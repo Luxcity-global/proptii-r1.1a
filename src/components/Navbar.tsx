@@ -1,24 +1,32 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { Home, Camera, Search } from 'lucide-react';
 
 const Navbar = () => {
   return (
-    <nav className="fixed w-full z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
-          <Link to="/" className="flex-shrink-0">
-            <div className="text-white font-bold text-2xl flex items-center">
-              <Home className="w-6 h-6 mr-2" />
-              proptii
-            </div>
-          </Link>
+    <nav className="absolute top-0 left-0 right-0 z-20">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="flex items-center justify-between h-20">
+          <div className="flex-shrink-0">
+            <img
+              src="/images/proptii-logo.png"
+              alt="Proptii"
+              className="h-12 w-auto"
+            />
+          </div>
           
-          <div className="hidden md:flex items-center space-x-8">
-            <Link to="/book-viewing" className="text-white hover:text-gray-200">Book Viewing</Link>
-            <Link to="/referencing" className="text-white hover:text-gray-200">Referencing</Link>
-            <Link to="/contracts" className="text-white hover:text-gray-200">Contracts</Link>
-            <button className="bg-primary text-white px-6 py-2 rounded-full hover:bg-opacity-90 transition">
+          <div className="flex-1 flex justify-center space-x-8">
+            <a href="#" className="text-white hover:text-gray-200 transition-colors">
+              Book Viewing
+            </a>
+            <a href="#" className="text-white hover:text-gray-200 transition-colors">
+              Referencing
+            </a>
+            <a href="#" className="text-white hover:text-gray-200 transition-colors">
+              Contracts
+            </a>
+          </div>
+
+          <div className="flex-shrink-0">
+            <button className="bg-primary text-white px-6 py-2 rounded-full hover:bg-opacity-90 transition-all">
               Login
             </button>
           </div>
