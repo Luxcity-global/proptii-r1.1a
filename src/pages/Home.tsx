@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Camera, Mic, Search } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -25,6 +25,10 @@ const Home = () => {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<'openrent' | 'zoopla' | null>(null);
+
+  useEffect(() => {
+    console.log('Home component mounted');
+  }, []);
 
   const handleSearch = useCallback(async (): Promise<void> => {
     if (!searchQuery.trim() || isLoading) return;
@@ -80,13 +84,12 @@ const Home = () => {
 
       console.log('Sending request with query:', searchQuery);
       
-      const response = await client.path("/openai/deployments/gpt-4o/chat/completions")
-        .post({
-          body: requestBody,
-          queryParameters: {
-            'api-version': '2024-02-15-preview'
-          }
-        });
+      const response = await client.path("/openai/deployments/gpt-4o/chat/completions").post({
+        body: requestBody,
+        queryParameters: {
+          'api-version': '2024-02-15-preview'
+        }
+      });
 
       console.log('Received response:', response);
 
@@ -94,7 +97,9 @@ const Home = () => {
         throw new Error('No response received from the API');
       }
 
-      setSearchResults(response.body);
+      // Type assertion to ensure the response matches our SearchResult type
+      const typedResponse = response.body as unknown as SearchResult;
+      setSearchResults(typedResponse);
     } catch (error: any) {
       console.error('Search error:', error);
       setError(error.message || 'An error occurred while searching. Please try again.');
@@ -115,6 +120,9 @@ const Home = () => {
 
   return (
     <div className="min-h-screen font-nunito">
+      <div key="debug-log" style={{ display: 'none' }}>
+        {console.log('Home component rendering')}
+      </div>
       <Navbar />
       
       {/* Hero Section */}
