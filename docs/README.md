@@ -1,67 +1,84 @@
 # Proptii Documentation
 
-This directory contains documentation for the Proptii application, including component maps, API interfaces, development setup, and refactoring plans.
+Welcome to the Proptii documentation. This directory contains comprehensive documentation for the Proptii application, including development guides, API documentation, component documentation, and more.
 
 ## Directory Structure
 
-- **component-map/**: Contains documentation about the application's component structure
-  - `ComponentMap.md`: Detailed map of all components and their relationships
+```
+docs/
+├── api-simulation/       # Documentation for API simulation functions
+├── components/           # Documentation for UI components
+├── development/          # Development guides and standards
+├── auth/                 # Authentication documentation
+└── README.md             # This file
+```
 
-- **api-interfaces/**: Contains TypeScript interfaces for API calls
-  - `ApiInterfaces.ts`: TypeScript interfaces for all API calls
+## Documentation Sections
 
-- **development/**: Contains documentation about the development environment
-  - `DevelopmentSetup.md`: Setup instructions for the development environment
+### API Simulation
 
-- **refactoring/**: Contains plans for refactoring components
-  - `ReferencingModalRefactoring.md`: Plan for refactoring the ReferencingModal component
+The [API Simulation](./api-simulation/README.md) section contains documentation for the API simulation functions used in the Proptii application. This includes:
 
-## Getting Started
+- Detailed documentation of all API simulation functions
+- Expected API endpoints for future implementation
+- Implementation priorities and strategies
 
-1. Review the `ComponentMap.md` to understand the application structure
-2. Set up your development environment according to `DevelopmentSetup.md`
-3. Familiarize yourself with the API interfaces in `ApiInterfaces.ts`
-4. Follow the refactoring plans in the `refactoring/` directory
+### Components
 
-## Important Notes
+The [Components](./components/README.md) section contains documentation for the UI components used in the Proptii application. This includes:
 
-### Protected Authentication Elements
+- Component hierarchy and relationships
+- Component props and state
+- Usage examples and best practices
 
-> **IMPORTANT**: The following authentication elements must be preserved:
+### Development
 
-1. `AuthContext.tsx` - Core authentication logic
-2. `login()`, `logout()`, and `editProfile()` methods
-3. Azure B2C integration in `authConfig.ts`
-4. Authentication state management in `Referencing.tsx`
-5. The event dispatch mechanism after successful login
+The [Development](./development/README.md) section contains guides and standards for developing the Proptii application. This includes:
 
-### Stability Checks
+- Setup guide for the development environment
+- Project structure overview
+- Coding standards and best practices
+- Testing strategy and guidelines
 
-Before making any changes to the codebase, run the following checks:
+### Authentication
 
-1. **Build Check**:
-   ```bash
-   npm run build
-   ```
+The [Authentication](./auth/README.md) section contains documentation for the authentication system used in the Proptii application. This includes:
 
-2. **Lint Check**:
-   ```bash
-   npm run lint
-   ```
+- Authentication flow and architecture
+- Azure B2C integration details
+- Security considerations and best practices
 
-3. **Type Check**:
-   ```bash
-   npm run typecheck
-   ```
+## Contributing to Documentation
 
-4. **Test Check**:
-   ```bash
-   npm run test
-   ```
+When adding new features or making significant changes to the codebase, please update the relevant documentation to reflect those changes. This includes:
 
-## Next Steps
+1. Adding new files for new features or components
+2. Updating existing files to reflect changes to the codebase
+3. Ensuring that the documentation is clear, concise, and up-to-date
 
-1. Create the folder structure for the new components
-2. Implement the reusable UI components
-3. Create skeleton implementations of the form section components
-4. Implement the sidebar component 
+## Documentation Standards
+
+To maintain consistency across the documentation, please follow these standards:
+
+1. Use Markdown for all documentation files
+2. Use descriptive file names that reflect the content
+3. Include a clear title and introduction for each document
+4. Use headings to organize content hierarchically
+5. Include code examples where appropriate
+6. Link to related documentation where relevant
+
+## Getting Help
+
+If you encounter any issues or have questions about the documentation, please:
+
+1. Check the existing documentation for answers
+2. Reach out to the project team on the designated communication channel
+
+## Future Documentation Plans
+
+The documentation will continue to evolve as the Proptii application grows. Future plans include:
+
+1. Adding more detailed component documentation
+2. Creating user guides for end users
+3. Adding deployment and operations documentation
+4. Expanding API documentation as real APIs are implemented 
