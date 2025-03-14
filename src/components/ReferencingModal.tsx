@@ -72,6 +72,15 @@ interface FormData {
 const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // Reset to first step when modal is opened
+  useEffect(() => {
+    if (isOpen) {
+      console.log('Modal opened, resetting to step 1');
+      setCurrentStep(1);
+    }
+  }, [isOpen]);
+  
   const [formData, setFormData] = useState<FormData>({
     identity: {
       firstName: user?.givenName || '',

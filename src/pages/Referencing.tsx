@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -8,11 +8,25 @@ import ReferencingModal from '../components/ReferencingModal';
 const Referencing = () => {
   const { isAuthenticated, login } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [wasAuthenticated, setWasAuthenticated] = useState(isAuthenticated);
+  const [loginAttempted, setLoginAttempted] = useState(false);
+
+  // Track authentication state changes
+  useEffect(() => {
+    // If user just logged in and had attempted to login
+    if (isAuthenticated && !wasAuthenticated && loginAttempted) {
+      setIsModalOpen(true);
+      setLoginAttempted(false);
+    }
+    
+    setWasAuthenticated(isAuthenticated);
+  }, [isAuthenticated, wasAuthenticated, loginAttempted]);
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
       setIsModalOpen(true);
     } else {
+      setLoginAttempted(true);
       login();
     }
   };

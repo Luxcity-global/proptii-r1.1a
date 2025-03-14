@@ -63,11 +63,19 @@ export const AuthProvider: React.FC<{ pca: IPublicClientApplication; children: R
   const login = async () => {
     try {
       setError(null);
+      console.log('Login attempt started');
       const result = await instance.loginPopup(loginRequest);
       if (result) {
+        console.log('Login successful, updating state');
         setIsAuthenticated(true);
         setUser(extractUserProfile(result.account));
         instance.setActiveAccount(result.account);
+        
+        // Force a re-render after successful login
+        setTimeout(() => {
+          console.log('Dispatching auth state change event');
+          window.dispatchEvent(new CustomEvent('auth-state-changed'));
+        }, 100);
       }
     } catch (error: any) {
       console.error('Login failed:', error);
