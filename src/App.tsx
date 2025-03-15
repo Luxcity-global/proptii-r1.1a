@@ -1,50 +1,36 @@
-import React, { useEffect } from 'react';
-import { PublicClientApplication } from "@azure/msal-browser";
-import { MsalAuthProvider } from './contexts/AuthContext';
-import { msalConfig } from './config/authConfig';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import { MSALProviderWrapper } from './contexts/AuthContext';
 import Home from './pages/Home';
 import Referencing from './pages/Referencing';
-import ErrorBoundary from './components/ErrorBoundary';
-
-console.log('App.tsx - Starting initialization with config:', msalConfig);
-
-// Initialize MSAL instance
-const pca = new PublicClientApplication(msalConfig);
-
-// Handle the redirect promise when returning from a redirect sign-in
-pca.initialize().then(() => {
-  console.log('MSAL Initialized successfully');
-  // Account selection logic is app dependent. Adjust as needed for your use case
-  const accounts = pca.getAllAccounts();
-  console.log('Found accounts:', accounts);
-  if (accounts.length > 0) {
-    pca.setActiveAccount(accounts[0]);
-  }
-}).catch((error) => {
-  console.error("MSAL Initialization Error: ", error);
-});
+import RedirectUriWarning from './components/RedirectUriWarning';
+import ReferencingTest from './components/referencing/ReferencingTest';
+import TestReferencingPage from './pages/test-referencing';
+import BackendIntegrationTest from './pages/BackendIntegrationTest';
+import ReferencingModalTest from './pages/ReferencingTest';
+import macTheme from './theme/macTheme';
+import './App.css';
 
 function App() {
-  useEffect(() => {
-    console.log('App component mounted');
-  }, []);
-
   return (
-    <ErrorBoundary>
-      <React.StrictMode>
-        <BrowserRouter>
-          <MsalAuthProvider instance={pca}>
-            <div className="app-container">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/referencing" element={<Referencing />} />
-              </Routes>
-            </div>
-          </MsalAuthProvider>
-        </BrowserRouter>
-      </React.StrictMode>
-    </ErrorBoundary>
+    <ThemeProvider theme={macTheme}>
+      <CssBaseline />
+      <MSALProviderWrapper>
+        <RedirectUriWarning />
+        <Router>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/referencing" element={<Referencing />} />
+            <Route path="/referencing-test" element={<ReferencingTest />} />
+            <Route path="/test-referencing" element={<TestReferencingPage />} />
+            <Route path="/backend-test" element={<BackendIntegrationTest />} />
+            <Route path="/referencing-modal-test" element={<ReferencingModalTest />} />
+          </Routes>
+        </Router>
+      </MSALProviderWrapper>
+    </ThemeProvider>
   );
 }
 

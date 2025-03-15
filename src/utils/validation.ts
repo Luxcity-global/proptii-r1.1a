@@ -141,8 +141,12 @@ export function validateResidentialData(data: ResidentialData): Record<string, s
 export function validateFinancialData(data: FinancialData): Record<string, string> {
   const errors: Record<string, string> = {};
   
+  if (!data.useOpenBanking && !data.monthlyIncome) {
+    errors.monthlyIncome = 'Monthly income is required';
+  }
+  
   if (!data.useOpenBanking && !data.proofOfIncomeType) {
-    errors.proofOfIncomeType = 'Proof of income type is required';
+    errors.proofOfIncomeType = 'Proof of income is required';
   }
   
   if (!data.useOpenBanking && data.proofOfIncomeType && !data.proofOfIncomeDocument) {
@@ -158,22 +162,14 @@ export function validateFinancialData(data: FinancialData): Record<string, strin
 export function validateGuarantorData(data: GuarantorData): Record<string, string> {
   const errors: Record<string, string> = {};
   
-  if (!data.firstName.trim()) {
-    errors.firstName = 'Guarantor first name is required';
-  }
-  
-  if (!data.lastName.trim()) {
-    errors.lastName = 'Guarantor last name is required';
+  if (!data.fullName.trim()) {
+    errors.fullName = 'Guarantor\'s full name is required';
   }
   
   if (!data.email.trim()) {
     errors.email = 'Guarantor email is required';
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
     errors.email = 'Please enter a valid email address';
-  }
-  
-  if (!data.phoneNumber.trim()) {
-    errors.phoneNumber = 'Guarantor phone number is required';
   }
   
   if (!data.address.trim()) {

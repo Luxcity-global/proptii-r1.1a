@@ -6,28 +6,78 @@ import FAQSection from '../components/FAQSection';
 import ReferencingModal from '../components/ReferencingModal';
 
 const Referencing = () => {
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated, login, isLoading } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [wasAuthenticated, setWasAuthenticated] = useState(isAuthenticated);
-  const [loginAttempted, setLoginAttempted] = useState(false);
+  const [loginInProgress, setLoginInProgress] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Track authentication state changes
+  // Listen for auth state changes
   useEffect(() => {
-    // If user just logged in and had attempted to login
-    if (isAuthenticated && !wasAuthenticated && loginAttempted) {
-      setIsModalOpen(true);
-      setLoginAttempted(false);
+    const handleAuthStateChange = () => {
+      // If authentication succeeded, open the modal
+      if (isAuthenticated && loginInProgress) {
+        setLoginInProgress(false);
+        setLoginError(null);
+        setIsModalOpen(true);
+      } 
+      // If authentication failed but was in progress, show error
+      else if (!isAuthenticated && loginInProgress && !isLoading) {
+        setLoginInProgress(false);
+        setLoginError("Authentication failed. Please try again.");
+        // Auto-clear error after 5 seconds
+        setTimeout(() => setLoginError(null), 5000);
+      }
+    };
+
+    window.addEventListener('auth-state-changed', handleAuthStateChange);
+    
+    // Check if user is already authenticated after loading
+    if (!isLoading) {
+      if (isAuthenticated && loginInProgress) {
+        setLoginInProgress(false);
+        setIsModalOpen(true);
+      } else if (!isAuthenticated && loginInProgress) {
+        setLoginInProgress(false);
+        setLoginError("Authentication failed. Please try again.");
+        // Auto-clear error after 5 seconds
+        setTimeout(() => setLoginError(null), 5000);
+      }
     }
     
-    setWasAuthenticated(isAuthenticated);
-  }, [isAuthenticated, wasAuthenticated, loginAttempted]);
+    return () => {
+      window.removeEventListener('auth-state-changed', handleAuthStateChange);
+    };
+  }, [isAuthenticated, loginInProgress, isLoading]);
 
-  const handleGetStarted = () => {
+  const handleGetStarted = async () => {
     if (isAuthenticated) {
       setIsModalOpen(true);
     } else {
-      setLoginAttempted(true);
-      login();
+      try {
+        setLoginError(null);
+        setLoginInProgress(true);
+        
+        // Inform the user that they might be redirected
+        console.log("Starting login process. You may be redirected to the login page.");
+        
+        await login();
+        
+        // If we get here, the popup login was successful
+        console.log("Login successful via popup");
+      } catch (error) {
+        console.error("Login error in Referencing page:", error);
+        setLoginInProgress(false);
+        
+        // Check if the error is related to popup blocking
+        if (error instanceof Error && error.message.includes('popup')) {
+          setLoginError("Popup was blocked. Please allow popups for this site or you will be redirected.");
+        } else {
+          setLoginError("Authentication failed. Please try again.");
+        }
+        
+        // Auto-clear error after 5 seconds
+        setTimeout(() => setLoginError(null), 5000);
+      }
     }
   };
 
@@ -63,11 +113,33 @@ const Referencing = () => {
             identity, financial status, and rental history
           </p>
 
+          {/* Display login error if any */}
+          {loginError && (
+            <div className="bg-red-500 bg-opacity-80 text-white p-4 rounded-lg mb-6 max-w-md mx-auto">
+              <p>{loginError}</p>
+              {loginError.includes('Popup was blocked') && (
+                <p className="mt-2 text-sm">
+                  Please check your browser settings to allow popups for this site. 
+                  You may need to click the popup blocker icon in your browser's address bar.
+                </p>
+              )}
+            </div>
+          )}
+
           <button
             onClick={handleGetStarted}
             className="bg-primary text-white px-10 py-4 rounded-full hover:bg-opacity-90 transition-all text-xl font-medium"
+            disabled={isLoading || loginInProgress}
           >
-            {isAuthenticated ? 'Start Referencing' : 'Get Started'}
+            {isLoading || loginInProgress ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Loading...
+              </span>
+            ) : isAuthenticated ? 'Start Referencing' : 'Get Started'}
           </button>
         </div>
       </section>
@@ -121,8 +193,9 @@ const Referencing = () => {
             <button
               onClick={handleGetStarted}
               className="bg-primary text-white px-10 py-4 rounded-full hover:bg-opacity-90 transition-all text-xl font-medium"
+              disabled={isLoading || loginInProgress}
             >
-              {isAuthenticated ? 'Start Referencing' : 'Get Started'}
+              {isLoading ? 'Loading...' : isAuthenticated ? 'Start Referencing' : 'Get Started'}
             </button>
           </div>
         </div>
