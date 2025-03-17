@@ -4,6 +4,12 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import ReferencingModal from '../components/ReferencingModal';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import 'swiper/css';
+import 'swiper/css/navigation';
+import 'swiper/css/pagination';
+import { Pagination, Navigation } from "swiper/modules";
+
 
 const Referencing = () => {
   const { isAuthenticated, login } = useAuth();
@@ -59,60 +65,79 @@ const Referencing = () => {
       </section>
 
       {/* Steps Section */}
-      <section className="py-20 bg-white relative overflow-hidden">
-        {/* Background shapes */}
-        <div className="absolute top-0 left-0 w-80 h-80 bg-[#FFF5E1] rounded-full -translate-x-1/2 -translate-y-1/2 z-0"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#F6F8FD] rounded-full translate-x-1/3 translate-y-1/3 z-0"></div>
-        
-        <div className="relative z-10 max-w-7xl mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 font-archive text-[#333333]">Steps for referencing</h2>
-            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Once successfully verified, users are issued a digital "Rent Passport", a 
-              secure badge of trustworthiness. This streamlined process fosters trust 
-              and confidence in every property transaction.
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Step 1 */}
-            <div className="bg-white rounded-3xl shadow-lg p-8">
-              <div className="w-16 h-16 bg-primary text-white rounded-full flex items-center justify-center text-2xl font-bold mb-6">1</div>
-              <h3 className="text-2xl font-bold mb-4">Create Account</h3>
-              <p className="text-gray-600">
-                Sign up using your email or social accounts. Verify your email to activate your account.
-              </p>
-            </div>
-            
-            {/* Step 2 */}
-            <div className="bg-white rounded-3xl shadow-lg p-8">
-              <div className="w-16 h-16 bg-primary text-white rounded-full flex items-center justify-center text-2xl font-bold mb-6">2</div>
-              <h3 className="text-2xl font-bold mb-4">Submit Information</h3>
-              <p className="text-gray-600">
-                Provide your personal details, employment information, and financial status through our secure platform.
-              </p>
-            </div>
-            
-            {/* Step 3 */}
-            <div className="bg-white rounded-3xl shadow-lg p-8">
-              <div className="w-16 h-16 bg-primary text-white rounded-full flex items-center justify-center text-2xl font-bold mb-6">3</div>
-              <h3 className="text-2xl font-bold mb-4">Get Verified</h3>
-              <p className="text-gray-600">
-                Our AI system verifies your information quickly and thoroughly. Receive your digital Rent Passport upon approval.
-              </p>
-            </div>
-          </div>
-          
-          <div className="text-center mt-16">
-            <button
-              onClick={handleGetStarted}
-              className="bg-primary text-white px-10 py-4 rounded-full hover:bg-opacity-90 transition-all text-xl font-medium"
-            >
-              {isAuthenticated ? 'Start Referencing' : 'Get Started'}
-            </button>
-          </div>
+      <section className="relative bg-cover bg-center bg-no-repeat py-16 px-6 min-h-[500px]" style={{ backgroundImage: "url('/public/images/Referencing.png')" }}>
+      {/* Container with spacing */}
+      <div className="relative container mx-auto flex flex-col md:flex-row items-center justify-center justify-between gap-10 md:gap-16 lg:px-20 ">
+        {/* Left Section - Text Content */}
+        <div className="md:w-1/2 space-y-6">
+          <h2 className="text-3xl font-bold text-blue-700 leading-tight">
+            Steps for referencing
+          </h2>
+          <p className="text-gray-600 text-lg leading-relaxed">
+            Once successfully verified, users are issued a digital “Rent Passport,” 
+            a secure badge of trustworthiness. This streamlined process fosters trust 
+            and confidence in every property transaction.
+          </p>
+          <button className="bg-orange-600 text-white font-medium px-6 py-3 rounded-lg hover:bg-orange-700 transition-all duration-300 shadow-md hover:shadow-lg">
+          Get started
+          </button>
+
         </div>
-      </section>
+
+        {/* Right Section - Swiper Carousel */}
+        <div className="md:w-1/2">
+          <Swiper
+            modules={[Pagination, Navigation]}
+            pagination={{ clickable: true }}
+            navigation
+            spaceBetween={30} /* Increase spacing for better layout */
+            slidesPerView={1}
+            className="w-full max-w-lg"
+          >
+            {/* Slide 1 */}
+            <SwiperSlide>
+            <div className="bg-blue-700 text-white p-6 rounded-3xl text-center shadow-lg">
+                <div className="bg-white p-4 rounded-lg inline-block mb-4">
+                  <img src="/icon.png" alt="icon" className="h-10 w-10"/>
+                </div>
+                <h3 className="text-lg font-semibold">01. Review the Document Checklist</h3>
+                <p className="mt-2 text-gray-100">
+                  Ensure you have all the required documents organized and ready for submission.
+                </p>
+              </div>
+            </SwiperSlide>
+
+            {/* Slide 2 */}
+            <SwiperSlide>
+            <div className="bg-blue-700 text-white p-6 rounded-3xl text-center shadow-lg">
+                <div className="bg-white p-4 rounded-lg inline-block mb-4">
+                  <img src="/icon.png" alt="icon" className="h-10 w-10"/>
+                </div>
+                <h3 className="text-lg font-semibold">02. Submit Your Application</h3>
+                <p className="mt-2 text-gray-100">
+                  Upload and submit your documents securely through our platform.
+                </p>
+              </div>
+            </SwiperSlide>
+
+            {/* Slide 3 */}
+            <SwiperSlide>
+            <div className="bg-blue-700 text-white p-6 rounded-3xl text-center shadow-lg">
+                <div className="bg-white p-4 rounded-lg inline-block mb-4">
+                  <img src="/icon.png" alt="icon" className="h-10 w-10"/>
+                </div>
+                <h3 className="text-lg font-semibold">03. Verification Process</h3>
+                <p className="mt-2 text-gray-100">
+                  Our team will review and verify your documents promptly.
+                </p>
+              </div>
+            </SwiperSlide>
+          </Swiper>
+        </div>
+      </div>
+    </section>
+
+
 
       <FAQSection />
       <Footer />

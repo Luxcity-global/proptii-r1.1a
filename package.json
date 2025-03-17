@@ -22,7 +22,8 @@
     "react-dom": "^18.3.1",
     "react-icons": "^5.5.0",
     "react-router-dom": "^6.30.0",
-    "save-dev": "^0.0.1-security"
+    "save-dev": "^0.0.1-security",
+    "swiper": "^11.2.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
