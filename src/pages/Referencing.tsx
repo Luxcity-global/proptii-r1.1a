@@ -37,10 +37,10 @@ const Referencing = () => {
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center w-full">
           {/* Main Heading */}
-          <h1 className="text-6xl md:text-7xl font-bold mb-6 font-archive leading-tight text-white">
+          <h3 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight text-white">
             Verify Your Identity,<br />
             Funds, and Rental History
-          </h1>
+          </h3>
           
           {/* Subheading */}
           <p className="text-xl md:text-2xl mb-12 max-w-3xl mx-auto font-light text-white">
