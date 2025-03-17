@@ -1,60 +1,72 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FileText, Home, FileCheck, HelpCircle } from 'lucide-react';
+import { FileText, Home, FileCheck, Search, HelpCircle } from 'lucide-react';
 
 const FAQSection = () => {
   const faqCategories = [
     {
+      title: 'General Questions',
+      /*description: 'Find answers to common questions about our services.',*/
+      icon: HelpCircle
+    },
+    {
+      title: 'Searching',
+      /*description: 'Understand how payments and invoices work.',*/
+      icon: Search
+    },
+    {
       title: 'Referencing',
-      description: 'Verify your documents using our reliable third party partners',
+      /*description: 'Easily verify your documents with trusted partners.',*/
       icon: FileText
     },
     {
-      title: 'Viewings',
-      description: 'Learn about our streamlined property viewing process',
+      title: 'Book Viewings',
+      /*description: 'Learn about our seamless property viewing process.',*/
       icon: Home
     },
     {
       title: 'Contracts',
-      description: 'Understanding our contract management system',
+      /*description: 'Get clarity on our contract management system.',*/
       icon: FileCheck
-    },
-    {
-      title: 'General',
-      description: 'Common questions about our services',
-      icon: HelpCircle
     }
   ];
 
   return (
     <section className="py-20 bg-secondary">
-      <div className="max-w-7xl mx-auto px-4 text-center text-white">
-        <h2 className="text-3xl font-bold mb-8">Frequently Asked Questions</h2>
-        <p className="text-gray-300 mb-12 max-w-2xl mx-auto">
+      <div className="max-w-7xl mx-auto px-4 text-center">
+        <h2 className="text-3xl font-bold mb-8 text-white">Frequently Asked Questions</h2>
+        <p className="text-gray-500 mb-12 max-w-2xl mx-auto">
           Get quick answers to all your questions and concerns about our service.
           Whether as a tenant or homeowner, we will have an answer waiting for you.
         </p>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        {/* Updated Grid Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 place-items-center">
           {faqCategories.map((category, index) => (
-            <div key={index} className="bg-white rounded-lg p-6 text-center">
-              <div className="text-primary mb-4 flex justify-center">
-                <category.icon className="w-8 h-8" />
+            <div key={index} className="bg-white rounded-lg p-6 text-center shadow-lg max-w-[280px] w-full transform hover:scale-105 transition-all duration-300">
+              {/* Small Circle Behind Icon */}
+              <div className="flex justify-center mb-4">
+                <div className="w-16 h-16 bg-[#FFF6F0] flex items-center justify-center rounded-full">
+                  <category.icon className="w-8 h-8 text-primary" />
+                </div>
               </div>
-              <h3 className="text-gray-900 font-semibold">{category.title}</h3>
-              <p className="text-sm text-gray-600 mt-2">
-                {category.description}
-              </p>
+              
+              {/* Text Updates */}
+              <h3 className="text-[#374957] font-semibold text-lg">{category.title}</h3>
+              <p className="text-sm text-[#374957] mt-2">{category.description}</p>
             </div>
           ))}
-        </div>
 
-        <Link
-          to="/help"
-          className="inline-block mt-12 px-8 py-3 bg-primary text-white rounded-full hover:bg-opacity-90 transition"
-        >
-          Visit Help Page
-        </Link>
+          {/* Positioning the Button in the Grid */}
+          <div className="flex justify-center items-center w-full max-w-[280px]">
+            <Link
+              to="/help"
+              className="inline-block px-8 py-3 bg-primary text-white rounded-full hover:bg-opacity-90 transition text-lg font-medium"
+            >
+              Visit Help Page
+            </Link>
+          </div>
+        </div>
       </div>
     </section>
   );

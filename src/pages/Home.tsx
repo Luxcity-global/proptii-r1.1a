@@ -152,9 +152,9 @@ const Home = () => {
           </div>
 
           {/* Main Heading */}
-          <h1 className="text-6xl md:text-7xl font-bold mb-6 font-archive leading-tight">
+          <h3 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight">
             Find Your Dream Home
-          </h1>
+          </h3>
           
           {/* Subheading */}
           <p className="text-xl md:text-2xl mb-12 max-w-2xl mx-auto font-light">
@@ -266,68 +266,77 @@ const Home = () => {
         </section>
       )}
 
-      {/* Services Section */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Book Viewing Card */}
-            <div className="bg-white rounded-3xl shadow-lg p-8 flex flex-col">
-              <div className="mb-8">
-                <img
-                  src="/images/viewing-room.jpg"
-                  alt="Modern living room"
-                  className="w-full h-64 object-cover rounded-2xl"
-                  style={{ objectPosition: 'center 30%' }}
-                />
-              </div>
-              <h3 className="text-[#E65D24] text-3xl font-bold mb-4">Book Viewing</h3>
-              <p className="text-gray-600 mb-8 flex-grow">
-                Save time and effort with our AI-powered booking service. Simply enter your desired property details and let our system handle the rest.
-              </p>
-              <button className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
-                Learn More
-              </button>
-            </div>
+{/**The new services section */}
+<section className="relative py-20 bg-[#f9f5f0]">
+  {/* Background Image (Blobs) */}
+  <img 
+    src="/images/middle-section.png" 
+    alt="Decorative background"
+    className="absolute top-0 left-0 w-full h-full object-cover opacity-50"
+  />
 
-            {/* Referencing Card */}
-            <div className="bg-white rounded-3xl shadow-lg p-8 flex flex-col">
-              <div className="mb-8">
-                <img
-                  src="/images/referencing-person.jpg"
-                  alt="Professional woman with tablet"
-                  className="w-full h-64 object-cover rounded-2xl"
-                  style={{ objectPosition: 'center 20%' }}
-                />
-              </div>
-              <h3 className="text-[#E65D24] text-3xl font-bold mb-4">Referencing</h3>
-              <p className="text-gray-600 mb-8 flex-grow">
-                Ensure peace of mind for both landlords and tenants. Our rigorous referencing process verifies renter or buyer identity, financial stability, and rental history.
-              </p>
-              <button className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
-                Learn More
-              </button>
-            </div>
-
-            {/* Contract Card */}
-            <div className="bg-white rounded-3xl shadow-lg p-8 flex flex-col">
-              <div className="mb-8">
-                <img
-                  src="/images/modern-building.jpg"
-                  alt="Modern glass building"
-                  className="w-full h-64 object-cover rounded-2xl"
-                />
-              </div>
-              <h3 className="text-[#E65D24] text-3xl font-bold mb-4">Contract</h3>
-              <p className="text-gray-600 mb-8 flex-grow">
-                Save time and reduce errors with our contract management solution. We offer a range of customizable lease agreement templates to suit your specific needs.
-              </p>
-              <button className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
-                Learn More
-              </button>
-            </div>
-          </div>
+  <div className="max-w-7xl mx-auto px-4 relative z-10">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      {/* Book Viewing Card */}
+      <div className="bg-white rounded-3xl shadow-lg p-8 flex flex-col">
+        <div className="mb-8">
+          <img
+            src="/images/viewing-room.jpg"
+            alt="Modern living room"
+            className="w-full h-64 object-cover rounded-2xl"
+            style={{ objectPosition: 'center 30%' }}
+          />
         </div>
-      </section>
+        <h3 className="text-[#E65D24] text-3xl font-bold mb-4">Book Viewing</h3>
+        <p className="text-gray-600 mb-8 flex-grow">
+          Save time and effort with our AI-powered booking service. Simply enter your desired property details and let our system handle the rest.
+        </p>
+        <button className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
+          Learn More
+        </button>
+      </div>
+
+      {/* Referencing Card */}
+      <div className="bg-white rounded-3xl shadow-lg p-8 flex flex-col">
+        <div className="mb-8">
+          <img
+            src="/images/referencing-person.jpg"
+            alt="Professional woman with tablet"
+            className="w-full h-64 object-cover rounded-2xl"
+            style={{ objectPosition: 'center 20%' }}
+          />
+        </div>
+        <h3 className="text-[#E65D24] text-3xl font-bold mb-4">Referencing</h3>
+        <p className="text-gray-600 mb-8 flex-grow">
+          Ensure peace of mind for both landlords and tenants. Our rigorous referencing process verifies renter or buyer identity, financial stability, and rental history.
+        </p>
+        <button className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
+          Learn More
+        </button>
+      </div>
+
+      {/* Contract Card */}
+      <div className="bg-white rounded-3xl shadow-lg p-8 flex flex-col">
+        <div className="mb-8">
+          <img
+            src="/images/modern-building.jpg"
+            alt="Modern glass building"
+            className="w-full h-64 object-cover rounded-2xl"
+          />
+        </div>
+        <h3 className="text-[#E65D24] text-3xl font-bold mb-4">Contract</h3>
+        <p className="text-gray-600 mb-8 flex-grow">
+          Save time and reduce errors with our contract management solution. We offer a range of customizable lease agreement templates to suit your specific needs.
+        </p>
+        <button className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
+          Learn More
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+      {/**End of the new services section */}
 
       <FAQSection />
       <Footer />

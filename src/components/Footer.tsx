@@ -1,101 +1,70 @@
-import React from 'react';
+/*import React from 'react';
 import { Link } from 'react-router-dom';
-import { Home } from 'lucide-react';
+import { Home } from 'lucide-react';*/
+import { FaFacebookF, FaLinkedinIn, FaTwitter, FaYoutube, FaDribbble } from "react-icons/fa";
 
-const Footer = () => {
+function Footer() {
   return (
-    <footer className="bg-gray-900 text-white py-16">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Company Info */}
-          <div className="col-span-1">
-            <h3 className="text-xl font-bold mb-4">Company</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/about" className="hover:text-gray-300 transition-colors">
-                  About us
-                </Link>
-              </li>
-              <li>
-                <Link to="/faq" className="hover:text-gray-300 transition-colors">
-                  FAQ
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Services */}
-          <div className="col-span-1">
-            <h3 className="text-xl font-bold mb-4">Services</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/" className="hover:text-gray-300 transition-colors">
-                  Home
-                </Link>
-              </li>
-              <li>
-                <Link to="/referencing" className="hover:text-gray-300 transition-colors">
-                  Referencing
-                </Link>
-              </li>
-              <li>
-                <Link to="/viewings" className="hover:text-gray-300 transition-colors">
-                  Book Viewings
-                </Link>
-              </li>
-              <li>
-                <Link to="/contracts" className="hover:text-gray-300 transition-colors">
-                  Contracts
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Contact */}
-          <div className="col-span-1">
-            <h3 className="text-xl font-bold mb-4">Contact</h3>
-            <ul className="space-y-2">
-              <li>
-                <a href="mailto:info@proptii.com" className="hover:text-gray-300 transition-colors">
-                  Email
-                </a>
-              </li>
-              <li>
-                <a href="tel:+44123456789" className="hover:text-gray-300 transition-colors">
-                  Phone
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          {/* Newsletter */}
-          <div className="col-span-1">
-            <h3 className="text-xl font-bold mb-4">Stay Updated</h3>
-            <p className="text-gray-400 mb-4">
-              Subscribe to our newsletter for the latest updates and property news.
-            </p>
-            <form className="flex gap-2">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="flex-1 px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-primary"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-opacity-90 transition-all"
-              >
-                Subscribe
-              </button>
-            </form>
-          </div>
+    <footer className="bg-[#0F2537] text-white py-8 px-6">
+      <div className="max-w-6xl mx-auto flex flex-wrap justify-between gap-8">
+        {/* Branding Section */}
+        <div className="max-w-sm">
+          <img src="/public/images/proptii-logo.png" alt="Proptii Logo" className="h-12 mb-4" />
+          <p className="text-sm opacity-75">
+            Revolutionizing real estate with AI to streamline the journey from
+            discovery to completion for renters and buyers.
+          </p>
         </div>
 
-        <div className="mt-12 pt-8 border-t border-gray-800 text-center text-gray-400">
-          <p>Copyright 2024, All Rights Reserved by Proptii</p>
+        {/* Navigation Links */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-16">
+        <div>
+          <h4 className="text-lg font-semibold mb-3">Home</h4>
+          <ul className="space-y-2 text-sm opacity-75">
+            <li><a href="#">Book Viewings</a></li>
+            <li><a href="#">Referencing</a></li>
+            <li><a href="#">Contracts</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="text-lg font-semibold mb-3">Contact</h4>
+          <ul className="space-y-2 text-sm opacity-75">
+            <li><a href="#">Email</a></li>
+            <li><a href="#">Phone</a></li>
+            <li><a href="#">Contact Us</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="text-lg font-semibold mb-3">Company</h4>
+          <ul className="space-y-2 text-sm opacity-75">
+            <li><a href="#">About Us</a></li>
+            <li><a href="#">FAQ</a></li>
+            <li><a href="#">Privacy Policy</a></li>
+            <li><a href="#">Terms of Service</a></li>
+          </ul>
+        </div>
+      </div>
+      </div>
+      
+      {/* Horizontal Line */}
+      <hr className="border-gray-700 my-6" />
+      
+      {/* Footer Bottom Section */}
+      <div className="flex justify-between items-center max-w-6xl mx-auto text-sm opacity-75">
+        <p>Copyright 2025, All Rights Reserved by Proptii &copy;</p>
+        <div className="flex space-x-4">
+          <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75"><FaFacebookF /></a>
+          <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75"><FaLinkedinIn /></a>
+          <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75"><FaTwitter /></a>
+          <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75"><FaYoutube /></a>
+          <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75"><FaDribbble /></a>
         </div>
       </div>
     </footer>
   );
-};
+}
+
 
 export default Footer;
