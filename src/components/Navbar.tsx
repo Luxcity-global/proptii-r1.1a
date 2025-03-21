@@ -111,9 +111,9 @@ const Navbar = () => {
             <a href="#" className="text-white hover:text-gray-200 transition-colors">
               Book Viewing
             </a>
-            <a href="#" className="text-white hover:text-gray-200 transition-colors">
+            <Link to="/contracts" className="text-white hover:text-gray-200">
               Contracts
-            </a>
+            </Link>
           </div>
 
           <div className="flex-shrink-0 relative">

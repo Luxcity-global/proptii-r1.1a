@@ -5,6 +5,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { MSALProviderWrapper } from './contexts/AuthContext';
 import Home from './pages/Home';
 import Referencing from './pages/Referencing';
+import ContractsPage from './pages/Contracts';
 import RedirectUriWarning from './components/RedirectUriWarning';
 import ReferencingTest from './components/referencing/ReferencingTest';
 import TestReferencingPage from './pages/test-referencing';
@@ -23,6 +24,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/referencing" element={<Referencing />} />
+            <Route path="/contracts" element={<ContractsPage />} />
             <Route path="/referencing-test" element={<ReferencingTest />} />
             <Route path="/test-referencing" element={<TestReferencingPage />} />
             <Route path="/backend-test" element={<BackendIntegrationTest />} />
