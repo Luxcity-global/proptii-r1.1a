@@ -7,8 +7,10 @@ import {
   Paper,
   Grid,
   Button,
-  styled
+  styled,
+  Link as MuiLink
 } from '@mui/material';
+import { Link } from 'react-router-dom';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import PhoneIcon from '@mui/icons-material/Phone';
 import EmailIcon from '@mui/icons-material/Email';
@@ -76,6 +78,11 @@ const PropWiseButton = styled(Button)(({ theme }) => ({
   fontWeight: 500,
   textTransform: 'none'
 }));
+
+const Logo = styled('img')({
+  height: 40,
+  marginRight: 'auto'
+});
 
 /**
  * Dashboard header component with user information and welcome message

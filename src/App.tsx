@@ -16,6 +16,7 @@ import SavedProperties from './components/dashboard/sections/SavedProperties';
 import Viewings from './components/dashboard/sections/Viewings';
 import theme from './theme/theme';
 import './App.css';
+import BookViewing from './pages/BookViewing';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
             <Route path="/test-referencing" element={<TestReferencingPage />} />
             <Route path="/backend-test" element={<BackendIntegrationTest />} />
             <Route path="/referencing-modal-test" element={<ReferencingModalTest />} />
+            <Route path="/book-viewing" element={<BookViewing />} />
             
             {/* Dashboard Routes */}
             <Route path="/dashboard" element={<Dashboard />}>

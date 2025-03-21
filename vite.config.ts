@@ -7,8 +7,18 @@ export default defineConfig({
     'process.env': process.env
   },
   server: {
+    port: 5173,
+    strictPort: false,
     watch: {
       usePolling: true,
     },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path
+      }
+    }
   },
 });

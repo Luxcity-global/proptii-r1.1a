@@ -455,8 +455,8 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
         return true;
       } else {
         // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return true;
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return true;
       }
     } catch (error) {
       console.error('Error submitting application:', error);
@@ -662,13 +662,13 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
   return (
     <ReferencingContext.Provider
       value={{
-        state,
-        dispatch,
-        updateFormData,
-        saveCurrentStep,
-        submitApplication,
-        nextStep,
-        prevStep,
+    state,
+    dispatch,
+    updateFormData,
+    saveCurrentStep,
+    submitApplication,
+    nextStep,
+    prevStep,
         setCurrentStep,
         saveAsDraft,
         setPropertyId,
@@ -687,6 +687,6 @@ export const useReferencing = (): ReferencingContextType => {
     throw new Error('useReferencing must be used within a ReferencingProvider');
   }
   return context;
-};
+}; 
 
 export default ReferencingContext; 

@@ -14,6 +14,11 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { DASHBOARD_SECTIONS, BLUE_COLOR, DARK_GREY } from '../Dashboard';
+import HomeIcon from '@mui/icons-material/Home';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import { Link } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { alpha } from '@mui/material/styles';
 
 // Import icons
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -24,6 +29,7 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import SettingsIcon from '@mui/icons-material/Settings';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import LogoutIcon from '@mui/icons-material/Logout';
 
 interface DashboardSidebarProps {
   activeSection: string;
@@ -62,6 +68,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   onSectionChange
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Map section IDs to icons
   const getIcon = (sectionId: string) => {
@@ -143,7 +150,61 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
             </ListItemButton>
           </ListItem>
         ))}
+        <ListItemButton
+          component={Link}
+          to="/book-viewing"
+          selected={location.pathname === '/book-viewing'}
+          sx={{
+            '&.Mui-selected': {
+              backgroundColor: alpha(BLUE_COLOR, 0.1),
+              '&:hover': {
+                backgroundColor: alpha(BLUE_COLOR, 0.15)
+              }
+            }
+          }}
+        >
+          <ListItemIcon>
+            <CalendarMonthIcon sx={{ color: location.pathname === '/book-viewing' ? BLUE_COLOR : DARK_GREY }} />
+          </ListItemIcon>
+          <ListItemText 
+            primary="Book Viewing"
+            sx={{
+              '& .MuiTypography-root': {
+                color: location.pathname === '/book-viewing' ? BLUE_COLOR : DARK_GREY
+              }
+            }}
+          />
+        </ListItemButton>
       </NavList>
+
+      <Divider />
+
+      <List>
+        <ListItem disablePadding>
+          <ListItemButton
+            component="a"
+            href="/"
+            sx={{
+              borderRadius: '0 24px 24px 0',
+              mr: 2,
+              '&:hover': {
+                backgroundColor: 'rgba(19, 108, 158, 0.1)',
+                '& .MuiListItemIcon-root': {
+                  color: BLUE_COLOR,
+                },
+                '& .MuiListItemText-primary': {
+                  color: BLUE_COLOR,
+                },
+              },
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 40 }}>
+              <HomeIcon />
+            </ListItemIcon>
+            <ListItemText primary="Proptii Home" />
+          </ListItemButton>
+        </ListItem>
+      </List>
 
       {/* Bottom Actions */}
       <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
