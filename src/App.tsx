@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -14,6 +13,9 @@ import Dashboard from './components/dashboard/Dashboard';
 import DashboardHome from './components/dashboard/sections/DashboardHome';
 import SavedProperties from './components/dashboard/sections/SavedProperties';
 import Viewings from './components/dashboard/sections/Viewings';
+import TenantReferencing from './components/dashboard/sections/TenantReferencing';
+import TenantContracts from './components/dashboard/sections/TenantContracts';
+import FileDashboard from './components/dashboard/sections/YourFiles';
 import theme from './theme/theme';
 import './App.css';
 
@@ -37,9 +39,9 @@ function App() {
               <Route index element={<DashboardHome />} />
               <Route path="saved-searches" element={<SavedProperties />} />
               <Route path="viewings" element={<Viewings />} />
-              <Route path="referencing" element={<div>Referencing Status</div>} />
-              <Route path="contracts" element={<div>Contracts</div>} />
-              <Route path="files" element={<div>Files</div>} />
+              <Route path="tenant-contracts" element={<TenantContracts/>} />
+              <Route path="your-files" element={<FileDashboard />} />
+              <Route path="tenant-referencing" element={<TenantReferencing />} />
             </Route>
           </Routes>
         </Router>

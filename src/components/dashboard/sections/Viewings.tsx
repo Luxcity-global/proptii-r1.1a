@@ -8,6 +8,7 @@ import {
   CardMedia,
   CardContent,
   Grid,
+  styled,
   Button,
   Divider,
   Chip,
@@ -22,6 +23,13 @@ import EmailIcon from '@mui/icons-material/Email';
 import { useDashboardData } from '../../../hooks/useDashboardData';
 import { formatDate } from '../../../utils/formatters';
 
+const PropertyImage = styled('img')({
+  width: 170,
+  height: 150,
+  borderRadius: 4,
+  objectFit: 'cover'
+});
+
 /**
  * Viewings component to display upcoming and past property viewings
  */
@@ -31,7 +39,7 @@ const Viewings: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh'}}>
         <CircularProgress />
       </Box>
     );
@@ -52,7 +60,7 @@ const Viewings: React.FC = () => {
   const activeViewings = activeTab === 'upcoming' ? upcomingViewings : pastViewings;
 
   return (
-    <Box>
+    <Box bgcolor={'#D2D9FF4A'} padding={3}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h5" component="h1">
           Property Viewings
@@ -119,24 +127,36 @@ const Viewings: React.FC = () => {
           )}
         </Paper>
       ) : (
-        <Grid container spacing={3}>
+        <Grid container spacing={3} padding={0}>
           {activeViewings.map((viewing) => (
-            <Grid item xs={12} md={6} key={viewing.id}>
+            <Grid item xs={12} md={6} key={viewing.id} padding={0}>
               <Card sx={{ 
                 display: 'flex', 
                 flexDirection: 'column',
                 borderRadius: 2,
                 overflow: 'hidden',
-                boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.05)'
+                paddingLeft: 1,
+                paddingTop: 1,
+                boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.05)',
+                backgroundColor: 'white', 
+                border: '1px rgb(233, 233, 233) solid' 
               }}>
                 <Box sx={{ display: 'flex', height: 160 }}>
-                  <CardMedia
-                    component="img"
-                    sx={{ width: 240 }}
-                    image={viewing.propertyImageUrl || "/images/property-placeholder.jpg"}
+                  <PropertyImage
+                    src="/images/UK house3.jpeg"
                     alt={viewing.propertyAddress}
                   />
-                  <CardContent sx={{ flex: '1 0 auto', p: 2 }}>
+                  
+                  
+                  <CardContent sx={{ flex: '1 0 auto', p: 2, gap:10 }}>
+
+                    <Chip 
+                      label={viewing.status === 'upcoming' ? 'Upcoming' : viewing.status === 'completed' ? 'Completed' : 'Cancelled'}
+                      color={viewing.status === 'upcoming' ? 'primary' : viewing.status === 'completed' ? 'success' : 'error'}
+                      size="small"
+                      sx={{ mt: 1 }}
+                    />
+
                     <Typography variant="body1" fontWeight={500} gutterBottom>
                       {viewing.propertyAddress}
                     </Typography>
@@ -147,7 +167,7 @@ const Viewings: React.FC = () => {
                         {viewing.date}
                       </Typography>
                     </Box>
-                    
+
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                       <AccessTimeIcon fontSize="small" sx={{ color: 'text.secondary', mr: 1 }} />
                       <Typography variant="body2" color="text.secondary">
@@ -155,12 +175,7 @@ const Viewings: React.FC = () => {
                       </Typography>
                     </Box>
 
-                    <Chip 
-                      label={viewing.status === 'upcoming' ? 'Upcoming' : viewing.status === 'completed' ? 'Completed' : 'Cancelled'}
-                      color={viewing.status === 'upcoming' ? 'primary' : viewing.status === 'completed' ? 'success' : 'error'}
-                      size="small"
-                      sx={{ mt: 1 }}
-                    />
+                    
                   </CardContent>
                 </Box>
                 

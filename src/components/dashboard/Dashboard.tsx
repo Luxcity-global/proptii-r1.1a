@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Grid, CssBaseline, useTheme, useMediaQuery } from '@mui/material';
+import { Box, CssBaseline, useTheme, useMediaQuery } from '@mui/material';
 import { Outlet } from 'react-router-dom';
 import DashboardSidebar from './ui/DashboardSidebar';
 import DashboardHeader from './ui/DashboardHeader';
@@ -15,9 +15,10 @@ export const DASHBOARD_SECTIONS = [
   { id: 'dashboard', label: 'Dashboard', path: '/dashboard' },
   { id: 'saved-searches', label: 'Saved Searches', path: '/dashboard/saved-searches' },
   { id: 'viewings', label: 'Viewings', path: '/dashboard/viewings' },
-  { id: 'referencing', label: 'Referencing', path: '/dashboard/referencing' },
-  { id: 'contracts', label: 'Contracts', path: '/dashboard/contracts' },
-  { id: 'files', label: 'Your Files', path: '/dashboard/files' },
+  
+  { id: 'TenantContracts', label: 'Contracts', path: '/dashboard/tenant-contracts' },
+  { id: 'TenantReferencing', label: 'Tenant Referencing', path: '/dashboard/tenant-referencing' },
+  { id: 'YourFiles', label: 'Your Files', path: '/dashboard/your-files' },
 ];
 
 /**

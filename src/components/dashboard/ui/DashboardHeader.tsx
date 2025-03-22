@@ -24,6 +24,8 @@ const HeaderPaper = styled(Paper)(({ theme }) => ({
   alignItems: 'center',
   borderRadius: 12,
   marginBottom: theme.spacing(3),
+  backgroundColor: 'white',
+  border: '1px rgb(233, 233, 233) solid',
   boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.05)'
 }));
 
@@ -116,7 +118,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName }) => {
           <Box sx={{ 
             display: 'flex', 
             flexDirection: 'column', 
-            alignItems: { xs: 'flex-start', md: 'center' },
+            alignItems: { xs: 'flex-start', md: 'start' },
             height: '100%',
             justifyContent: 'center'
           }}>

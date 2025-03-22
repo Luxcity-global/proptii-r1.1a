@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Card,
+  styled,
   CardMedia,
   CardContent,
   CardActions,
@@ -22,11 +23,20 @@ import KingBedIcon from '@mui/icons-material/KingBed';
 import HomeIcon from '@mui/icons-material/Home';
 import { useDashboardData } from '../../../hooks/useDashboardData';
 import { formatCurrency, formatDate } from '../../../utils/formatters';
+import { AlignJustify } from 'lucide-react';
+
+const PropertyImage = styled('img')({
+  width: '100%',
+  height: 180,
+  borderRadius: 4,
+  objectFit: 'cover'
+});
+
 
 /**
  * SavedProperties component to display properties saved by the user
  */
-const SavedProperties: React.FC = () => {
+const SavedProperties: React.FC = () => {  
   const { isLoading, error, savedProperties } = useDashboardData();
 
   if (isLoading) {
@@ -45,9 +55,9 @@ const SavedProperties: React.FC = () => {
     );
   }
 
-  return (
-    <Box>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  return ( 
+    <Box bgcolor={'#D2D9FF4A'} display={'flex'} flexDirection={'column'} justifyContent={'stretch' }      padding={3}>
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}  >
         <Typography variant="h5" component="h1">
           Saved Properties
         </Typography>
@@ -63,13 +73,15 @@ const SavedProperties: React.FC = () => {
         </Button>
       </Box>
 
+          
+
       {savedProperties.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <HomeIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
           <Typography variant="h6" gutterBottom>
             No Saved Properties
           </Typography>
-          <Typography variant="body1" color="textSecondary" paragraph>
+          <Typography variant="body1" color= '#1E9674' paragraph>
             You haven't saved any properties yet. Browse listings and click the heart icon to save properties you're interested in.
           </Typography>
           <Button 
@@ -85,20 +97,25 @@ const SavedProperties: React.FC = () => {
           {savedProperties.map((property) => (
             <Grid item xs={12} sm={6} md={4} key={property.id}>
               <Card sx={{ 
-                height: '100%', 
+                height: '100%',
+                width: '80%',
                 display: 'flex', 
                 flexDirection: 'column',
                 borderRadius: 2,
                 overflow: 'hidden',
+                backgroundColor: 'white',
+                paddingLeft: 1,
+                paddingRight: 1,
+                paddingTop: 1,
+                gap: 2,
                 boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.05)'
               }}>
                 <Box sx={{ position: 'relative' }}>
-                  <CardMedia
-                    component="img"
-                    height={220}
-                    image={property.imageUrl || "/images/property-placeholder.jpg"}
+                <PropertyImage
+                    src="/images/detached-house.jpg"
                     alt={property.address}
                   />
+                  
                   <Box sx={{ 
                     position: 'absolute', 
                     top: 12, 
@@ -138,21 +155,21 @@ const SavedProperties: React.FC = () => {
                     </Typography>
                   </Box>
                   
-                  <Box sx={{ display: 'flex', mt: 2, justifyContent: 'space-between' }}>
+                  <Box sx={{ display: 'flex', mt: 2, justifyContent: 'start', gap: 1 }}>
                     <Chip 
-                      icon={<KingBedIcon />} 
+                      icon={<KingBedIcon style={{color: '#D68552'}} /> } 
                       label={`${property.bedrooms} ${property.bedrooms === 1 ? 'Bed' : 'Beds'}`}
                       size="small"
                       sx={{ mr: 1 }}
                     />
                     <Chip 
-                      icon={<BathtubIcon />} 
+                      icon={<BathtubIcon style={{color: '#357E99'}} />} 
                       label={`${property.bathrooms} ${property.bathrooms === 1 ? 'Bath' : 'Baths'}`}
                       size="small"
                       sx={{ mr: 1 }}
                     />
                     <Chip 
-                      icon={<HomeIcon />} 
+                      icon={<HomeIcon style={{color: '#1E9674'}} />} 
                       label={property.propertyType}
                       size="small"
                     />
