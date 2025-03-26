@@ -56,21 +56,24 @@ const SavedProperties: React.FC = () => {
   }
 
   return ( 
-    <Box bgcolor={'#D2D9FF4A'} display={'flex'} flexDirection={'column'} justifyContent={'stretch' }      padding={3}>
+    <Box bgcolor={'#EDF3FA'} display={'flex'} flexDirection={'column'} justifyContent={'stretch' }      padding={3}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}  >
         <Typography variant="h5" component="h1">
           Saved Properties
         </Typography>
         <Button 
-          variant="contained" 
-          color="primary" 
-          sx={{ 
+            variant="contained" 
+            sx={{ 
+            backgroundColor: '#DC5F12', // Use custom color here
             borderRadius: 2,
-            textTransform: 'none'
-          }}
-        >
-          Browse Properties
-        </Button>
+            textTransform: 'none',
+            '&:hover': {
+            backgroundColor: '#C44E0F', // Optional: Define hover color
+    }
+  }}
+>
+  Browse Properties
+</Button>
       </Box>
 
           

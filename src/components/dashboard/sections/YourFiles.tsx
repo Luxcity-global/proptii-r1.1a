@@ -1,5 +1,9 @@
 import React, { useState } from "react";
 import {  formatDate, } from '../../../utils/formatters';
+import { 
+  
+  Typography
+} from '@mui/material';
 
 interface FileItem {
   name: string;
@@ -39,7 +43,10 @@ const FileDashboard: React.FC = () => {
   );
 
   return (
-    <div className="p-6 bg-blue-50 min-h-screen">
+    <div className="p-6  min-h-screen" style={{ backgroundColor: '#EDF3FA', gap: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'stretch' }}>
+    <Typography variant="h5" component="h1">
+                 Your Files
+       </Typography>
       {/* Uploaded Files Card */}
       <div className="bg-white shadow-md rounded-lg p-4 flex items-center justify-between">
         <div>
@@ -91,16 +98,21 @@ const FileDashboard: React.FC = () => {
           {filteredFiles.length > 0 ? (
             filteredFiles.map((file, index) => (
               <div
-                key={index}
-                className="flex justify-between items-center p-3 border-b last:border-none"
+          key={index}
+          className="flex justify-between items-center p-3 border-b last:border-none"
               >
-                <div>
-                  <p className="text-gray-800 font-medium">{file.name}</p>
-                  <p className="text-gray-500 text-sm">{file.date}</p>
-                </div>
-                <button className="border border-blue-600 text-blue-600 px-4 py-1 rounded-md hover:bg-blue-100">
-                  View File
-                </button>
+          <div>
+            <p className="text-gray-800 font-medium">{file.name}</p>
+            <p className="text-gray-500 text-sm">{file.date}</p>
+          </div>
+          <div className="flex space-x-2">
+            <button className="border border-blue-600 text-blue-600 px-4 py-1 rounded-md hover:bg-blue-100">
+              View File
+            </button>
+            <button className="border border-green-600 text-green-600 px-4 py-1 rounded-md hover:bg-green-100">
+              Download File
+            </button>
+          </div>
               </div>
             ))
           ) : (

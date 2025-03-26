@@ -10,32 +10,30 @@ import {
   IconButton,
   CircularProgress,
   Alert,
-  alpha
+  alpha,
+  collapseClasses
 } from '@mui/material';
+import { BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Bar, Cell, PieChart, Pie } from 'recharts';
 import { Link } from 'react-router-dom';
-import HomeIcon from '@mui/icons-material/Home';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import ArticleIcon from '@mui/icons-material/Article';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import ImageIcon from '@mui/icons-material/Image';
 import NorthEastIcon from '@mui/icons-material/NorthEast';
-import { BLUE_COLOR } from '../Dashboard';
 import { useDashboardData } from '../../../hooks/useDashboardData';
 import { formatCurrency, formatDate, formatFileSize } from '../../../utils/formatters';
+
 
 const DashboardCard = styled(Paper)(({ theme }) => ({
   borderRadius: 12,
   overflow: 'hidden',
-  height: '100%',
+  height: '400px',
   display: 'flex',
   flexDirection: 'row',
   boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.05)'
 }));
 
 const CardSidebar = styled(Box)(({ theme }) => ({
-  backgroundColor: '#2f7db0',
+  backgroundColor: '#4E97CC',
   color: theme.palette.common.white,
   padding: theme.spacing(3),
   width: '33.33%',
@@ -116,6 +114,8 @@ const PropertyImage = styled('img')({
   objectFit: 'cover'
 });
 
+
+
 /**
  * Main dashboard home page component
  */
@@ -130,13 +130,13 @@ const DashboardHome: React.FC = () => {
     files 
   } = useDashboardData();
 
-  if (isLoading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const data = [
+    { name: 'Total', value: dashboardSummary?.viewings.total || 0 },
+    { name: 'Completed', value: dashboardSummary?.viewings.past || 0 },
+    { name: 'Upcoming', value: dashboardSummary?.viewings.upcoming || 0 }
+  ];
+
+  
 
   if (error) {
     return (
@@ -145,17 +145,18 @@ const DashboardHome: React.FC = () => {
       </Alert>
     );
   }
-
+  const referencingProgress = (dashboardSummary?.referencing.completedSteps || 0);
+  ;
   return (
-    <Grid container spacing={3} bgcolor={'#D2D9FF4A'} >
+    <Grid container spacing={3} bgcolor={'#EDF3FA'} padding={3}>
       {/* Saved Listings Card */}
-      <Grid item xs={12} md={6} >
+      <Grid item xs={12} md={6}  >
         <DashboardCard>
           <CardSidebar>
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%'}}>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <IconWrapper>
-                <svg width="16" height="16" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <IconWrapper  style={{ width: '16%', height: '100%' }}>
+                <svg width="18" height="18" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <g clip-path="url(#clip0_1919_20247)">
                 <path d="M20.5185 8.09305L13.8115 1.3852C12.9815 0.557544 11.8571 0.0927734 10.6849 0.0927734C9.51267 0.0927734 8.38829 0.557544 7.5582 1.3852L0.851233 8.09305C0.604022 8.33868 0.408025 8.63094 0.274604 8.95288C0.141183 9.27482 0.0729927 9.62004 0.0739853 9.96853V18.6491C0.0739853 19.3527 0.353468 20.0274 0.85095 20.5249C1.34843 21.0224 2.02316 21.3018 2.72671 21.3018H18.643C19.3466 21.3018 20.0213 21.0224 20.5188 20.5249C21.0163 20.0274 21.2958 19.3527 21.2958 18.6491V9.96853C21.2968 9.62004 21.2286 9.27482 21.0951 8.95288C20.9617 8.63094 20.7657 8.33868 20.5185 8.09305ZM13.3376 19.5334H8.03215V16.0548C8.03215 15.3512 8.31163 14.6765 8.80912 14.179C9.3066 13.6815 9.98133 13.402 10.6849 13.402C11.3884 13.402 12.0632 13.6815 12.5606 14.179C13.0581 14.6765 13.3376 15.3512 13.3376 16.0548V19.5334ZM19.5273 18.6491C19.5273 18.8836 19.4341 19.1085 19.2683 19.2744C19.1025 19.4402 18.8776 19.5334 18.643 19.5334H15.1061V16.0548C15.1061 14.8822 14.6403 13.7576 13.8111 12.9285C12.982 12.0994 11.8574 11.6336 10.6849 11.6336C9.5123 11.6336 8.38775 12.0994 7.55861 12.9285C6.72947 13.7576 6.26367 14.8822 6.26367 16.0548V19.5334H2.72671C2.49219 19.5334 2.26728 19.4402 2.10145 19.2744C1.93563 19.1085 1.84247 18.8836 1.84247 18.6491V9.96853C1.84329 9.73418 1.93636 9.50959 2.10155 9.34337L8.80852 2.63817C9.30696 2.14205 9.98161 1.86353 10.6849 1.86353C11.3881 1.86353 12.0628 2.14205 12.5612 2.63817L19.2682 9.34602C19.4327 9.51159 19.5258 9.7351 19.5273 9.96853V18.6491Z" fill="#3F2E00"/>
                 </g>
@@ -167,7 +168,7 @@ const DashboardHome: React.FC = () => {
                   </svg>
 
                 </IconWrapper>
-                <Typography variant="subtitle1" fontWeight={600} sx={{ fontSize: '0.9rem' }}>
+                <Typography variant="subtitle1" fontWeight={600} sx={{ fontSize: '1.2rem' }}>
                   Saved Listings
                 </Typography>
               </Box>
@@ -185,15 +186,15 @@ const DashboardHome: React.FC = () => {
             </Box>
           </CardSidebar>
           
-          <CardContent>
+          <CardContent >
             <GoToButton to="/dashboard/saved-searches">
               Go to Saved Listings
               <NorthEastIcon />
             </GoToButton>
             
             {savedProperties.slice(0, 4).map((property) => (
-              <PropertyListItem key={property.id}>
-                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+              <PropertyListItem key={property.id} height={'35%'} >
+                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%',  }}>
                   <PropertyImage
                     src="/images/house-placeholder.jpg"
                     alt={property.address}
@@ -220,6 +221,8 @@ const DashboardHome: React.FC = () => {
           </CardContent>
         </DashboardCard>
       </Grid>
+      
+      
 
       {/* Viewings Card */}
       <Grid item xs={12} md={6}>
@@ -227,7 +230,7 @@ const DashboardHome: React.FC = () => {
           <CardSidebar>
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <IconWrapper>
+                <IconWrapper style={{ width: '16%', height: '100%' }}>
                 <svg width="18" height="18" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <g clip-path="url(#clip0_1919_20405)">
               <path d="M20.6509 8.40288C19.2795 6.16929 16.1599 2.42188 10.6846 2.42188C5.20943 2.42188 2.08982 6.16929 0.718367 8.40288C0.294398 9.08861 0.0698242 9.87889 0.0698242 10.6851C0.0698242 11.4913 0.294398 12.2816 0.718367 12.9673C2.08982 15.2009 5.20943 18.9483 10.6846 18.9483C16.1599 18.9483 19.2795 15.2009 20.6509 12.9673C21.0749 12.2816 21.2995 11.4913 21.2995 10.6851C21.2995 9.87889 21.0749 9.08861 20.6509 8.40288ZM19.1433 12.0415C17.9655 13.9568 15.2995 17.1799 10.6846 17.1799C6.06979 17.1799 3.40381 13.9568 2.226 12.0415C1.97411 11.6339 1.84069 11.1643 1.84069 10.6851C1.84069 10.206 1.97411 9.73627 2.226 9.32868C3.40381 7.41341 6.06979 4.19036 10.6846 4.19036C15.2995 4.19036 17.9655 7.40988 19.1433 9.32868C19.3952 9.73627 19.5286 10.206 19.5286 10.6851C19.5286 11.1643 19.3952 11.6339 19.1433 12.0415Z" fill="#584414"/>
@@ -237,16 +240,16 @@ const DashboardHome: React.FC = () => {
               </svg>
 
                 </IconWrapper>
-                <Typography variant="subtitle1" fontWeight={600} sx={{ fontSize: '0.9rem' }}>
+                <Typography variant="subtitle1" fontWeight={600} sx={{ fontSize: '1.2rem' }}>
                   Viewings
                 </Typography>
               </Box>
               <Box sx={{ mt: 'auto' }}>
                 <StatsNumber>
-                  {dashboardSummary?.viewings.upcoming || 0}
+                    {dashboardSummary?.viewings.total || 0}
                 </StatsNumber>
                 <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                  Upcoming Viewings
+                  Total Viewings
                 </Typography>
                 <Typography variant="caption" sx={{ opacity: 0.7, display: 'block', mt: 1 }}>
                   Next on {dashboardSummary?.viewings.nextViewing?.date || 'N/A'}
@@ -261,24 +264,91 @@ const DashboardHome: React.FC = () => {
               <NorthEastIcon />
             </GoToButton>
             
-            {upcomingViewings.slice(0, 3).map((viewing) => (
+            {/* {upcomingViewings.slice(0, 3).map((viewing) => (
               <PropertyListItem key={viewing.id}>
-                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                  <PropertyImage
-                    src="/images/house-placeholder.jpg"
-                    alt={viewing.propertyAddress}
-                  />
-                  <Box sx={{ flexGrow: 1, ml: 2 }}>
-                    <Typography variant="body2" fontWeight={500}>
-                      {viewing.propertyAddress}
-                    </Typography>
-                    <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
-                      {viewing.date} at {viewing.time}
-                    </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+              <PropertyImage
+              src="/images/house-placeholder.jpg"
+              alt={viewing.propertyAddress}
+              />
+              <Box sx={{ flexGrow: 1, ml: 2 }}>
+              <Typography variant="body2" fontWeight={500}>
+                {viewing.propertyAddress}
+              </Typography>
+              <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
+                {viewing.date} at {viewing.time}
+              </Typography>
+              </Box>
+              </Box>
+              </PropertyListItem>
+            ))} */}
+
+            <Box sx={{ mt: 4 }}>
+              <Typography variant="h6" gutterBottom>
+              Viewings Summary
+              </Typography>
+                { <Box sx={{ display: 'flex', flex:'row', justifyContent: 'start', alignItems: 'end', gap:3, height: '100%', pt: 4 }}>
+                <Box sx={{ display: 'flex', alignItems: 'end', justifyContent: 'center' }}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Box sx={{ height: `${(dashboardSummary?.viewings.total || 0) * 30}px`, width: 50, bgcolor: '#003450', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                  <Typography variant="body2" color="white" sx={{ mb: 1 }}>
+                  {dashboardSummary?.viewings.total || 0}
+                  </Typography>
                   </Box>
                 </Box>
-              </PropertyListItem>
-            ))}
+                
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'end', justifyContent: 'center', mt: 2 }}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Box sx={{ height: `${(dashboardSummary?.viewings.past || 0) * 30}px`, width: 50, bgcolor: '#2A6C00', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                  <Typography variant="body2" color="white" sx={{ mb: 1 }}>
+                  {dashboardSummary?.viewings.past || 0}
+                  </Typography>
+                  </Box>
+                </Box>
+                
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'end', justifyContent: 'center', mt: 2 }}>
+                <Box sx={{ textAlign: 'center', pr: 3 }}>
+                  <Box sx={{ height: `${(dashboardSummary?.viewings.upcoming || 0) * 30}px`, width: 50, bgcolor: '#ff9800', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                  <Typography variant="body2" color="white" sx={{ mb: 1 }}>
+                  {dashboardSummary?.viewings.upcoming || 0}
+                  </Typography>
+                  </Box>
+                </Box>
+                </Box>
+
+                
+                <Box sx={{ display: 'flex', flexDirection: 'column', mt: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <Box sx={{ width: 16, height: 16, bgcolor: '#003450', mr: 1 }} />
+                  <Typography variant="body2">Total Viewings</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <Box sx={{ width: 16, height: 16, bgcolor: '#2A6C00', mr: 1 }} />
+                  <Typography variant="body2">Completed Viewings</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ width: 16, height: 16, bgcolor: '#ff9800', mr: 1 }} />
+                  <Typography variant="body2">Upcoming Viewings</Typography>
+                  </Box>
+                </Box>
+                
+                </Box> }
+              
+                {/* <BarChart width={300} height={200} data={data} >
+                  <CartesianGrid strokeDasharray="1 1" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="value" radius={[10, 10, 0, 0]}>
+                    {data.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={getBarColor(entry)} />
+                    ))}
+                  </Bar>
+                </BarChart> */}
+          </Box>
             
             {upcomingViewings.length === 0 && (
               <Box sx={{ py: 2, textAlign: 'center' }}>
@@ -292,12 +362,13 @@ const DashboardHome: React.FC = () => {
       </Grid>
 
       {/* Referencing Card */}
+   
       <Grid item xs={12} md={6}>
         <DashboardCard>
           <CardSidebar>
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <IconWrapper>
+              <Box sx={{ display: 'flex', alignItems: 'center'}}>
+                <IconWrapper style={{ width: '16%', height: '100%' }}>
                 <svg width="18" height="18" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <g clip-path="url(#clip0_1919_20416)">
                 <path d="M17.3477 2.83484L15.8834 1.36876C15.4737 0.956985 14.9864 0.630546 14.4497 0.408341C13.9131 0.186137 13.3376 0.0725776 12.7567 0.0742367H7.14801C5.97587 0.0756407 4.85213 0.541896 4.0233 1.37073C3.19447 2.19956 2.72821 3.32329 2.72681 4.49544V16.8748C2.72821 18.047 3.19447 19.1707 4.0233 19.9995C4.85213 20.8284 5.97587 21.2946 7.14801 21.296H14.2219C15.3941 21.2946 16.5178 20.8284 17.3466 19.9995C18.1755 19.1707 18.6417 18.047 18.6431 16.8748V5.96063C18.6446 5.37984 18.5308 4.80454 18.3085 4.26801C18.0861 3.73147 17.7596 3.24435 17.3477 2.83484ZM16.0974 4.08515C16.2228 4.21011 16.3351 4.34759 16.4325 4.49544H14.2219V2.28484C14.3695 2.38327 14.5072 2.4958 14.6331 2.62085L16.0974 4.08515ZM16.8747 16.8748C16.8747 17.5784 16.5952 18.2531 16.0977 18.7506C15.6002 19.248 14.9255 19.5275 14.2219 19.5275H7.14801C6.44446 19.5275 5.76973 19.248 5.27225 18.7506C4.77477 18.2531 4.49529 17.5784 4.49529 16.8748V4.49544C4.49529 3.79189 4.77477 3.11716 5.27225 2.61968C5.76973 2.1222 6.44446 1.84272 7.14801 1.84272H12.4535V4.49544C12.4535 4.96447 12.6398 5.41429 12.9714 5.74594C13.3031 6.0776 13.7529 6.26392 14.2219 6.26392H16.8747V16.8748ZM14.2219 8.0324C14.4565 8.0324 14.6814 8.12556 14.8472 8.29139C15.013 8.45722 15.1062 8.68213 15.1062 8.91664C15.1062 9.15116 15.013 9.37607 14.8472 9.54189C14.6814 9.70772 14.4565 9.80088 14.2219 9.80088H7.14801C6.9135 9.80088 6.68859 9.70772 6.52276 9.54189C6.35693 9.37607 6.26377 9.15116 6.26377 8.91664C6.26377 8.68213 6.35693 8.45722 6.52276 8.29139C6.68859 8.12556 6.9135 8.0324 7.14801 8.0324H14.2219ZM15.1062 12.4536C15.1062 12.6881 15.013 12.913 14.8472 13.0789C14.6814 13.2447 14.4565 13.3378 14.2219 13.3378H7.14801C6.9135 13.3378 6.68859 13.2447 6.52276 13.0789C6.35693 12.913 6.26377 12.6881 6.26377 12.4536C6.26377 12.2191 6.35693 11.9942 6.52276 11.8284C6.68859 11.6625 6.9135 11.5694 7.14801 11.5694H14.2219C14.4565 11.5694 14.6814 11.6625 14.8472 11.8284C15.013 11.9942 15.1062 12.2191 15.1062 12.4536ZM14.9364 15.4715C15.0739 15.6606 15.1308 15.8964 15.0949 16.1274C15.0589 16.3584 14.933 16.5658 14.7445 16.7041C13.8486 17.3425 12.7875 17.7088 11.6886 17.7591C11.0465 17.756 10.424 17.5381 9.9201 17.1401C9.63007 16.9411 9.51954 16.8748 9.30114 16.8748C8.70996 16.9663 8.15217 17.208 7.68121 17.5769C7.49441 17.7101 7.26317 17.7654 7.03632 17.7313C6.80948 17.6971 6.60478 17.5762 6.46545 17.3939C6.32613 17.2117 6.26308 16.9824 6.28963 16.7545C6.31618 16.5267 6.43025 16.3181 6.60774 16.1727C7.38691 15.5678 8.32253 15.1979 9.30467 15.1063C9.8937 15.1157 10.4631 15.3193 10.9246 15.6855C11.135 15.8747 11.4058 15.9828 11.6886 15.9906C12.4116 15.9364 13.1069 15.6894 13.702 15.2752C13.8918 15.1377 14.1284 15.0811 14.3598 15.1179C14.5913 15.1547 14.7987 15.2819 14.9364 15.4715Z" fill="#584414"/>
@@ -306,13 +377,13 @@ const DashboardHome: React.FC = () => {
                 </svg>
 
                 </IconWrapper>
-                <Typography variant="subtitle1" fontWeight={600} sx={{ fontSize: '0.9rem' }}>
+                <Typography variant="subtitle1" fontWeight={600} sx={{ fontSize: '1.2rem' }}>
                   Referencing
                 </Typography>
               </Box>
               <Box sx={{ mt: 'auto' }}>
                 <StatsNumber>
-                  {dashboardSummary?.referencing.progress || 0}%
+                  {dashboardSummary?.referencing.progress || 0}
                 </StatsNumber>
                 <Typography variant="body2" sx={{ opacity: 0.8 }}>
                   Reference Progress
@@ -324,14 +395,14 @@ const DashboardHome: React.FC = () => {
             </Box>
           </CardSidebar>
           
-          <CardContent>
+          <CardContent >
             <GoToButton to="/dashboard/referencing">
               Go to Referencing
               <NorthEastIcon />
             </GoToButton>
             
-            <Box sx={{ mt: 4, mb: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <Box 
+            <Box sx={{ mt: 1, mb: 1, display: 'flex', flexDirection: 'row', justifyContent: 'start', alignItems: 'center', gap: 2 }}>
+              {/*<Box 
                 sx={{
                   width: 80,
                   height: 80,
@@ -342,7 +413,7 @@ const DashboardHome: React.FC = () => {
                   borderColor: 'rgba(56, 142, 60, 0.2)',
                   borderRadius: '50%'
                 }}
-              >
+              >*/}
                 <Box sx={{ 
                   width: 60, 
                   height: 60, 
@@ -350,47 +421,128 @@ const DashboardHome: React.FC = () => {
                   borderRadius: '50%',
                   display: 'flex',
                   justifyContent: 'center',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  overflow: 'hidden'
                 }}>
-                  <ArticleIcon color="success" />
+                  <img src="/images/protection-shield-icon-3d-render-illustration.png" alt="Placeholder" style={{ width: '50%', height: 'auto', objectFit: 'contain' }} />
                 </Box>
+                
+              
+              <Box>
+                <Typography variant="caption" sx={{ mt: 1, textAlign: 'center', fontSize: '1rem', fontWeight: 530 }}> 
+                  {referencingProgress === 0 ? "Not started yet" : 
+                   referencingProgress === 1 ? "You're Just Getting Started" : 
+                   referencingProgress === 2 ? "Making Progress" : 
+                   referencingProgress === 3 ? "Halfway There" : 
+                   referencingProgress === 4 ? "Almost Done" : 
+                   referencingProgress === 5 ? "Just One More Step" : 
+                   "Congratulations! Your referencing is complete!"}
+                </Typography>
               </Box>
             </Box>
             
-            <Typography variant="body2" textAlign="center" sx={{ mt: 2 }}>
-              {dashboardSummary?.referencing.completedSteps || 0} out of {dashboardSummary?.referencing.totalSteps || 0} steps complete
+            {/*<Typography variant="body2" textAlign="left" sx={{ mt: 2 }}>
+              <Box component="span" sx={{ color: 'green', fontWeight: 'bold' }}>
+              {dashboardSummary?.referencing.completedSteps || 0}
+              </Box> 
+              {' '}out of{' '}
+              <Box component="span" sx={{ color: 'green', fontWeight: 'bold' }}>
+              {dashboardSummary?.referencing.totalSteps || 0}
+              </Box> 
+              {' '}steps complete
             </Typography>
             
-            <Box sx={{ mt: 2 }}>
-              <LinearProgress 
-                variant="determinate" 
-                value={dashboardSummary?.referencing.progress || 0} 
-                sx={{ 
-                  height: 8, 
-                  borderRadius: 4,
-                  mb: 2,
-                  bgcolor: 'rgba(19, 108, 158, 0.1)',
-                  '& .MuiLinearProgress-bar': {
-                    bgcolor: BLUE_COLOR
-                  }
-                }} 
+            {/* <Box sx={{ mt: 2, display: 'flex', gap: 1, paddingBottom: 1 }}>
+              {[...Array(6)].map((_, index) => (
+              <Box 
+              key={index} 
+              sx={{ 
+              flexGrow: 1, 
+              height: 8, 
+              borderRadius: 4, 
+              bgcolor: index < referencingProgress ? '#4DA41A' : 'rgba(19, 108, 158, 0.1)'
+              }} 
               />
-            </Box>
+              ))}
+            </Box> */}
             
+            
+
+            <Box sx={{ mt: 2, mb: 4, display: 'flex', flexDirection:'row', justifyContent: 'center', alignItems:'center', gap: 10 }}>
+                <PieChart width={200} height={200}>
+                <Pie
+                data={[
+                { name: 'Identity', value: 1 },
+                { name: 'Employment', value: 1 },
+                { name: 'Residential', value: 1 },
+                { name: 'Financial', value: 1 },
+                { name: 'Guarantor', value: 1 },
+                { name: 'Agent Details', value: 1 }
+                ]}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                outerRadius={100}
+                fill="#8884d8"
+                dataKey="value"
+                >
+                <Cell key="Identity" fill={dashboardSummary?.referencing.identity ? "#4CAF50" : "#F9A876"} />
+                <Cell key="Employment" fill={dashboardSummary?.referencing.employment ? "#4CAF50" : "#F9A876"} />
+                <Cell key="Residential" fill={dashboardSummary?.referencing.residential ? "#4CAF50" : "#F9A876"} />
+                <Cell key="Financial" fill={dashboardSummary?.referencing.financial ? "#4CAF50" : "#F9A876"} />
+                <Cell key="Guarantor" fill={dashboardSummary?.referencing.guarantor ? "#4CAF50" : "#F9A876"} />
+                <Cell key="Agent Details" fill={dashboardSummary?.referencing.agentDetails ? "#4CAF50" : "#F9A876"} />
+                </Pie>
+                </PieChart>
+                <Box>
+                {(['identity', 'employment', 'residential', 'financial', 'guarantor', 'agentDetails'] as const).map((section) => (
+                <Box key={section} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Box
+                  sx={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: '4px',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  bgcolor: dashboardSummary?.referencing[section] ? '#4CAF50' : 'transparent',
+                  border: `2px solid ${dashboardSummary?.referencing[section] ? '#4CAF50' : '#ccc'}`,
+                  }}
+                >
+                  {dashboardSummary?.referencing[section] && (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="white"
+                    width="12px"
+                    height="12px"
+                  >
+                    <path d="M9 16.2l-4.2-4.2L3 13.8l6 6 12-12-1.8-1.8z" />
+                  </svg>
+                  )}
+                </Box>
+                <Typography variant="body2" sx={{ ml: 1 }}>
+                  {section.charAt(0).toUpperCase() + section.slice(1)}
+                </Typography>
+                </Box>
+                ))}
+                </Box>
+            </Box>
+
             <Box sx={{ mt: 'auto', width: '100%' }}>
               <Button 
-                component={Link}
-                to="/dashboard/referencing"
-                variant="outlined" 
-                fullWidth 
-                sx={{ 
-                  borderRadius: 1,
-                  py: 1.5,
-                  textTransform: 'none',
-                  fontWeight: 500
-                }}
+              component={Link}
+              to="/dashboard/referencing"
+              variant="outlined" 
+              fullWidth 
+              sx={{ 
+              borderRadius: 1,
+              py: 1.5,
+              textTransform: 'none',
+              fontWeight: 500
+              }}
               >
-                {dashboardSummary?.referencing.nextStep ? `Next: ${dashboardSummary.referencing.nextStep}` : 'Resume Process'}
+              Resume Process
               </Button>
             </Box>
           </CardContent>
@@ -403,7 +555,7 @@ const DashboardHome: React.FC = () => {
           <CardSidebar>
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <IconWrapper>
+                <IconWrapper style={{ width: '16%', height: '100%' }}>
                 <svg width="18" height="18" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <g clip-path="url(#clip0_1919_20427)">
                 <path d="M15.1059 12.4536C15.1059 12.6881 15.0127 12.913 14.8469 13.0789C14.6811 13.2447 14.4562 13.3378 14.2217 13.3378H7.14773C6.91321 13.3378 6.6883 13.2447 6.52248 13.0789C6.35665 12.913 6.26349 12.6881 6.26349 12.4536C6.26349 12.2191 6.35665 11.9942 6.52248 11.8284C6.6883 11.6625 6.91321 11.5694 7.14773 11.5694H14.2217C14.4562 11.5694 14.6811 11.6625 14.8469 11.8284C15.0127 11.9942 15.1059 12.2191 15.1059 12.4536ZM11.5689 15.1063H7.14773C6.91321 15.1063 6.6883 15.1995 6.52248 15.3653C6.35665 15.5311 6.26349 15.7561 6.26349 15.9906C6.26349 16.2251 6.35665 16.45 6.52248 16.6158C6.6883 16.7817 6.91321 16.8748 7.14773 16.8748H11.5689C11.8034 16.8748 12.0284 16.7817 12.1942 16.6158C12.36 16.45 12.4532 16.2251 12.4532 15.9906C12.4532 15.7561 12.36 15.5311 12.1942 15.3653C12.0284 15.1995 11.8034 15.1063 11.5689 15.1063ZM19.5271 9.3455V16.8748C19.5257 18.047 19.0594 19.1707 18.2306 19.9995C17.4018 20.8284 16.278 21.2946 15.1059 21.296H6.26349C5.09134 21.2946 3.96761 20.8284 3.13878 19.9995C2.30994 19.1707 1.84369 18.047 1.84229 16.8748V4.49544C1.84369 3.3233 2.30994 2.19956 3.13878 1.37073C3.96761 0.541898 5.09134 0.0756432 6.26349 0.0742391H10.2558C11.069 0.0721462 11.8745 0.231269 12.6258 0.542408C13.3771 0.853548 14.0592 1.31053 14.6328 1.88693L17.7135 4.9694C18.2903 5.5426 18.7475 6.22454 19.0588 6.97572C19.3701 7.72689 19.5293 8.53238 19.5271 9.3455ZM13.3825 3.13725C13.1042 2.8677 12.7918 2.63582 12.4532 2.44754V6.26392C12.4532 6.49844 12.5463 6.72335 12.7122 6.88918C12.878 7.055 13.1029 7.14816 13.3374 7.14816H17.1538C16.9654 6.80967 16.7332 6.49749 16.4632 6.21971L13.3825 3.13725ZM17.7586 9.3455C17.7586 9.1996 17.7303 9.05989 17.7171 8.91665H13.3374C12.6339 8.91665 11.9591 8.63716 11.4617 8.13968C10.9642 7.6422 10.6847 6.96747 10.6847 6.26392V1.88428C10.5414 1.87102 10.4009 1.84272 10.2558 1.84272H6.26349C5.55994 1.84272 4.88521 2.1222 4.38773 2.61968C3.89025 3.11717 3.61077 3.7919 3.61077 4.49544V16.8748C3.61077 17.5784 3.89025 18.2531 4.38773 18.7506C4.88521 19.2481 5.55994 19.5275 6.26349 19.5275H15.1059C15.8094 19.5275 16.4842 19.2481 16.9817 18.7506C17.4791 18.2531 17.7586 17.5784 17.7586 16.8748V9.3455Z" fill="#584414"/>
@@ -412,7 +564,7 @@ const DashboardHome: React.FC = () => {
                   </svg>
 
                 </IconWrapper>
-                <Typography variant="subtitle1" fontWeight={600} sx={{ fontSize: '0.9rem' }}>
+                <Typography variant="subtitle1" fontWeight={600} sx={{ fontSize: '1.2rem' }}>
                   Contracts
                 </Typography>
               </Box>
@@ -436,31 +588,51 @@ const DashboardHome: React.FC = () => {
               <NorthEastIcon />
             </GoToButton>
             
-            <Box sx={{ my: 3 }}>
+            <Box sx={{ mb: 3, display: 'flex', flexDirection: 'column', justifyContent:'center', borderRadius: 2, p: 2, paddingTop:8, gap: 3 }} height={'90%'}>
               <Box sx={{ 
                 p: 2, 
-                borderRadius: 1, 
-                bgcolor: 'rgba(0, 0, 0, 0.02)', 
+                borderRadius: 3, 
+                bgcolor: '#EDF3FA', 
                 border: '1px solid',
-                borderColor: 'divider'
+                borderColor: 'divider',
+                width: '100%'
               }}>
-                <Typography variant="body1" sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="body1" sx={{ display: 'flex', justifyContent: 'space-betwe', alignItems: 'center', gap: 2 }} >
+                  <span style={{ fontWeight: 'bold', color: '#15507B', fontSize: '1.7rem' }}>{dashboardSummary?.contracts.requested || 0}</span>
                   <span>Requested Contracts:</span>
-                  <span>{dashboardSummary?.contracts.requested || 0}</span>
+                  <Button  
+                    component={Link}
+                    to="/dashboard/tenant-contracts?signed=true"
+                    variant="outlined" 
+                    size="small" 
+                    sx={{ ml: 2, width: '200px' }}
+                    >
+                  View Requested Contracts
+                  </Button>
                 </Typography>
               </Box>
               
               <Box sx={{ 
                 p: 2, 
-                borderRadius: 1, 
-                bgcolor: 'rgba(0, 0, 0, 0.02)', 
+                borderRadius: 3, 
+                bgcolor: '#EDF3FA', 
                 border: '1px solid',
                 borderColor: 'divider',
+                width: '100%',
                 mt: 2
               }}>
-                <Typography variant="body1" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Total Contracts:</span>
-                  <span>{dashboardSummary?.contracts.total || 0}</span>
+                <Typography variant="body1" sx={{ display: 'flex', justifyContent: 'sart', alignItems: 'center', gap: 1 }} >
+                    <span style={{ fontWeight: 'bold', color: '#15507B', fontSize: '1.7rem' }}>{dashboardSummary?.contracts.total || 0}</span>
+                    <span style={{ paddingRight: '24px' }}>Signed Contracts:</span>
+                    <Button 
+                    component={Link}
+                    to="/dashboard/tenant-contracts?signed=true"
+                    variant="outlined" 
+                    size="small" 
+                    sx={{ ml: 2, width: '200px' }}
+                    >
+                    View Signed Contracts
+                    </Button>
                 </Typography>
               </Box>
             </Box>
@@ -525,11 +697,18 @@ const DashboardHome: React.FC = () => {
 };
 
 // Helper functions for file display
+const getBarColor = (entry: { name: string }): string => {
+  if (entry.name === 'Total') return '#8884d8';
+  if (entry.name === 'Completed') return '#82ca9d';
+  if (entry.name === 'Upcoming') return '#ffc658';
+  return '#8884d8';
+};
+
 const getFileColorByType = (type: string): string => {
   if (type.includes('pdf')) {
     return 'rgba(244, 67, 54, 0.1)';
   } else if (type.includes('image')) {
-    return 'rgba(56, 142, 60, 0.1)';
+    return 'rgba(33, 150, 243, 0.1)';
   } else {
     return 'rgba(33, 150, 243, 0.1)';
   }

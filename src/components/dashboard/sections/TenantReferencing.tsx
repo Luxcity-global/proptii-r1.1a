@@ -27,7 +27,7 @@ interface Section {
 const StatsNumber = styled(Typography)(({ theme }) => ({
     fontSize: '20pt',
     fontWeight: 700,
-    color: '#374957',
+    color: 'white',
     marginBottom: theme.spacing(1)
 }));
 
@@ -113,11 +113,7 @@ const sections: Section[] = [
     <path d="M16.8745 17.7593C17.109 17.7593 17.3339 17.6661 17.4997 17.5003C17.6656 17.3344 17.7587 17.1095 17.7587 16.875V6.26412C17.7587 6.02961 17.6656 5.8047 17.4997 5.63887C17.3339 5.47304 17.109 5.37988 16.8745 5.37988C16.64 5.37988 16.415 5.47304 16.2492 5.63887C16.0834 5.8047 15.9902 6.02961 15.9902 6.26412V16.875C15.9902 17.1095 16.0834 17.3344 16.2492 17.5003C16.415 17.6661 16.64 17.7593 16.8745 17.7593Z" fill="#3F2E00"/>
     <path d="M9.80123 17.7593C10.0357 17.7593 10.2607 17.6661 10.4265 17.5003C10.5923 17.3344 10.6855 17.1095 10.6855 16.875V6.26412C10.6855 6.02961 10.5923 5.8047 10.4265 5.63887C10.2607 5.47304 10.0357 5.37988 9.80123 5.37988C9.56672 5.37988 9.34181 5.47304 9.17598 5.63887C9.01015 5.8047 8.91699 6.02961 8.91699 6.26412V16.875C8.91699 17.1095 9.01015 17.3344 9.17598 17.5003C9.34181 17.6661 9.56672 17.7593 9.80123 17.7593Z" fill="#3F2E00"/>
     </g>
-    <defs>
-    <clipPath id="clip0_1726_13876">
-    <rect width="21.2218" height="21.2218" fill="white" transform="translate(0.0742188 0.0742188)"/>
-    </clipPath>
-    </defs>
+    
     </svg>
     ,
   },
@@ -187,41 +183,67 @@ const TenantReferencing: React.FC = () => {
 
   
   const referencingProgress = (dashboardSummary?.referencing.progress || 0); // This should match the percentage in DashboardHome.tsx
+
+  
+  const completedSteps = dashboardSummary?.referencing.completedSteps || 0;
+  const totalSteps = dashboardSummary?.referencing.totalSteps || 1; // Avoid division by zero
+
+  // Calculate the progress as a fraction of the total steps
+  const progressFraction = completedSteps / totalSteps;
+
+  // Calculate the strokeDashoffset based on the progress fraction
+  const strokeDashoffset = 251 * (1 - progressFraction);
   
 
   return (
-    <div className="p-6 bg-blue-50 min-h-screen">
-      <h1 className="text-2xl font-semibold mb-4">Referencing</h1>
-      <div className="grid grid-cols-3 gap-4">
+    <div className="p-6 min-h-screen" style={{ backgroundColor: '#EDF3FA' }}>
+      {/* Referencing Progress */}
+      <Typography variant="h5" component="h1">
+                       Referencing
+      </Typography>
+      <div className="grid grid-cols-3 gap-0" style={{  display: 'flex', flexDirection: 'row', justifyContent: 'start', alignItems: 'center' }}>
         {/* Left Panel */}
-        <div className="col-span-1 bg-white p-4 rounded-lg shadow flex-col items-end" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', paddingTop  : '1rem', paddingBottom: '1rem', gap: '0rem' }}>
+        <div className="col-span-1 bg-white p-4 rounded-lg shadow flex-col items-end" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', paddingTop  : '1rem', paddingBottom: '1rem', gap: '0rem', width: '30%' }}>
           <div className="progrecircle text-center" style={{display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '2rem', padding: '0rem', backgroundColor: '#ECEFED', width: '200px', height: '200px', borderRadius: '2000px', boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.05)',border: '1px rgb(214, 214, 214) solid' }}>
             <div className="relative w-300px h-300px mx-auto">
-              <svg viewBox="0 0 100 100" className="w-full h-full">
+                <svg viewBox="0 0 100 100" className="w-full h-full">
+                <defs>
+                  <pattern id="image" patternUnits="userSpaceOnUse" width="100" height="100"  >
+                  <image href="/images/shield.png" x="-90" y="-90" width="280" height="280"  />
+                  </pattern>
+                </defs>
                 <circle
                   cx="50"
                   cy="50"
                   r="40"
                   stroke="orange"
                   strokeWidth="8"
-                  fill="white"
+                  fill="url(#image)"
                   strokeLinecap="round"
                   strokeDasharray="251"
-                  strokeDashoffset={`${251 - (referencingProgress / 100) * 251}`}
+                  strokeDashoffset={strokeDashoffset}
                 />
-              </svg>
-                <div className="absolute inset-0 flex items-center justify-center text-xl font-semibold" style={{ color: '#474457'  }}>
-                <StatsNumber style={{zIndex:20}}>
-                  {referencingProgress}%
-                </StatsNumber>
-                <svg style={{zIndex:10}} width="52" height="64" viewBox="0 0 52 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M26 64C26 64 52 51.2 52 32V9.6C52 9.6 42.8958 8.60136 37.5 6.5C32.6929 4.62792 26 0 26 0C26 0 19.6267 4.63161 15 6.5C9.45353 8.73983 0 9.6 0 9.6V32C0 51.2 26 64 26 64Z" fill="#4DA41A"/>
                 </svg>
+                <div className="absolute inset-0 flex items-center justify-center text-xl font-semibold text-white" style={{ width: '100%', height: '100%',  }}>
+                {referencingProgress === 6 ? (
+                  <svg width="20" height="20" viewBox="-3 -3 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: '24%', height: '24%',  }}>
+                  <g clip-path="url(#clip0_1726_13952)">
+                  <path d="M25.5372 11.3595C25.2208 11.0993 24.7425 10.7061 24.6879 10.502C24.6267 10.2727 24.8418 9.69612 24.9988 9.27507C25.3028 8.45934 25.6477 7.53463 25.1924 6.74773C24.7316 5.95136 23.75 5.78801 22.8838 5.64381C22.4712 5.57501 21.8477 5.47119 21.6882 5.31175C21.5288 5.15231 21.425 4.52877 21.3562 4.11617C21.212 3.24996 21.0484 2.2684 20.2521 1.80759C19.4656 1.35235 18.5407 1.69718 17.7247 2.00123C17.3039 2.1582 16.7271 2.37284 16.498 2.31187C16.2939 2.25728 15.9007 1.77896 15.6403 1.46255C15.0767 0.777214 14.4377 0 13.5 0C12.5623 0 11.9233 0.777214 11.3595 1.46276C11.0993 1.77917 10.7061 2.25748 10.502 2.31207C10.2725 2.37305 9.69612 2.1582 9.27507 2.00123C8.45934 1.69718 7.53463 1.35235 6.74773 1.80759C5.95136 2.2684 5.78801 3.24996 5.64381 4.11617C5.57501 4.52877 5.47119 5.15231 5.31175 5.31175C5.15231 5.47119 4.52877 5.57501 4.11617 5.64381C3.24996 5.78801 2.2684 5.95157 1.80759 6.74794C1.35235 7.53463 1.69718 8.45934 2.00123 9.27528C2.1582 9.69612 2.37305 10.2729 2.31187 10.502C2.25728 10.7061 1.77896 11.0993 1.46255 11.3597C0.777214 11.9233 0 12.5623 0 13.5C0 14.4377 0.777214 15.0767 1.46276 15.6405C1.77917 15.9007 2.25748 16.2939 2.31207 16.498C2.37325 16.7273 2.1582 17.3039 2.00123 17.7249C1.69718 18.5407 1.35235 19.4654 1.80759 20.2523C2.2684 21.0486 3.24996 21.212 4.11617 21.3562C4.52877 21.425 5.15231 21.5288 5.31175 21.6882C5.47119 21.8477 5.57501 22.4712 5.64381 22.8838C5.78801 23.75 5.95157 24.7316 6.74794 25.1924C7.53442 25.6477 8.45934 25.3028 9.27528 24.9988C9.69612 24.8418 10.2731 24.6272 10.502 24.6881C10.7061 24.7427 11.0993 25.221 11.3597 25.5374C11.9233 26.2228 12.5623 27 13.5 27C14.4377 27 15.0767 26.2228 15.6405 25.5372C15.9007 25.2208 16.2939 24.7425 16.498 24.6879C16.7275 24.6272 17.3039 24.8418 17.7249 24.9988C18.5407 25.3026 19.4654 25.6477 20.2523 25.1924C21.0486 24.7316 21.212 23.75 21.3562 22.8838C21.425 22.4712 21.5288 21.8477 21.6882 21.6882C21.8477 21.5288 22.4712 21.425 22.8838 21.3562C23.75 21.212 24.7316 21.0484 25.1924 20.2521C25.6477 19.4654 25.3028 18.5407 24.9988 17.7247C24.8418 17.3039 24.627 16.7271 24.6881 16.498C24.7427 16.2939 25.221 15.9007 25.5374 15.6403C26.2228 15.0767 27 14.4377 27 13.5C27 12.5623 26.2228 11.9233 25.5372 11.3595Z" fill="white"/>
+                  <path d="M25.4831 11.3595C25.1549 11.0993 24.6589 10.7061 24.6023 10.502C24.5388 10.2727 24.7619 9.69612 24.9247 9.27507C25.24 8.45934 25.5976 7.53463 25.1255 6.74773C24.6476 5.95136 23.6297 5.78801 22.7314 5.64381C22.3035 5.57501 21.6569 5.47119 21.4915 5.31175C21.3262 5.15231 21.2185 4.52877 21.1472 4.11617C20.9976 3.24996 20.828 2.2684 20.0021 1.80759C19.1865 1.35235 18.2274 1.69718 17.3812 2.00123C16.9448 2.1582 16.3466 2.37284 16.1091 2.31187C15.8974 2.25728 15.4896 1.77896 15.2195 1.46255C14.6351 0.777214 13.9724 0 13 0V27C13.9724 27 14.6351 26.2228 15.2198 25.5372C15.4896 25.2208 15.8974 24.7425 16.1091 24.6879C16.347 24.6272 16.9448 24.8418 17.3814 24.9988C18.2274 25.3026 19.1863 25.6477 20.0023 25.1924C20.8282 24.7316 20.9976 23.75 21.1472 22.8838C21.2185 22.4712 21.3262 21.8477 21.4915 21.6882C21.6569 21.5288 22.3035 21.425 22.7314 21.3562C23.6297 21.212 24.6476 21.0484 25.1255 20.2521C25.5976 19.4654 25.24 18.5407 24.9247 17.7247C24.7619 17.3039 24.5391 16.7271 24.6025 16.498C24.6591 16.2939 25.1552 15.9007 25.4833 15.6403C26.194 15.0767 27 14.4377 27 13.5C27 12.5623 26.194 11.9233 25.4831 11.3595Z" fill="#F5F5F5"/>
+                  <path d="M19.7096 10.0913C19.6311 9.54212 19.3435 9.05618 18.8996 8.7235C18.4559 8.39061 17.909 8.25054 17.3598 8.32881C16.8106 8.4073 16.3249 8.69507 15.992 9.13878L12.7556 13.4537L11.3336 12.0318C10.5239 11.222 9.20635 11.222 8.39638 12.0318C7.58662 12.8415 7.58662 14.1593 8.39638 14.969L11.5118 18.0843C11.904 18.4767 12.4256 18.6926 12.9804 18.6926C13.0294 18.6926 13.0788 18.6909 13.1276 18.6874C13.7285 18.6448 14.2806 18.3438 14.6419 17.8618L19.3151 11.6311C19.648 11.1872 19.788 10.6405 19.7096 10.0913Z" fill="#2A6C00"/>
+                  </g>
+                  <defs>
+                  <clipPath id="clip0_1726_13952">
+                  <rect width="100px" height="100px" fill="white" transform="translate(0.0742188 0.0742188)"/>
+                  </clipPath>
+                  </defs>
+                  </svg>
+                ) : (
+                  <StatsNumber style={{ zIndex: 20, fill: 'white' }}>
+                  {referencingProgress}
+                  </StatsNumber>
+                )}
                 </div>
-                
-
-               
- 
               
             </div>
             
@@ -256,13 +278,13 @@ const TenantReferencing: React.FC = () => {
             </div>
           
 
-          <button className="w-full text-white py-2 rounded-lg mt-4 hover:bg-blue-700" style={{ backgroundColor: '#136C9E' }}>
+          <button className="w-full text-white py-2 rounded-lg mt-4 hover:bg-blue-700" style={{ backgroundColor: '#136C9E', borderRadius: '32px', padding: '1rem', width: '100%', marginTop: '1rem' }}>
             Resume Process
           </button>
         </div>
 
         {/* Right Panel */}
-        <div className="col-span-2 grid grid-cols-2 gap-4 ">
+        <div className="col-span-2 grid grid-cols-2 gap-4 " style={{  borderRadius: '8px', padding: '1rem', width: '100%' }}>
           {sections.map((section) => (
                 <div key={section.title} className="p-0 flex flex-row rounded-lg shadow" style={{ backgroundColor: 'white' }}>
                 <div className="flex flex-col justify-between items-start"style={{ backgroundColor: '#4E97CC', borderRadius: '8px 0 0 8px', padding: '1rem', width:'30%', height: '260px' }}>
@@ -270,7 +292,7 @@ const TenantReferencing: React.FC = () => {
                     {section.icon}
                   </div>
                     <div className="mt-auto">
-                    <h2 className="text-lg font-semibold" style={{ color: 'white' }}>{section.title}</h2>
+                    <h2 className="CardName text-lg font-semibold" style={{ color: 'white' }}>{section.title}</h2>
                     <p className="text-xs" style={{ color: 'white' }} >As of {formatDate(new Date().toISOString())}</p>
                     </div>
                 </div>

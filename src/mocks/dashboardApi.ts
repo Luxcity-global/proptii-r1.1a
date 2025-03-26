@@ -20,7 +20,14 @@ export interface DashboardSummary {
     progress: number;
     completedSteps: number;
     totalSteps: number;
-    nextStep?: string;
+    identity: boolean,
+    employment: boolean,
+    residential: boolean,
+    financial: boolean,
+    guarantor: boolean,
+    agentDetails: boolean,
+    
+    
   };
   contracts: {
     pending: number;
@@ -127,11 +134,27 @@ const mockDashboardData: DashboardSummary = {
     }
   },
   referencing: {
-    status: 'in_progress',
-    progress: 50,
-    completedSteps: 3,
+    status: 'not_started',
+    identity: true,
+    employment: true,
+    residential: true,
+    financial: true,
+    guarantor: true,
+    agentDetails: true,
+    get progress() {
+      return [
+        this.identity,
+        this.employment,
+        this.residential,
+        this.financial,
+        this.guarantor,
+        this.agentDetails
+      ].reduce((acc, curr) => acc + (curr ? 1 : 0), 0);
+    },
+    get completedSteps() {
+      return this.progress;
+    },
     totalSteps: 6,
-    nextStep: 'Financial Information'
   },
   contracts: {
     pending: 0,

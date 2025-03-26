@@ -1,32 +1,24 @@
-import React from 'react';
-import { 
-  Box, 
-  List, 
-  ListItem, 
-  ListItemButton, 
-  ListItemIcon, 
+import React, { useState } from 'react';
+import {
+  Box,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
   ListItemText,
   Divider,
   Avatar,
   IconButton,
   Tooltip,
   styled,
-  Button
+  Button,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { DASHBOARD_SECTIONS, BLUE_COLOR, DARK_GREY } from '../Dashboard';
-
-// Import icons
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import BookmarkIcon from '@mui/icons-material/Bookmark';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import SettingsIcon from '@mui/icons-material/Settings';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import FolderIcon from '@mui/icons-material/Folder';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import MenuIcon from '@mui/icons-material/Menu';
 
 interface DashboardSidebarProps {
   activeSection: string;
@@ -34,7 +26,6 @@ interface DashboardSidebarProps {
 }
 
 const SidebarContainer = styled(Box)(({ theme }) => ({
-  width: 220,
   flexShrink: 0,
   borderRight: '1px solid',
   borderColor: theme.palette.divider,
@@ -42,160 +33,47 @@ const SidebarContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   height: '100%',
+  transition: 'width 0.3s',
 }));
 
-const NavList = styled(List)({
+const NavList = styled(List)(() => ({
   padding: '8px',
-  flexGrow: 1
-});
+  flexGrow: 1,
+}));
 
 const LogoContainer = styled(Box)(({ theme }) => ({
   padding: theme.spacing(2),
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
-  marginBottom: theme.spacing(1)
+  marginBottom: theme.spacing(1),
 }));
 
-/**
- * Dashboard sidebar component with navigation
- */
-const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ 
+const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   activeSection,
-  onSectionChange
+  onSectionChange,
 }) => {
   const navigate = useNavigate();
-
-  // Map section IDs to icons
-  const getIcon = (sectionId: string) => {
-    switch (sectionId) {
-      case 'dashboard':
-        return (
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <g clipPath="url(#clip0_1919_20172)">
-              <path
-          d="M19.9167 10.0311C19.5893 7.51064 18.3144 5.20941 16.3512 3.59516C14.388 1.98092 11.8837 1.1748 9.34747 1.34067C6.81122 1.50653 4.4333 2.63193 2.69703 4.48811C0.960757 6.34429 -0.00356686 8.79197 6.17117e-05 11.3336C-0.00474196 12.6941 0.270943 14.0409 0.809907 15.29C1.34887 16.5391 2.13954 17.6637 3.13256 18.5936C3.89201 19.2968 4.89269 19.681 5.92756 19.667H14.0667C15.16 19.6695 16.2104 19.2418 16.9909 18.4761C18.1032 17.394 18.947 16.0668 19.455 14.6005C19.963 13.1342 20.1211 11.5694 19.9167 10.0311ZM15.8259 17.2811C15.357 17.7431 14.7249 18.0015 14.0667 18.0003H5.92756C5.31862 18.0128 4.72797 17.7919 4.27673 17.3828C3.44946 16.6079 2.79075 15.6708 2.34169 14.63C1.89264 13.5893 1.66287 12.4671 1.66673 11.3336C1.66755 10.1605 1.91571 9.00072 2.39501 7.92996C2.87431 6.85921 3.57399 5.90155 4.44839 5.11946C5.96768 3.74938 7.94259 2.99394 9.98839 3.00029C10.3153 3.00043 10.6419 3.01879 10.9667 3.05529C12.5297 3.23682 14.0093 3.85743 15.2342 4.84523C16.459 5.83303 17.3789 7.14761 17.8874 8.6367C18.3959 10.1258 18.4721 11.7285 18.1073 13.2591C17.7424 14.7897 16.9514 16.1857 15.8259 17.2853V17.2811ZM6.5059 14.9045C6.66392 15.0592 6.75401 15.2703 6.75636 15.4915C6.7587 15.7126 6.6731 15.9256 6.51839 16.0836C6.36369 16.2417 6.15254 16.3317 5.9314 16.3341C5.71026 16.3364 5.49725 16.2508 5.33923 16.0961C4.39336 15.1696 3.74481 13.9824 3.47624 12.6859C3.20766 11.3894 3.33124 10.0422 3.83122 8.81623C4.33119 7.59021 5.18491 6.54083 6.28356 5.80186C7.38221 5.06289 8.67601 4.66781 10.0001 4.66696C10.3188 4.66687 10.6371 4.68943 10.9526 4.73446C11.0609 4.75008 11.1651 4.7869 11.2592 4.84281C11.3534 4.89872 11.4355 4.97262 11.5011 5.0603C11.5666 5.14799 11.6143 5.24772 11.6413 5.35382C11.6683 5.45991 11.6741 5.57028 11.6584 5.67863C11.644 5.78757 11.6081 5.89254 11.5525 5.98737C11.497 6.08219 11.4231 6.16496 11.3351 6.2308C11.2472 6.29664 11.1469 6.34423 11.0403 6.37076C10.9337 6.39729 10.8228 6.40223 10.7142 6.38529C9.6713 6.23633 8.60797 6.42059 7.67597 6.9118C6.74398 7.403 5.99095 8.17604 5.52436 9.12059C5.05777 10.0651 4.90145 11.1329 5.07771 12.1716C5.25397 13.2103 5.75381 14.1667 6.5059 14.9045ZM16.5992 10.3811C16.6443 10.6966 16.6668 11.0149 16.6667 11.3336C16.6694 12.2217 16.4931 13.1012 16.1484 13.9196C15.8036 14.738 15.2974 15.4785 14.6601 16.097C14.5018 16.2517 14.2886 16.3372 14.0673 16.3347C13.846 16.3322 13.6348 16.2419 13.4801 16.0836C13.3254 15.9254 13.2398 15.7122 13.2423 15.4909C13.2448 15.2696 13.3351 15.0583 13.4934 14.9036C14.0564 14.3548 14.4816 13.6806 14.7342 12.936C14.9868 12.1914 15.0596 11.3976 14.9467 10.6195C14.9151 10.4005 14.9718 10.178 15.1042 10.0009C15.2367 9.82376 15.4341 9.70648 15.653 9.67488C15.8719 9.64327 16.0944 9.69993 16.2715 9.83237C16.4487 9.96482 16.566 10.1622 16.5976 10.3811H16.5992ZM11.6051 10.907C11.7053 11.2676 11.6834 11.6513 11.5426 11.9981C11.4018 12.3449 11.1501 12.6354 10.8268 12.824C10.5035 13.0127 10.1269 13.089 9.75566 13.041C9.38443 12.9931 9.03955 12.8235 8.77487 12.5588C8.5102 12.2941 8.34062 11.9493 8.29264 11.578C8.24466 11.2068 8.32097 10.8301 8.50965 10.5069C8.69833 10.1836 8.98877 9.9319 9.33559 9.79111C9.68241 9.65031 10.0661 9.62834 10.4267 9.72863L13.5776 6.57779C13.6544 6.4982 13.7464 6.43472 13.8481 6.39104C13.9497 6.34737 14.0591 6.32438 14.1697 6.32342C14.2804 6.32246 14.3901 6.34354 14.4925 6.38544C14.5949 6.42734 14.688 6.48922 14.7662 6.56746C14.8445 6.64571 14.9063 6.73875 14.9482 6.84117C14.9901 6.94358 15.0112 7.05331 15.0103 7.16396C15.0093 7.27461 14.9863 7.38396 14.9426 7.48563C14.899 7.5873 14.8355 7.67926 14.7559 7.75613L11.6051 10.907Z"
-          fill={activeSection === 'dashboard' ? BLUE_COLOR : '#374957'}
-              />
-            </g>
-          </svg>
-        );
-      case 'saved-searches':
-        return (
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 20 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <g clipPath="url(#clip0_1919_20172)">
-              <path
-          d="M6.5 4.482c1.664-1.673 5.825 1.254 0 5.018-5.825-3.764-1.664-6.69 0-5.018" fill={activeSection === 'saved-searches' ? BLUE_COLOR : '#374957'}/>
-           <path d="M13 6.5a6.47 6.47 0 0 1-1.258 3.844q.06.044.115.098l3.85 3.85a1 1 0 0 1-1.414 1.415l-3.85-3.85a1 1 0 0 1-.1-.115h.002A6.5 6.5 0 1 1 13 6.5M6.5 12a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11"
-          fill={activeSection === 'saved-searches' ? BLUE_COLOR : '#374957'}
-              />
-            </g>
-          </svg>
-        );
-      case 'favorites':
-        return <FavoriteIcon />;
-      case 'viewings':
-        return (
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <g clipPath="url(#clip0_1919_20172)">
-              <path
-          d="M19.3923 8.34956C18.0998 6.24456 15.1598 2.71289 9.9998 2.71289C4.8398 2.71289 1.8998 6.24456 0.607299 8.34956C0.207739 8.99581 -0.00390625 9.74059 -0.00390625 10.5004C-0.00390625 11.2602 0.207739 12.005 0.607299 12.6512C1.8998 14.7562 4.8398 18.2879 9.9998 18.2879C15.1598 18.2879 18.0998 14.7562 19.3923 12.6512C19.7919 12.005 20.0035 11.2602 20.0035 10.5004C20.0035 9.74059 19.7919 8.99581 19.3923 8.34956ZM17.9715 11.7787C16.8615 13.5837 14.349 16.6212 9.9998 16.6212C5.65063 16.6212 3.13813 13.5837 2.02813 11.7787C1.79074 11.3946 1.66501 10.952 1.66501 10.5004C1.66501 10.0488 1.79074 9.60619 2.02813 9.22206C3.13813 7.41706 5.65063 4.37956 9.9998 4.37956C14.349 4.37956 16.8615 7.41372 17.9715 9.22206C18.2089 9.60619 18.3346 10.0488 18.3346 10.5004C18.3346 10.952 18.2089 11.3946 17.9715 11.7787Z" fill={activeSection === 'viewings' ? BLUE_COLOR : '#374957'}/>
-          <path d="M9.99968 6.33301C9.17559 6.33301 8.37001 6.57738 7.6848 7.03522C6.9996 7.49306 6.46554 8.1438 6.15018 8.90516C5.83481 9.66652 5.7523 10.5043 5.91307 11.3126C6.07384 12.1208 6.47068 12.8632 7.0534 13.446C7.63612 14.0287 8.37855 14.4255 9.1868 14.5863C9.99505 14.7471 10.8328 14.6645 11.5942 14.3492C12.3555 14.0338 13.0063 13.4998 13.4641 12.8146C13.922 12.1293 14.1663 11.3238 14.1663 10.4997C14.165 9.39501 13.7256 8.33597 12.9445 7.55486C12.1634 6.77374 11.1043 6.33433 9.99968 6.33301ZM9.99968 12.9997C9.50522 12.9997 9.02187 12.8531 8.61075 12.5783C8.19963 12.3036 7.8792 11.9132 7.68998 11.4564C7.50076 10.9996 7.45125 10.4969 7.54771 10.0119C7.64418 9.527 7.88228 9.08154 8.23191 8.73191C8.58154 8.38228 9.027 8.14417 9.51195 8.04771C9.9969 7.95125 10.4996 8.00076 10.9564 8.18998C11.4132 8.37919 11.8036 8.69963 12.0784 9.11075C12.3531 9.52187 12.4997 10.0052 12.4997 10.4997C12.4997 11.1627 12.2363 11.7986 11.7674 12.2674C11.2986 12.7363 10.6627 12.9997 9.99968 12.9997Z"
-          fill={activeSection === 'viewings' ? BLUE_COLOR : '#374957'}
-              />
-            </g>
-          </svg>
-        );
-      case 'referencing':
-        return <AssignmentIcon />;
-      case 'TenantContracts':
-        return (
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <g clipPath="url(#clip0_1919_20172)">
-              <path
-          d="M14.1665 11.6667C14.1665 11.8877 14.0787 12.0997 13.9224 12.2559C13.7661 12.4122 13.5542 12.5 13.3332 12.5H6.6665C6.44549 12.5 6.23353 12.4122 6.07725 12.2559C5.92097 12.0997 5.83317 11.8877 5.83317 11.6667C5.83317 11.4457 5.92097 11.2337 6.07725 11.0774C6.23353 10.9211 6.44549 10.8334 6.6665 10.8334H13.3332C13.5542 10.8334 13.7661 10.9211 13.9224 11.0774C14.0787 11.2337 14.1665 11.4457 14.1665 11.6667ZM10.8332 14.1667H6.6665C6.44549 14.1667 6.23353 14.2545 6.07725 14.4108C5.92097 14.567 5.83317 14.779 5.83317 15C5.83317 15.221 5.92097 15.433 6.07725 15.5893C6.23353 15.7456 6.44549 15.8334 6.6665 15.8334H10.8332C11.0542 15.8334 11.2661 15.7456 11.4224 15.5893C11.5787 15.433 11.6665 15.221 11.6665 15C11.6665 14.779 11.5787 14.567 11.4224 14.4108C11.2661 14.2545 11.0542 14.1667 10.8332 14.1667ZM18.3332 8.73752V15.8334C18.3319 16.938 17.8924 17.9971 17.1113 18.7782C16.3302 19.5593 15.2712 19.9987 14.1665 20H5.83317C4.72851 19.9987 3.66947 19.5593 2.88835 18.7782C2.10724 17.9971 1.66783 16.938 1.6665 15.8334V4.16669C1.66783 3.06202 2.10724 2.00298 2.88835 1.22187C3.66947 0.440754 4.72851 0.00134242 5.83317 1.92072e-05H9.59567C10.362 -0.00195323 11.1212 0.148009 11.8292 0.441235C12.5372 0.734461 13.1801 1.16513 13.7207 1.70835L16.624 4.61335C17.1675 5.15355 17.5985 5.79623 17.8919 6.50416C18.1852 7.2121 18.3352 7.9712 18.3332 8.73752ZM12.5423 2.88669C12.2801 2.63265 11.9856 2.41412 11.6665 2.23669V5.83335C11.6665 6.05437 11.7543 6.26633 11.9106 6.42261C12.0669 6.57889 12.2788 6.66669 12.4998 6.66669H16.0965C15.919 6.34768 15.7001 6.05347 15.4457 5.79169L12.5423 2.88669ZM16.6665 8.73752C16.6665 8.60002 16.6398 8.46835 16.6273 8.33335H12.4998C11.8368 8.33335 11.2009 8.06996 10.7321 7.60112C10.2632 7.13228 9.99984 6.49639 9.99984 5.83335V1.70585C9.86484 1.69335 9.73234 1.66669 9.59567 1.66669H5.83317C5.17013 1.66669 4.53425 1.93008 4.0654 2.39892C3.59656 2.86776 3.33317 3.50364 3.33317 4.16669V15.8334C3.33317 16.4964 3.59656 17.1323 4.0654 17.6011C4.53425 18.07 5.17013 18.3334 5.83317 18.3334H14.1665C14.8295 18.3334 15.4654 18.07 15.9343 17.6011C16.4031 17.1323 16.6665 16.4964 16.6665 15.8334V8.73752Z"
-          fill={activeSection === 'TenantContracts' ? BLUE_COLOR : '#374957'}
-              />
-            </g>
-          </svg>
-        ); 
-      case 'YourFiles':
-        return (
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <g clipPath="url(#clip0_1919_20172)">
-              <path
-          d="M15.8333 2.49967H10.3933C10.2645 2.50053 10.1371 2.47203 10.0208 2.41634L7.39083 1.09634C7.04366 0.923462 6.66117 0.83333 6.27333 0.833008H4.16667C3.062 0.834331 2.00296 1.27374 1.22185 2.05486C0.440735 2.83597 0.00132321 3.89501 0 4.99967L0 14.9997C0.00132321 16.1043 0.440735 17.1634 1.22185 17.9445C2.00296 18.7256 3.062 19.165 4.16667 19.1663H15.8333C16.938 19.165 17.997 18.7256 18.7782 17.9445C19.5593 17.1634 19.9987 16.1043 20 14.9997V6.66634C19.9987 5.56168 19.5593 4.50264 18.7782 3.72152C17.997 2.94041 16.938 2.501 15.8333 2.49967V2.49967ZM4.16667 2.49967H6.27333C6.40221 2.49882 6.5296 2.52732 6.64583 2.58301L9.27583 3.89884C9.62266 4.07316 10.0052 4.16473 10.3933 4.16634H15.8333C16.3317 4.16715 16.8184 4.3169 17.2311 4.59635C17.6437 4.8758 17.9634 5.27221 18.1492 5.73467L1.66667 5.82801V4.99967C1.66667 4.33663 1.93006 3.70075 2.3989 3.23191C2.86774 2.76307 3.50363 2.49967 4.16667 2.49967V2.49967ZM15.8333 17.4997H4.16667C3.50363 17.4997 2.86774 17.2363 2.3989 16.7674C1.93006 16.2986 1.66667 15.6627 1.66667 14.9997V7.49467L18.3333 7.40051V14.9997C18.3333 15.6627 18.0699 16.2986 17.6011 16.7674C17.1323 17.2363 16.4964 17.4997 15.8333 17.4997Z"
-          fill={activeSection === 'YourFiles' ? BLUE_COLOR : '#374957'}
-              />
-            </g>
-          </svg>
-        );
-      case 'TenantReferencing':
-        return (
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <g clipPath="url(#clip0_1919_20172)">
-              <path
-          d="M3.33301 5.50045C3.00447 5.50131 2.67902 5.43702 2.37549 5.31129C2.07196 5.18556 1.79637 5.00088 1.56468 4.76795L0.27801 3.62295C0.112913 3.47576 0.0130503 3.26901 0.00039162 3.04818C-0.0122671 2.82736 0.0633147 2.61055 0.21051 2.44545C0.357705 2.28036 0.564456 2.18049 0.78528 2.16783C1.0061 2.15518 1.22291 2.23076 1.38801 2.37795L2.70884 3.55629C2.78446 3.6412 2.87665 3.70974 2.97974 3.75769C3.08283 3.80565 3.19465 3.83199 3.30831 3.83512C3.42196 3.83824 3.53506 3.81807 3.64063 3.77585C3.7462 3.73363 3.84201 3.67025 3.92218 3.58962L6.92551 0.730453C7.087 0.586678 7.29806 0.511302 7.5141 0.520245C7.73013 0.529188 7.93424 0.621751 8.08329 0.778382C8.23235 0.935013 8.3147 1.14345 8.31293 1.35966C8.31117 1.57588 8.22544 1.78294 8.07384 1.93712L5.08301 4.78212C4.85282 5.01097 4.57978 5.1922 4.2795 5.31546C3.97923 5.43871 3.6576 5.50158 3.33301 5.50045V5.50045ZM19.9997 3.83379C19.9997 3.61277 19.9119 3.40081 19.7556 3.24453C19.5993 3.08825 19.3874 3.00045 19.1663 3.00045H10.833C10.612 3.00045 10.4 3.08825 10.2438 3.24453C10.0875 3.40081 9.99968 3.61277 9.99968 3.83379C9.99968 4.0548 10.0875 4.26676 10.2438 4.42304C10.4 4.57932 10.612 4.66712 10.833 4.66712H19.1663C19.3874 4.66712 19.5993 4.57932 19.7556 4.42304C19.9119 4.26676 19.9997 4.0548 19.9997 3.83379ZM5.08301 11.4488L8.07384 8.60379C8.15732 8.52947 8.22499 8.43912 8.27284 8.33811C8.32068 8.23711 8.34772 8.12751 8.35235 8.01584C8.35697 7.90417 8.33908 7.79271 8.29975 7.6881C8.26042 7.58349 8.20044 7.48785 8.12339 7.40689C8.04634 7.32593 7.9538 7.26129 7.85126 7.21683C7.74872 7.17236 7.63828 7.14898 7.52652 7.14807C7.41476 7.14716 7.30396 7.16873 7.20071 7.21152C7.09746 7.25431 7.00387 7.31742 6.92551 7.39712L3.92551 10.2563C3.76687 10.408 3.55584 10.4926 3.33634 10.4926C3.11685 10.4926 2.90582 10.408 2.74718 10.2563L1.42218 8.93545C1.26501 8.78365 1.05451 8.69966 0.836009 8.70156C0.617512 8.70346 0.408501 8.7911 0.253994 8.9456C0.0994876 9.10011 0.0118468 9.30912 0.00994815 9.52762C0.00804947 9.74612 0.0920448 9.95662 0.243843 10.1138L1.56468 11.4346C2.03107 11.9011 2.66294 12.1644 3.32259 12.167C3.98224 12.1697 4.61621 11.9115 5.08634 11.4488H5.08301ZM19.9997 10.5005C19.9997 10.2794 19.9119 10.0675 19.7556 9.9112C19.5993 9.75492 19.3874 9.66712 19.1663 9.66712H10.833C10.612 9.66712 10.4 9.75492 10.2438 9.9112C10.0875 10.0675 9.99968 10.2794 9.99968 10.5005C9.99968 10.7215 10.0875 10.9334 10.2438 11.0897C10.4 11.246 10.612 11.3338 10.833 11.3338H19.1663C19.3874 11.3338 19.5993 11.246 19.7556 11.0897C19.9119 10.9334 19.9997 10.7215 19.9997 10.5005ZM5.08301 18.1155L8.07051 15.2705C8.15399 15.1961 8.22166 15.1058 8.26951 15.0048C8.31735 14.9038 8.34439 14.7942 8.34901 14.6825C8.35363 14.5708 8.33575 14.4594 8.29641 14.3548C8.25708 14.2502 8.19711 14.1545 8.12006 14.0736C8.04301 13.9926 7.95046 13.928 7.84792 13.8835C7.74539 13.839 7.63495 13.8156 7.52319 13.8147C7.41143 13.8138 7.30063 13.8354 7.19737 13.8782C7.09412 13.921 7.00054 13.9841 6.92218 14.0638L3.92218 16.923C3.84201 17.0036 3.7462 17.067 3.64063 17.1092C3.53506 17.1514 3.42196 17.1716 3.30831 17.1685C3.19465 17.1653 3.08283 17.139 2.97974 17.091C2.87665 17.0431 2.78446 16.9745 2.70884 16.8896L1.38801 15.7113C1.22291 15.5641 1.0061 15.4885 0.78528 15.5012C0.564456 15.5138 0.357705 15.6137 0.21051 15.7788C0.0633147 15.9439 -0.0122671 16.1607 0.00039162 16.3815C0.0130503 16.6023 0.112913 16.8091 0.27801 16.9563L1.56468 18.1013C2.03107 18.5678 2.66294 18.8311 3.32259 18.8337C3.98224 18.8364 4.61621 18.5782 5.08634 18.1155H5.08301ZM19.9997 17.1671C19.9997 16.9461 19.9119 16.7341 19.7556 16.5779C19.5993 16.4216 19.3874 16.3338 19.1663 16.3338H10.833C10.612 16.3338 10.4 16.4216 10.2438 16.5779C10.0875 16.7341 9.99968 16.9461 9.99968 17.1671C9.99968 17.3881 10.0875 17.6001 10.2438 17.7564C10.4 17.9127 10.612 18.0005 10.833 18.0005H19.1663C19.3874 18.0005 19.5993 17.9127 19.7556 17.7564C19.9119 17.6001 19.9997 17.3881 19.9997 17.1671Z"
-          fill={activeSection === 'TenantReferencing' ? BLUE_COLOR : '#374957'}
-              />
-            </g>
-          </svg>
-        ) ;
-      default:
-        return <DashboardIcon />;
-    }
-  };
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleNavClick = (sectionId: string, path: string) => {
     onSectionChange(sectionId);
     navigate(path);
   };
 
+  const toggleSidebar = () => {
+    setIsCollapsed(!isCollapsed);
+  };
+
   return (
-    <SidebarContainer>
+    <SidebarContainer sx={{ width: isCollapsed ? 60 : 220 }}>
       {/* Logo */}
       <LogoContainer>
         <IconButton onClick={() => navigate('/referencing')}>
-          <img 
-        src="/images/proptii-logo.png" 
-        alt="Proptii" 
-        style={{ height: 40, width: 'auto' }} 
+          <img
+            src={isCollapsed ? '/images/Proptii ico.png' : '/images/proptii-logo.png'}
+            alt="Proptii"
+            style={{ height: 40, width: 'auto' }}
           />
         </IconButton>
       </LogoContainer>
@@ -203,93 +81,127 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       <Divider />
 
       {/* Navigation Items */}
-      <NavList>
-        {DASHBOARD_SECTIONS.map((section) => (
-          <ListItem key={section.id} disablePadding sx={{ mb: 0.5 }}>
-            <ListItemButton
-              selected={activeSection === section.id}
-              onClick={() => handleNavClick(section.id, section.path)}
-              sx={{
-                borderRadius: '8px',
-                '&.Mui-selected': {
-                  backgroundColor: 'rgba(19, 108, 158, 0.1)',
-                  '&:hover': {
-                    backgroundColor: 'rgba(19, 108, 158, 0.15)',
-                  },
-                  '& .MuiListItemIcon-root': {
-                    color: BLUE_COLOR,
-                  },
-                  '& .MuiListItemText-primary': {
-                    color: BLUE_COLOR,
-                    fontWeight: 600,
-                  },
-                },
-              }}
-            >
-              <ListItemIcon sx={{ 
-                minWidth: '40px',
-                color: activeSection === section.id ? BLUE_COLOR : DARK_GREY
-              }}>
-                {getIcon(section.id)}
-              </ListItemIcon>
-              <ListItemText 
-                primary={section.label} 
-                primaryTypographyProps={{ 
-                  fontSize: '0.9rem',
-                  fontWeight: activeSection === section.id ? 600 : 400
-                }}
-              />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </NavList>
-
-      {/* Return to Site Button */}
-      <Box sx={{ p: 2 }}>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<ArrowBackIcon />}
+      <NavList
+  sx={{
+    display: 'flex',
+    flexDirection: 'column',
+    gap: isCollapsed ? '1px' : '2px', // Increase gap when collapsed
+  }}
+>
+  {DASHBOARD_SECTIONS.map((section) => (
+    <ListItem key={section.id} disablePadding sx={{ mb: isCollapsed ? 2 : 0.5 }}>
+      <ListItemButton
+        selected={activeSection === section.id}
+        onClick={() => handleNavClick(section.id, section.path)}
+        sx={{
+          borderRadius: '8px',
+          justifyContent: isCollapsed ? 'center' : 'flex-start', // Center the button when collapsed
+          '&.Mui-selected': {
+            backgroundColor: 'rgba(19, 108, 158, 0.1)',
+            '&:hover': {
+              backgroundColor: 'rgba(19, 108, 158, 0.15)',
+            },
+            '& .MuiListItemIcon-root': {
+              color: BLUE_COLOR,
+            },
+            '& .MuiListItemText-primary': {
+              color: BLUE_COLOR,
+              fontWeight: 600,
+            },
+          },
+        }}
+      >
+        <ListItemIcon
           sx={{
-        borderRadius: '50px',
-        textTransform: 'none',
-        backgroundColor: 'white',
-        border: '1px solid',
-        borderColor: BLUE_COLOR,
-        width: '100%',
-        height: '40px',
-        color: BLUE_COLOR,
-        '&:hover': {
-          backgroundColor: 'rgba(19, 108, 158, 0.1)',
-        },
+            minWidth: '40px',
+            color: activeSection === section.id ? BLUE_COLOR : DARK_GREY,
+            justifyContent: 'center', // Center the icon
+            alignItems: 'center', // Center the icon
+            display: 'flex', // Ensure the icon is flexed
           }}
-          onClick={() => navigate('/referencing')}
         >
-          Proptii Home
-        </Button>
-      </Box>
-     
+          {section.icon(activeSection === section.id)}
+        </ListItemIcon>
+        {!isCollapsed && (
+          <ListItemText
+            primary={section.label}
+            primaryTypographyProps={{
+              fontSize: '0.9rem',
+              fontWeight: activeSection === section.id ? 600 : 400,
+            }}
+          />
+        )}
+      </ListItemButton>
+    </ListItem>
+  ))}
+</NavList>
 
+      {/* Collapse/Expand Button */}
+<Box
+  sx={{
+    p: 2,
+    display: 'flex',
+    flexDirection: isCollapsed ? 'column' : 'column', // Stack horizontally when collapsed, vertically when expanded
+    justifyContent: isCollapsed ? 'center' : 'start', // Align to start when expanded, center when collapsed
+    alignItems: 'start', // Center vertically
+  }}
+>
+  
+  <IconButton onClick={toggleSidebar}>
+    <MenuIcon />
+  </IconButton>
+  <Avatar
+      sx={{
+        width: 38,
+        height: 38,
+        bgcolor: BLUE_COLOR,
+      }}
+    >
+      T
+  </Avatar>
+</Box>
+
+
+      
       {/* Bottom Actions */}
-      <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'start', mb: 1 }}>
-          <Tooltip title="Settings">
-            <IconButton size="small">
-              <SettingsIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Refresh">
-            <IconButton size="small">
-              <RefreshIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'start', justifyContent: 'start' }}>
-          <Avatar sx={{ width: 32, height: 32, bgcolor: BLUE_COLOR }}>T</Avatar>
-        </Box>
-      </Box>
+<Box
+  sx={{
+    p: 2,
+    borderTop: '1px solid',
+    borderColor: 'divider',
+    display: 'flex',
+    flexDirection: isCollapsed ? 'row' : 'column', // Stack horizontally when collapsed, vertically when expanded
+    alignItems: isCollapsed ? 'center' : 'flex-start', // Center when collapsed, align to start when expanded
+    justifyContent: isCollapsed ? 'center' : 'flex-start', // Center when collapsed, align to start when expanded
+    gap: 2, // Add spacing between items
+  }}
+>
+  {/* Grouped Settings and Refresh Icons */}
+  <Box
+    sx={{
+      display: 'flex',
+      flexDirection: isCollapsed ? 'column' : 'row', // Stack vertically when collapsed, horizontally when expanded
+      alignItems: 'center', // Always center the icons within the group
+      justifyContent: 'center', // Center the icons within the group
+      gap: 1, // Add spacing between icons
+    }}
+  >
+    <Tooltip title="Settings">
+      <IconButton size="small">
+        <SettingsIcon fontSize="small" />
+      </IconButton>
+    </Tooltip>
+    <Tooltip title="Refresh">
+      <IconButton size="small">
+        <RefreshIcon fontSize="small" />
+      </IconButton>
+    </Tooltip>
+  </Box>
+
+  
+</Box>
     </SidebarContainer>
   );
 };
 
-export default DashboardSidebar; 
+export default DashboardSidebar;
