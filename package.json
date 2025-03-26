@@ -16,6 +16,7 @@
     "@azure/msal-react": "^3.0.4",
     "@types/node": "^22.13.0",
     "axios": "^1.7.9",
+    "country-list": "^2.3.0",
     "lucide": "^0.474.0",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
@@ -23,7 +24,7 @@
     "react-icons": "^5.5.0",
     "react-router-dom": "^6.30.0",
     "save-dev": "^0.0.1-security",
-    "swiper": "^11.2.5"
+    "swiper": "^11.2.6"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
