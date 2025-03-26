@@ -65,12 +65,12 @@ const Referencing = () => {
       </section>
 
       {/* Steps Section */}
-      <section className="relative bg-cover bg-center bg-no-repeat py-16 px-6 min-h-[500px]" style={{ backgroundImage: "url('/public/images/Referencing.png')" }}>
+      <section className="relative bg-cover bg-center bg-no-repeat py-24 px-8 min-h-[550px] flex items-center justify-center" style={{ backgroundImage: "url('/public/images/Referencing.png')" }}>
       {/* Container with spacing */}
-      <div className="relative container mx-auto flex flex-col md:flex-row items-center justify-center justify-between gap-10 md:gap-16 lg:px-20 ">
+      <div className="relative container mx-auto flex flex-col md:flex-row items-center gap-12 lg:px-32">
         {/* Left Section - Text Content */}
-        <div className="md:w-1/2 space-y-6">
-          <h2 className="text-3xl font-bold text-blue-700 leading-tight">
+        <div className="md:w-1/2 space-y-10 md:text-left md:mr-12">
+          <h2 className="text-3xl font-bold text-[#136C9E] leading-tight">
             Steps for referencing
           </h2>
           <p className="text-gray-600 text-lg leading-relaxed">
@@ -84,21 +84,25 @@ const Referencing = () => {
 
         </div>
 
-        {/* Right Section - Swiper Carousel */}
-        <div className="md:w-1/2">
+{/* Right Section - Swiper Carousel */}
+        <div className="md:w-2/5 flex justify-center">
           <Swiper
             modules={[Pagination, Navigation]}
             pagination={{ clickable: true }}
             navigation
-            spaceBetween={30} /* Increase spacing for better layout */
+            spaceBetween={20} /* Increase spacing for better layout */
             slidesPerView={1}
-            className="w-full max-w-lg"
+            className="w-full max-w-md"
+            style={{
+              "--swiper-navigation-color": "#1C87C3",
+              "--swiper-pagination-color": "#1C87C3"
+            }}
           >
             {/* Slide 1 */}
             <SwiperSlide>
-            <div className="bg-blue-700 text-white p-6 rounded-3xl text-center shadow-lg">
-                <div className="bg-white p-4 rounded-lg inline-block mb-4">
-                  <img src="/icon.png" alt="icon" className="h-10 w-10"/>
+            <div className="bg-[#136C9E] text-white p-6 rounded-3xl text-center shadow-lg">
+                <div className="bg-white p-1 rounded-lg inline-block mb-12">
+                  <img src="/images/1-Review.png" alt="icon" className="h-20 w-20"/>
                 </div>
                 <h3 className="text-lg font-semibold">01. Review the Document Checklist</h3>
                 <p className="mt-2 text-gray-100">
@@ -109,26 +113,39 @@ const Referencing = () => {
 
             {/* Slide 2 */}
             <SwiperSlide>
-            <div className="bg-blue-700 text-white p-6 rounded-3xl text-center shadow-lg">
-                <div className="bg-white p-4 rounded-lg inline-block mb-4">
-                  <img src="/icon.png" alt="icon" className="h-10 w-10"/>
+            <div className="bg-[#136C9E] text-white p-6 rounded-3xl text-center shadow-lg">
+                <div className="bg-white p-1 rounded-lg inline-block mb-12">
+                  <img src="/images/2-Upload.png" alt="icon" className="h-20 w-20"/>
                 </div>
-                <h3 className="text-lg font-semibold">02. Submit Your Application</h3>
+                <h3 className="text-lg font-semibold">02. Upload Your Documents</h3>
                 <p className="mt-2 text-gray-100">
-                  Upload and submit your documents securely through our platform.
+                Ensure you have all the required documnts organized and ready for Submission
                 </p>
               </div>
             </SwiperSlide>
 
             {/* Slide 3 */}
             <SwiperSlide>
-            <div className="bg-blue-700 text-white p-6 rounded-3xl text-center shadow-lg">
-                <div className="bg-white p-4 rounded-lg inline-block mb-4">
-                  <img src="/icon.png" alt="icon" className="h-10 w-10"/>
+            <div className="bg-[#136C9E] text-white p-6 rounded-3xl text-center shadow-lg">
+                <div className="bg-white p-1 rounded-lg inline-block mb-12">
+                  <img src="/images/3-Respond.png" alt="icon" className="h-20 w-20"/>
                 </div>
-                <h3 className="text-lg font-semibold">03. Verification Process</h3>
+                <h3 className="text-lg font-semibold">03. Respond to Any Follow-Ups</h3>
                 <p className="mt-2 text-gray-100">
-                  Our team will review and verify your documents promptly.
+                Ensure you have all the required documents organized and ready for submission
+                </p>
+              </div>
+            </SwiperSlide>
+
+            {/* Slide 4 */}
+            <SwiperSlide>
+            <div className="bg-[#136C9E] text-white p-6 rounded-3xl text-center shadow-lg">
+                <div className="bg-white p-1 rounded-lg inline-block mb-12">
+                  <img src="/images/4-Receive.png" alt="icon" className="h-20 w-20"/>
+                </div>
+                <h3 className="text-lg font-semibold">04. Receive Feedback</h3>
+                <p className="mt-2 text-gray-100">
+                Ensure you have all the required documents organized and ready for submission
                 </p>
               </div>
             </SwiperSlide>
@@ -136,8 +153,6 @@ const Referencing = () => {
         </div>
       </div>
     </section>
-
-
 
       <FAQSection />
       <Footer />
