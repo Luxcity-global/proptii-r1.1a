@@ -1,8 +1,5 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import { MSALProviderWrapper } from './contexts/AuthContext';
 import Home from './pages/Home';
 import Referencing from './pages/Referencing';
 import RedirectUriWarning from './components/RedirectUriWarning';
@@ -14,19 +11,23 @@ import Dashboard from './components/dashboard/Dashboard';
 import DashboardHome from './components/dashboard/sections/DashboardHome';
 import SavedProperties from './components/dashboard/sections/SavedProperties';
 import Viewings from './components/dashboard/sections/Viewings';
-import theme from './theme/theme';
+import SavedListings from './components/saved-listings/SavedListings';
 import './App.css';
 import BookViewing from './pages/BookViewing';
+import { SearchTest } from './components/__tests__/SearchTest';
+import { PinStyleModalTest } from './components/__tests__/PinStyleModalTest';
+import { ZoplaModalTest } from './components/__tests__/ZoplaModalTest';
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <MSALProviderWrapper>
-        <RedirectUriWarning />
-        <Router>
+    <Router>
+      <div className="min-h-screen bg-gray-50">
+        <main>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/search-test" element={<SearchTest />} />
+            <Route path="/pin-style-test" element={<PinStyleModalTest />} />
+            <Route path="/zoopla-test" element={<ZoplaModalTest />} />
             <Route path="/referencing" element={<Referencing />} />
             <Route path="/referencing-test" element={<ReferencingTest />} />
             <Route path="/test-referencing" element={<TestReferencingPage />} />
@@ -38,15 +39,16 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />}>
               <Route index element={<DashboardHome />} />
               <Route path="saved-searches" element={<SavedProperties />} />
+              <Route path="saved-listings" element={<SavedListings />} />
               <Route path="viewings" element={<Viewings />} />
               <Route path="referencing" element={<div>Referencing Status</div>} />
               <Route path="contracts" element={<div>Contracts</div>} />
               <Route path="files" element={<div>Files</div>} />
             </Route>
           </Routes>
-        </Router>
-      </MSALProviderWrapper>
-    </ThemeProvider>
+        </main>
+      </div>
+    </Router>
   );
 }
 
