@@ -1114,7 +1114,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       {/* Modal container */}
       <div className="relative w-full max-w-5xl mx-auto my-8 bg-white rounded-lg shadow-xl flex overflow-hidden min-h-[600px]">
         {/* Sidebar */}
-        <div className="w-64 bg-gray-50 py-6 px-4 border-r border-gray-200 hidden md:block md:flex flex-col">
+        <div className="w-64 bg-gray-50 py-4 px-4 border-r border-gray-200 hidden md:block md:flex flex-col">
           <div className="mb-6 px-2">
             <h2 className="text-xl font-bold text-orange-600 mb-2">Referencing Steps</h2>
           </div>
