@@ -5,6 +5,7 @@ import { msalConfig } from './config/authConfig';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import Referencing from './pages/Referencing';
+import ContractsPage from './pages/Contracts';
 import ErrorBoundary from './components/ErrorBoundary';
 
 console.log('App.tsx - Starting initialization with config:', msalConfig);
@@ -39,6 +40,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/referencing" element={<Referencing />} />
+                <Route path="/contracts" element={<ContractsPage />} />
               </Routes>
             </div>
           </MsalAuthProvider>
