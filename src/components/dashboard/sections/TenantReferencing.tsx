@@ -104,7 +104,9 @@ const sections: Section[] = [
     title: "Financial",
     date: "30/01/2025",
     status:"Not Started",
-    checks: [{ name: "Proof of Income", status: "notStarted" }],
+    checks: [{ name: "Proof of Income", status: "notStarted" },
+            { name: "Monthly Income", status: "notStarted" }
+    ],
     icon: <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
     <g clip-path="url(#clip0_1726_13876)">
     <path d="M20.4118 19.5275H2.72694C2.49243 19.5275 2.26752 19.4344 2.10169 19.2685C1.93586 19.1027 1.8427 18.8778 1.8427 18.6433V0.958459C1.8427 0.723944 1.74954 0.499034 1.58371 0.333207C1.41788 0.16738 1.19297 0.0742188 0.958459 0.0742188C0.723944 0.0742188 0.499034 0.16738 0.333207 0.333207C0.16738 0.499034 0.0742188 0.723944 0.0742188 0.958459L0.0742188 18.6433C0.0742188 19.3468 0.353701 20.0215 0.851183 20.519C1.34866 21.0165 2.0234 21.296 2.72694 21.296H20.4118C20.6463 21.296 20.8712 21.2028 21.037 21.037C21.2028 20.8712 21.296 20.6463 21.296 20.4118C21.296 20.1772 21.2028 19.9523 21.037 19.7865C20.8712 19.6207 20.6463 19.5275 20.4118 19.5275Z" fill="#3F2E00"/>
@@ -121,7 +123,10 @@ const sections: Section[] = [
     title: "Guarantor",
     date: "30/01/2025",
     status: "Not Started",
-    checks: [{ name: "Address", status: "notStarted" }],
+    checks: [{ name: "Address", status: "notStarted" },
+            { name: "Name", status: "notStarted" },
+            { name: "Contact", status: "notStarted" }],
+    
     icon: <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
     <g clip-path="url(#clip0_1726_13921)">
     <path d="M6.70602 11.5693C5.91904 11.5693 5.14972 11.336 4.49536 10.8988C3.84101 10.4615 3.331 9.84008 3.02983 9.113C2.72866 8.38591 2.64986 7.58585 2.8034 6.81399C2.95693 6.04212 3.3359 5.33311 3.89239 4.77663C4.44887 4.22014 5.15788 3.84117 5.92974 3.68764C6.70161 3.53411 7.50167 3.61291 8.22875 3.91407C8.95584 4.21524 9.57728 4.72525 10.0145 5.37961C10.4517 6.03396 10.6851 6.80328 10.6851 7.59027C10.6839 8.64523 10.2643 9.65664 9.51837 10.4026C8.7724 11.1486 7.76098 11.5682 6.70602 11.5693ZM6.70602 5.37966C6.26881 5.37966 5.84141 5.50931 5.47788 5.75222C5.11435 5.99512 4.83101 6.34037 4.66369 6.74431C4.49638 7.14824 4.4526 7.59272 4.5379 8.02153C4.62319 8.45035 4.83373 8.84424 5.14289 9.1534C5.45205 9.46256 5.84594 9.6731 6.27476 9.75839C6.70357 9.84369 7.14805 9.79991 7.55198 9.6326C7.95592 9.46528 8.30117 9.18194 8.54407 8.81841C8.78698 8.45488 8.91663 8.02748 8.91663 7.59027C8.91663 7.00398 8.68372 6.4417 8.26916 6.02713C7.85459 5.61257 7.29231 5.37966 6.70602 5.37966ZM13.3378 20.4118V19.9696C13.3378 18.2108 12.6391 16.5239 11.3954 15.2802C10.1517 14.0365 8.46489 13.3378 6.70602 13.3378C4.94716 13.3378 3.26033 14.0365 2.01663 15.2802C0.772925 16.5239 0.0742188 18.2108 0.0742188 19.9696L0.0742188 20.4118C0.0742188 20.6463 0.16738 20.8712 0.333207 21.037C0.499034 21.2028 0.723944 21.296 0.958459 21.296C1.19297 21.296 1.41788 21.2028 1.58371 21.037C1.74954 20.8712 1.8427 20.6463 1.8427 20.4118V19.9696C1.8427 18.6798 2.35508 17.4428 3.26713 16.5307C4.17918 15.6187 5.41619 15.1063 6.70602 15.1063C7.99586 15.1063 9.23286 15.6187 10.1449 16.5307C11.057 17.4428 11.5693 18.6798 11.5693 19.9696V20.4118C11.5693 20.6463 11.6625 20.8712 11.8283 21.037C11.9942 21.2028 12.2191 21.296 12.4536 21.296C12.6881 21.296 12.913 21.2028 13.0788 21.037C13.2447 20.8712 13.3378 20.6463 13.3378 20.4118ZM21.296 15.9906C21.296 14.7957 20.9501 13.6263 20.3001 12.6237C19.6501 11.6211 18.7238 10.828 17.633 10.3402C16.5422 9.85246 15.3335 9.69086 14.1529 9.87491C12.9722 10.059 11.8701 10.5808 10.9796 11.3775C10.8918 11.4546 10.8202 11.5483 10.7689 11.6532C10.7176 11.7582 10.6876 11.8722 10.6806 11.9888C10.6736 12.1054 10.6898 12.2223 10.7282 12.3326C10.7666 12.4429 10.8265 12.5445 10.9045 12.6315C10.9824 12.7185 11.0768 12.7893 11.1822 12.8396C11.2876 12.8899 11.4019 12.9189 11.5186 12.9248C11.6352 12.9307 11.7519 12.9134 11.8618 12.874C11.9718 12.8345 12.0728 12.7737 12.1591 12.695C12.7953 12.1261 13.5825 11.7535 14.4258 11.6221C15.2691 11.4907 16.1323 11.6063 16.9114 11.9547C17.6905 12.3031 18.352 12.8696 18.8163 13.5858C19.2805 14.3019 19.5275 15.1371 19.5275 15.9906C19.5275 16.2251 19.6207 16.45 19.7865 16.6158C19.9523 16.7816 20.1772 16.8748 20.4118 16.8748C20.6463 16.8748 20.8712 16.7816 21.037 16.6158C21.2028 16.45 21.296 16.2251 21.296 15.9906ZM15.5484 8.03239C14.7614 8.03239 13.9921 7.79902 13.3378 7.36179C12.6834 6.92456 12.1734 6.30311 11.8722 5.57603C11.5711 4.84895 11.4923 4.04889 11.6458 3.27702C11.7993 2.50516 12.1783 1.79615 12.7348 1.23967C13.2913 0.683182 14.0003 0.304211 14.7722 0.150678C15.544 -0.00285629 16.3441 0.0759428 17.0712 0.37711C17.7982 0.678278 18.4197 1.18829 18.8569 1.84264C19.2941 2.497 19.5275 3.26632 19.5275 4.0533C19.5263 5.10826 19.1067 6.11968 18.3608 6.86565C17.6148 7.61162 16.6034 8.03122 15.5484 8.03239ZM15.5484 1.8427C15.1112 1.8427 14.6838 1.97235 14.3203 2.21526C13.9568 2.45816 13.6734 2.80341 13.5061 3.20734C13.3388 3.61128 13.295 4.05576 13.3803 4.48457C13.4656 4.91339 13.6761 5.30728 13.9853 5.61644C14.2945 5.92559 14.6883 6.13613 15.1172 6.22143C15.546 6.30673 15.9905 6.26295 16.3944 6.09563C16.7983 5.92832 17.1436 5.64498 17.3865 5.28145C17.6294 4.91792 17.759 4.49052 17.759 4.0533C17.759 3.46702 17.5261 2.90474 17.1116 2.49017C16.697 2.0756 16.1347 1.8427 15.5484 1.8427Z" fill="#3F2E00"/>
@@ -167,7 +172,7 @@ const ProgressItem: React.FC<{ check: CheckItem }> = ({ check }) => {
   }
 
   return (
-    <div className="flex justify-between items-center text-sm">
+    <div className="flex justify-between items-center text-sm" style={{ backgroundColor: '#f5f5f5', padding: '0.5rem', borderRadius: '32px', paddingBottom: '0.5rem', paddingTop: '0.5rem', paddingLeft: '1rem', paddingRight: '1rem', width: '100%', height: '40px', marginBottom: '0.5rem', }}>
       <span>{check.name}</span>
       {icon}
     </div>
@@ -201,9 +206,9 @@ const TenantReferencing: React.FC = () => {
       <Typography variant="h5" component="h1">
                        Referencing
       </Typography>
-      <div className="grid grid-cols-3 gap-0" style={{  display: 'flex', flexDirection: 'row', justifyContent: 'start', alignItems: 'center' }}>
+      <div className="grid grid-cols-3 gap-0" style={{  display: 'flex', flexDirection: 'row', justifyContent: 'start', alignItems: 'center', }}>
         {/* Left Panel */}
-        <div className="col-span-1 bg-white p-4 rounded-lg shadow flex-col items-end" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', paddingTop  : '1rem', paddingBottom: '1rem', gap: '0rem', width: '30%' }}>
+        <div className="col-span-1 bg-white p-4 rounded-lg shadow flex-col items-end h-full" style={{ display: 'flex',    flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', paddingBottom: '1rem', gap: '0rem', width: '30%', height: '810px'}}>
           <div className="progrecircle text-center" style={{display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '2rem', padding: '0rem', backgroundColor: '#ECEFED', width: '200px', height: '200px', borderRadius: '2000px', boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.05)',border: '1px rgb(214, 214, 214) solid' }}>
             <div className="relative w-300px h-300px mx-auto">
                 <svg viewBox="0 0 100 100" className="w-full h-full">
@@ -251,9 +256,9 @@ const TenantReferencing: React.FC = () => {
           </div>
 
           
-
-            <div className="mt-4 w-full" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center',gap: '2rem' }}>
-            <p className="mt-2 text-gray-700 font-semibold mb-4" >Referencing Progress</p>
+                {/*Reference Progress Tracker */}
+            <div className="mt-4 w-full" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', }}>
+            <p className=" text-gray-700 font-semibold " >Referencing Progress</p>
             {sections.map((section) => (
               <div
               key={section.title}
@@ -278,9 +283,21 @@ const TenantReferencing: React.FC = () => {
             </div>
           
 
-          <button className="w-full text-white py-2 rounded-lg mt-4 hover:bg-blue-700" style={{ backgroundColor: '#136C9E', borderRadius: '32px', padding: '1rem', width: '100%', marginTop: '1rem' }}>
+            <button
+            className="w-full text-white py-2 rounded-lg mt-4 hover:bg-blue-700"
+            style={{
+              backgroundColor: '#136C9E',
+              borderRadius: '32px',
+              padding: '1rem',
+              width: '100%',
+              marginTop: '1rem',
+            }}
+            onClick={() => {
+              window.location.href = '/referencing';
+            }}
+            >
             Resume Process
-          </button>
+            </button>
         </div>
 
         {/* Right Panel */}
@@ -299,8 +316,8 @@ const TenantReferencing: React.FC = () => {
 
                 
               
-                <div className="statusanditem " style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem', width:'70%', height: '260px' }}>
-                  <div className="mt-2 space-y-1" style={{ display: 'flex', flexDirection: 'column', gap: '1rem',  height: '260px',}}>
+                <div className="statusanditem " style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem', width:'70%', height: '260px'}}>
+                  <div className="mt-2 space-y-1" style={{ display: 'flex', flexDirection: 'column', gap: '1rem',  height: '260px',  }}>
                     <span
                       className={`px-2 py-1 text-xs rounded width-100%  ${
                         section.status === "Complete"
@@ -312,16 +329,18 @@ const TenantReferencing: React.FC = () => {
                         >
                       {section.status}
                     </span>
-                    {section.checks.map((check) => (
-                    <ProgressItem key={check.name} check={check} />
-                    ))}
+                    <div >
+                      {section.checks.map((check) => (
+                      <ProgressItem key={check.name} check={check} />
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="mt-3 text-blue-600 text-sm bg-#959DA4">
-                    {section.title === "Financial" || section.title === "Credit Check"
-                    ? "View Details"
-                    : "View Uploaded Files"}
-                  </div>
+                    {section.title === "Financial" || section.title === "Credit Check" ? (
+                    <div className="mt-3 text-blue-600 text-sm bg-#959DA4">
+                      View Details
+                    </div>
+                    ) : null}
                 </div>
               </div>
           ))}

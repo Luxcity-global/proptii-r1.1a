@@ -1,127 +1,160 @@
-import React, { useState } from "react";
-import {  formatDate, } from '../../../utils/formatters';
-import { 
-  
-  Typography
-} from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Paper, Button, ButtonGroup } from '@mui/material';
+import { mockGetUserFiles } from '../../../mocks/dashboardApi';
+import { UserFile } from '../../../mocks/dashboardApi';
+import { formatDate } from '../../../utils/formatters';
 
-interface FileItem {
-  name: string;
-  date: string;
-}
+const FileTable: React.FC = () => {
+  const [files, setFiles] = useState<UserFile[]>([]);
+  const [groupedFiles, setGroupedFiles] = useState<Record<string, UserFile[]>>({});
+  const [activeCategory, setActiveCategory] = useState<string>('identity'); // Default to 'identity'
 
-interface Tab {
-  label: string;
-  files: FileItem[];
-}
+  // Fetch files from the mock API
+  useEffect(() => {
+    const fetchFiles = async () => {
+      const response = await mockGetUserFiles();
+      if (response.success) {
+        setFiles(response.data || []);
 
-const tabs: Tab[] = [
-  {
-    label: "Identity Files",
-    files: [{ name: "Lease_Agreement.pdf", date: "2/13/2025 11:36 AM" }],
-  },
-  {
-    label: "Employment Files",
-    files: [{ name: "Pay_Slip.pdf", date: "2/10/2025 09:45 AM" }],
-  },
-  {
-    label: "Residential Files",
-    files: [{ name: "Utility_Bill.pdf", date: "2/08/2025 03:12 PM" }],
-  },
-  {
-    label: "Financial Files",
-    files: [{ name: "Bank_Statement.pdf", date: "2/05/2025 10:30 AM" }],
-  },
-];
+        // Group files by category
+        const grouped = (response.data ?? []).reduce((acc: Record<string, UserFile[]>, file) => {
+          if (!acc[file.category]) {
+            acc[file.category] = [];
+          }
+          acc[file.category].push(file);
+          return acc;
+        }, {});
+        setGroupedFiles(grouped);
+      } else {
+        console.error('Failed to fetch files:', response.error);
+      }
+    };
 
-const FileDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState(0);
-  const [searchQuery, setSearchQuery] = useState("");
+    fetchFiles();
+  }, []);
 
-  const filteredFiles = tabs[activeTab].files.filter((file) =>
-    file.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Render the table for the active category
+  const renderTable = (category: string) => {
+    const files = groupedFiles[category] || [];
+    return (
+      <TableContainer component={Paper} sx={{ marginTop: 2, backgroundColor: '#FFFFFF' }}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>File Name</TableCell>
+              <TableCell>Type</TableCell>
+              <TableCell>Size (KB)</TableCell>
+              <TableCell>Uploaded At</TableCell>
+              <TableCell>Actions</TableCell> {/* New column for actions */}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {files.map((file) => (
+              <TableRow key={file.id}>
+                <TableCell>{file.name}</TableCell>
+                <TableCell>{file.type}</TableCell>
+                <TableCell>{(file.size / 1024).toFixed(2)}</TableCell>
+                <TableCell>{new Date(file.uploadedAt).toLocaleDateString()}</TableCell>
+                <TableCell>
+                  {/* View Button */}
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => window.open(file.url, '_blank')}
+                    sx={{ marginRight: 1 }}
+                  >
+                    View
+                  </Button>
+                  {/* Download Button */}
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = file.url;
+                      link.download = file.name;
+                      link.click();
+                    }}
+                  >
+                    Download
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    );
+  };
 
   return (
-    <div className="p-6  min-h-screen" style={{ backgroundColor: '#EDF3FA', gap: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'stretch' }}>
-    <Typography variant="h5" component="h1">
-                 Your Files
-       </Typography>
-      {/* Uploaded Files Card */}
-      <div className="bg-white shadow-md rounded-lg p-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold">4</h2>
-          <p className="text-gray-600">Uploaded Files</p>
-          <p className="text-xs text-gray-500">As of {formatDate(new Date().toISOString())}</p>
-        </div>
-        <div className="text-orange-500 text-3xl">📄</div>
-      </div>
+    <Box sx={{ padding: 3, backgroundColor: '#EDF3FA', borderRadius: 2, height: '100%', gap: 2, display: 'flex', flexDirection: 'column' }}>
+      <Typography variant="h6" gutterBottom>
+        User Files
+      </Typography>
+       <div className="Yourfilescard bg-white p-4 rounded-lg shadow flex items-center" style={{ gap: '1rem', display: 'flex', flexDirection: 'row', justifyContent: 'start', alignItems: 'start', height: 'auto', width: '230px', border: '1px solid #81B0F8'}}>
+                <div style={{ gap: '0.2rem', display: 'flex', flexDirection: 'column', justifyContent: 'start', alignItems: 'start', }}>
+                    <h2 className="text-xl font-semibold">{files.length}</h2>
+                  <p className="text-gray-600">Your files</p>
+                  <p className="text-xs text-gray-500">As of {formatDate(new Date().toISOString())}</p>
+                </div>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <g clip-path="url(#clip0_1919_20188)">
+                <path d="M15.8333 2.49967H10.3933C10.2645 2.50053 10.1371 2.47203 10.0208 2.41634L7.39083 1.09634C7.04366 0.923462 6.66117 0.83333 6.27333 0.833008H4.16667C3.062 0.834331 2.00296 1.27374 1.22185 2.05486C0.440735 2.83597 0.00132321 3.89501 0 4.99967L0 14.9997C0.00132321 16.1043 0.440735 17.1634 1.22185 17.9445C2.00296 18.7256 3.062 19.165 4.16667 19.1663H15.8333C16.938 19.165 17.997 18.7256 18.7782 17.9445C19.5593 17.1634 19.9987 16.1043 20 14.9997V6.66634C19.9987 5.56168 19.5593 4.50264 18.7782 3.72152C17.997 2.94041 16.938 2.501 15.8333 2.49967ZM4.16667 2.49967H6.27333C6.40222 2.49882 6.5296 2.52732 6.64583 2.58301L9.27583 3.89884C9.62266 4.07316 10.0052 4.16473 10.3933 4.16634H15.8333C16.3317 4.16715 16.8184 4.3169 17.2311 4.59635C17.6437 4.8758 17.9634 5.27221 18.1492 5.73467L1.66667 5.82801V4.99967C1.66667 4.33663 1.93006 3.70075 2.3989 3.23191C2.86774 2.76307 3.50363 2.49967 4.16667 2.49967ZM15.8333 17.4997H4.16667C3.50363 17.4997 2.86774 17.2363 2.3989 16.7674C1.93006 16.2986 1.66667 15.6627 1.66667 14.9997V7.49467L18.3333 7.40051V14.9997C18.3333 15.6627 18.0699 16.2986 17.6011 16.7674C17.1323 17.2363 16.4964 17.4997 15.8333 17.4997Z" fill="#DC5F12"/>
+                </g>
 
-      {/* Tab Navigation */}
-      <div className="flex space-x-2 mt-4">
-        {tabs.map((tab, index) => (
-          <button
-            key={index}
-            className={`px-4 py-2 rounded-md font-medium ${
-              activeTab === index
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-700"
-            }`}
-            onClick={() => setActiveTab(index)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* File Table */}
-      <div className="bg-white mt-4 shadow-md rounded-lg p-4">
-        {/* Search Bar */}
-        <div className="flex justify-between items-center pb-3 border-b">
-          <span className="text-gray-600">File Name and Upload Date</span>
-          <div className="flex space-x-2">
-            <input
-              type="text"
-              placeholder="Find File..."
-              className="border px-3 py-1 rounded-md outline-none"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <button className="px-3 py-1 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-100">
-              Search
-            </button>
-          </div>
-        </div>
-
-        {/* File List */}
-        <div className="mt-3">
-          {filteredFiles.length > 0 ? (
-            filteredFiles.map((file, index) => (
-              <div
-          key={index}
-          className="flex justify-between items-center p-3 border-b last:border-none"
-              >
-          <div>
-            <p className="text-gray-800 font-medium">{file.name}</p>
-            <p className="text-gray-500 text-sm">{file.date}</p>
-          </div>
-          <div className="flex space-x-2">
-            <button className="border border-blue-600 text-blue-600 px-4 py-1 rounded-md hover:bg-blue-100">
-              View File
-            </button>
-            <button className="border border-green-600 text-green-600 px-4 py-1 rounded-md hover:bg-green-100">
-              Download File
-            </button>
-          </div>
+                </svg>
               </div>
-            ))
-          ) : (
-            <p className="text-gray-500 text-sm p-3">No files found</p>
-          )}
-        </div>
-      </div>
-    </div>
+
+      {/* Navigation Buttons */}
+      <ButtonGroup variant="contained" aria-label="outlined primary button group" sx={{ marginBottom: 2, padding: 2, gap:4, backgroundColor: '#FFFFFF', width: '100%', borderRadius: 2 }}>
+        <Button 
+          onClick={() => setActiveCategory('identity')} 
+          sx={{ 
+            backgroundColor: activeCategory === 'identity' ? '#1976d2' : '#e0e0e0', 
+            color: activeCategory === 'identity' ? '#ffffff' : '#000000',
+            '&:hover': { backgroundColor: activeCategory === 'identity' ? '#1565c0' : '#d5d5d5' },
+            borderRadius: 2,
+          }}
+        >
+          Identity Files
+        </Button>
+        <Button 
+          onClick={() => setActiveCategory('financial')} 
+          sx={{ 
+            backgroundColor: activeCategory === 'financial' ? '#1976d2' : '#e0e0e0', 
+            color: activeCategory === 'financial' ? '#ffffff' : '#000000',
+            '&:hover': { backgroundColor: activeCategory === 'financial' ? '#1565c0' : '#d5d5d5' }
+          }}
+        >
+          Financial Files
+        </Button>
+        <Button 
+          onClick={() => setActiveCategory('residential')} 
+          sx={{ 
+            backgroundColor: activeCategory === 'residential' ? '#1976d2' : '#e0e0e0', 
+            color: activeCategory === 'residential' ? '#ffffff' : '#000000',
+            '&:hover': { backgroundColor: activeCategory === 'residential' ? '#1565c0' : '#d5d5d5' }
+          }}
+        >
+          Residential Files
+        </Button>
+        <Button 
+          onClick={() => setActiveCategory('employment')} 
+          sx={{ 
+            backgroundColor: activeCategory === 'employment' ? '#1976d2' : '#e0e0e0', 
+            color: activeCategory === 'employment' ? '#ffffff' : '#000000',
+            '&:hover': { backgroundColor: activeCategory === 'employment' ? '#1565c0' : '#d5d5d5' }
+          }}
+        >
+          Employment Files
+        </Button>
+      </ButtonGroup>
+
+      {/* Render the table for the selected category */}
+      {renderTable(activeCategory)}
+    </Box>
   );
 };
 
-export default FileDashboard;
+export default FileTable;

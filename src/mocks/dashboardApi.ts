@@ -385,12 +385,12 @@ const mockFiles: UserFile[] = mockDashboardData.files.recentlyAdded.map(file => 
   uploadedAt: file.date,
   category: file.name.toLowerCase().includes('passport') || file.name.toLowerCase().includes('photo') 
     ? 'identity' 
-    : file.name.toLowerCase().includes('bank') || file.name.toLowerCase().includes('employment')
+    : file.name.toLowerCase().includes('bank') 
       ? 'financial'
       : file.name.toLowerCase().includes('address') || file.name.toLowerCase().includes('utility')
         ? 'residential'
-        : file.name.toLowerCase().includes('contract')
-          ? 'contract'
+        : file.name.toLowerCase().includes('employment') // Ensure "Employment Contract" is categorized here
+          ? 'employment'
           : 'other',
   url: file.url
 }));

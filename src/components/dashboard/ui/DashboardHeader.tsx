@@ -56,11 +56,11 @@ const ContactItem = styled(Box)(({ theme }) => ({
   marginTop: theme.spacing(1),
   '& svg': {
     marginRight: theme.spacing(1),
-    color: theme.palette.text.secondary,
+    
     fontSize: '1rem'
   },
   '& .MuiTypography-root': {
-    color: theme.palette.text.secondary,
+    
     fontSize: '0.875rem'
   }
 }));
@@ -73,7 +73,7 @@ const PropWiseButton = styled(Button)(({ theme }) => ({
     backgroundColor: theme.palette.background.default,
   },
   boxShadow: 'none',
-  borderRadius: '20px',
+  borderRadius: '60px',
   padding: '6px 16px',
   fontWeight: 500,
   textTransform: 'none'
@@ -123,13 +123,41 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName }) => {
             justifyContent: 'center'
           }}>
             <ContactItem>
-              <PhoneIcon />
-              <Typography>+44 7911 123456</Typography>
+              <Box 
+          sx={{ 
+            width: 32, 
+            height: 32, 
+            bgcolor: '#DBE8FC', 
+            borderRadius: '50%', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            paddingLeft: 1,
+            marginRight: 1 
+          }}
+              >
+          <PhoneIcon sx={{ color: '#3B63B5' }} />
+              </Box>
+              <Typography sx={{ color: '#374957' }}>+44 7911 123456</Typography>
             </ContactItem>
             
             <ContactItem>
-              <EmailIcon />
-              <Typography>TosinLanipekun@Luxcity.omnicrosoft</Typography>
+              <Box 
+          sx={{ 
+            width: 32, 
+            height: 32, 
+            bgcolor: '#DBE8FC', 
+            borderRadius: '50%', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            paddingLeft: 1,
+            marginRight: 1
+          }}
+              >
+          <EmailIcon sx={{ color: '#3B63B5' }} />
+              </Box>
+              <Typography sx={{ color: '#374957' }}>TosinLanipekun@Luxcity.omnicrosoft</Typography>
             </ContactItem>
           </Box>
         </Grid>
