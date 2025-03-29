@@ -22,18 +22,21 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
   height: '100%',
   borderRadius: 12,
-  border: `1px solid ${theme.palette.divider}`
+  backgroundColor: '#FFFFFF', // Set background color to white
+  border: 'none', // Remove the outline
+  boxShadow: 'none', // Remove any shadow
 }));
 
 const PropertyCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(2),
   borderRadius: 12,
-  border: `1px solid ${theme.palette.divider}`,
+  backgroundColor: '#E7F2FF', // Set background color to white
+  border: 'none', // Remove the outline
+  boxShadow: 'none', // Remove any shadow
   transition: 'all 0.2s ease-in-out',
   '&:hover': {
-    boxShadow: theme.shadows[4],
-    borderColor: BLUE_COLOR
-  }
+    boxShadow: theme.shadows[4], // Optional: Add a subtle shadow on hover
+  },
 }));
 
 // Mock data
@@ -66,7 +69,7 @@ const similarProperties = [
 
 export const RequirementsChecker: React.FC = () => {
   const calculateMatchPercentage = () => {
-    const matched = requirements.filter(req => req.matched).length;
+    const matched = requirements.filter((req) => req.matched).length;
     return Math.round((matched / requirements.length) * 100);
   };
 
@@ -76,74 +79,71 @@ export const RequirementsChecker: React.FC = () => {
         Requirements Analysis
       </Typography>
 
-      <Grid container spacing={3}>
+      {/* Stack the sections vertically */}
+      <Box display="flex" flexDirection="column" gap={3}>
         {/* Requirements List */}
-        <Grid item xs={12} md={6}>
-          <StyledPaper>
-            <Typography variant="subtitle1" gutterBottom>
-              Your Requirements
+        <StyledPaper>
+          <Typography variant="subtitle1" gutterBottom>
+            Your Requirements
+          </Typography>
+          <List>
+            {requirements.map((req) => (
+              <ListItem key={req.id}>
+                <ListItemIcon>
+                  {req.matched ? (
+                    <CheckCircleIcon sx={{ color: 'success.main' }} />
+                  ) : (
+                    <WarningIcon sx={{ color: 'warning.main' }} />
+                  )}
+                </ListItemIcon>
+                <ListItemText primary={req.text} />
+                <Chip
+                  label={req.matched ? 'Matched' : 'Not Matched'}
+                  color={req.matched ? 'success' : 'warning'}
+                  size="small"
+                />
+              </ListItem>
+            ))}
+          </List>
+          <Box sx={{ mt: 2, textAlign: 'center' }}>
+            <Typography variant="h4" color="primary">
+              {calculateMatchPercentage()}% Match
             </Typography>
-            <List>
-              {requirements.map((req) => (
-                <ListItem key={req.id}>
-                  <ListItemIcon>
-                    {req.matched ? (
-                      <CheckCircleIcon sx={{ color: 'success.main' }} />
-                    ) : (
-                      <WarningIcon sx={{ color: 'warning.main' }} />
-                    )}
-                  </ListItemIcon>
-                  <ListItemText primary={req.text} />
-                  <Chip
-                    label={req.matched ? 'Matched' : 'Not Matched'}
-                    color={req.matched ? 'success' : 'warning'}
-                    size="small"
-                  />
-                </ListItem>
-              ))}
-            </List>
-            <Box sx={{ mt: 2, textAlign: 'center' }}>
-              <Typography variant="h4" color="primary">
-                {calculateMatchPercentage()}% Match
-              </Typography>
-            </Box>
-          </StyledPaper>
-        </Grid>
+          </Box>
+        </StyledPaper>
 
         {/* Similar Properties */}
-        <Grid item xs={12} md={6}>
-          <StyledPaper>
-            <Typography variant="subtitle1" gutterBottom>
-              Similar Properties
-            </Typography>
-            <Grid container spacing={2}>
-              {similarProperties.map((property) => (
-                <Grid item xs={12} key={property.id}>
-                  <PropertyCard>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                      <HomeIcon sx={{ mr: 1, color: BLUE_COLOR }} />
-                      <Typography variant="subtitle1">
-                        {property.title}
-                      </Typography>
-                    </Box>
-                    <Typography variant="body2" color="textSecondary" gutterBottom>
-                      {property.location}
+        <StyledPaper>
+          <Typography variant="subtitle1" gutterBottom>
+            Similar Properties
+          </Typography>
+          <Grid container spacing={2}>
+            {similarProperties.map((property) => (
+              <Grid item xs={12} key={property.id}>
+                <PropertyCard>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <HomeIcon sx={{ mr: 1, color: BLUE_COLOR }} />
+                    <Typography variant="subtitle1">
+                      {property.title}
                     </Typography>
-                    <Typography variant="h6" color="primary" gutterBottom>
-                      {property.price}
-                    </Typography>
-                    <Chip
-                      label={`${property.matchScore}% Match`}
-                      color="success"
-                      size="small"
-                    />
-                  </PropertyCard>
-                </Grid>
-              ))}
-            </Grid>
-          </StyledPaper>
-        </Grid>
-      </Grid>
+                  </Box>
+                  <Typography variant="body2" color="textSecondary" gutterBottom>
+                    {property.location}
+                  </Typography>
+                  <Typography variant="h6" color="primary" gutterBottom>
+                    {property.price}
+                  </Typography>
+                  <Chip
+                    label={`${property.matchScore}% Match`}
+                    color="success"
+                    size="small"
+                  />
+                </PropertyCard>
+              </Grid>
+            ))}
+          </Grid>
+        </StyledPaper>
+      </Box>
     </Box>
   );
 };
