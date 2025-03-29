@@ -1299,7 +1299,7 @@ const WarningModal = () => {
             
             <div className="rounded-lg p-6 text-center text-white" style={{ backgroundColor: '#136C9E' }}>
               <div className="flex justify-center mb-2">
-                <div className="rounded-full p-1 w-8 h-8 flex items-center justify-center" style={{ backgroundColor: '#DC5F12' }}>
+                <div className="rounded-full p-2 w-8 h-8 flex items-center justify-center" style={{ backgroundColor: '#DC5F12' }}>
                   <Info className="text-white" size={24} />
                 </div>
               </div>
