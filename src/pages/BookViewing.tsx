@@ -11,16 +11,17 @@ import 'swiper/css/pagination';
 import { Pagination, Navigation } from "swiper/modules";
 
 
-const Referencing = () => {
+const BookViewing = () => {
   const { isAuthenticated, login } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleGetStarted = () => {
-    //if (isAuthenticated) {
-      setIsModalOpen(true);
-    //} else {
-    //  login();
-    //}
+    // Commenting out authentication check for now
+    // if (isAuthenticated) {
+    setIsModalOpen(true);
+    // } else {
+    //   login();
+    // }
   };
 
   return (
@@ -32,7 +33,7 @@ const Referencing = () => {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img 
-            src="/images/pablo-merchan-montes-wYOPqmtDD0w-unsplash.jpg" 
+            src="/images/01_Lady_Child_Family_BG.jpg" 
             alt="Family enjoying dinner together" 
             className="w-full h-full object-cover"
             loading="eager"
@@ -44,22 +45,21 @@ const Referencing = () => {
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center w-full">
           {/* Main Heading */}
           <h3 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight text-white">
-            Verify Your Identity,<br />
-            Funds, and Rental History
+          Skip the Hassle and Book Property<br />
+          Viewings with Proptii AI
           </h3>
+          
           
           {/* Subheading */}
           <p className="text-xl md:text-2xl mb-12 max-w-3xl mx-auto font-light text-white">
-            Ensure peace of mind for both landlords and tenants.
-            Our rigorous referencing process verifies renter or buyer
-            identity, financial status, and rental history
+          We make finding and securing your home easy,every step of the way,
           </p>
 
           <button
             onClick={handleGetStarted}
             className="bg-primary text-white px-10 py-4 rounded-full hover:bg-opacity-90 transition-all text-xl font-medium"
           >
-            {isAuthenticated ? 'Start Referencing' : 'Get Started'}
+            {isAuthenticated ? 'Start booking viewings' : 'Get Started'}
           </button>
         </div>
       </section>
@@ -71,16 +71,12 @@ const Referencing = () => {
         {/* Left Section - Text Content */}
         <div className="md:w-1/2 space-y-10 md:text-left md:mr-12">
           <h2 className="text-3xl font-bold text-[#136C9E] leading-tight">
-            Steps for referencing
+          Steps to book viewing
           </h2>
           <p className="text-gray-600 text-lg leading-relaxed">
-            Once successfully verified, users are issued a digital “Rent Passport,” 
-            a secure badge of trustworthiness. This streamlined process fosters trust 
-            and confidence in every property transaction.
+          Streamline Your Home Search Experience Dive into property details, schedule personalized viewings, and navigate your real estate journey with confidence.
           </p>
-          <button 
-          onClick={handleGetStarted}
-          className="bg-orange-600 text-white font-medium px-6 py-3 rounded-lg hover:bg-orange-700 transition-all duration-300 shadow-md hover:shadow-lg">
+          <button className="bg-orange-600 text-white font-medium px-6 py-3 rounded-lg hover:bg-orange-700 transition-all duration-300 shadow-md hover:shadow-lg">
           Get started
           </button>
 
@@ -105,11 +101,11 @@ const Referencing = () => {
     <SwiperSlide>
       <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
         <div className="bg-white p-1 rounded-lg inline-block mb-12">
-          <img src="/images/1-Review.png" alt="icon" className="h-20 w-20"/>
+          <img src="/images/BV 1.png" alt="icon" className="h-20 w-20"/>
         </div>
-        <h3 className="text-lg font-semibold mb-4">01. Review the Document Checklist</h3>
+        <h3 className="text-lg font-semibold mb-4">01. Input Property Details</h3>
         <p className="text-gray-100 mb-6">
-          Ensure you have all the required documents organized and ready for submission.
+        Input your already searched property details.
         </p>
       </div>
     </SwiperSlide>
@@ -118,11 +114,11 @@ const Referencing = () => {
     <SwiperSlide>
       <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
         <div className="bg-white p-1 rounded-lg inline-block mb-12">
-          <img src="/images/2-Upload.png" alt="icon" className="h-20 w-20"/>
+          <img src="/images/BV 2.png" alt="icon" className="h-20 w-20"/>
         </div>
-        <h3 className="text-lg font-semibold mb-4">02. Upload Your Documents</h3>
+        <h3 className="text-lg font-semibold mb-4">02. Complete the form</h3>
         <p className="text-gray-100 mb-6">
-          Ensure you have all the required documents organized and ready for submission.
+        To proceed with your booking, fill the forms so we can assist you make the booking.
         </p>
       </div>
     </SwiperSlide>
@@ -131,11 +127,11 @@ const Referencing = () => {
     <SwiperSlide>
       <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
         <div className="bg-white p-1 rounded-lg inline-block mb-12">
-          <img src="/images/3-Respond.png" alt="icon" className="h-20 w-20"/>
+          <img src="/images/BV 3.png" alt="icon" className="h-20 w-20"/>
         </div>
-        <h3 className="text-lg font-semibold mb-4">03. Respond to Any Follow-Ups</h3>
+        <h3 className="text-lg font-semibold mb-4">03. Confirm your Booking Details</h3>
         <p className="text-gray-100 mb-6">
-          Ensure you have all the required documents organized and ready for submission.
+        Proptii can make mistakes, Go through important information's to confirm details.
         </p>
       </div>
     </SwiperSlide>
@@ -144,11 +140,11 @@ const Referencing = () => {
     <SwiperSlide>
       <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
         <div className="bg-white p-1 rounded-lg inline-block mb-12">
-          <img src="/images/4-Receive.png" alt="icon" className="h-20 w-20"/>
+          <img src="/images/BV 4.png" alt="icon" className="h-20 w-20"/>
         </div>
-        <h3 className="text-lg font-semibold mb-4">04. Receive Feedback</h3>
+        <h3 className="text-lg font-semibold mb-4">04. Await your Booking Confirmation</h3>
         <p className="text-gray-100 mb-6">
-          Ensure you have all the required documents organized and ready for submission.
+        Your booking confirmations and updates would br sent to your mail or as a text message.
         </p>
       </div>
     </SwiperSlide>
@@ -161,13 +157,13 @@ const Referencing = () => {
       <FAQSection />
       <Footer />
       
-      {/* Referencing Modal */}
+      {/* Referencing Modal
       <ReferencingModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-      />
+      />*/}
     </div>
   );
 };
 
-export default Referencing; 
+export default BookViewing; 

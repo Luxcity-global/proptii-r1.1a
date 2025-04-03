@@ -49,10 +49,7 @@ interface ResidentialData {
 
 interface FinancialData {
   monthlyIncome: string;
-  proofOfIncomeType: string;
   proofOfIncomeDocument: File | null;
-  useOpenBanking: boolean;
-  isConnectedToOpenBanking: boolean;
 }
 
 interface GuarantorData {
