@@ -28,9 +28,9 @@ const Navbar = () => {
             <Link to="/referencing" className="text-white hover:text-gray-200 transition-colors">
               Referencing
             </Link>
-            <a href="#" className="text-white hover:text-gray-200 transition-colors">
-              Book Viewing
-            </a>
+            <Link to="/bookviewing" className="text-white hover:text-gray-200 transition-colors">
+            Book Viewing
+            </Link>
             <Link to="/contracts" className="text-white hover:text-gray-200 transition-colors">
               Contracts
             </Link>
