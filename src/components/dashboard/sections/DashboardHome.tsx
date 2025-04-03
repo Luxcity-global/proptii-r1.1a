@@ -294,7 +294,7 @@ const DashboardHome: React.FC = () => {
                 { <Box sx={{ display: 'flex', flex:'row', justifyContent: 'start', alignItems: 'end', gap:3, height: '100%', pt: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'end', justifyContent: 'center' }}>
                 <Box sx={{ textAlign: 'center' }}>
-                  <Box sx={{ height: `${(dashboardSummary?.viewings.total || 0) * 30}px`, width: 50, bgcolor: '#C95200', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                  <Box sx={{ height: `${(dashboardSummary?.viewings.total || 0) * 30}px`, width: 50, bgcolor: '#C4A86E', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                   <Typography variant="body2" color="white" sx={{ mb: 1 }}>
                   {dashboardSummary?.viewings.total || 0}
                   </Typography>
@@ -304,7 +304,7 @@ const DashboardHome: React.FC = () => {
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'end', justifyContent: 'center', mt: 2 }}>
                 <Box sx={{ textAlign: 'center' }}>
-                  <Box sx={{ height: `${(dashboardSummary?.viewings.past || 0) * 30}px`, width: 50, bgcolor: '#EB6A1F', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                  <Box sx={{ height: `${(dashboardSummary?.viewings.past || 0) * 30}px`, width: 50, bgcolor: '#E1C387', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                   <Typography variant="body2" color="white" sx={{ mb: 1 }}>
                   {dashboardSummary?.viewings.past || 0}
                   </Typography>
@@ -314,7 +314,7 @@ const DashboardHome: React.FC = () => {
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'end', justifyContent: 'center', mt: 2 }}>
                 <Box sx={{ textAlign: 'center', pr: 3 }}>
-                  <Box sx={{ height: `${(dashboardSummary?.viewings.upcoming || 0) * 30}px`, width: 50, bgcolor: '#FF8C52', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                  <Box sx={{ height: `${(dashboardSummary?.viewings.upcoming || 0) * 30}px`, width: 50, bgcolor: '#FEDFA0', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                   <Typography variant="body2" color="white" sx={{ mb: 1 }}>
                   {dashboardSummary?.viewings.upcoming || 0}
                   </Typography>
@@ -325,15 +325,15 @@ const DashboardHome: React.FC = () => {
                 
                 <Box sx={{ display: 'flex', flexDirection: 'column', mt: 2 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <Box sx={{ width: 16, height: 16, bgcolor: '#C95200', mr: 1 }} />
+                  <Box sx={{ width: 16, height: 16, bgcolor: '#C4A86E', mr: 1 }} />
                   <Typography variant="body2">Total Viewings</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <Box sx={{ width: 16, height: 16, bgcolor: '#EB6A1F', mr: 1 }} />
+                  <Box sx={{ width: 16, height: 16, bgcolor: '#E1C387', mr: 1 }} />
                   <Typography variant="body2">Completed Viewings</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Box sx={{ width: 16, height: 16, bgcolor: '#FF8C51', mr: 1 }} />
+                  <Box sx={{ width: 16, height: 16, bgcolor: '#FEDFA0', mr: 1 }} />
                   <Typography variant="body2">Upcoming Viewings</Typography>
                   </Box>
                 </Box>
