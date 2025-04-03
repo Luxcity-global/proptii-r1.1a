@@ -333,7 +333,7 @@ const DashboardHome: React.FC = () => {
                   <Typography variant="body2">Completed Viewings</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Box sx={{ width: 16, height: 16, bgcolor: '#FF8C52', mr: 1 }} />
+                  <Box sx={{ width: 16, height: 16, bgcolor: '#FF8C51', mr: 1 }} />
                   <Typography variant="body2">Upcoming Viewings</Typography>
                   </Box>
                 </Box>
