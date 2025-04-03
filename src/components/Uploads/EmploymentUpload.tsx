@@ -14,7 +14,7 @@ const EmploymentUpload = ({ updateFormData, formData }) => {
   return (
     <div className="mt-8">
       {/* Heading */}
-      <h2 className="text-lg font-semibold mb-2">Employment Documents</h2>
+      <h2 className="text-lg font-semibold mb-2">Employment/School Admission Documents</h2>
 
       {/* Label 
       <label className="block text-gray-700 mb-2">

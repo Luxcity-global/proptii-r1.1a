@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
-import { PublicClientApplication } from "@azure/msal-browser";
-import { MsalAuthProvider } from './contexts/AuthContext';
-import { msalConfig } from './config/authConfig';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import { MSALProviderWrapper } from './contexts/AuthContext';
 import Home from './pages/Home';
 import Referencing from './pages/Referencing';
+import ContractsPage from './pages/Contracts';
+import BookViewing from './pages/BookViewing';
 import ErrorBoundary from './components/ErrorBoundary';
 
 console.log('App.tsx - Starting initialization with config:', msalConfig);
@@ -26,25 +27,33 @@ pca.initialize().then(() => {
 });
 
 function App() {
-  useEffect(() => {
-    console.log('App component mounted');
-  }, []);
-
   return (
-    <ErrorBoundary>
-      <React.StrictMode>
-        <BrowserRouter>
-          <MsalAuthProvider instance={pca}>
-            <div className="app-container">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/referencing" element={<Referencing />} />
-              </Routes>
-            </div>
-          </MsalAuthProvider>
-        </BrowserRouter>
-      </React.StrictMode>
-    </ErrorBoundary>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <MSALProviderWrapper>
+        <RedirectUriWarning />
+        <Router>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/referencing" element={<Referencing />} />
+            <Route path="/referencing-test" element={<ReferencingTest />} />
+            <Route path="/test-referencing" element={<TestReferencingPage />} />
+            <Route path="/backend-test" element={<BackendIntegrationTest />} />
+            <Route path="/referencing-modal-test" element={<ReferencingModalTest />} />
+            
+            {/* Dashboard Routes */}
+            <Route path="/dashboard" element={<Dashboard />}>
+              <Route index element={<DashboardHome />} />
+              <Route path="saved-searches" element={<SavedProperties />} />
+              <Route path="viewings" element={<Viewings />} />
+              <Route path="tenant-contracts" element={<TenantContracts/>} />
+              <Route path="your-files" element={<FileDashboard />} />
+              <Route path="tenant-referencing" element={<TenantReferencing />} />
+            </Route>
+          </Routes>
+        </Router>
+      </MSALProviderWrapper>
+    </ThemeProvider>
   );
 }
 

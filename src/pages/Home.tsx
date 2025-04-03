@@ -3,12 +3,14 @@ import { Camera, Mic, Search } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
-import createClient from "@azure-rest/ai-inference";
 import { AzureKeyCredential } from "@azure/core-auth";
 import PropertyModal from '../components/PropertyModal';
 import AISearchIcon from '../components/icons/AISearchIcon';
 import OpenRentLogo from '/images/openrent-logo.png';
 import ZooplaLogo from '/images/zoopla-logo.png';
+
+// Import the OpenAI client
+import OpenAI from "openai";
 
 interface SearchResult {
   choices: Array<{
@@ -45,12 +47,19 @@ const Home = () => {
     }
 
     try {
-      const client = createClient(
-        'https://ai-tosinai2685488296748963.openai.azure.com',
-        new AzureKeyCredential(apiKey)
-      );
+      // Create the OpenAI client with Azure configuration
+      const openai = new OpenAI({
+        apiKey: apiKey,
+        baseURL: 'https://ai-tosinai2685488296748963.openai.azure.com/openai/deployments/gpt-4o',
+        defaultQuery: { 'api-version': '2024-02-15-preview' },
+        defaultHeaders: { 'api-key': apiKey }
+      });
 
-      const requestBody = {
+      console.log('Sending request with query:', searchQuery);
+      
+      // Use the chat completions API
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o', // This is ignored for Azure, but required by the client
         messages: [
           {
             role: "system",
@@ -80,25 +89,23 @@ const Home = () => {
         top_p: 0.95,
         frequency_penalty: 0,
         presence_penalty: 0
-      };
-
-      console.log('Sending request with query:', searchQuery);
-      
-      const response = await client.path("/openai/deployments/gpt-4o/chat/completions").post({
-        body: requestBody,
-        queryParameters: {
-          'api-version': '2024-02-15-preview'
-        }
       });
 
       console.log('Received response:', response);
 
-      if (!response || !response.body) {
+      if (!response) {
         throw new Error('No response received from the API');
       }
 
-      // Type assertion to ensure the response matches our SearchResult type
-      const typedResponse = response.body as unknown as SearchResult;
+      // Convert the response to match our SearchResult type
+      const typedResponse: SearchResult = {
+        choices: response.choices.map((choice: any) => ({
+          message: {
+            content: choice.message.content || ''
+          }
+        }))
+      };
+      
       setSearchResults(typedResponse);
     } catch (error: any) {
       console.error('Search error:', error);
@@ -120,9 +127,6 @@ const Home = () => {
 
   return (
     <div className="min-h-screen font-nunito">
-      <div key="debug-log" style={{ display: 'none' }}>
-        {console.log('Home component rendering')}
-      </div>
       <Navbar />
       
       {/* Hero Section */}
