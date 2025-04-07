@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
-import ReferencingModal from '../components/ReferencingModal';
+//import ReferencingModal from '../components/ReferencingModal';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import 'swiper/css/navigation';
@@ -59,7 +59,7 @@ const BookViewing = () => {
             onClick={handleGetStarted}
             className="bg-primary text-white px-10 py-4 rounded-full hover:bg-opacity-90 transition-all text-xl font-medium"
           >
-            {isAuthenticated ? 'Start Referencing' : 'Get Started'}
+            {isAuthenticated ? 'Start booking viewings' : 'Get Started'}
           </button>
         </div>
       </section>
