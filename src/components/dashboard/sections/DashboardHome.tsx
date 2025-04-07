@@ -295,7 +295,7 @@ const DashboardHome: React.FC = () => {
                 <Box sx={{ display: 'flex', alignItems: 'end', justifyContent: 'center' }}>
                 <Box sx={{ textAlign: 'center' }}>
                   <Box sx={{ height: `${(dashboardSummary?.viewings.total || 0) * 30}px`, width: 50, bgcolor: '#C4A86E', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-                  <Typography variant="body2" color="white" sx={{ mb: 1 }}>
+                  <Typography variant="body2" color="black" sx={{ mb: 1 }}>
                   {dashboardSummary?.viewings.total || 0}
                   </Typography>
                   </Box>
@@ -305,7 +305,7 @@ const DashboardHome: React.FC = () => {
                 <Box sx={{ display: 'flex', alignItems: 'end', justifyContent: 'center', mt: 2 }}>
                 <Box sx={{ textAlign: 'center' }}>
                   <Box sx={{ height: `${(dashboardSummary?.viewings.past || 0) * 30}px`, width: 50, bgcolor: '#E1C387', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-                  <Typography variant="body2" color="white" sx={{ mb: 1 }}>
+                  <Typography variant="body2" color="black" sx={{ mb: 1 }}>
                   {dashboardSummary?.viewings.past || 0}
                   </Typography>
                   </Box>
@@ -315,7 +315,7 @@ const DashboardHome: React.FC = () => {
                 <Box sx={{ display: 'flex', alignItems: 'end', justifyContent: 'center', mt: 2 }}>
                 <Box sx={{ textAlign: 'center', pr: 3 }}>
                   <Box sx={{ height: `${(dashboardSummary?.viewings.upcoming || 0) * 30}px`, width: 50, bgcolor: '#FEDFA0', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-                  <Typography variant="body2" color="white" sx={{ mb: 1 }}>
+                  <Typography variant="body2" color="black" sx={{ mb: 1 }}>
                   {dashboardSummary?.viewings.upcoming || 0}
                   </Typography>
                   </Box>
