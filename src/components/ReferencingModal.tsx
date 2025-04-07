@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { X, User, Briefcase, Home, Euro, Users, CreditCard, CheckCircle, Upload } from 'lucide-react';
+import { X, Menu, User, Briefcase, Home, Euro, Users, CreditCard, CheckCircle, PoundSterling, AlertTriangle, Info, Upload } from 'lucide-react';
 import FileUpload from "./Uploads/FileUpload";
 import EmploymentUpload from "./Uploads/EmploymentUpload";
 import ResidentialUpload from "./Uploads/ResidentialUpload";
@@ -48,6 +48,7 @@ interface ResidentialData {
 }
 
 interface FinancialData {
+  monthlyIncome: string;
   proofOfIncomeType: string;
   proofOfIncomeDocument: File | null;
   useOpenBanking: boolean;
@@ -63,10 +64,14 @@ interface GuarantorData {
 }
 
 interface CreditCheckData {
-  hasAgreedToCheck: boolean;
+  //hasAgreedToCheck: boolean;
 }
 
 interface AgentDetailsData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
   hasAgreedToCheck: boolean;
 }
 
@@ -83,6 +88,9 @@ interface FormData {
 const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [isFormComplete, setIsFormComplete] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     identity: {
       firstName: user?.givenName || '',
@@ -115,6 +123,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       proofDocument: null
     },
     financial: {
+      monthlyIncome: '',
       proofOfIncomeType: '',
       proofOfIncomeDocument: null,
       useOpenBanking: false,
@@ -128,9 +137,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       address: ''
     },
     creditCheck: {
-      hasAgreedToCheck: false
+      //hasAgreedToCheck: false
     },
     agentDetails: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phoneNumber: '',
       hasAgreedToCheck: false
     }
   });
@@ -139,6 +152,167 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const [lastSavedSteps, setLastSavedSteps] = useState<{ [key: number]: Date | null }>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // New state to track step completeness
+  const [stepStatus, setStepStatus] = useState<{ [key: number]: 'empty' | 'partial' | 'complete' }>({
+    1: 'empty',
+    2: 'empty',
+    3: 'empty',
+    4: 'empty',
+    5: 'empty',
+    6: 'empty',
+    7: 'empty'
+  });
+
+  // Update form data for any step
+  const updateFormData = (step: keyof FormData, data: Partial<FormData[keyof FormData]>) => {
+    // Update form data
+    setFormData(prev => ({
+      ...prev,
+      [step]: {
+        ...prev[step],
+        ...data
+      }
+    }));
+
+    // Map steps to their corresponding index
+    const stepMap: { [key in keyof FormData]: number } = {
+      identity: 1,
+      employment: 2,
+      residential: 3,
+      financial: 4,
+      guarantor: 5,
+      creditCheck: 6,
+      agentDetails: 7
+    };
+
+    const stepIndex = stepMap[step];
+    
+    // Determine step status
+    const status = determineStepStatus(step, { ...formData[step], ...data });
+    
+    // Update step status
+    setStepStatus(prev => ({
+      ...prev,
+      [stepIndex]: status
+    }));
+  };
+
+  // Comprehensive step status determination
+  const determineStepStatus = (step: keyof FormData, data: any): 'empty' | 'partial' | 'complete' => {
+    switch(step) {
+      case 'identity':
+        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.dateOfBirth && data.nationality) 
+          return 'complete';
+        if (data.firstName || data.lastName || data.email || data.phoneNumber || data.dateOfBirth || data.nationality) 
+          return 'partial';
+        return 'empty';
+      
+      case 'employment':
+        if (data.employmentStatus && data.companyDetails && data.jobPosition && data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType && data.lengthOfEmployment) 
+          return 'complete';
+        if (data.employmentStatus || data.companyDetails || data.jobPosition || data.referenceFullName || data.referenceEmail || data.referencePhone || data.proofType || data.lengthOfEmployment) 
+          return 'partial';
+        return 'empty';
+      
+      case 'residential':
+        if (data.currentAddress && data.durationAtCurrentAddress && data.previousAddress && data.durationAtPreviousAddress && data.reasonForLeaving && data.proofType) 
+          return 'complete';
+        if (data.currentAddress || data.durationAtCurrentAddress || data.previousAddress || data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType) 
+          return 'partial';
+        return 'empty';
+      
+      case 'financial':
+        if (data.proofOfIncomeType && data.monthlyIncome) 
+          return 'complete';
+        if (data.proofOfIncomeType || data.monthlyIncome) 
+          return 'partial';
+        return 'empty';
+      
+      case 'guarantor':
+        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.address ) 
+          return 'complete';
+        if (data.firstName || data.lastName || data.email || data.phoneNumber || data.address) 
+          return 'partial';
+        return 'empty';
+      
+      case 'creditCheck':
+        // Check if key identity fields are filled in
+        const identityData = data.identity || {};
+        const hasCriticalIdentityInfo = 
+          identityData.firstName && 
+          identityData.lastName && 
+          identityData.email && 
+          identityData.phoneNumber &&
+          identityData.dateOfBirth;
+
+        // Return 'complete' if critical identity info is present
+        return hasCriticalIdentityInfo ? 'complete' : 'empty';
+      
+      case 'agentDetails':
+        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck) 
+          return 'complete';
+        if (data.firstName || data.lastName || data.email || data.phoneNumber)
+          return 'partial';
+        return 'empty';
+      
+      default:
+        return 'empty';
+    }
+  };
+
+  // Modify the sidebar to include status indicators
+  const renderSidebarNavigation = () => {
+    const steps = [
+      { icon: User, text: 'Identity', step: 1, dataKey: 'identity' },
+      { icon: Briefcase, text: 'Employment', step: 2, dataKey: 'employment' },
+      { icon: Home, text: 'Residential', step: 3, dataKey: 'residential' },
+      { icon: PoundSterling, text: 'Financial', step: 4, dataKey: 'financial' },
+      { icon: Users, text: 'Guarantor', step: 5, dataKey: 'guarantor' },
+      { icon: CreditCard, text: 'Credit Check', step: 6, dataKey: 'creditCheck' },
+      { icon: User, text: 'Agent Details', step: 7, dataKey: 'agentDetails' }
+    ];
+
+    return steps.map(({ icon: Icon, text, step, dataKey }) => {
+      const status = stepStatus[step];
+
+      // Only show dot if step is not 'empty'
+      const shouldShowDot = status !== 'empty';
+      
+      // Determine dot color based on status
+      let dotColor = '';
+      switch(status) {
+        case 'partial':
+          dotColor = 'bg-orange-500'; // Orange for partial completion
+          break;
+        case 'complete':
+          dotColor = 'bg-green-500';  // Green for complete
+          break;
+        default:
+          dotColor = 'bg-gray-300';   // Gray for empty
+      }
+
+      return (
+        <li
+          key={step}
+          onClick={() => goToStep(step)}
+          className={`flex items-center space-x-3 px-4 py-3 cursor-pointer transition-all ${
+            currentStep === step
+              ? 'bg-blue-100 text-black font-semibold rounded-lg'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          <Icon size={18} className={currentStep === step ? 'text-orange-600' : 'text-gray-500'} />
+          <span>{text}</span>
+          {shouldShowDot && (
+          <span 
+            className={`ml-auto w-3 h-3 rounded-full ${dotColor}`}
+            title={`Status: ${status}`}
+          />
+          )}
+        </li>
+      );
+    });
+  };
 
   // Reset form when user changes
   useEffect(() => {
@@ -156,7 +330,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   }, [user]);
 
   // Update form data for any step
-  const updateFormData = (step: keyof FormData, data: Partial<FormData[keyof FormData]>) => {
+  {/*const updateFormData = (step: keyof FormData, data: Partial<FormData[keyof FormData]>) => {
     setFormData(prev => ({
       ...prev,
       [step]: {
@@ -164,7 +338,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         ...data
       }
     }));
-  };
+  };*/}
 
   // Save current form data
   const saveCurrentStep = async () => {
@@ -189,6 +363,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     // (prevents skipping ahead)
     //if (step <= currentStep) {
       setCurrentStep(step);
+      setIsMenuOpen(false); // Close menu on selection
     //}
   };
 
@@ -205,8 +380,55 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   };
 
+  // Add a function to check if all steps are complete
+  const checkFormCompleteness = () => {
+    const allStepsComplete = Object.values(stepStatus).every(status => status === 'complete');
+    setIsFormComplete(allStepsComplete);
+    return allStepsComplete;
+  };
+
+  // Typing Animation Component
+const TypingAnimation = ({ text, className }) => {
+  const [displayText, setDisplayText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [typingSpeed, setTypingSpeed] = useState(150);
+  
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!isDeleting) {
+        // Typing forward
+        if (currentIndex < text.length) {
+          setDisplayText(text.substring(0, currentIndex + 1));
+          setCurrentIndex(prevIndex => prevIndex + 1);
+          setTypingSpeed(150);
+        } else {
+          // Pause at the end before starting to delete
+          setIsDeleting(true);
+          setTypingSpeed(1000); // Longer pause when complete
+        }
+      } else {
+        // Deleting
+        if (currentIndex > 0) {
+          setDisplayText(text.substring(0, currentIndex - 1));
+          setCurrentIndex(prevIndex => prevIndex - 1);
+          setTypingSpeed(75); // Delete faster than type
+        } else {
+          // Reset to start typing again
+          setIsDeleting(false);
+          setTypingSpeed(500); // Pause before restarting
+        }
+      }
+    }, typingSpeed);
+    
+    return () => clearTimeout(timeout);
+  }, [currentIndex, isDeleting, text, typingSpeed]);
+  
+  return <h2 className={className}>{displayText}<span className="animate-pulse">|</span></h2>;
+};
+
   // Submit the final application
-  const submitApplication = async () => {
+  {/*const submitApplication = async () => {
     try {
       setIsSubmitting(true);
       
@@ -221,7 +443,87 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     } finally {
       setIsSubmitting(false);
     }
+  };*/}
+  // Update the submit application function
+  const submitApplication = async () => {
+    // Check if all steps are complete
+    const isComplete = checkFormCompleteness();
+    
+    // If form is incomplete, show the custom warning modal
+    if (!isComplete) {
+      setShowWarningModal(true);
+      return; // Pause submission until user confirms
+    }
+    
+    // Continue with submission if form is complete or after user confirms
+    proceedWithSubmission();
   };
+  
+  // Function to handle the actual submission after confirmation
+  const proceedWithSubmission = async () => {
+    try {
+      setIsSubmitting(true);
+      
+      // In a real implementation, you would submit to your API here
+      // For now, simulate submission
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Show success message
+      alert('Your application has been submitted successfully!');
+      onClose();
+    } catch (error) {
+      console.error('Error submitting application:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  // Add this modal component to your render function
+  // Define the warning modal component
+const WarningModal = () => {
+  if (!showWarningModal) return null;
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+        <div className="flex items-center mb-4">
+          <div className="bg-yellow-100 p-2 rounded-full">
+            <AlertTriangle className="text-yellow-500 w-6 h-6" />
+          </div>
+          <h3 className="text-lg font-semibold ml-3">Incomplete Form</h3>
+        </div>
+        
+        <p className="text-gray-600 mb-6">
+          Your form is incomplete. Some information may be missing or incorrect.
+          Are you sure you want to submit anyway?
+        </p>
+        
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={() => setShowWarningModal(false)}
+            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              setShowWarningModal(false);
+              proceedWithSubmission();
+            }}
+            className="px-4 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors"
+          >
+            Submit Anyway
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+  useEffect(() => {
+    checkFormCompleteness();
+  }, [stepStatus]);
+
 
   //const activeSection = "#374957";
 
@@ -493,7 +795,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         return (
           <div className="relative">
             <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Fill in your employment details below.</h2>
+              <h2 className="text-xl font-semibold text-gray-800">Fill in your employment details below</h2>
             </div>
             <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
               <div className="col-span-1">
@@ -551,7 +853,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         </div>*/}
 
               <div className="col-span-1">
-                <label className="block text-gray-700 mb-2">Job Reference - Full Name</label>
+                <label className="block text-gray-700 mb-2">Referee - Full Name</label>
                 <input
                   type="text"
                   value={formData.employment.referenceFullName}
@@ -562,7 +864,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               </div>
 
               <div className="col-span-1">
-                <label className="block text-gray-700 mb-2">Job Reference - Email Address</label>
+                <label className="block text-gray-700 mb-2">Referee - Email Address</label>
                 <input
                   type="email"
                   value={formData.employment.referenceEmail}
@@ -589,7 +891,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       
 
               <div className="col-span-1">
-                <label className="block text-gray-700 mb-2">Job Reference - Phone Number</label>
+                <label className="block text-gray-700 mb-2">Referee - Phone Number</label>
                 <input
                   type="tel"
                   value={formData.employment.referencePhone}
@@ -634,6 +936,17 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               <h2 className="text-xl font-semibold text-gray-800">Fill in your residential details below</h2>
             </div>
             <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
+            <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Reason for leaving Previous Address</label>
+                <textarea
+                  value={formData.residential.reasonForLeaving}
+                  onChange={(e) => updateFormData('residential', { reasonForLeaving: e.target.value })}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Please provide the reason for leaving"
+                />
+              </div>
+
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Current Address</label>
                  <textarea
@@ -642,17 +955,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   rows={4}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="Enter your current address"
-                />
-              </div>
-
-              <div className="col-span-1">
-                <label className="block text-gray-700 mb-2">Reason for leaving Previous Address</label>
-                <textarea
-                  value={formData.residential.reasonForLeaving}
-                  onChange={(e) => updateFormData('residential', { reasonForLeaving: e.target.value })}
-                  rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Please provide the reason for leaving"
                 />
               </div>
 
@@ -684,20 +986,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               </div>
 
               <div className="col-span-1">
-                <label className="block text-gray-700 mb-2">Select exact duration at this address</label>
-                <select
-                  value={formData.residential.durationAtPreviousAddress}
-                  onChange={(e) => updateFormData('residential', { durationAtPreviousAddress: e.target.value })}
-                  className={`w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${!formData.residential.durationAtPreviousAddress ? 'text-gray-400' : 'text-gray-900'}`}
-                >
-                  <option value="" disabled>Select duration</option>
-                  <option value="Less than 1 year">Less than 1 year</option>
-                  <option value="1-2 years">1-2 years</option>
-                  <option value="2-3 years">2-3 years</option>
-                </select>
-              </div>
-
-              <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Proof of Address</label>
                 <select
                   value={formData.residential.proofType}
@@ -709,6 +997,20 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   <option value="Bank Statement">Bank Statement</option>
                   <option value="Council Tax Bill">Council Tax Bill</option>
                   <option value="Tenancy Agreement">Tenancy Agreement</option>
+                </select>
+              </div>
+
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Select exact duration at this address</label>
+                <select
+                  value={formData.residential.durationAtPreviousAddress}
+                  onChange={(e) => updateFormData('residential', { durationAtPreviousAddress: e.target.value })}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${!formData.residential.durationAtPreviousAddress ? 'text-gray-400' : 'text-gray-900'}`}
+                >
+                  <option value="" disabled>Select duration</option>
+                  <option value="Less than 1 year">Less than 1 year</option>
+                  <option value="1-2 years">1-2 years</option>
+                  <option value="2-3 years">2-3 years</option>
                 </select>
               </div>
 
@@ -748,9 +1050,9 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
             
             <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
             <div className="col-span-1">
-                <label className="block text-gray-700 mb-2">Monthly Income</label>
+                <label className="block text-gray-700 mb-2">Monthly Income (£)</label>
                 <input
-                  type="text"
+                  type="number"
                   value={formData.financial.monthlyIncome}
                   onChange={(e) => updateFormData('financial', { monthlyIncome: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
@@ -995,11 +1297,16 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               </label>
         </div>*/}
             
-            <div className="mt-10 pt-6 border-t border-gray-200 text-center">
-              <p className="text-gray-500 font-medium">Coming Soon</p>
-              <p className="text-gray-400 text-sm">We need to connect to live credit checking agencies.</p>
+            <div className="rounded-lg p-6 text-center text-white" style={{ backgroundColor: '#136C9E' }}>
+              <div className="flex justify-center mb-2">
+                <div className="rounded-full p-2 w-8 h-8 flex items-center justify-center" style={{ backgroundColor: '#DC5F12' }}>
+                  <Info className="text-white" size={24} />
+                </div>
+              </div>
+              <TypingAnimation text="Coming Soon" className="text-2xl font-medium mb-2" />
+              <p className="text-white text-sm">Automated live credit checks</p>
+              </div>
             </div>
-          </div>
         );
 
         case 7:
@@ -1014,7 +1321,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       <div className="bg-white rounded-lg p-6 mb-6">
         <div className="grid grid-cols-2 gap-x-6 gap-y-4">
           <div className="col-span-1">
-            <label className="block text-gray-700 mb-2">First Name</label>
+            <label className="block text-gray-700 mb-2">Agent's First Name</label>
             <input
               type="text"
               value={formData.agentDetails.firstName || ""}
@@ -1029,7 +1336,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           </div>
 
           <div className="col-span-1">
-            <label className="block text-gray-700 mb-2">Last Name</label>
+            <label className="block text-gray-700 mb-2">Agent's Last Name</label>
             <input
               type="text"
               value={formData.agentDetails.lastName || ""}
@@ -1044,7 +1351,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           </div>
 
           <div className="col-span-1">
-            <label className="block text-gray-700 mb-2">Email Address</label>
+            <label className="block text-gray-700 mb-2">Agent's Email Address</label>
             <input
               type="email"
               value={formData.agentDetails.email || ""}
@@ -1059,7 +1366,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           </div>
 
           <div className="col-span-1">
-            <label className="block text-gray-700 mb-2">Phone Number</label>
+            <label className="block text-gray-700 mb-2">Agent's Phone Number</label>
             <input
               type="tel"
               value={formData.agentDetails.phoneNumber || ""}
@@ -1089,7 +1396,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
             className="h-5 w-5 text-primary border-gray-300 rounded focus:ring-primary"
           />
           <span className="ml-2 text-gray-700">
-            I authorize Proptii to perform a credit check using the information provided
+            I authorise Proptii to perform a credit check using the information provided
           </span>
         </label>
       </div>
@@ -1113,8 +1420,30 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       
       {/* Modal container */}
       <div className="relative w-full max-w-5xl mx-auto my-8 bg-white rounded-lg shadow-xl flex overflow-hidden min-h-[600px]">
+
+        {/* Mobile Hamburger Menu 
+        <div className="md:hidden w-full p-4 bg-gray-100 flex justify-between items-center border-b">*/}
+          {/*<h2 className="text-lg font-bold text-orange-600">Referencing Steps</h2>
+          <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2">
+            <Menu size={24} />
+          </button>
+        </div>*/}
+        
+        {/* Dropdown Menu for Mobile 
+        {isMenuOpen && (
+          <ul className="absolute top-16 left-0 w-full bg-white shadow-lg z-10 md:hidden">
+            {[['Identity', User, 1], ['Employment', Briefcase, 2], ['Residential', Home, 3], ['Financial', Euro, 4], ['Guarantor', Users, 5], ['Credit Check', CreditCard, 6], ['Upload Docs', Upload, 7]].map(([label, Icon, step]) => (
+              <li key={step} onClick={() => goToStep(step)} className="flex items-center space-x-3 px-4 py-3 cursor-pointer hover:bg-gray-100">
+                <Icon size={18} className={currentStep === step ? 'text-orange-600' : 'text-gray-500'} />
+                <span>{label}</span>
+              </li>
+            ))}
+          </ul>
+        )}*/}
+
+
         {/* Sidebar */}
-        <div className="w-64 bg-gray-50 py-6 px-4 border-r border-gray-200 hidden md:block md:flex flex-col">
+        <div className="w-64 bg-gray-50 py-4 px-4 border-r border-gray-200 hidden md:block md:flex flex-col">
           <div className="mb-6 px-2">
             <h2 className="text-xl font-bold text-orange-600 mb-2">Referencing Steps</h2>
           </div>
@@ -1124,7 +1453,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
             </p>
           </div>
           
-          {/* Step navigation */}
+          {/* Step navigation 
           <ul className="space-y-1">
             <li
               onClick={() => goToStep(1)}
@@ -1171,16 +1500,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               }`}
             >
               <Euro size={18} className={currentStep === 4 ? 'text-orange-600' : 'text-gray-500'} />
-              {/*<svg width="18" height="18" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <g clip-path="url(#clip0_1726_13876)">
-              <path d="M20.4118 19.5275H2.72694C2.49243 19.5275 2.26752 19.4344 2.10169 19.2685C1.93586 19.1027 1.8427 18.8778 1.8427 18.6433V0.958459C1.8427 0.723944 1.74954 0.499034 1.58371 0.333207C1.41788 0.16738 1.19297 0.0742188 0.958459 0.0742188C0.723944 0.0742188 0.499034 0.16738 0.333207 0.333207C0.16738 0.499034 0.0742188 0.723944 0.0742188 0.958459L0.0742188 18.6433C0.0742188 19.3468 0.353701 20.0215 0.851183 20.519C1.34866 21.0165 2.0234 21.296 2.72694 21.296H20.4118C20.6463 21.296 20.8712 21.2028 21.037 21.037C21.2028 20.8712 21.296 20.6463 21.296 20.4118C21.296 20.1772 21.2028 19.9523 21.037 19.7865C20.8712 19.6207 20.6463 19.5275 20.4118 19.5275Z" fill="#3F2E00"/>
-              <path d="M13.3374 17.7589C13.5719 17.7589 13.7968 17.6658 13.9626 17.5C14.1284 17.3341 14.2216 17.1092 14.2216 16.8747V10.685C14.2216 10.4505 14.1284 10.2256 13.9626 10.0598C13.7968 9.89394 13.5719 9.80078 13.3374 9.80078C13.1029 9.80078 12.8779 9.89394 12.7121 10.0598C12.5463 10.2256 12.4531 10.4505 12.4531 10.685V16.8747C12.4531 17.1092 12.5463 17.3341 12.7121 17.5C12.8779 17.6658 13.1029 17.7589 13.3374 17.7589Z" fill="#3F2E00"/>
-              <path d="M6.26412 17.7589C6.49864 17.7589 6.72355 17.6658 6.88938 17.5C7.0552 17.3341 7.14836 17.1092 7.14836 16.8747V10.685C7.14836 10.4505 7.0552 10.2256 6.88938 10.0598C6.72355 9.89394 6.49864 9.80078 6.26412 9.80078C6.02961 9.80078 5.8047 9.89394 5.63887 10.0598C5.47304 10.2256 5.37988 10.4505 5.37988 10.685V16.8747C5.37988 17.1092 5.47304 17.3341 5.63887 17.5C5.8047 17.6658 6.02961 17.7589 6.26412 17.7589Z" fill="#3F2E00"/>
-              <path d="M16.8745 17.7593C17.109 17.7593 17.3339 17.6661 17.4997 17.5003C17.6656 17.3344 17.7587 17.1095 17.7587 16.875V6.26412C17.7587 6.02961 17.6656 5.8047 17.4997 5.63887C17.3339 5.47304 17.109 5.37988 16.8745 5.37988C16.64 5.37988 16.415 5.47304 16.2492 5.63887C16.0834 5.8047 15.9902 6.02961 15.9902 6.26412V16.875C15.9902 17.1095 16.0834 17.3344 16.2492 17.5003C16.415 17.6661 16.64 17.7593 16.8745 17.7593Z" fill="#3F2E00"/>
-              <path d="M9.80123 17.7593C10.0357 17.7593 10.2607 17.6661 10.4265 17.5003C10.5923 17.3344 10.6855 17.1095 10.6855 16.875V6.26412C10.6855 6.02961 10.5923 5.8047 10.4265 5.63887C10.2607 5.47304 10.0357 5.37988 9.80123 5.37988C9.56672 5.37988 9.34181 5.47304 9.17598 5.63887C9.01015 5.8047 8.91699 6.02961 8.91699 6.26412V16.875C8.91699 17.1095 9.01015 17.3344 9.17598 17.5003C9.34181 17.6661 9.56672 17.7593 9.80123 17.7593Z" fill="#3F2E00"/>
-              fill={currentStep === 4 ? "#EA580C" : "#3F2E00"}
-              </g>
-            </svg>*/}
               <span>Financial</span>
             </li>
 
@@ -1219,7 +1538,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               <User size={18} className={currentStep === 7 ? 'text-orange-600' : 'text-gray-500'} />
               <span>Agent Details</span>
             </li>
-            </ul>
+            </ul>*/}
+
+          <ul className="space-y-1">
+            {renderSidebarNavigation()}
+          </ul>
 
           
           {/* Progress bar */}
@@ -1238,7 +1561,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         <div className="flex-1 flex flex-col max-h-[90vh]">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-            <h2 className="text-md font-semi-bold">Referencing Form</h2>
+          <div className="flex items-center space-x-4">
+          {/* Mobile Menu Button */}
+          <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-2">
+            <Menu size={24} />
+          </button>
+          <h2 className="text-md font-semibold">Referencing Form</h2>
+        </div>
             <button
               onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors"
@@ -1247,6 +1576,43 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               <X size={18} />
             </button>
           </div>
+
+          {/* Mobile Sidebar (Overlay) */}
+          {isMenuOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+          <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl p-6">
+            <button onClick={() => setIsMenuOpen(false)} className="mb-4">
+              <X size={24} />
+            </button>
+            <ul className="space-y-4">
+              {[
+                ["Identity", User, 1],
+                ["Employment", Briefcase, 2],
+                ["Residential", Home, 3],
+                ["Financial", Euro, 4],
+                ["Guarantor", Users, 5],
+                ["Credit Check", CreditCard, 6],
+                ["Agent Details", User, 7],
+              ].map(([label, Icon, step]) => (
+                <li
+                  key={step}
+                  onClick={() => {
+                    goToStep(step);
+                    setIsMenuOpen(false);
+                  }}
+                  className="flex items-center space-x-3 px-4 py-3 cursor-pointer hover:bg-gray-100"
+                >
+                  <Icon
+                    size={18}
+                    className={currentStep === step ? "text-orange-600" : "text-gray-500"}
+                  />
+                  <span>{label}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
           
           {/* Form content */}
           <div className="flex-1 overflow-y-auto p-6 bg-[#f2f7fb]">
@@ -1302,6 +1668,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           </div>
         </div>
       </div>
+      {/* Add the warning modal here */}
+    <WarningModal />
     </div>
   );
 };

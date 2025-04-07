@@ -83,73 +83,73 @@ const BookViewing = () => {
         </div>
 
         {/* Right Section - Swiper Carousel */}
-<div className="md:w-2/5 flex justify-center">
-  <Swiper
-    modules={[Pagination, Navigation]}
-    pagination={{ clickable: true }}
-    navigation
-    spaceBetween={20} /* Increase spacing for better layout */
-    slidesPerView={1}
-    className="w-full max-w-md"
-    style={{
-      "--swiper-navigation-color": "#58B2E8", // Lighter color for better contrast
-      "--swiper-pagination-color": "#58B2E8",
-      "--swiper-navigation-size": "24px" // Reduce navigation icon size
-    }}
-  >
-    {/* Slide 1 */}
-    <SwiperSlide>
-      <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
-        <div className="bg-white p-1 rounded-lg inline-block mb-12">
-          <img src="/images/BV 1.png" alt="icon" className="h-20 w-20"/>
-        </div>
-        <h3 className="text-lg font-semibold mb-4">01. Input Property Details</h3>
-        <p className="text-gray-100 mb-6">
-        Input your already searched property details.
-        </p>
-      </div>
-    </SwiperSlide>
+        <div className="md:w-2/5 flex justify-center">
+          <Swiper
+            modules={[Pagination, Navigation]}
+            pagination={{ clickable: true }}
+            navigation
+            spaceBetween={20} /* Increase spacing for better layout */
+            slidesPerView={1}
+            className="w-full max-w-md"
+            style={{
+              "--swiper-navigation-color": "#58B2E8", // Lighter color for better contrast
+              "--swiper-pagination-color": "#58B2E8",
+              "--swiper-navigation-size": "24px" // Reduce navigation icon size
+            }}
+          >
+          {/* Slide 1 */}
+          <SwiperSlide>
+            <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
+              <div className="bg-white p-1 rounded-lg inline-block mb-12">
+                <img src="/images/BV 1.png" alt="icon" className="h-20 w-20"/>
+              </div>
+              <h3 className="text-lg font-semibold mb-4">01. Input Property Details</h3>
+              <p className="text-gray-100 mb-6">
+              Input your already searched property details.
+              </p>
+            </div>
+          </SwiperSlide>
 
-    {/* Slide 2 */}
-    <SwiperSlide>
-      <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
-        <div className="bg-white p-1 rounded-lg inline-block mb-12">
-          <img src="/images/BV 2.png" alt="icon" className="h-20 w-20"/>
-        </div>
-        <h3 className="text-lg font-semibold mb-4">02. Complete the form</h3>
-        <p className="text-gray-100 mb-6">
-        To proceed with your booking, fill the forms so we can assist you make the booking.
-        </p>
-      </div>
-    </SwiperSlide>
+          {/* Slide 2 */}
+          <SwiperSlide>
+            <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
+              <div className="bg-white p-1 rounded-lg inline-block mb-12">
+                <img src="/images/BV 2.png" alt="icon" className="h-20 w-20"/>
+              </div>
+              <h3 className="text-lg font-semibold mb-4">02. Complete the form</h3>
+              <p className="text-gray-100 mb-6">
+              To proceed with your booking, fill the forms so we can assist you make the booking.
+              </p>
+            </div>
+          </SwiperSlide>
 
-    {/* Slide 3 */}
-    <SwiperSlide>
-      <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
-        <div className="bg-white p-1 rounded-lg inline-block mb-12">
-          <img src="/images/BV 3.png" alt="icon" className="h-20 w-20"/>
-        </div>
-        <h3 className="text-lg font-semibold mb-4">03. Confirm your Booking Details</h3>
-        <p className="text-gray-100 mb-6">
-        Proptii can make mistakes, Go through important information's to confirm details.
-        </p>
-      </div>
-    </SwiperSlide>
+          {/* Slide 3 */}
+          <SwiperSlide>
+            <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
+              <div className="bg-white p-1 rounded-lg inline-block mb-12">
+                <img src="/images/BV 3.png" alt="icon" className="h-20 w-20"/>
+              </div>
+              <h3 className="text-lg font-semibold mb-4">03. Confirm your Booking Details</h3>
+              <p className="text-gray-100 mb-6">
+              Proptii can make mistakes, Go through important information's to confirm details.
+              </p>
+            </div>
+          </SwiperSlide>
 
-    {/* Slide 4 */}
-    <SwiperSlide>
-      <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
-        <div className="bg-white p-1 rounded-lg inline-block mb-12">
-          <img src="/images/BV 4.png" alt="icon" className="h-20 w-20"/>
-        </div>
-        <h3 className="text-lg font-semibold mb-4">04. Await your Booking Confirmation</h3>
-        <p className="text-gray-100 mb-6">
-        Your booking confirmations and updates would br sent to your mail or as a text message.
-        </p>
+          {/* Slide 4 */}
+          <SwiperSlide>
+            <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
+              <div className="bg-white p-1 rounded-lg inline-block mb-12">
+                <img src="/images/BV 4.png" alt="icon" className="h-20 w-20"/>
+              </div>
+              <h3 className="text-lg font-semibold mb-4">04. Await your Booking Confirmation</h3>
+              <p className="text-gray-100 mb-6">
+              Your booking confirmations and updates would br sent to your mail or as a text message.
+              </p>
+            </div>
+          </SwiperSlide>
+        </Swiper>
       </div>
-    </SwiperSlide>
-  </Swiper>
-</div>
 
       </div>
     </section>
