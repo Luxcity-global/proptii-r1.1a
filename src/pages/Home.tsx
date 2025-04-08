@@ -3,6 +3,7 @@ import { Camera, Mic, Search } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
+import { useNavigate } from 'react-router-dom';
 import { AzureKeyCredential } from "@azure/core-auth";
 import PropertyModal from '../components/PropertyModal';
 import AISearchIcon from '../components/icons/AISearchIcon';
@@ -124,6 +125,8 @@ const Home = () => {
   const handleViewResults = () => {
     setIsModalOpen(true);
   };
+
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen font-nunito">
@@ -295,7 +298,9 @@ const Home = () => {
         <p className="text-gray-600 mb-8 flex-grow">
           Save time and effort with our AI-powered booking service. Simply enter your desired property details and let our system handle the rest.
         </p>
-        <button className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
+        <button 
+        onClick={() => navigate('/bookviewing')}
+        className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
           Learn More
         </button>
       </div>
@@ -314,7 +319,9 @@ const Home = () => {
         <p className="text-gray-600 mb-8 flex-grow">
           Ensure peace of mind for both landlords and tenants. Our rigorous referencing process verifies renter or buyer identity, financial stability, and rental history.
         </p>
-        <button className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
+        <button 
+        onClick={() => navigate('/referencing')}
+        className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
           Learn More
         </button>
       </div>
@@ -332,7 +339,9 @@ const Home = () => {
         <p className="text-gray-600 mb-8 flex-grow">
           Save time and reduce errors with our contract management solution. We offer a range of customizable lease agreement templates to suit your specific needs.
         </p>
-        <button className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
+        <button 
+        onClick={() => navigate('/contracts')}
+        className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
           Learn More
         </button>
       </div>

@@ -78,7 +78,9 @@ const Referencing = () => {
             a secure badge of trustworthiness. This streamlined process fosters trust 
             and confidence in every property transaction.
           </p>
-          <button className="bg-orange-600 text-white font-medium px-6 py-3 rounded-lg hover:bg-orange-700 transition-all duration-300 shadow-md hover:shadow-lg">
+          <button 
+          onClick={handleGetStarted}
+          className="bg-orange-600 text-white font-medium px-6 py-3 rounded-lg hover:bg-orange-700 transition-all duration-300 shadow-md hover:shadow-lg">
           Get started
           </button>
 

@@ -2,6 +2,11 @@
 import { Link } from 'react-router-dom';
 import { Home } from 'lucide-react';*/
 import { FaFacebookF, FaLinkedinIn, FaTwitter, FaYoutube, FaDribbble } from "react-icons/fa";
+//import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+
+
+//const navigate = useNavigate();
 
 function Footer() {
   return (
@@ -21,10 +26,37 @@ function Footer() {
         <div>
           <h4 className="text-lg font-semibold mb-3">Home</h4>
           <ul className="space-y-2 text-sm opacity-75">
-            <li><a href="#">Book Viewings</a></li>
-            <li><a href="#">Referencing</a></li>
-            <li><a href="#">Contracts</a></li>
-          </ul>
+            <li>
+              <Link to="/bookviewing" className="hover:underline">
+                Book Viewings
+              </Link>
+            </li>
+            <li>
+              <Link to="/referencing" className="hover:underline">
+                Referencing
+              </Link>
+            </li>
+            <li>
+              <Link to="/contracts" className="hover:underline">
+                Contracts
+              </Link>
+            </li>
+              {/*<li>
+                <button onClick={() => navigate('/bookviewing')} className="hover:underline">
+                  Book Viewings
+                </button>
+              </li>
+              <li>
+                <button onClick={() => navigate('/referencing')} className="hover:underline">
+                  Referencing
+                </button>
+              </li>
+              <li>
+                <button onClick={() => navigate('/contracts')} className="hover:underline">
+                  Contracts
+                </button>
+</li>*/}
+            </ul>
         </div>
 
         <div>
