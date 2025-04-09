@@ -35,6 +35,8 @@ const SubmissionForm: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [images, setImages] = useState<File[]>([]);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  // Add state to store image previews
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
   const {
     register,
@@ -59,6 +61,14 @@ const SubmissionForm: React.FC = () => {
   const handleImagesChange = (newImages: File[]) => {
     setImages(newImages);
     setValue('images', newImages);
+    
+    // Generate and store preview URLs for the images
+    const newPreviews: string[] = [];
+    newImages.forEach(file => {
+      const url = URL.createObjectURL(file);
+      newPreviews.push(url);
+    });
+    setImagePreviews(newPreviews);
   };
 
   const onSubmit = async (data: PropertyFormData) => {
@@ -95,7 +105,8 @@ const SubmissionForm: React.FC = () => {
           </button>
         </div>
         
-        <ListingPreview data={getValues()} images={images} />
+        {/* Pass the image previews to the ListingPreview component */}
+        <ListingPreview data={getValues()} imagePreviews={imagePreviews} />
         
         <div className="mt-8 flex justify-end">
           <button
@@ -268,14 +279,12 @@ const SubmissionForm: React.FC = () => {
           <h2 className="text-xl font-semibold mb-4">Location</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
               <input
                 type="text"
                 {...register('address')}
                 className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="Enter street address"
+                placeholder="Street name and number"
               />
               {errors.address && (
                 <p className="text-red-500 text-sm mt-1">{errors.address.message}</p>
@@ -284,67 +293,43 @@ const SubmissionForm: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Postcode
-                </label>
-                <input
-                  type="text"
-                  {...register('postcode')}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Enter postcode"
-                />
-                {errors.postcode && (
-                  <p className="text-red-500 text-sm mt-1">{errors.postcode.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  City
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
                 <input
                   type="text"
                   {...register('city')}
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Enter city"
                 />
                 {errors.city && (
                   <p className="text-red-500 text-sm mt-1">{errors.city.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Postcode</label>
+                <input
+                  type="text"
+                  {...register('postcode')}
+                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+                {errors.postcode && (
+                  <p className="text-red-500 text-sm mt-1">{errors.postcode.message}</p>
                 )}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Images Section */}
+        {/* Agent Contact Section */}
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-          <h2 className="text-xl font-semibold mb-4">Property Images</h2>
-          <div className="space-y-4">
-            <ImageUpload 
-              images={images} 
-              onChange={handleImagesChange} 
-              maxImages={4} 
-            />
-            {errors.images && (
-              <p className="text-red-500 text-sm mt-1">{errors.images.message}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Contact Details Section */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-          <h2 className="text-xl font-semibold mb-4">Contact Details</h2>
+          <h2 className="text-xl font-semibold mb-4">Agent Information</h2>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Your Name
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
                 <input
                   type="text"
                   {...register('agentName')}
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Enter your name"
                 />
                 {errors.agentName && (
                   <p className="text-red-500 text-sm mt-1">{errors.agentName.message}</p>
@@ -352,14 +337,11 @@ const SubmissionForm: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Company Name
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
                 <input
                   type="text"
                   {...register('agentCompany')}
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Enter company name"
                 />
                 {errors.agentCompany && (
                   <p className="text-red-500 text-sm mt-1">{errors.agentCompany.message}</p>
@@ -369,14 +351,11 @@ const SubmissionForm: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
                 <input
                   type="email"
                   {...register('contactEmail')}
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Enter your email"
                 />
                 {errors.contactEmail && (
                   <p className="text-red-500 text-sm mt-1">{errors.contactEmail.message}</p>
@@ -384,14 +363,11 @@ const SubmissionForm: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone Number
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
                 <input
                   type="tel"
                   {...register('contactPhone')}
                   className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Enter phone number"
                 />
                 {errors.contactPhone && (
                   <p className="text-red-500 text-sm mt-1">{errors.contactPhone.message}</p>
@@ -401,18 +377,48 @@ const SubmissionForm: React.FC = () => {
           </div>
         </div>
 
+        {/* Image Upload Section */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+          <h2 className="text-xl font-semibold mb-4">Property Photos</h2>
+          <p className="text-sm text-gray-500 mb-2">
+            Upload clear images that best represent the property
+          </p>
+          {/* Pass hidePreview prop to disable the default thumbnails */}
+          <ImageUpload images={images} onChange={handleImagesChange} hidePreview={true} />
+          {errors.images && (
+            <p className="text-red-500 text-sm mt-2">{errors.images.message}</p>
+          )}
+          
+          {/* Custom preview thumbnails of uploaded images */}
+          {imagePreviews.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Uploaded Images:</p>
+              <div className="flex flex-wrap gap-2">
+                {imagePreviews.map((preview, index) => (
+                  <div key={index} className="relative w-24 h-24 rounded-md overflow-hidden border border-gray-200">
+                    <img 
+                      src={preview} 
+                      alt={`Property image ${index + 1}`} 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Action Buttons */}
-        <div className="flex justify-between">
+        <div className="flex justify-between items-center pt-6">
           <button
             type="button"
             onClick={togglePreview}
-            disabled={!isValid}
-            className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            className="flex items-center text-gray-700 hover:text-primary transition"
           >
-            <Eye className="w-5 h-5" />
-            <span>Preview Listing</span>
+            <Eye className="w-5 h-5 mr-2" />
+            Preview Listing
           </button>
-          
+
           <button
             type="submit"
             disabled={isSubmitting || !isValid}
@@ -433,4 +439,4 @@ const SubmissionForm: React.FC = () => {
   );
 };
 
-export default SubmissionForm; 
+export default SubmissionForm;

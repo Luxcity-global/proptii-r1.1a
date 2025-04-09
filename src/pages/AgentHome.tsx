@@ -32,7 +32,7 @@ const AgentHome = () => {
               >
                 Tenant
               </Link>
-              <button className="px-8 py-3 rounded-full bg-primary text-white font-semibold transition-all">
+              <button className="px-8 py-3 rounded-full bg-[#FFEFD4] text-black font-semibold transition-all">
                 Agent
               </button>
             </div>
@@ -51,7 +51,7 @@ const AgentHome = () => {
           {/* Start New Listing Button */}
           <Link
             to="/listings/new"
-            className="inline-block px-8 py-4 bg-primary text-white rounded-full text-lg font-semibold hover:bg-opacity-90 transition-all"
+            className="inline-block px-8 py-4 bg-[#FFEFD4] text-black rounded-full text-lg font-semibold hover:bg-opacity-90 transition-all"
           >
             Start New Listing
           </Link>
