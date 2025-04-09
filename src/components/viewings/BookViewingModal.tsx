@@ -53,10 +53,11 @@ const ContentSection = styled(Box)(({ theme }) => ({
 const StepSidebar = styled(Box)(({ theme }) => ({
   width: '240px',
   borderRight: `1px solid #E7F2FF`, // Updated outline color
-  padding: theme.spacing(2),
+  padding: theme.spacing(4, 2, 2, 2), // Increased top padding from 2 to 4
   display: 'flex',
   flexDirection: 'column',
   gap: theme.spacing(1),
+  backgroundColor: '#fff', // Add background color
 }));
 
 // Step button styling
@@ -128,9 +129,14 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
   useBookViewing();
   const [activeStep, setActiveStep] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); // State to toggle sidebar
+  const [showSuccess, setShowSuccess] = useState(false); // State for success popup
 
   const handleNext = () => {
-    setActiveStep((prevStep) => prevStep + 1);
+    if (activeStep === steps.length - 1) {
+      setShowSuccess(true);
+    } else {
+      setActiveStep((prevStep) => prevStep + 1);
+    }
   };
 
   const handleBack = () => {
@@ -141,11 +147,16 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     setIsSidebarOpen((prev) => !prev);
   };
 
+  const handleSuccessClose = () => {
+    setShowSuccess(false);
+    onClose();
+  };
+
   return (
-    <StyledDialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
-      <Box display="flex" flex={1} minHeight="500px">
-        {/* Sidebar Navigation */}
-        {isSidebarOpen && (
+    <>
+      <StyledDialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+        <Box display="flex" flex={1} minHeight="500px">
+          {/* Sidebar Navigation */}
           <StepSidebar
             sx={{
               position: 'absolute',
@@ -153,180 +164,217 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
               top: 0,
               bottom: 0,
               zIndex: 10,
-              transform: isSidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
-              transition: 'transform 0.3s ease-in-out',
+              width: isSidebarOpen ? '240px' : '64px',
+              transform: 'none',
+              transition: 'width 0.3s ease-in-out',
+              overflow: 'hidden', // Add this to prevent content overflow during transition
             }}
           >
-            {/* Hamburger Menu Icon */}
+            {/* Hamburger Menu */}
             <IconButton
               onClick={toggleSidebar}
               sx={{
                 position: 'absolute',
-                top: 16,
-                right: 16, // Align to the top-right of the Sidebar
-                zIndex: 20,
+                top: isSidebarOpen ? 24 : 16, // Adjusted position when sidebar is closed
+                right: isSidebarOpen ? 16 : 12,
+                zIndex: 1200,
                 color: DARK_GREY,
                 backgroundColor: '#EDF3FA',
+                width: 35,  // Increased from 32
+                height: 35, // Increased from 32
                 '&:hover': {
                   backgroundColor: alpha('#EDF3FA', 0.8),
                 },
               }}
             >
-              <MenuIcon />
+              <MenuIcon sx={{ 
+                transform: isSidebarOpen ? 'rotate(180deg)' : 'none', 
+                transition: 'transform 0.3s ease-in-out',
+                fontSize: '22px'  // Increased from 20px
+              }} />
             </IconButton>
 
-            {/* Sidebar Title */}
-            <Typography
-              variant="h6"
-              sx={{
-                color: '#DC5F12',
-                fontWeight: 'bold',
-                marginBottom: 3,
-              }}
-            >
-              Steps
-            </Typography>
+            {/* Titles only shown when sidebar is open */}
+            {isSidebarOpen && (
+              <>
+                <Typography variant="h6" sx={{ color: '#DC5F12', fontWeight: 'bold', mb: 1 }}>
+                  Steps
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#6B7280', mb: 1 }}>
+                  Follow the steps to book your property viewing.
+                </Typography>
+              </>
+            )}
 
-            {/* Sidebar Text */}
-            <Typography
-              variant="body2"
-              sx={{
-                color: '#6B7280',
-                marginBottom: 3,
-              }}
-            >
-              Follow the steps to book your property viewing.
-            </Typography>
-
-            {/* Steps */}
-            {steps.map((step, index) => (
-              <StepButton
-                key={step.label}
-                isActive={activeStep === index}
-                onClick={() => index <= activeStep && setActiveStep(index)}
-                startIcon={
-                  index < activeStep ? (
-                    <Check style={{ color: BLUE_COLOR }} />
-                  ) : (
-                    step.icon
-                  )
-                }
-                fullWidth
-              >
-                {step.label}
-              </StepButton>
-            ))}
-          </StepSidebar>
-        )}
-
-        {/* Main Content */}
-        <Box
-          flex={1}
-          display="flex"
-          flexDirection="column"
-          sx={{
-            marginLeft: isSidebarOpen ? '240px' : '0', // Adjust content based on sidebar state
-            transition: 'margin-left 0.3s ease-in-out',
-          }}
-        >
-          {/* Header */}
-          <StyledDialogTitle>
-            <Box display="flex" justifyContent="space-between" alignItems="center">
-              {/* Title */}
-              <Typography
-                variant="body2"
-                sx={{
-                  fontSize: '0.4rem',
-                  fontWeight: 'regular',
-                  color: '#6B7280',
-                }}
-              >
-                Book a Property Viewing
-              </Typography>
-
-              {/* Cancel Icon */}
-              <IconButton
-                onClick={onClose}
-                sx={{
-                  color: DARK_GREY,
-                  backgroundColor: '#EDF3FA',
-                  '&:hover': {
-                    backgroundColor: alpha('#EDF3FA', 0.8),
-                  },
-                }}
-              >
-                <Close />
-              </IconButton>
+            {/* Steps - Adjusted marginTop based on sidebar state */}
+            <Box sx={{ 
+              mt: isSidebarOpen ? 1 : 4.5, // Increased spacing when closed
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: isSidebarOpen ? 'stretch' : 'center',
+            }}>
+              {steps.map((step, index) => (
+                <StepButton
+                  key={step.label}
+                  isActive={activeStep === index}
+                  onClick={() => index <= activeStep && setActiveStep(index)}
+                  startIcon={index < activeStep ? <Check style={{ color: BLUE_COLOR }} /> : step.icon}
+                  sx={{
+                    justifyContent: isSidebarOpen ? 'flex-start' : 'center',
+                    minWidth: 0,
+                    width: isSidebarOpen ? '100%' : '40px',
+                    p: isSidebarOpen ? undefined : '8px',
+                    my: 0.5,
+                    '& .MuiButton-startIcon': {
+                      margin: isSidebarOpen ? undefined : 0,
+                    }
+                  }}
+                >
+                  {isSidebarOpen ? step.label : ''}
+                </StepButton>
+              ))}
             </Box>
-          </StyledDialogTitle>
+          </StepSidebar>
 
-          {/* Step Content */}
-          <StyledDialogContent
+          {/* Main Content */}
+          <Box
+            flex={1}
+            display="flex"
+            flexDirection="column"
             sx={{
-              backgroundColor: '#EDF3FA',
-              pb: 3,
-              flex: 1, // Ensure content takes up available space
-            }}
-          >
-            <ContentSection>
-              {activeStep === 0 && <PropertySelector />}
-              {activeStep === 1 && <ViewingScheduler />}
-              {activeStep === 2 && <RequirementsChecker />}
-              {activeStep === 3 && <ViewingComparison />}
-            </ContentSection>
-          </StyledDialogContent>
-
-          {/* Footer */}
-          <StyledDialogActions
-            sx={{
-              marginLeft: isSidebarOpen ? '240px' : '0', // Align footer with sidebar
+              marginLeft: isSidebarOpen ? '240px' : '64px', // Adjust content based on sidebar state
               transition: 'margin-left 0.3s ease-in-out',
             }}
           >
-            <Button
-              onClick={onClose}
+            {/* Header */}
+            <StyledDialogTitle>
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                {/* Title */}
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontSize: '0.4rem',
+                    fontWeight: 'regular',
+                    color: '#6B7280',
+                  }}
+                >
+                  Book a Property Viewing
+                </Typography>
+
+                {/* Cancel Icon */}
+                <IconButton
+                  onClick={onClose}
+                  sx={{
+                    color: DARK_GREY,
+                    backgroundColor: '#EDF3FA',
+                    '&:hover': {
+                      backgroundColor: alpha('#EDF3FA', 0.8),
+                    },
+                  }}
+                >
+                  <Close />
+                </IconButton>
+              </Box>
+            </StyledDialogTitle>
+
+            {/* Step Content */}
+            <StyledDialogContent
               sx={{
-                color: DARK_GREY,
-                '&:hover': {
-                  backgroundColor: alpha(DARK_GREY, 0.04),
-                },
+                backgroundColor: '#EDF3FA',
+                pb: 3,
+                flex: 1, // Ensure content takes up available space
               }}
             >
-              Cancel
-            </Button>
-            {activeStep > 0 && (
+              <ContentSection>
+                {activeStep === 0 && <PropertySelector />}
+                {activeStep === 1 && <ViewingScheduler />}
+                {activeStep === 2 && <RequirementsChecker />}
+                {activeStep === 3 && <ViewingComparison />}
+              </ContentSection>
+            </StyledDialogContent>
+
+            {/* Footer */}
+            <StyledDialogActions
+              sx={{
+                marginLeft: isSidebarOpen ? '240px' : '64px', // Align footer with sidebar
+                transition: 'margin-left 0.3s ease-in-out',
+              }}
+            >
               <Button
-                onClick={handleBack}
-                variant="outlined"
+                onClick={onClose}
                 sx={{
-                  borderColor: BLUE_COLOR,
-                  color: BLUE_COLOR,
+                  color: DARK_GREY,
                   '&:hover': {
-                    borderColor: BLUE_COLOR,
-                    backgroundColor: alpha(BLUE_COLOR, 0.04),
+                    backgroundColor: alpha(DARK_GREY, 0.04),
                   },
                 }}
               >
-                Back
+                Cancel
               </Button>
-            )}
-            <Button
-              onClick={handleNext}
-              variant="contained"
-              sx={{
-                bgcolor: BLUE_COLOR,
-                '&:hover': {
+              {activeStep > 0 && (
+                <Button
+                  onClick={handleBack}
+                  variant="outlined"
+                  sx={{
+                    borderColor: BLUE_COLOR,
+                    color: BLUE_COLOR,
+                    '&:hover': {
+                      borderColor: BLUE_COLOR,
+                      backgroundColor: alpha(BLUE_COLOR, 0.04),
+                    },
+                  }}
+                >
+                  Back
+                </Button>
+              )}
+              <Button
+                onClick={handleNext}
+                variant="contained"
+                sx={{
                   bgcolor: BLUE_COLOR,
-                  opacity: 0.9,
-                },
-              }}
-            >
-              {activeStep === steps.length - 1 ? 'Confirm' : 'Next'}
-            </Button>
-          </StyledDialogActions>
+                  '&:hover': {
+                    bgcolor: BLUE_COLOR,
+                    opacity: 0.9,
+                  },
+                }}
+              >
+                {activeStep === steps.length - 1 ? 'Confirm' : 'Next'}
+              </Button>
+            </StyledDialogActions>
+          </Box>
         </Box>
-      </Box>
-    </StyledDialog>
+      </StyledDialog>
+
+      {/* Success Popup */}
+      <Dialog
+        open={showSuccess}
+        onClose={handleSuccessClose}
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            padding: 2,
+          }
+        }}
+      >
+        <DialogContent>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: 2,
+            py: 2 
+          }}>
+            <Typography variant="h6" sx={{ color: BLUE_COLOR }}>
+              Your booking was successful
+            </Typography>
+            <Button variant="contained" onClick={handleSuccessClose} sx={{ bgcolor: BLUE_COLOR }}>
+              Close
+            </Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
