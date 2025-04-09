@@ -132,10 +132,15 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
   const [showSuccess, setShowSuccess] = useState(false); // State for success popup
 
   const handleNext = () => {
-    if (activeStep === steps.length - 1) {
-      setShowSuccess(true);
-    } else {
-      setActiveStep((prevStep) => prevStep + 1);
+    try {
+      console.log('Current step:', activeStep);
+      if (activeStep === steps.length - 1) {
+        setShowSuccess(true);
+      } else {
+        setActiveStep((prevStep) => prevStep + 1);
+      }
+    } catch (error) {
+      console.error('Error in handleNext:', error);
     }
   };
 
