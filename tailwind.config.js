@@ -7,6 +7,14 @@ export default {
         primary: '#F15A22',
         secondary: '#002B49',
       },
+      fontFamily: {
+        archivo: ['Archivo', 'sans-serif'],
+        'nunito-sans': ['Nunito Sans', 'sans-serif'],
+        archive: ['Archive', 'sans-serif'],
+      },
+      fontSize: {
+        '2.5xl': '1.75rem', // 28px
+      },
     },
   },
   plugins: [],

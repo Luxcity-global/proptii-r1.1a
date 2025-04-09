@@ -88,7 +88,7 @@ function Footer() {
         <p>Copyright 2025, All Rights Reserved by Proptii &copy;</p>
         <div className="flex space-x-4">
           <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75"><FaFacebookF /></a>
-          <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75"><FaLinkedinIn /></a>
+          <a href="https://www.linkedin.com/company/luxcity-global/?viewAsMember=true" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75"><FaLinkedinIn /></a>
           <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75"><FaTwitter /></a>
           <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75"><FaYoutube /></a>
           <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75"><FaDribbble /></a>

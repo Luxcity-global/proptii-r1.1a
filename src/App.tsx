@@ -3,10 +3,19 @@ import { PublicClientApplication } from "@azure/msal-browser";
 //import { MsalAuthProvider } from './contexts/AuthContext';
 import { msalConfig } from './config/authConfig';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
+//import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+//import { CssBaseline, Box } from '@mui/material';
 import { MSALProviderWrapper } from './contexts/AuthContext';
+//import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+//import { ThemeProvider } from '@mui/material/styles';
+//import { CssBaseline, Box } from '@mui/material';
+import { AuthProvider } from './context/AuthContext';
+//import { theme } from './theme';
 import Home from './pages/Home';
+import { LoginPage } from './pages/Login';
+import { RegisterPage } from './pages/Register';
+import { NotFoundPage } from './pages/NotFound';
 import Referencing from './pages/Referencing';
 import ContractsPage from './pages/Contracts';
 import BookViewing from './pages/BookViewing';
@@ -17,6 +26,9 @@ import Viewings from './components/dashboard/sections/Viewings';
 import TenantContracts from './components/dashboard/sections/TenantContracts';
 import FileTable from './components/dashboard/sections/YourFiles';
 import TenantReferencing from './components/dashboard/sections/TenantReferencing';
+import AgentHome from './pages/AgentHome';
+import Listings from './pages/Listings';
+import NewListingPage from './pages/listings/new';
 import ErrorBoundary from './components/ErrorBoundary';
 
 console.log('App.tsx - Starting initialization with config:', msalConfig);
@@ -40,14 +52,22 @@ pca.initialize().then(() => {
 function App() {
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundary fallback={<div>Custom fallback UI</div>}>
     {/*<ThemeProvider theme={theme}>*/}
       <CssBaseline />
       <MSALProviderWrapper>
         {/*<RedirectUriWarning />*/}
+        <AuthProvider>
         <Router>
+        {/*<Box sx={{ 
+            minHeight: '100vh', 
+            display: 'flex', 
+            flexDirection: 'column',
+            bgcolor: 'background.default'
+          }}>*/}
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/agent" element={<AgentHome />} />
             <Route path="/referencing" element={<Referencing />} />
             <Route path="/contracts" element={<ContractsPage />} />
             <Route path="/bookviewing" element={<BookViewing />} />
@@ -55,6 +75,13 @@ function App() {
             <Route path="/test-referencing" element={<TestReferencingPage />} />
             <Route path="/backend-test" element={<BackendIntegrationTest />} />
   <Route path="/referencing-modal-test" element={<ReferencingModalTest />} />*/}
+
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              
+              {/* Listings routes */}
+              <Route path="/listings" element={<Listings />} />
+              <Route path="/listings/new" element={<NewListingPage />} />
             
             {/* Dashboard Routes */}
             <Route path="/dashboard" element={<Dashboard />}>
@@ -67,6 +94,7 @@ function App() {
             </Route>
           </Routes>
         </Router>
+        </AuthProvider>
       </MSALProviderWrapper>
     {/*</ThemeProvider>*/}
     </ErrorBoundary>

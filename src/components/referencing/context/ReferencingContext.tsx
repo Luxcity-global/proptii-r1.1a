@@ -1,10 +1,18 @@
+<<<<<<< HEAD
 import React, { createContext, useReducer, useContext, ReactNode, useEffect, useCallback } from 'react';
+=======
+import React, { createContext, useReducer, useContext, ReactNode, useEffect, useCallback, useState } from 'react';
+>>>>>>> upstream/feature/ai-search-listings-agents
 import { FormData, FormSection, ReferencingState as FormReferencingState, ReferencingAction as FormReferencingAction, ReferencingFormData } from '../../../types/referencing';
 import { saveToLocalStorage, loadFromLocalStorage, saveDraft } from '../../../utils/localStorage';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import * as referencingService from '../../../services/referencingService';
 import { isAzureConfigured } from '../../../config/azure';
 import { uploadToAzureStorage } from '../../../services/storageService';
+<<<<<<< HEAD
+=======
+import * as yup from 'yup';
+>>>>>>> upstream/feature/ai-search-listings-agents
 
 // Define the state type
 interface ReferencingState {
@@ -49,10 +57,24 @@ interface ReferencingContextType {
   saveAsDraft: (name: string) => Promise<boolean>;
   setPropertyId: (id: string) => void;
   uploadDocument: (section: FormSection, field: string, file: File) => Promise<string | null>;
+<<<<<<< HEAD
 }
 
 // Create the context
 const ReferencingContext = createContext<ReferencingContextType | null>(null);
+=======
+  formData: FormData;
+  errors: {
+    [K in keyof FormData]?: {
+      [key: string]: string;
+    };
+  };
+  validateSection: (section: keyof FormData) => Promise<boolean>;
+}
+
+// Create the context
+const ReferencingContext = createContext<ReferencingContextType | undefined>(undefined);
+>>>>>>> upstream/feature/ai-search-listings-agents
 
 // Initial state
 const initialFormData: FormData = {
@@ -455,8 +477,13 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
         return true;
       } else {
         // Simulate API call
+<<<<<<< HEAD
         await new Promise(resolve => setTimeout(resolve, 2000));
         return true;
+=======
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return true;
+>>>>>>> upstream/feature/ai-search-listings-agents
       }
     } catch (error) {
       console.error('Error submitting application:', error);
@@ -659,6 +686,59 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
     return formData;
   };
 
+<<<<<<< HEAD
+=======
+  // Validation schemas
+  const employmentSchema = yup.object().shape({
+    employmentStatus: yup.string().required('Employment status is required'),
+    companyDetails: yup.string().required('Company details are required'),
+    lengthOfEmployment: yup.string().required('Length of employment is required'),
+    jobPosition: yup.string().required('Job position is required'),
+    referenceFullName: yup.string().required('Reference name is required'),
+    referenceEmail: yup.string().email('Invalid email').required('Reference email is required'),
+    referencePhone: yup.string().required('Reference phone is required'),
+    proofDocument: yup.mixed().required('Proof of employment is required')
+  });
+
+  const validateSection = useCallback(async (section: keyof FormData) => {
+    try {
+      let schema;
+      switch (section) {
+        case 'employment':
+          schema = employmentSchema;
+          break;
+        // Add other section schemas here
+        default:
+          return true;
+      }
+
+      await schema.validate(state.formData[section], { abortEarly: false });
+      dispatch({
+        type: 'CLEAR_ERROR',
+        payload: section
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof yup.ValidationError) {
+        const newErrors: { [key: string]: string } = {};
+        error.inner.forEach(err => {
+          if (err.path) {
+            newErrors[err.path] = err.message;
+          }
+        });
+        dispatch({
+          type: 'SET_ERROR',
+          payload: {
+            section,
+            error: newErrors
+          }
+        });
+      }
+      return false;
+    }
+  }, [state.formData]);
+
+>>>>>>> upstream/feature/ai-search-listings-agents
   return (
     <ReferencingContext.Provider
       value={{
@@ -672,7 +752,14 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
         setCurrentStep,
         saveAsDraft,
         setPropertyId,
+<<<<<<< HEAD
         uploadDocument
+=======
+        uploadDocument,
+        formData: state.formData,
+        errors: state.errors,
+        validateSection
+>>>>>>> upstream/feature/ai-search-listings-agents
       }}
     >
       {children}
@@ -687,6 +774,10 @@ export const useReferencing = (): ReferencingContextType => {
     throw new Error('useReferencing must be used within a ReferencingProvider');
   }
   return context;
+<<<<<<< HEAD
 };
+=======
+}; 
+>>>>>>> upstream/feature/ai-search-listings-agents
 
 export default ReferencingContext; 

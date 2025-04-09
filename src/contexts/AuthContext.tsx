@@ -14,7 +14,7 @@ import { msalConfig, loginRequest, b2cPolicies } from '../config/authConfig';
 export const msalInstance = new PublicClientApplication(msalConfig);
 
 // Development mode flag - set to true to bypass authentication for development
-const DEV_MODE = true; // TEMPORARY: Set to false in production
+const DEV_MODE = false; // Set to false in production
 
 // Initialize the MSAL instance before using it
 msalInstance.initialize().catch(error => {
@@ -77,9 +77,9 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const { instance, accounts, inProgress } = useMsal();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(DEV_MODE || false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [user, setUser] = useState<AccountInfo | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(!DEV_MODE);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
   // We don't need to initialize MSAL here again since we already did it above
