@@ -23,18 +23,19 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
   height: '100%',
   borderRadius: 12,
-  border: `1px solid ${theme.palette.divider}`
+  boxShadow: 'none', // Optional: Remove shadow if present
+  backgroundColor: theme.palette.background.paper, // Keep the background color
 }));
 
 const PropertyCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(2),
   borderRadius: 12,
-  border: `1px solid ${theme.palette.divider}`,
+  boxShadow: 'none', // Optional: Remove shadow if present
+  backgroundColor: theme.palette.background.paper, // Keep the background color
   transition: 'all 0.2s ease-in-out',
   '&:hover': {
-    boxShadow: theme.shadows[4],
-    borderColor: BLUE_COLOR
-  }
+    boxShadow: theme.shadows[4], // Optional: Add a subtle shadow on hover
+  },
 }));
 
 // Mock data
@@ -102,80 +103,88 @@ export const ViewingComparison: React.FC = () => {
       </Typography>
 
       <Grid container spacing={3}>
-        {/* Properties Comparison */}
-        <Grid item xs={12}>
-          <Grid container spacing={3}>
-            {viewedProperties.map((property) => (
-              <Grid item xs={12} md={6} key={property.id}>
-                <StyledPaper>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="h6">
-                      {property.title}
-                    </Typography>
-                    <Button
-                      startIcon={property.isFavorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
-                      color={property.isFavorite ? 'error' : 'inherit'}
-                    >
-                      {property.isFavorite ? 'Favorited' : 'Add to Favorites'}
-                    </Button>
-                  </Box>
-                  <Typography variant="h5" color="primary" gutterBottom>
-                    {property.price}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary" gutterBottom>
-                    {property.location}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary" gutterBottom>
-                    Rating: {property.rating}/5
-                  </Typography>
+        {viewedProperties.map((property) => (
+          <Grid item xs={12} md={6} key={property.id}>
+            <StyledPaper>
+              {/* Stack the title and favorite button vertically */}
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', mb: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  {property.title}
+                </Typography>
+                <Button
+                  startIcon={property.isFavorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+                  color={property.isFavorite ? 'error' : 'inherit'}
+                >
+                  {property.isFavorite ? 'Favorited' : 'Add to Favorites'}
+                </Button>
+                <Typography variant="h5" color="primary" gutterBottom>
+                  {property.price}
+                </Typography>
+                <Typography variant="body2" color="textSecondary" gutterBottom>
+                  {property.location}
+                </Typography>
+                <Typography variant="body2" color="textSecondary" gutterBottom>
+                  Rating: {property.rating}/5
+                </Typography>
+              </Box>
 
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Pros
-                    </Typography>
-                    <List dense>
-                      {property.pros.map((pro, index) => (
-                        <ListItem key={index}>
-                          <ListItemIcon>
-                            <CheckCircleIcon sx={{ color: 'success.main' }} />
-                          </ListItemIcon>
-                          <ListItemText primary={pro} />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Box>
+              {/* Pros */}
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Pros
+                </Typography>
+                <List dense>
+                  {property.pros.map((pro, index) => (
+                    <ListItem key={index}>
+                      <ListItemIcon>
+                        <CheckCircleIcon sx={{ color: 'success.main' }} />
+                      </ListItemIcon>
+                      <ListItemText primary={pro} />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
 
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Cons
-                    </Typography>
-                    <List dense>
-                      {property.cons.map((con, index) => (
-                        <ListItem key={index}>
-                          <ListItemIcon>
-                            <CancelIcon sx={{ color: 'error.main' }} />
-                          </ListItemIcon>
-                          <ListItemText primary={con} />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Box>
-                </StyledPaper>
-              </Grid>
-            ))}
+              {/* Cons */}
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Cons
+                </Typography>
+                <List dense>
+                  {property.cons.map((con, index) => (
+                    <ListItem key={index}>
+                      <ListItemIcon>
+                        <CancelIcon sx={{ color: 'error.main' }} />
+                      </ListItemIcon>
+                      <ListItemText primary={con} />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            </StyledPaper>
           </Grid>
-        </Grid>
+        ))}
+      </Grid>
 
         {/* Next Steps */}
         <Grid item xs={12}>
-          <StyledPaper>
+          <StyledPaper
+            sx={{
+              mt: 2.5, // Top margin of 20px
+              mb: 2.5, // Bottom margin of 20px
+            }}
+          >
             <Typography variant="subtitle1" gutterBottom>
               Next Steps
             </Typography>
             <Grid container spacing={2}>
               {nextSteps.map((step, index) => (
-                <Grid item xs={12} sm={4} key={index}>
-                  <PropertyCard>
+                <Grid item xs={12} key={index}> {/* Full width for each card */}
+                  <PropertyCard
+                    sx={{
+                      backgroundColor: '#E7F2FF', // Set background color to light blue
+                    }}
+                  >
                     <Typography variant="subtitle1" gutterBottom>
                       {step.title}
                     </Typography>
@@ -189,8 +198,8 @@ export const ViewingComparison: React.FC = () => {
                         bgcolor: BLUE_COLOR,
                         '&:hover': {
                           bgcolor: BLUE_COLOR,
-                          opacity: 0.9
-                        }
+                          opacity: 0.9,
+                        },
                       }}
                     >
                       Get Started
@@ -201,9 +210,9 @@ export const ViewingComparison: React.FC = () => {
             </Grid>
           </StyledPaper>
         </Grid>
-      </Grid>
     </Box>
   );
 };
 
-export default ViewingComparison; 
+export default ViewingComparison;
+
