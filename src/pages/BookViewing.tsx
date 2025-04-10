@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
-//import ReferencingModal from '../components/ReferencingModal';
+import BookViewingModal from '../components/viewings/BookViewingModal';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import 'swiper/css/navigation';
@@ -157,13 +157,12 @@ const BookViewing = () => {
       <FAQSection />
       <Footer />
       
-      {/* Referencing Modal
-      <ReferencingModal 
-        isOpen={isModalOpen} 
+      <BookViewingModal 
+        open={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-      />*/}
+      />
     </div>
   );
 };
 
-export default BookViewing; 
+export default BookViewing;
