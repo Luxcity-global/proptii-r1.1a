@@ -1,6 +1,6 @@
 //import React, { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-//import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
@@ -12,6 +12,8 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import { useState, useEffect } from 'react';
 
 const Home = () => {
+  const navigate = useNavigate();
+
   const {
     query,
     setQuery,

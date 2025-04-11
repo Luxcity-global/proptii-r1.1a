@@ -5,6 +5,8 @@ import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 
 const AgentHome = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen font-nunito">
       <Navbar />
