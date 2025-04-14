@@ -89,7 +89,7 @@ const AgentHome = () => {
         <button 
         onClick={() => navigate('/bookviewing')}
         className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
-          Learn More
+          Learn More Now
         </button>
       </div>
 
