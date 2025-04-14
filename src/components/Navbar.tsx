@@ -94,7 +94,7 @@ const Navbar = () => {
           <div className="flex-shrink-0">
             <Link to="/">
               <img
-                src="/images/proptii-logo.png"
+                src="/images/proptii-long-logo.png"
                 alt="Proptii"
                 className="h-12 w-auto"
               />

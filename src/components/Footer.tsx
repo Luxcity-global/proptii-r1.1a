@@ -14,7 +14,7 @@ function Footer() {
       <div className="max-w-6xl mx-auto flex flex-wrap justify-between gap-8">
         {/* Branding Section */}
         <div className="max-w-sm">
-          <img src="/public/images/proptii-logo.png" alt="Proptii Logo" className="h-12 mb-4" />
+          <img src="/public/images/proptii-long-logo.png" alt="Proptii Logo" className="h-12 mb-4" />
           <p className="text-sm opacity-75">
             Revolutionizing real estate with AI to streamline the journey from
             discovery to completion for renters and buyers.
