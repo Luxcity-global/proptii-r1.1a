@@ -1,7 +1,7 @@
 import { Configuration, BrowserCacheLocation, LogLevel } from "@azure/msal-browser";
 
 // Get environment variables with fallbacks
-const clientId = import.meta.env.VITE_AZURE_AD_CLIENT_ID || "49f7bfc0-cab3-4c54-aa25-279cc788551f";
+const clientId = import.meta.env.VITE_AZURE_AD_CLIENT_ID || "532e1fa0-18a6-4356-bd78-1f62bd6d5e2f";
 const tenantName = import.meta.env.VITE_AZURE_AD_TENANT_NAME || "proptii.onmicrosoft.com";
 const policyName = import.meta.env.VITE_AZURE_AD_POLICY_NAME || "B2C_1_SignUpandSignInProptii";
 const redirectUri = import.meta.env.VITE_REDIRECT_URI || window.location.origin;
