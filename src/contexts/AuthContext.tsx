@@ -363,4 +363,4 @@ export const MSALProviderWrapper: React.FC<MSALProviderWrapperProps> = ({ childr
       <AuthProvider>{children}</AuthProvider>
     </MsalProvider>
   );
-}; 
+};
