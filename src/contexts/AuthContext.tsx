@@ -204,6 +204,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       window.dispatchEvent(new CustomEvent('auth-state-changed'));
       return;
     }
+
+    // Check if authentication is already in progress
+    if (inProgress !== 'none') {
+      console.log('Authentication already in progress. Please wait...');
+      return;
+    }
     
     try {
       setIsLoading(true);
