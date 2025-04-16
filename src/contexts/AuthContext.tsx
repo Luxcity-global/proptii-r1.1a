@@ -214,11 +214,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // If the test popup is blocked, go straight to redirect
       if (isPopupBlocked(testPopup)) {
         console.warn("Popup blocked by browser, using redirect login instead");
-        // Close the test popup if it somehow opened
-        if (testPopup) testPopup.close();
+        // Check if there's an ongoing interaction before proceeding
+      if (inProgress === "none") {
         // Use redirect login
         instance.loginRedirect(loginRequest);
-        return; // Exit early as redirect will reload the page
+      } else {
+        console.warn("Another interaction is in progress. Please try again when it completes.");
+        setIsLoading(false);
+      }
+      return;
       }
       
       // Close the test popup since it was just for testing
@@ -227,34 +231,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Try popup authentication
       try {
         // Configure popup window - use minimal configuration to avoid triggering popup blockers
-        const popupConfig = {
-          ...loginRequest,
-          // Don't set popupWindowAttributes here as it can trigger popup blockers
-          // Let the browser handle the popup dimensions and position
-        };
-        
         // Attempt popup login with minimal configuration
-        await instance.loginPopup(popupConfig);
+      await instance.loginPopup({
+        ...loginRequest,
+        // Don't set popupWindowAttributes here as it can trigger popup blockers
+      });
         
         // Update authentication state after successful login
-        if (accounts.length > 0) {
-          setIsAuthenticated(true);
-          setUser(accounts[0]);
-        }
+      if (accounts.length > 0) {
+        setIsAuthenticated(true);
+        setUser(accounts[0]);
+      }
       } catch (popupError: any) {
         // If popup fails and it's not just user cancellation, try redirect
         if (popupError.errorCode !== "user_cancelled") {
           console.warn("Popup login failed, falling back to redirect:", popupError);
           
-          // Fall back to redirect login
-          instance.loginRedirect(loginRequest);
-          return; // Exit early as redirect will reload the page
-        } else {
-          // If user cancelled, just log and continue
-          console.log("User cancelled login");
-          throw popupError; // Re-throw to be caught by outer catch
-        }
+          // Add a small delay before trying redirect to allow any ongoing interaction to settle
+        setTimeout(() => {
+          // Check if there's an ongoing interaction before proceeding
+          if (inProgress === "none") {
+            // Fall back to redirect login
+            instance.loginRedirect(loginRequest);
+          } else {
+            console.warn("Another interaction is in progress. Please try again when it completes.");
+            setIsLoading(false);
+          }
+        }, 1000);
+        return; // Exit early
+      } else {
+        // If user cancelled, just log and continue
+        console.log("User cancelled login");
+        throw popupError; // Re-throw to be caught by outer catch
       }
+    }
       
       // Dispatch event for UI updates
       window.dispatchEvent(new CustomEvent('auth-state-changed'));
