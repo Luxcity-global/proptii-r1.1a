@@ -217,7 +217,6 @@ const Viewings: React.FC = () => {
                         {viewing.date}
                       </Typography>
                     </Box>
-
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                       <AccessTimeIcon fontSize="small" sx={{ color: 'text.secondary', mr: 1 }} />
                       <Typography variant="body2" color="text.secondary">

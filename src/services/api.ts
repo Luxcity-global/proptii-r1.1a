@@ -1,8 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { getMsalInstance } from '../contexts/AuthContext';
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-
 // API response types
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -336,5 +334,56 @@ export const deleteDocument = async (documentId: string): Promise<ApiResponse<an
       success: false,
       error: error.response?.data?.message || 'Failed to delete document'
     };
+  }
+};
+export const api = {
+  // Submit a new listing
+  submitListing: async (data: PropertyFormData) => {
+    // Simulate API call
+    console.log('Submitting listing:', data);
+    
+    // Simulate processing time
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Return success response
+    return {
+      success: true,
+      message: 'Listing submitted successfully',
+      listingId: `listing-${Date.now()}`,
+    };
+  },
+  
+  // Get all listings
+  getListings: async () => {
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Return mock data
+    return [
+      {
+        id: '1',
+        title: 'Modern 2 Bed Apartment',
+        price: 2500,
+        type: 'rent',
+        bedrooms: 2,
+        bathrooms: 1,
+        isAvailableNow: true,
+        location: {
+          address: '123 Main St, Swiss Cottage',
+          city: 'London',
+          postcode: 'SW1A 1AA',
+        },
+        images: ['https://placehold.co/600x400'],
+        features: ['Furnished', 'Parking', 'Gym', 'Pet Friendly'],
+        description: 'Beautiful modern apartment in the heart of London.',
+        agent: {
+          name: 'John Smith',
+          company: 'Proptii Agents',
+          phone: '+44 20 7123 4567',
+          email: 'john@proptii.com'
+        },
+      },
+      // Add more mock listings as needed
+    ];
   }
 }; 

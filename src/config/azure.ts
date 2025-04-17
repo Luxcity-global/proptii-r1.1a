@@ -39,6 +39,7 @@ export const AZURE_AD_B2C = {
 };
 
 // Function to check if Azure configuration is complete
+<<<<<<< HEAD
 export const isAzureConfigured = (): boolean => {
   // Check if essential Azure configuration is available
   return (
@@ -49,6 +50,28 @@ export const isAzureConfigured = (): boolean => {
   );
 };
 
+=======
+export const isAzureConfigured = () => {
+  return !!(
+    import.meta.env.VITE_AZURE_OPENAI_API_KEY &&
+    import.meta.env.VITE_AZURE_OPENAI_ENDPOINT &&
+    import.meta.env.VITE_AZURE_OPENAI_DEPLOYMENT_NAME
+  );
+};
+
+export const getAzureConfig = () => {
+  if (!isAzureConfigured()) {
+    throw new Error('Azure configuration is missing');
+  }
+
+  return {
+    apiKey: import.meta.env.VITE_AZURE_OPENAI_API_KEY,
+    endpoint: import.meta.env.VITE_AZURE_OPENAI_ENDPOINT,
+    deploymentName: import.meta.env.VITE_AZURE_OPENAI_DEPLOYMENT_NAME
+  };
+};
+
+>>>>>>> upstream/feature/ai-search-listings-agents
 // Function to get Azure Storage blob URL
 export const getAzureStorageBlobUrl = (blobName: string): string => {
   if (!AZURE_STORAGE.accountName || !AZURE_STORAGE.containerName) {

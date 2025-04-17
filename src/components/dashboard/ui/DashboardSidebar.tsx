@@ -187,7 +187,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     {/* Add the new button here */}
     <Button
       variant="outlined"
-      onClick={() => navigate('/referencing')}
+      onClick={() => navigate('/')}
       startIcon={
         <svg
           width="18"

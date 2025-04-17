@@ -14,15 +14,25 @@ import {
   DialogContent as MuiDialogContent,
   DialogContentText,
   Button,
-  Alert
+  Alert,
+  Stepper,
+  Step,
+  StepLabel
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { ReferencingProvider, useReferencing } from './context/ReferencingContext';
+import { useReferencing } from './context/ReferencingContext';
 import ReferencingSidebar from './ui/ReferencingSidebar';
 import MobileStepper from './ui/MobileStepper';
 import FormContent from './ui/FormContent';
 import { FormSection } from '../../types/referencing';
 import { isAzureConfigured } from '../../config/azure';
+import { useAuth } from '../../context/AuthContext';
+import EmploymentSection from './sections/EmploymentSection';
+import IdentitySection from './sections/IdentitySection';
+import ResidentialSection from './sections/ResidentialSection';
+import FinancialSection from './sections/FinancialSection';
+import GuarantorSection from './sections/GuarantorSection';
+import { CreditCheckSection } from './sections/CreditCheckSection';
 
 // Define color constants
 const BLUE_COLOR = '#136C9E';
@@ -36,14 +46,13 @@ interface ReferencingModalProps {
   applicationId?: string;
 }
 
-// Define the steps for the referencing process
-const STEPS: { label: string; section: FormSection }[] = [
-  { label: 'Identity', section: 'identity' },
-  { label: 'Employment', section: 'employment' },
-  { label: 'Residential', section: 'residential' },
-  { label: 'Financial', section: 'financial' },
-  { label: 'Guarantor', section: 'guarantor' },
-  { label: 'Credit Check', section: 'creditCheck' }
+const steps = [
+  'Identity',
+  'Employment',
+  'Residential',
+  'Financial',
+  'Guarantor',
+  'Credit Check'
 ];
 
 /**
@@ -58,234 +67,178 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
   applicationId
 }) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [apiAvailable, setApiAvailable] = useState<boolean | null>(null);
-  
-  // Check if Azure is configured
-  const azureConfigured = isAzureConfigured();
-  
-  // Check if API is available
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { user } = useAuth();
+  const {
+    currentStep,
+    setCurrentStep,
+    validateSection,
+    formData,
+    errors,
+    submitApplication
+  } = useReferencing();
+
+  const [isApiAvailable, setIsApiAvailable] = useState(true);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   useEffect(() => {
-    if (!open) return; // Only check when modal is open
-    
     const checkApiAvailability = async () => {
       try {
-        // Try to fetch from the API
-        const response = await fetch(import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api', {
-          method: 'HEAD',
-          // Add a timeout to avoid long waits
-          signal: AbortSignal.timeout(5000)
-        });
-        setApiAvailable(response.ok);
+        const response = await fetch('/api/health');
+        setIsApiAvailable(response.ok);
       } catch (error) {
-        console.warn('API not available:', error);
-        setApiAvailable(false);
+        setIsApiAvailable(false);
       }
     };
-    
-    checkApiAvailability();
+
+    if (open) {
+      checkApiAvailability();
+    }
   }, [open]);
-  
-  // Handle close with confirmation if there are unsaved changes
+
   const handleClose = () => {
-    // Check if there are unsaved changes
-    const hasUnsavedChanges = localStorage.getItem(`proptii_property_${propertyId}_draft`) !== null;
-    
     if (hasUnsavedChanges) {
-      setShowConfirmDialog(true);
+      if (window.confirm('You have unsaved changes. Are you sure you want to close?')) {
+        onClose();
+      }
     } else {
       onClose();
     }
   };
-  
-  // Handle confirm dialog actions
-  const handleConfirmClose = () => {
-    setShowConfirmDialog(false);
-    onClose();
-  };
-  
-  const handleCancelClose = () => {
-    setShowConfirmDialog(false);
-  };
-  
-  // Handle keyboard events
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Close on escape key
-      if (event.key === 'Escape' && open) {
-        handleClose();
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [open]);
 
-  return (
-    <ReferencingProvider initialApplicationId={applicationId} propertyId={propertyId}>
-      <ReferencingInitializer />
-      <Dialog
-        open={open}
-        onClose={handleClose}
-        maxWidth="lg"
-        fullWidth
-        fullScreen={isMobile}
-        aria-labelledby="referencing-modal-title"
-        sx={{
-          '& .MuiDialog-paper': {
-            borderRadius: 1,
-            overflow: 'hidden'
-          }
-        }}
-      >
-        <DialogTitle id="referencing-modal-title" sx={{ p: 3, bgcolor: 'background.paper' }}>
-          <Box display="flex" alignItems="center" justifyContent="space-between">
-            <Typography 
-              variant="h4" 
-              sx={{ 
-                fontWeight: 600, 
-                color: ORANGE_COLOR,
-                fontSize: {
-                  xs: '1rem',  // Smaller on mobile
-                  sm: '1.25rem', // Medium on tablet
-                  md: '1.5rem'     // Larger on desktop
-                }
-              }}
-            >
-              Tenant Referencing Application
-            </Typography>
-            <IconButton
-              edge="end"
-              color="inherit"
-              onClick={handleClose}
-              aria-label="close"
-              sx={{
-                color: 'text.secondary',
-                '&:hover': {
-                  color: BLUE_COLOR,
-                  bgcolor: 'action.hover'
-                }
-              }}
-            >
+  const handleNext = async () => {
+    const isValid = await validateSection(steps[currentStep - 1].toLowerCase().replace(' ', '') as any);
+    if (isValid) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const handleBack = () => {
+    setCurrentStep(currentStep - 1);
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      await submitApplication();
+      onClose();
+    } catch (error) {
+      console.error('Error submitting application:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return <IdentitySection />;
+      case 2:
+        return <EmploymentSection />;
+      case 3:
+        return <ResidentialSection />;
+      case 4:
+        return <FinancialSection />;
+      case 5:
+        return <GuarantorSection />;
+      case 6:
+        return <CreditCheckSection />;
+      default:
+        return null;
+    }
+  };
+
+  if (!isApiAvailable) {
+    return (
+      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Service Unavailable</Typography>
+            <IconButton onClick={handleClose} size="small">
               <CloseIcon />
             </IconButton>
           </Box>
         </DialogTitle>
-        
-        {!azureConfigured && (
-          <Alert severity="warning" sx={{ mx: 2 }}>
-            Azure configuration is incomplete. Some features may not work properly.
-          </Alert>
-        )}
-        
-        {apiAvailable === false && (
-          <Alert severity="info" sx={{ mx: 2, mt: azureConfigured ? 0 : 2 }}>
-            API is not available. Running in simulation mode.
-          </Alert>
-        )}
-        
-        <DialogContent dividers sx={{ p: 0 }}>
-          <Grid container>
-            {/* Sidebar for navigation */}
-            {!isMobile && (
-              <Grid item xs={12} md={3} sx={{ 
-                borderRight: 1, 
-                borderColor: 'divider',
-                bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)'
-              }}>
-                <ReferencingSidebar steps={STEPS} />
-              </Grid>
-            )}
-            
-            {/* Mobile stepper */}
-            {isMobile && (
-              <Grid item xs={12} sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-                <MobileStepper steps={STEPS} />
-              </Grid>
-            )}
-            
-            {/* Main content area */}
-            <Grid item xs={12} md={9} sx={{ p: 3 }}>
-              <FormContent steps={STEPS} />
-            </Grid>
-          </Grid>
+        <DialogContent>
+          <Typography>
+            We're currently experiencing technical difficulties. Please try again later.
+          </Typography>
         </DialogContent>
       </Dialog>
-      
-      {/* Confirmation dialog for unsaved changes */}
-      <MuiDialog
-        open={showConfirmDialog}
-        onClose={handleCancelClose}
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
-        sx={{
-          '& .MuiDialog-paper': {
-            borderRadius: 2
-          }
-        }}
-      >
-        <DialogTitle id="alert-dialog-title" sx={{ fontWeight: 600, color: ORANGE_COLOR }}>
-          Unsaved Changes
+    );
+  }
+
+  if (!isAzureConfigured()) {
+    return (
+      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Configuration Error</Typography>
+            <IconButton onClick={handleClose} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
         </DialogTitle>
-        <MuiDialogContent>
-          <DialogContentText id="alert-dialog-description">
-            You have unsaved changes. Are you sure you want to close the form? Your changes will be lost.
-          </DialogContentText>
-        </MuiDialogContent>
-        <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button 
-            onClick={handleCancelClose} 
-            variant="outlined"
-            sx={{ 
-              borderRadius: 2,
-              borderColor: BLUE_COLOR,
-              color: BLUE_COLOR,
-              '&:hover': {
-                borderColor: BLUE_COLOR,
-                backgroundColor: 'rgba(19, 108, 158, 0.05)'
-              }
-            }}
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleConfirmClose} 
-            variant="contained" 
-            sx={{ 
-              borderRadius: 2,
-              backgroundColor: BLUE_COLOR,
-              '&:hover': {
-                backgroundColor: 'rgba(19, 108, 158, 0.9)'
-              }
-            }}
-            autoFocus
-          >
-            Close Anyway
-          </Button>
-        </DialogActions>
-      </MuiDialog>
-    </ReferencingProvider>
+        <DialogContent>
+          <Typography>
+            The application is not properly configured. Please contact support.
+          </Typography>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="md"
+      fullWidth
+      fullScreen={isMobile}
+    >
+      <DialogTitle>
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6">Tenant Referencing Application</Typography>
+          <IconButton onClick={handleClose} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+      <DialogContent>
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <Stepper activeStep={currentStep - 1} alternativeLabel>
+            {steps.map((label) => (
+              <Step key={label}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+          
+          <Box sx={{ flex: 1, mt: 3 }}>
+            {renderStepContent()}
+          </Box>
+          
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+            <Button
+              onClick={handleBack}
+              disabled={currentStep === 1}
+              variant="outlined"
+            >
+              Back
+            </Button>
+            <Button
+              onClick={currentStep === steps.length ? handleSubmit : handleNext}
+              variant="contained"
+              disabled={isSubmitting}
+            >
+              {currentStep === steps.length ? 'Submit' : 'Next'}
+            </Button>
+          </Box>
+        </Box>
+      </DialogContent>
+    </Dialog>
   );
 };
 
-/**
- * Helper component to initialize the referencing state
- */
-const ReferencingInitializer: React.FC = () => {
-  const { state, setCurrentStep } = useReferencing();
-  
-  // Set initial step to 'identity' if not already set
-  useEffect(() => {
-    if (typeof state.currentStep === 'number' && state.currentStep === 0) {
-      setCurrentStep('identity');
-    }
-  }, [state.currentStep, setCurrentStep]);
-  
-  return null;
-};
-
-export default ReferencingModal; 
+export default ReferencingModal;
