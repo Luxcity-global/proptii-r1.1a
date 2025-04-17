@@ -17,11 +17,11 @@ const BookViewing = () => {
 
   const handleGetStarted = () => {
     // Commenting out authentication check for now
-    // if (isAuthenticated) {
+     if (isAuthenticated) {
     setIsModalOpen(true);
-    // } else {
-    //   login();
-    // }
+     } else {
+       login();
+     }
   };
 
   return (

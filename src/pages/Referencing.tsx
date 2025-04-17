@@ -16,11 +16,11 @@ const Referencing = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleGetStarted = () => {
-    //if (isAuthenticated) {
+    if (isAuthenticated) {
       setIsModalOpen(true);
-    //} else {
-    //  login();
-    //}
+    } else {
+      login();
+    }
   };
 
   return (

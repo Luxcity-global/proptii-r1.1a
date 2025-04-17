@@ -10,7 +10,7 @@ import { MSALProviderWrapper } from './contexts/AuthContext';
 //import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 //import { ThemeProvider } from '@mui/material/styles';
 //import { CssBaseline, Box } from '@mui/material';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
 //import { theme } from './theme';
 import Home from './pages/Home';
 import { LoginPage } from './pages/Login';
