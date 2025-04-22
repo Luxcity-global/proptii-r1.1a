@@ -6,7 +6,7 @@ import EmploymentUpload from "./Uploads/EmploymentUpload";
 import ResidentialUpload from "./Uploads/ResidentialUpload";
 import FinancialUpload from "./Uploads/FinancialUpload";
 import GuarantorUpload from "./Uploads/GuarantorUpload";
-
+import referencingService from '../services/referencingService';
 
 interface ReferencingModalProps {
   isOpen: boolean;
@@ -64,7 +64,6 @@ interface GuarantorData {
 }
 
 interface CreditCheckData {
-  //hasAgreedToCheck: boolean;
 }
 
 interface AgentDetailsData {
@@ -137,7 +136,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       address: ''
     },
     creditCheck: {
-      //hasAgreedToCheck: false
     },
     agentDetails: {
       firstName: '',
@@ -147,12 +145,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       hasAgreedToCheck: false
     }
   });
-  
-  //const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
   const [lastSavedSteps, setLastSavedSteps] = useState<{ [key: number]: Date | null }>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // New state to track step completeness
   const [stepStatus, setStepStatus] = useState<{ [key: number]: 'empty' | 'partial' | 'complete' }>({
     1: 'empty',
     2: 'empty',
@@ -163,9 +159,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     7: 'empty'
   });
 
-  // Update form data for any step
   const updateFormData = (step: keyof FormData, data: Partial<FormData[keyof FormData]>) => {
-    // Update form data
     setFormData(prev => ({
       ...prev,
       [step]: {
@@ -174,7 +168,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       }
     }));
 
-    // Map steps to their corresponding index
     const stepMap: { [key in keyof FormData]: number } = {
       identity: 1,
       employment: 2,
@@ -186,18 +179,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     };
 
     const stepIndex = stepMap[step];
-    
-    // Determine step status
     const status = determineStepStatus(step, { ...formData[step], ...data });
-    
-    // Update step status
+
     setStepStatus(prev => ({
       ...prev,
       [stepIndex]: status
     }));
   };
 
-  // Comprehensive step status determination
   const determineStepStatus = (step: keyof FormData, data: any): 'empty' | 'partial' | 'complete' => {
     switch(step) {
       case 'identity':
@@ -236,7 +225,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         return 'empty';
       
       case 'creditCheck':
-        // Check if key identity fields are filled in
         const identityData = data.identity || {};
         const hasCriticalIdentityInfo = 
           identityData.firstName && 
@@ -245,7 +233,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           identityData.phoneNumber &&
           identityData.dateOfBirth;
 
-        // Return 'complete' if critical identity info is present
         return hasCriticalIdentityInfo ? 'complete' : 'empty';
       
       case 'agentDetails':
@@ -260,7 +247,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   };
 
-  // Modify the sidebar to include status indicators
   const renderSidebarNavigation = () => {
     const steps = [
       { icon: User, text: 'Identity', step: 1, dataKey: 'identity' },
@@ -274,21 +260,17 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
     return steps.map(({ icon: Icon, text, step, dataKey }) => {
       const status = stepStatus[step];
-
-      // Only show dot if step is not 'empty'
       const shouldShowDot = status !== 'empty';
-      
-      // Determine dot color based on status
       let dotColor = '';
       switch(status) {
         case 'partial':
-          dotColor = 'bg-orange-500'; // Orange for partial completion
+          dotColor = 'bg-orange-500';
           break;
         case 'complete':
-          dotColor = 'bg-green-500';  // Green for complete
+          dotColor = 'bg-green-500';
           break;
         default:
-          dotColor = 'bg-gray-300';   // Gray for empty
+          dotColor = 'bg-gray-300';
       }
 
       return (
@@ -314,7 +296,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     });
   };
 
-  // Reset form when user changes
   useEffect(() => {
     if (user) {
       setFormData(prev => ({
@@ -329,42 +310,86 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   }, [user]);
 
-  // Update form data for any step
-  {/*const updateFormData = (step: keyof FormData, data: Partial<FormData[keyof FormData]>) => {
-    setFormData(prev => ({
-      ...prev,
-      [step]: {
-        ...prev[step],
-        ...data
-      }
-    }));
-  };*/}
-
-  // Save current form data
   const saveCurrentStep = async () => {
     try {
       setIsSaving(true);
-      await new Promise(resolve => setTimeout(resolve, 800));
       
+      if (!user) {
+        throw new Error('No user found. Please login again.');
+      }
+
+      const userId = user.id || user.localAccountId || user.homeAccountId;
+      
+      if (!userId) {
+        throw new Error('User ID is required. Please login again.');
+      }
+
+      // Validate current step data before saving
+      const currentSections = {
+        1: 'identity',
+        2: 'employment',
+        3: 'residential',
+        4: 'financial',
+        5: 'guarantor',
+        6: 'creditCheck',
+        7: 'agentDetails'
+      } as const;
+
+      const currentSection = currentSections[currentStep as keyof typeof currentSections];
+      const currentStepData = formData[currentSection];
+
+      if (!currentStepData) {
+        throw new Error('No data to save for current step');
+      }
+
+      let saveResult;
+      
+      switch(currentStep) {
+        case 1:
+          saveResult = await referencingService.saveIdentityData(userId, formData.identity);
+          break;
+        case 2:
+          saveResult = await referencingService.saveEmploymentData(userId, formData.employment);
+          break;
+        case 3:
+          saveResult = await referencingService.saveResidentialData(userId, formData.residential);
+          break;
+        case 4:
+          saveResult = await referencingService.saveFinancialData(userId, formData.financial);
+          break;
+        case 5:
+          saveResult = await referencingService.saveGuarantorData(userId, formData.guarantor);
+          break;
+        case 7:
+          saveResult = await referencingService.saveAgentDetailsData(userId, formData.agentDetails);
+          break;
+        default:
+          throw new Error('Invalid step');
+      }
+
+      if (!saveResult) {
+        throw new Error('Save operation failed');
+      }
+
       setLastSavedSteps(prev => ({
         ...prev,
         [currentStep]: new Date()
       }));
-    } catch (error) {
-      console.error('Error saving form:', error);
+
+      // Show success message
+      alert('Data saved successfully!');
+
+    } catch (error: any) {
+      console.error('Error saving form data:', error);
+      alert(`Failed to save data: ${error.message}`);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Handle step navigation
   const goToStep = (step: number) => {
-    // Only allow going to steps that are <= current step
-    // (prevents skipping ahead)
-    //if (step <= currentStep) {
-      setCurrentStep(step);
-      setIsMenuOpen(false); // Close menu on selection
-    //}
+    setCurrentStep(step);
+    setIsMenuOpen(false);
   };
 
   const nextStep = async () => {
@@ -380,161 +405,165 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   };
 
-  // Add a function to check if all steps are complete
   const checkFormCompleteness = () => {
     const allStepsComplete = Object.values(stepStatus).every(status => status === 'complete');
     setIsFormComplete(allStepsComplete);
     return allStepsComplete;
   };
 
-  // Typing Animation Component
-const TypingAnimation = ({ text, className }) => {
-  const [displayText, setDisplayText] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [typingSpeed, setTypingSpeed] = useState(150);
-  
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!isDeleting) {
-        // Typing forward
-        if (currentIndex < text.length) {
-          setDisplayText(text.substring(0, currentIndex + 1));
-          setCurrentIndex(prevIndex => prevIndex + 1);
-          setTypingSpeed(150);
-        } else {
-          // Pause at the end before starting to delete
-          setIsDeleting(true);
-          setTypingSpeed(1000); // Longer pause when complete
-        }
-      } else {
-        // Deleting
-        if (currentIndex > 0) {
-          setDisplayText(text.substring(0, currentIndex - 1));
-          setCurrentIndex(prevIndex => prevIndex - 1);
-          setTypingSpeed(75); // Delete faster than type
-        } else {
-          // Reset to start typing again
-          setIsDeleting(false);
-          setTypingSpeed(500); // Pause before restarting
-        }
-      }
-    }, typingSpeed);
+  const TypingAnimation = ({ text, className }) => {
+    const [displayText, setDisplayText] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [typingSpeed, setTypingSpeed] = useState(150);
     
-    return () => clearTimeout(timeout);
-  }, [currentIndex, isDeleting, text, typingSpeed]);
-  
-  return <h2 className={className}>{displayText}<span className="animate-pulse">|</span></h2>;
-};
+    useEffect(() => {
+      const timeout = setTimeout(() => {
+        if (!isDeleting) {
+          if (currentIndex < text.length) {
+            setDisplayText(text.substring(0, currentIndex + 1));
+            setCurrentIndex(prevIndex => prevIndex + 1);
+            setTypingSpeed(150);
+          } else {
+            setIsDeleting(true);
+            setTypingSpeed(1000);
+          }
+        } else {
+          if (currentIndex > 0) {
+            setDisplayText(text.substring(0, currentIndex - 1));
+            setCurrentIndex(prevIndex => prevIndex - 1);
+            setTypingSpeed(75);
+          } else {
+            setIsDeleting(false);
+            setTypingSpeed(500);
+          }
+        }
+      }, typingSpeed);
+      
+      return () => clearTimeout(timeout);
+    }, [currentIndex, isDeleting, text, typingSpeed]);
+    
+    return <h2 className={className}>{displayText}<span className="animate-pulse">|</span></h2>;
+  };
 
-  // Submit the final application
-  {/*const submitApplication = async () => {
-    try {
-      setIsSubmitting(true);
-      
-      // In a real implementation, you would submit to your API here
-      // For now, simulate submission
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      alert('Your application has been submitted successfully!');
-      onClose();
-    } catch (error) {
-      console.error('Error submitting application:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };*/}
-  // Update the submit application function
   const submitApplication = async () => {
-    // Check if all steps are complete
     const isComplete = checkFormCompleteness();
-    
-    // If form is incomplete, show the custom warning modal
     if (!isComplete) {
       setShowWarningModal(true);
-      return; // Pause submission until user confirms
+      return;
     }
-    
-    // Continue with submission if form is complete or after user confirms
     proceedWithSubmission();
   };
-  
-  // Function to handle the actual submission after confirmation
+
   const proceedWithSubmission = async () => {
     try {
       setIsSubmitting(true);
-      
-      // In a real implementation, you would submit to your API here
-      // For now, simulate submission
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Show success message
+      await saveCurrentStep();
+      const userId = user?.id || '';
+      await referencingService.submitApplication(userId, formData);
       alert('Your application has been submitted successfully!');
       onClose();
     } catch (error) {
       console.error('Error submitting application:', error);
+      alert('There was an error submitting your application. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
-  
-  // Add this modal component to your render function
-  // Define the warning modal component
-const WarningModal = () => {
-  if (!showWarningModal) return null;
-  
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-        <div className="flex items-center mb-4">
-          <div className="bg-yellow-100 p-2 rounded-full">
-            <AlertTriangle className="text-yellow-500 w-6 h-6" />
+
+  const WarningModal = () => {
+    if (!showWarningModal) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+          <div className="flex items-center mb-4">
+            <div className="bg-yellow-100 p-2 rounded-full">
+              <AlertTriangle className="text-yellow-500 w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-semibold ml-3">Incomplete Form</h3>
           </div>
-          <h3 className="text-lg font-semibold ml-3">Incomplete Form</h3>
-        </div>
-        
-        <p className="text-gray-600 mb-6">
-          Your form is incomplete. Some information may be missing or incorrect.
-          Are you sure you want to submit anyway?
-        </p>
-        
-        <div className="flex justify-end space-x-3">
-          <button
-            onClick={() => setShowWarningModal(false)}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              setShowWarningModal(false);
-              proceedWithSubmission();
-            }}
-            className="px-4 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors"
-          >
-            Submit Anyway
-          </button>
+          
+          <p className="text-gray-600 mb-6">
+            Your form is incomplete. Some information may be missing or incorrect.
+            Are you sure you want to submit anyway?
+          </p>
+          
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={() => setShowWarningModal(false)}
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setShowWarningModal(false);
+                proceedWithSubmission();
+              }}
+              className="px-4 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors"
+            >
+              Submit Anyway
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   useEffect(() => {
     checkFormCompleteness();
   }, [stepStatus]);
 
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (user && user.id) {
+        try {
+          const userData = await referencingService.getFormData(user.id);
+          setFormData(prevData => ({
+            identity: { ...prevData.identity, ...userData.identity },
+            employment: { ...prevData.employment, ...userData.employment },
+            residential: { ...prevData.residential, ...userData.residential },
+            financial: { ...prevData.financial, ...userData.financial },
+            guarantor: { ...prevData.guarantor, ...userData.guarantor },
+            creditCheck: { ...prevData.creditCheck },
+            agentDetails: { ...prevData.agentDetails, ...userData.agentDetails }
+          }));
+          Object.keys(userData).forEach(step => {
+            if (userData[step] && Object.keys(userData[step]).length > 0) {
+              const stepIndex = {
+                identity: 1,
+                employment: 2,
+                residential: 3,
+                financial: 4,
+                guarantor: 5,
+                creditCheck: 6,
+                agentDetails: 7
+              }[step];
+              if (stepIndex) {
+                const status = determineStepStatus(step, userData[step]);
+                setStepStatus(prev => ({
+                  ...prev,
+                  [stepIndex]: status
+                }));
+              }
+            }
+          });
+        } catch (error) {
+          console.error('Error loading user data:', error);
+        }
+      }
+    };
 
-  //const activeSection = "#374957";
+    loadUserData();
+  }, [user]);
 
-  // Render form content based on current step
   const renderFormContent = () => {
     switch (currentStep) {
       case 1:
         return (
           <div className="relative">
             <h3 className="text-xl font-semibold mb-6">Fill in your personal details below</h3>
-            
             <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
               <div>
                 <label className="block text-gray-700 mb-2">First Name</label>
@@ -545,7 +574,6 @@ const WarningModal = () => {
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
-              
               <div>
                 <label className="block text-gray-700 mb-2">Last Name</label>
                 <input
@@ -555,7 +583,6 @@ const WarningModal = () => {
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
-              
               <div>
                 <label className="block text-gray-700 mb-2">Email Address</label>
                 <input
@@ -565,7 +592,6 @@ const WarningModal = () => {
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
-              
               <div>
                 <label className="block text-gray-700 mb-2">Phone Number</label>
                 <input
@@ -575,7 +601,6 @@ const WarningModal = () => {
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
-              
               <div>
                 <label className="block text-gray-700 mb-2">Date of Birth</label>
                 <div className="relative">
@@ -585,35 +610,8 @@ const WarningModal = () => {
                     onChange={(e) => updateFormData('identity', { dateOfBirth: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                   />
-                  {/*<div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-        </div>*/}
                 </div>
               </div>
-              
-              {/*<div>
-                <label className="block text-gray-700 mb-2">Are you British</label>
-                <select
-                  value={formData.identity.isBritish ? "true" : "false"}
-                  onChange={(e) => updateFormData('identity', { isBritish: e.target.value === "true" })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary appearance-none"
-                >
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-gray-700 mb-2">Proof of Identity</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Passport, Driving License"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-      </div>*/}
-              
               <div>
                 <label className="block text-gray-700 mb-2">Nationality</label>
                 <select
@@ -754,43 +752,9 @@ const WarningModal = () => {
                 </select>
               </div>
             </div>
-            
-            {/*<div className="mt-8">
-              <label className="block text-gray-700 mb-2">Upload Proof of Identity</label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <div className="flex flex-col items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-blue-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p className="text-gray-600 mb-2">Click to upload or drag and drop</p>
-                  <input
-                    type="file"
-                    id="identity-proof-upload"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        updateFormData('identity', { identityProof: e.target.files[0] });
-                      }
-                    }}
-                  />
-                  <label
-                    htmlFor="identity-proof-upload"
-                    className="cursor-pointer text-blue-600 hover:text-blue-800"
-                  >
-                    Click to upload
-                  </label>
-                  {formData.identity.identityProof && (
-                    <div className="mt-2 text-green-600">
-                      File selected: {formData.identity.identityProof.name}
-                    </div>
-                  )}
-                </div>
-              </div>
-                  </div>*/}
-                  <FileUpload updateFormData={updateFormData} formData={formData} />
+            <FileUpload updateFormData={updateFormData} formData={formData} />
           </div>
         );
-      
       case 2:
         return (
           <div className="relative">
@@ -814,7 +778,6 @@ const WarningModal = () => {
                   <option value="Student">Student</option>
                 </select>
               </div>
-
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Company Details</label>
                 <input
@@ -825,7 +788,6 @@ const WarningModal = () => {
                   placeholder="Company name"
                 />
               </div>
-
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Length of Employment (Years)</label>
                 <input
@@ -836,7 +798,6 @@ const WarningModal = () => {
                   placeholder="2"
                 />
               </div>
-
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Job Position</label>
                 <input
@@ -847,11 +808,6 @@ const WarningModal = () => {
                   placeholder="Software Developer"
                 />
               </div>
-
-              {/*<div className="col-span-2">
-                <h3 className="text-gray-700 font-medium mb-2">Job Reference</h3>
-        </div>*/}
-
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Referee - Full Name</label>
                 <input
@@ -862,7 +818,6 @@ const WarningModal = () => {
                   placeholder="John Smith"
                 />
               </div>
-
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Referee - Email Address</label>
                 <input
@@ -873,7 +828,6 @@ const WarningModal = () => {
                   placeholder="john.smith@example.com"
                 />
               </div>
-
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Proof of Employment</label>
                 <select
@@ -887,9 +841,7 @@ const WarningModal = () => {
                   <option value="Bank Statement">Bank Statement</option>
                   <option value="Tax Return">Tax Return</option>
                 </select>
-      </div>
-      
-
+              </div>
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Referee - Phone Number</label>
                 <input
@@ -900,35 +852,10 @@ const WarningModal = () => {
                   placeholder="+44 123 456 7890"
                 />
               </div>
-
-        
-              {/*<div className="col-span-2 mt-2">
-                <label className="block text-gray-700 mb-3">Upload Proof of Employment</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center">
-                  <input
-                    type="file"
-                    id="proofDocument"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        updateFormData('employment', { proofDocument: e.target.files[0] });
-                      }
-                    }}
-                  />
-                  <label htmlFor="proofDocument" className="cursor-pointer flex flex-col items-center justify-center w-full">
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-2">
-                      <Upload size={24} className="text-gray-500" />
-                    </div>
-                    <p className="text-gray-700 font-medium">Upload your document here</p>
-                    <p className="text-gray-500 text-sm mt-1">PDF, JPG or PNG (max 5MB)</p>
-                  </label>
-                </div>
-                  </div>*/}
             </div>
             <EmploymentUpload updateFormData={updateFormData} formData={formData} />
           </div>
         );
-      
       case 3:
         return (
           <div className="relative">
@@ -936,7 +863,7 @@ const WarningModal = () => {
               <h2 className="text-xl font-semibold text-gray-800">Fill in your residential details below</h2>
             </div>
             <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
-            <div className="col-span-1">
+              <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Reason for leaving Previous Address</label>
                 <textarea
                   value={formData.residential.reasonForLeaving}
@@ -946,7 +873,6 @@ const WarningModal = () => {
                   placeholder="Please provide the reason for leaving"
                 />
               </div>
-
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Current Address</label>
                  <textarea
@@ -957,7 +883,6 @@ const WarningModal = () => {
                   placeholder="Enter your current address"
                 />
               </div>
-
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2 whitespace-nowrap">Previous Address (If less than 3 yrs at current)</label>
                 <input
@@ -968,7 +893,6 @@ const WarningModal = () => {
                   placeholder="Enter your previous address"
                 />
               </div>
-
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">How long have you lived at this Address?</label>
                 <select
@@ -984,7 +908,6 @@ const WarningModal = () => {
                   <option value="5+ years">5+ years</option>
                 </select>
               </div>
-
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Proof of Address</label>
                 <select
@@ -999,7 +922,6 @@ const WarningModal = () => {
                   <option value="Tenancy Agreement">Tenancy Agreement</option>
                 </select>
               </div>
-
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Select exact duration at this address</label>
                 <select
@@ -1013,43 +935,18 @@ const WarningModal = () => {
                   <option value="2-3 years">2-3 years</option>
                 </select>
               </div>
-
-              {/*<div className="col-span-2 mt-2">
-                <label className="block text-gray-700 mb-3">Upload Proof of Address</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center">
-                  <input
-                    type="file"
-                    id="addressProofDocument"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        updateFormData('residential', { proofDocument: e.target.files[0] });
-                      }
-                    }}
-                  />
-                  <label htmlFor="addressProofDocument" className="cursor-pointer flex flex-col items-center justify-center w-full">
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-2">
-                      <Upload size={24} className="text-gray-500" />
-                    </div>
-                    <p className="text-gray-700 font-medium">Click to upload or drag and drop</p>
-                    <p className="text-gray-500 text-sm mt-1">PDF, JPG or PNG (max 5MB)</p>
-                  </label>
-                </div>
-                  </div>*/}
             </div>
             <ResidentialUpload updateFormData={updateFormData} formData={formData} />
           </div>
         );
-      
       case 4:
         return (
           <div className="relative">
             <div className="mb-6">
               <h2 className="text-xl font-semibold text-gray-800">Fill in your financial details below</h2>
             </div>
-            
             <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
-            <div className="col-span-1">
+              <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Monthly Income (£)</label>
                 <input
                   type="number"
@@ -1059,7 +956,6 @@ const WarningModal = () => {
                   placeholder="Enter your monthly income"
                 />
               </div>
-
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Proof of income</label>
                 <select
@@ -1075,87 +971,16 @@ const WarningModal = () => {
                   <option value="P60">P60</option>
                 </select>
               </div>
-              
-              {/*<div className="mb-10">
-                <label className="block text-gray-700 mb-3">Upload Proof of income</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center">
-                  <input
-                    type="file"
-                    id="incomeProofDocument"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        updateFormData('financial', { proofOfIncomeDocument: e.target.files[0] });
-                      }
-                    }}
-                  />
-                  <label htmlFor="incomeProofDocument" className="cursor-pointer flex flex-col items-center justify-center w-full">
-                    <div className="w-12 h-12 text-blue-600 mb-2 flex items-center justify-center">
-                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M13 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V9L13 2Z" stroke="#4F6BED" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                    <p className="text-center">
-                      <span className="text-blue-600 hover:underline">Click to upload</span> or drag and drop
-                    </p>
-                  </label>
-                </div>
-                  </div>*/}
-              
-              {/* Divider with "or" 
-              <div className="relative py-4">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300"></div>
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-[#f2f7fb] px-4 text-sm text-gray-500">or</span>
-                </div>
-              </div>*/}
-              
-              {/* Open Banking Section 
-              <div className="mt-6">
-                <p className="text-gray-700 mb-4">Use open banking for faster connection</p>
-                
-                {formData.financial.isConnectedToOpenBanking ? (
-                  <div className="flex items-center">
-                    <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center mr-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <span className="text-gray-800">Connected</span>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // In a real implementation, you would initiate an open banking connection flow here
-                      // For now, simulate a successful connection
-                      setTimeout(() => {
-                        updateFormData('financial', { 
-                          useOpenBanking: true,
-                          isConnectedToOpenBanking: true
-                        });
-                      }, 1000);
-                    }}
-                    className="border border-gray-300 bg-white text-gray-700 rounded-md px-4 py-2 hover:bg-gray-50 transition-colors"
-                  >
-                    Connect to open banking
-                  </button>
-                )}
-              </div>*/}
             </div>
             <FinancialUpload updateFormData={updateFormData} formData={formData} />
           </div>
         );
-      
       case 5:
         return (
           <div className="relative">
             <div className="mb-6">
               <h2 className="text-xl font-semibold text-gray-800">Fill in your guarantor's personal details below</h2>
             </div>
-            
             <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Guarantor's First Name</label>
@@ -1167,7 +992,6 @@ const WarningModal = () => {
                   placeholder="Enter first name"
                 />
               </div>
-              
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Guarantor's Last Name</label>
                 <input
@@ -1178,7 +1002,6 @@ const WarningModal = () => {
                   placeholder="Enter last name"
                 />
               </div>
-              
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Guarantor's Email Address</label>
                 <input
@@ -1189,7 +1012,6 @@ const WarningModal = () => {
                   placeholder="Enter email address"
                 />
               </div>
-              
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Guarantor's Phone Number</label>
                 <input
@@ -1200,7 +1022,6 @@ const WarningModal = () => {
                   placeholder="Enter phone number"
                 />
               </div>
-              
               <div className="col-span-2">
                 <label className="block text-gray-700 mb-2">Guarantor's Address</label>
                 <textarea
@@ -1215,21 +1036,18 @@ const WarningModal = () => {
             <GuarantorUpload updateFormData={updateFormData} formData={formData} />
           </div>
         );
-      
       case 6:
         return (
           <div className="relative">
             <div className="mb-6">
               <h2 className="text-xl font-semibold text-gray-800">Fill in your personal details below</h2>
             </div>
-            
             <div className="bg-white rounded-lg p-6 mb-6">
               <p className="text-gray-700 mb-6">
                 A Credit check is required to complete your referencing.<br />
                 Your personal information has been filled in automatically.<br />
                 <strong>Check that all your details are correct.</strong>
               </p>
-              
               <div className="grid grid-cols-2 gap-x-6 gap-y-4">
                 <div className="col-span-1">
                   <label className="block text-gray-700 mb-2">First Name</label>
@@ -1240,7 +1058,6 @@ const WarningModal = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
                   />
                 </div>
-                
                 <div className="col-span-1">
                   <label className="block text-gray-700 mb-2">Last Name</label>
                   <input
@@ -1250,7 +1067,6 @@ const WarningModal = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
                   />
                 </div>
-                
                 <div className="col-span-1">
                   <label className="block text-gray-700 mb-2">Email Address</label>
                   <input
@@ -1260,7 +1076,6 @@ const WarningModal = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
                   />
                 </div>
-                
                 <div className="col-span-1">
                   <label className="block text-gray-700 mb-2">Phone Number</label>
                   <input
@@ -1270,7 +1085,6 @@ const WarningModal = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
                   />
                 </div>
-                
                 <div className="col-span-1">
                   <label className="block text-gray-700 mb-2">Date of birth</label>
                   <input
@@ -1282,21 +1096,6 @@ const WarningModal = () => {
                 </div>
               </div>
             </div>
-            
-            {/*<div className="mt-4 mb-4">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={formData.creditCheck.hasAgreedToCheck}
-                  onChange={(e) => updateFormData('creditCheck', { hasAgreedToCheck: e.target.checked })}
-                  className="h-5 w-5 text-primary border-gray-300 rounded focus:ring-primary"
-                />
-                <span className="ml-2 text-gray-700">
-                  I authorize Proptii to perform a credit check using the information provided
-                </span>
-              </label>
-        </div>*/}
-            
             <div className="rounded-lg p-6 text-center text-white" style={{ backgroundColor: '#136C9E' }}>
               <div className="flex justify-center mb-2">
                 <div className="rounded-full p-2 w-8 h-8 flex items-center justify-center" style={{ backgroundColor: '#DC5F12' }}>
@@ -1305,104 +1104,97 @@ const WarningModal = () => {
               </div>
               <TypingAnimation text="Coming Soon" className="text-2xl font-medium mb-2" />
               <p className="text-white text-sm">Automated live credit checks</p>
+            </div>
+          </div>
+        );
+      case 7:
+        return (
+          <div className="relative">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-800">
+                Fill in the agent's details below
+              </h2>
+            </div>
+            <div className="bg-white rounded-lg p-6 mb-6">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                <div className="col-span-1">
+                  <label className="block text-gray-700 mb-2">Agent's First Name</label>
+                  <input
+                    type="text"
+                    value={formData.agentDetails.firstName || ""}
+                    onChange={(e) =>
+                      updateFormData("agentDetails", {
+                        ...formData.agentDetails,
+                        firstName: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-gray-700 mb-2">Agent's Last Name</label>
+                  <input
+                    type="text"
+                    value={formData.agentDetails.lastName || ""}
+                    onChange={(e) =>
+                      updateFormData("agentDetails", {
+                        ...formData.agentDetails,
+                        lastName: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-gray-700 mb-2">Agent's Email Address</label>
+                  <input
+                    type="email"
+                    value={formData.agentDetails.email || ""}
+                    onChange={(e) =>
+                      updateFormData("agentDetails", {
+                        ...formData.agentDetails,
+                        email: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-gray-700 mb-2">Agent's Phone Number</label>
+                  <input
+                    type="tel"
+                    value={formData.agentDetails.phoneNumber || ""}
+                    onChange={(e) =>
+                      updateFormData("agentDetails", {
+                        ...formData.agentDetails,
+                        phoneNumber: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
+                  />
+                </div>
               </div>
             </div>
+            <div className="mt-4 mb-4">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.agentDetails.hasAgreedToCheck || false}
+                  onChange={(e) =>
+                    updateFormData("agentDetails", {
+                      ...formData.agentDetails,
+                      hasAgreedToCheck: e.target.checked,
+                    })
+                  }
+                  className="h-5 w-5 text-primary border-gray-300 rounded focus:ring-primary"
+                />
+                <span className="ml-2 text-gray-700">
+                  I authorise Proptii to perform a credit check using the information provided
+                </span>
+              </label>
+            </div>
+          </div>
         );
-
-        case 7:
-        return (
-    <div className="relative">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-800">
-          Fill in the agent's details below
-        </h2>
-      </div>
-
-      <div className="bg-white rounded-lg p-6 mb-6">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-          <div className="col-span-1">
-            <label className="block text-gray-700 mb-2">Agent's First Name</label>
-            <input
-              type="text"
-              value={formData.agentDetails.firstName || ""}
-              onChange={(e) =>
-                updateFormData("agentDetails", {
-                  ...formData.agentDetails,
-                  firstName: e.target.value,
-                })
-              }
-              className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
-            />
-          </div>
-
-          <div className="col-span-1">
-            <label className="block text-gray-700 mb-2">Agent's Last Name</label>
-            <input
-              type="text"
-              value={formData.agentDetails.lastName || ""}
-              onChange={(e) =>
-                updateFormData("agentDetails", {
-                  ...formData.agentDetails,
-                  lastName: e.target.value,
-                })
-              }
-              className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
-            />
-          </div>
-
-          <div className="col-span-1">
-            <label className="block text-gray-700 mb-2">Agent's Email Address</label>
-            <input
-              type="email"
-              value={formData.agentDetails.email || ""}
-              onChange={(e) =>
-                updateFormData("agentDetails", {
-                  ...formData.agentDetails,
-                  email: e.target.value,
-                })
-              }
-              className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
-            />
-          </div>
-
-          <div className="col-span-1">
-            <label className="block text-gray-700 mb-2">Agent's Phone Number</label>
-            <input
-              type="tel"
-              value={formData.agentDetails.phoneNumber || ""}
-              onChange={(e) =>
-                updateFormData("agentDetails", {
-                  ...formData.agentDetails,
-                  phoneNumber: e.target.value,
-                })
-              }
-              className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 mb-4">
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={formData.agentDetails.hasAgreedToCheck || false}
-            onChange={(e) =>
-              updateFormData("agentDetails", {
-                ...formData.agentDetails,
-                hasAgreedToCheck: e.target.checked,
-              })
-            }
-            className="h-5 w-5 text-primary border-gray-300 rounded focus:ring-primary"
-          />
-          <span className="ml-2 text-gray-700">
-            I authorise Proptii to perform a credit check using the information provided
-          </span>
-        </label>
-      </div>
-    </div>
-  );
-      
       default:
         return null;
     }
@@ -1412,37 +1204,11 @@ const WarningModal = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto">
-      {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
         onClick={onClose}
       />
-      
-      {/* Modal container */}
       <div className="relative w-full max-w-5xl mx-auto my-8 bg-white rounded-lg shadow-xl flex overflow-hidden min-h-[600px]">
-
-        {/* Mobile Hamburger Menu 
-        <div className="md:hidden w-full p-4 bg-gray-100 flex justify-between items-center border-b">*/}
-          {/*<h2 className="text-lg font-bold text-orange-600">Referencing Steps</h2>
-          <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2">
-            <Menu size={24} />
-          </button>
-        </div>*/}
-        
-        {/* Dropdown Menu for Mobile 
-        {isMenuOpen && (
-          <ul className="absolute top-16 left-0 w-full bg-white shadow-lg z-10 md:hidden">
-            {[['Identity', User, 1], ['Employment', Briefcase, 2], ['Residential', Home, 3], ['Financial', Euro, 4], ['Guarantor', Users, 5], ['Credit Check', CreditCard, 6], ['Upload Docs', Upload, 7]].map(([label, Icon, step]) => (
-              <li key={step} onClick={() => goToStep(step)} className="flex items-center space-x-3 px-4 py-3 cursor-pointer hover:bg-gray-100">
-                <Icon size={18} className={currentStep === step ? 'text-orange-600' : 'text-gray-500'} />
-                <span>{label}</span>
-              </li>
-            ))}
-          </ul>
-        )}*/}
-
-
-        {/* Sidebar */}
         <div className="w-64 bg-gray-50 py-4 px-4 border-r border-gray-200 hidden md:block md:flex flex-col">
           <div className="mb-6 px-2">
             <h2 className="text-xl font-bold text-orange-600 mb-2">Referencing Steps</h2>
@@ -1452,100 +1218,9 @@ const WarningModal = () => {
               The referencing process verifies renter or buyer identity, financial status, and rental history.
             </p>
           </div>
-          
-          {/* Step navigation 
-          <ul className="space-y-1">
-            <li
-              onClick={() => goToStep(1)}
-              className={`flex items-center space-x-3 px-4 py-3 cursor-pointer transition-all ${
-                currentStep === 1
-                  ? 'bg-blue-100 text-black font-semibold rounded-lg'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <User size={18} className={currentStep === 1 ? 'text-orange-600' : 'text-gray-500'} />
-              <span>Identity</span>
-            </li>
-
-            <li
-              onClick={() => goToStep(2)}
-              className={`flex items-center space-x-3 px-4 py-3 cursor-pointer transition-all ${
-                currentStep === 2
-                  ? 'bg-blue-100 text-black font-semibold rounded-lg'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <Briefcase size={18} className={currentStep === 2 ? 'text-orange-600' : 'text-gray-500'} />
-              <span>Employment</span>
-            </li>
-
-            <li
-              onClick={() => goToStep(3)}
-              className={`flex items-center space-x-3 px-4 py-3 cursor-pointer transition-all ${
-                currentStep === 3
-                  ? 'bg-blue-100 text-black font-semibold rounded-lg'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <Home size={18} className={currentStep === 3 ? 'text-orange-600' : 'text-gray-500'} />
-              <span>Residential</span>
-            </li>
-
-            <li
-              onClick={() => goToStep(4)}
-              className={`flex items-center space-x-3 px-4 py-3 cursor-pointer transition-all ${
-                currentStep === 4
-                  ? 'bg-blue-100 text-black font-semibold rounded-lg'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <Euro size={18} className={currentStep === 4 ? 'text-orange-600' : 'text-gray-500'} />
-              <span>Financial</span>
-            </li>
-
-            <li
-              onClick={() => goToStep(5)}
-              className={`flex items-center space-x-3 px-4 py-3 cursor-pointer transition-all ${
-                currentStep === 5
-                  ? 'bg-blue-100 text-black font-semibold rounded-lg'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <Users size={18} className={currentStep === 5 ? 'text-orange-600' : 'text-gray-500'} />
-              <span>Guarantor</span>
-            </li>
-
-            <li
-              onClick={() => goToStep(6)}
-              className={`flex items-center space-x-3 px-4 py-3 cursor-pointer transition-all ${
-                currentStep === 6
-                  ? 'bg-blue-100 text-black font-semibold rounded-lg'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <CreditCard size={18} className={currentStep === 6 ? 'text-orange-600' : 'text-gray-500'} />
-              <span>Credit Check</span>
-            </li>
-
-            <li
-              onClick={() => goToStep(7)}
-              className={`flex items-center space-x-3 px-4 py-3 cursor-pointer transition-all ${
-                currentStep === 7
-                  ? 'bg-blue-100 text-black font-semibold rounded-lg'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              <User size={18} className={currentStep === 7 ? 'text-orange-600' : 'text-gray-500'} />
-              <span>Agent Details</span>
-            </li>
-            </ul>*/}
-
           <ul className="space-y-1">
             {renderSidebarNavigation()}
           </ul>
-
-          
-          {/* Progress bar */}
           <div className="mt-auto pt-6 px-2">
             <div className="text-sm text-gray-600 mb-2">Step {currentStep} of 7</div>
             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -1556,18 +1231,14 @@ const WarningModal = () => {
             </div>
           </div>
         </div>
-        
-        {/* Main content */}
         <div className="flex-1 flex flex-col max-h-[90vh]">
-          {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center space-x-4">
-          {/* Mobile Menu Button */}
-          <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-2">
-            <Menu size={24} />
-          </button>
-          <h2 className="text-md font-semibold">Referencing Form</h2>
-        </div>
+            <div className="flex items-center space-x-4">
+              <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-2">
+                <Menu size={24} />
+              </button>
+              <h2 className="text-md font-semibold">Referencing Form</h2>
+            </div>
             <button
               onClick={onClose}
               className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors"
@@ -1576,60 +1247,53 @@ const WarningModal = () => {
               <X size={18} />
             </button>
           </div>
-
-          {/* Mobile Sidebar (Overlay) */}
           {isMenuOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
-          <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl p-6">
-            <button onClick={() => setIsMenuOpen(false)} className="mb-4">
-              <X size={24} />
-            </button>
-            <ul className="space-y-4">
-              {[
-                ["Identity", User, 1],
-                ["Employment", Briefcase, 2],
-                ["Residential", Home, 3],
-                ["Financial", Euro, 4],
-                ["Guarantor", Users, 5],
-                ["Credit Check", CreditCard, 6],
-                ["Agent Details", User, 7],
-              ].map(([label, Icon, step]) => (
-                <li
-                  key={step}
-                  onClick={() => {
-                    goToStep(step);
-                    setIsMenuOpen(false);
-                  }}
-                  className="flex items-center space-x-3 px-4 py-3 cursor-pointer hover:bg-gray-100"
-                >
-                  <Icon
-                    size={18}
-                    className={currentStep === step ? "text-orange-600" : "text-gray-500"}
-                  />
-                  <span>{label}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-          
-          {/* Form content */}
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+              <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl p-6">
+                <button onClick={() => setIsMenuOpen(false)} className="mb-4">
+                  <X size={24} />
+                </button>
+                <ul className="space-y-4">
+                  {[
+                    ["Identity", User, 1],
+                    ["Employment", Briefcase, 2],
+                    ["Residential", Home, 3],
+                    ["Financial", Euro, 4],
+                    ["Guarantor", Users, 5],
+                    ["Credit Check", CreditCard, 6],
+                    ["Agent Details", User, 7],
+                  ].map(([label, Icon, step]) => (
+                    <li
+                      key={step}
+                      onClick={() => {
+                        goToStep(step);
+                        setIsMenuOpen(false);
+                      }}
+                      className="flex items-center space-x-3 px-4 py-3 cursor-pointer hover:bg-gray-100"
+                    >
+                      <Icon
+                        size={18}
+                        className={currentStep === step ? "text-orange-600" : "text-gray-500"}
+                      />
+                      <span>{label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
           <div className="flex-1 overflow-y-auto p-6 bg-[#f2f7fb]">
             {renderFormContent()}
           </div>
-          
-          {/* Footer with action buttons */}
           <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
             <div>
-            {lastSavedSteps[currentStep] && (
-              <div className="flex items-center text-sm text-gray-500 ml-2">
-                <CheckCircle className="text-green-500 mr-1" fontSize="small" />
-                <span>Saved</span>
-              </div>
+              {lastSavedSteps[currentStep] && (
+                <div className="flex items-center text-sm text-gray-500 ml-2">
+                  <CheckCircle className="text-green-500 mr-1" fontSize="small" />
+                  <span>Saved</span>
+                </div>
               )}
             </div>
-            
             <div className="flex space-x-3">
               {currentStep > 1 && (
                 <button
@@ -1639,7 +1303,6 @@ const WarningModal = () => {
                   Previous
                 </button>
               )}
-              
               <button
                 onClick={saveCurrentStep}
                 className="px-6 py-2 bg-gray-100 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-200 transition-colors"
@@ -1647,7 +1310,6 @@ const WarningModal = () => {
               >
                 {isSaving ? 'Saving...' : 'Save'}
               </button>
-              
               {currentStep < 7 ? (
                 <button
                   onClick={nextStep}
@@ -1668,10 +1330,9 @@ const WarningModal = () => {
           </div>
         </div>
       </div>
-      {/* Add the warning modal here */}
-    <WarningModal />
+      <WarningModal />
     </div>
   );
 };
 
-export default ReferencingModal; 
+export default ReferencingModal;

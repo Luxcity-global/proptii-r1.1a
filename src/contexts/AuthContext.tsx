@@ -44,23 +44,22 @@ msalInstance.addEventCallback((event: EventMessage) => {
 
 // Define the shape of our auth context
 interface AuthContextType {
+  user: {
+    id: string;
+    givenName?: string;
+    familyName?: string;
+    email?: string;
+    name?: string;
+  } | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  user: AccountInfo | null;
   login: () => Promise<void>;
   logout: () => Promise<void>;
   editProfile: () => Promise<void>;
 }
 
 // Create the context with a default value
-const AuthContext = createContext<AuthContextType>({
-  isAuthenticated: false,
-  isLoading: true,
-  user: null,
-  login: async () => {},
-  logout: async () => {},
-  editProfile: async () => {},
-});
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Custom hook to use the auth context
 export const useAuth = () => useContext(AuthContext);
@@ -78,7 +77,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const { instance, accounts, inProgress } = useMsal();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [user, setUser] = useState<AccountInfo | null>(null);
+  const [user, setUser] = useState<AuthContextType['user']>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
@@ -89,13 +88,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // In development mode, create a mock user
     if (DEV_MODE) {
       setUser({
-        homeAccountId: 'dev-account',
-        localAccountId: 'dev-account',
-        environment: 'development',
-        tenantId: 'dev-tenant',
-        username: 'dev@example.com',
+        id: 'dev-account',
+        givenName: 'Development',
+        familyName: 'User',
+        email: 'dev@example.com',
         name: 'Development User',
-      } as AccountInfo);
+      });
       setIsLoading(false);
     }
   }, []);
@@ -112,8 +110,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         // Update auth state based on accounts
         if (accounts.length > 0) {
+          const currentAccount = accounts[0];
           setIsAuthenticated(true);
-          setUser(accounts[0]);
+          setUser({
+            id: currentAccount.localAccountId || currentAccount.homeAccountId,
+            givenName: currentAccount.name?.split(' ')[0],
+            familyName: currentAccount.name?.split(' ').slice(1).join(' '),
+            email: currentAccount.username,
+            name: currentAccount.name
+          });
         } else {
           setIsAuthenticated(false);
           setUser(null);
@@ -149,8 +154,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             ...loginRequest,
             account: accounts[0]
           });
+          const currentAccount = accounts[0];
           setIsAuthenticated(true);
-          setUser(accounts[0]);
+          setUser({
+            id: currentAccount.localAccountId || currentAccount.homeAccountId,
+            givenName: currentAccount.name?.split(' ')[0],
+            familyName: currentAccount.name?.split(' ').slice(1).join(' '),
+            email: currentAccount.username,
+            name: currentAccount.name
+          });
         } catch (error) {
           if (error instanceof InteractionRequiredAuthError) {
             // Silent token acquisition failed, user needs to sign in interactively
@@ -175,8 +187,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Update auth state when accounts change
   useEffect(() => {
     if (accounts.length > 0) {
+      const currentAccount = accounts[0];
       setIsAuthenticated(true);
-      setUser(accounts[0]);
+      setUser({
+        id: currentAccount.localAccountId || currentAccount.homeAccountId,
+        givenName: currentAccount.name?.split(' ')[0],
+        familyName: currentAccount.name?.split(' ').slice(1).join(' '),
+        email: currentAccount.username,
+        name: currentAccount.name
+      });
     } else {
       setIsAuthenticated(false);
       setUser(null);
@@ -192,13 +211,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (DEV_MODE) {
       setIsAuthenticated(true);
       setUser({
-        homeAccountId: 'dev-account',
-        localAccountId: 'dev-account',
-        environment: 'development',
-        tenantId: 'dev-tenant',
-        username: 'dev@example.com',
+        id: 'dev-account',
+        givenName: 'Development',
+        familyName: 'User',
+        email: 'dev@example.com',
         name: 'Development User',
-      } as AccountInfo);
+      });
       
       // Dispatch event for UI updates
       window.dispatchEvent(new CustomEvent('auth-state-changed'));
@@ -238,8 +256,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         // Update authentication state after successful login
         if (accounts.length > 0) {
+          const currentAccount = accounts[0];
           setIsAuthenticated(true);
-          setUser(accounts[0]);
+          setUser({
+            id: currentAccount.localAccountId || currentAccount.homeAccountId,
+            givenName: currentAccount.name?.split(' ')[0],
+            familyName: currentAccount.name?.split(' ').slice(1).join(' '),
+            email: currentAccount.username,
+            name: currentAccount.name
+          });
         }
       } catch (popupError: any) {
         // If popup fails and it's not just user cancellation, try redirect
@@ -339,9 +364,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   return (
     <AuthContext.Provider
       value={{
+        user,
         isAuthenticated,
         isLoading,
-        user,
         login,
         logout,
         editProfile,
@@ -363,4 +388,4 @@ export const MSALProviderWrapper: React.FC<MSALProviderWrapperProps> = ({ childr
       <AuthProvider>{children}</AuthProvider>
     </MsalProvider>
   );
-}; 
+};

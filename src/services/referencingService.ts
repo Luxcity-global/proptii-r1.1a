@@ -1,4 +1,5 @@
 import apiService, { ApiResponse } from './api';
+import axios from 'axios';
 import { FormSection, ReferencingFormData } from '../types/referencing';
 
 /**
@@ -34,6 +35,65 @@ export interface ApplicationStatus {
     };
   };
 }
+
+/**
+ * Interface for form data
+ */
+export interface ReferencingFormData {
+  identity: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    dateOfBirth: string;
+    nationality: string;
+    identityProof?: File | null;
+  };
+  employment: {
+    employmentStatus: string;
+    companyDetails: string;
+    lengthOfEmployment: string;
+    jobPosition: string;
+    referenceFullName: string;
+    referenceEmail: string;
+    referencePhone: string;
+    proofType: string;
+    proofDocument?: File | null;
+  };
+  residential: {
+    currentAddress: string;
+    durationAtCurrentAddress: string;
+    previousAddress: string;
+    durationAtPreviousAddress: string;
+    reasonForLeaving: string;
+    proofType: string;
+    proofDocument?: File | null;
+  };
+  financial: {
+    monthlyIncome: string;
+    proofOfIncomeType: string;
+    proofOfIncomeDocument?: File | null;
+    useOpenBanking: boolean;
+    isConnectedToOpenBanking: boolean;
+  };
+  guarantor: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    address: string;
+  };
+  creditCheck: {};
+  agentDetails: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    hasAgreedToCheck: boolean;
+  };
+}
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3002/api';
 
 /**
  * Create a new referencing application
@@ -94,7 +154,7 @@ export const saveSectionData = async (
 /**
  * Submit application for review
  */
-export const submitApplication = async (applicationId: string): Promise<ApiResponse<any>> => {
+export const submitApplicationForReview = async (applicationId: string): Promise<ApiResponse<any>> => {
   try {
     const response = await apiService.post(`/referencing/applications/${applicationId}/submit`);
     return response;
@@ -235,4 +295,140 @@ export const deleteDraft = async (
     console.error('Error deleting draft:', error);
     throw error;
   }
-}; 
+};
+
+const referencingService = {
+  async saveIdentityData(userId: string, data: any) {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+    try {
+      const response = await axios.post(`${API_BASE_URL}/referencing/${userId}/identity`, data, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to save identity data:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Failed to save identity data');
+    }
+  },
+
+  async saveEmploymentData(userId: string, data: any) {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+    try {
+      const response = await axios.post(`${API_BASE_URL}/referencing/${userId}/employment`, data, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to save employment data:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Failed to save employment data');
+    }
+  },
+
+  async saveResidentialData(userId: string, data: any) {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+    try {
+      const response = await axios.post(`${API_BASE_URL}/referencing/${userId}/residential`, data, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to save residential data:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Failed to save residential data');
+    }
+  },
+
+  async saveFinancialData(userId: string, data: any) {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+    try {
+      const response = await axios.post(`${API_BASE_URL}/referencing/${userId}/financial`, data, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to save financial data:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Failed to save financial data');
+    }
+  },
+
+  async saveGuarantorData(userId: string, data: any) {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+    try {
+      const response = await axios.post(`${API_BASE_URL}/referencing/${userId}/guarantor`, data, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to save guarantor data:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Failed to save guarantor data');
+    }
+  },
+
+  async saveAgentDetailsData(userId: string, data: any) {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+    try {
+      const response = await axios.post(`${API_BASE_URL}/referencing/${userId}/agent`, data, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to save agent details:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Failed to save agent details');
+    }
+  },
+
+  async getFormData(userId: string) {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+    try {
+      const response = await axios.get(`${API_BASE_URL}/referencing/${userId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to get form data:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Failed to get form data');
+    }
+  },
+
+  async submitApplication(userId: string, data: any) {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+    try {
+      const response = await axios.post(`${API_BASE_URL}/referencing/${userId}/submit`, data, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to submit application:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Failed to submit application');
+    }
+  }
+};
+
+export default referencingService;
