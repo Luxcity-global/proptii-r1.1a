@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useFormsStorage } from '../contexts/FormsContext';
 
 interface FormData {
   fullName: string;
@@ -13,8 +14,9 @@ interface FormData {
   additionalInfo: string;
 }
 
-const ReferencingForm = () => {
+const ReferencingForm: React.FC = () => {
   const { user } = useAuth();
+  const { saveForm, getForm } = useFormsStorage();
   const [formData, setFormData] = useState<FormData>({
     fullName: user?.name || '',
     email: user?.email || '',
@@ -54,6 +56,28 @@ const ReferencingForm = () => {
       setSubmitSuccess(true);
     }, 2000);
   };
+
+  const handleSave = async () => {
+    try {
+      await saveForm('referencing-form', formData);
+      // Show success message
+    } catch (error) {
+      // Handle error
+      console.error('Failed to save form:', error);
+    }
+  };
+
+  useEffect(() => {
+    // Load saved form data
+    const loadForm = async () => {
+      const savedData = await getForm('referencing-form');
+      if (savedData) {
+        // Update your form state with saved data
+        setFormData(savedData);
+      }
+    };
+    loadForm();
+  }, []);
 
   return (
     <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-8">
@@ -277,4 +301,4 @@ const ReferencingForm = () => {
   );
 };
 
-export default ReferencingForm; 
+export default ReferencingForm;

@@ -9,6 +9,7 @@ import {
   AccountInfo
 } from '@azure/msal-browser';
 import { msalConfig, loginRequest, b2cPolicies } from '../config/authConfig';
+import { FormsProvider } from './FormsContext';
 
 // Initialize MSAL instance
 export const msalInstance = new PublicClientApplication(msalConfig);
@@ -320,7 +321,11 @@ interface MSALProviderWrapperProps {
 export const MSALProviderWrapper: React.FC<MSALProviderWrapperProps> = ({ children }) => {
   return (
     <MsalProvider instance={msalInstance}>
-      <AuthProvider>{children}</AuthProvider>
+      <AuthProvider>
+        <FormsProvider>
+          {children}
+        </FormsProvider>
+      </AuthProvider>
     </MsalProvider>
   );
 };
