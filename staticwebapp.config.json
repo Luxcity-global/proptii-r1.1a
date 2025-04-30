@@ -8,6 +8,23 @@
                 "POST",
                 "PUT",
                 "DELETE"
+            ],
+            "allowedRoles": [
+                "authenticated"
+            ]
+        },
+        {
+            "route": "/admin/*",
+            "serve": "/index.html",
+            "allowedRoles": [
+                "administrator"
+            ]
+        },
+        {
+            "route": "/profile/*",
+            "serve": "/index.html",
+            "allowedRoles": [
+                "authenticated"
             ]
         },
         {
@@ -16,28 +33,90 @@
             "statusCode": 200
         }
     ],
+    "auth": {
+        "identityProviders": {
+            "azureActiveDirectory": {
+                "registration": {
+                    "openIdIssuer": "https://login.microsoftonline.com/7787b033-fe7a-40f3-96b1-7df676ac0531/v2.0",
+                    "clientId": "e221eddb-ad9f-47d3-9b64-c4b2ed273aaf",
+                    "clientSecretSettingName": "33be5233-4614-411b-9eaf-58174bb6f941"
+                }
+            }
+        }
+    },
     "navigationFallback": {
         "rewrite": "/index.html",
         "exclude": [
             "/images/*",
             "/css/*",
             "/js/*",
-            "/api/*"
+            "/api/*",
+            "/.auth/*"
         ]
     },
     "mimeTypes": {
-        ".json": "text/json"
+        ".json": "text/json",
+        ".js": "text/javascript",
+        ".css": "text/css",
+        ".html": "text/html",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".svg": "image/svg+xml"
     },
     "globalHeaders": {
-        "Content-Security-Policy": "default-src https: 'unsafe-eval' 'unsafe-inline'; object-src 'none'",
+        "Content-Security-Policy": "default-src 'self' https: 'unsafe-eval' 'unsafe-inline' blob: data:; object-src 'none'",
         "X-Content-Type-Options": "nosniff",
         "X-Frame-Options": "DENY",
-        "X-XSS-Protection": "1; mode=block"
+        "X-XSS-Protection": "1; mode=block",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(), geolocation=()"
     },
     "responseOverrides": {
+        "401": {
+            "redirect": "/.auth/login/aad",
+            "statusCode": 302
+        },
+        "403": {
+            "rewrite": "/403.html"
+        },
         "404": {
             "rewrite": "/index.html",
             "statusCode": 200
         }
+    },
+    "platformErrorOverrides": [
+        {
+            "code": "NotFound",
+            "serve": "/404.html"
+        },
+        {
+            "code": "Unauthorized",
+            "serve": "/.auth/login/aad"
+        }
+    ],
+    "networking": {
+        "allowedIpRanges": [
+            "any"
+        ]
+    },
+    "cors": {
+        "allowedOrigins": [
+            "https://black-wave-0bb98540f.azurestaticapps.net",
+            "http://localhost:5173"
+        ],
+        "allowedMethods": [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "OPTIONS"
+        ],
+        "allowedHeaders": [
+            "*"
+        ],
+        "exposedHeaders": [
+            "*"
+        ],
+        "maxAge": 600
     }
 }

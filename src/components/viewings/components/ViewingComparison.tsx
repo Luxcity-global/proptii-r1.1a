@@ -9,7 +9,6 @@ import {
   Divider
 } from '@mui/material';
 import { useBookViewing } from '../context/BookViewingContext';
-import { format } from 'date-fns';
 
 // Constants
 const BLUE_COLOR = '#136C9E';
@@ -66,6 +65,27 @@ const ViewingComparison: React.FC = () => {
     return parts.join(', ');
   };
 
+  const formatDate = (date: Date | string | undefined) => {
+    if (!date) return 'Not selected';
+    const d = new Date(date);
+    return d.toLocaleDateString('en-GB', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const formatTime = (time: Date | string | undefined) => {
+    if (!time) return 'Not selected';
+    const d = new Date(time);
+    return d.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  };
+
   return (
     <Box sx={{ p: 2 }}>
       <SectionTitle variant="h6">Review Details</SectionTitle>
@@ -79,7 +99,7 @@ const ViewingComparison: React.FC = () => {
             <Typography variant="subtitle1" sx={{ color: DARK_GREY, mb: 2, fontWeight: 500 }}>
               Property Details
             </Typography>
-            
+
             <InfoSection>
               <InfoLabel>Property Address</InfoLabel>
               <InfoValue>{formatAddress()}</InfoValue>
@@ -100,24 +120,20 @@ const ViewingComparison: React.FC = () => {
 
             <InfoSection>
               <InfoLabel>Viewing Date</InfoLabel>
-              <InfoValue>
-                {viewingDetails?.date ? format(new Date(viewingDetails.date), 'PPPP') : 'Not selected'}
-              </InfoValue>
+              <InfoValue>{formatDate(viewingDetails?.date)}</InfoValue>
             </InfoSection>
 
             <InfoSection>
               <InfoLabel>Viewing Time</InfoLabel>
-              <InfoValue>
-                {viewingDetails?.time ? format(new Date(viewingDetails.time), 'HH:mm') : 'Not selected'}
-              </InfoValue>
+              <InfoValue>{formatTime(viewingDetails?.time)}</InfoValue>
             </InfoSection>
 
             <InfoSection>
               <InfoLabel>Viewing Type</InfoLabel>
               <InfoValue>
-                {viewingDetails?.preference === 'in-person' ? 'In-Person Viewing' : 
-                 viewingDetails?.preference === 'virtual' ? 'Virtual Viewing' : 
-                 'Not specified'}
+                {viewingDetails?.preference === 'in-person' ? 'In-Person Viewing' :
+                  viewingDetails?.preference === 'virtual' ? 'Virtual Viewing' :
+                    'Not specified'}
               </InfoValue>
             </InfoSection>
           </Grid>

@@ -1,0 +1,164 @@
+name: Production Deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Create env file
+        run: |
+          echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" >> .env.production
+          echo "VITE_AZURE_AD_CLIENT_ID=${{ secrets.VITE_AZURE_AD_CLIENT_ID }}" >> .env.production
+          echo "VITE_AZURE_STORAGE_URL=${{ secrets.VITE_AZURE_STORAGE_URL }}" >> .env.production
+          echo "VITE_AZURE_CDN_ENDPOINT=${{ secrets.VITE_AZURE_CDN_ENDPOINT }}" >> .env.production
+          echo "VITE_AZURE_APP_INSIGHTS_KEY=${{ secrets.VITE_AZURE_APP_INSIGHTS_KEY }}" >> .env.production
+          echo "VITE_ENVIRONMENT=production" >> .env.production
+          echo "VITE_ENABLE_DEBUG_LOGGING=false" >> .env.production
+          echo "VITE_ENABLE_PERFORMANCE_MONITORING=true" >> .env.production
+          echo "VITE_ENABLE_ERROR_REPORTING=true" >> .env.production
+          echo "VITE_ENABLE_CSP=true" >> .env.production
+          echo "VITE_ENABLE_HSTS=true" >> .env.production
+          echo "VITE_ENABLE_CORS=false" >> .env.production
+
+      - name: Run Validation
+        run: npm run verify:production
+
+  build:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Create env file
+        run: |
+          echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" >> .env.production
+          echo "VITE_AZURE_AD_CLIENT_ID=${{ secrets.VITE_AZURE_AD_CLIENT_ID }}" >> .env.production
+          echo "VITE_AZURE_STORAGE_URL=${{ secrets.VITE_AZURE_STORAGE_URL }}" >> .env.production
+          echo "VITE_AZURE_CDN_ENDPOINT=${{ secrets.VITE_AZURE_CDN_ENDPOINT }}" >> .env.production
+          echo "VITE_AZURE_APP_INSIGHTS_KEY=${{ secrets.VITE_AZURE_APP_INSIGHTS_KEY }}" >> .env.production
+          echo "VITE_ENVIRONMENT=production" >> .env.production
+          echo "VITE_ENABLE_DEBUG_LOGGING=false" >> .env.production
+          echo "VITE_ENABLE_PERFORMANCE_MONITORING=true" >> .env.production
+          echo "VITE_ENABLE_ERROR_REPORTING=true" >> .env.production
+          echo "VITE_ENABLE_CSP=true" >> .env.production
+          echo "VITE_ENABLE_HSTS=true" >> .env.production
+          echo "VITE_ENABLE_CORS=false" >> .env.production
+
+      - name: Build
+        run: npm run build:production
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: production-build
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    
+    # Required manual approval for production deployment
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: production-build
+          path: dist
+
+      - name: Deploy to Azure Static Web Apps
+        id: deploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "dist"
+          api_location: ""
+          output_location: ""
+          production_branch: "main"
+          
+      - name: Verify Deployment
+        run: |
+          echo "Waiting for deployment to stabilize..."
+          sleep 30
+          curl -f ${{ secrets.VITE_AZURE_STORAGE_URL }}/index.html || exit 1
+
+      - name: Purge CDN Cache
+        run: |
+          az cdn endpoint purge \
+            --content-paths "/*" \
+            --profile-name ${{ secrets.CDN_PROFILE_NAME }} \
+            --name ${{ secrets.CDN_ENDPOINT_NAME }} \
+            --resource-group ${{ secrets.RESOURCE_GROUP_NAME }}
+
+      - name: Update Status Page
+        if: always()
+        run: |
+          curl -X POST ${{ secrets.STATUS_PAGE_UPDATE_URL }} \
+            -H "Authorization: Bearer ${{ secrets.STATUS_PAGE_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "environment": "production",
+              "status": "${{ job.status }}",
+              "lastChecked": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"
+            }'
+
+  notify:
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Notify Success
+        if: needs.deploy.result == 'success'
+        run: |
+          curl -X POST ${{ secrets.TEAMS_WEBHOOK_URL }} \
+            -H "Content-Type: application/json" \
+            -d '{
+              "text": "✅ Production deployment successful\nEnvironment: Production\nBranch: ${{ github.ref_name }}\nCommit: ${{ github.sha }}\nDeployed by: ${{ github.actor }}"
+            }'
+
+      - name: Notify Failure
+        if: needs.deploy.result == 'failure'
+        run: |
+          curl -X POST ${{ secrets.TEAMS_WEBHOOK_URL }} \
+            -H "Content-Type: application/json" \
+            -d '{
+              "text": "❌ Production deployment failed\nEnvironment: Production\nBranch: ${{ github.ref_name }}\nCommit: ${{ github.sha }}\nTriggered by: ${{ github.actor }}"
+            }' 
