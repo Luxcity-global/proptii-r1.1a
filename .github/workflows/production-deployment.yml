@@ -87,7 +87,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     
-    # Required manual approval for production deployment
     environment:
       name: production
       url: ${{ steps.deploy.outputs.url }}
@@ -101,18 +100,58 @@ jobs:
           name: production-build
           path: dist
 
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Configure Security Settings
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          RESOURCE_GROUP_NAME: ${{ secrets.RESOURCE_GROUP_NAME }}
+          AZURE_FRONTDOOR_NAME: ${{ secrets.AZURE_FRONTDOOR_NAME }}
+          AZURE_FRONTDOOR_ENDPOINT: ${{ secrets.AZURE_FRONTDOOR_ENDPOINT }}
+          BLOCKED_IP_RANGES: ${{ secrets.BLOCKED_IP_RANGES }}
+          CDN_PROFILE_NAME: ${{ secrets.CDN_PROFILE_NAME }}
+          CDN_ENDPOINT_NAME: ${{ secrets.CDN_ENDPOINT_NAME }}
+        run: |
+          npm run configure:security
+
       - name: Deploy to Azure Static Web Apps
-        id: deploy
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "dist"
-          api_location: ""
-          output_location: ""
+          skip_app_build: true
           production_branch: "main"
+        id: deploy
+
+      - name: Verify Security Headers
+        run: |
+          response_headers=$(curl -s -I ${{ steps.deploy.outputs.url }})
           
+          # Check for required security headers
+          echo "Verifying security headers..."
+          
+          if ! echo "$response_headers" | grep -q "Strict-Transport-Security"; then
+            echo "❌ Missing HSTS header"
+            exit 1
+          fi
+          
+          if ! echo "$response_headers" | grep -q "Content-Security-Policy"; then
+            echo "❌ Missing CSP header"
+            exit 1
+          fi
+          
+          if ! echo "$response_headers" | grep -q "X-Content-Type-Options: nosniff"; then
+            echo "❌ Missing X-Content-Type-Options header"
+            exit 1
+          fi
+          
+          echo "✅ Security headers verification passed"
+
       - name: Verify Deployment
         run: |
           echo "Waiting for deployment to stabilize..."

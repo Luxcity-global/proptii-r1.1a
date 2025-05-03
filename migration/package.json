@@ -7,35 +7,27 @@
     "setup:dev": "node scripts/setup/dev.js",
     "setup:staging": "node scripts/setup/staging.js",
     "setup:prod": "node scripts/setup/prod.js",
-    
     "export:dev": "node src/export/index.js --env dev",
     "export:staging": "node src/export/index.js --env staging",
     "export:prod": "node src/export/index.js --env prod",
-    
     "transform:dev": "node src/transform/index.js --env dev",
     "transform:staging": "node src/transform/index.js --env staging",
     "transform:prod": "node src/transform/index.js --env prod",
-    
     "import:dev": "node src/import/index.js --env dev",
     "import:staging": "node src/import/index.js --env staging",
     "import:prod": "node src/import/index.js --env prod",
-    
     "validate:dev": "node src/validation/index.js --env dev",
     "validate:staging": "node src/validation/index.js --env staging",
     "validate:prod": "node src/validation/index.js --env prod",
-    
     "migrate:dev": "node scripts/migrate.js --env dev",
     "migrate:staging": "node scripts/migrate.js --env staging",
     "migrate:prod": "node scripts/migrate.js --env prod",
-    
     "rollback:dev": "node scripts/rollback/index.js --env dev",
     "rollback:staging": "node scripts/rollback/index.js --env staging",
     "rollback:prod": "node scripts/rollback/index.js --env prod",
-    
     "test": "jest",
     "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",
-    
     "lint": "eslint src/**/*.js",
     "format": "prettier --write \"src/**/*.js\""
   },
@@ -44,8 +36,7 @@
     "@google-cloud/firestore": "^6.0.0",
     "dotenv": "^16.0.0",
     "winston": "^3.8.0",
-    "yargs": "^17.5.0",
-    "firebase-admin": "^11.0.0"
+    "yargs": "^17.5.0"
   },
   "devDependencies": {
     "jest": "^29.0.0",
@@ -70,4 +61,4 @@
   "author": "Proptii Development Team",
   "license": "UNLICENSED",
   "private": true
-} 
+}

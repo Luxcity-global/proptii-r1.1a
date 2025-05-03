@@ -6,6 +6,8 @@ import App from './App.tsx';
 import './index.css';
 import { msalInstance } from './contexts/AuthContext';
 import theme from './theme/theme';
+import { ErrorBoundary } from './utils/errorHandler';
+import appInsights from './utils/performanceMonitor';
 
 // Initialize MSAL before rendering the app
 const initializeApp = async () => {
@@ -14,32 +16,39 @@ const initializeApp = async () => {
     if (import.meta.env.VITE_MSAL_CLIENT_ID && import.meta.env.VITE_MSAL_AUTHORITY) {
       await msalInstance.initialize();
       console.log('MSAL initialized successfully');
-      
+
       await msalInstance.handleRedirectPromise().catch(error => {
         console.error('Error handling redirect:', error);
       });
     } else {
       console.log('MSAL initialization skipped - running in local development mode');
     }
-    
+
+    // Initialize performance monitoring
+    appInsights.loadAppInsights();
+
     // Render the app
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <App />
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
         </ThemeProvider>
       </StrictMode>
     );
   } catch (error) {
     console.error('Error during initialization:', error);
-    
+
     // Render the app anyway
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <App />
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
         </ThemeProvider>
       </StrictMode>
     );

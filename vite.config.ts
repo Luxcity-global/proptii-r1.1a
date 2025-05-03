@@ -44,9 +44,51 @@ const envConfigs = {
   },
   production: {
     sourcemap: false,
-    minify: 'esbuild',
+    minify: 'terser',
     cssCodeSplit: true,
     reportCompressedSize: false,
+    chunkSizeWarningLimit: 500,
+    assetsInlineLimit: 8192, // 8kb
+    modulePreload: {
+      polyfill: true
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', '@mui/material', '@mui/x-date-pickers', '@emotion/react', '@emotion/styled'],
+          utils: ['date-fns', '@date-io/date-fns', 'zod'],
+          forms: ['react-hook-form', '@hookform/resolvers'],
+          icons: ['@fortawesome/react-fontawesome', '@fortawesome/fontawesome-svg-core'],
+          pdf: ['pdfjs-dist'],
+        },
+        assetFileNames: 'assets/[hash][extname]',
+        chunkFileNames: 'chunks/[hash].js',
+        entryFileNames: 'entries/[hash].js'
+      }
+    },
+    build: {
+      target: 'es2015',
+      cssTarget: 'chrome61',
+      terserOptions: {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+          pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.trace'],
+        },
+        mangle: {
+          safari10: true,
+        },
+        format: {
+          comments: false,
+        },
+      },
+      commonjsOptions: {
+        include: [/node_modules/],
+        extensions: ['.js', '.cjs'],
+        strictRequires: true,
+        transformMixedEsModules: true,
+      }
+    }
   },
 };
 
@@ -57,7 +99,26 @@ export default defineConfig(({ command, mode }) => {
   const envConfig = envConfigs[mode] || envConfigs.development;
 
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      mode === 'production' && {
+        name: 'production-optimizations',
+        configResolved(config) {
+          // Remove development-only code
+          config.define = {
+            ...config.define,
+            __DEV__: false,
+            'process.env.NODE_ENV': '"production"'
+          };
+        },
+        transform(code, id) {
+          if (mode === 'production' && id.includes('node_modules')) {
+            // Remove PropTypes in production
+            return code.replace(/PropTypes\..*?[,;]/g, '');
+          }
+        }
+      }
+    ].filter(Boolean),
     // Base URL configuration for Azure Static Web Apps
     base: '/',
     define: {
@@ -87,28 +148,16 @@ export default defineConfig(({ command, mode }) => {
       },
     },
     optimizeDeps: {
+      ...envConfig.optimizeDeps,
       include: [
+        ...(envConfig.optimizeDeps?.include || []),
+        'react',
+        'react-dom',
         '@mui/material',
-        '@mui/icons-material',
-        '@mui/x-date-pickers',
         '@emotion/react',
-        '@emotion/styled',
-        'swiper',
-        'swiper/react',
-        'lucide-react',
-        '@fortawesome/react-fontawesome',
-        '@fortawesome/fontawesome-svg-core',
-        '@fortawesome/free-solid-svg-icons',
-        '@fortawesome/free-regular-svg-icons',
-        '@fortawesome/free-brands-svg-icons',
-        'pdfjs-dist',
-        'react-hook-form',
-        '@hookform/resolvers/zod',
-        'zod',
-        'date-fns',
-        '@date-io/date-fns'
+        '@emotion/styled'
       ],
-      exclude: []
+      exclude: ['@azure/msal-browser']
     },
     server: {
       port: 5173,
@@ -136,6 +185,17 @@ export default defineConfig(({ command, mode }) => {
         strict: false,
         allow: ['..']
       },
+      ...(mode === 'production' && {
+        headers: {
+          'Cache-Control': 'public, max-age=31536000',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+          'X-XSS-Protection': '1; mode=block',
+          'Referrer-Policy': 'strict-origin-when-cross-origin',
+          'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+          'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
+        }
+      })
     },
     preview: {
       port: 5173,
@@ -145,38 +205,29 @@ export default defineConfig(({ command, mode }) => {
     build: {
       ...envConfig,
       outDir: 'dist',
+      emptyOutDir: true,
+      manifest: true,
+      ssrManifest: true,
+      reportCompressedSize: mode === 'production',
       rollupOptions: {
-        input: {
-          main: path.resolve(__dirname, 'index.html'),
-        },
+        ...envConfig.rollupOptions,
         output: {
+          ...envConfig.rollupOptions?.output,
           manualChunks: {
-            vendor: ['react', 'react-dom', '@mui/material', '@mui/x-date-pickers', '@emotion/react', '@emotion/styled'],
-            swiper: ['swiper', 'swiper/react'],
-            icons: ['lucide-react'],
-            fontawesome: [
-              '@fortawesome/react-fontawesome',
-              '@fortawesome/fontawesome-svg-core',
-              '@fortawesome/free-solid-svg-icons',
-              '@fortawesome/free-regular-svg-icons',
-              '@fortawesome/free-brands-svg-icons'
-            ],
-            pdf: ['pdfjs-dist'],
-            forms: ['react-hook-form', '@hookform/resolvers/zod', 'zod'],
-            utils: ['date-fns', '@date-io/date-fns']
-          },
-        },
-        external: []
+            ...(envConfig.rollupOptions?.output?.manualChunks || {}),
+          }
+        }
       },
-      // Optimize build for Azure Static Web Apps
-      chunkSizeWarningLimit: 1000,
-      cssCodeSplit: true,
-      minify: 'terser',
-      terserOptions: {
-        compress: {
-          drop_console: command === 'build',
-        },
-      },
+      // CDN configuration for production
+      ...(mode === 'production' && {
+        assetsDir: 'assets',
+        cssCodeSplit: true,
+        sourcemap: false,
+        write: true,
+        brotliSize: false,
+        chunkSizeWarningLimit: 500,
+        terserOptions: envConfig.build?.terserOptions,
+      })
     },
     logLevel: 'info'
   };
