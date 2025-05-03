@@ -20,6 +20,8 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^5.14.14",
     "@mui/material": "^5.14.14",
+    "@types/applicationinsights": "^0.20.0",
+    "applicationinsights": "^3.7.0",
     "axios": "^1.7.9",
     "firebase": "^11.6.0",
     "react": "^18.3.1",

@@ -4,5 +4,26 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"azureFunctions.deploySubpath": "api",
+		"azureFunctions.projectLanguage": "TypeScript",
+		"azureFunctions.projectRuntime": "~4",
+		"debug.internalConsoleOptions": "neverOpen",
+		"editor.formatOnSave": true,
+		"files.exclude": {
+			"**/.git": true,
+			"**/.DS_Store": true,
+			"**/node_modules": true,
+			"**/dist": true
+		}
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-azuretools.vscode-azurefunctions",
+			"ms-vscode.azure-account",
+			"ms-azuretools.vscode-azureresourcegroups",
+			"dbaeumer.vscode-eslint",
+			"esbenp.prettier-vscode"
+		]
+	}
 }
