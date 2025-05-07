@@ -1,57 +1,78 @@
 const winston = require('winston');
-const { format } = winston;
 const path = require('path');
 
-// Import config (assuming it's been created)
-const { config } = require('./config');
-
-const logFormat = format.combine(
-  format.timestamp(),
-  format.errors({ stack: true }),
-  format.splat(),
-  format.json()
+// Define custom log format
+const logFormat = winston.format.combine(
+  winston.format.timestamp(),
+  winston.format.errors({ stack: true }),
+  winston.format.json()
 );
 
+// Create logs directory if it doesn't exist
+const logsDir = path.join(process.cwd(), 'logs');
+require('fs').mkdirSync(logsDir, { recursive: true });
+
+// Configure logger
 const logger = winston.createLogger({
-  level: config.logging.level || 'info',
+  level: process.env.LOG_LEVEL || 'info',
   format: logFormat,
   defaultMeta: { service: 'migration-service' },
   transports: [
+    // Write all logs with level 'error' and below to error.log
     new winston.transports.File({
-      filename: path.join(config.logging.directory, 'error.log'),
-      level: 'error'
+      filename: path.join(logsDir, 'error.log'),
+      level: 'error',
+      maxsize: 5242880, // 5MB
+      maxFiles: 5,
     }),
+    // Write all logs with level 'info' and below to combined.log
     new winston.transports.File({
-      filename: path.join(config.logging.directory, 'combined.log')
+      filename: path.join(logsDir, 'combined.log'),
+      maxsize: 5242880, // 5MB
+      maxFiles: 5,
     })
   ]
 });
 
-// If we're not in production, log to console as well
+// If we're not in production, log to the console with colors
 if (process.env.NODE_ENV !== 'production') {
   logger.add(new winston.transports.Console({
-    format: format.combine(
-      format.colorize(),
-      format.simple()
+    format: winston.format.combine(
+      winston.format.colorize(),
+      winston.format.simple()
     )
   }));
 }
 
-// Add custom logging methods for migration events
-logger.migration = {
-  start: (details) => logger.info('Starting migration process', { event: 'migration_start', ...details }),
-  complete: (details) => logger.info('Migration completed successfully', { event: 'migration_complete', ...details }),
-  error: (error, details) => logger.error('Migration error occurred', {
-    event: 'migration_error',
-    error: error.message,
-    stack: error.stack,
-    code: error.code,
-    ...details
-  }),
-  progress: (details) => logger.info('Migration progress update', { event: 'migration_progress', ...details }),
-  warning: (message, details) => logger.warn(message, { event: 'migration_warning', ...details }),
-  validation: (details) => logger.info('Data validation', { event: 'data_validation', ...details }),
-  transform: (details) => logger.debug('Data transformation', { event: 'data_transform', ...details })
+// Add request context tracking
+const requestContext = new Map();
+
+function setRequestContext(key, value) {
+  requestContext.set(key, value);
+}
+
+function clearRequestContext() {
+  requestContext.clear();
+}
+
+// Wrap logger methods to include request context
+const wrappedLogger = {
+  error: (message, meta = {}) => {
+    logger.error(message, { ...meta, context: Object.fromEntries(requestContext) });
+  },
+  warn: (message, meta = {}) => {
+    logger.warn(message, { ...meta, context: Object.fromEntries(requestContext) });
+  },
+  info: (message, meta = {}) => {
+    logger.info(message, { ...meta, context: Object.fromEntries(requestContext) });
+  },
+  debug: (message, meta = {}) => {
+    logger.debug(message, { ...meta, context: Object.fromEntries(requestContext) });
+  },
+  setRequestContext,
+  clearRequestContext
 };
 
-module.exports = logger; 
+module.exports = {
+  logger: wrappedLogger
+}; 

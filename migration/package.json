@@ -7,37 +7,33 @@
     "setup:dev": "node scripts/setup/dev.js",
     "setup:staging": "node scripts/setup/staging.js",
     "setup:prod": "node scripts/setup/prod.js",
-    
     "export:dev": "node src/export/index.js --env dev",
     "export:staging": "node src/export/index.js --env staging",
     "export:prod": "node src/export/index.js --env prod",
-    
     "transform:dev": "node src/transform/index.js --env dev",
     "transform:staging": "node src/transform/index.js --env staging",
     "transform:prod": "node src/transform/index.js --env prod",
-    
     "import:dev": "node src/import/index.js --env dev",
     "import:staging": "node src/import/index.js --env staging",
     "import:prod": "node src/import/index.js --env prod",
-    
     "validate:dev": "node src/validation/index.js --env dev",
     "validate:staging": "node src/validation/index.js --env staging",
     "validate:prod": "node src/validation/index.js --env prod",
-    
-    "migrate:dev": "node scripts/migrate.js --env dev",
-    "migrate:staging": "node scripts/migrate.js --env staging",
-    "migrate:prod": "node scripts/migrate.js --env prod",
-    
+    "migrate:dev": "node src/index.js --env dev",
+    "migrate:staging": "node src/index.js --env staging",
+    "migrate:prod": "node src/index.js --env prod",
     "rollback:dev": "node scripts/rollback/index.js --env dev",
     "rollback:staging": "node scripts/rollback/index.js --env staging",
     "rollback:prod": "node scripts/rollback/index.js --env prod",
-    
     "test": "jest",
     "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",
-    
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "lint": "eslint src/**/*.js",
-    "format": "prettier --write \"src/**/*.js\""
+    "lint:fix": "eslint src/**/*.js --fix",
+    "format": "prettier --write \"src/**/*.js\"",
+    "prepare": "husky install"
   },
   "dependencies": {
     "@azure/cosmos": "^3.17.0",
@@ -48,11 +44,37 @@
     "firebase-admin": "^11.0.0"
   },
   "devDependencies": {
-    "jest": "^29.0.0",
-    "eslint": "^8.0.0",
-    "prettier": "^2.8.0",
     "@types/jest": "^29.0.0",
-    "@types/node": "^18.0.0"
+    "eslint": "^8.0.0",
+    "eslint-config-prettier": "^8.0.0",
+    "eslint-plugin-jest": "^27.0.0",
+    "husky": "^8.0.0",
+    "jest": "^29.0.0",
+    "lint-staged": "^13.0.0",
+    "prettier": "^2.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 80,
+        "functions": 80,
+        "lines": 80,
+        "statements": 80
+      }
+    }
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   },
   "engines": {
     "node": ">=18.0.0"
@@ -70,4 +92,4 @@
   "author": "Proptii Development Team",
   "license": "UNLICENSED",
   "private": true
-} 
+}
