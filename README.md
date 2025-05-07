@@ -1,180 +1,124 @@
-# Proptii
+# Proptii Static Web Application
 
-Proptii is a property management and referencing application that helps users find properties, apply for tenancy, and complete the referencing process.
+## Overview
+Proptii is a modern web application built with Vite and hosted on Azure Static Web Apps. This application provides a robust frontend interface with Azure AD B2C authentication and CDN integration for optimal performance.
 
-## Features
-
-- **Property Search**: Search for properties using natural language queries
-- **Referencing Process**: Complete the referencing process online
-- **Open Banking Integration**: Connect to open banking services for financial verification
-- **User Authentication**: Secure authentication using Azure B2C
-
-## Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
-
-- Node.js (v18.x or later)
-- npm (v9.x or later)
-- Git (v2.x or later)
+- Node.js (version specified in package.json)
+- Azure CLI
+- Git
 
 ### Installation
-
-1. Clone the repository:
-
 ```bash
-git clone https://github.com/your-organization/proptii.git
-cd proptii
-```
+# Clone the repository
+git clone https://github.com/[organization]/proptii-r1.1a-2.git
+cd proptii-r1.1a-2
 
-2. Set up the development environment:
+# Install dependencies
+npm install
 
-```bash
-# Option 1: Using the setup script (recommended)
-./scripts/setup-dev.sh
+# Set up environment variables
+cp .env.example .env.local
+# Edit .env.local with your values
 
-# Option 2: Manual setup
-npm ci
-```
-
-3. Create a `.env` file in the root directory with the following variables:
-
-```
-VITE_AZURE_API_KEY=your_azure_api_key
-VITE_AZURE_AD_TENANT_ID=your_azure_ad_tenant_id
-VITE_AZURE_AD_CLIENT_ID=your_azure_ad_client_id
-VITE_AZURE_AD_TENANT_NAME=your_azure_ad_tenant_name
-```
-
-4. Start the development server:
-# Proptii Frontend
-
-A modern real estate platform built with React, TypeScript, and Vite.
-
-## Features
-
-- Modern UI with Material-UI and Tailwind CSS
-- Type-safe development with TypeScript
-- Fast development with Vite
-- Responsive design
-- Image upload and management
-- Form handling with React Hook Form
-- Date picker integration
-- AI-powered features
-
-## Prerequisites
-
-- Node.js (v18 or higher)
-- npm (v9 or higher)
-
-## Installation
-
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install --legacy-peer-deps
-   ```
-
-## Development
-
-To start the development server:
-
-```bash
+# Start development server
 npm run dev
 ```
 
-The application will be available at http://localhost:5173 (or another port if 5173 is already in use).
-
-## Development
-
-### Project Structure
-
-See [Project Structure](./docs/development/ProjectStructure.md) for a detailed overview of the codebase.
-
-### Coding Standards
-
-See [Coding Standards](./docs/development/CodingStandards.md) for the coding standards and best practices.
-
-### Testing
-
-See [Testing Strategy](./docs/development/TestingStrategy.md) for the testing strategy and guidelines.
-
-### API Documentation
-
-See [API Simulation](./docs/api-simulation/README.md) for documentation on the API simulation functions.
-
-## Scripts
-
-- `npm run dev`: Start the development server
-- `npm run build`: Build the application for production
-- `npm run lint`: Run ESLint to check for code style issues
-- `npm run format`: Run Prettier to format code
-- `npm test`: Run tests
-
-## Documentation
-
-Comprehensive documentation is available in the `docs` directory:
-
-- [Development Documentation](./docs/development/README.md)
-- [API Simulation Documentation](./docs/api-simulation/README.md)
-- [Component Documentation](./docs/components/README.md)
-- [Authentication Documentation](./docs/auth/README.md)
-
-## Contributing
-
-1. Create a new branch from `develop`:
-
-```bash
-git checkout develop
-git pull
-git checkout -b feature/your-feature-name
+## 🏗️ Project Structure
+```
+proptii-r1.1a-2/
+├── src/               # Source code
+├── public/            # Static assets
+├── dist/             # Build output
+├── docs/             # Documentation
+│   └── development/  # Development guides
+├── tests/            # Test files
+└── scripts/          # Utility scripts
 ```
 
-2. Make your changes following the coding standards
+## 🛠️ Development
 
-3. Test your changes
-
-4. Submit a pull request to the `develop` branch
-
-## License
-
-This project is proprietary and confidential. Unauthorized copying, distribution, or use is strictly prohibited.
-To start both frontend and backend:
-
+### Available Scripts
 ```bash
-npm run start:dev
-```
+# Development server
+npm run dev
 
-## Building for Production
-
-```bash
+# Production build
 npm run build
+
+# Preview production build
+npm run preview
+
+# Run tests
+npm run test
+
+# Type checking
+npm run type-check
 ```
 
-## Project Structure
+### Environment Variables
+Required environment variables:
+- `VITE_API_URL`: Backend API endpoint
+- `VITE_AZURE_AD_CLIENT_ID`: Azure AD B2C client ID
+- `VITE_AZURE_STORAGE_URL`: Azure Storage account URL
 
+## 🚀 Deployment
+
+### Automated Deployment
+The application automatically deploys through GitHub Actions:
+- `develop` branch → Development environment
+- `staging` branch → Staging environment
+- `main` branch → Production environment
+
+### Manual Deployment
+```bash
+# Build the application
+npm run build
+
+# Deploy to Azure Static Web Apps
+az staticwebapp deploy --source dist
 ```
-src/
-├── app/          # Next.js app directory
-├── components/   # Reusable UI components
-├── contexts/     # React contexts
-├── hooks/        # Custom React hooks
-├── pages/        # Page components
-├── services/     # API services
-├── types/        # TypeScript type definitions
-├── utils/        # Utility functions
-└── assets/       # Static assets
-```
 
-## Environment Variables
+## 🔒 Security
 
-Create a `.env` file based on `.env.template` with your configuration.
+### Authentication
+- Azure AD B2C integration
+- Role-based access control
+- Secure token management
 
-## Contributing
+### Environment Security
+- Secrets management through Azure Key Vault
+- Secure environment variable handling
+- HTTPS enforcement
 
-1. Create a feature branch
-2. Make your changes
-3. Submit a pull request
+## 📚 Documentation
+- [Setup Instructions](docs/development/DevtoProd-290425/03-Dev%20A-%20Steps/05A02-Setup-Instructions.md)
+- [Resource Documentation](docs/development/DevtoProd-290425/03-Dev%20A-%20Steps/05A01-Resource-Documentation.md)
+- [Azure Static Web Apps Documentation](https://docs.microsoft.com/azure/static-web-apps)
 
-## License
+## 🔧 Troubleshooting
+Common issues and solutions are documented in the [Setup Instructions](docs/development/DevtoProd-290425/03-Dev%20A-%20Steps/05A02-Setup-Instructions.md#troubleshooting-steps).
 
-Proprietary - All rights reserved
+## 📈 Performance
+- CDN integration for static assets
+- Optimized build configuration
+- Caching strategies implemented
+
+## 🤝 Contributing
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📝 License
+[License information to be added]
+
+## 👥 Support
+For support and questions, please contact:
+- Technical Lead: [contact]
+- DevOps Support: [contact]
+- Project Manager: [contact]

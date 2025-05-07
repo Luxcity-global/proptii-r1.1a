@@ -30,6 +30,8 @@ import AgentHome from './pages/AgentHome';
 import Listings from './pages/Listings';
 import NewListingPage from './pages/listings/new';
 import ErrorBoundary from './components/ErrorBoundary';
+import { ProtectedRoute } from './components/common/ProtectedRoute';
+import { UnauthorizedPage } from './pages/Unauthorized';
 
 console.log('App.tsx - Starting initialization with config:', msalConfig);
 
@@ -53,50 +55,79 @@ function App() {
 
   return (
     <ErrorBoundary fallback={<div>Custom fallback UI</div>}>
-    {/*<ThemeProvider theme={theme}>*/}
+      {/*<ThemeProvider theme={theme}>*/}
       <CssBaseline />
       <MSALProviderWrapper>
         {/*<RedirectUriWarning />*/}
         <AuthProvider>
-        <Router>
-        {/*<Box sx={{ 
+          <Router>
+            {/*<Box sx={{ 
             minHeight: '100vh', 
             display: 'flex', 
             flexDirection: 'column',
             bgcolor: 'background.default'
           }}>*/}
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/agent" element={<AgentHome />} />
-            <Route path="/referencing" element={<Referencing />} />
-            <Route path="/contracts" element={<ContractsPage />} />
-            <Route path="/bookviewing" element={<BookViewing />} />
-            {/*<Route path="/referencing-test" element={<ReferencingTest />} />
-            <Route path="/test-referencing" element={<TestReferencingPage />} />
-            <Route path="/backend-test" element={<BackendIntegrationTest />} />
-  <Route path="/referencing-modal-test" element={<ReferencingModalTest />} />*/}
-
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<Home />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
-              
+              <Route path="/unauthorized" element={<UnauthorizedPage />} />
+
+              {/* Protected Routes */}
+              <Route path="/agent" element={
+                <ProtectedRoute requiredRoles={['agent']}>
+                  <AgentHome />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/referencing" element={
+                <ProtectedRoute>
+                  <Referencing />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/contracts" element={
+                <ProtectedRoute>
+                  <ContractsPage />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/bookviewing" element={
+                <ProtectedRoute>
+                  <BookViewing />
+                </ProtectedRoute>
+              } />
+
               {/* Listings routes */}
               <Route path="/listings" element={<Listings />} />
-              <Route path="/listings/new" element={<NewListingPage />} />
-            
-            {/* Dashboard Routes */}
-            <Route path="/dashboard" element={<Dashboard />}>
-              <Route index element={<DashboardHome />} />
-              <Route path="saved-searches" element={<SavedProperties />} />
-              <Route path="viewings" element={<Viewings />} />
-              <Route path="tenant-contracts" element={<TenantContracts/>} />
-              <Route path="your-files" element={<FileTable />} />
-              <Route path="tenant-referencing" element={<TenantReferencing />} />
-            </Route>
-          </Routes>
-        </Router>
+              <Route path="/listings/new" element={
+                <ProtectedRoute requiredRoles={['agent']}>
+                  <NewListingPage />
+                </ProtectedRoute>
+              } />
+
+              {/* Dashboard Routes */}
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }>
+                <Route index element={<DashboardHome />} />
+                <Route path="saved-searches" element={<SavedProperties />} />
+                <Route path="viewings" element={<Viewings />} />
+                <Route path="tenant-contracts" element={<TenantContracts />} />
+                <Route path="your-files" element={<FileTable />} />
+                <Route path="tenant-referencing" element={<TenantReferencing />} />
+              </Route>
+
+              {/* Catch-all route for 404 */}
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </Router>
         </AuthProvider>
       </MSALProviderWrapper>
-    {/*</ThemeProvider>*/}
+      {/*</ThemeProvider>*/}
     </ErrorBoundary>
   );
 }

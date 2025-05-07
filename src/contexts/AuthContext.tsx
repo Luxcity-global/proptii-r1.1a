@@ -1,20 +1,26 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useMsal, MsalProvider } from '@azure/msal-react';
-import { 
-  PublicClientApplication, 
-  EventType, 
-  EventMessage, 
-  AuthenticationResult, 
+import {
+  PublicClientApplication,
+  EventType,
+  EventMessage,
+  AuthenticationResult,
   InteractionRequiredAuthError,
   AccountInfo
 } from '@azure/msal-browser';
 import { msalConfig, loginRequest, b2cPolicies } from '../config/authConfig';
+import SessionManager from '../services/SessionManager';
+import SecurityMiddleware from '../middleware/SecurityMiddleware';
+import SecurityPolicyService from '../services/SecurityPolicyService';
 
 // Initialize MSAL instance
 export const msalInstance = new PublicClientApplication(msalConfig);
 
 // Development mode flag - set to true to bypass authentication for development
 const DEV_MODE = false; // Set to false in production
+
+// Initialize services
+const securityPolicyService = SecurityPolicyService.getInstance();
 
 // Initialize the MSAL instance before using it
 msalInstance.initialize().catch(error => {
@@ -42,15 +48,16 @@ msalInstance.addEventCallback((event: EventMessage) => {
   }
 });
 
-// Define the shape of our auth context
+interface User {
+  id: string;
+  email: string;
+  givenName?: string;
+  familyName?: string;
+  name?: string;
+}
+
 interface AuthContextType {
-  user: {
-    id: string;
-    givenName?: string;
-    familyName?: string;
-    email?: string;
-    name?: string;
-  } | null;
+  user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: () => Promise<void>;
@@ -58,11 +65,15 @@ interface AuthContextType {
   editProfile: () => Promise<void>;
 }
 
-// Create the context with a default value
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Custom hook to use the auth context
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 
 // Helper function to check if popups are blocked
 const isPopupBlocked = (popup: Window | null): boolean => {
@@ -76,39 +87,18 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const { instance, accounts, inProgress } = useMsal();
+  const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [user, setUser] = useState<AuthContextType['user']>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  const sessionManager = SessionManager.getInstance();
+  const securityMiddleware = SecurityMiddleware.getInstance();
 
-  // We don't need to initialize MSAL here again since we already did it above
   useEffect(() => {
-    setIsInitialized(true);
-    
-    // In development mode, create a mock user
-    if (DEV_MODE) {
-      setUser({
-        id: 'dev-account',
-        givenName: 'Development',
-        familyName: 'User',
-        email: 'dev@example.com',
-        name: 'Development User',
-      });
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Handle redirect responses
-  useEffect(() => {
-    const handleRedirectResponse = async () => {
-      // Only proceed if MSAL is initialized
-      if (!isInitialized) return;
-      
+    const initializeAuth = async () => {
       try {
         // Handle redirect response if any
         await instance.handleRedirectPromise();
-        
-        // Update auth state based on accounts
+
         if (accounts.length > 0) {
           const currentAccount = accounts[0];
           setIsAuthenticated(true);
@@ -119,248 +109,150 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             email: currentAccount.username,
             name: currentAccount.name
           });
-        } else {
+
+          // Try silent token acquisition
+          await instance.acquireTokenSilent({
+            ...loginRequest,
+            account: currentAccount
+          });
+
+          // Record session activity
+          sessionManager.recordActivity('interaction', 'Session initialized');
+        }
+      } catch (error) {
+        if (error instanceof InteractionRequiredAuthError) {
+          // Silent token acquisition failed, user needs to sign in interactively
           setIsAuthenticated(false);
           setUser(null);
         }
-      } catch (error) {
-        console.error("Error handling redirect:", error);
-        setIsAuthenticated(false);
-        setUser(null);
-        
-        // Store the error in localStorage for the warning component to display
-        if (error instanceof Error) {
-          localStorage.setItem('auth_error', error.message);
-        }
+        console.error('Auth initialization error:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (isInitialized) {
-      handleRedirectResponse();
-    }
-  }, [instance, accounts, isInitialized]);
+    initializeAuth();
 
-  // Try silent token acquisition on component mount
-  useEffect(() => {
-    const acquireTokenSilently = async () => {
-      // Only proceed if MSAL is initialized
-      if (!isInitialized) return;
-      
-      if (accounts.length > 0) {
-        try {
-          await instance.acquireTokenSilent({
-            ...loginRequest,
-            account: accounts[0]
-          });
-          const currentAccount = accounts[0];
-          setIsAuthenticated(true);
-          setUser({
-            id: currentAccount.localAccountId || currentAccount.homeAccountId,
-            givenName: currentAccount.name?.split(' ')[0],
-            familyName: currentAccount.name?.split(' ').slice(1).join(' '),
-            email: currentAccount.username,
-            name: currentAccount.name
-          });
-        } catch (error) {
-          if (error instanceof InteractionRequiredAuthError) {
-            // Silent token acquisition failed, user needs to sign in interactively
-            setIsAuthenticated(false);
-            setUser(null);
-          } else {
-            console.error("Silent token acquisition failed:", error);
-          }
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
-        setIsLoading(false);
-      }
+    // Listen for session timeout
+    const handleSessionTimeout = () => {
+      logout();
     };
+    window.addEventListener('session_timeout', handleSessionTimeout);
 
-    if (isInitialized) {
-      acquireTokenSilently();
-    }
-  }, [instance, accounts, isInitialized]);
+    // Listen for account lockout
+    const handleAccountLockout = () => {
+      logout();
+      // Show lockout notification to user
+      // You would need to implement this UI component
+    };
+    window.addEventListener('account-locked', handleAccountLockout);
 
-  // Update auth state when accounts change
-  useEffect(() => {
-    if (accounts.length > 0) {
-      const currentAccount = accounts[0];
-      setIsAuthenticated(true);
-      setUser({
-        id: currentAccount.localAccountId || currentAccount.homeAccountId,
-        givenName: currentAccount.name?.split(' ')[0],
-        familyName: currentAccount.name?.split(' ').slice(1).join(' '),
-        email: currentAccount.username,
-        name: currentAccount.name
-      });
-    } else {
-      setIsAuthenticated(false);
-      setUser(null);
-    }
-    
-    // Dispatch custom event when auth state changes
-    window.dispatchEvent(new CustomEvent('auth-state-changed'));
-  }, [accounts]);
+    // Listen for password reuse attempts
+    const handlePasswordReuseAttempt = () => {
+      // Show password reuse error to user
+      // You would need to implement this UI component
+    };
+    window.addEventListener('password-reuse-attempt', handlePasswordReuseAttempt);
 
-  // Login function
+    return () => {
+      window.removeEventListener('session_timeout', handleSessionTimeout);
+      window.removeEventListener('account-locked', handleAccountLockout);
+      window.removeEventListener('password-reuse-attempt', handlePasswordReuseAttempt);
+    };
+  }, [instance, accounts]);
+
   const login = async (): Promise<void> => {
-    // In development mode, just set authenticated to true
-    if (DEV_MODE) {
-      setIsAuthenticated(true);
-      setUser({
-        id: 'dev-account',
-        givenName: 'Development',
-        familyName: 'User',
-        email: 'dev@example.com',
-        name: 'Development User',
-      });
-      
-      // Dispatch event for UI updates
-      window.dispatchEvent(new CustomEvent('auth-state-changed'));
-      return;
-    }
-    
     try {
       setIsLoading(true);
-      
-      // First, try to detect if popups are blocked by opening a test popup
-      const testPopup = window.open('about:blank', '_blank', 'width=1,height=1');
-      
-      // If the test popup is blocked, go straight to redirect
-      if (isPopupBlocked(testPopup)) {
-        console.warn("Popup blocked by browser, using redirect login instead");
-        // Close the test popup if it somehow opened
-        if (testPopup) testPopup.close();
-        // Use redirect login
-        instance.loginRedirect(loginRequest);
-        return; // Exit early as redirect will reload the page
+
+      // First, refresh CSRF token
+      await securityMiddleware.refreshCsrfToken();
+
+      // Try popup login
+      const result = await instance.loginPopup(loginRequest);
+
+      if (result) {
+        // Dispatch auth state change event with success status
+        window.dispatchEvent(new CustomEvent('auth-state-changed', {
+          detail: {
+            success: true,
+            userId: result.account?.localAccountId || result.account?.homeAccountId
+          }
+        }));
+
+        setIsAuthenticated(true);
+        setUser({
+          id: result.account?.localAccountId || result.account?.homeAccountId || '',
+          email: result.account?.username || '',
+          name: result.account?.name,
+          givenName: result.account?.name?.split(' ')[0],
+          familyName: result.account?.name?.split(' ').slice(1).join(' ')
+        });
+
+        // Record login activity
+        sessionManager.recordActivity('interaction', 'User login');
       }
-      
-      // Close the test popup since it was just for testing
-      testPopup?.close();
-      
-      // Try popup authentication
-      try {
-        // Configure popup window - use minimal configuration to avoid triggering popup blockers
-        const popupConfig = {
-          ...loginRequest,
-          // Don't set popupWindowAttributes here as it can trigger popup blockers
-          // Let the browser handle the popup dimensions and position
-        };
-        
-        // Attempt popup login with minimal configuration
-        await instance.loginPopup(popupConfig);
-        
-        // Update authentication state after successful login
-        if (accounts.length > 0) {
-          const currentAccount = accounts[0];
-          setIsAuthenticated(true);
-          setUser({
-            id: currentAccount.localAccountId || currentAccount.homeAccountId,
-            givenName: currentAccount.name?.split(' ')[0],
-            familyName: currentAccount.name?.split(' ').slice(1).join(' '),
-            email: currentAccount.username,
-            name: currentAccount.name
-          });
+    } catch (error) {
+      console.error('Login error:', error);
+
+      // Dispatch auth state change event with failure status
+      window.dispatchEvent(new CustomEvent('auth-state-changed', {
+        detail: {
+          success: false,
+          userId: accounts[0]?.localAccountId || accounts[0]?.homeAccountId
         }
-      } catch (popupError: any) {
-        // If popup fails and it's not just user cancellation, try redirect
-        if (popupError.errorCode !== "user_cancelled") {
-          console.warn("Popup login failed, falling back to redirect:", popupError);
-          
-          // Fall back to redirect login
-          instance.loginRedirect(loginRequest);
-          return; // Exit early as redirect will reload the page
-        } else {
-          // If user cancelled, just log and continue
-          console.log("User cancelled login");
-          throw popupError; // Re-throw to be caught by outer catch
-        }
-      }
-      
-      // Dispatch event for UI updates
-      window.dispatchEvent(new CustomEvent('auth-state-changed'));
-    } catch (error: any) {
-      // Handle any errors
-      if (error.errorCode !== "user_cancelled") {
-        console.error("Login failed:", error);
-      }
+      }));
+
+      // Try redirect login as fallback
+      await instance.loginRedirect(loginRequest);
+    } finally {
       setIsLoading(false);
-      // Dispatch event even on failure to update UI
-      window.dispatchEvent(new CustomEvent('auth-state-changed'));
     }
   };
 
-  // Logout function
   const logout = async (): Promise<void> => {
-    // In development mode, just set authenticated to false
-    if (DEV_MODE) {
+    try {
+      setIsLoading(true);
+      // Record logout activity before clearing session
+      sessionManager.recordActivity('interaction', 'User logout');
+
+      await instance.logoutPopup({
+        postLogoutRedirectUri: window.location.origin
+      });
+
       setIsAuthenticated(false);
       setUser(null);
-      
-      // Dispatch event for UI updates
-      window.dispatchEvent(new CustomEvent('auth-state-changed'));
-      return;
-    }
-    
-    try {
-      setIsLoading(true);
-      // Use popup for logout as well
-      await instance.logoutPopup();
-    } catch (error: any) {
-      // Ignore user_cancelled errors
-      if (error.errorCode !== "user_cancelled") {
-        console.error("Logout failed:", error);
-      }
+
+      // Clear session
+      localStorage.clear();
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Try redirect logout as fallback
+      await instance.logoutRedirect({
+        postLogoutRedirectUri: window.location.origin
+      });
+    } finally {
       setIsLoading(false);
-      // Dispatch event even on failure to update UI
-      window.dispatchEvent(new CustomEvent('auth-state-changed'));
     }
   };
 
-  // Edit profile function
   const editProfile = async (): Promise<void> => {
-    // In development mode, just show a message
-    if (DEV_MODE) {
-      console.log('Edit profile not available in development mode');
-      alert('Edit profile not available in development mode');
-      return;
-    }
-    
     try {
       setIsLoading(true);
-      // Use popup for profile editing
-      const popupWidth = 500;
-      const popupHeight = 600;
-      const left = window.screenX + (window.outerWidth - popupWidth) / 2;
-      const top = window.screenY + (window.outerHeight - popupHeight) / 2;
-      
-      const popupWindowAttributes = {
-        popupSize: { width: popupWidth, height: popupHeight },
-        popupPosition: { top, left }
-      };
-      
-      // Use the correct edit profile policy from the config
+      // Record profile edit activity
+      sessionManager.recordActivity('interaction', 'Profile edit');
+
       await instance.loginPopup({
         ...loginRequest,
-        authority: `https://proptii.b2clogin.com/proptii.onmicrosoft.com/${b2cPolicies.editProfile}`,
-        popupWindowAttributes
+        authority: `${instance.config.auth?.authority}/profile-edit`
       });
-    } catch (error: any) {
-      // Ignore user_cancelled errors
-      if (error.errorCode !== "user_cancelled") {
-        console.error("Edit profile failed:", error);
-      }
+    } catch (error) {
+      console.error('Profile edit error:', error);
+    } finally {
       setIsLoading(false);
-      // Dispatch event even on failure to update UI
-      window.dispatchEvent(new CustomEvent('auth-state-changed'));
     }
   };
 
-  // Provide the auth context to children components
   return (
     <AuthContext.Provider
       value={{
@@ -369,7 +261,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isLoading,
         login,
         logout,
-        editProfile,
+        editProfile
       }}
     >
       {children}
@@ -389,3 +281,5 @@ export const MSALProviderWrapper: React.FC<MSALProviderWrapperProps> = ({ childr
     </MsalProvider>
   );
 };
+
+export default AuthContext;

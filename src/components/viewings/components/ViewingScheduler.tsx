@@ -9,8 +9,6 @@ import {
   alpha,
   MenuItem
 } from '@mui/material';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
 import { useBookViewing } from '../context/BookViewingContext';
 
 // Constants
@@ -62,22 +60,22 @@ const StyledTextField = styled(TextField)(({ theme }) => ({
 const ViewingScheduler: React.FC = () => {
   const { state, dispatch } = useBookViewing();
 
-  const handleDateChange = (date: Date | null) => {
+  const handleDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     dispatch({
       type: 'UPDATE_VIEWING_DETAILS',
       payload: {
         ...state.viewingDetails,
-        date: date,
+        date: event.target.value,
       },
     });
   };
 
-  const handleTimeChange = (time: Date | null) => {
+  const handleTimeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     dispatch({
       type: 'UPDATE_VIEWING_DETAILS',
       payload: {
         ...state.viewingDetails,
-        time: time,
+        time: event.target.value,
       },
     });
   };
@@ -106,32 +104,37 @@ const ViewingScheduler: React.FC = () => {
               Viewing Details
             </Typography>
             
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <Box sx={{ mb: 3 }}>
-                <DatePicker
-                  label="Select Date"
-                  value={state.viewingDetails?.date || null}
-                  onChange={handleDateChange}
-                  renderInput={(params) => (
-                    <StyledTextField {...params} fullWidth />
-                  )}
-                  minDate={new Date()}
-                />
-              </Box>
-              
-              <Box sx={{ mb: 3 }}>
-                <TimePicker
-                  label="Select Time"
-                  value={state.viewingDetails?.time || null}
-                  onChange={handleTimeChange}
-                  renderInput={(params) => (
-                    <StyledTextField {...params} fullWidth />
-                  )}
-                  views={['hours', 'minutes']}
-                  ampm={false}
-                />
-              </Box>
-            </LocalizationProvider>
+            <Box sx={{ mb: 3 }}>
+              <StyledTextField
+                type="date"
+                label="Select Date"
+                value={state.viewingDetails?.date || ''}
+                onChange={handleDateChange}
+                fullWidth
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                inputProps={{
+                  min: new Date().toISOString().split('T')[0],
+                }}
+              />
+            </Box>
+            
+            <Box sx={{ mb: 3 }}>
+              <StyledTextField
+                type="time"
+                label="Select Time"
+                value={state.viewingDetails?.time || ''}
+                onChange={handleTimeChange}
+                fullWidth
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                inputProps={{
+                  step: 300, // 5 minutes
+                }}
+              />
+            </Box>
 
             <StyledTextField
               select
