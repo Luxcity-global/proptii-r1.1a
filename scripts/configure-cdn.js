@@ -35,7 +35,7 @@ const configureCDN = async () => {
                 origins: [
                     {
                         name: 'static-web-app',
-                        hostName: process.env.VITE_AZURE_STORAGE_URL.replace(/^https?:\/\//, ''),
+                        hostName: 'proptii-cdn-endpoint.azureedge.net',
                         httpPort: 80,
                         httpsPort: 443,
                         priority: 1,
