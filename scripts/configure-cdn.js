@@ -1,20 +1,39 @@
 import { DefaultAzureCredential } from '@azure/identity';
 import { CdnManagementClient } from '@azure/arm-cdn';
 import chalk from 'chalk';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const configureCDN = async () => {
     try {
         console.log(chalk.blue('🔧 Configuring CDN settings...'));
 
+        // Debug: Log environment variables
+        console.log(chalk.yellow('\nEnvironment Variables:'));
+        console.log(chalk.yellow(`Subscription ID: ${process.env.AZURE_SUBSCRIPTION_ID}`));
+        console.log(chalk.yellow(`Resource Group: ${process.env.RESOURCE_GROUP_NAME}`));
+        console.log(chalk.yellow(`CDN Profile: ${process.env.CDN_PROFILE_NAME}`));
+        console.log(chalk.yellow(`CDN Endpoint: ${process.env.CDN_ENDPOINT_NAME}\n`));
+
         const credential = new DefaultAzureCredential();
-        const cdnClient = new CdnManagementClient(credential, process.env.AZURE_SUBSCRIPTION_ID);
+        const cdnClient = new CdnManagementClient(credential, process.env.AZURE_SUBSCRIPTION_ID, {
+            apiVersion: '2020-09-01'
+        });
 
         const resourceGroupName = process.env.RESOURCE_GROUP_NAME;
         const profileName = process.env.CDN_PROFILE_NAME;
         const endpointName = process.env.CDN_ENDPOINT_NAME;
 
+        // Debug: Log configuration attempt
+        console.log(chalk.blue('\nAttempting to configure CDN with:'));
+        console.log(chalk.blue(`Resource Group: ${resourceGroupName}`));
+        console.log(chalk.blue(`Profile Name: ${profileName}`));
+        console.log(chalk.blue(`Endpoint Name: ${endpointName}\n`));
+
         // Update endpoint properties
-        await cdnClient.endpoints.beginUpdate(
+        const endpoint = await cdnClient.endpoints.beginUpdateAndWait(
             resourceGroupName,
             profileName,
             endpointName,
@@ -41,131 +60,78 @@ const configureCDN = async () => {
                         priority: 1,
                         weight: 1000
                     }
-                ]
-            }
-        );
-
-        // Configure caching rules
-        const cachingRules = [
-            {
-                name: 'StaticAssets',
-                order: 1,
-                conditions: [
-                    {
-                        matchVariable: 'RequestFilename',
-                        operator: 'EndsWith',
-                        matchValue: ['.js', '.css', '.jpg', '.jpeg', '.png', '.gif', '.svg']
-                    }
                 ],
-                actions: [
-                    {
-                        name: 'CacheExpiration',
-                        parameters: {
-                            cacheBehavior: 'Override',
-                            cacheType: 'All',
-                            cacheDuration: '7.00:00:00' // 7 days
-                        }
-                    }
-                ]
-            },
-            {
-                name: 'HTMLFiles',
-                order: 2,
-                conditions: [
-                    {
-                        matchVariable: 'RequestFilename',
-                        operator: 'EndsWith',
-                        matchValue: ['.html']
-                    }
-                ],
-                actions: [
-                    {
-                        name: 'CacheExpiration',
-                        parameters: {
-                            cacheBehavior: 'Override',
-                            cacheType: 'All',
-                            cacheDuration: '00:05:00' // 5 minutes
-                        }
-                    }
-                ]
-            }
-        ];
-
-        // Apply caching rules
-        for (const rule of cachingRules) {
-            await cdnClient.endpoints.beginUpdateRule(
-                resourceGroupName,
-                profileName,
-                endpointName,
-                rule.name,
-                {
-                    order: rule.order,
-                    conditions: rule.conditions,
-                    actions: rule.actions
-                }
-            );
-        }
-
-        // Configure custom domain HTTPS
-        const customDomains = await cdnClient.customDomains.listByEndpoint(
-            resourceGroupName,
-            profileName,
-            endpointName
-        );
-
-        for (const domain of customDomains) {
-            await cdnClient.customDomains.beginEnableCustomHttps(
-                resourceGroupName,
-                profileName,
-                endpointName,
-                domain.name
-            );
-        }
-
-        // Configure security policies
-        await cdnClient.endpoints.beginUpdate(
-            resourceGroupName,
-            profileName,
-            endpointName,
-            {
                 deliveryPolicy: {
-                    description: 'Security Headers Policy',
+                    description: 'Caching Rules',
                     rules: [
                         {
-                            name: 'SecurityHeaders',
+                            name: 'StaticAssets1',
                             order: 1,
                             conditions: [
                                 {
-                                    name: 'RequestScheme',
+                                    name: 'UrlPath',
                                     parameters: {
-                                        matchValues: ['HTTP', 'HTTPS'],
-                                        operator: 'Equal'
+                                        operator: 'EndsWith',
+                                        matchValues: ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.ico'],
+                                        transforms: ['Lowercase']
                                     }
                                 }
                             ],
                             actions: [
                                 {
-                                    name: 'ModifyResponseHeader',
+                                    name: 'CacheExpiration',
                                     parameters: {
-                                        headerAction: 'Append',
-                                        headerName: 'Strict-Transport-Security',
-                                        value: 'max-age=31536000; includeSubDomains'
+                                        cacheBehavior: 'Override',
+                                        cacheType: 'All',
+                                        cacheDuration: '7.00:00:00'
                                     }
-                                },
+                                }
+                            ]
+                        },
+                        {
+                            name: 'StaticAssets2',
+                            order: 2,
+                            conditions: [
                                 {
-                                    name: 'ModifyResponseHeader',
+                                    name: 'UrlPath',
                                     parameters: {
-                                        headerAction: 'Append',
-                                        headerName: 'X-Content-Type-Options',
-                                        value: 'nosniff'
+                                        operator: 'EndsWith',
+                                        matchValues: ['.css', '.js', '.woff', '.woff2', '.ttf', '.eot'],
+                                        transforms: ['Lowercase']
                                     }
-                                },
+                                }
+                            ],
+                            actions: [
                                 {
-                                    name: 'ModifyResponseHeader',
+                                    name: 'CacheExpiration',
                                     parameters: {
-                                        headerAction: 'Append',
-                                        headerName: 'X-Frame-Options',
-                                        value: 'DENY'
+                                        cacheBehavior: 'Override',
+                                        cacheType: 'All',
+                                        cacheDuration: '7.00:00:00'
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            name: 'HTMLFiles',
+                            order: 3,
+                            conditions: [
+                                {
+                                    name: 'UrlPath',
+                                    parameters: {
+                                        operator: 'EndsWith',
+                                        matchValues: ['.html'],
+                                        transforms: ['Lowercase']
+                                    }
+                                }
+                            ],
+                            actions: [
+                                {
+                                    name: 'CacheExpiration',
+                                    parameters: {
+                                        cacheBehavior: 'Override',
+                                        cacheType: 'All',
+                                        cacheDuration: '00:05:00'
                                     }
                                 }
                             ]
@@ -175,17 +141,17 @@ const configureCDN = async () => {
             }
         );
 
-        console.log(chalk.green('✅ CDN configuration completed successfully!'));
-        console.log(chalk.blue('📝 Applied configurations:'));
-        console.log(chalk.blue('   - Compression enabled for static assets'));
-        console.log(chalk.blue('   - Caching rules configured'));
-        console.log(chalk.blue('   - HTTPS enforced'));
-        console.log(chalk.blue('   - Security headers implemented'));
+        console.log(chalk.green('✅ CDN endpoint and caching rules configured successfully!'));
 
     } catch (error) {
         console.error(chalk.red('❌ CDN configuration failed:'), error.message);
+        if (error.response) {
+            console.error(chalk.red('Response data:'), error.response.data);
+            console.error(chalk.red('Response status:'), error.response.status);
+        }
         process.exit(1);
     }
 };
 
+// Run the configuration
 configureCDN(); 

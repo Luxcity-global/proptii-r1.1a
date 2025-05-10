@@ -11,9 +11,7 @@ const requiredEnvVars = [
     'AZURE_SUBSCRIPTION_ID',
     'RESOURCE_GROUP_NAME',
     'CDN_PROFILE_NAME',
-    'CDN_ENDPOINT_NAME',
-    'VITE_AZURE_STORAGE_URL',
-    'VITE_AZURE_CDN_ENDPOINT'
+    'CDN_ENDPOINT_NAME'
 ];
 
 const validateEnvironment = () => {
@@ -55,6 +53,13 @@ const verifyCDNSetup = async () => {
         const originStatus = endpoint.origins?.[0]?.enabled ? 'Connected' : 'Disconnected';
         console.log(chalk.green('✅ Origin status:'), originStatus);
 
+        // Get the CDN endpoint hostname
+        const cdnHostname = endpoint.hostName;
+        if (!cdnHostname) {
+            throw new Error('CDN endpoint hostname not found');
+        }
+        console.log(chalk.green('✅ CDN Hostname:'), cdnHostname);
+
         // Test content delivery
         const testUrls = [
             '/index.html',
@@ -66,7 +71,7 @@ const verifyCDNSetup = async () => {
         console.log(chalk.blue('\n📦 Testing content delivery...'));
         for (const url of testUrls) {
             try {
-                const response = await axios.get(`${process.env.VITE_AZURE_CDN_ENDPOINT}${url}`, {
+                const response = await axios.get(`https://${cdnHostname}${url}`, {
                     validateStatus: status => status < 500,
                     timeout: 5000 // 5 second timeout
                 });
@@ -83,53 +88,61 @@ const verifyCDNSetup = async () => {
         // 4.2 SSL Validation
         console.log(chalk.blue('\n🔒 Verifying SSL configuration...'));
 
-        // Check custom domains and SSL status
-        const customDomains = await cdnClient.customDomains.listByEndpoint(
-            resourceGroupName,
-            profileName,
-            endpointName
-        );
+        // Check custom domains
+        const customDomainName = 'proptii.co';
+        console.log(chalk.blue(`\nChecking custom domain: ${customDomainName}`));
 
-        if (customDomains.length === 0) {
-            console.log(chalk.yellow('⚠️ No custom domains configured'));
-        } else {
-            for (const domain of customDomains) {
+        try {
+            // Check if custom domain exists
+            const customDomain = await cdnClient.customDomains.get(
+                resourceGroupName,
+                profileName,
+                endpointName,
+                customDomainName
+            );
+
+            if (customDomain) {
+                console.log(chalk.green(`✅ Custom domain ${customDomainName} is configured`));
+
+                // Get SSL status
+                const sslStatus = await cdnClient.customDomains.getSslStatus(
+                    resourceGroupName,
+                    profileName,
+                    endpointName,
+                    customDomainName
+                );
+                console.log(chalk.green(`✅ SSL status for ${customDomainName}:`), sslStatus.certificateStatus || 'Unknown');
+
+                // Test HTTPS redirection
                 try {
-                    const sslStatus = await cdnClient.customDomains.getSslStatus(
-                        resourceGroupName,
-                        profileName,
-                        endpointName,
-                        domain.name
-                    );
-                    console.log(chalk.green(`✅ SSL status for ${domain.name}:`), sslStatus.certificateStatus || 'Unknown');
-
-                    // Test HTTPS redirection
-                    try {
-                        const httpResponse = await axios.get(`http://${domain.name}`, {
-                            maxRedirects: 0,
-                            validateStatus: status => status < 500,
-                            timeout: 5000
-                        });
-                        console.log(chalk.green(`✅ HTTPS redirection for ${domain.name}:`),
-                            httpResponse.status === 301 || httpResponse.status === 302 ? 'Working' : 'Not redirecting');
-                    } catch (error) {
-                        if (error.response?.status === 301 || error.response?.status === 302) {
-                            console.log(chalk.green(`✅ HTTPS redirection for ${domain.name}: Working`));
-                        } else if (error.code === 'ECONNABORTED') {
-                            console.log(chalk.red(`❌ HTTPS redirection for ${domain.name}: Request timeout`));
-                        } else {
-                            console.log(chalk.red(`❌ HTTPS redirection for ${domain.name}:`), error.message);
-                        }
-                    }
+                    const httpResponse = await axios.get(`http://${customDomainName}`, {
+                        maxRedirects: 0,
+                        validateStatus: status => status < 500,
+                        timeout: 5000
+                    });
+                    console.log(chalk.green(`✅ HTTPS redirection for ${customDomainName}:`),
+                        httpResponse.status === 301 || httpResponse.status === 302 ? 'Working' : 'Not redirecting');
                 } catch (error) {
-                    console.log(chalk.red(`❌ Failed to get SSL status for ${domain.name}:`), error.message);
+                    if (error.response?.status === 301 || error.response?.status === 302) {
+                        console.log(chalk.green(`✅ HTTPS redirection for ${customDomainName}: Working`));
+                    } else if (error.code === 'ECONNABORTED') {
+                        console.log(chalk.red(`❌ HTTPS redirection for ${customDomainName}: Request timeout`));
+                    } else {
+                        console.log(chalk.red(`❌ HTTPS redirection for ${customDomainName}:`), error.message);
+                    }
                 }
+            }
+        } catch (error) {
+            if (error.statusCode === 404) {
+                console.log(chalk.yellow(`⚠️ Custom domain ${customDomainName} is not configured`));
+            } else {
+                console.log(chalk.red(`❌ Failed to check custom domain ${customDomainName}:`), error.message);
             }
         }
 
         // Verify security headers
         try {
-            const securityHeaders = await axios.get(`${process.env.VITE_AZURE_CDN_ENDPOINT}/index.html`, {
+            const securityHeaders = await axios.get(`https://${cdnHostname}/index.html`, {
                 timeout: 5000
             });
             const headers = securityHeaders.headers;
@@ -177,7 +190,7 @@ const verifyCDNSetup = async () => {
             const responseTimes = [];
             for (let i = 0; i < 5; i++) {
                 const start = Date.now();
-                await axios.get(`${process.env.VITE_AZURE_CDN_ENDPOINT}/index.html`, {
+                await axios.get(`https://${cdnHostname}/index.html`, {
                     timeout: 5000
                 });
                 responseTimes.push(Date.now() - start);
@@ -197,7 +210,7 @@ const verifyCDNSetup = async () => {
             for (const location of edgeLocations) {
                 try {
                     const start = Date.now();
-                    await axios.get(`${process.env.VITE_AZURE_CDN_ENDPOINT}/index.html`, {
+                    await axios.get(`https://${cdnHostname}/index.html`, {
                         headers: { 'X-Forwarded-For': location },
                         timeout: 5000
                     });

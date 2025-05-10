@@ -1,92 +1,100 @@
 import { DefaultAzureCredential } from '@azure/identity';
 import { CdnManagementClient } from '@azure/arm-cdn';
 import chalk from 'chalk';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const configureCDNSecurity = async () => {
     try {
         console.log(chalk.blue('🔧 Configuring CDN security settings...'));
 
+        // Debug: Log environment variables
+        console.log(chalk.yellow('\nEnvironment Variables:'));
+        console.log(chalk.yellow(`Subscription ID: ${process.env.AZURE_SUBSCRIPTION_ID}`));
+        console.log(chalk.yellow(`Resource Group: ${process.env.RESOURCE_GROUP_NAME}`));
+        console.log(chalk.yellow(`CDN Profile: ${process.env.CDN_PROFILE_NAME}`));
+        console.log(chalk.yellow(`CDN Endpoint: ${process.env.CDN_ENDPOINT_NAME}\n`));
+
         const credential = new DefaultAzureCredential();
-        const subscriptionId = '93714023-0875-491f-bd2f-dbc0ce275c4c';
-        const cdnClient = new CdnManagementClient(credential, subscriptionId);
+        const cdnClient = new CdnManagementClient(credential, process.env.AZURE_SUBSCRIPTION_ID, {
+            apiVersion: '2020-09-01'
+        });
 
-        const resourceGroupName = 'proptii-rg-eastus2';
-        const profileName = 'proptii-cdn-profile';
-        const endpointName = 'proptii-cdn-endpoint';
+        const resourceGroupName = process.env.RESOURCE_GROUP_NAME;
+        const profileName = process.env.CDN_PROFILE_NAME;
+        const endpointName = process.env.CDN_ENDPOINT_NAME;
 
-        // Update endpoint properties with security settings and caching rules
-        await cdnClient.endpoints.beginUpdate(
+        // Debug: Log configuration attempt
+        console.log(chalk.blue('\nAttempting to configure CDN security with:'));
+        console.log(chalk.blue(`Resource Group: ${resourceGroupName}`));
+        console.log(chalk.blue(`Profile Name: ${profileName}`));
+        console.log(chalk.blue(`Endpoint Name: ${endpointName}\n`));
+
+        // Update endpoint properties with security settings
+        await cdnClient.endpoints.beginUpdateAndWait(
             resourceGroupName,
             profileName,
             endpointName,
             {
                 isHttpAllowed: false,
                 isHttpsAllowed: true,
-                optimizationType: 'GeneralWebDelivery',
-                queryStringCachingBehavior: 'IgnoreQueryString',
-                contentTypesToCompress: [
-                    'application/javascript',
-                    'text/javascript',
-                    'text/css',
-                    'text/html',
-                    'application/json',
-                    'image/svg+xml'
-                ],
-                isCompressionEnabled: true,
-                origins: [
-                    {
-                        name: 'static-web-app',
-                        hostName: 'black-wave-0bb98540f.6.azurestaticapps.net',
-                        httpPort: 80,
-                        httpsPort: 443,
-                        priority: 1,
-                        weight: 1000
-                    }
-                ],
                 deliveryPolicy: {
+                    description: 'Security Headers Policy',
                     rules: [
                         {
-                            name: 'StaticAssets',
+                            name: 'SecurityHeaders',
                             order: 1,
                             conditions: [
                                 {
-                                    name: 'UrlFileExtension',
+                                    name: 'RequestScheme',
                                     parameters: {
+                                        matchValues: ['HTTP', 'HTTPS'],
                                         operator: 'Equal',
-                                        matchValues: ['.js', '.css', '.jpg', '.jpeg', '.png', '.gif', '.svg']
+                                        transforms: []
                                     }
                                 }
                             ],
                             actions: [
                                 {
-                                    name: 'CacheExpiration',
+                                    name: 'ModifyResponseHeader',
                                     parameters: {
-                                        cacheBehavior: 'Override',
-                                        cacheType: 'All',
-                                        cacheDuration: '7.00:00:00'
+                                        headerAction: 'Append',
+                                        headerName: 'Strict-Transport-Security',
+                                        value: 'max-age=31536000; includeSubDomains'
                                     }
-                                }
-                            ]
-                        },
-                        {
-                            name: 'HTMLFiles',
-                            order: 2,
-                            conditions: [
+                                },
                                 {
-                                    name: 'UrlFileExtension',
+                                    name: 'ModifyResponseHeader',
                                     parameters: {
-                                        operator: 'Equal',
-                                        matchValues: ['.html']
+                                        headerAction: 'Append',
+                                        headerName: 'X-Content-Type-Options',
+                                        value: 'nosniff'
                                     }
-                                }
-                            ],
-                            actions: [
+                                },
                                 {
-                                    name: 'CacheExpiration',
+                                    name: 'ModifyResponseHeader',
                                     parameters: {
-                                        cacheBehavior: 'Override',
-                                        cacheType: 'All',
-                                        cacheDuration: '00:05:00'
+                                        headerAction: 'Append',
+                                        headerName: 'X-Frame-Options',
+                                        value: 'DENY'
+                                    }
+                                },
+                                {
+                                    name: 'ModifyResponseHeader',
+                                    parameters: {
+                                        headerAction: 'Append',
+                                        headerName: 'Content-Security-Policy',
+                                        value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.azure.com https://*.microsoftonline.com"
+                                    }
+                                },
+                                {
+                                    name: 'ModifyResponseHeader',
+                                    parameters: {
+                                        headerAction: 'Append',
+                                        headerName: 'Referrer-Policy',
+                                        value: 'strict-origin-when-cross-origin'
                                     }
                                 }
                             ]
@@ -97,15 +105,23 @@ const configureCDNSecurity = async () => {
         );
 
         console.log(chalk.green('✅ CDN security configuration completed successfully!'));
-        console.log(chalk.blue('📝 Applied configurations:'));
+        console.log(chalk.blue('📝 Applied security configurations:'));
         console.log(chalk.blue('   - HTTPS enforced'));
-        console.log(chalk.blue('   - Compression enabled'));
-        console.log(chalk.blue('   - Caching rules configured'));
+        console.log(chalk.blue('   - HSTS enabled'));
+        console.log(chalk.blue('   - X-Content-Type-Options: nosniff'));
+        console.log(chalk.blue('   - X-Frame-Options: DENY'));
+        console.log(chalk.blue('   - Content-Security-Policy configured'));
+        console.log(chalk.blue('   - Referrer-Policy: strict-origin-when-cross-origin'));
 
     } catch (error) {
         console.error(chalk.red('❌ CDN security configuration failed:'), error.message);
+        if (error.response) {
+            console.error(chalk.red('Response data:'), error.response.data);
+            console.error(chalk.red('Response status:'), error.response.status);
+        }
         process.exit(1);
     }
 };
 
+// Run the configuration
 configureCDNSecurity(); 
