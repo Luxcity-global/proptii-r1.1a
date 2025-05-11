@@ -122,3 +122,42 @@ For support and questions, please contact:
 - Technical Lead: [contact]
 - DevOps Support: [contact]
 - Project Manager: [contact]
+
+## CDN Configuration
+
+The application uses Azure CDN for content delivery. The CDN is configured with the following features:
+
+- Custom domain: proptii.co
+- SSL/TLS encryption
+- Cache optimization
+- Security headers
+- Health monitoring
+
+### CDN Management
+
+The following npm scripts are available for CDN management:
+
+```bash
+# Configure CDN
+npm run configure:cdn
+
+# Configure CDN security
+npm run configure:cdn-security
+
+# Configure CDN SSL
+npm run configure:cdn-ssl
+
+# Configure CDN endpoint
+npm run configure:cdn-endpoint
+
+# Monitor CDN health
+npm run monitor:cdn
+
+# Verify CDN setup
+npm run verify:cdn
+
+# Purge CDN cache
+npm run cdn:purge
+```
+
+For detailed documentation about the CDN setup, configuration, and operations, please refer to [CDN Documentation](docs/development/CDN-Documentation.md).

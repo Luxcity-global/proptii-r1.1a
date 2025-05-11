@@ -1,104 +1,70 @@
 import { DefaultAzureCredential } from '@azure/identity';
 import { CdnManagementClient } from '@azure/arm-cdn';
+import dotenv from 'dotenv';
 import chalk from 'chalk';
 
-const configureCDNSSL = async () => {
+// Load environment variables
+dotenv.config();
+
+const CUSTOM_DOMAIN = 'proptii.co';
+
+async function configureCDNSSL() {
+    console.log(chalk.blue('🔧 Configuring CDN SSL settings...'));
+
     try {
-        console.log(chalk.blue('🔧 Configuring CDN SSL settings...'));
-
         const credential = new DefaultAzureCredential();
-        const subscriptionId = '93714023-0875-491f-bd2f-dbc0ce275c4c';
-        const cdnClient = new CdnManagementClient(credential, subscriptionId);
+        const cdnClient = new CdnManagementClient(credential, process.env.AZURE_SUBSCRIPTION_ID);
 
-        const resourceGroupName = 'proptii-rg-eastus2';
-        const profileName = 'proptii-cdn-profile';
-        const endpointName = 'proptii-cdn-endpoint';
+        console.log(chalk.yellow('\nEnvironment Variables:'));
+        console.log(`Subscription ID: ${process.env.AZURE_SUBSCRIPTION_ID}`);
+        console.log(`Resource Group: ${process.env.RESOURCE_GROUP_NAME}`);
+        console.log(`CDN Profile: ${process.env.CDN_PROFILE_NAME}`);
+        console.log(`CDN Endpoint: ${process.env.CDN_ENDPOINT_NAME}\n`);
 
-        // Update endpoint with SSL settings
-        await cdnClient.endpoints.beginUpdate(
-            resourceGroupName,
-            profileName,
-            endpointName,
+        // Get the CDN endpoint details
+        const endpoint = await cdnClient.endpoints.get(
+            process.env.RESOURCE_GROUP_NAME,
+            process.env.CDN_PROFILE_NAME,
+            process.env.CDN_ENDPOINT_NAME
+        );
+
+        console.log(chalk.yellow('CDN Endpoint Details:'));
+        console.log(`Hostname: ${endpoint.hostName}`);
+        console.log(`Origin: ${endpoint.originHostHeader}`);
+        console.log(`HTTPS Enabled: ${endpoint.isHttpsAllowed}\n`);
+
+        console.log(chalk.yellow('Next Steps for Domain Configuration:'));
+        console.log('1. Add the following CNAME record to your DNS settings:');
+        console.log(`   Name: ${CUSTOM_DOMAIN}`);
+        console.log(`   Value: ${endpoint.hostName}`);
+        console.log('\n2. Wait for DNS propagation (can take up to 48 hours)');
+        console.log('3. Verify domain ownership in Azure Portal');
+        console.log('4. Run the verification script after DNS propagation');
+
+        // Update endpoint to enforce HTTPS
+        console.log(chalk.yellow('\nUpdating endpoint to enforce HTTPS...'));
+        await cdnClient.endpoints.beginUpdateAndWait(
+            process.env.RESOURCE_GROUP_NAME,
+            process.env.CDN_PROFILE_NAME,
+            process.env.CDN_ENDPOINT_NAME,
             {
                 isHttpAllowed: false,
                 isHttpsAllowed: true,
-                optimizationType: 'GeneralWebDelivery',
-                queryStringCachingBehavior: 'IgnoreQueryString',
-                contentTypesToCompress: [
-                    'application/javascript',
-                    'text/javascript',
-                    'text/css',
-                    'text/html',
-                    'application/json',
-                    'image/svg+xml'
-                ],
-                isCompressionEnabled: true,
-                origins: [
-                    {
-                        name: 'static-web-app',
-                        hostName: 'black-wave-0bb98540f.6.azurestaticapps.net',
-                        httpPort: 80,
-                        httpsPort: 443,
-                        priority: 1,
-                        weight: 1000
-                    }
-                ],
-                deliveryPolicy: {
-                    rules: [
-                        {
-                            name: 'SecurityHeaders',
-                            order: 1,
-                            conditions: [
-                                {
-                                    name: 'RequestScheme',
-                                    parameters: {
-                                        matchValues: ['HTTP', 'HTTPS'],
-                                        operator: 'Equal'
-                                    }
-                                }
-                            ],
-                            actions: [
-                                {
-                                    name: 'ModifyResponseHeader',
-                                    parameters: {
-                                        headerAction: 'Append',
-                                        headerName: 'Strict-Transport-Security',
-                                        value: 'max-age=31536000; includeSubDomains'
-                                    }
-                                },
-                                {
-                                    name: 'ModifyResponseHeader',
-                                    parameters: {
-                                        headerAction: 'Append',
-                                        headerName: 'X-Content-Type-Options',
-                                        value: 'nosniff'
-                                    }
-                                },
-                                {
-                                    name: 'ModifyResponseHeader',
-                                    parameters: {
-                                        headerAction: 'Append',
-                                        headerName: 'X-Frame-Options',
-                                        value: 'DENY'
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                }
+                optimizationType: 'GeneralWebDelivery'
             }
         );
+        console.log(chalk.green('✓ HTTPS enforcement configured successfully'));
 
-        console.log(chalk.green('✅ CDN SSL configuration completed successfully!'));
-        console.log(chalk.blue('📝 Applied configurations:'));
-        console.log(chalk.blue('   - HTTPS enforced'));
-        console.log(chalk.blue('   - Security headers configured'));
-        console.log(chalk.blue('   - HSTS enabled'));
+        console.log(chalk.green('\n✅ CDN SSL configuration completed successfully!'));
+        console.log(chalk.yellow('\nAfter DNS propagation, run:'));
+        console.log('npm run configure:cdn-ssl-verify');
 
     } catch (error) {
-        console.error(chalk.red('❌ CDN SSL configuration failed:'), error.message);
+        console.error(chalk.red('\n❌ CDN SSL configuration failed:'));
+        console.error(error.message);
         process.exit(1);
     }
-};
+}
 
+// Run the configuration
 configureCDNSSL(); 
