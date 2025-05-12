@@ -1,0 +1,128 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "users_1_lastName": {
+            "type": "SecureString"
+        },
+        "vulnerabilityAssessments_Default_storageContainerPath": {
+            "type": "SecureString"
+        },
+        "sites_Referencing_Backend_name": {
+            "defaultValue": "Referencing-Backend",
+            "type": "String"
+        },
+        "networkSecurityGroups_proptii_prod_nsg_01_name": {
+            "defaultValue": "proptii-prod-nsg-01",
+            "type": "String"
+        },
+        "virtualNetworks_proptii_prod_vnet_01_name": {
+            "defaultValue": "proptii-prod-vnet-01",
+            "type": "String"
+        },
+        "vaults_proptii_prod_kv_01_name": {
+            "defaultValue": "proptii-prod-kv-01",
+            "type": "String"
+        },
+        "storageAccounts_proptiiprodst01_name": {
+            "defaultValue": "proptiiprodst01east2",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2024-05-01",
+            "name": "[parameters('networkSecurityGroups_proptii_prod_nsg_01_name')]",
+            "location": "eastus2",
+            "tags": {
+                "Environment": "Production",
+                "Project": "Proptii",
+                "ManagedBy": "DevTeam",
+                "Component": "infrastructure"
+            },
+            "properties": {
+                "securityRules": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2024-05-01",
+            "name": "[parameters('virtualNetworks_proptii_prod_vnet_01_name')]",
+            "location": "eastus2",
+            "tags": {
+                "Environment": "Production",
+                "Project": "Proptii",
+                "ManagedBy": "DevTeam",
+                "Component": "infrastructure"
+            },
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.0.0.0/16"
+                    ]
+                },
+                "privateEndpointVNetPolicies": "Disabled",
+                "subnets": [],
+                "virtualNetworkPeerings": [],
+                "enableDdosProtection": false
+            }
+        },
+        {
+            "type": "Microsoft.KeyVault/vaults",
+            "apiVersion": "2024-12-01-preview",
+            "name": "[parameters('vaults_proptii_prod_kv_01_name')]",
+            "location": "eastus2",
+            "tags": {
+                "Environment": "Production",
+                "Project": "Proptii",
+                "ManagedBy": "DevTeam",
+                "Component": "infrastructure"
+            },
+            "properties": {
+                "sku": {
+                    "family": "A",
+                    "name": "standard"
+                },
+                "tenantId": "7787b033-fe7a-40f3-96b1-7df676ac0531",
+                "accessPolicies": [],
+                "enabledForDeployment": false,
+                "enableSoftDelete": true,
+                "softDeleteRetentionInDays": 90,
+                "enableRbacAuthorization": true,
+                "vaultUri": "[concat('https://', parameters('vaults_proptii_prod_kv_01_name'), '.vault.azure.net/')]",
+                "provisioningState": "Succeeded",
+                "publicNetworkAccess": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2024-01-01",
+            "name": "[parameters('storageAccounts_proptiiprodst01_name')]",
+            "location": "eastus2",
+            "tags": {
+                "Environment": "Production",
+                "Project": "Proptii",
+                "ManagedBy": "DevTeam",
+                "Component": "backend"
+            },
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "kind": "StorageV2",
+            "properties": {
+                "allowCrossTenantReplication": false,
+                "minimumTlsVersion": "TLS1_0",
+                "allowBlobPublicAccess": false,
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "virtualNetworkRules": [],
+                    "ipRules": [],
+                    "defaultAction": "Allow"
+                }
+            }
+        }
+    ]
+} 

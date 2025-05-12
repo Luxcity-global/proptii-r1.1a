@@ -1,0 +1,67 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "users_1_lastName": {
+            "type": "SecureString"
+        },
+        "vulnerabilityAssessments_Default_storageContainerPath": {
+            "type": "SecureString"
+        },
+        "accounts_proptii_vision_name": {
+            "defaultValue": "proptii-vision-east2",
+            "type": "String"
+        },
+        "components_proptii_referencing_api_name": {
+            "defaultValue": "proptii-referencing-api",
+            "type": "String"
+        },
+        "workspaces_DefaultWorkspace_93714023_0875_491f_bd2f_dbc0ce275c4c_SUK_externalid": {
+            "defaultValue": "/subscriptions/93714023-0875-491f-bd2f-dbc0ce275c4c/resourceGroups/DefaultResourceGroup-SUK/providers/Microsoft.OperationalInsights/workspaces/DefaultWorkspace-93714023-0875-491f-bd2f-dbc0ce275c4c-SUK",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.CognitiveServices/accounts",
+            "apiVersion": "2024-10-01",
+            "name": "[parameters('accounts_proptii_vision_name')]",
+            "location": "eastus2",
+            "sku": {
+                "name": "F0"
+            },
+            "kind": "ComputerVision",
+            "identity": {
+                "type": "None"
+            },
+            "properties": {
+                "customSubDomainName": "[parameters('accounts_proptii_vision_name')]",
+                "networkAcls": {
+                    "defaultAction": "Allow",
+                    "virtualNetworkRules": [],
+                    "ipRules": []
+                },
+                "publicNetworkAccess": "Enabled"
+            }
+        },
+        {
+            "type": "microsoft.insights/components",
+            "apiVersion": "2020-02-02",
+            "name": "[parameters('components_proptii_referencing_api_name')]",
+            "location": "eastus2",
+            "kind": "web",
+            "properties": {
+                "Application_Type": "web",
+                "Flow_Type": "Redfield",
+                "Request_Source": "IbizaWebAppExtensionCreate",
+                "RetentionInDays": 90,
+                "WorkspaceResourceId": "[parameters('workspaces_DefaultWorkspace_93714023_0875_491f_bd2f_dbc0ce275c4c_SUK_externalid')]",
+                "IngestionMode": "LogAnalytics",
+                "publicNetworkAccessForIngestion": "Enabled",
+                "publicNetworkAccessForQuery": "Enabled",
+                "DisableLocalAuth": false
+            }
+        }
+    ]
+} 
