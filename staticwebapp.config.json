@@ -1,0 +1,196 @@
+{
+    "routes": [
+        {
+            "route": "/api/public/*",
+            "serve": "/api/index.js",
+            "methods": [
+                "GET"
+            ],
+            "allowedRoles": [
+                "anonymous",
+                "authenticated"
+            ]
+        },
+        {
+            "route": "/api/auth/*",
+            "serve": "/api/index.js",
+            "methods": [
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE"
+            ],
+            "allowedRoles": [
+                "authenticated"
+            ],
+            "headers": {
+                "Cache-Control": "no-store"
+            }
+        },
+        {
+            "route": "/api/admin/*",
+            "serve": "/api/index.js",
+            "methods": [
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE"
+            ],
+            "allowedRoles": [
+                "administrator"
+            ],
+            "headers": {
+                "Cache-Control": "no-store"
+            }
+        },
+        {
+            "route": "/admin/*",
+            "serve": "/index.html",
+            "allowedRoles": [
+                "administrator"
+            ]
+        },
+        {
+            "route": "/profile/*",
+            "serve": "/index.html",
+            "allowedRoles": [
+                "authenticated"
+            ]
+        },
+        {
+            "route": "/*",
+            "serve": "/index.html",
+            "statusCode": 200
+        }
+    ],
+    "auth": {
+        "identityProviders": {
+            "azureActiveDirectory": {
+                "registration": {
+                    "openIdIssuer": "https://login.microsoftonline.com/7787b033-fe7a-40f3-96b1-7df676ac0531/v2.0",
+                    "clientId": "e221eddb-ad9f-47d3-9b64-c4b2ed273aaf",
+                    "clientSecretSettingName": "33be5233-4614-411b-9eaf-58174bb6f941"
+                }
+            }
+        },
+        "roles": [
+            "anonymous",
+            "authenticated",
+            "administrator"
+        ]
+    },
+    "navigationFallback": {
+        "rewrite": "/index.html",
+        "exclude": [
+            "/images/*",
+            "/css/*",
+            "/js/*",
+            "/api/*",
+            "/.auth/*",
+            "/assets/*"
+        ]
+    },
+    "mimeTypes": {
+        ".json": "text/json",
+        ".js": "text/javascript",
+        ".css": "text/css",
+        ".html": "text/html",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".svg": "image/svg+xml",
+        ".woff": "font/woff",
+        ".woff2": "font/woff2"
+    },
+    "globalHeaders": {
+        "Content-Security-Policy": "default-src 'self' https: 'unsafe-eval' 'unsafe-inline' blob: data:; object-src 'none'",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "X-XSS-Protection": "1; mode=block",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
+    },
+    "responseOverrides": {
+        "401": {
+            "redirect": "/.auth/login/aad",
+            "statusCode": 302
+        },
+        "403": {
+            "rewrite": "/unauthorized",
+            "statusCode": 403
+        },
+        "404": {
+            "rewrite": "/index.html",
+            "statusCode": 200
+        },
+        "429": {
+            "rewrite": "/rate-limit-exceeded.html",
+            "statusCode": 429
+        }
+    },
+    "platformErrorOverrides": [
+        {
+            "code": "NotFound",
+            "serve": "/404.html"
+        },
+        {
+            "code": "Unauthorized",
+            "serve": "/.auth/login/aad"
+        },
+        {
+            "code": "TooManyRequests",
+            "serve": "/rate-limit-exceeded.html"
+        }
+    ],
+    "networking": {
+        "allowedIpRanges": [
+            "any"
+        ]
+    },
+    "cors": {
+        "allowedOrigins": [
+            "https://black-wave-0bb98540f.azurestaticapps.net",
+            "https://*.proptii.com",
+            "http://localhost:5173",
+            "http://localhost:3000"
+        ],
+        "allowedMethods": [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "OPTIONS",
+            "HEAD"
+        ],
+        "allowedHeaders": [
+            "Accept",
+            "Authorization",
+            "Content-Type",
+            "Origin",
+            "X-Requested-With",
+            "X-API-Key"
+        ],
+        "exposedHeaders": [
+            "X-RateLimit-Limit",
+            "X-RateLimit-Remaining",
+            "X-RateLimit-Reset"
+        ],
+        "maxAge": 3600,
+        "credentials": true
+    },
+    "rateLimiting": {
+        "enabled": true,
+        "rules": [
+            {
+                "path": "/api/*",
+                "limit": 100,
+                "window": "1m"
+            },
+            {
+                "path": "/api/auth/*",
+                "limit": 20,
+                "window": "1m"
+            }
+        ]
+    }
+}
