@@ -72,10 +72,26 @@ function Footer() {
           <div>
             <h4 className="text-lg font-semibold mb-3">Company</h4>
             <ul className="space-y-2 text-sm opacity-75">
-              <li><a href="#">About Us</a></li>
-              <li><a href="#">FAQ</a></li>
-              <li><a href="#">Privacy Policy</a></li>
-              <li><a href="#">Terms of Service</a></li>
+              <li>
+                <Link to="/about-us" className="hover:underline">
+                  About Us
+                </Link>
+              </li>
+              <li>
+                <Link to="/faq" className="hover:underline">
+                  FAQ
+                </Link>
+              </li>
+              <li>
+                <Link to="/privacy-policy" className="hover:underline">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link to="/terms-of-service" className="hover:underline">
+                  Terms of Service
+                </Link>
+              </li>
             </ul>
           </div>
         </div>

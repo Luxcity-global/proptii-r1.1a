@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserCircle, ChevronDown, Settings, LogOut } from 'lucide-react';
 
@@ -43,7 +43,7 @@ const Navbar = () => {
     };
 
     window.addEventListener('auth-state-changed', handleAuthStateChange);
-    
+
     return () => {
       window.removeEventListener('auth-state-changed', handleAuthStateChange);
     };
@@ -53,25 +53,25 @@ const Navbar = () => {
     try {
       setLoginError(null);
       setLoginInProgress(true);
-      
+
       // Inform the user that they might be redirected
       console.log("Starting login process. You may be redirected to the login page.");
-      
+
       await login();
-      
+
       // If we get here, the popup login was successful
       console.log("Login successful via popup");
     } catch (error) {
       console.error("Login error in Navbar:", error);
       setLoginInProgress(false);
-      
+
       // Check if the error is related to popup blocking
       if (error instanceof Error && error.message.includes('popup')) {
         setLoginError("Popup was blocked. Please allow popups for this site or you will be redirected.");
       } else {
         setLoginError("Login failed. Please try again.");
       }
-      
+
       // Auto-clear error after 5 seconds
       setTimeout(() => setLoginError(null), 5000);
     }
@@ -100,29 +100,54 @@ const Navbar = () => {
               />
             </Link>
           </div>
-          
+
           <div className="flex-1 flex justify-center space-x-8">
-            <Link to="/" className="text-white hover:text-gray-200 transition-colors">
+            {/*<NavLink
+              to="/"
+              className={({ isActive }) =>
+                `text-white hover:text-[#E76F51] transition-colors ${isActive ? 'text-[#E76F51]' : ''}`
+              }
+            >
               Home
-            </Link>
-            <Link to="/referencing" className="text-white hover:text-gray-200 transition-colors">
+            </NavLink>*/}
+            <NavLink
+              to="/bookviewing"
+              className={({ isActive }) =>
+                `text-white hover:text-[#E76F51] transition-colors ${isActive ? 'text-[#E76F51]' : ''}`
+              }
+            >
+              Book Viewing
+            </NavLink>
+            <NavLink
+              to="/referencing"
+              className={({ isActive }) =>
+                `text-white hover:text-[#E76F51] transition-colors ${isActive ? 'text-[#E76F51]' : ''}`
+              }
+            >
               Referencing
-            </Link>
-            <Link to="/bookviewing" className="text-white hover:text-gray-200 transition-colors">
-            Book Viewing
-            </Link>
-            <Link to="/contracts" className="text-white hover:text-gray-200 transition-colors">
+            </NavLink>
+            <NavLink
+              to="/contracts"
+              className={({ isActive }) =>
+                `text-white hover:text-[#E76F51] transition-colors ${isActive ? 'text-[#E76F51]' : ''}`
+              }
+            >
               Contracts
-            </Link>
-            <Link to="/Dashboard" className="text-white hover:text-gray-200 transition-colors">
-              Dashbaord
-            </Link>
+            </NavLink>
+            <NavLink
+              to="/Dashboard"
+              className={({ isActive }) =>
+                `text-white hover:text-[#E76F51] transition-colors ${isActive ? 'text-[#E76F51]' : ''}`
+              }
+            >
+              Dashboard
+            </NavLink>
           </div>
 
           <div className="flex-shrink-0 relative">
             {isAuthenticated ? (
               <div className="relative user-dropdown">
-                <button 
+                <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   className="flex items-center space-x-2 text-white focus:outline-none"
                 >
@@ -162,7 +187,7 @@ const Navbar = () => {
                     )}
                   </div>
                 )}
-                <button 
+                <button
                   onClick={handleLogin}
                   className="bg-primary text-white px-6 py-2 rounded-full hover:bg-opacity-90 transition-all flex items-center"
                   disabled={isLoading || loginInProgress}

@@ -23,6 +23,10 @@ import NewListingPage from './pages/listings/new';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { UnauthorizedPage } from './pages/Unauthorized';
+import AboutUs from './pages/AboutUs';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import FAQ from './pages/FAQ';
 
 export const App: React.FC = () => {
   return (
@@ -36,6 +40,10 @@ export const App: React.FC = () => {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
+            <Route path="/about-us" element={<AboutUs />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/faq" element={<FAQ />} />
 
             {/* Protected Routes */}
             <Route path="/agent" element={<AgentHome />} />
