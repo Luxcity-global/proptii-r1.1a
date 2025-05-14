@@ -12,7 +12,7 @@ interface PropertyDetails {
   street: string;
   town: string;
   city: string;
-  postcode: string;
+  postcode?: string;
   agent: Agent;
 }
 

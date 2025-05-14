@@ -20,6 +20,7 @@ interface IdentityData {
   email: string;
   phoneNumber: string;
   dateOfBirth: string;
+  dateOfBirthError?: string;
   isBritish: boolean;
   nationality: string;
   identityProof: File | null;
@@ -97,6 +98,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       email: user?.email || '',
       phoneNumber: '',
       dateOfBirth: '',
+      dateOfBirthError: undefined,
       isBritish: true,
       nationality: 'British',
       identityProof: null
@@ -188,60 +190,60 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   };
 
   const determineStepStatus = (step: keyof FormData, data: any): 'empty' | 'partial' | 'complete' => {
-    switch(step) {
+    switch (step) {
       case 'identity':
-        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.dateOfBirth && data.nationality) 
+        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.dateOfBirth && data.nationality)
           return 'complete';
-        if (data.firstName || data.lastName || data.email || data.phoneNumber || data.dateOfBirth || data.nationality) 
+        if (data.firstName || data.lastName || data.email || data.phoneNumber || data.dateOfBirth || data.nationality)
           return 'partial';
         return 'empty';
-      
+
       case 'employment':
-        if (data.employmentStatus && data.companyDetails && data.jobPosition && data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType && data.lengthOfEmployment) 
+        if (data.employmentStatus && data.companyDetails && data.jobPosition && data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType && data.lengthOfEmployment)
           return 'complete';
-        if (data.employmentStatus || data.companyDetails || data.jobPosition || data.referenceFullName || data.referenceEmail || data.referencePhone || data.proofType || data.lengthOfEmployment) 
+        if (data.employmentStatus || data.companyDetails || data.jobPosition || data.referenceFullName || data.referenceEmail || data.referencePhone || data.proofType || data.lengthOfEmployment)
           return 'partial';
         return 'empty';
-      
+
       case 'residential':
-        if (data.currentAddress && data.durationAtCurrentAddress && data.previousAddress && data.durationAtPreviousAddress && data.reasonForLeaving && data.proofType) 
+        if (data.currentAddress && data.durationAtCurrentAddress && data.previousAddress && data.durationAtPreviousAddress && data.reasonForLeaving && data.proofType)
           return 'complete';
-        if (data.currentAddress || data.durationAtCurrentAddress || data.previousAddress || data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType) 
+        if (data.currentAddress || data.durationAtCurrentAddress || data.previousAddress || data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType)
           return 'partial';
         return 'empty';
-      
+
       case 'financial':
-        if (data.proofOfIncomeType && data.monthlyIncome) 
+        if (data.proofOfIncomeType && data.monthlyIncome)
           return 'complete';
-        if (data.proofOfIncomeType || data.monthlyIncome) 
+        if (data.proofOfIncomeType || data.monthlyIncome)
           return 'partial';
         return 'empty';
-      
+
       case 'guarantor':
-        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.address ) 
+        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.address)
           return 'complete';
-        if (data.firstName || data.lastName || data.email || data.phoneNumber || data.address) 
+        if (data.firstName || data.lastName || data.email || data.phoneNumber || data.address)
           return 'partial';
         return 'empty';
-      
+
       case 'creditCheck':
         const identityData = data.identity || {};
-        const hasCriticalIdentityInfo = 
-          identityData.firstName && 
-          identityData.lastName && 
-          identityData.email && 
+        const hasCriticalIdentityInfo =
+          identityData.firstName &&
+          identityData.lastName &&
+          identityData.email &&
           identityData.phoneNumber &&
           identityData.dateOfBirth;
 
         return hasCriticalIdentityInfo ? 'complete' : 'empty';
-      
+
       case 'agentDetails':
-        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck) 
+        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck)
           return 'complete';
         if (data.firstName || data.lastName || data.email || data.phoneNumber)
           return 'partial';
         return 'empty';
-      
+
       default:
         return 'empty';
     }
@@ -262,7 +264,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       const status = stepStatus[step];
       const shouldShowDot = status !== 'empty';
       let dotColor = '';
-      switch(status) {
+      switch (status) {
         case 'partial':
           dotColor = 'bg-orange-500';
           break;
@@ -277,19 +279,18 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         <li
           key={step}
           onClick={() => goToStep(step)}
-          className={`flex items-center space-x-3 px-4 py-3 cursor-pointer transition-all ${
-            currentStep === step
-              ? 'bg-blue-100 text-black font-semibold rounded-lg'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
+          className={`flex items-center space-x-3 px-4 py-3 cursor-pointer transition-all ${currentStep === step
+            ? 'bg-blue-100 text-black font-semibold rounded-lg'
+            : 'text-gray-600 hover:bg-gray-100'
+            }`}
         >
           <Icon size={18} className={currentStep === step ? 'text-orange-600' : 'text-gray-500'} />
           <span>{text}</span>
           {shouldShowDot && (
-          <span 
-            className={`ml-auto w-3 h-3 rounded-full ${dotColor}`}
-            title={`Status: ${status}`}
-          />
+            <span
+              className={`ml-auto w-3 h-3 rounded-full ${dotColor}`}
+              title={`Status: ${status}`}
+            />
           )}
         </li>
       );
@@ -313,13 +314,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const saveCurrentStep = async () => {
     try {
       setIsSaving(true);
-      
+
       if (!user) {
         throw new Error('No user found. Please login again.');
       }
 
       const userId = user.id || user.localAccountId || user.homeAccountId;
-      
+
       if (!userId) {
         throw new Error('User ID is required. Please login again.');
       }
@@ -343,8 +344,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       }
 
       let saveResult;
-      
-      switch(currentStep) {
+
+      switch (currentStep) {
         case 1:
           saveResult = await referencingService.saveIdentityData(userId, formData.identity);
           break;
@@ -416,7 +417,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     const [isDeleting, setIsDeleting] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [typingSpeed, setTypingSpeed] = useState(150);
-    
+
     useEffect(() => {
       const timeout = setTimeout(() => {
         if (!isDeleting) {
@@ -439,10 +440,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           }
         }
       }, typingSpeed);
-      
+
       return () => clearTimeout(timeout);
     }, [currentIndex, isDeleting, text, typingSpeed]);
-    
+
     return <h2 className={className}>{displayText}<span className="animate-pulse">|</span></h2>;
   };
 
@@ -473,7 +474,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
   const WarningModal = () => {
     if (!showWarningModal) return null;
-    
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
         <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
@@ -483,12 +484,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
             </div>
             <h3 className="text-lg font-semibold ml-3">Incomplete Form</h3>
           </div>
-          
+
           <p className="text-gray-600 mb-6">
             Your form is incomplete. Some information may be missing or incorrect.
             Are you sure you want to submit anyway?
           </p>
-          
+
           <div className="flex justify-end space-x-3">
             <button
               onClick={() => setShowWarningModal(false)}
@@ -607,9 +608,38 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   <input
                     type="date"
                     value={formData.identity.dateOfBirth}
-                    onChange={(e) => updateFormData('identity', { dateOfBirth: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    onChange={(e) => {
+                      const selectedDate = new Date(e.target.value);
+                      const today = new Date();
+                      const age = today.getFullYear() - selectedDate.getFullYear();
+                      const monthDiff = today.getMonth() - selectedDate.getMonth();
+
+                      // Adjust age if birthday hasn't occurred this year
+                      const isOldEnough =
+                        age > 18 ||
+                        (age === 18 && monthDiff > 0) ||
+                        (age === 18 && monthDiff === 0 && today.getDate() >= selectedDate.getDate());
+
+                      if (!isOldEnough) {
+                        // Show error state
+                        updateFormData('identity', {
+                          dateOfBirth: e.target.value,
+                          dateOfBirthError: 'You must be at least 18 years old'
+                        });
+                      } else {
+                        // Clear error state
+                        updateFormData('identity', {
+                          dateOfBirth: e.target.value,
+                          dateOfBirthError: undefined
+                        });
+                      }
+                    }}
+                    max={new Date().toISOString().split('T')[0]}
+                    className={`w-full px-4 py-2 border ${formData.identity.dateOfBirthError ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 ${formData.identity.dateOfBirthError ? 'focus:ring-red-500' : 'focus:ring-primary'}`}
                   />
+                  {formData.identity.dateOfBirthError && (
+                    <p className="mt-1 text-sm text-red-500">{formData.identity.dateOfBirthError}</p>
+                  )}
                 </div>
               </div>
               <div>
@@ -875,7 +905,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               </div>
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Current Address</label>
-                 <textarea
+                <textarea
                   value={formData.residential.currentAddress}
                   onChange={(e) => updateFormData('residential', { currentAddress: e.target.value })}
                   rows={4}
@@ -1204,7 +1234,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto">
-      <div 
+      <div
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
         onClick={onClose}
       />
@@ -1224,7 +1254,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           <div className="mt-auto pt-6 px-2">
             <div className="text-sm text-gray-600 mb-2">Step {currentStep} of 7</div>
             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div 
+              <div
                 className="h-full bg-[#136C9E] transition-all duration-300"
                 style={{ width: `${(currentStep / 7) * 100}%` }}
               ></div>

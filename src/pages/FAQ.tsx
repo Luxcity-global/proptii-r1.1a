@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
@@ -14,6 +15,26 @@ interface FAQSection {
 
 const FAQ = () => {
     const [openSection, setOpenSection] = useState<string | null>(null);
+    const location = useLocation();
+
+    // Effect to handle hash changes and open corresponding section
+    useEffect(() => {
+        const hash = location.hash.slice(1); // Remove the # from the hash
+        if (hash) {
+            // Convert hash format to match section title format
+            const sectionTitle = hash
+                .split('-')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+            setOpenSection(sectionTitle);
+
+            // Smooth scroll to the section
+            const element = document.getElementById(hash);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+    }, [location.hash]);
 
     const faqSections: FAQSection[] = [
         {
@@ -76,7 +97,7 @@ const FAQ = () => {
             questions: [
                 {
                     question: "How can I book a property viewing?",
-                    answer: "Use our booking bot which can be found on the Book Viewings page. Enter the required information including date and time and click ‘Book Viewing’. You can initiate the process from a searched listing. The agent or landlord will confirm your appointment and you will be notified."
+                    answer: "Use our booking bot which can be found on the Book Viewings page. Enter the required information including date and time and click 'Book Viewing'. You can initiate the process from a searched listing. The agent or landlord will confirm your appointment and you will be notified."
                 },
                 {
                     question: "Can I reschedule a viewing?",
@@ -84,11 +105,11 @@ const FAQ = () => {
                 },
                 {
                     question: "Will I receive a reminder for my viewing?",
-                    answer: "Yes, the platform sends automated reminders to ensure you don’t miss your appointment."
+                    answer: "Yes, the platform sends automated reminders to ensure you don't miss your appointment."
                 },
                 {
                     question: "What happens if the agent or landlord cancels the viewing?",
-                    answer: "If a viewing is canceled, you’ll be notified immediately, and you can rebook or choose another property to view."
+                    answer: "If a viewing is canceled, you'll be notified immediately, and you can rebook or choose another property to view."
                 }
             ]
         },
@@ -121,7 +142,7 @@ const FAQ = () => {
             <Navbar />
             {/* Hero Section */}
             <section
-                className="relative h-[60vh] bg-cover bg-center"
+                className="relative h-[80vh] bg-cover bg-center"
                 style={{ backgroundImage: 'url("/images/FAQ-Hero.png")' }}
             >
                 <div className="absolute inset-0 bg-[#0A2342]/80"></div>
@@ -138,13 +159,14 @@ const FAQ = () => {
 
             {/* FAQ Content */}
             <section
-                className="py-16 relative bg-[#F8F9FB]"
+                className="py-16 relative bg-[#F8F9FB] scroll-mt-24"
                 style={{
                     backgroundImage: 'url("/images/Contract-bg.png")',
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundBlendMode: 'overlay',
-                    backgroundColor: '#F8F9FB'
+                    backgroundColor: '#F8F9FB',
+                    scrollPaddingTop: '6rem'
                 }}
             >
                 <div className="max-w-4xl mx-auto px-4">
@@ -152,6 +174,7 @@ const FAQ = () => {
                         {faqSections.map((section) => (
                             <div
                                 key={section.title}
+                                id={section.title.toLowerCase().replace(/\s+/g, '-')}
                                 className="bg-white rounded-lg shadow-sm overflow-hidden mb-4"
                             >
                                 <button
