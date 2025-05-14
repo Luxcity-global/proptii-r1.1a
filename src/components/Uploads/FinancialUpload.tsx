@@ -33,7 +33,7 @@ const FinancialUpload = ({ updateFormData, formData }) => {
             </svg>
 
           {/* Drag and Drop Text */}
-          <p className="text-gray-600">Drag and drop a file here, or click to select</p>
+          <p className="text-gray-600">Drag and drop or click to select</p>
 
           {/* Accepted Formats */}
           <p className="text-gray-500 text-sm mt-1">
