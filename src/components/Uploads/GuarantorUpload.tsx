@@ -16,9 +16,9 @@ const GuarantorUpload = ({ updateFormData, formData }) => {
       {/* Heading */}
       <h2 className="text-lg font-semibold mb-2">Guarantor Identity Verification</h2>
 
-      {/* Label */} 
+      {/* Label */}
       <label className="block text-gray-700 mb-2">
-      Please upload a document to verify your guarantor's identity. This could be a copy of their passport, driving license, or other government-issued ID. <span className="text-red-500">*</span>
+        Please upload a document to verify your guarantor's identity. This could be a copy of their passport, driving license, or other government-issued ID. <span className="text-red-500">*</span>
       </label>
 
       {/* Drag and Drop File Upload */}
@@ -30,10 +30,10 @@ const GuarantorUpload = ({ updateFormData, formData }) => {
           {/* Upload Icon */}
           <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-blue-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+          </svg>
 
           {/* Drag and Drop Text */}
-          <p className="text-gray-600">Drag and drop a file here, or click to select</p>
+          <p className="text-gray-600">Drag and drop or click to select</p>
 
           {/* Accepted Formats */}
           <p className="text-gray-500 text-sm mt-1">
@@ -68,7 +68,7 @@ const GuarantorUpload = ({ updateFormData, formData }) => {
 
       {/* Helper Text */}
       <p className="text-gray-500 text-sm mt-2">
-      This document will be used to verify your guarantor's identity.
+        This document will be used to verify your guarantor's identity.
       </p>
       <br />
       <label className="text-lg text-gray-500 font-md mb-2">Note: Your guarantor will be contacted to verify their details and consent to act as your guarantor.</label>

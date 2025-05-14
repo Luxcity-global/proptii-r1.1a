@@ -7,12 +7,12 @@ const Navbar = () => {
   const { isAuthenticated, user, login, logout, editProfile, isLoading } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loginInProgress, setLoginInProgress] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
+    const handleClickOutside = (event) => {
+      const target = event.target;
       if (isDropdownOpen && !target.closest('.user-dropdown')) {
         setIsDropdownOpen(false);
       }
@@ -102,18 +102,12 @@ const Navbar = () => {
           </div>
 
           <div className="flex-1 flex justify-center space-x-8">
-            {/*<NavLink
-              to="/"
-              className={({ isActive }) =>
-                `text-white hover:text-[#E76F51] transition-colors ${isActive ? 'text-[#E76F51]' : ''}`
-              }
-            >
-              Home
-            </NavLink>*/}
             <NavLink
               to="/bookviewing"
               className={({ isActive }) =>
-                `text-white hover:text-[#E76F51] transition-colors ${isActive ? 'text-[#E76F51]' : ''}`
+                isActive
+                  ? 'text-[#E76F51] font-bold transition-colors'
+                  : 'text-white hover:text-[#E76F51] transition-colors'
               }
             >
               Book Viewing
@@ -121,7 +115,9 @@ const Navbar = () => {
             <NavLink
               to="/referencing"
               className={({ isActive }) =>
-                `text-white hover:text-[#E76F51] transition-colors ${isActive ? 'text-[#E76F51]' : ''}`
+                isActive
+                  ? 'text-[#E76F51] font-bold transition-colors'
+                  : 'text-white hover:text-[#E76F51] transition-colors'
               }
             >
               Referencing
@@ -129,7 +125,9 @@ const Navbar = () => {
             <NavLink
               to="/contracts"
               className={({ isActive }) =>
-                `text-white hover:text-[#E76F51] transition-colors ${isActive ? 'text-[#E76F51]' : ''}`
+                isActive
+                  ? 'text-[#E76F51] font-bold transition-colors'
+                  : 'text-white hover:text-[#E76F51] transition-colors'
               }
             >
               Contracts
@@ -137,7 +135,9 @@ const Navbar = () => {
             <NavLink
               to="/Dashboard"
               className={({ isActive }) =>
-                `text-white hover:text-[#E76F51] transition-colors ${isActive ? 'text-[#E76F51]' : ''}`
+                isActive
+                  ? 'text-[#E76F51] font-bold transition-colors'
+                  : 'text-white hover:text-[#E76F51] transition-colors'
               }
             >
               Dashboard
@@ -180,7 +180,7 @@ const Navbar = () => {
                 {loginError && (
                   <div className="absolute right-0 -bottom-16 w-64 bg-red-500 text-white p-2 rounded-md text-sm">
                     {loginError}
-                    {loginError.includes('Popup was blocked') && (
+                    {loginError && loginError.includes && loginError.includes('Popup was blocked') && (
                       <div className="mt-1 text-xs">
                         Please check your browser settings to allow popups for this site.
                       </div>

@@ -122,7 +122,7 @@ const PropertySelector: React.FC = () => {
               <Grid item xs={12} sm={4}>
                 <StyledTextField
                   fullWidth
-                  label="Postcode"
+                  label="Postcode (Optional)"
                   value={state.selectedProperty?.postcode || ''}
                   onChange={handlePropertyChange('postcode')}
                 />
