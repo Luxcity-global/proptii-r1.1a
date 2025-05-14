@@ -1,10 +1,11 @@
 /*import React from 'react';
 import { Link } from 'react-router-dom';
 import { Home } from 'lucide-react';*/
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebookF, faLinkedinIn, faTwitter, faYoutube, faDribbble } from "@fortawesome/free-brands-svg-icons";
 //import { useNavigate } from 'react-router-dom';
-import { Link } from 'react-router-dom';
 
 
 //const navigate = useNavigate();
@@ -101,8 +102,8 @@ function Footer() {
       <hr className="border-gray-700 my-6" />
 
       {/* Footer Bottom Section */}
-      <div className="flex justify-between items-center max-w-6xl mx-auto text-sm opacity-75">
-        <p>Copyright 2025, All Rights Reserved by Proptii &copy;</p>
+      <div className="flex flex-col md:flex-row justify-between items-center max-w-6xl mx-auto text-sm opacity-75 space-y-4 md:space-y-0">
+        <p className="text-center md:text-left">&copy; 2025 Proptii. All Rights Reserved</p>
         <div className="flex space-x-4">
           <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
             <FontAwesomeIcon icon={faFacebookF} />

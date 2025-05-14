@@ -8,11 +8,16 @@ import { SearchInput } from '../components/SearchInput';
 import { SearchResults } from '../components/SearchResults';
 import { useSearch } from '../hooks/useSearch';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { Container } from '../components/layout/Container';
+import { ResponsiveGrid } from '../components/layout/ResponsiveGrid';
+import { H1, H2, Body, Small } from '../components/typography/ResponsiveText';
+import { useResponsive } from '../hooks/useResponsive';
 
 import { useState, useEffect } from 'react';
 
 const Home = () => {
   const navigate = useNavigate();
+  const { isMobile } = useResponsive();
 
   const {
     query,
@@ -83,60 +88,112 @@ const Home = () => {
       <Navbar />
       
       {/* Hero Section */}
-      <section className="h-[80vh] relative flex items-center">
-        {/* Background Image */}
-        <div className="absolute inset-0 z-0">
-          <img
-            src="/images/01_Lady_Child_Family_BG.jpg"
-            alt="Mother and child smiling"
-            className="w-full h-full object-cover"
-            loading="eager"
-          />
-          <div className="absolute inset-0 bg-black bg-opacity-40"></div>
-        </div>
+      <section className="relative h-[80vh] bg-secondary">
+        <Container className="h-full flex items-center">
+          <div className="max-w-2xl">
+            <H1 className="text-white mb-6">
+              Find Your Perfect Property with Proptii
+            </H1>
+            <Body className="text-white mb-8">
+              Browse through thousands of properties, connect with trusted agents,
+              and find your dream home today.
+            </Body>
+            <button className="bg-primary text-white px-8 py-3 rounded-md hover:bg-opacity-90">
+              Get Started
+            </button>
+          </div>
+        </Container>
+      </section>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full">
-          {/* User Type Selection */}
-          <div className="mb-12">
-            <div className="inline-flex rounded-full bg-white p-1 shadow-lg">
-              <button className="px-8 py-3 rounded-full bg-primary text-white font-semibold transition-all">
-                Tenant
-              </button>
-              <Link
-                to="/Agent"
-                className="px-8 py-3 rounded-full text-gray-700 hover:bg-gray-50 font-semibold transition-all"
-              >
-                Agent
-              </Link>
+      {/* Featured Properties */}
+      <section className="py-16">
+        <Container>
+          <H2 className="mb-8">Featured Properties</H2>
+          <ResponsiveGrid
+            cols={{
+              xs: 1,
+              sm: 2,
+              lg: 3
+            }}
+            gap="6"
+          >
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="bg-gray-50 rounded-lg overflow-hidden">
+                <img
+                  src={`/placeholder-property-${index + 1}.jpg`}
+                  alt="Property"
+                  className="w-full h-48 object-cover"
+                />
+                <div className="p-4">
+                  <H2 className="mb-2">Beautiful Property</H2>
+                  <Body className="mb-2">
+                    3 bed • 2 bath • 1,500 sqft
+                  </Body>
+                  <Small className="text-primary">$350,000</Small>
+                </div>
+              </div>
+            ))}
+          </ResponsiveGrid>
+        </Container>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-16 bg-gray-50">
+        <Container>
+          <H2 className="text-center mb-12">Why Choose Proptii?</H2>
+          <ResponsiveGrid
+            cols={{
+              xs: 1,
+              md: 3
+            }}
+            gap="8"
+          >
+            <div className="text-center">
+              <div className="bg-primary bg-opacity-10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                </svg>
+              </div>
+              <H2 className="mb-2">Expert Agents</H2>
+              <Body>Connect with professional agents who know your market.</Body>
             </div>
-          </div>
 
-          {/* Main Heading */}
-          <h3 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight">
-            Find Your Dream Home
-          </h3>
-          
-          {/* Subheading */}
-          <p className="text-xl md:text-2xl mb-12 max-w-2xl mx-auto font-light">
-            We make finding and securing your home easy, every step of the way.
-          </p>
+            <div className="text-center">
+              <div className="bg-primary bg-opacity-10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                </svg>
+              </div>
+              <H2 className="mb-2">Easy Process</H2>
+              <Body>Simple and streamlined property search and booking.</Body>
+            </div>
 
-          {/* Search Bar */}
-          <div className="max-w-2xl mx-auto">
-            <SearchInput
-              onSearch={handleSearch}
-              isLoading={isLoading}
-              value={query}
-              onChange={setQuery}
-            />
-            {isLoading && <ProgressBar />}
-            {!isBackendAvailable && (
-              <p className="text-yellow-500 mt-2">
-                Search service is currently unavailable. Please try again later.
-              </p>
-            )}
+            <div className="text-center">
+              <div className="bg-primary bg-opacity-10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+              </div>
+              <H2 className="mb-2">Trusted Reviews</H2>
+              <Body>Real reviews from verified property buyers.</Body>
+            </div>
+          </ResponsiveGrid>
+        </Container>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-16">
+        <Container>
+          <div className="bg-secondary rounded-lg p-8 md:p-12 text-center">
+            <H1 className="text-white mb-4">Ready to Find Your Dream Home?</H1>
+            <Body className="text-white mb-8">
+              Join thousands of happy homeowners who found their perfect property with Proptii.
+            </Body>
+            <button className="bg-primary text-white px-8 py-3 rounded-md hover:bg-opacity-90">
+              Start Searching
+            </button>
           </div>
-        </div>
+        </Container>
       </section>
 
       {/* Display Search Results */}

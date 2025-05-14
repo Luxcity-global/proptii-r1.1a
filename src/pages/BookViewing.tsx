@@ -69,7 +69,7 @@ const BookViewing = () => {
       {/* Container with spacing */}
       <div className="relative container mx-auto flex flex-col md:flex-row items-center gap-12 lg:px-32">
         {/* Left Section - Text Content */}
-        <div className="md:w-1/2 space-y-10 md:text-left md:mr-12">
+        <div className="md:w-1 space-y-10 md:text-left md:mr-12">
           <h2 className="text-3xl font-bold text-[#136C9E] leading-tight">
           Steps to book viewing
           </h2>
