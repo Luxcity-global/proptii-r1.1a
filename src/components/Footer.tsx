@@ -2,7 +2,13 @@
 import { Link } from 'react-router-dom';
 import { Home } from 'lucide-react';*/
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFacebookF, faLinkedinIn, faTwitter, faYoutube, faDribbble } from "@fortawesome/free-brands-svg-icons";
+import {
+  faLinkedinIn,
+  faInstagram,
+  faTiktok,
+  faYoutube,
+  faDribbble
+} from "@fortawesome/free-brands-svg-icons";
 //import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 
@@ -61,15 +67,6 @@ function Footer() {
           </div>
 
           <div>
-            <h4 className="text-lg font-semibold mb-3">Contact</h4>
-            <ul className="space-y-2 text-sm opacity-75">
-              <li><a href="#">Email</a></li>
-              <li><a href="#">Phone</a></li>
-              <li><a href="#">Contact Us</a></li>
-            </ul>
-          </div>
-
-          <div>
             <h4 className="text-lg font-semibold mb-3">Company</h4>
             <ul className="space-y-2 text-sm opacity-75">
               <li>
@@ -87,6 +84,18 @@ function Footer() {
                   Privacy Policy
                 </Link>
               </li>
+              {/*<li>
+                <Link to="/terms-of-service" className="hover:underline">
+                  Terms of Service
+                </Link>
+              </li>*/}
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-lg font-semibold mb-3"></h4>
+            <ul className="space-y-2 text-sm opacity-75">
+              <li><a href="mailto:contactus@luxcity.co.uk">Contact Us</a></li>
               <li>
                 <Link to="/terms-of-service" className="hover:underline">
                   Terms of Service
@@ -94,6 +103,8 @@ function Footer() {
               </li>
             </ul>
           </div>
+
+
         </div>
       </div>
 
@@ -104,14 +115,14 @@ function Footer() {
       <div className="flex justify-between items-center max-w-6xl mx-auto text-sm opacity-75">
         <p>Copyright 2025, All Rights Reserved by Proptii &copy;</p>
         <div className="flex space-x-4">
-          <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
-            <FontAwesomeIcon icon={faFacebookF} />
-          </a>
           <a href="https://www.linkedin.com/company/luxcity-global/?viewAsMember=true" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
             <FontAwesomeIcon icon={faLinkedinIn} />
           </a>
+          <a href="https://www.instagram.com/luxcity_tech/" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
+            <FontAwesomeIcon icon={faInstagram} />
+          </a>
           <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
-            <FontAwesomeIcon icon={faTwitter} />
+            <FontAwesomeIcon icon={faTiktok} />
           </a>
           <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
             <FontAwesomeIcon icon={faYoutube} />

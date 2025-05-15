@@ -19,9 +19,9 @@ service cloud.firestore {
     // Properties collection
     match /properties/{propertyId} {
       allow read: if true; // Public read access
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated(); // Allow any authenticated user to create
       allow update, delete: if isAuthenticated() && 
-        (resource.data.agentId == request.auth.uid || request.auth.token.admin == true);
+        (resource.data.userId == request.auth.uid || resource.data.agentId == request.auth.uid || request.auth.token.admin == true);
     }
 
     // Viewing requests

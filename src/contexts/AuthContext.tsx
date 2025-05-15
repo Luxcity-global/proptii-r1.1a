@@ -20,7 +20,7 @@ let msalInstance: PublicClientApplication | null = null;
 export const getMsalInstance = () => {
   if (!msalInstance) {
     msalInstance = new PublicClientApplication(msalConfig);
-    
+
     // Initialize the MSAL instance
     msalInstance.initialize().catch(error => {
       console.error("Error initializing MSAL:", error);
@@ -57,6 +57,7 @@ interface User {
   givenName?: string;
   familyName?: string;
   name?: string;
+  roles: string[];
 }
 
 interface AuthContextType {
@@ -110,7 +111,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             givenName: currentAccount.name?.split(' ')[0],
             familyName: currentAccount.name?.split(' ').slice(1).join(' '),
             email: currentAccount.username,
-            name: currentAccount.name
+            name: currentAccount.name,
+            roles: ['tenant'] // Default role for new users
           });
 
           // Try silent token acquisition
@@ -189,7 +191,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           email: result.account?.username || '',
           name: result.account?.name,
           givenName: result.account?.name?.split(' ')[0],
-          familyName: result.account?.name?.split(' ').slice(1).join(' ')
+          familyName: result.account?.name?.split(' ').slice(1).join(' '),
+          roles: ['tenant'] // Default role for new users
         });
 
         // Record login activity

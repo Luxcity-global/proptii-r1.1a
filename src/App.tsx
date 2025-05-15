@@ -57,7 +57,7 @@ export const App: React.FC = () => {
             {/* Listings routes */}
             <Route path="/listings" element={<Listings />} />
             <Route path="/listings/new" element={
-              <ProtectedRoute requiredRoles={['agent']}>
+              <ProtectedRoute requiredRoles={['agent', 'tenant']}>
                 <NewListingPage />
               </ProtectedRoute>
             } />

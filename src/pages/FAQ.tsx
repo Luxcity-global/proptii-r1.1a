@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import HelpFormModal from '../components/HelpFormModal';
 
 // FAQ Section interface
 interface FAQSection {
@@ -15,7 +16,9 @@ interface FAQSection {
 
 const FAQ = () => {
     const [openSection, setOpenSection] = useState<string | null>(null);
+    const [isHelpFormOpen, setIsHelpFormOpen] = useState(false);
     const location = useLocation();
+    const [searchParams] = useSearchParams();
 
     // Effect to handle hash changes and open corresponding section
     useEffect(() => {
@@ -35,6 +38,14 @@ const FAQ = () => {
             }
         }
     }, [location.hash]);
+
+    // Effect to handle help modal opening from URL parameter
+    useEffect(() => {
+        const shouldOpenHelp = searchParams.get('openHelp') === 'true';
+        if (shouldOpenHelp) {
+            setIsHelpFormOpen(true);
+        }
+    }, [searchParams]);
 
     const faqSections: FAQSection[] = [
         {
@@ -157,6 +168,22 @@ const FAQ = () => {
                 </div>
             </section>
 
+            {/* Contact Support Section */}
+            <div className="bg-[#F8F9FB] py-8 border-b border-gray-200">
+                <div className="max-w-4xl mx-auto px-4 text-center">
+                    <p className="text-gray-700 text-lg">
+                        Can't find what you're looking for?{' '}
+                        <button
+                            onClick={() => setIsHelpFormOpen(true)}
+                            className="text-[#FF6B35] font-medium hover:underline"
+                        >
+                            Click here
+                        </button>
+                        {' '}to contact us directly.
+                    </p>
+                </div>
+            </div>
+
             {/* FAQ Content */}
             <section
                 className="py-16 relative bg-[#F8F9FB] scroll-mt-24"
@@ -263,6 +290,12 @@ const FAQ = () => {
             </section>
 
             <Footer />
+
+            {/* Help Form Modal */}
+            <HelpFormModal
+                isOpen={isHelpFormOpen}
+                onClose={() => setIsHelpFormOpen(false)}
+            />
         </div>
     );
 };
