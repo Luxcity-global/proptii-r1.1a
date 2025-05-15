@@ -132,16 +132,6 @@ const Navbar = () => {
             >
               Contracts
             </NavLink>
-            <NavLink
-              to="/Dashboard"
-              className={({ isActive }) =>
-                isActive
-                  ? 'text-[#E76F51] font-bold transition-colors'
-                  : 'text-white hover:text-[#E76F51] transition-colors'
-              }
-            >
-              Dashboard
-            </NavLink>
           </div>
 
           <div className="flex-shrink-0 relative">
@@ -158,6 +148,19 @@ const Navbar = () => {
 
                 {isDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-50">
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 w-full text-left"
+                    >
+                      <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M10 3H3V10H10V3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M21 3H14V10H21V3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M21 14H14V21H21V14Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M10 14H3V21H10V14Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      Dashboard
+                    </Link>
                     <button
                       onClick={handleEditProfile}
                       className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 w-full text-left"
