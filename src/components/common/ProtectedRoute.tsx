@@ -7,9 +7,9 @@ interface ProtectedRouteProps {
   requiredRoles?: string[];
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  requiredRoles = [] 
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  requiredRoles = []
 }) => {
   const { isAuthenticated, user, isLoading } = useAuth();
   const location = useLocation();
@@ -25,11 +25,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Check role-based access if roles are specified
-  if (requiredRoles.length > 0) {
-    const userRoles = user?.roles || [];
+  if (requiredRoles.length > 0 && user) {
+    // Default to tenant role if no roles are specified
+    const userRoles = user.roles || ['tenant'];
     const hasRequiredRole = requiredRoles.some(role => userRoles.includes(role));
-    
+
     if (!hasRequiredRole) {
+      console.log('Access denied. User roles:', userRoles, 'Required roles:', requiredRoles);
       return <Navigate to="/unauthorized" replace />;
     }
   }

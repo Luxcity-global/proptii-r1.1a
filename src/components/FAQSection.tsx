@@ -70,10 +70,10 @@ const FAQSection = () => {
           {/* Positioning the Button in the Grid */}
           <div className="flex justify-center items-center w-full max-w-[280px]">
             <Link
-              to="/help"
+              to="/faq?openHelp=true"
               className="inline-block px-8 py-3 bg-primary text-white rounded-full hover:bg-opacity-90 transition text-lg font-medium"
             >
-              Visit Help Page
+              Need More Help?
             </Link>
           </div>
         </div>
