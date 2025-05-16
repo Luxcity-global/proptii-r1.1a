@@ -113,7 +113,7 @@ function Footer() {
 
       {/* Footer Bottom Section */}
       <div className="flex justify-between items-center max-w-6xl mx-auto text-sm opacity-75">
-        <p>Copyright 2025, All Rights Reserved by Proptii &copy;</p>
+        <p>&copy; 2025, All Rights Reserved by Proptii</p>
         <div className="flex space-x-4">
           <a href="https://www.linkedin.com/company/luxcity-global/?viewAsMember=true" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
             <FontAwesomeIcon icon={faLinkedinIn} />

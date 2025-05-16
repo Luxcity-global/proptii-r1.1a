@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import ReferencingModal from '../components/ReferencingModal';
+import DocumentChecklistModal from '../components/DocumentChecklistModal';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import 'swiper/css/navigation';
@@ -13,14 +14,20 @@ import { Pagination, Navigation } from "swiper/modules";
 
 const Referencing = () => {
   const { isAuthenticated, login } = useAuth();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
+  const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
 
   const handleGetStarted = () => {
-    //if (isAuthenticated) {
-    setIsModalOpen(true);
-    //} else {
-    //  login();
-    //}
+    const shouldSkipChecklist = localStorage.getItem('skipDocumentChecklist') === 'true';
+    if (shouldSkipChecklist) {
+      setIsReferencingModalOpen(true);
+    } else {
+      setIsChecklistModalOpen(true);
+    }
+  };
+
+  const handleChecklistComplete = () => {
+    setIsReferencingModalOpen(true);
   };
 
   return (
@@ -161,10 +168,17 @@ const Referencing = () => {
       <FAQSection />
       <Footer />
 
+      {/* Document Checklist Modal */}
+      <DocumentChecklistModal
+        isOpen={isChecklistModalOpen}
+        onClose={() => setIsChecklistModalOpen(false)}
+        onGetStarted={handleChecklistComplete}
+      />
+
       {/* Referencing Modal */}
       <ReferencingModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={isReferencingModalOpen}
+        onClose={() => setIsReferencingModalOpen(false)}
       />
     </div>
   );
