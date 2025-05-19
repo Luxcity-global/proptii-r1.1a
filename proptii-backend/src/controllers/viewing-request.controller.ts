@@ -33,14 +33,14 @@ export class ViewingRequestController {
     return await this.viewingRequestService.findByAgent(agentId);
   }
 
-  @Get('available-slots/:propertyId')
+ /* @Get('available-slots/:propertyId')
   async getAvailableSlots(
     @Param('propertyId') propertyId: string,
     @Query('date') date: string,
   ): Promise<string[]> {
     return await this.viewingRequestService.getAvailableSlots(propertyId, new Date(date));
   }
-
+*/
   @Put(':id')
   async update(
     @Param('id') id: string,

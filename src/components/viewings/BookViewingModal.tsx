@@ -22,6 +22,7 @@ import PropertySelector from './components/PropertySelector';
 import ViewingScheduler from './components/ViewingScheduler';
 import ViewingComparison from './components/ViewingComparison';
 import { BookViewingProvider, useBookViewing } from './context/BookViewingContext';
+import { bookingService } from './services/bookingService';
 
 import { Home, Event, DoneAll, Close, Warning } from '@mui/icons-material';
 import CheckIcon from '@mui/icons-material/Check';
@@ -165,6 +166,18 @@ const steps = [
   },
 ];
 
+// Update the PropertyDetails interface to include id
+interface PropertyDetails {
+  id: string;
+  street: string;
+  city: string;
+  postcode: string;
+  agent?: {
+    name: string;
+    email: string;
+  };
+}
+
 interface BookViewingModalProps {
   open: boolean;
   onClose: () => void;
@@ -235,22 +248,44 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
 
     try {
       setIsSaving(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setSaveComplete(true);
-      setShowSavedIndicator(true);
-      
-      setTimeout(() => {
-        setSaveComplete(false);
-        setIsSaving(false);
-        if (activeStep === steps.length - 1) {
-          setShowSuccess(true);
-        } else {
-          setActiveStep((prevStep) => prevStep + 1);
+
+      if (activeStep === steps.length - 1) {
+        // Submit the viewing request to the backend
+        const property = state.selectedProperty;
+        const viewing = state.viewingDetails;
+        
+        if (!property || !viewing) {
+          throw new Error('Missing property or viewing details');
         }
-      }, 500);
+
+        await bookingService.scheduleViewing(property, viewing);
+
+        setSaveComplete(true);
+        setShowSavedIndicator(true);
+        setTimeout(() => {
+          setSaveComplete(false);
+          setIsSaving(false);
+          setShowSuccess(true);
+        }, 500);
+      } else {
+        // Just move to next step
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        setSaveComplete(true);
+        setShowSavedIndicator(true);
+        setTimeout(() => {
+          setSaveComplete(false);
+          setIsSaving(false);
+          setActiveStep((prevStep) => prevStep + 1);
+        }, 500);
+      }
     } catch (error) {
       console.error('Error in handleNext:', error);
       setIsSaving(false);
+      // Show error message to user
+      dispatch({ 
+        type: 'SET_ERROR', 
+        payload: error instanceof Error ? error.message : 'Failed to save viewing request' 
+      });
     }
   };
 

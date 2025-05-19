@@ -1,14 +1,50 @@
-import { IsNotEmpty, IsString, IsUUID, IsDate, IsIn } from 'class-validator';
+import { IsNotEmpty, IsString, IsDate, IsIn, ValidateNested, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class CreateViewingRequestDto {
+class PropertyDto {
   @IsNotEmpty()
-  @IsUUID()
-  property_id: string;
+  @IsString()
+  street: string;
 
   @IsNotEmpty()
-  @IsUUID()
-  agent_id: string;
+  @IsString()
+  city: string;
+
+  @IsOptional()
+  @IsString()
+  town: string;
+
+  @IsNotEmpty()
+  @IsString()
+  postcode: string;
+}
+
+class AgentDto {
+  @IsNotEmpty()
+  @IsString()
+  name: string;
+
+  @IsNotEmpty()
+  @IsString()
+  email: string;
+
+  @IsNotEmpty()
+  @IsString()
+  phone: string;
+
+  @IsNotEmpty()
+  @IsString()
+  company: string;
+}
+
+export class CreateViewingRequestDto {
+  @ValidateNested()
+  @Type(() => PropertyDto)
+  property: PropertyDto;
+
+  @ValidateNested()
+  @Type(() => AgentDto)
+  agent: AgentDto;
 
   @IsNotEmpty()
   @Type(() => Date)
