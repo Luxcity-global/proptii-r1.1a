@@ -388,7 +388,10 @@ const referencingService = {
       throw new Error('User ID is required');
     }
     try {
-      const response = await axios.post(`${API_BASE_URL}/referencing/${userId}/agent`, data, {
+      const response = await axios.post(`${API_BASE_URL}/api/referencing/agent-details`, {
+        userId,
+        ...data
+      }, {
         headers: {
           'Content-Type': 'application/json'
         }

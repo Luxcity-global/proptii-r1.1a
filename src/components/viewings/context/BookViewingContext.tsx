@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 
 // Types
 interface Agent {
+  id: string;
   name: string;
   email: string;
   phone: string;
@@ -9,10 +10,11 @@ interface Agent {
 }
 
 interface PropertyDetails {
+  id?: string;
   street: string;
   town: string;
   city: string;
-  postcode?: string;
+  postcode: string;
   agent: Agent;
 }
 
@@ -45,6 +47,7 @@ const initialState: BookViewingState = {
     city: '',
     postcode: '',
     agent: {
+      id: '',
       name: '',
       email: '',
       phone: '',
