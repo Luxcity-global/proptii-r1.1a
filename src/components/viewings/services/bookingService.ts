@@ -1,13 +1,12 @@
-import { Property, ViewingSchedule, Requirement } from '../context/BookViewingContext';
+import { PropertyDetails, ViewingDetails } from '../context/BookViewingContext';
 
 // API base URL - use Vite environment variable
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
 export const bookingService = {
-  searchProperty: async (propertyUrl: string): Promise<Property> => {
+  searchProperty: async (propertyUrl: string): Promise<PropertyDetails> => {
     try {
-      // TODO: Implement actual API call
-      const response = await fetch('/api/properties/search', {
+      const response = await fetch(`${API_BASE_URL}/api/properties/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ propertyUrl })
@@ -20,9 +19,9 @@ export const bookingService = {
     }
   },
 
-  searchPropertyListings: async (searchUrl: string): Promise<Property[]> => {
+  searchPropertyListings: async (searchUrl: string): Promise<PropertyDetails[]> => {
     try {
-      const response = await fetch('/api/properties/search-listings', {
+      const response = await fetch(`${API_BASE_URL}/api/properties/search-listings`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -42,12 +41,29 @@ export const bookingService = {
     }
   },
 
-  scheduleViewing: async (propertyId: string, schedule: ViewingSchedule): Promise<void> => {
+  scheduleViewing: async (property: PropertyDetails, viewingDetails: ViewingDetails): Promise<void> => {
     try {
-      const response = await fetch('/api/viewings/schedule', {
+      const response = await fetch(`${API_BASE_URL}/api/viewing-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ propertyId, schedule })
+        body: JSON.stringify({
+          property: {
+            street: property.street,
+            city: property.city,
+            town: property.town || '',
+            postcode: property.postcode
+          },
+          agent: {
+            name: property.agent.name,
+            email: property.agent.email,
+            phone: property.agent.phone,
+            company: property.agent.company
+          },
+          viewing_date: viewingDetails.date,
+          viewing_time: viewingDetails.time,
+          preference: viewingDetails.preference,
+          status: 'PENDING'
+        })
       });
       
       if (!response.ok) throw new Error('Failed to schedule viewing');
