@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Test Form</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="email"], input[type="text"], textarea {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #response {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+    </style>
+</head>
+<body>
+    <h2>Email Test Form</h2>
+    <form id="emailForm">
+        <div class="form-group">
+            <label for="to">To:</label>
+            <input type="email" id="to" name="to" required>
+        </div>
+        <div class="form-group">
+            <label for="subject">Subject:</label>
+            <input type="text" id="subject" name="subject" required>
+        </div>
+        <div class="form-group">
+            <label for="html">Message (HTML supported):</label>
+            <textarea id="html" name="html" rows="6" required></textarea>
+        </div>
+        <div class="form-group">
+            <label for="attachments">Attachments:</label>
+            <input type="file" id="attachments" name="attachments" multiple>
+        </div>
+        <button type="submit">Send Email</button>
+    </form>
+    <div id="response"></div>
+
+    <script>
+        document.getElementById('emailForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const responseDiv = document.getElementById('response');
+            
+            try {
+                const formData = new FormData();
+                formData.append('to', document.getElementById('to').value);
+                formData.append('subject', document.getElementById('subject').value);
+                formData.append('html', document.getElementById('html').value);
+                
+                // Add attachments if any
+                const attachmentFiles = document.getElementById('attachments').files;
+                for (let i = 0; i < attachmentFiles.length; i++) {
+                    formData.append('attachments', attachmentFiles[i]);
+                }
+
+                const response = await fetch('http://localhost:3001/api/email/send', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    responseDiv.className = 'success';
+                    responseDiv.textContent = 'Email sent successfully! Message ID: ' + result.messageId;
+                } else {
+                    throw new Error(result.error || 'Failed to send email');
+                }
+            } catch (error) {
+                responseDiv.className = 'error';
+                responseDiv.textContent = 'Error: ' + error.message;
+                console.error('Error details:', error);
+            }
+        });
+    </script>
+</body>
+</html> 

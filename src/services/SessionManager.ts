@@ -81,14 +81,34 @@ export class SessionManager {
             }
         });
         this.msalInstance = new PublicClientApplication(msalConfig);
-        
-        // Initialize encryption key (32 bytes for AES-256)
-        const keyBytes = new Uint8Array(32);
-        crypto.getRandomValues(keyBytes);
-        this.encryptionKey = Array.from(keyBytes)
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-            
+
+        // Use a consistent encryption key from environment variables or generate a fixed one
+        const envKey = import.meta.env.VITE_SESSION_ENCRYPTION_KEY;
+        if (envKey) {
+            // Convert hex string to bytes
+            const hexToBytes = (hex: string) => {
+                const bytes = new Uint8Array(hex.length / 2);
+                for (let i = 0; i < hex.length; i += 2) {
+                    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+                }
+                return bytes;
+            };
+
+            // If environment key is provided, convert from hex and ensure it's the correct length
+            const keyBytes = hexToBytes(envKey);
+            if (keyBytes.length !== 32) {
+                throw new Error('Session encryption key must be 32 bytes (256 bits) long');
+            }
+            // Convert bytes to string for use as encryption key
+            this.encryptionKey = String.fromCharCode(...keyBytes);
+        } else {
+            // Generate a fixed 256-bit key (32 bytes) for development
+            this.encryptionKey = Array.from(new Uint8Array(32))
+                .map(() => Math.floor(Math.random() * 256))
+                .map(b => String.fromCharCode(b))
+                .join('');
+        }
+
         this.initializeSession();
         this.setupActivityListeners();
         this.setupTabSync();

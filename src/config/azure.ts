@@ -6,10 +6,10 @@
  */
 
 // API Base URL
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3002/api';
 
 // Check if we're in development mode
-export const isDevelopment = typeof window !== 'undefined' && 
+export const isDevelopment = typeof window !== 'undefined' &&
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 // Azure Storage Account configuration
@@ -39,7 +39,6 @@ export const AZURE_AD_B2C = {
 };
 
 // Function to check if Azure configuration is complete
-<<<<<<< HEAD
 export const isAzureConfigured = (): boolean => {
   // Check if essential Azure configuration is available
   return (
@@ -50,34 +49,12 @@ export const isAzureConfigured = (): boolean => {
   );
 };
 
-=======
-export const isAzureConfigured = () => {
-  return !!(
-    import.meta.env.VITE_AZURE_OPENAI_API_KEY &&
-    import.meta.env.VITE_AZURE_OPENAI_ENDPOINT &&
-    import.meta.env.VITE_AZURE_OPENAI_DEPLOYMENT_NAME
-  );
-};
-
-export const getAzureConfig = () => {
-  if (!isAzureConfigured()) {
-    throw new Error('Azure configuration is missing');
-  }
-
-  return {
-    apiKey: import.meta.env.VITE_AZURE_OPENAI_API_KEY,
-    endpoint: import.meta.env.VITE_AZURE_OPENAI_ENDPOINT,
-    deploymentName: import.meta.env.VITE_AZURE_OPENAI_DEPLOYMENT_NAME
-  };
-};
-
->>>>>>> upstream/feature/ai-search-listings-agents
 // Function to get Azure Storage blob URL
 export const getAzureStorageBlobUrl = (blobName: string): string => {
   if (!AZURE_STORAGE.accountName || !AZURE_STORAGE.containerName) {
     throw new Error('Azure Storage configuration is incomplete');
   }
-  
+
   return `https://${AZURE_STORAGE.accountName}.blob.core.windows.net/${AZURE_STORAGE.containerName}/${blobName}`;
 };
 
@@ -86,6 +63,6 @@ export const getAzureStorageSasUrl = (blobName: string): string => {
   if (!AZURE_STORAGE.accountName || !AZURE_STORAGE.containerName || !AZURE_STORAGE.sasToken) {
     throw new Error('Azure Storage configuration is incomplete');
   }
-  
+
   return `https://${AZURE_STORAGE.accountName}.blob.core.windows.net/${AZURE_STORAGE.containerName}/${blobName}${AZURE_STORAGE.sasToken}`;
 }; 
