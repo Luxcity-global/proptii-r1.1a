@@ -249,6 +249,10 @@ class ReferencingService {
     }
     try {
       const response = await axios.post(`${this.API_URL}/api/referencing/${userId}/identity`, data, {
+      const response = await axios.post(`${API_BASE_URL}/api/referencing/identity`, {
+        userId,
+        ...data
+      }, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -342,9 +346,20 @@ class ReferencingService {
           }
         }
       );
+      console.log('Sending agent details data:', { userId, ...data });
+      const response = await axios.post(`${API_BASE_URL}/api/referencing/agent-details`, {
+        userId,
+        ...data
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      console.log('Agent details save response:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Failed to save agent details:', error);
+      console.error('Error response:', error.response?.data);
       throw new Error(error.response?.data?.message || error.message || 'Failed to save agent details');
     }
   }
@@ -369,6 +384,8 @@ class ReferencingService {
     try {
       // First, submit the application data
       const response = await axios.post(`${this.API_URL}/api/referencing/${userId}/submit`, data.formData, {
+      console.log('Submitting application for user:', userId);
+      const response = await axios.post(`${API_BASE_URL}/api/referencing/${userId}/submit`, data, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -423,9 +440,11 @@ class ReferencingService {
         throw new Error('Failed to send email to agent/landlord');
       }
 
+      console.log('Application submission response:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Failed to submit application:', error);
+      console.error('Error response:', error.response?.data);
       throw new Error(error.response?.data?.message || error.message || 'Failed to submit application');
     }
   }
