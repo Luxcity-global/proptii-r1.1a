@@ -1,18 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { X, Menu, User, Briefcase, Home, Euro, Users, CreditCard, CheckCircle, PoundSterling, AlertTriangle, Info, Upload } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import FileUpload from "./Uploads/FileUpload";
 import EmploymentUpload from "./Uploads/EmploymentUpload";
 import ResidentialUpload from "./Uploads/ResidentialUpload";
 import FinancialUpload from "./Uploads/FinancialUpload";
 import GuarantorUpload from "./Uploads/GuarantorUpload";
 import referencingService from '../services/referencingService';
-import { emailService } from '../services/emailService';
 
 interface ReferencingModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+interface User {
+  id?: string;
+  localAccountId?: string;
+  homeAccountId?: string;
+  givenName?: string;
+  familyName?: string;
+  name?: string;
+  email?: string;
+}
+
+interface TypingAnimationProps {
+  text: string;
+  className: string;
 }
 
 // Form data types for different steps
@@ -64,7 +77,6 @@ interface GuarantorData {
   email: string;
   phoneNumber: string;
   address: string;
-  identityDocument: File | null;
 }
 
 interface CreditCheckData {
@@ -88,74 +100,12 @@ interface FormData {
   agentDetails: AgentDetailsData;
 }
 
-interface TypingAnimationProps {
-  text: string;
-  className: string;
-}
-
-const TypingAnimation: React.FC<TypingAnimationProps> = ({ text, className }) => {
-  const [displayText, setDisplayText] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [typingSpeed, setTypingSpeed] = useState(150);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!isDeleting) {
-        if (currentIndex < text.length) {
-          setDisplayText(text.substring(0, currentIndex + 1));
-          setCurrentIndex(prevIndex => prevIndex + 1);
-          setTypingSpeed(150);
-        } else {
-          setIsDeleting(true);
-          setTypingSpeed(1000);
-        }
-      } else {
-        if (currentIndex > 0) {
-          setDisplayText(text.substring(0, currentIndex - 1));
-          setCurrentIndex(prevIndex => prevIndex - 1);
-          setTypingSpeed(75);
-        } else {
-          setIsDeleting(false);
-          setTypingSpeed(500);
-        }
-      }
-    }, typingSpeed);
-
-    return () => clearTimeout(timeout);
-  }, [currentIndex, isDeleting, text, typingSpeed]);
-
-  return <h2 className={className}>{displayText}<span className="animate-pulse">|</span></h2>;
-};
-
-interface Attachment {
-  filename: string;
-  content: File;
-}
-
-interface NavigationItem {
-  label: string;
-  Icon: LucideIcon;
-  step: number;
-}
-
-const navigationItems: NavigationItem[] = [
-  { label: "Identity", Icon: User, step: 1 },
-  { label: "Employment", Icon: Briefcase, step: 2 },
-  { label: "Residential", Icon: Home, step: 3 },
-  { label: "Financial", Icon: Euro, step: 4 },
-  { label: "Guarantor", Icon: Users, step: 5 },
-  { label: "Credit Check", Icon: CreditCard, step: 6 },
-  { label: "Agent Details", Icon: User, step: 7 }
-];
-
 const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [isFormComplete, setIsFormComplete] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     identity: {
       firstName: user?.givenName || '',
@@ -200,8 +150,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       lastName: '',
       email: '',
       phoneNumber: '',
-      address: '',
-      identityDocument: null
+      address: ''
     },
     creditCheck: {
     },
@@ -228,20 +177,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   });
 
   const updateFormData = (step: keyof FormData, data: Partial<FormData[keyof FormData]>) => {
-    setFormData(prev => {
-      const updated = {
-        ...prev,
-        [step]: {
-          ...prev[step],
-          ...data
-        }
-      };
-      // Save the entire form data to local storage
-      if (user?.id) {
-        localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(updated));
+    setFormData(prev => ({
+      ...prev,
+      [step]: {
+        ...prev[step],
+        ...data
       }
-      return updated;
-    });
+    }));
 
     const stepMap: { [key in keyof FormData]: number } = {
       identity: 1,
@@ -265,76 +207,42 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const determineStepStatus = (step: keyof FormData, data: any): 'empty' | 'partial' | 'complete' => {
     switch (step) {
       case 'identity':
-        const hasAllIdentityFields = data.firstName && data.lastName && data.email &&
-          data.phoneNumber && data.dateOfBirth && data.nationality;
-        const hasIdentityDocument = data.identityProof;
-
-        if (hasAllIdentityFields && hasIdentityDocument) {
-          // Also update credit check status when identity is complete
-          updateFormData('creditCheck', {
-            firstName: data.firstName,
-            lastName: data.lastName,
-            email: data.email,
-            phoneNumber: data.phoneNumber,
-            dateOfBirth: data.dateOfBirth
-          });
+        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.dateOfBirth && data.nationality)
           return 'complete';
-        }
-        if (hasAllIdentityFields || hasIdentityDocument || data.firstName || data.lastName ||
-          data.email || data.phoneNumber || data.dateOfBirth || data.nationality) {
+        if (data.firstName || data.lastName || data.email || data.phoneNumber || data.dateOfBirth || data.nationality)
           return 'partial';
-        }
         return 'empty';
 
       case 'employment':
-        const hasAllEmploymentFields = data.employmentStatus && data.companyDetails && data.jobPosition &&
-          data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType && data.lengthOfEmployment;
-        const hasEmploymentDocument = data.proofDocument;
-
-        if (hasAllEmploymentFields && hasEmploymentDocument)
+        if (data.employmentStatus && data.companyDetails && data.jobPosition && data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType && data.lengthOfEmployment)
           return 'complete';
-        if (hasAllEmploymentFields || hasEmploymentDocument || data.employmentStatus || data.companyDetails ||
-          data.jobPosition || data.referenceFullName || data.referenceEmail || data.referencePhone ||
-          data.proofType || data.lengthOfEmployment)
+        if (data.employmentStatus || data.companyDetails || data.jobPosition || data.referenceFullName || data.referenceEmail || data.referencePhone || data.proofType || data.lengthOfEmployment)
           return 'partial';
         return 'empty';
 
       case 'residential':
-        const hasAllResidentialFields = data.currentAddress && data.durationAtCurrentAddress &&
-          data.previousAddress && data.durationAtPreviousAddress && data.reasonForLeaving && data.proofType;
-        const hasResidentialDocument = data.proofDocument;
-
-        if (hasAllResidentialFields && hasResidentialDocument)
+        if (data.currentAddress && data.durationAtCurrentAddress && data.previousAddress && data.durationAtPreviousAddress && data.reasonForLeaving && data.proofType)
           return 'complete';
-        if (hasAllResidentialFields || hasResidentialDocument || data.currentAddress || data.durationAtCurrentAddress ||
-          data.previousAddress || data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType)
+        if (data.currentAddress || data.durationAtCurrentAddress || data.previousAddress || data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType)
           return 'partial';
         return 'empty';
 
       case 'financial':
-        const hasAllFinancialFields = data.proofOfIncomeType && data.monthlyIncome;
-        const hasFinancialDocument = data.proofOfIncomeDocument;
-
-        if (hasAllFinancialFields && hasFinancialDocument)
+        if (data.proofOfIncomeType && data.monthlyIncome)
           return 'complete';
-        if (hasAllFinancialFields || hasFinancialDocument || data.proofOfIncomeType || data.monthlyIncome)
+        if (data.proofOfIncomeType || data.monthlyIncome)
           return 'partial';
         return 'empty';
 
       case 'guarantor':
-        const hasAllGuarantorFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
-        const hasGuarantorDocument = data.identityDocument;
-
-        if (hasAllGuarantorFields && hasGuarantorDocument)
+        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.address)
           return 'complete';
-        if (hasAllGuarantorFields || hasGuarantorDocument || data.firstName || data.lastName || data.email ||
-          data.phoneNumber || data.address)
+        if (data.firstName || data.lastName || data.email || data.phoneNumber || data.address)
           return 'partial';
         return 'empty';
 
       case 'creditCheck':
-        // Check identity data directly from formData
-        const identityData = formData.identity || {};
+        const identityData = data.identity || {};
         const hasCriticalIdentityInfo =
           identityData.firstName &&
           identityData.lastName &&
@@ -342,13 +250,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           identityData.phoneNumber &&
           identityData.dateOfBirth;
 
-        if (hasCriticalIdentityInfo) {
-          return 'complete';
-        } else if (identityData.firstName || identityData.lastName || identityData.email ||
-          identityData.phoneNumber || identityData.dateOfBirth) {
-          return 'partial';
-        }
-        return 'empty';
+        return hasCriticalIdentityInfo ? 'complete' : 'empty';
 
       case 'agentDetails':
         if (data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck)
@@ -424,20 +326,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   }, [user]);
 
-  // Load data from local storage on mount
-  useEffect(() => {
-    if (user?.id) {
-      const saved = localStorage.getItem(`referencing_${user.id}_formData`);
-      if (saved) {
-        try {
-          setFormData(JSON.parse(saved));
-        } catch (e) {
-          console.error('Failed to parse saved form data:', e);
-        }
-      }
-    }
-  }, [user]);
-
   const saveCurrentStep = async () => {
     try {
       setIsSaving(true);
@@ -446,12 +334,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         throw new Error('No user found. Please login again.');
       }
 
-      const userId = user.id;
+      const userId = user.id || user.localAccountId || user.homeAccountId;
 
       if (!userId) {
         throw new Error('User ID is required. Please login again.');
       }
 
+      // Validate current step data before saving
       const currentSections = {
         1: 'identity',
         2: 'employment',
@@ -469,107 +358,46 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         throw new Error('No data to save for current step');
       }
 
-      // First save to local storage as backup
-      try {
-        localStorage.setItem(`referencing_${userId}_${currentSection}`, JSON.stringify(currentStepData));
-      } catch (error) {
-        console.error('Error saving to local storage:', error);
-        // Continue execution - local storage failure shouldn't stop Cosmos DB save
-      }
-
-      // Then try to save to Cosmos DB via backend service
       let saveResult;
-      try {
-        switch (currentStep) {
-          case 1:
-            saveResult = await referencingService.saveIdentityData(userId, {
-              ...formData.identity,
-              // Convert File objects to base64 if needed
-              identityProof: formData.identity.identityProof ? {
-                name: formData.identity.identityProof.name,
-                type: formData.identity.identityProof.type,
-                size: formData.identity.identityProof.size
-              } : null
-            });
-            break;
-          case 2:
-            saveResult = await referencingService.saveEmploymentData(userId, {
-              ...formData.employment,
-              proofDocument: formData.employment.proofDocument ? {
-                name: formData.employment.proofDocument.name,
-                type: formData.employment.proofDocument.type,
-                size: formData.employment.proofDocument.size
-              } : null
-            });
-            break;
-          case 3:
-            saveResult = await referencingService.saveResidentialData(userId, {
-              ...formData.residential,
-              proofDocument: formData.residential.proofDocument ? {
-                name: formData.residential.proofDocument.name,
-                type: formData.residential.proofDocument.type,
-                size: formData.residential.proofDocument.size
-              } : null
-            });
-            break;
-          case 4:
-            saveResult = await referencingService.saveFinancialData(userId, {
-              ...formData.financial,
-              proofOfIncomeDocument: formData.financial.proofOfIncomeDocument ? {
-                name: formData.financial.proofOfIncomeDocument.name,
-                type: formData.financial.proofOfIncomeDocument.type,
-                size: formData.financial.proofOfIncomeDocument.size
-              } : null
-            });
-            break;
-          case 5:
-            saveResult = await referencingService.saveGuarantorData(userId, formData.guarantor);
-            break;
-          case 7:
-            saveResult = await referencingService.saveAgentDetailsData(userId, formData.agentDetails);
-            break;
-          default:
-            throw new Error('Invalid step');
-        }
 
-        if (!saveResult) {
-          throw new Error('Save operation failed');
-        }
-
-        // Update last saved timestamp
-        setLastSavedSteps(prev => ({
-          ...prev,
-          [currentStep]: new Date()
-        }));
-
-        // Show success message
-        alert('Data saved successfully to both local storage and database!');
-
-      } catch (error: any) {
-        console.error('Error saving to backend:', error);
-        alert('Data saved locally but failed to sync with database. Changes will be synced when connection is restored.');
-
-        // Store failed operation for later retry
-        const failedOp = {
-          userId,
-          step: currentStep,
-          section: currentSection,
-          data: currentStepData,
-          timestamp: new Date().toISOString()
-        };
-
-        try {
-          const failedOps = JSON.parse(localStorage.getItem('failed_referencing_ops') || '[]');
-          failedOps.push(failedOp);
-          localStorage.setItem('failed_referencing_ops', JSON.stringify(failedOps));
-        } catch (e) {
-          console.error('Error storing failed operation:', e);
-        }
+      switch (currentStep) {
+        case 1:
+          saveResult = await referencingService.saveIdentityData(userId, formData.identity);
+          break;
+        case 2:
+          saveResult = await referencingService.saveEmploymentData(userId, formData.employment);
+          break;
+        case 3:
+          saveResult = await referencingService.saveResidentialData(userId, formData.residential);
+          break;
+        case 4:
+          saveResult = await referencingService.saveFinancialData(userId, formData.financial);
+          break;
+        case 5:
+          saveResult = await referencingService.saveGuarantorData(userId, formData.guarantor);
+          break;
+        case 7:
+          saveResult = await referencingService.saveAgentDetailsData(userId, formData.agentDetails);
+          break;
+        default:
+          throw new Error('Invalid step');
       }
+
+      if (!saveResult) {
+        throw new Error('Save operation failed');
+      }
+
+      setLastSavedSteps(prev => ({
+        ...prev,
+        [currentStep]: new Date()
+      }));
+
+      // Show success message
+      alert('Data saved successfully!');
 
     } catch (error: any) {
-      console.error('Error in save operation:', error);
-      alert(error.message);
+      console.error('Error saving form data:', error);
+      alert(`Failed to save data: ${error.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -594,26 +422,44 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   };
 
   const checkFormCompleteness = () => {
-    // Check each section's status
-    const identityComplete = stepStatus[1] === 'complete';
-    const employmentComplete = stepStatus[2] === 'complete';
-    const residentialComplete = stepStatus[3] === 'complete';
-    const financialComplete = stepStatus[4] === 'complete';
-    const guarantorComplete = stepStatus[5] === 'complete';
-    const creditCheckComplete = stepStatus[6] === 'complete';
-    const agentDetailsComplete = stepStatus[7] === 'complete';
+    const allStepsComplete = Object.values(stepStatus).every(status => status === 'complete');
+    setIsFormComplete(allStepsComplete);
+    return allStepsComplete;
+  };
 
-    const allComplete =
-      identityComplete &&
-      employmentComplete &&
-      residentialComplete &&
-      financialComplete &&
-      guarantorComplete &&
-      creditCheckComplete &&
-      agentDetailsComplete;
+  const TypingAnimation: React.FC<TypingAnimationProps> = ({ text, className }) => {
+    const [displayText, setDisplayText] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [typingSpeed, setTypingSpeed] = useState(150);
 
-    setIsFormComplete(allComplete);
-    return allComplete;
+    useEffect(() => {
+      const timeout = setTimeout(() => {
+        if (!isDeleting) {
+          if (currentIndex < text.length) {
+            setDisplayText(text.substring(0, currentIndex + 1));
+            setCurrentIndex(prevIndex => prevIndex + 1);
+            setTypingSpeed(150);
+          } else {
+            setIsDeleting(true);
+            setTypingSpeed(1000);
+          }
+        } else {
+          if (currentIndex > 0) {
+            setDisplayText(text.substring(0, currentIndex - 1));
+            setCurrentIndex(prevIndex => prevIndex - 1);
+            setTypingSpeed(75);
+          } else {
+            setIsDeleting(false);
+            setTypingSpeed(500);
+          }
+        }
+      }, typingSpeed);
+
+      return () => clearTimeout(timeout);
+    }, [currentIndex, isDeleting, text, typingSpeed]);
+
+    return <h2 className={className}>{displayText}<span className="animate-pulse">|</span></h2>;
   };
 
   const submitApplication = async () => {
@@ -628,76 +474,24 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const proceedWithSubmission = async () => {
     try {
       setIsSubmitting(true);
+      
+      if (!user) {
+        throw new Error('No user found. Please login again.');
+      }
+
+      const userId = user.id || user.localAccountId || user.homeAccountId;
+      
+      if (!userId) {
+        throw new Error('User ID is required. Please login again.');
+      }
+
       await saveCurrentStep();
-      const userId = user?.id || '';
-
-      // Get agent details from the form data
-      const agentEmail = formData.agentDetails?.email;
-      const agentName = `${formData.agentDetails?.firstName || ''} ${formData.agentDetails?.lastName || ''}`.trim();
-
-      if (!agentEmail) {
-        throw new Error('Agent email is required. Please complete the Agent Details section.');
-      }
-
-      // Prepare attachments array
-      const attachments: Attachment[] = [];
-
-      // Helper function to add file if it exists
-      const addFileToAttachments = (file: File | null, prefix: string) => {
-        if (file && file instanceof File) {
-          const fileName = `${prefix}_${formData.identity?.firstName || 'unknown'}_${formData.identity?.lastName || 'unknown'}.${file.name.split('.').pop()}`;
-          attachments.push({
-            filename: fileName,
-            content: file
-          });
-        }
-      };
-
-      // Add all available files
-      if (formData.identity?.identityProof) {
-        addFileToAttachments(formData.identity.identityProof, 'identity_proof');
-      }
-      if (formData.employment?.proofDocument) {
-        addFileToAttachments(formData.employment.proofDocument, 'employment_proof');
-      }
-      if (formData.residential?.proofDocument) {
-        addFileToAttachments(formData.residential.proofDocument, 'residential_proof');
-      }
-      if (formData.financial?.proofOfIncomeDocument) {
-        addFileToAttachments(formData.financial.proofOfIncomeDocument, 'income_proof');
-      }
-      if (formData.guarantor?.identityDocument) {
-        addFileToAttachments(formData.guarantor.identityDocument, 'guarantor_proof');
-      }
-
-      // Prepare email content with form data
-      const emailContent = {
-        to: agentEmail,
-        subject: `New Referencing Application from ${formData.identity?.firstName} ${formData.identity?.lastName}`,
-        attachments,
-        formData
-      };
-
-      // Send email using the email service
-      const emailSent = await emailService.sendEmail(emailContent);
-
-      if (!emailSent) {
-        throw new Error('Failed to send email');
-      }
-
-      // Clear local storage after successful submission
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith(`referencing_${userId}`)) {
-          localStorage.removeItem(key);
-        }
-      });
-
-      // Show success modal instead of alert
-      setShowSuccessModal(true);
+      await referencingService.submitApplication(userId, formData);
+      alert('Your application has been submitted successfully!');
+      onClose();
     } catch (error) {
       console.error('Error submitting application:', error);
-      // Show error in a modal instead of alert
-      setShowWarningModal(true);
+      alert('There was an error submitting your application. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -743,53 +537,52 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     );
   };
 
-  const SuccessModal = () => {
-    if (!showSuccessModal) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-          <div className="flex items-center mb-4">
-            <div className="bg-green-100 p-2 rounded-full">
-              <CheckCircle className="text-green-500 w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-semibold ml-3">Application Submitted Successfully</h3>
-          </div>
-
-          <p className="text-gray-600 mb-6">
-            Your application has been submitted successfully. The agent will review your documents and contact you shortly.
-          </p>
-
-          <div className="flex justify-end">
-            <button
-              onClick={() => {
-                setShowSuccessModal(false);
-                onClose();
-              }}
-              className="px-4 py-2 bg-[#136C9E] text-white rounded-md hover:bg-opacity-90 transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   useEffect(() => {
     checkFormCompleteness();
   }, [stepStatus]);
 
-  // Add an effect to update credit check status when identity form changes
   useEffect(() => {
-    if (formData.identity) {
-      const creditCheckStatus = determineStepStatus('creditCheck', formData);
-      setStepStatus(prev => ({
-        ...prev,
-        6: creditCheckStatus
-      }));
-    }
-  }, [formData.identity]);
+    const loadUserData = async () => {
+      if (user && user.id) {
+        try {
+          const userData = await referencingService.getFormData(user.id);
+          setFormData(prevData => ({
+            identity: { ...prevData.identity, ...userData.identity },
+            employment: { ...prevData.employment, ...userData.employment },
+            residential: { ...prevData.residential, ...userData.residential },
+            financial: { ...prevData.financial, ...userData.financial },
+            guarantor: { ...prevData.guarantor, ...userData.guarantor },
+            creditCheck: { ...prevData.creditCheck },
+            agentDetails: { ...prevData.agentDetails, ...userData.agentDetails }
+          }));
+          Object.keys(userData).forEach(step => {
+            if (userData[step] && Object.keys(userData[step]).length > 0) {
+              const stepIndex = {
+                identity: 1,
+                employment: 2,
+                residential: 3,
+                financial: 4,
+                guarantor: 5,
+                creditCheck: 6,
+                agentDetails: 7
+              }[step];
+              if (stepIndex) {
+                const status = determineStepStatus(step, userData[step]);
+                setStepStatus(prev => ({
+                  ...prev,
+                  [stepIndex]: status
+                }));
+              }
+            }
+          });
+        } catch (error) {
+          console.error('Error loading user data:', error);
+        }
+      }
+    };
+
+    loadUserData();
+  }, [user]);
 
   const renderFormContent = () => {
     switch (currentStep) {
@@ -1516,7 +1309,15 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   <X size={24} />
                 </button>
                 <ul className="space-y-4">
-                  {navigationItems.map(({ label, Icon, step }) => (
+                  {[
+                    ["Identity", User, 1],
+                    ["Employment", Briefcase, 2],
+                    ["Residential", Home, 3],
+                    ["Financial", Euro, 4],
+                    ["Guarantor", Users, 5],
+                    ["Credit Check", CreditCard, 6],
+                    ["Agent Details", User, 7],
+                  ].map(([label, Icon, step]) => (
                     <li
                       key={step}
                       onClick={() => {
@@ -1585,7 +1386,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         </div>
       </div>
       <WarningModal />
-      <SuccessModal />
     </div>
   );
 };
