@@ -7,24 +7,24 @@ const ResidentialUpload = ({ updateFormData, formData }) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
       setSelectedFile(file);
-      updateFormData("identity", { identityProof: file });
+      updateFormData("residential", { proofDocument: file });
     }
   };
 
   return (
     <div className="mt-8">
       {/* Heading */}
-      <h2 className="text-lg font-semibold mb-2">Residential Documents</h2>
+      <h2 className="text-lg font-semibold mb-2">Proof of Address</h2>
 
-      {/* Label 
+      {/* Label */}
       <label className="block text-gray-700 mb-2">
-        Passport or ID Card <span className="text-red-500">*</span>
-      </label>*/}
+        Please upload a document to verify your current address <span className="text-red-500">*</span>
+      </label>
 
       {/* Drag and Drop File Upload */}
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-white">
         <label
-          htmlFor="identity-proof-upload"
+          htmlFor="residential-proof-upload"
           className="cursor-pointer flex flex-col items-center justify-center"
         >
           {/* Upload Icon */}
@@ -47,7 +47,7 @@ const ResidentialUpload = ({ updateFormData, formData }) => {
         {/* Hidden File Input */}
         <input
           type="file"
-          id="identity-proof-upload"
+          id="residential-proof-upload"
           className="hidden"
           accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
           onChange={handleFileChange}
@@ -68,7 +68,7 @@ const ResidentialUpload = ({ updateFormData, formData }) => {
 
       {/* Helper Text */}
       <p className="text-gray-500 text-sm mt-2">
-        Please upload a recent utility bill, bank statement, or council tax bill
+        Please upload a recent utility bill, bank statement, or council tax bill showing your current address
       </p>
     </div>
   );
