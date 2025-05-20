@@ -303,7 +303,10 @@ const referencingService = {
       throw new Error('User ID is required');
     }
     try {
-      const response = await axios.post(`${API_BASE_URL}/referencing/${userId}/identity`, data, {
+      const response = await axios.post(`${API_BASE_URL}/api/referencing/identity`, {
+        userId,
+        ...data
+      }, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -388,6 +391,7 @@ const referencingService = {
       throw new Error('User ID is required');
     }
     try {
+      console.log('Sending agent details data:', { userId, ...data });
       const response = await axios.post(`${API_BASE_URL}/api/referencing/agent-details`, {
         userId,
         ...data
@@ -396,9 +400,11 @@ const referencingService = {
           'Content-Type': 'application/json'
         }
       });
+      console.log('Agent details save response:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Failed to save agent details:', error);
+      console.error('Error response:', error.response?.data);
       throw new Error(error.response?.data?.message || error.message || 'Failed to save agent details');
     }
   },
@@ -421,14 +427,17 @@ const referencingService = {
       throw new Error('User ID is required');
     }
     try {
-      const response = await axios.post(`${API_BASE_URL}/referencing/${userId}/submit`, data, {
+      console.log('Submitting application for user:', userId);
+      const response = await axios.post(`${API_BASE_URL}/api/referencing/${userId}/submit`, data, {
         headers: {
           'Content-Type': 'application/json'
         }
       });
+      console.log('Application submission response:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('Failed to submit application:', error);
+      console.error('Error response:', error.response?.data);
       throw new Error(error.response?.data?.message || error.message || 'Failed to submit application');
     }
   }

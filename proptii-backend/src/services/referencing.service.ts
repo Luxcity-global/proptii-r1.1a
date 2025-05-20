@@ -14,24 +14,32 @@ export class ReferencingService {
 
   async saveIdentityData(data: any): Promise<any> {
     try {
-      const { resource: existingData } = await this.container.items
-        .query({
-          query: 'SELECT * FROM c WHERE c.type = "identity" AND c.userId = @userId',
-          parameters: [{ name: '@userId', value: data.userId }]
-        })
-        .fetchAll();
+      if (!data.userId) {
+        throw new BadRequestException('User ID is required');
+      }
 
-      if (existingData.length > 0) {
-        const updatedData = {
-          ...existingData[0],
-          ...data,
-          type: 'identity',
-          updatedAt: new Date().toISOString()
-        };
-        const { resource } = await this.container.item(existingData[0].id).replace(updatedData);
-        return { success: true, message: 'Identity data updated successfully', data: resource };
-      } else {
+      // Generate a unique ID for the document
+      const documentId = `identity_${data.userId}`;
+
+      try {
+        // Try to read the existing document
+        const { resource: existingDoc } = await this.container.item(documentId).read();
+        
+        if (existingDoc) {
+          // Update existing document
+          const updatedData = {
+            ...existingDoc,
+            ...data,
+            type: 'identity',
+            updatedAt: new Date().toISOString()
+          };
+          const { resource } = await this.container.item(documentId).replace(updatedData);
+          return { success: true, message: 'Identity data updated successfully', data: resource };
+        }
+      } catch (readError) {
+        // Document doesn't exist, create new one
         const newData = {
+          id: documentId,
           ...data,
           type: 'identity',
           createdAt: new Date().toISOString(),
@@ -41,13 +49,17 @@ export class ReferencingService {
         return { success: true, message: 'Identity data saved successfully', data: resource };
       }
     } catch (error) {
+      console.error('Error saving identity data:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       throw new Error('Error saving identity data: ' + error.message);
     }
   }
 
   async saveEmploymentData(data: any): Promise<any> {
     try {
-      const { resource: existingData } = await this.container.items
+      const { resources: existingData } = await this.container.items
         .query({
           query: 'SELECT * FROM c WHERE c.type = "employment" AND c.userId = @userId',
           parameters: [{ name: '@userId', value: data.userId }]
@@ -80,7 +92,7 @@ export class ReferencingService {
 
   async saveResidentialData(data: any): Promise<any> {
     try {
-      const { resource: existingData } = await this.container.items
+      const { resources: existingData } = await this.container.items
         .query({
           query: 'SELECT * FROM c WHERE c.type = "residential" AND c.userId = @userId',
           parameters: [{ name: '@userId', value: data.userId }]
@@ -113,7 +125,7 @@ export class ReferencingService {
 
   async saveFinancialData(data: any): Promise<any> {
     try {
-      const { resource: existingData } = await this.container.items
+      const { resources: existingData } = await this.container.items
         .query({
           query: 'SELECT * FROM c WHERE c.type = "financial" AND c.userId = @userId',
           parameters: [{ name: '@userId', value: data.userId }]
@@ -146,7 +158,7 @@ export class ReferencingService {
 
   async saveGuarantorData(data: any): Promise<any> {
     try {
-      const { resource: existingData } = await this.container.items
+      const { resources: existingData } = await this.container.items
         .query({
           query: 'SELECT * FROM c WHERE c.type = "guarantor" AND c.userId = @userId',
           parameters: [{ name: '@userId', value: data.userId }]
@@ -179,33 +191,55 @@ export class ReferencingService {
 
   async saveAgentDetailsData(data: any): Promise<any> {
     try {
-      const { resource: existingData } = await this.container.items
+      console.log('Received agent details data:', JSON.stringify(data, null, 2));
+      
+      if (!data.userId) {
+        throw new Error('userId is required for saving agent details');
+      }
+
+      const { resources: existingData } = await this.container.items
         .query({
           query: 'SELECT * FROM c WHERE c.type = "agent_details" AND c.userId = @userId',
           parameters: [{ name: '@userId', value: data.userId }]
         })
         .fetchAll();
 
+      console.log('Existing agent details data:', JSON.stringify(existingData, null, 2));
+
+      const newData = {
+        ...data,
+        type: 'agent_details',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
       if (existingData.length > 0) {
-        const updatedData = {
-          ...existingData[0],
-          ...data,
-          type: 'agent_details',
-          updatedAt: new Date().toISOString()
-        };
-        const { resource } = await this.container.item(existingData[0].id).replace(updatedData);
-        return { success: true, message: 'Agent details data updated successfully', data: resource };
+        // Update existing item
+        try {
+          const updatedData = {
+            ...existingData[0],
+            ...data,
+            type: 'agent_details',
+            updatedAt: new Date().toISOString()
+          };
+          console.log('Updating agent details with:', JSON.stringify(updatedData, null, 2));
+          const { resource } = await this.container.item(existingData[0].id).replace(updatedData);
+          return { success: true, message: 'Agent details data updated successfully', data: resource };
+        } catch (updateError) {
+          console.error('Error updating existing agent details:', updateError);
+          // If update fails, try creating a new item
+          console.log('Falling back to creating new agent details');
+          const { resource } = await this.container.items.create(newData);
+          return { success: true, message: 'Agent details data saved successfully', data: resource };
+        }
       } else {
-        const newData = {
-          ...data,
-          type: 'agent_details',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
+        // Create new item
+        console.log('Creating new agent details with:', JSON.stringify(newData, null, 2));
         const { resource } = await this.container.items.create(newData);
         return { success: true, message: 'Agent details data saved successfully', data: resource };
       }
     } catch (error) {
+      console.error('Detailed error in saveAgentDetailsData:', error);
       throw new Error('Error saving agent details data: ' + error.message);
     }
   }

@@ -13,6 +13,21 @@ interface ReferencingModalProps {
   onClose: () => void;
 }
 
+interface User {
+  id?: string;
+  localAccountId?: string;
+  homeAccountId?: string;
+  givenName?: string;
+  familyName?: string;
+  name?: string;
+  email?: string;
+}
+
+interface TypingAnimationProps {
+  text: string;
+  className: string;
+}
+
 // Form data types for different steps
 interface IdentityData {
   firstName: string;
@@ -412,7 +427,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     return allStepsComplete;
   };
 
-  const TypingAnimation = ({ text, className }) => {
+  const TypingAnimation: React.FC<TypingAnimationProps> = ({ text, className }) => {
     const [displayText, setDisplayText] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -459,8 +474,18 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const proceedWithSubmission = async () => {
     try {
       setIsSubmitting(true);
+      
+      if (!user) {
+        throw new Error('No user found. Please login again.');
+      }
+
+      const userId = user.id || user.localAccountId || user.homeAccountId;
+      
+      if (!userId) {
+        throw new Error('User ID is required. Please login again.');
+      }
+
       await saveCurrentStep();
-      const userId = user?.id || '';
       await referencingService.submitApplication(userId, formData);
       alert('Your application has been submitted successfully!');
       onClose();
