@@ -7,7 +7,7 @@ const FinancialUpload = ({ updateFormData, formData }) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
       setSelectedFile(file);
-      updateFormData("identity", { identityProof: file });
+      updateFormData("financial", { proofOfIncomeDocument: file });
     }
   };
 
@@ -16,7 +16,7 @@ const FinancialUpload = ({ updateFormData, formData }) => {
       {/* Heading */}
       <h2 className="text-lg font-semibold mb-2">Financial Documents</h2>
 
-      {/* Label */} 
+      {/* Label */}
       <label className="block text-gray-700 mb-2">
         Upload Proof of Income <span className="text-red-500">*</span>
       </label>
@@ -30,7 +30,7 @@ const FinancialUpload = ({ updateFormData, formData }) => {
           {/* Upload Icon */}
           <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-blue-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+          </svg>
 
           {/* Drag and Drop Text */}
           <p className="text-gray-600">Drag and drop or click to select</p>
@@ -68,7 +68,7 @@ const FinancialUpload = ({ updateFormData, formData }) => {
 
       {/* Helper Text */}
       <p className="text-gray-500 text-sm mt-2">
-      Please upload bank statements, payslips, or other proof of income
+        Please upload bank statements, payslips, or other proof of income
       </p>
     </div>
   );

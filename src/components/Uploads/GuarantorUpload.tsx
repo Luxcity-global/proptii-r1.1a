@@ -7,7 +7,7 @@ const GuarantorUpload = ({ updateFormData, formData }) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
       setSelectedFile(file);
-      updateFormData("identity", { identityProof: file });
+      updateFormData("guarantor", { identityDocument: file });
     }
   };
 
@@ -24,7 +24,7 @@ const GuarantorUpload = ({ updateFormData, formData }) => {
       {/* Drag and Drop File Upload */}
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-white">
         <label
-          htmlFor="identity-proof-upload"
+          htmlFor="guarantor-proof-upload"
           className="cursor-pointer flex flex-col items-center justify-center"
         >
           {/* Upload Icon */}
@@ -47,7 +47,7 @@ const GuarantorUpload = ({ updateFormData, formData }) => {
         {/* Hidden File Input */}
         <input
           type="file"
-          id="identity-proof-upload"
+          id="guarantor-proof-upload"
           className="hidden"
           accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
           onChange={handleFileChange}

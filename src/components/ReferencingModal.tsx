@@ -64,6 +64,7 @@ interface GuarantorData {
   email: string;
   phoneNumber: string;
   address: string;
+  identityDocument: File | null;
 }
 
 interface CreditCheckData {
@@ -154,6 +155,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [isFormComplete, setIsFormComplete] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     identity: {
       firstName: user?.givenName || '',
@@ -198,7 +200,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       lastName: '',
       email: '',
       phoneNumber: '',
-      address: ''
+      address: '',
+      identityDocument: null
     },
     creditCheck: {
     },
@@ -225,13 +228,20 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   });
 
   const updateFormData = (step: keyof FormData, data: Partial<FormData[keyof FormData]>) => {
-    setFormData(prev => ({
-      ...prev,
-      [step]: {
-        ...prev[step],
-        ...data
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        [step]: {
+          ...prev[step],
+          ...data
+        }
+      };
+      // Save the entire form data to local storage
+      if (user?.id) {
+        localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(updated));
       }
-    }));
+      return updated;
+    });
 
     const stepMap: { [key in keyof FormData]: number } = {
       identity: 1,
@@ -255,42 +265,76 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const determineStepStatus = (step: keyof FormData, data: any): 'empty' | 'partial' | 'complete' => {
     switch (step) {
       case 'identity':
-        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.dateOfBirth && data.nationality)
+        const hasAllIdentityFields = data.firstName && data.lastName && data.email &&
+          data.phoneNumber && data.dateOfBirth && data.nationality;
+        const hasIdentityDocument = data.identityProof;
+
+        if (hasAllIdentityFields && hasIdentityDocument) {
+          // Also update credit check status when identity is complete
+          updateFormData('creditCheck', {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+            phoneNumber: data.phoneNumber,
+            dateOfBirth: data.dateOfBirth
+          });
           return 'complete';
-        if (data.firstName || data.lastName || data.email || data.phoneNumber || data.dateOfBirth || data.nationality)
+        }
+        if (hasAllIdentityFields || hasIdentityDocument || data.firstName || data.lastName ||
+          data.email || data.phoneNumber || data.dateOfBirth || data.nationality) {
           return 'partial';
+        }
         return 'empty';
 
       case 'employment':
-        if (data.employmentStatus && data.companyDetails && data.jobPosition && data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType && data.lengthOfEmployment)
+        const hasAllEmploymentFields = data.employmentStatus && data.companyDetails && data.jobPosition &&
+          data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType && data.lengthOfEmployment;
+        const hasEmploymentDocument = data.proofDocument;
+
+        if (hasAllEmploymentFields && hasEmploymentDocument)
           return 'complete';
-        if (data.employmentStatus || data.companyDetails || data.jobPosition || data.referenceFullName || data.referenceEmail || data.referencePhone || data.proofType || data.lengthOfEmployment)
+        if (hasAllEmploymentFields || hasEmploymentDocument || data.employmentStatus || data.companyDetails ||
+          data.jobPosition || data.referenceFullName || data.referenceEmail || data.referencePhone ||
+          data.proofType || data.lengthOfEmployment)
           return 'partial';
         return 'empty';
 
       case 'residential':
-        if (data.currentAddress && data.durationAtCurrentAddress && data.previousAddress && data.durationAtPreviousAddress && data.reasonForLeaving && data.proofType)
+        const hasAllResidentialFields = data.currentAddress && data.durationAtCurrentAddress &&
+          data.previousAddress && data.durationAtPreviousAddress && data.reasonForLeaving && data.proofType;
+        const hasResidentialDocument = data.proofDocument;
+
+        if (hasAllResidentialFields && hasResidentialDocument)
           return 'complete';
-        if (data.currentAddress || data.durationAtCurrentAddress || data.previousAddress || data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType)
+        if (hasAllResidentialFields || hasResidentialDocument || data.currentAddress || data.durationAtCurrentAddress ||
+          data.previousAddress || data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType)
           return 'partial';
         return 'empty';
 
       case 'financial':
-        if (data.proofOfIncomeType && data.monthlyIncome)
+        const hasAllFinancialFields = data.proofOfIncomeType && data.monthlyIncome;
+        const hasFinancialDocument = data.proofOfIncomeDocument;
+
+        if (hasAllFinancialFields && hasFinancialDocument)
           return 'complete';
-        if (data.proofOfIncomeType || data.monthlyIncome)
+        if (hasAllFinancialFields || hasFinancialDocument || data.proofOfIncomeType || data.monthlyIncome)
           return 'partial';
         return 'empty';
 
       case 'guarantor':
-        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.address)
+        const hasAllGuarantorFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
+        const hasGuarantorDocument = data.identityDocument;
+
+        if (hasAllGuarantorFields && hasGuarantorDocument)
           return 'complete';
-        if (data.firstName || data.lastName || data.email || data.phoneNumber || data.address)
+        if (hasAllGuarantorFields || hasGuarantorDocument || data.firstName || data.lastName || data.email ||
+          data.phoneNumber || data.address)
           return 'partial';
         return 'empty';
 
       case 'creditCheck':
-        const identityData = data.identity || {};
+        // Check identity data directly from formData
+        const identityData = formData.identity || {};
         const hasCriticalIdentityInfo =
           identityData.firstName &&
           identityData.lastName &&
@@ -298,7 +342,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           identityData.phoneNumber &&
           identityData.dateOfBirth;
 
-        return hasCriticalIdentityInfo ? 'complete' : 'empty';
+        if (hasCriticalIdentityInfo) {
+          return 'complete';
+        } else if (identityData.firstName || identityData.lastName || identityData.email ||
+          identityData.phoneNumber || identityData.dateOfBirth) {
+          return 'partial';
+        }
+        return 'empty';
 
       case 'agentDetails':
         if (data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck)
@@ -377,47 +427,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   // Load data from local storage on mount
   useEffect(() => {
     if (user?.id) {
-      const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'creditCheck', 'agentDetails'];
-      const savedData: any = {};
-
-      sections.forEach(section => {
-        const storedData = localStorage.getItem(`referencing_${user.id}_${section}`);
-        if (storedData) {
-          try {
-            savedData[section] = JSON.parse(storedData);
-          } catch (error) {
-            console.error(`Error parsing ${section} data from local storage:`, error);
-          }
+      const saved = localStorage.getItem(`referencing_${user.id}_formData`);
+      if (saved) {
+        try {
+          setFormData(JSON.parse(saved));
+        } catch (e) {
+          console.error('Failed to parse saved form data:', e);
         }
-      });
-
-      // Only update form data if we found some saved data
-      if (Object.keys(savedData).length > 0) {
-        setFormData(prevData => ({
-          ...prevData,
-          ...savedData
-        }));
-
-        // Update step status for loaded data
-        Object.entries(savedData).forEach(([section, data]) => {
-          const stepIndex = {
-            identity: 1,
-            employment: 2,
-            residential: 3,
-            financial: 4,
-            guarantor: 5,
-            creditCheck: 6,
-            agentDetails: 7
-          }[section];
-
-          if (stepIndex) {
-            const status = determineStepStatus(section as keyof FormData, data);
-            setStepStatus(prev => ({
-              ...prev,
-              [stepIndex]: status
-            }));
-          }
-        });
       }
     }
   }, [user]);
@@ -578,9 +594,26 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   };
 
   const checkFormCompleteness = () => {
-    const allStepsComplete = Object.values(stepStatus).every(status => status === 'complete');
-    setIsFormComplete(allStepsComplete);
-    return allStepsComplete;
+    // Check each section's status
+    const identityComplete = stepStatus[1] === 'complete';
+    const employmentComplete = stepStatus[2] === 'complete';
+    const residentialComplete = stepStatus[3] === 'complete';
+    const financialComplete = stepStatus[4] === 'complete';
+    const guarantorComplete = stepStatus[5] === 'complete';
+    const creditCheckComplete = stepStatus[6] === 'complete';
+    const agentDetailsComplete = stepStatus[7] === 'complete';
+
+    const allComplete =
+      identityComplete &&
+      employmentComplete &&
+      residentialComplete &&
+      financialComplete &&
+      guarantorComplete &&
+      creditCheckComplete &&
+      agentDetailsComplete;
+
+    setIsFormComplete(allComplete);
+    return allComplete;
   };
 
   const submitApplication = async () => {
@@ -633,65 +666,17 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       if (formData.financial?.proofOfIncomeDocument) {
         addFileToAttachments(formData.financial.proofOfIncomeDocument, 'income_proof');
       }
+      if (formData.guarantor?.identityDocument) {
+        addFileToAttachments(formData.guarantor.identityDocument, 'guarantor_proof');
+      }
 
-      // Prepare email content
+      // Prepare email content with form data
       const emailContent = {
         to: agentEmail,
         subject: `New Referencing Application from ${formData.identity?.firstName} ${formData.identity?.lastName}`,
-        html: `
-          <h2>New Referencing Application</h2>
-          <p>Dear ${agentName},</p>
-          <p>A new referencing application has been submitted with the following details:</p>
-          
-          <h3>Tenant Information</h3>
-          <ul>
-            <li>Name: ${formData.identity?.firstName} ${formData.identity?.lastName}</li>
-            <li>Email: ${formData.identity?.email}</li>
-            <li>Phone: ${formData.identity?.phoneNumber}</li>
-            <li>Date of Birth: ${formData.identity?.dateOfBirth}</li>
-            <li>Nationality: ${formData.identity?.nationality}</li>
-          </ul>
-
-          <h3>Employment Details</h3>
-          <ul>
-            <li>Status: ${formData.employment?.employmentStatus}</li>
-            <li>Company: ${formData.employment?.companyDetails}</li>
-            <li>Position: ${formData.employment?.jobPosition}</li>
-            <li>Length of Employment: ${formData.employment?.lengthOfEmployment}</li>
-          </ul>
-
-          <h3>Residential History</h3>
-          <ul>
-            <li>Current Address: ${formData.residential?.currentAddress}</li>
-            <li>Time at Address: ${formData.residential?.durationAtCurrentAddress}</li>
-            <li>Previous Address: ${formData.residential?.previousAddress}</li>
-          </ul>
-
-          <h3>Financial Information</h3>
-          <ul>
-            <li>Monthly Income: £${formData.financial?.monthlyIncome}</li>
-            <li>Proof of Income Type: ${formData.financial?.proofOfIncomeType}</li>
-          </ul>
-
-          <h3>Guarantor Details</h3>
-          <ul>
-            <li>Name: ${formData.guarantor?.firstName} ${formData.guarantor?.lastName}</li>
-            <li>Email: ${formData.guarantor?.email}</li>
-            <li>Phone: ${formData.guarantor?.phoneNumber}</li>
-            <li>Address: ${formData.guarantor?.address}</li>
-          </ul>
-
-          <p>Please find attached all supporting documents provided by the applicant.</p>
-          <p>Best regards,<br>Proptii Referencing System</p>
-        `,
-        attachments
+        attachments,
+        formData
       };
-
-      console.log('Sending email with attachments:', attachments.map(a => ({
-        filename: a.filename,
-        size: a.content.size,
-        type: a.content.type
-      })));
 
       // Send email using the email service
       const emailSent = await emailService.sendEmail(emailContent);
@@ -707,11 +692,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         }
       });
 
-      alert('Your application has been submitted successfully!');
-      onClose();
+      // Show success modal instead of alert
+      setShowSuccessModal(true);
     } catch (error) {
       console.error('Error submitting application:', error);
-      alert('There was an error submitting your application. Please try again.');
+      // Show error in a modal instead of alert
+      setShowWarningModal(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -757,9 +743,53 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     );
   };
 
+  const SuccessModal = () => {
+    if (!showSuccessModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+          <div className="flex items-center mb-4">
+            <div className="bg-green-100 p-2 rounded-full">
+              <CheckCircle className="text-green-500 w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-semibold ml-3">Application Submitted Successfully</h3>
+          </div>
+
+          <p className="text-gray-600 mb-6">
+            Your application has been submitted successfully. The agent will review your documents and contact you shortly.
+          </p>
+
+          <div className="flex justify-end">
+            <button
+              onClick={() => {
+                setShowSuccessModal(false);
+                onClose();
+              }}
+              className="px-4 py-2 bg-[#136C9E] text-white rounded-md hover:bg-opacity-90 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   useEffect(() => {
     checkFormCompleteness();
   }, [stepStatus]);
+
+  // Add an effect to update credit check status when identity form changes
+  useEffect(() => {
+    if (formData.identity) {
+      const creditCheckStatus = determineStepStatus('creditCheck', formData);
+      setStepStatus(prev => ({
+        ...prev,
+        6: creditCheckStatus
+      }));
+    }
+  }, [formData.identity]);
 
   const renderFormContent = () => {
     switch (currentStep) {
@@ -1555,6 +1585,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         </div>
       </div>
       <WarningModal />
+      <SuccessModal />
     </div>
   );
 };

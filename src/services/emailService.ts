@@ -1,4 +1,5 @@
 import axios from 'axios';
+import JSZip from 'jszip';
 
 interface EmailAttachment {
   filename: string;
@@ -8,8 +9,9 @@ interface EmailAttachment {
 interface EmailContent {
   to: string;
   subject: string;
-  html: string;
+  html?: string;
   attachments: EmailAttachment[];
+  formData?: any;
 }
 
 class EmailService {
@@ -24,6 +26,7 @@ class EmailService {
     const residential = formData.residential || {};
     const financial = formData.financial || {};
     const guarantor = formData.guarantor || {};
+    const agentDetails = formData.agentDetails || {};
 
     const htmlString = `
 <!DOCTYPE html>
@@ -45,6 +48,10 @@ class EmailService {
 <body>
   <h2>Referencing Application</h2>
   
+  <p>Hi ${agentDetails.firstName || ''},</p>
+  <p>${identity.firstName || ''} ${identity.lastName || ''} has uploaded their verification documents.</p>
+  <p>The documents include:</p>
+
   <div class="section">
     <div class="section-title">Tenant Information</div>
     <div class="info-item">First Name: ${identity.firstName || 'N/A'}</div>
@@ -92,8 +99,12 @@ class EmailService {
     <div class="info-item">Guarantor's Address: ${guarantor.address || 'N/A'}</div>
   </div>
 
+  <p>Once completed, you will receive the confirmation forms from the Referee and Guarantor. Please review all submissions and verify the documents. Once confirmed, you may proceed to accept the user as a tenant.</p>
+
+  <p>Please contact ${identity.firstName || ''} on ${identity.email || ''} if you need more documents. Let us know if you need support during the verification process.</p>
+
   <div style="margin-top: 32px;">
-    Yours sincerely,<br>
+    Best regards,<br>
     The Proptii Team
   </div>
   <hr />
@@ -101,8 +112,7 @@ class EmailService {
     <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com" class="footer-link">here</a>.</em>
   </div>
   <div class="footer-logo">
-    <img src="/images/proptii-logo.png" alt="Proptii Logo" />
-    <span style="font-size: 2rem; color: #E65D24; font-weight: bold; vertical-align: middle;">proptii</span>
+    <img src="https://ci3.googleusercontent.com/meips/ADKq_NY8hEqCfpvIsclrL2Y7Bh5rbsplzRLKZCSdpIpnfd0yj3UbdHYRghh_jcqBeTVksaYGkXybNBH7dR78-7qrgfVu81YmwI4tHtHb3B7ILEq32SZW1Rf1WYXK=s0-d-e1-ft#https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png" alt="Proptii Logo" />
   </div>
 </body>
 </html>`;
@@ -111,13 +121,71 @@ class EmailService {
     return htmlString;
   }
 
+  private async createAttachmentsZip(attachments: EmailAttachment[], identity: any): Promise<File | null> {
+    if (attachments.length === 0) return null;
+
+    try {
+      const zip = new JSZip();
+
+      // Create folders for different types of documents
+      const idFolder = zip.folder("1_Identity_Documents");
+      const employmentFolder = zip.folder("2_Employment_Documents");
+      const residentialFolder = zip.folder("3_Residential_Documents");
+      const financialFolder = zip.folder("4_Financial_Documents");
+      const guarantorFolder = zip.folder("5_Guarantor_Documents");
+
+      // Helper function to add file to appropriate folder
+      const addFileToFolder = async (attachment: EmailAttachment) => {
+        const { filename, content } = attachment;
+        const fileBuffer = await content.arrayBuffer();
+
+        if (filename.startsWith('identity_proof')) {
+          idFolder?.file(filename, fileBuffer);
+        } else if (filename.startsWith('employment_proof')) {
+          employmentFolder?.file(filename, fileBuffer);
+        } else if (filename.startsWith('residential_proof')) {
+          residentialFolder?.file(filename, fileBuffer);
+        } else if (filename.startsWith('income_proof')) {
+          financialFolder?.file(filename, fileBuffer);
+        } else if (filename.startsWith('guarantor_proof')) {
+          guarantorFolder?.file(filename, fileBuffer);
+        }
+      };
+
+      // Add all files to their respective folders
+      await Promise.all(attachments.map(addFileToFolder));
+
+      // Generate the zip file
+      const zipBlob = await zip.generateAsync({
+        type: "blob",
+        compression: "DEFLATE",
+        compressionOptions: {
+          level: 6
+        }
+      });
+
+      // Create a File from the Blob
+      const applicantName = `${identity?.firstName || 'Unknown'}_${identity?.lastName || 'User'}`;
+      const timestamp = new Date().toISOString().split('T')[0];
+      return new File(
+        [zipBlob],
+        `${applicantName}_Documents_${timestamp}.zip`,
+        { type: 'application/zip' }
+      );
+    } catch (error) {
+      console.error('Error creating zip file:', error);
+      throw new Error('Failed to create zip file');
+    }
+  }
+
   async sendEmail(emailContent: EmailContent): Promise<boolean> {
     try {
       console.log('Starting email submission process...');
       console.log('Email content:', {
         to: emailContent.to,
         subject: emailContent.subject,
-        attachmentsCount: emailContent.attachments.length
+        attachmentsCount: emailContent.attachments.length,
+        formData: emailContent.formData
       });
 
       // Create FormData to handle file uploads
@@ -127,32 +195,38 @@ class EmailService {
       formData.append('to', emailContent.to);
       let subject = emailContent.subject.replace(/^New\s+/i, '');
       formData.append('subject', subject);
-      formData.append('html', emailContent.html);
 
-      // Add attachments
-      emailContent.attachments.forEach((attachment, index) => {
-        if (attachment.content instanceof File) {
-          console.log(`Adding attachment ${index + 1}:`, {
-            filename: attachment.filename,
-            size: attachment.content.size,
-            type: attachment.content.type
+      // Generate HTML template using the provided form data
+      const html = this.generateEmailTemplate(emailContent.formData);
+      formData.append('html', html);
+
+      // Create zip file of attachments if there are any
+      if (emailContent.attachments.length > 0) {
+        const zipFile = await this.createAttachmentsZip(
+          emailContent.attachments,
+          emailContent.formData?.identity
+        );
+
+        if (zipFile) {
+          console.log('Created zip file:', {
+            name: zipFile.name,
+            size: zipFile.size,
+            type: zipFile.type
           });
-          formData.append('attachments', attachment.content, attachment.filename);
-        } else {
-          console.warn(`Invalid attachment at index ${index}:`, attachment);
+          formData.append('attachments', zipFile);
         }
-      });
+      }
 
-      console.log('Sending request to:', `${this.API_URL}/api/email/send`);
+      console.log('Generated HTML template:', html);
 
       // Send to backend
       const response = await axios.post(`${this.API_URL}/api/email/send`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 30000, // 30 seconds
-        maxContentLength: 50 * 1024 * 1024, // 50MB max
-        maxBodyLength: 50 * 1024 * 1024 // 50MB max
+        timeout: 30000,
+        maxContentLength: 50 * 1024 * 1024,
+        maxBodyLength: 50 * 1024 * 1024
       });
 
       console.log('Server response:', response.data);
