@@ -3,7 +3,7 @@ import { ReferencingService } from '../services/referencing.service';
 
 @Controller('api/referencing')
 export class ReferencingController {
-  constructor(private readonly referencingService: ReferencingService) {}
+  constructor(private readonly referencingService: ReferencingService) { }
 
   @Post('identity')
   @HttpCode(200)
@@ -35,10 +35,17 @@ export class ReferencingController {
     return await this.referencingService.saveGuarantorData(data);
   }
 
-  @Post('agent-details')
+  @Post('agent')
   @HttpCode(200)
   async saveAgentDetailsData(@Body() data: any) {
-    return await this.referencingService.saveAgentDetailsData(data);
+    try {
+      console.log('Received agent details data:', data);
+      const result = await this.referencingService.saveAgentDetailsData(data);
+      return result;
+    } catch (error) {
+      console.error('Error saving agent details:', error);
+      throw error;
+    }
   }
 
   @Get(':userId')

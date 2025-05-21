@@ -8,7 +8,7 @@ import ResidentialUpload from "./Uploads/ResidentialUpload";
 import FinancialUpload from "./Uploads/FinancialUpload";
 import GuarantorUpload from "./Uploads/GuarantorUpload";
 import referencingService from '../services/referencingService';
-import { emailService } from '../services/emailService';
+import emailService from '../services/emailService';
 
 interface ReferencingModalProps {
   isOpen: boolean;
@@ -46,6 +46,8 @@ interface ResidentialData {
   previousAddress: string;
   durationAtPreviousAddress: string;
   reasonForLeaving: string;
+  alreadyHavePropertyAddress: string;
+  propertyAddress: string;
   proofType: string;
   proofDocument: File | null;
 }
@@ -79,13 +81,62 @@ interface AgentDetailsData {
 }
 
 interface FormData {
-  identity: IdentityData;
-  employment: EmploymentData;
-  residential: ResidentialData;
-  financial: FinancialData;
-  guarantor: GuarantorData;
-  creditCheck: CreditCheckData;
-  agentDetails: AgentDetailsData;
+  identity: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    dateOfBirth: string;
+    dateOfBirthError?: string;
+    isBritish: boolean;
+    nationality: string;
+    identityProof: File | null;
+  };
+  employment: {
+    employmentStatus: string;
+    companyDetails: string;
+    lengthOfEmployment: string;
+    jobPosition: string;
+    referenceFullName: string;
+    referenceEmail: string;
+    referencePhone: string;
+    proofType: string;
+    proofDocument: File | null;
+  };
+  residential: {
+    currentAddress: string;
+    durationAtCurrentAddress: string;
+    previousAddress: string;
+    durationAtPreviousAddress: string;
+    reasonForLeaving: string;
+    alreadyHavePropertyAddress: string;
+    propertyAddress: string;
+    proofType: string;
+    proofDocument: File | null;
+  };
+  financial: {
+    monthlyIncome: string;
+    proofOfIncomeType: string;
+    proofOfIncomeDocument: File | null;
+    useOpenBanking: boolean;
+    isConnectedToOpenBanking: boolean;
+  };
+  guarantor: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    address: string;
+    identityDocument: File | null;
+  };
+  creditCheck: Record<string, unknown>;
+  agentDetails: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    hasAgreedToCheck: boolean;
+  };
 }
 
 interface TypingAnimationProps {
@@ -149,6 +200,83 @@ const navigationItems: NavigationItem[] = [
   { label: "Agent Details", Icon: User, step: 7 }
 ];
 
+// Add a helper function to convert File to StoredFile format
+const fileToStoredFile = (file: File) => {
+  return {
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    lastModified: file.lastModified
+  };
+};
+
+// Add interfaces for stored file data
+interface StoredFile {
+  name: string;
+  type: string;
+  size: number;
+  lastModified: number;
+}
+
+interface StoredFormData {
+  identity: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    dateOfBirth: string;
+    dateOfBirthError?: string;
+    isBritish: boolean;
+    nationality: string;
+    identityProof: StoredFile | null;
+  };
+  employment: {
+    employmentStatus: string;
+    companyDetails: string;
+    lengthOfEmployment: string;
+    jobPosition: string;
+    referenceFullName: string;
+    referenceEmail: string;
+    referencePhone: string;
+    proofType: string;
+    proofDocument: StoredFile | null;
+  };
+  residential: {
+    currentAddress: string;
+    durationAtCurrentAddress: string;
+    previousAddress: string;
+    durationAtPreviousAddress: string;
+    reasonForLeaving: string;
+    alreadyHavePropertyAddress: string;
+    propertyAddress: string;
+    proofType: string;
+    proofDocument: StoredFile | null;
+  };
+  financial: {
+    monthlyIncome: string;
+    proofOfIncomeType: string;
+    proofOfIncomeDocument: StoredFile | null;
+    useOpenBanking: boolean;
+    isConnectedToOpenBanking: boolean;
+  };
+  guarantor: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    address: string;
+    identityDocument: StoredFile | null;
+  };
+  creditCheck: {};
+  agentDetails: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    hasAgreedToCheck: boolean;
+  };
+}
+
 const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
@@ -186,6 +314,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       durationAtPreviousAddress: '',
       reasonForLeaving: '',
       proofType: '',
+      alreadyHavePropertyAddress: '',
+      propertyAddress: '',
       proofDocument: null
     },
     financial: {
@@ -227,6 +357,27 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     7: 'empty'
   });
 
+  // Load status from localStorage on mount
+  useEffect(() => {
+    if (user?.id) {
+      const savedStatus = localStorage.getItem(`referencing_${user.id}_stepStatus`);
+      if (savedStatus) {
+        try {
+          setStepStatus(JSON.parse(savedStatus));
+        } catch (e) {
+          console.error('Failed to parse saved step status:', e);
+        }
+      }
+    }
+  }, [user]);
+
+  // Save status to localStorage whenever it changes
+  useEffect(() => {
+    if (user?.id) {
+      localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
+    }
+  }, [stepStatus, user]);
+
   const updateFormData = (step: keyof FormData, data: Partial<FormData[keyof FormData]>) => {
     setFormData(prev => {
       const updated = {
@@ -256,10 +407,17 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     const stepIndex = stepMap[step];
     const status = determineStepStatus(step, { ...formData[step], ...data });
 
-    setStepStatus(prev => ({
-      ...prev,
-      [stepIndex]: status
-    }));
+    setStepStatus(prev => {
+      const updated = {
+        ...prev,
+        [stepIndex]: status
+      };
+      // Save step status to localStorage
+      if (user?.id) {
+        localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(updated));
+      }
+      return updated;
+    });
   };
 
   const determineStepStatus = (step: keyof FormData, data: any): 'empty' | 'partial' | 'complete' => {
@@ -267,17 +425,9 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 'identity':
         const hasAllIdentityFields = data.firstName && data.lastName && data.email &&
           data.phoneNumber && data.dateOfBirth && data.nationality;
-        const hasIdentityDocument = data.identityProof;
+        const hasIdentityDocument = data.identityProof && (data.identityProof instanceof File || data.identityProof.name);
 
         if (hasAllIdentityFields && hasIdentityDocument) {
-          // Also update credit check status when identity is complete
-          updateFormData('creditCheck', {
-            firstName: data.firstName,
-            lastName: data.lastName,
-            email: data.email,
-            phoneNumber: data.phoneNumber,
-            dateOfBirth: data.dateOfBirth
-          });
           return 'complete';
         }
         if (hasAllIdentityFields || hasIdentityDocument || data.firstName || data.lastName ||
@@ -289,7 +439,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 'employment':
         const hasAllEmploymentFields = data.employmentStatus && data.companyDetails && data.jobPosition &&
           data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType && data.lengthOfEmployment;
-        const hasEmploymentDocument = data.proofDocument;
+        const hasEmploymentDocument = data.proofDocument && (data.proofDocument instanceof File || data.proofDocument.name);
 
         if (hasAllEmploymentFields && hasEmploymentDocument)
           return 'complete';
@@ -302,18 +452,18 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 'residential':
         const hasAllResidentialFields = data.currentAddress && data.durationAtCurrentAddress &&
           data.previousAddress && data.durationAtPreviousAddress && data.reasonForLeaving && data.proofType;
-        const hasResidentialDocument = data.proofDocument;
+        const hasResidentialDocument = data.proofDocument && (data.proofDocument instanceof File || data.proofDocument.name);
 
         if (hasAllResidentialFields && hasResidentialDocument)
           return 'complete';
         if (hasAllResidentialFields || hasResidentialDocument || data.currentAddress || data.durationAtCurrentAddress ||
-          data.previousAddress || data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType)
+          data.previousAddress || data.alreadyHavePropertyAddress || data.propertyAddress || data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType)
           return 'partial';
         return 'empty';
 
       case 'financial':
         const hasAllFinancialFields = data.proofOfIncomeType && data.monthlyIncome;
-        const hasFinancialDocument = data.proofOfIncomeDocument;
+        const hasFinancialDocument = data.proofOfIncomeDocument && (data.proofOfIncomeDocument instanceof File || data.proofOfIncomeDocument.name);
 
         if (hasAllFinancialFields && hasFinancialDocument)
           return 'complete';
@@ -323,7 +473,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
       case 'guarantor':
         const hasAllGuarantorFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
-        const hasGuarantorDocument = data.identityDocument;
+        const hasGuarantorDocument = data.identityDocument && (data.identityDocument instanceof File || data.identityDocument.name);
 
         if (hasAllGuarantorFields && hasGuarantorDocument)
           return 'complete';
@@ -333,7 +483,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         return 'empty';
 
       case 'creditCheck':
-        // Check identity data directly from formData
         const identityData = formData.identity || {};
         const hasCriticalIdentityInfo =
           identityData.firstName &&
@@ -424,20 +573,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   }, [user]);
 
-  // Load data from local storage on mount
-  useEffect(() => {
-    if (user?.id) {
-      const saved = localStorage.getItem(`referencing_${user.id}_formData`);
-      if (saved) {
-        try {
-          setFormData(JSON.parse(saved));
-        } catch (e) {
-          console.error('Failed to parse saved form data:', e);
-        }
-      }
-    }
-  }, [user]);
-
+  // Update saveCurrentStep to handle file storage
   const saveCurrentStep = async () => {
     try {
       setIsSaving(true);
@@ -462,110 +598,28 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         7: 'agentDetails'
       } as const;
 
+      type SectionKey = keyof typeof currentSections;
+      type SectionValue = typeof currentSections[SectionKey];
+
       const currentSection = currentSections[currentStep as keyof typeof currentSections];
-      const currentStepData = formData[currentSection];
+      const currentStepData = formData[currentSection as keyof FormData];
 
       if (!currentStepData) {
         throw new Error('No data to save for current step');
       }
 
-      // First save to local storage as backup
-      try {
-        localStorage.setItem(`referencing_${userId}_${currentSection}`, JSON.stringify(currentStepData));
-      } catch (error) {
-        console.error('Error saving to local storage:', error);
-        // Continue execution - local storage failure shouldn't stop Cosmos DB save
-      }
+      // Save to localStorage
+      localStorage.setItem(`referencing_${userId}_${currentSection}`, JSON.stringify(currentStepData));
+      localStorage.setItem(`referencing_${userId}_stepStatus`, JSON.stringify(stepStatus));
 
-      // Then try to save to Cosmos DB via backend service
-      let saveResult;
-      try {
-        switch (currentStep) {
-          case 1:
-            saveResult = await referencingService.saveIdentityData(userId, {
-              ...formData.identity,
-              // Convert File objects to base64 if needed
-              identityProof: formData.identity.identityProof ? {
-                name: formData.identity.identityProof.name,
-                type: formData.identity.identityProof.type,
-                size: formData.identity.identityProof.size
-              } : null
-            });
-            break;
-          case 2:
-            saveResult = await referencingService.saveEmploymentData(userId, {
-              ...formData.employment,
-              proofDocument: formData.employment.proofDocument ? {
-                name: formData.employment.proofDocument.name,
-                type: formData.employment.proofDocument.type,
-                size: formData.employment.proofDocument.size
-              } : null
-            });
-            break;
-          case 3:
-            saveResult = await referencingService.saveResidentialData(userId, {
-              ...formData.residential,
-              proofDocument: formData.residential.proofDocument ? {
-                name: formData.residential.proofDocument.name,
-                type: formData.residential.proofDocument.type,
-                size: formData.residential.proofDocument.size
-              } : null
-            });
-            break;
-          case 4:
-            saveResult = await referencingService.saveFinancialData(userId, {
-              ...formData.financial,
-              proofOfIncomeDocument: formData.financial.proofOfIncomeDocument ? {
-                name: formData.financial.proofOfIncomeDocument.name,
-                type: formData.financial.proofOfIncomeDocument.type,
-                size: formData.financial.proofOfIncomeDocument.size
-              } : null
-            });
-            break;
-          case 5:
-            saveResult = await referencingService.saveGuarantorData(userId, formData.guarantor);
-            break;
-          case 7:
-            saveResult = await referencingService.saveAgentDetailsData(userId, formData.agentDetails);
-            break;
-          default:
-            throw new Error('Invalid step');
-        }
+      // Update last saved timestamp
+      setLastSavedSteps(prev => ({
+        ...prev,
+        [currentStep]: new Date()
+      }));
 
-        if (!saveResult) {
-          throw new Error('Save operation failed');
-        }
-
-        // Update last saved timestamp
-        setLastSavedSteps(prev => ({
-          ...prev,
-          [currentStep]: new Date()
-        }));
-
-        // Show success message
-        alert('Data saved successfully to both local storage and database!');
-
-      } catch (error: any) {
-        console.error('Error saving to backend:', error);
-        alert('Data saved locally but failed to sync with database. Changes will be synced when connection is restored.');
-
-        // Store failed operation for later retry
-        const failedOp = {
-          userId,
-          step: currentStep,
-          section: currentSection,
-          data: currentStepData,
-          timestamp: new Date().toISOString()
-        };
-
-        try {
-          const failedOps = JSON.parse(localStorage.getItem('failed_referencing_ops') || '[]');
-          failedOps.push(failedOp);
-          localStorage.setItem('failed_referencing_ops', JSON.stringify(failedOps));
-        } catch (e) {
-          console.error('Error storing failed operation:', e);
-        }
-      }
+      // Show success message
+      alert('Data saved successfully!');
 
     } catch (error: any) {
       console.error('Error in save operation:', error);
@@ -574,6 +628,59 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       setIsSaving(false);
     }
   };
+
+  // Update useEffect for loading stored data to properly handle files and status
+  useEffect(() => {
+    if (user?.id) {
+      try {
+        // Load step status
+        const savedStatus = localStorage.getItem(`referencing_${user.id}_stepStatus`);
+        if (savedStatus) {
+          setStepStatus(JSON.parse(savedStatus));
+        }
+
+        // Load form data for each section
+        const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'creditCheck', 'agentDetails'];
+        const loadedFormData: any = {};
+
+        sections.forEach(section => {
+          const savedData = localStorage.getItem(`referencing_${user.id}_${section}`);
+          if (savedData) {
+            const sectionData = JSON.parse(savedData);
+            loadedFormData[section] = sectionData;
+
+            // Update step status based on loaded data
+            const stepIndex = {
+              identity: 1,
+              employment: 2,
+              residential: 3,
+              financial: 4,
+              guarantor: 5,
+              creditCheck: 6,
+              agentDetails: 7
+            }[section];
+
+            if (stepIndex) {
+              const status = determineStepStatus(section as keyof FormData, sectionData);
+              setStepStatus(prev => ({
+                ...prev,
+                [stepIndex]: status
+              }));
+            }
+          }
+        });
+
+        if (Object.keys(loadedFormData).length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            ...loadedFormData
+          }));
+        }
+      } catch (e) {
+        console.error('Failed to load saved data:', e);
+      }
+    }
+  }, [user]);
 
   const goToStep = (step: number) => {
     setCurrentStep(step);
@@ -639,13 +746,15 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         throw new Error('Agent email is required. Please complete the Agent Details section.');
       }
 
-      // Prepare attachments array
+      // Prepare attachments array with proper naming for zip organization
       const attachments: Attachment[] = [];
 
-      // Helper function to add file if it exists
-      const addFileToAttachments = (file: File | null, prefix: string) => {
+      // Helper function to add file if it exists with proper naming for zip folders
+      const addFileToAttachments = (file: File | null, prefix: string, section: string) => {
         if (file && file instanceof File) {
-          const fileName = `${prefix}_${formData.identity?.firstName || 'unknown'}_${formData.identity?.lastName || 'unknown'}.${file.name.split('.').pop()}`;
+          const fileExtension = file.name.split('.').pop();
+          const sanitizedName = `${formData.identity?.firstName || 'unknown'}_${formData.identity?.lastName || 'unknown'}`;
+          const fileName = `${section}/${prefix}_${sanitizedName}.${fileExtension}`;
           attachments.push({
             filename: fileName,
             content: file
@@ -653,51 +762,88 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         }
       };
 
-      // Add all available files
+      // Add all files with proper folder structure
       if (formData.identity?.identityProof) {
-        addFileToAttachments(formData.identity.identityProof, 'identity_proof');
+        addFileToAttachments(
+          formData.identity.identityProof,
+          'identity_proof',
+          '1_Identity_Documents'
+        );
       }
+
       if (formData.employment?.proofDocument) {
-        addFileToAttachments(formData.employment.proofDocument, 'employment_proof');
+        addFileToAttachments(
+          formData.employment.proofDocument,
+          'employment_proof',
+          '2_Employment_Documents'
+        );
       }
+
       if (formData.residential?.proofDocument) {
-        addFileToAttachments(formData.residential.proofDocument, 'residential_proof');
+        addFileToAttachments(
+          formData.residential.proofDocument,
+          'residential_proof',
+          '3_Residential_Documents'
+        );
       }
+
       if (formData.financial?.proofOfIncomeDocument) {
-        addFileToAttachments(formData.financial.proofOfIncomeDocument, 'income_proof');
+        addFileToAttachments(
+          formData.financial.proofOfIncomeDocument,
+          'income_proof',
+          '4_Financial_Documents'
+        );
       }
+
       if (formData.guarantor?.identityDocument) {
-        addFileToAttachments(formData.guarantor.identityDocument, 'guarantor_proof');
+        addFileToAttachments(
+          formData.guarantor.identityDocument,
+          'guarantor_proof',
+          '5_Guarantor_Documents'
+        );
       }
 
-      // Prepare email content with form data
-      const emailContent = {
-        to: agentEmail,
-        subject: `New Referencing Application from ${formData.identity?.firstName} ${formData.identity?.lastName}`,
-        attachments,
-        formData
-      };
-
-      // Send email using the email service
-      const emailSent = await emailService.sendEmail(emailContent);
-
-      if (!emailSent) {
-        throw new Error('Failed to send email');
-      }
-
-      // Clear local storage after successful submission
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith(`referencing_${userId}`)) {
-          localStorage.removeItem(key);
+      // Submit the application
+      const submissionResult = await referencingService.submitApplication(userId, {
+        formData,
+        emailContent: {
+          to: agentEmail,
+          subject: `New Tenant Application${formData.residential?.propertyAddress ? ` - ${formData.residential.propertyAddress}` : ''}`,
+          attachments,
+          formData // Pass the entire formData for email template generation
         }
       });
 
-      // Show success modal instead of alert
+      if (!submissionResult.success) {
+        throw new Error(submissionResult.message || 'Failed to submit application');
+      }
+
+      // Send emails to all recipients
+      const emailResults = await emailService.sendMultipleEmails(formData, attachments);
+
+      if (emailResults.error) {
+        console.error('Error sending some emails:', emailResults.error);
+      }
+
+      // Log email sending results
+      console.log('Email sending results:', {
+        agent: emailResults.agent,
+        referee: emailResults.referee,
+        guarantor: emailResults.guarantor
+      });
+
+      // Show success modal
       setShowSuccessModal(true);
+
+      // Don't clear local storage immediately after submission
+      // Instead, mark the submission as complete
+      if (userId) {
+        localStorage.setItem(`referencing_${userId}_submitted`, 'true');
+      }
+
     } catch (error) {
       console.error('Error submitting application:', error);
-      // Show error in a modal instead of alert
-      setShowWarningModal(true);
+      alert(error instanceof Error ? error.message : 'Failed to submit application');
     } finally {
       setIsSubmitting(false);
     }
@@ -790,6 +936,21 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       }));
     }
   }, [formData.identity]);
+
+  // Add cleanup effect when modal is closed
+  useEffect(() => {
+    if (!isOpen && user?.id) {
+      const isSubmitted = localStorage.getItem(`referencing_${user.id}_submitted`) === 'true';
+      if (isSubmitted) {
+        // Clear storage only if the form was successfully submitted
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith(`referencing_${user.id}`)) {
+            localStorage.removeItem(key);
+          }
+        });
+      }
+    }
+  }, [isOpen, user]);
 
   const renderFormContent = () => {
     switch (currentStep) {
@@ -1124,6 +1285,34 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
             <div className="mb-6">
               <h2 className="text-xl font-semibold text-gray-800">Fill in your residential details below</h2>
             </div>
+
+            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
+              <div className="col-span-2">
+                <label className="block text-gray-700 mb-2">Do you already have a property you're interested in renting?</label>
+                <select
+                  value={formData.residential.alreadyHavePropertyAddress}
+                  onChange={(e) => updateFormData('residential', { alreadyHavePropertyAddress: e.target.value })}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${!formData.residential.alreadyHavePropertyAddress ? 'text-gray-400' : 'text-gray-900'}`}
+                >
+                  <option value="" disabled>Select</option>
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                </select>
+                {formData.residential.alreadyHavePropertyAddress === 'Yes' && (
+                  <div className="mt-4">
+                    <label className="block text-gray-700 mb-2">Property Address</label>
+                    <textarea
+                      value={formData.residential.propertyAddress}
+                      onChange={(e) => updateFormData('residential', { propertyAddress: e.target.value })}
+                      rows={4}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Enter the address of the property you're interested in"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
               <div className="col-span-1">
                 <label className="block text-gray-700 mb-2">Reason for leaving Previous Address</label>
@@ -1166,8 +1355,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   <option value="Less than 1 year">Less than 1 year</option>
                   <option value="1-2 years">1-2 years</option>
                   <option value="2-3 years">2-3 years</option>
-                  <option value="3-5 years">3-5 years</option>
-                  <option value="5+ years">5+ years</option>
                 </select>
               </div>
               <div className="col-span-1">

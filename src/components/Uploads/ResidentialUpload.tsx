@@ -1,24 +1,64 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-const ResidentialUpload = ({ updateFormData, formData }) => {
-  const [selectedFile, setSelectedFile] = useState(null);
+interface StoredFile {
+  name: string;
+  type: string;
+  size: number;
+  lastModified: number;
+  dataUrl: string;
+}
 
-  const handleFileChange = (event) => {
+interface ResidentialUploadProps {
+  updateFormData: (section: string, data: any) => void;
+  formData: any;
+}
+
+const ResidentialUpload: React.FC<ResidentialUploadProps> = ({ updateFormData, formData }) => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  // Load file from formData on mount
+  useEffect(() => {
+    if (formData?.residential?.proofDocument?.dataUrl) {
+      setPreview(formData.residential.proofDocument.dataUrl);
+    }
+  }, [formData]);
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
       setSelectedFile(file);
-      updateFormData("residential", { proofDocument: file });
+
+      // Convert file to base64 for storage
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        setPreview(dataUrl);
+
+        // Create StoredFile object
+        const storedFile: StoredFile = {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          lastModified: file.lastModified,
+          dataUrl: dataUrl
+        };
+
+        // Update form data with stored file
+        updateFormData("residential", { proofDocument: storedFile });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   return (
     <div className="mt-8">
       {/* Heading */}
-      <h2 className="text-lg font-semibold mb-2">Proof of Address</h2>
+      <h2 className="text-lg font-semibold mb-2">Residential Documents</h2>
 
       {/* Label */}
       <label className="block text-gray-700 mb-2">
-        Please upload a document to verify your current address <span className="text-red-500">*</span>
+        Proof of Address <span className="text-red-500">*</span>
       </label>
 
       {/* Drag and Drop File Upload */}
@@ -27,21 +67,48 @@ const ResidentialUpload = ({ updateFormData, formData }) => {
           htmlFor="residential-proof-upload"
           className="cursor-pointer flex flex-col items-center justify-center"
         >
-          {/* Upload Icon */}
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-blue-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
+          {!preview ? (
+            <>
+              {/* Upload Icon */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-blue-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
 
-          {/* Drag and Drop Text */}
-          <p className="text-gray-600">Drag and drop or click to select</p>
+              {/* Drag and Drop Text */}
+              <p className="text-gray-600">Drag and drop or click to select</p>
 
-          {/* Accepted Formats */}
-          <p className="text-gray-500 text-sm mt-1">
-            Accepted formats: <span className="font-semibold">.PDF, .DOC, .DOCX, .JPG, .JPEG, .PNG</span>
-          </p>
+              {/* Accepted Formats */}
+              <p className="text-gray-500 text-sm mt-1">
+                Accepted formats: <span className="font-semibold">.PDF, .DOC, .DOCX, .JPG, .JPEG, .PNG</span>
+              </p>
 
-          {/* File Size Limit */}
-          <p className="text-gray-500 text-sm">Maximum file size: 5.0 MB</p>
+              {/* File Size Limit */}
+              <p className="text-gray-500 text-sm">Maximum file size: 5.0 MB</p>
+            </>
+          ) : (
+            <div className="w-full">
+              <div className="flex items-center justify-center mb-4">
+                {formData?.residential?.proofDocument?.type?.startsWith('image/') ? (
+                  <img src={preview} alt="Preview" className="max-h-32 max-w-full object-contain" />
+                ) : (
+                  <div className="p-4 bg-gray-100 rounded">
+                    <p className="text-gray-600">{formData?.residential?.proofDocument?.name}</p>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  setSelectedFile(null);
+                  setPreview(null);
+                  updateFormData("residential", { proofDocument: null });
+                }}
+                className="text-red-500 hover:text-red-700"
+              >
+                Remove File
+              </button>
+            </div>
+          )}
         </label>
 
         {/* Hidden File Input */}
@@ -52,23 +119,11 @@ const ResidentialUpload = ({ updateFormData, formData }) => {
           accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
           onChange={handleFileChange}
         />
-
-        {/* Upload Button */}
-        <button className="mt-4 bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">
-          Upload File
-        </button>
-
-        {/* Display Selected File */}
-        {selectedFile && (
-          <div className="mt-2 text-green-600">
-            File selected: {selectedFile.name}
-          </div>
-        )}
       </div>
 
       {/* Helper Text */}
       <p className="text-gray-500 text-sm mt-2">
-        Please upload a recent utility bill, bank statement, or council tax bill showing your current address
+        Please upload a clear copy of your proof of address document
       </p>
     </div>
   );
