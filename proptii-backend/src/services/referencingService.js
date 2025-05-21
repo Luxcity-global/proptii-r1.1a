@@ -1,144 +1,125 @@
-// In-memory storage for development
-const storage = {
-  identityData: new Map(),
-  employmentData: new Map(),
-  residentialData: new Map(),
-  financialData: new Map(),
-  guarantorData: new Map(),
-  agentData: new Map()
-};
+import { CosmosClient } from '@azure/cosmos';
+import * as dotenv from 'dotenv';
 
-// Save identity data
-const saveIdentityData = async (userId, data) => {
-  try {
-    storage.identityData.set(userId, { ...data, updatedAt: new Date() });
-    return { success: true, message: 'Identity data saved successfully' };
-  } catch (err) {
-    console.error('Error saving identity data:', err);
-    throw err;
+dotenv.config();
+
+class ReferencingService {
+  constructor() {
+    // Verify required environment variables
+    const requiredEnvVars = ['COSMOS_DB_ENDPOINT', 'COSMOS_DB_KEY', 'COSMOS_DB_NAME', 'COSMOS_DB_CONTAINER'];
+    const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+    if (missingVars.length > 0) {
+      console.error('Missing required environment variables:', missingVars);
+      throw new Error('Missing required CosmosDB configuration');
+    }
+
+    // Initialize CosmosDB client
+    this.client = new CosmosClient({
+      endpoint: process.env.COSMOS_DB_ENDPOINT,
+      key: process.env.COSMOS_DB_KEY
+    });
+
+    this.database = this.client.database(process.env.COSMOS_DB_NAME);
+    this.container = this.database.container(process.env.COSMOS_DB_CONTAINER);
   }
-};
 
-// Save employment data
-const saveEmploymentData = async (userId, data) => {
-  try {
-    storage.employmentData.set(userId, { ...data, updatedAt: new Date() });
-    return { success: true, message: 'Employment data saved successfully' };
-  } catch (err) {
-    console.error('Error saving employment data:', err);
-    throw err;
+  async submitApplication(data) {
+    try {
+      console.log('Processing application submission:', {
+        userId: data.userId,
+        type: data.type
+      });
+
+      // Save all form sections
+      const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'agentDetails'];
+      const savedSections = await Promise.all(
+        sections.map(section =>
+          this.saveFormSection(data.userId, section, data.formData[section])
+        )
+      );
+
+      // Create submission record
+      const submissionRecord = {
+        id: `submission_${data.userId}_${Date.now()}`,
+        userId: data.userId,
+        type: 'submission',
+        status: 'submitted',
+        timestamp: new Date().toISOString(),
+        formData: data.formData,
+        sections: savedSections.map(section => section.id)
+      };
+
+      const { resource: submission } = await this.container.items.create(submissionRecord);
+
+      console.log('Application submitted successfully:', {
+        submissionId: submission.id,
+        userId: data.userId
+      });
+
+      return {
+        success: true,
+        id: submission.id,
+        message: 'Application submitted successfully'
+      };
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      throw error;
+    }
   }
-};
 
-// Save residential data
-const saveResidentialData = async (userId, data) => {
-  try {
-    storage.residentialData.set(userId, { ...data, updatedAt: new Date() });
-    return { success: true, message: 'Residential data saved successfully' };
-  } catch (err) {
-    console.error('Error saving residential data:', err);
-    throw err;
+  async saveFormSection(userId, section, data) {
+    try {
+      if (!userId || !section || !data) {
+        throw new Error('Missing required parameters');
+      }
+
+      const record = {
+        id: `${section}_${userId}_${Date.now()}`,
+        userId,
+        type: section,
+        data,
+        timestamp: new Date().toISOString()
+      };
+
+      const { resource } = await this.container.items.create(record);
+
+      console.log(`Saved ${section} data:`, {
+        id: resource.id,
+        userId,
+        type: section
+      });
+
+      return resource;
+    } catch (error) {
+      console.error(`Error saving ${section} data:`, error);
+      throw error;
+    }
   }
-};
 
-// Save financial data
-const saveFinancialData = async (userId, data) => {
-  try {
-    storage.financialData.set(userId, { ...data, updatedAt: new Date() });
-    return { success: true, message: 'Financial data saved successfully' };
-  } catch (err) {
-    console.error('Error saving financial data:', err);
-    throw err;
+  async getFormData(userId) {
+    try {
+      const querySpec = {
+        query: 'SELECT * FROM c WHERE c.userId = @userId',
+        parameters: [{ name: '@userId', value: userId }]
+      };
+
+      const { resources } = await this.container.items.query(querySpec).fetchAll();
+
+      // Group data by section type
+      const formData = resources.reduce((acc, item) => {
+        if (item.type !== 'submission') {
+          acc[item.type] = item.data;
+        }
+        return acc;
+      }, {});
+
+      return formData;
+    } catch (error) {
+      console.error('Error getting form data:', error);
+      throw error;
+    }
   }
-};
+}
 
-// Save guarantor data
-const saveGuarantorData = async (userId, data) => {
-  try {
-    storage.guarantorData.set(userId, { ...data, updatedAt: new Date() });
-    return { success: true, message: 'Guarantor data saved successfully' };
-  } catch (err) {
-    console.error('Error saving guarantor data:', err);
-    throw err;
-  }
-};
-
-// Save agent details data
-const saveAgentDetailsData = async (userId, data) => {
-  try {
-    storage.agentData.set(userId, { ...data, updatedAt: new Date() });
-    return { success: true, message: 'Agent details saved successfully' };
-  } catch (err) {
-    console.error('Error saving agent details:', err);
-    throw err;
-  }
-};
-
-// Get form data
-const getFormData = async (userId) => {
-  try {
-    return {
-      identity: storage.identityData.get(userId) || {},
-      employment: storage.employmentData.get(userId) || {},
-      residential: storage.residentialData.get(userId) || {},
-      financial: storage.financialData.get(userId) || {},
-      guarantor: storage.guarantorData.get(userId) || {},
-      agent: storage.agentData.get(userId) || {}
-    };
-  } catch (err) {
-    console.error('Error getting form data:', err);
-    throw err;
-  }
-};
-
-// Submit complete application
-const submitApplication = async (userId, formData) => {
-  try {
-    // First save all data
-    await saveIdentityData(userId, formData.identity);
-    await saveEmploymentData(userId, formData.employment);
-    await saveResidentialData(userId, formData.residential);
-    await saveFinancialData(userId, formData.financial);
-    await saveGuarantorData(userId, formData.guarantor);
-    await saveAgentDetailsData(userId, formData.agent);
-    
-    // Then mark the application as submitted
-    const pool = await connectToDatabase();
-    
-    await pool.request()
-      .input('userId', sql.NVarChar, userId)
-      .query(`
-        IF EXISTS (SELECT 1 FROM ApplicationStatus WHERE userId = @userId)
-        BEGIN
-          UPDATE ApplicationStatus 
-          SET 
-            status = 'Submitted',
-            updatedAt = GETDATE()
-          WHERE userId = @userId
-        END
-        ELSE
-        BEGIN
-          INSERT INTO ApplicationStatus 
-            (userId, status, submittedAt, updatedAt)
-          VALUES
-            (@userId, 'Submitted', GETDATE(), GETDATE())
-        END
-      `);
-    
-    return { success: true, message: 'Application submitted successfully' };
-  } catch (err) {
-    console.error('Error submitting application:', err);
-    throw err;
-  }
-};
-
-export const referencingService = {
-  saveIdentityData,
-  saveEmploymentData,
-  saveResidentialData,
-  saveFinancialData,
-  saveGuarantorData,
-  saveAgentDetailsData,
-  getFormData,
-  submitApplication
-};
+export const referencingService = new ReferencingService();
