@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv';
 import express from 'express';
 import { referencingService } from '../services/referencingService.js';
-import { EmailClient } from '../services/emailClient.js';
+import { emailService } from '../services/emailService.js';
 import { AzureKeyCredential } from '@azure/core-auth';
 import multer from 'multer';
 
@@ -12,7 +12,8 @@ const router = express.Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB max file size
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+    files: 10 // Maximum 10 files
   }
 });
 
@@ -100,91 +101,128 @@ router.post('/:userId/agent', async (req, res) => {
 });
 
 // Submit application
-router.post('/:userId/submit', async (req, res) => {
+router.post('/submissions', async (req, res) => {
   try {
-    console.log('Submitting application:', req.params.userId);
-    const result = await referencingService.submitApplication(req.params.userId, req.body);
+    console.log('Received submission request:', {
+      userId: req.body.userId,
+      type: req.body.type
+    });
+
+    const result = await referencingService.submitApplication(req.body);
     res.json(result);
   } catch (err) {
     console.error('Error submitting application:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      success: false,
+      error: err.message || 'Failed to submit application'
+    });
   }
 });
 
-// Send email with application details
+// Send email with attachments
 router.post('/send-email', upload.array('attachments'), async (req, res) => {
   try {
-    const { to, subject, html } = req.body;
-    const attachments = req.files || [];
-
     console.log('Received email request:', {
-      to,
-      subject,
-      attachmentsCount: attachments.length
+      to: req.body.to,
+      subject: req.body.subject,
+      attachmentsCount: req.files?.length || 0,
+      emailType: req.body.emailType || 'agent'
     });
 
-    // Configure email service
-    const emailConfig = {
-      endpoint: process.env.EMAIL_SERVICE_ENDPOINT,
-      key: process.env.EMAIL_SERVICE_KEY,
-      from: process.env.EMAIL_FROM_ADDRESS || 'noreply@proptii.com'
-    };
+    const formData = JSON.parse(req.body.formData);
+    const attachments = req.files?.map(file => ({
+      filename: file.originalname,
+      content: file.buffer
+    })) || [];
 
-    // Validate email configuration
-    if (!emailConfig.endpoint || !emailConfig.key || !emailConfig.from) {
-      console.error('Missing email configuration:', {
-        hasEndpoint: !!emailConfig.endpoint,
-        hasKey: !!emailConfig.key,
-        hasFrom: !!emailConfig.from
-      });
-      return res.status(500).json({
-        error: 'Email service not properly configured',
-        success: false
-      });
-    }
-
-    // Create email client
-    const emailClient = new EmailClient(emailConfig.endpoint, new AzureKeyCredential(emailConfig.key));
-
-    // Prepare email message
-    const message = {
-      senderAddress: emailConfig.from,
-      content: {
-        subject,
-        html,
-      },
-      recipients: {
-        to: [{ address: to }],
-      },
-    };
-
-    // Add attachments if any
-    if (attachments.length > 0) {
-      message.attachments = attachments.map(file => ({
-        name: file.originalname,
-        contentType: file.mimetype,
-        contentInBase64: file.buffer.toString('base64')
-      }));
-    }
-
-    console.log('Sending email with message:', {
-      to: message.recipients.to,
-      subject: message.content.subject,
-      attachmentsCount: message.attachments?.length || 0
+    const emailResult = await emailService.sendEmail({
+      to: req.body.to,
+      subject: req.body.subject,
+      formData,
+      attachments,
+      submissionId: req.body.submissionId,
+      emailType: req.body.emailType || 'agent'
     });
 
-    // Send email
-    const poller = await emailClient.beginSend(message);
-    await poller.pollUntilDone();
-
-    console.log('Email sent successfully');
-    res.json({ success: true });
+    res.json({
+      success: true,
+      messageId: emailResult.messageId
+    });
   } catch (err) {
     console.error('Error sending email:', err);
     res.status(500).json({
-      error: err.message,
       success: false,
-      details: err.toString()
+      error: err.message || 'Failed to send email'
+    });
+  }
+});
+
+// Send multiple emails (agent, referee, guarantor)
+router.post('/send-multiple-emails', upload.array('attachments'), async (req, res) => {
+  try {
+    console.log('Received multiple email request');
+
+    const formData = JSON.parse(req.body.formData);
+    const attachments = req.files?.map(file => ({
+      filename: file.originalname,
+      content: file.buffer
+    })) || [];
+
+    const results = {
+      agent: false,
+      referee: false,
+      guarantor: false
+    };
+
+    // Send to agent
+    if (formData.agentDetails?.email) {
+      const agentResult = await emailService.sendEmail({
+        to: formData.agentDetails.email,
+        subject: `New Tenant Application${formData.residential?.propertyAddress ? ` - ${formData.residential.propertyAddress}` : ''}`,
+        formData,
+        attachments,
+        submissionId: req.body.submissionId,
+        emailType: 'agent'
+      });
+      results.agent = agentResult.success;
+    }
+
+    // Send to referee
+    if (formData.employment?.referenceEmail) {
+      const refereeResult = await emailService.sendEmail({
+        to: formData.employment.referenceEmail,
+        subject: `Reference Request for ${formData.identity?.firstName} ${formData.identity?.lastName}`,
+        formData,
+        attachments: [],
+        submissionId: req.body.submissionId,
+        emailType: 'referee'
+      });
+      results.referee = refereeResult.success;
+    }
+
+    // Send to guarantor
+    if (formData.guarantor?.email) {
+      const guarantorResult = await emailService.sendEmail({
+        to: formData.guarantor.email,
+        subject: `Guarantor Request for ${formData.identity?.firstName} ${formData.identity?.lastName}`,
+        formData,
+        attachments: [],
+        submissionId: req.body.submissionId,
+        emailType: 'guarantor'
+      });
+      results.guarantor = guarantorResult.success;
+    }
+
+    res.json({
+      success: true,
+      results
+    });
+  } catch (err) {
+    console.error('Error sending multiple emails:', err);
+    res.status(500).json({
+      success: false,
+      error: err.message || 'Failed to send emails',
+      results: err.results || {}
     });
   }
 });
@@ -227,42 +265,25 @@ router.get('/test-email-config', (req, res) => {
 // Test email sending
 router.post('/test-email', async (req, res) => {
   try {
-    // Configure email service
-    const emailConfig = {
-      endpoint: process.env.EMAIL_SERVICE_ENDPOINT,
-      key: process.env.EMAIL_SERVICE_KEY,
-      from: process.env.EMAIL_FROM_ADDRESS
-    };
+    const testHtml = `
+      <h1>Email Service Test</h1>
+      <p>This is a test email from Proptii Referencing System.</p>
+      <p>If you're receiving this, the email service is working correctly!</p>
+      <br>
+      <p>Time sent: ${new Date().toLocaleString()}</p>
+    `;
 
-    // Create email client
-    const emailClient = new EmailClient(emailConfig.endpoint, new AzureKeyCredential(emailConfig.key));
-
-    // Prepare test email message
-    const message = {
-      senderAddress: emailConfig.from,
-      content: {
-        subject: 'Proptii Email Service Test',
-        html: `
-          <h1>Email Service Test</h1>
-          <p>This is a test email from Proptii Referencing System.</p>
-          <p>If you're receiving this, the email service is working correctly!</p>
-          <br>
-          <p>Time sent: ${new Date().toLocaleString()}</p>
-        `,
-      },
-      recipients: {
-        to: [{ address: req.body.email || 'aishadaodu@mail.com' }],
-      },
-    };
-
-    // Send email
-    const poller = await emailClient.beginSend(message);
-    await poller.pollUntilDone();
+    const result = await emailService.sendEmail({
+      to: req.body.email || 'aishadaodu@gmail.com',
+      subject: 'Proptii Email Service Test',
+      html: testHtml
+    });
 
     res.json({
       success: true,
       message: 'Test email sent successfully',
-      sentTo: req.body.email || 'aishadaodu@mail.com'
+      messageId: result.messageId,
+      sentTo: req.body.email || 'aishadaodu@gmail.com'
     });
   } catch (err) {
     console.error('Error sending test email:', err);

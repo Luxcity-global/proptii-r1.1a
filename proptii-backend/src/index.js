@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import referencingRoutes from './routes/referencingRoutes.js';
+import { emailService } from './services/emailService.js';
 
 dotenv.config();
 
@@ -26,6 +27,13 @@ app.get('/', (req, res) => {
   res.send('Proptii Backend API is running!');
 });
 
+// Verify email configuration on startup
+try {
+  await emailService.verifyConnection();
+} catch (error) {
+  console.error('Failed to verify email configuration:', error);
+}
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -39,7 +47,8 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
   console.log('Environment variables loaded:');
-  console.log('EMAIL_SERVICE_ENDPOINT:', process.env.EMAIL_SERVICE_ENDPOINT ? 'Set' : 'Not set');
-  console.log('EMAIL_SERVICE_KEY:', process.env.EMAIL_SERVICE_KEY ? 'Set' : 'Not set');
-  console.log('EMAIL_FROM_ADDRESS:', process.env.EMAIL_FROM_ADDRESS ? 'Set' : 'Not set');
+  console.log('SMTP_HOST:', process.env.SMTP_HOST ? 'Set' : 'Not set');
+  console.log('SMTP_PORT:', process.env.SMTP_PORT ? 'Set' : 'Not set');
+  console.log('SMTP_USER:', process.env.SMTP_USER ? 'Set' : 'Not set');
+  console.log('SMTP_FROM_EMAIL:', process.env.SMTP_FROM_EMAIL ? 'Set' : 'Not set');
 });
