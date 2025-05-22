@@ -78,12 +78,11 @@ const Referencing = () => {
           {/* Left Section - Text Content */}
           <div className="md:w-1/2 space-y-10 md:text-left md:mr-12">
             <h2 className="text-3xl font-bold text-[#136C9E] leading-tight">
-              Steps for referencing
+            All your referencing, sorted in one place
             </h2>
             <p className="text-gray-600 text-lg leading-relaxed">
-              Once successfully verified, users are issued a digital "Rent Passport,"
-              a secure badge of trustworthiness. This streamlined process fosters trust
-              and confidence in every property transaction.
+            No more chasing employers or guarantors. Our platform collects your details, reaches out to your referees, 
+            and shares the full package with agents—fast and securely.
             </p>
             <button
               onClick={handleGetStarted}

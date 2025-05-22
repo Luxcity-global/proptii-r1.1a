@@ -10,27 +10,56 @@ interface FormData {
     subject: string;
     heading: string;
     body: string;
+    email: string;
 }
 
 const HelpFormModal: React.FC<HelpFormModalProps> = ({ isOpen, onClose }) => {
     const [formData, setFormData] = useState<FormData>({
         subject: '',
         heading: '',
-        body: ''
+        body: '',
+        email: ''
     });
     const [showSuccess, setShowSuccess] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Handle form submission here
-        console.log('Form submitted:', formData);
-        // Show success message
-        setShowSuccess(true);
+        setShowSuccess(false);
+        try {
+            console.log('Submitting to:', import.meta.env.VITE_GOOGLE_SHEETS_API_ENDPOINT + '/submit');
+            const response = await fetch(
+                `${import.meta.env.VITE_GOOGLE_SHEETS_API_ENDPOINT}/submit`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        spreadsheetId: '1S7IodtaQ-quVf0e3kvmr2IhTEqvLdGJ6OJDcJAbBvGU',
+                        data: {
+                            timestamp: new Date().toISOString(),
+                            subject: formData.subject,
+                            heading: formData.heading,
+                            body: formData.body,
+                            userEmail: formData.email
+                        }
+                    })
+                }
+            );
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to submit help form');
+            }
+            setShowSuccess(true);
+        } catch (err) {
+            alert('There was an error submitting your request. Please try again later.');
+            console.error('Form submission error:', err);
+        }
     };
 
     const handleSuccessClose = () => {
         setShowSuccess(false);
-        setFormData({ subject: '', heading: '', body: '' });
+        setFormData({ subject: '', heading: '', body: '', email: '' });
         onClose();
     };
 
@@ -97,6 +126,21 @@ const HelpFormModal: React.FC<HelpFormModalProps> = ({ isOpen, onClose }) => {
                                 onChange={(e) => setFormData({ ...formData, body: e.target.value })}
                                 placeholder="Please provide details about your inquiry"
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#136C9E] focus:border-transparent h-32 resize-none"
+                                required
+                            />
+                        </div>
+
+                        {/* Email */}
+                        <div>
+                            <label className="block text-gray-700 mb-2 font-medium">
+                                Your Email
+                            </label>
+                            <input
+                                type="email"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                placeholder="Enter your email address"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#136C9E] focus:border-transparent"
                                 required
                             />
                         </div>

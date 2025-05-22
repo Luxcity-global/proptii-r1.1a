@@ -71,10 +71,10 @@ const BookViewing = () => {
           {/* Left Section - Text Content */}
           <div className="md:w-1/2 space-y-10 md:text-left md:mr-12">
             <h2 className="text-3xl font-bold text-[#136C9E] leading-tight">
-              Steps to book viewing
+            Property viewings made easy.
             </h2>
             <p className="text-gray-600 text-lg leading-relaxed">
-              Streamline Your Home Search Experience: Dive into property details, schedule personalized viewings, and navigate your real estate journey with confidence.
+            Simply share the listing link and your preferred date and time—our AI takes it from there. We’ll contact the agent and confirm your appointment, so you can focus on finding the right home.
             </p>
             <button
               onClick={handleGetStarted}

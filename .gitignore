@@ -23,6 +23,7 @@ api/local.settings.json
 bin/
 obj/
 appsettings.json
+credentials/
 
 # IDE
 .idea/
