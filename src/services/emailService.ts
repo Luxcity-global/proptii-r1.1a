@@ -213,28 +213,42 @@ class EmailService {
       formData.append('formData', JSON.stringify(emailContent.formData));
       formData.append('emailType', emailContent.emailType || 'agent');
 
-      // Add each attachment with its full path structure
-      for (const attachment of emailContent.attachments) {
-        // Create a new filename that includes the folder structure
-        const folderPath = attachment.filename.split('/')[0]; // Get the folder name (e.g., "1_Identity_Documents")
-        const actualFileName = attachment.filename.split('/')[1]; // Get the actual filename
+      // Only create zip file for agent emails
+      if (emailContent.emailType === 'agent' && emailContent.attachments.length > 0) {
+        // Create zip file
+        const zip = new JSZip();
 
-        // Create a new File object with the folder path in the filename
-        const fileBlob = new Blob([await attachment.content.arrayBuffer()], { type: attachment.content.type });
-        const fileWithPath = new File([fileBlob], `${folderPath}/${actualFileName}`, { type: attachment.content.type });
+        // Create folders for different types of documents
+        const folders = {
+          '1_Identity_Documents': zip.folder('1_Identity_Documents'),
+          '2_Employment_Documents': zip.folder('2_Employment_Documents'),
+          '3_Residential_Documents': zip.folder('3_Residential_Documents'),
+          '4_Financial_Documents': zip.folder('4_Financial_Documents'),
+          '5_Guarantor_Documents': zip.folder('5_Guarantor_Documents')
+        };
 
-        formData.append('attachments', fileWithPath);
-      }
+        // Add files to their respective folders
+        for (const attachment of emailContent.attachments) {
+          const folderPath = attachment.filename.split('/')[0];
+          const fileName = attachment.filename.split('/')[1];
+          const folder = folders[folderPath as keyof typeof folders];
 
-      // Log the FormData contents for debugging
-      for (const pair of formData.entries()) {
-        if (pair[1] instanceof File) {
-          console.log('Attachment:', {
-            name: pair[1].name,
-            size: pair[1].size,
-            type: pair[1].type
-          });
+          if (folder) {
+            const fileArrayBuffer = await attachment.content.arrayBuffer();
+            folder.file(fileName, fileArrayBuffer);
+          }
         }
+
+        // Generate zip file
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const zipFile = new File(
+          [zipBlob],
+          `${emailContent.formData.identity.firstName}_${emailContent.formData.identity.lastName}_Documents.zip`,
+          { type: 'application/zip' }
+        );
+
+        // Add zip file to FormData
+        formData.append('attachments', zipFile);
       }
 
       // Send to backend
@@ -307,7 +321,7 @@ class EmailService {
       if (guarantor.email) {
         const guarantorResult = await this.sendEmail({
           to: guarantor.email,
-          subject: `Guarantor Request for ${identity.firstName} ${identity.lastName}`,
+          subject: `You've Been Chosen as a Guarantor by ${identity.firstName} ${identity.lastName}`,
           formData,
           attachments: [],
           emailType: 'guarantor'

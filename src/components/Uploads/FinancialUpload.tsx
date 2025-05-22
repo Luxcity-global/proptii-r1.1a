@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
+import { Upload, X } from 'lucide-react';
+import { FormData } from '../ReferencingModal';
 
 interface StoredFile {
   name: string;
@@ -9,8 +11,8 @@ interface StoredFile {
 }
 
 interface FinancialUploadProps {
-  updateFormData: (section: string, data: any) => void;
-  formData: any;
+  updateFormData: (step: keyof FormData, data: Partial<FormData[keyof FormData]>) => void;
+  formData: FormData;
 }
 
 const FinancialUpload: React.FC<FinancialUploadProps> = ({ updateFormData, formData }) => {
@@ -96,7 +98,7 @@ const FinancialUpload: React.FC<FinancialUploadProps> = ({ updateFormData, formD
                   </div>
                 )}
               </div>
-              <button 
+              <button
                 onClick={(e) => {
                   e.preventDefault();
                   setSelectedFile(null);

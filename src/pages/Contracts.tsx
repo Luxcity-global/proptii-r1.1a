@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import ContractModal from '../components/contract/ContractModal';
+import '../styles/typing.css';
 
 
 const ContractsPage = () => {
@@ -22,14 +23,14 @@ const ContractsPage = () => {
   return (
     <div className="min-h-screen font-nunito">
       <Navbar />
-      
+
       {/* Hero Section - always visible regardless of authentication status */}
       <section className="h-[80vh] relative flex items-center overflow-hidden">
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
-          <img 
-            src="/images/01_Man_Woman_Office_BG.jpg" 
-            alt="Family enjoying dinner together" 
+          <img
+            src="/images/01_Man_Woman_Office_BG.jpg"
+            alt="Family enjoying dinner together"
             className="w-full h-full object-cover"
             loading="eager"
           />
@@ -40,20 +41,16 @@ const ContractsPage = () => {
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center w-full">
           {/* Main Heading */}
           <h3 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight text-white">
-          Streamline Your Lease<br />
-          Agreements
+          Rental Agreements Made Simple.<br />
           </h3>
-          
+
           {/* Subheading */}
           <p className="text-xl md:text-2xl mb-12 max-w-3xl mx-auto font-light text-white">
-            Save time and reduce errors with our contract management
-            solution. We offer a range of customizable lease agreement
-            templates to suit your specific needs.
+          Fast digital signing, safe storage, and effortless sharing.
           </p>
 
           <button
-            onClick={handleGetStarted}
-            className="bg-primary text-white px-10 py-4 rounded-lg hover:bg-opacity-90 transition-all text-xl font-medium"
+            className="bg-primary text-white px-10 py-4 rounded-full hover:bg-opacity-90 transition-all text-xl font-medium"
           >
             {isAuthenticated ? 'Start Contracts' : 'Get Started'}
           </button>
@@ -64,32 +61,45 @@ const ContractsPage = () => {
       <section className="py-20 bg-white relative overflow-hidden">
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
-          <img 
-            src="/images/Contract-bg.png" 
-            alt="Contracts background" 
+          <img
+            src="/images/Contract-bg.png"
+            alt="Contracts background"
             className="w-full h-full object-cover"
             loading="eager"
           />
         </div>
-        
-        <div className="relative z-10 max-w-7xl mx-auto px-4 md:pl-14">
+
+        {/* Coming Soon Overlay */}
+        <div className="absolute inset-0 z-20 bg-black bg-opacity-70 flex flex-col items-center justify-center">
+          <h3 className="text-4xl md:text-6xl text-white font-bold mb-4 animate-pulse">
+            Coming Soon
+          </h3>
+          <div className="typing-text">
+            <p className="text-xl text-white opacity-80">
+              We're working hard to bring you this feature
+            </p>
+          </div>
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 md:pl-14 opacity-50">
           <div className="flex flex-col md:flex-row items-center justify-between space-y-8 md:space-y-0 md:space-x-8">
             <div className="md:w-1/2 text-left space-y-14">
-              <h2 className="text-4xl md:text-5xl font-bold font-archive text-[#136C9E]">Contracts</h2>
+              <h2 className="text-4xl md:text-5xl font-bold font-archive text-[#136C9E]">Securely store rental documents.</h2>
               <p className="text-lg text-gray-600">
-                Invite your agent or landlord to submit your contract for review and signing. Upon signing, the contract will be forwarded to your agent and landlord, and a copy will be securely stored here for your records.
+              Our platform lets tenants sign contracts digitally, store them safely, and share instantly with landlords or agents—no more printing, scanning, or searching.
               </p>
               <button
                 onClick={handleGetStarted}
                 className="bg-[#E76F51] text-white px-6 py-3 rounded-md hover:bg-opacity-90 transition-all text-lg font-medium"
+                disabled
               >
                 Get started
               </button>
             </div>
             <div className="md:w-1/2 mt-8 md:mt-0 flex justify-center">
-              <img 
-                src="/images/R 9.png" 
-                alt="Contract illustration" 
+              <img
+                src="/images/R 9.png"
+                alt="Contract illustration"
                 className="w-2.5/4 h-auto"
               />
             </div>
@@ -102,7 +112,7 @@ const ContractsPage = () => {
 
       <FAQSection />
       <Footer />
-      
+
       {/* Contracts Modal
       <ContractsManagementModal 
         isOpen={isModalOpen}
