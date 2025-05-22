@@ -10,7 +10,7 @@ const AgentHome = () => {
 
   return (
     <div className="min-h-screen font-nunito">
-      <Navbar />
+      <Navbar isAgent={true} />
 
       {/* Hero Section */}
       <section className="h-[80vh] relative flex items-center">

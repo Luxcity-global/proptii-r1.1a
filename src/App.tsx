@@ -27,6 +27,7 @@ import AboutUs from './pages/AboutUs';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import FAQ from './pages/FAQ';
+import AgentContractLanding from './pages/AgentContractLanding';
 
 export const App: React.FC = () => {
   return (
@@ -47,6 +48,7 @@ export const App: React.FC = () => {
 
             {/* Protected Routes */}
             <Route path="/agent" element={<AgentHome />} />
+            <Route path="/Agent" element={<AgentHome />} />
 
             <Route path="/referencing" element={<Referencing />} />
 
@@ -71,6 +73,9 @@ export const App: React.FC = () => {
               <Route path="your-files" element={<FileTable />} />
               <Route path="tenant-referencing" element={<TenantReferencing />} />
             </Route>
+
+            {/* New agent contract route */}
+            <Route path="/agent-contracts" element={<AgentContractLanding />} />
 
             {/* Catch-all route for 404 */}
             <Route path="*" element={<NotFoundPage />} />

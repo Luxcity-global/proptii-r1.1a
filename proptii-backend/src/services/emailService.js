@@ -287,41 +287,35 @@ class EmailService {
           .footer-desc { font-style: italic; color: #555; margin-top: 10px; }
           .footer-link { color: #136C9E; text-decoration: underline; }
           hr { border: none; border-top: 1px solid #bbb; margin: 24px 0 16px 0; }
+          .button { display: inline-block; padding: 10px 20px; background-color: #136C9E; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+          .button:hover { background-color: #0F5A82; }
+          .agent-info { background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }
         </style>
       </head>
       <body>
-        <h2>Employment Reference Request</h2>
+        <p>Hi ${employment.referenceFullName || ''},</p>
         
-        <p>Dear ${employment.referenceFullName || ''},</p>
+        <p>${identity.firstName} ${identity.lastName} has listed you as a referee in their tenancy application on Proptii.</p>
         
-        <p>${identity.firstName || ''} ${identity.lastName || ''} has provided your contact details as an employment reference for their rental application.</p>
-        
-        <div class="section">
-          <div class="section-title">Reference Request Details</div>
-          <div class="info-item">Applicant Name: ${identity.firstName || ''} ${identity.lastName || ''}</div>
-          <div class="info-item">Company: ${employment.companyDetails || ''}</div>
-          <div class="info-item">Position: ${employment.jobPosition || ''}</div>
-          <div class="info-item">Employment Duration: ${employment.lengthOfEmployment || ''} years</div>
-        </div>
-        
-        <p>We would greatly appreciate if you could verify the following information:</p>
+        <p>We kindly ask you to confirm the following:</p>
         <ul>
-          <li>Confirmation of employment status and duration</li>
-          <li>Current position and salary range</li>
-          <li>Reliability and punctuality</li>
-          <li>Any additional information that might be relevant</li>
+          <li>Their current employment status</li>
+          <li>A brief note on their character and reliability</li>
         </ul>
         
-        <p>Please respond to this email with the requested information. Your response will be treated confidentially and will only be used for the purpose of this rental application.</p>
+        <p>Please complete the short reference form using the link below:</p>
+        <p><a href="https://docs.google.com/forms/d/e/1FAIpQLScPCYOvh4O-RuceRjFc5BTmghho1QmhHlGu9jkEA5uSSGaZ3g/viewform?usp=preview" style="color: #136C9E; text-decoration: none;">👉 Complete Reference Form</a></p>
         
-        <div class="section">
-          <div class="section-title">Agent Contact Information</div>
-          <div class="info-item">Name: ${agentDetails.firstName || ''} ${agentDetails.lastName || ''}</div>
-          <div class="info-item">Email: ${agentDetails.email || ''}</div>
-          <div class="info-item">Phone: ${agentDetails.phoneNumber || ''}</div>
+        <p>Once submitted, your response will be shared directly with the letting agent handling the application.</p>
+        
+        <div class="agent-info">
+          <strong>Agent Contact for Reference Only:</strong><br>
+          Name: ${agentDetails.firstName} ${agentDetails.lastName}<br>
+          Email: ${agentDetails.email}<br>
+          Phone: ${agentDetails.phoneNumber || 'N/A'}
         </div>
         
-        <p>Thank you for your time and cooperation.</p>
+        <p>Thank you for taking the time to assist in this process. Your input helps support a smooth and fair tenancy journey.</p>
         
         <div style="margin-top: 32px;">
           Best regards,<br>
@@ -340,7 +334,6 @@ class EmailService {
 
   generateGuarantorEmailTemplate(formData) {
     const identity = formData?.identity || {};
-    const residential = formData?.residential || {};
     const guarantor = formData?.guarantor || {};
     const agentDetails = formData?.agentDetails || {};
 
@@ -359,47 +352,34 @@ class EmailService {
           .footer-desc { font-style: italic; color: #555; margin-top: 10px; }
           .footer-link { color: #136C9E; text-decoration: underline; }
           hr { border: none; border-top: 1px solid #bbb; margin: 24px 0 16px 0; }
+          .button { display: inline-block; padding: 10px 20px; background-color: #136C9E; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+          .button:hover { background-color: #0F5A82; }
+          .agent-info { background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }
         </style>
       </head>
       <body>
-        <h2>Guarantor Request for Rental Application</h2>
+        <p>Hi ${guarantor.firstName || ''},</p>
         
-        <p>Dear ${guarantor.firstName || ''} ${guarantor.lastName || ''},</p>
+        <p>${identity.firstName} ${identity.lastName} has selected you as their guarantor for a rental application on Proptii.</p>
         
-        <p>${identity.firstName || ''} ${identity.lastName || ''} has nominated you as their guarantor for their rental application at ${residential.propertyAddress || ''}.</p>
+        <p>Please review the guarantor terms and let us know if you accept this responsibility.</p>
         
-        <div class="section">
-          <div class="section-title">Rental Application Details</div>
-          <div class="info-item">Applicant Name: ${identity.firstName || ''} ${identity.lastName || ''}</div>
-          <div class="info-item">Property Address: ${residential.propertyAddress || ''}</div>
-          <div class="info-item">Monthly Rent: ${residential.monthlyRent ? `£${residential.monthlyRent}` : 'N/A'}</div>
+        <p>If you agree, simply sign the form below to confirm your acceptance:</p>
+        <p><a href="https://docs.google.com/forms/d/e/1FAIpQLScZAljnM4q5IcBDmsK3E32MprXfXxgHn62zYUGDyQ8GJFXlNQ/viewform?usp=header" style="color: #136C9E; text-decoration: none;">👉 Complete Guarantor Form</a></p>
+        
+        <p>Your signed form will be securely shared with the letting agent managing the application.</p>
+        
+        <div class="agent-info">
+          <strong>Agent Contact for Reference Only:</strong><br>
+          Name: ${agentDetails.firstName} ${agentDetails.lastName}<br>
+          Email: ${agentDetails.email}<br>
+          Phone: ${agentDetails.phoneNumber || 'N/A'}
         </div>
         
-        <p>As a guarantor, you would be agreeing to:</p>
-        <ul>
-          <li>Take responsibility for rent payments if the tenant fails to pay</li>
-          <li>Cover any damages to the property beyond normal wear and tear</li>
-          <li>Ensure all terms of the tenancy agreement are met</li>
-        </ul>
-        
-        <p>Please review this request carefully. If you agree to act as guarantor, you will need to:</p>
-        <ol>
-          <li>Provide proof of identity and address</li>
-          <li>Complete a credit check</li>
-          <li>Sign a guarantor agreement</li>
-        </ol>
-        
-        <div class="section">
-          <div class="section-title">Agent Contact Information</div>
-          <div class="info-item">Name: ${agentDetails.firstName || ''} ${agentDetails.lastName || ''}</div>
-          <div class="info-item">Email: ${agentDetails.email || ''}</div>
-          <div class="info-item">Phone: ${agentDetails.phoneNumber || ''}</div>
-        </div>
-        
-        <p>Please contact the agent directly to proceed with the guarantor verification process or if you have any questions.</p>
+        <p>Thank you for supporting ${identity.firstName} in this process.</p>
         
         <div style="margin-top: 32px;">
-          Best regards,<br>
+          Warm regards,<br>
           The Proptii Team
         </div>
         <hr />

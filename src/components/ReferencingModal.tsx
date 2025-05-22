@@ -80,63 +80,14 @@ interface AgentDetailsData {
   hasAgreedToCheck: boolean;
 }
 
-interface FormData {
-  identity: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phoneNumber: string;
-    dateOfBirth: string;
-    dateOfBirthError?: string;
-    isBritish: boolean;
-    nationality: string;
-    identityProof: File | null;
-  };
-  employment: {
-    employmentStatus: string;
-    companyDetails: string;
-    lengthOfEmployment: string;
-    jobPosition: string;
-    referenceFullName: string;
-    referenceEmail: string;
-    referencePhone: string;
-    proofType: string;
-    proofDocument: File | null;
-  };
-  residential: {
-    currentAddress: string;
-    durationAtCurrentAddress: string;
-    previousAddress: string;
-    durationAtPreviousAddress: string;
-    reasonForLeaving: string;
-    alreadyHavePropertyAddress: string;
-    propertyAddress: string;
-    proofType: string;
-    proofDocument: File | null;
-  };
-  financial: {
-    monthlyIncome: string;
-    proofOfIncomeType: string;
-    proofOfIncomeDocument: File | null;
-    useOpenBanking: boolean;
-    isConnectedToOpenBanking: boolean;
-  };
-  guarantor: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phoneNumber: string;
-    address: string;
-    identityDocument: File | null;
-  };
-  creditCheck: Record<string, unknown>;
-  agentDetails: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phoneNumber: string;
-    hasAgreedToCheck: boolean;
-  };
+export interface FormData {
+  identity: IdentityData;
+  employment: EmploymentData;
+  residential: ResidentialData;
+  financial: FinancialData;
+  guarantor: GuarantorData;
+  creditCheck: CreditCheckData;
+  agentDetails: AgentDetailsData;
 }
 
 interface TypingAnimationProps {
@@ -216,7 +167,28 @@ interface StoredFile {
   type: string;
   size: number;
   lastModified: number;
+  dataUrl: string;
 }
+
+// Add this helper function before the ReferencingModal component
+const base64ToFile = (storedFile: StoredFile): File => {
+  // Convert base64 to blob
+  const arr = storedFile.dataUrl.split(',');
+  const mime = arr[0].match(/:(.*?);/)?.[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  const blob = new Blob([u8arr], { type: mime });
+
+  // Create File from Blob
+  return new File([blob], storedFile.name, {
+    type: storedFile.type,
+    lastModified: storedFile.lastModified
+  });
+};
 
 interface StoredFormData {
   identity: {
@@ -573,44 +545,55 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   }, [user]);
 
-  // Update saveCurrentStep to handle file storage
+  // Update the useEffect for loading stored data
+  useEffect(() => {
+    if (user?.id) {
+      try {
+        // Load step status
+        const savedStatus = localStorage.getItem(`referencing_${user.id}_stepStatus`);
+        if (savedStatus) {
+          setStepStatus(JSON.parse(savedStatus));
+        }
+
+        // Load current step
+        const savedStep = localStorage.getItem(`referencing_${user.id}_currentStep`);
+        if (savedStep) {
+          setCurrentStep(parseInt(savedStep, 10));
+        }
+
+        // Load entire form data at once
+        const savedFormData = localStorage.getItem(`referencing_${user.id}_formData`);
+        if (savedFormData) {
+          const parsedData = JSON.parse(savedFormData);
+          setFormData(prev => ({
+            ...prev,
+            ...parsedData
+          }));
+        }
+
+      } catch (e) {
+        console.error('Failed to load saved data:', e);
+      }
+    }
+  }, [user]);
+
+  // Update saveCurrentStep to save all data
   const saveCurrentStep = async () => {
     try {
       setIsSaving(true);
 
-      if (!user) {
+      if (!user?.id) {
         throw new Error('No user found. Please login again.');
       }
 
-      const userId = user.id;
+      // Save current step
+      localStorage.setItem(`referencing_${user.id}_currentStep`, currentStep.toString());
 
-      if (!userId) {
-        throw new Error('User ID is required. Please login again.');
-      }
+      // Save entire form data
+      localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(formData));
 
-      const currentSections = {
-        1: 'identity',
-        2: 'employment',
-        3: 'residential',
-        4: 'financial',
-        5: 'guarantor',
-        6: 'creditCheck',
-        7: 'agentDetails'
-      } as const;
-
-      type SectionKey = keyof typeof currentSections;
-      type SectionValue = typeof currentSections[SectionKey];
-
-      const currentSection = currentSections[currentStep as keyof typeof currentSections];
-      const currentStepData = formData[currentSection as keyof FormData];
-
-      if (!currentStepData) {
-        throw new Error('No data to save for current step');
-      }
-
-      // Save to localStorage
-      localStorage.setItem(`referencing_${userId}_${currentSection}`, JSON.stringify(currentStepData));
-      localStorage.setItem(`referencing_${userId}_stepStatus`, JSON.stringify(stepStatus));
+      // Save step status
+      localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
 
       // Update last saved timestamp
       setLastSavedSteps(prev => ({
@@ -629,58 +612,17 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   };
 
-  // Update useEffect for loading stored data to properly handle files and status
+  // Add auto-save on form updates
   useEffect(() => {
     if (user?.id) {
-      try {
-        // Load step status
-        const savedStatus = localStorage.getItem(`referencing_${user.id}_stepStatus`);
-        if (savedStatus) {
-          setStepStatus(JSON.parse(savedStatus));
-        }
-
-        // Load form data for each section
-        const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'creditCheck', 'agentDetails'];
-        const loadedFormData: any = {};
-
-        sections.forEach(section => {
-          const savedData = localStorage.getItem(`referencing_${user.id}_${section}`);
-          if (savedData) {
-            const sectionData = JSON.parse(savedData);
-            loadedFormData[section] = sectionData;
-
-            // Update step status based on loaded data
-            const stepIndex = {
-              identity: 1,
-              employment: 2,
-              residential: 3,
-              financial: 4,
-              guarantor: 5,
-              creditCheck: 6,
-              agentDetails: 7
-            }[section];
-
-            if (stepIndex) {
-              const status = determineStepStatus(section as keyof FormData, sectionData);
-              setStepStatus(prev => ({
-                ...prev,
-                [stepIndex]: status
-              }));
-            }
-          }
-        });
-
-        if (Object.keys(loadedFormData).length > 0) {
-          setFormData(prev => ({
-            ...prev,
-            ...loadedFormData
-          }));
-        }
-      } catch (e) {
-        console.error('Failed to load saved data:', e);
-      }
+      // Save form data whenever it changes
+      localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(formData));
+      // Save step status
+      localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
+      // Save current step
+      localStorage.setItem(`referencing_${user.id}_currentStep`, currentStep.toString());
     }
-  }, [user]);
+  }, [formData, stepStatus, currentStep, user]);
 
   const goToStep = (step: number) => {
     setCurrentStep(step);
@@ -749,10 +691,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       // Prepare attachments array with proper naming for zip organization
       const attachments: Attachment[] = [];
 
-      // Helper function to add file if it exists with proper naming for zip folders
-      const addFileToAttachments = (file: File | null, prefix: string, section: string) => {
-        if (file && file instanceof File) {
-          const fileExtension = file.name.split('.').pop();
+      // Helper function to add file if it exists
+      const addFileToAttachments = (storedFile: StoredFile | null, prefix: string, section: string) => {
+        if (storedFile && storedFile.dataUrl) {
+          const file = base64ToFile(storedFile);
+          const fileExtension = storedFile.name.split('.').pop();
           const sanitizedName = `${formData.identity?.firstName || 'unknown'}_${formData.identity?.lastName || 'unknown'}`;
           const fileName = `${section}/${prefix}_${sanitizedName}.${fileExtension}`;
           attachments.push({
@@ -765,7 +708,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       // Add all files with proper folder structure
       if (formData.identity?.identityProof) {
         addFileToAttachments(
-          formData.identity.identityProof,
+          formData.identity.identityProof as StoredFile,
           'identity_proof',
           '1_Identity_Documents'
         );
@@ -773,7 +716,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
       if (formData.employment?.proofDocument) {
         addFileToAttachments(
-          formData.employment.proofDocument,
+          formData.employment.proofDocument as StoredFile,
           'employment_proof',
           '2_Employment_Documents'
         );
@@ -781,7 +724,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
       if (formData.residential?.proofDocument) {
         addFileToAttachments(
-          formData.residential.proofDocument,
+          formData.residential.proofDocument as StoredFile,
           'residential_proof',
           '3_Residential_Documents'
         );
@@ -789,7 +732,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
       if (formData.financial?.proofOfIncomeDocument) {
         addFileToAttachments(
-          formData.financial.proofOfIncomeDocument,
+          formData.financial.proofOfIncomeDocument as StoredFile,
           'income_proof',
           '4_Financial_Documents'
         );
@@ -797,7 +740,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
       if (formData.guarantor?.identityDocument) {
         addFileToAttachments(
-          formData.guarantor.identityDocument,
+          formData.guarantor.identityDocument as StoredFile,
           'guarantor_proof',
           '5_Guarantor_Documents'
         );
@@ -937,17 +880,19 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   }, [formData.identity]);
 
-  // Add cleanup effect when modal is closed
+  // Update cleanup effect
   useEffect(() => {
     if (!isOpen && user?.id) {
       const isSubmitted = localStorage.getItem(`referencing_${user.id}_submitted`) === 'true';
       if (isSubmitted) {
         // Clear storage only if the form was successfully submitted
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith(`referencing_${user.id}`)) {
-            localStorage.removeItem(key);
-          }
-        });
+        const keysToRemove = [
+          `referencing_${user.id}_formData`,
+          `referencing_${user.id}_stepStatus`,
+          `referencing_${user.id}_currentStep`,
+          `referencing_${user.id}_submitted`
+        ];
+        keysToRemove.forEach(key => localStorage.removeItem(key));
       }
     }
   }, [isOpen, user]);

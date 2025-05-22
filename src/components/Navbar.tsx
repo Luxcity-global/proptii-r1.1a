@@ -3,7 +3,11 @@ import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserCircle, ChevronDown, Settings, LogOut } from 'lucide-react';
 
-const Navbar = () => {
+interface NavbarProps {
+  isAgent?: boolean;
+}
+
+const Navbar: React.FC<NavbarProps> = ({ isAgent = false }) => {
   const { isAuthenticated, user, login, logout, editProfile, isLoading } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loginInProgress, setLoginInProgress] = useState(false);
@@ -123,7 +127,7 @@ const Navbar = () => {
               Referencing
             </NavLink>
             <NavLink
-              to="/contracts"
+              to={isAgent ? "/agent-contracts" : "/contracts"}
               className={({ isActive }) =>
                 isActive
                   ? 'text-[#E76F51] font-bold transition-colors'
