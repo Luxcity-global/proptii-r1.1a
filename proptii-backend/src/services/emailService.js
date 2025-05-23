@@ -287,9 +287,8 @@ class EmailService {
           .footer-desc { font-style: italic; color: #555; margin-top: 10px; }
           .footer-link { color: #136C9E; text-decoration: underline; }
           hr { border: none; border-top: 1px solid #bbb; margin: 24px 0 16px 0; }
-          .button { display: inline-block; padding: 10px 20px; background-color: #136C9E; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
-          .button:hover { background-color: #0F5A82; }
-          .agent-info { background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }
+          .form-link { color: #136C9E; text-decoration: none; font-weight: bold; }
+          .agent-section { margin-top: 20px; padding: 15px; background-color: #f5f5f5; border-radius: 5px; }
         </style>
       </head>
       <body>
@@ -304,23 +303,22 @@ class EmailService {
         </ul>
         
         <p>Please complete the short reference form using the link below:</p>
-        <p><a href="https://docs.google.com/forms/d/e/1FAIpQLScPCYOvh4O-RuceRjFc5BTmghho1QmhHlGu9jkEA5uSSGaZ3g/viewform?usp=preview" style="color: #136C9E; text-decoration: none;">👉 Complete Reference Form</a></p>
+        <p>👉 <a href="https://docs.google.com/forms/d/e/1FAIpQLScPCYOvh4O-RuceRjFc5BTmghho1QmhHlGu9jkEA5uSSGaZ3g/viewform?usp=preview" class="form-link">Reference Form Link</a></p>
         
         <p>Once submitted, your response will be shared directly with the letting agent handling the application.</p>
         
-        <div class="agent-info">
+        <div class="agent-section">
           <strong>Agent Contact for Reference Only:</strong><br>
-          Name: ${agentDetails.firstName} ${agentDetails.lastName}<br>
-          Email: ${agentDetails.email}<br>
-          Phone: ${agentDetails.phoneNumber || 'N/A'}
+          Name: ${agentDetails.firstName || ''} ${agentDetails.lastName || ''}<br>
+          Email: ${agentDetails.email || ''}<br>
+          Phone: ${agentDetails.phoneNumber || ''}
         </div>
         
         <p>Thank you for taking the time to assist in this process. Your input helps support a smooth and fair tenancy journey.</p>
         
-        <div style="margin-top: 32px;">
-          Best regards,<br>
-          The Proptii Team
-        </div>
+        <p>Best regards,<br>
+        The Proptii Team</p>
+        
         <hr />
         <div class="footer-desc">
           <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com" class="footer-link">here</a>.</em>
@@ -352,9 +350,8 @@ class EmailService {
           .footer-desc { font-style: italic; color: #555; margin-top: 10px; }
           .footer-link { color: #136C9E; text-decoration: underline; }
           hr { border: none; border-top: 1px solid #bbb; margin: 24px 0 16px 0; }
-          .button { display: inline-block; padding: 10px 20px; background-color: #136C9E; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
-          .button:hover { background-color: #0F5A82; }
-          .agent-info { background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }
+          .form-link { color: #136C9E; text-decoration: none; font-weight: bold; }
+          .agent-section { margin-top: 20px; padding: 15px; background-color: #f5f5f5; border-radius: 5px; }
         </style>
       </head>
       <body>
@@ -365,23 +362,22 @@ class EmailService {
         <p>Please review the guarantor terms and let us know if you accept this responsibility.</p>
         
         <p>If you agree, simply sign the form below to confirm your acceptance:</p>
-        <p><a href="https://docs.google.com/forms/d/e/1FAIpQLScZAljnM4q5IcBDmsK3E32MprXfXxgHn62zYUGDyQ8GJFXlNQ/viewform?usp=header" style="color: #136C9E; text-decoration: none;">👉 Complete Guarantor Form</a></p>
+        <p>👉 <a href="https://docs.google.com/forms/d/e/1FAIpQLScZAljnM4q5IcBDmsK3E32MprXfXxgHn62zYUGDyQ8GJFXlNQ/viewform?usp=header" class="form-link">Guarantor Form Link</a></p>
         
         <p>Your signed form will be securely shared with the letting agent managing the application.</p>
         
-        <div class="agent-info">
+        <div class="agent-section">
           <strong>Agent Contact for Reference Only:</strong><br>
-          Name: ${agentDetails.firstName} ${agentDetails.lastName}<br>
-          Email: ${agentDetails.email}<br>
-          Phone: ${agentDetails.phoneNumber || 'N/A'}
+          Name: ${agentDetails.firstName || ''} ${agentDetails.lastName || ''}<br>
+          Email: ${agentDetails.email || ''}<br>
+          Phone: ${agentDetails.phoneNumber || ''}
         </div>
         
         <p>Thank you for supporting ${identity.firstName} in this process.</p>
         
-        <div style="margin-top: 32px;">
-          Warm regards,<br>
-          The Proptii Team
-        </div>
+        <p>Warm regards,<br>
+        The Proptii Team</p>
+        
         <hr />
         <div class="footer-desc">
           <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com" class="footer-link">here</a>.</em>

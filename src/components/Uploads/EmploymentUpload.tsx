@@ -1,6 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { Upload, X } from 'lucide-react';
-import { FormData } from '../ReferencingModal';
+import { useState, useEffect } from "react";
 
 interface StoredFile {
   name: string;
@@ -11,8 +9,8 @@ interface StoredFile {
 }
 
 interface EmploymentUploadProps {
-  updateFormData: (step: keyof FormData, data: Partial<FormData[keyof FormData]>) => void;
-  formData: FormData;
+  updateFormData: (section: string, data: any) => void;
+  formData: any;
 }
 
 const EmploymentUpload: React.FC<EmploymentUploadProps> = ({ updateFormData, formData }) => {

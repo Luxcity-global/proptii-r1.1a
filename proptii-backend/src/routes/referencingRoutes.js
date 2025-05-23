@@ -168,50 +168,12 @@ router.post('/send-multiple-emails', upload.array('attachments'), async (req, re
       content: file.buffer
     })) || [];
 
-    const results = {
-      agent: false,
-      referee: false,
-      guarantor: false
-    };
-
-    // Send to agent
-    if (formData.agentDetails?.email) {
-      const agentResult = await emailService.sendEmail({
-        to: formData.agentDetails.email,
-        subject: `New Tenant Application${formData.residential?.propertyAddress ? ` - ${formData.residential.propertyAddress}` : ''}`,
-        formData,
-        attachments,
-        submissionId: req.body.submissionId,
-        emailType: 'agent'
-      });
-      results.agent = agentResult.success;
-    }
-
-    // Send to referee
-    if (formData.employment?.referenceEmail) {
-      const refereeResult = await emailService.sendEmail({
-        to: formData.employment.referenceEmail,
-        subject: `Reference Request for ${formData.identity?.firstName} ${formData.identity?.lastName}`,
-        formData,
-        attachments: [],
-        submissionId: req.body.submissionId,
-        emailType: 'referee'
-      });
-      results.referee = refereeResult.success;
-    }
-
-    // Send to guarantor
-    if (formData.guarantor?.email) {
-      const guarantorResult = await emailService.sendEmail({
-        to: formData.guarantor.email,
-        subject: `Guarantor Request for ${formData.identity?.firstName} ${formData.identity?.lastName}`,
-        formData,
-        attachments: [],
-        submissionId: req.body.submissionId,
-        emailType: 'guarantor'
-      });
-      results.guarantor = guarantorResult.success;
-    }
+    // Use the emailService.sendMultipleEmails method which handles all emails
+    const results = await emailService.sendMultipleEmails({
+      formData,
+      attachments,
+      submissionId: req.body.submissionId
+    });
 
     res.json({
       success: true,

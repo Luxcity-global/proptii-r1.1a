@@ -602,11 +602,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       }));
 
       // Show success message
-      alert('Data saved successfully!');
+      // alert('Data saved successfully!');
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error in save operation:', error);
-      alert(error.message);
+      // alert(error instanceof Error ? error.message : 'Failed to submit application');
     } finally {
       setIsSaving(false);
     }
@@ -786,7 +786,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
     } catch (error) {
       console.error('Error submitting application:', error);
-      alert(error instanceof Error ? error.message : 'Failed to submit application');
+      // alert(error instanceof Error ? error.message : 'Failed to submit application');
     } finally {
       setIsSubmitting(false);
     }
