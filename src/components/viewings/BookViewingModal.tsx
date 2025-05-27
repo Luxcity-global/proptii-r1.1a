@@ -149,19 +149,19 @@ const SavedIndicator = styled(Box)(({ theme }) => ({
 
 // Steps definition with icons
 const steps = [
-  { 
-    label: 'Property Details', 
-    icon: <Home sx={{ color: 'inherit' }} />, 
+  {
+    label: 'Property Details',
+    icon: <Home sx={{ color: 'inherit' }} />,
     stepIcon: <Home sx={{ color: 'inherit' }} />
   },
-  { 
-    label: 'Schedule Viewing', 
-    icon: <Event sx={{ color: 'inherit' }} />, 
+  {
+    label: 'Schedule Viewing',
+    icon: <Event sx={{ color: 'inherit' }} />,
     stepIcon: <Event sx={{ color: 'inherit' }} />
   },
-  { 
-    label: 'Confirmation', 
-    icon: <DoneAll sx={{ color: 'inherit' }} />, 
+  {
+    label: 'Confirmation',
+    icon: <DoneAll sx={{ color: 'inherit' }} />,
     stepIcon: <DoneAll sx={{ color: 'inherit' }} />
   },
 ];
@@ -206,15 +206,15 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
   const isAllDataComplete = () => {
     const property = state.selectedProperty;
     const viewing = state.viewingDetails;
-    
-    return property?.street && 
-           property?.city && 
-           property?.postcode && 
-           property?.agent?.name && 
-           property?.agent?.email &&
-           viewing?.date && 
-           viewing?.time && 
-           viewing?.preference;
+
+    return property?.street &&
+      property?.city &&
+      property?.postcode &&
+      property?.agent?.name &&
+      property?.agent?.email &&
+      viewing?.date &&
+      viewing?.time &&
+      viewing?.preference;
   };
 
   // Check if a section has content
@@ -224,15 +224,15 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
 
     switch (section) {
       case 0: // Property Details
-        return !!(property?.street || 
-                 property?.city || 
-                 property?.postcode || 
-                 property?.agent?.name || 
-                 property?.agent?.email);
+        return !!(property?.street ||
+          property?.city ||
+          property?.postcode ||
+          property?.agent?.name ||
+          property?.agent?.email);
       case 1: // Schedule Viewing
-        return !!(viewing?.date || 
-                 viewing?.time || 
-                 viewing?.preference);
+        return !!(viewing?.date ||
+          viewing?.time ||
+          viewing?.preference);
       case 2: // Confirmation
         return false; // Confirmation doesn't need a completion indicator
       default:
@@ -253,7 +253,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         // Submit the viewing request to the backend
         const property = state.selectedProperty;
         const viewing = state.viewingDetails;
-        
+
         if (!property || !viewing) {
           throw new Error('Missing property or viewing details');
         }
@@ -282,9 +282,9 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
       console.error('Error in handleNext:', error);
       setIsSaving(false);
       // Show error message to user
-      dispatch({ 
-        type: 'SET_ERROR', 
-        payload: error instanceof Error ? error.message : 'Failed to save viewing request' 
+      dispatch({
+        type: 'SET_ERROR',
+        payload: error instanceof Error ? error.message : 'Failed to save viewing request'
       });
     }
   };
@@ -310,11 +310,11 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         return (
           <>
             {!isAllDataComplete() && (
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 1, 
-                bgcolor: alpha('#DC5F12', 0.1), 
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                bgcolor: alpha('#DC5F12', 0.1),
                 color: '#DC5F12',
                 p: 2,
                 borderRadius: 1,
@@ -341,10 +341,10 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
 
   return (
     <>
-      <StyledDialog 
-        open={open} 
-        onClose={onClose} 
-        maxWidth="lg" 
+      <StyledDialog
+        open={open}
+        onClose={onClose}
+        maxWidth="lg"
         fullWidth
         fullScreen={isMobile}
       >
@@ -361,21 +361,21 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           {!isMobile && (
             <StepSidebar>
               <SidebarContent>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    color: ORANGE_COLOR, 
-                    fontWeight: 'bold', 
+                <Typography
+                  variant="h6"
+                  sx={{
+                    color: ORANGE_COLOR,
+                    fontWeight: 'bold',
                     mb: 1,
                     fontSize: '1.3rem' // Increased font size
                   }}
                 >
                   Steps
                 </Typography>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
-                    color: DARK_GREY, 
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: DARK_GREY,
                     mb: 2,
                     fontSize: '1rem' // Increased font size
                   }}
@@ -385,7 +385,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
                 {steps.map((step, index) => {
                   const isActive = activeStep === index;
                   const hasContent = hasSectionContent(index);
-                  
+
                   return (
                     <StepButton
                       key={step.label}
@@ -404,10 +404,10 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
                 })}
               </SidebarContent>
               <SidebarFooter>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
-                    color: DARK_GREY, 
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: DARK_GREY,
                     mb: 1,
                     fontSize: '1rem' // Increased font size
                   }}
@@ -434,9 +434,9 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
               {renderStepContent()}
             </ContentSection>
 
-            <DialogActions sx={{ 
-              position: 'relative', 
-              borderTop: `1px solid ${alpha(BLUE_COLOR, 0.12)}`, 
+            <DialogActions sx={{
+              position: 'relative',
+              borderTop: `1px solid ${alpha(BLUE_COLOR, 0.12)}`,
               p: 2,
               mt: 'auto',
               backgroundColor: '#fff',
@@ -457,7 +457,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
                   </SavedIndicator>
                 )}
               </Box>
-              
+
               <Box sx={{ display: 'flex', gap: 1 }}>
                 {activeStep > 0 && (
                   <Button
@@ -487,8 +487,8 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         </DialogContent>
       </StyledDialog>
 
-      <Dialog 
-        open={showSuccess} 
+      <Dialog
+        open={showSuccess}
         onClose={handleSuccessClose}
         maxWidth="sm"
         fullWidth
@@ -507,10 +507,10 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button 
+          <Button
             onClick={handleSuccessClose}
             variant="contained"
-            sx={{ 
+            sx={{
               bgcolor: BLUE_COLOR,
               '&:hover': {
                 bgcolor: BLUE_COLOR,

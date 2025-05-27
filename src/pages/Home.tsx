@@ -29,14 +29,28 @@ const Home = () => {
   useEffect(() => {
     const checkBackend = async () => {
       try {
-        const response = await fetch('http://localhost:3000/health');
-        setIsBackendAvailable(response.ok);
+        console.log('Checking backend health...');
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3002'}/search/health`);
+        const data = await response.json();
+        console.log('Backend health check response:', data);
+        
+        // Only set as available if we get a successful response with status 'ok'
+        setIsBackendAvailable(data.status === 'ok');
+        
+        if (data.status !== 'ok') {
+          console.error('Backend health check failed:', data.message || 'Unknown error');
+        }
       } catch (error) {
+        console.error('Backend health check failed:', error);
         setIsBackendAvailable(false);
       }
     };
 
     checkBackend();
+    // Set up periodic health checks
+    const interval = setInterval(checkBackend, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
   }, []);
 
   // Progress bar component
@@ -51,13 +65,17 @@ const Home = () => {
 
   const handleSearch = (searchQuery: string) => {
     if (!isBackendAvailable) {
+      console.error('Search attempted while backend is unavailable');
       alert('Search service is currently unavailable. Please try again later.');
       return;
     }
-    setQuery(searchQuery);
-    if (searchQuery.trim()) {
-      executeSearch();
+
+    if (!searchQuery?.trim()) {
+      return;
     }
+
+    setQuery(searchQuery);
+    executeSearch();
   };
 
   // Search results fallback UI

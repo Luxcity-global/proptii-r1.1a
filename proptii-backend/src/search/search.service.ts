@@ -193,4 +193,40 @@ Example response format:
       throw new Error(`Failed to get suggestions: ${error.message}`);
     }
   }
+
+  private async ensureBackendRunning(): Promise<void> {
+    try {
+      await this.checkHealth();
+    } catch (error) {
+      console.error('Backend health check failed:', error);
+      throw new Error('Search service is not available');
+    }
+  }
+
+  public async checkHealth(): Promise<void> {
+    try {
+      // Verify Azure OpenAI configuration
+      const apiKey = this.configService.get<string>('AZURE_OPENAI_API_KEY');
+      const endpoint = this.configService.get<string>('AZURE_OPENAI_ENDPOINT');
+      const deployment = this.configService.get<string>('AZURE_OPENAI_DEPLOYMENT');
+
+      if (!apiKey || !endpoint || !deployment) {
+        throw new Error('Azure OpenAI configuration is missing');
+      }
+
+      // Test connection with a simple completion request
+      const completion = await this.openai.chat.completions.create({
+        model: deployment,
+        messages: [{ role: 'user', content: 'test' }],
+        max_tokens: 5
+      });
+
+      if (!completion?.choices?.[0]?.message) {
+        throw new Error('Invalid response from Azure OpenAI');
+      }
+    } catch (error) {
+      this.logger.error('Health check failed:', error);
+      throw new Error(`Search service health check failed: ${error.message}`);
+    }
+  }
 } 
