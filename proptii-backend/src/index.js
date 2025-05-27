@@ -4,6 +4,7 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import referencingRoutes from './routes/referencingRoutes.js';
 import sheetsRoutes from './routes/sheetsRoutes.js';
+import searchRoutes from './routes/searchRoutes.js';
 import { emailService } from './services/emailService.js';
 
 dotenv.config();
@@ -23,6 +24,7 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 // API routes
 app.use('/api/referencing', referencingRoutes);
 app.use('/api/sheets', sheetsRoutes);
+app.use('/search', searchRoutes);
 
 // Test route to verify server is running
 app.get('/', (req, res) => {
@@ -53,4 +55,7 @@ app.listen(port, () => {
   console.log('SMTP_PORT:', process.env.SMTP_PORT ? 'Set' : 'Not set');
   console.log('SMTP_USER:', process.env.SMTP_USER ? 'Set' : 'Not set');
   console.log('SMTP_FROM_EMAIL:', process.env.SMTP_FROM_EMAIL ? 'Set' : 'Not set');
+  console.log('AZURE_OPENAI_API_KEY:', process.env.AZURE_OPENAI_API_KEY ? 'Set' : 'Not set');
+  console.log('AZURE_OPENAI_ENDPOINT:', process.env.AZURE_OPENAI_ENDPOINT ? 'Set' : 'Not set');
+  console.log('AZURE_OPENAI_DEPLOYMENT:', process.env.AZURE_OPENAI_DEPLOYMENT ? 'Set' : 'Not set');
 });

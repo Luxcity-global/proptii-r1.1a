@@ -691,89 +691,87 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       // Prepare attachments array with proper naming for zip organization
       const attachments: Attachment[] = [];
 
-      // Helper function to add file if it exists
-      const addFileToAttachments = (storedFile: StoredFile | null, prefix: string, section: string) => {
-        if (storedFile && storedFile.dataUrl) {
-          const file = base64ToFile(storedFile);
-          const fileExtension = storedFile.name.split('.').pop();
-          const sanitizedName = `${formData.identity?.firstName || 'unknown'}_${formData.identity?.lastName || 'unknown'}`;
-          const fileName = `${section}/${prefix}_${sanitizedName}.${fileExtension}`;
-          attachments.push({
-            filename: fileName,
-            content: file
+      // Helper function to convert stored file to File object and add to attachments
+      const addFileToAttachments = async (storedFile: StoredFile | File | null, prefix: string, section: string) => {
+        if (!storedFile) return;
+
+        let file: File;
+        if ('dataUrl' in storedFile) {
+          // Convert StoredFile to File
+          const arr = storedFile.dataUrl.split(',');
+          const mime = arr[0].match(/:(.*?);/)?.[1];
+          const bstr = atob(arr[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          file = new File([u8arr], storedFile.name, {
+            type: storedFile.type,
+            lastModified: storedFile.lastModified
           });
+        } else {
+          // It's already a File object
+          file = storedFile;
         }
+
+        const fileExtension = file.name.split('.').pop();
+        const sanitizedName = `${formData.identity?.firstName || 'unknown'}_${formData.identity?.lastName || 'unknown'}`;
+        const fileName = `${section}/${prefix}_${sanitizedName}.${fileExtension}`;
+        attachments.push({
+          filename: fileName,
+          content: file
+        });
       };
 
       // Add all files with proper folder structure
       if (formData.identity?.identityProof) {
-        addFileToAttachments(
-          formData.identity.identityProof as StoredFile,
+        await addFileToAttachments(
+          formData.identity.identityProof,
           'identity_proof',
           '1_Identity_Documents'
         );
       }
 
       if (formData.employment?.proofDocument) {
-        addFileToAttachments(
-          formData.employment.proofDocument as StoredFile,
+        await addFileToAttachments(
+          formData.employment.proofDocument,
           'employment_proof',
           '2_Employment_Documents'
         );
       }
 
       if (formData.residential?.proofDocument) {
-        addFileToAttachments(
-          formData.residential.proofDocument as StoredFile,
+        await addFileToAttachments(
+          formData.residential.proofDocument,
           'residential_proof',
           '3_Residential_Documents'
         );
       }
 
       if (formData.financial?.proofOfIncomeDocument) {
-        addFileToAttachments(
-          formData.financial.proofOfIncomeDocument as StoredFile,
+        await addFileToAttachments(
+          formData.financial.proofOfIncomeDocument,
           'income_proof',
           '4_Financial_Documents'
         );
       }
 
       if (formData.guarantor?.identityDocument) {
-        addFileToAttachments(
-          formData.guarantor.identityDocument as StoredFile,
+        await addFileToAttachments(
+          formData.guarantor.identityDocument,
           'guarantor_proof',
           '5_Guarantor_Documents'
         );
       }
 
-      // Submit the application
-      const submissionResult = await referencingService.submitApplication(userId, {
-        formData,
-        emailContent: {
-          to: agentEmail,
-          subject: `New Tenant Application${formData.residential?.propertyAddress ? ` - ${formData.residential.propertyAddress}` : ''}`,
-          attachments,
-          formData // Pass the entire formData for email template generation
-        }
-      });
-
-      if (!submissionResult.success) {
-        throw new Error(submissionResult.message || 'Failed to submit application');
-      }
-
-      // Send emails to all recipients
+      // Send emails to all recipients (including agent)
       const emailResults = await emailService.sendMultipleEmails(formData, attachments);
 
       if (emailResults.error) {
         console.error('Error sending some emails:', emailResults.error);
+        throw new Error(emailResults.error);
       }
-
-      // Log email sending results
-      console.log('Email sending results:', {
-        agent: emailResults.agent,
-        referee: emailResults.referee,
-        guarantor: emailResults.guarantor
-      });
 
       // Show success modal
       setShowSuccessModal(true);
