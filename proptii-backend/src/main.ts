@@ -12,14 +12,16 @@ async function bootstrap() {
   logger.log(`COSMOS_DB_DATABASE_NAME: ${process.env.COSMOS_DB_DATABASE_NAME}`);
   logger.log(`STORAGE_ACCOUNT: ${process.env.AZURE_STORAGE_ACCOUNT_NAME}`);
   logger.log(`NODE_ENV: ${process.env.NODE_ENV}`);
-  logger.log(`PORT: ${process.env.PORT || 3002}`);
+  logger.log(`PORT: ${process.env.PORT || 3000}`);
 
   // Initialize Cosmos DB
   try {
+    logger.log('Initializing Cosmos DB...');
     await initializeCosmosDB();
     logger.log('Cosmos DB initialized successfully');
   } catch (error) {
     logger.error('Failed to initialize Cosmos DB:', error);
+    logger.error('Please check your Cosmos DB configuration in .env file');
     process.exit(1);
   }
 
@@ -58,7 +60,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  const port = process.env.PORT || 3002;
+  const port = process.env.PORT || 3000;
   
   try {
     await app.listen(port, '0.0.0.0');

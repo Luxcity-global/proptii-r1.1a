@@ -30,7 +30,9 @@
       "types/*": ["./src/types/*"],
       "assets/*": ["./src/assets/*"],
       "config/*": ["./src/config/*"]
-    }
+    },
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
   },
   "include": ["src"],
   "exclude": ["node_modules"]
