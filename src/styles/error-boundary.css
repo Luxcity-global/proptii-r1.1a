@@ -1,0 +1,53 @@
+.error-boundary {
+    padding: 2rem;
+    margin: 2rem;
+    border: 1px solid #e53e3e;
+    border-radius: 0.5rem;
+    background-color: #fff5f5;
+    color: #2d3748;
+}
+
+.error-boundary h2 {
+    color: #c53030;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+}
+
+.error-message {
+    background-color: #fed7d7;
+    padding: 1rem;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+    white-space: pre-wrap;
+    font-family: monospace;
+}
+
+.error-stack {
+    background-color: #e2e8f0;
+    padding: 1rem;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 0.875rem;
+}
+
+.retry-button {
+    background-color: #4299e1;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+}
+
+.retry-button:hover {
+    background-color: #3182ce;
+}
+
+.retry-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5);
+} 

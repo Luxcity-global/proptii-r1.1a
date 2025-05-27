@@ -1,0 +1,1725 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { X, Menu, User, Briefcase, Home, Euro, Users, CreditCard, CheckCircle, PoundSterling, AlertTriangle, Info, Upload } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import FileUpload from "./Uploads/FileUpload";
+import EmploymentUpload from "./Uploads/EmploymentUpload";
+import ResidentialUpload from "./Uploads/ResidentialUpload";
+import FinancialUpload from "./Uploads/FinancialUpload";
+import GuarantorUpload from "./Uploads/GuarantorUpload";
+import referencingService from '../services/referencingService';
+import emailService from '../services/emailService';
+
+interface ReferencingModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+// Form data types for different steps
+interface IdentityData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  dateOfBirth: string;
+  dateOfBirthError?: string;
+  isBritish: boolean;
+  nationality: string;
+  identityProof: File | null;
+}
+
+interface EmploymentData {
+  employmentStatus: string;
+  companyDetails: string;
+  lengthOfEmployment: string;
+  jobPosition: string;
+  referenceFullName: string;
+  referenceEmail: string;
+  referencePhone: string;
+  proofType: string;
+  proofDocument: File | null;
+}
+
+interface ResidentialData {
+  currentAddress: string;
+  durationAtCurrentAddress: string;
+  previousAddress: string;
+  durationAtPreviousAddress: string;
+  reasonForLeaving: string;
+  alreadyHavePropertyAddress: string;
+  propertyAddress: string;
+  proofType: string;
+  proofDocument: File | null;
+}
+
+interface FinancialData {
+  monthlyIncome: string;
+  proofOfIncomeType: string;
+  proofOfIncomeDocument: File | null;
+  useOpenBanking: boolean;
+  isConnectedToOpenBanking: boolean;
+}
+
+interface GuarantorData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  address: string;
+  identityDocument: File | null;
+}
+
+interface CreditCheckData {
+}
+
+interface AgentDetailsData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  hasAgreedToCheck: boolean;
+}
+
+export interface FormData {
+  identity: IdentityData;
+  employment: EmploymentData;
+  residential: ResidentialData;
+  financial: FinancialData;
+  guarantor: GuarantorData;
+  creditCheck: CreditCheckData;
+  agentDetails: AgentDetailsData;
+}
+
+interface TypingAnimationProps {
+  text: string;
+  className: string;
+}
+
+const TypingAnimation: React.FC<TypingAnimationProps> = ({ text, className }) => {
+  const [displayText, setDisplayText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [typingSpeed, setTypingSpeed] = useState(150);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!isDeleting) {
+        if (currentIndex < text.length) {
+          setDisplayText(text.substring(0, currentIndex + 1));
+          setCurrentIndex(prevIndex => prevIndex + 1);
+          setTypingSpeed(150);
+        } else {
+          setIsDeleting(true);
+          setTypingSpeed(1000);
+        }
+      } else {
+        if (currentIndex > 0) {
+          setDisplayText(text.substring(0, currentIndex - 1));
+          setCurrentIndex(prevIndex => prevIndex - 1);
+          setTypingSpeed(75);
+        } else {
+          setIsDeleting(false);
+          setTypingSpeed(500);
+        }
+      }
+    }, typingSpeed);
+
+    return () => clearTimeout(timeout);
+  }, [currentIndex, isDeleting, text, typingSpeed]);
+
+  return <h2 className={className}>{displayText}<span className="animate-pulse">|</span></h2>;
+};
+
+interface Attachment {
+  filename: string;
+  content: File;
+}
+
+interface NavigationItem {
+  label: string;
+  Icon: LucideIcon;
+  step: number;
+}
+
+const navigationItems: NavigationItem[] = [
+  { label: "Identity", Icon: User, step: 1 },
+  { label: "Employment", Icon: Briefcase, step: 2 },
+  { label: "Residential", Icon: Home, step: 3 },
+  { label: "Financial", Icon: Euro, step: 4 },
+  { label: "Guarantor", Icon: Users, step: 5 },
+  { label: "Credit Check", Icon: CreditCard, step: 6 },
+  { label: "Agent Details", Icon: User, step: 7 }
+];
+
+// Add a helper function to convert File to StoredFile format
+const fileToStoredFile = (file: File) => {
+  return {
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    lastModified: file.lastModified
+  };
+};
+
+// Add interfaces for stored file data
+interface StoredFile {
+  name: string;
+  type: string;
+  size: number;
+  lastModified: number;
+  dataUrl: string;
+}
+
+// Add this helper function before the ReferencingModal component
+const base64ToFile = (storedFile: StoredFile): File => {
+  // Convert base64 to blob
+  const arr = storedFile.dataUrl.split(',');
+  const mime = arr[0].match(/:(.*?);/)?.[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  const blob = new Blob([u8arr], { type: mime });
+
+  // Create File from Blob
+  return new File([blob], storedFile.name, {
+    type: storedFile.type,
+    lastModified: storedFile.lastModified
+  });
+};
+
+interface StoredFormData {
+  identity: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    dateOfBirth: string;
+    dateOfBirthError?: string;
+    isBritish: boolean;
+    nationality: string;
+    identityProof: StoredFile | null;
+  };
+  employment: {
+    employmentStatus: string;
+    companyDetails: string;
+    lengthOfEmployment: string;
+    jobPosition: string;
+    referenceFullName: string;
+    referenceEmail: string;
+    referencePhone: string;
+    proofType: string;
+    proofDocument: StoredFile | null;
+  };
+  residential: {
+    currentAddress: string;
+    durationAtCurrentAddress: string;
+    previousAddress: string;
+    durationAtPreviousAddress: string;
+    reasonForLeaving: string;
+    alreadyHavePropertyAddress: string;
+    propertyAddress: string;
+    proofType: string;
+    proofDocument: StoredFile | null;
+  };
+  financial: {
+    monthlyIncome: string;
+    proofOfIncomeType: string;
+    proofOfIncomeDocument: StoredFile | null;
+    useOpenBanking: boolean;
+    isConnectedToOpenBanking: boolean;
+  };
+  guarantor: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    address: string;
+    identityDocument: StoredFile | null;
+  };
+  creditCheck: {};
+  agentDetails: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    hasAgreedToCheck: boolean;
+  };
+}
+
+const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) => {
+  const { user } = useAuth();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [isFormComplete, setIsFormComplete] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [formData, setFormData] = useState<FormData>({
+    identity: {
+      firstName: user?.givenName || '',
+      lastName: user?.familyName || '',
+      email: user?.email || '',
+      phoneNumber: '',
+      dateOfBirth: '',
+      dateOfBirthError: undefined,
+      isBritish: true,
+      nationality: 'British',
+      identityProof: null
+    },
+    employment: {
+      employmentStatus: '',
+      companyDetails: '',
+      lengthOfEmployment: '',
+      jobPosition: '',
+      referenceFullName: '',
+      referenceEmail: '',
+      referencePhone: '',
+      proofType: '',
+      proofDocument: null
+    },
+    residential: {
+      currentAddress: '',
+      durationAtCurrentAddress: '',
+      previousAddress: '',
+      durationAtPreviousAddress: '',
+      reasonForLeaving: '',
+      proofType: '',
+      alreadyHavePropertyAddress: '',
+      propertyAddress: '',
+      proofDocument: null
+    },
+    financial: {
+      monthlyIncome: '',
+      proofOfIncomeType: '',
+      proofOfIncomeDocument: null,
+      useOpenBanking: false,
+      isConnectedToOpenBanking: false
+    },
+    guarantor: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phoneNumber: '',
+      address: '',
+      identityDocument: null
+    },
+    creditCheck: {
+    },
+    agentDetails: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phoneNumber: '',
+      hasAgreedToCheck: false
+    }
+  });
+
+  const [lastSavedSteps, setLastSavedSteps] = useState<{ [key: number]: Date | null }>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [stepStatus, setStepStatus] = useState<{ [key: number]: 'empty' | 'partial' | 'complete' }>({
+    1: 'empty',
+    2: 'empty',
+    3: 'empty',
+    4: 'empty',
+    5: 'empty',
+    6: 'empty',
+    7: 'empty'
+  });
+
+  // Load status from localStorage on mount
+  useEffect(() => {
+    if (user?.id) {
+      const savedStatus = localStorage.getItem(`referencing_${user.id}_stepStatus`);
+      if (savedStatus) {
+        try {
+          setStepStatus(JSON.parse(savedStatus));
+        } catch (e) {
+          console.error('Failed to parse saved step status:', e);
+        }
+      }
+    }
+  }, [user]);
+
+  // Save status to localStorage whenever it changes
+  useEffect(() => {
+    if (user?.id) {
+      localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
+    }
+  }, [stepStatus, user]);
+
+  const updateFormData = (step: keyof FormData, data: Partial<FormData[keyof FormData]>) => {
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        [step]: {
+          ...prev[step],
+          ...data
+        }
+      };
+      // Save the entire form data to local storage
+      if (user?.id) {
+        localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(updated));
+      }
+      return updated;
+    });
+
+    const stepMap: { [key in keyof FormData]: number } = {
+      identity: 1,
+      employment: 2,
+      residential: 3,
+      financial: 4,
+      guarantor: 5,
+      creditCheck: 6,
+      agentDetails: 7
+    };
+
+    const stepIndex = stepMap[step];
+    const status = determineStepStatus(step, { ...formData[step], ...data });
+
+    setStepStatus(prev => {
+      const updated = {
+        ...prev,
+        [stepIndex]: status
+      };
+      // Save step status to localStorage
+      if (user?.id) {
+        localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  const determineStepStatus = (step: keyof FormData, data: any): 'empty' | 'partial' | 'complete' => {
+    switch (step) {
+      case 'identity':
+        const hasAllIdentityFields = data.firstName && data.lastName && data.email &&
+          data.phoneNumber && data.dateOfBirth && data.nationality;
+        const hasIdentityDocument = data.identityProof && (data.identityProof instanceof File || data.identityProof.name);
+
+        if (hasAllIdentityFields && hasIdentityDocument) {
+          return 'complete';
+        }
+        if (hasAllIdentityFields || hasIdentityDocument || data.firstName || data.lastName ||
+          data.email || data.phoneNumber || data.dateOfBirth || data.nationality) {
+          return 'partial';
+        }
+        return 'empty';
+
+      case 'employment':
+        const hasAllEmploymentFields = data.employmentStatus && data.companyDetails && data.jobPosition &&
+          data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType && data.lengthOfEmployment;
+        const hasEmploymentDocument = data.proofDocument && (data.proofDocument instanceof File || data.proofDocument.name);
+
+        if (hasAllEmploymentFields && hasEmploymentDocument)
+          return 'complete';
+        if (hasAllEmploymentFields || hasEmploymentDocument || data.employmentStatus || data.companyDetails ||
+          data.jobPosition || data.referenceFullName || data.referenceEmail || data.referencePhone ||
+          data.proofType || data.lengthOfEmployment)
+          return 'partial';
+        return 'empty';
+
+      case 'residential':
+        const hasAllResidentialFields = data.currentAddress && data.durationAtCurrentAddress &&
+          data.previousAddress && data.durationAtPreviousAddress && data.reasonForLeaving && data.proofType;
+        const hasResidentialDocument = data.proofDocument && (data.proofDocument instanceof File || data.proofDocument.name);
+
+        if (hasAllResidentialFields && hasResidentialDocument)
+          return 'complete';
+        if (hasAllResidentialFields || hasResidentialDocument || data.currentAddress || data.durationAtCurrentAddress ||
+          data.previousAddress || data.alreadyHavePropertyAddress || data.propertyAddress || data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType)
+          return 'partial';
+        return 'empty';
+
+      case 'financial':
+        const hasAllFinancialFields = data.proofOfIncomeType && data.monthlyIncome;
+        const hasFinancialDocument = data.proofOfIncomeDocument && (data.proofOfIncomeDocument instanceof File || data.proofOfIncomeDocument.name);
+
+        if (hasAllFinancialFields && hasFinancialDocument)
+          return 'complete';
+        if (hasAllFinancialFields || hasFinancialDocument || data.proofOfIncomeType || data.monthlyIncome)
+          return 'partial';
+        return 'empty';
+
+      case 'guarantor':
+        const hasAllGuarantorFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
+        const hasGuarantorDocument = data.identityDocument && (data.identityDocument instanceof File || data.identityDocument.name);
+
+        if (hasAllGuarantorFields && hasGuarantorDocument)
+          return 'complete';
+        if (hasAllGuarantorFields || hasGuarantorDocument || data.firstName || data.lastName || data.email ||
+          data.phoneNumber || data.address)
+          return 'partial';
+        return 'empty';
+
+      case 'creditCheck':
+        const identityData = formData.identity || {};
+        const hasCriticalIdentityInfo =
+          identityData.firstName &&
+          identityData.lastName &&
+          identityData.email &&
+          identityData.phoneNumber &&
+          identityData.dateOfBirth;
+
+        if (hasCriticalIdentityInfo) {
+          return 'complete';
+        } else if (identityData.firstName || identityData.lastName || identityData.email ||
+          identityData.phoneNumber || identityData.dateOfBirth) {
+          return 'partial';
+        }
+        return 'empty';
+
+      case 'agentDetails':
+        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck)
+          return 'complete';
+        if (data.firstName || data.lastName || data.email || data.phoneNumber)
+          return 'partial';
+        return 'empty';
+
+      default:
+        return 'empty';
+    }
+  };
+
+  const renderSidebarNavigation = () => {
+    const steps = [
+      { icon: User, text: 'Identity', step: 1, dataKey: 'identity' },
+      { icon: Briefcase, text: 'Employment', step: 2, dataKey: 'employment' },
+      { icon: Home, text: 'Residential', step: 3, dataKey: 'residential' },
+      { icon: PoundSterling, text: 'Financial', step: 4, dataKey: 'financial' },
+      { icon: Users, text: 'Guarantor', step: 5, dataKey: 'guarantor' },
+      { icon: CreditCard, text: 'Credit Check', step: 6, dataKey: 'creditCheck' },
+      { icon: User, text: 'Agent Details', step: 7, dataKey: 'agentDetails' }
+    ];
+
+    return steps.map(({ icon: Icon, text, step, dataKey }) => {
+      const status = stepStatus[step];
+      const shouldShowDot = status !== 'empty';
+      let dotColor = '';
+      switch (status) {
+        case 'partial':
+          dotColor = 'bg-orange-500';
+          break;
+        case 'complete':
+          dotColor = 'bg-green-500';
+          break;
+        default:
+          dotColor = 'bg-gray-300';
+      }
+
+      return (
+        <li
+          key={step}
+          onClick={() => goToStep(step)}
+          className={`flex items-center space-x-3 px-4 py-3 cursor-pointer transition-all ${currentStep === step
+            ? 'bg-blue-100 text-black font-semibold rounded-lg'
+            : 'text-gray-600 hover:bg-gray-100'
+            }`}
+        >
+          <Icon size={18} className={currentStep === step ? 'text-orange-600' : 'text-gray-500'} />
+          <span>{text}</span>
+          {shouldShowDot && (
+            <span
+              className={`ml-auto w-3 h-3 rounded-full ${dotColor}`}
+              title={`Status: ${status}`}
+            />
+          )}
+        </li>
+      );
+    });
+  };
+
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        identity: {
+          ...prev.identity,
+          firstName: user.givenName || user.name?.split(' ')[0] || '',
+          lastName: user.familyName || user.name?.split(' ').slice(1).join(' ') || '',
+          email: user.email || ''
+        }
+      }));
+    }
+  }, [user]);
+
+  // Update the useEffect for loading stored data
+  useEffect(() => {
+    if (user?.id) {
+      try {
+        // Load step status
+        const savedStatus = localStorage.getItem(`referencing_${user.id}_stepStatus`);
+        if (savedStatus) {
+          setStepStatus(JSON.parse(savedStatus));
+        }
+
+        // Load current step
+        const savedStep = localStorage.getItem(`referencing_${user.id}_currentStep`);
+        if (savedStep) {
+          setCurrentStep(parseInt(savedStep, 10));
+        }
+
+        // Load entire form data at once
+        const savedFormData = localStorage.getItem(`referencing_${user.id}_formData`);
+        if (savedFormData) {
+          const parsedData = JSON.parse(savedFormData);
+          setFormData(prev => ({
+            ...prev,
+            ...parsedData
+          }));
+        }
+
+      } catch (e) {
+        console.error('Failed to load saved data:', e);
+      }
+    }
+  }, [user]);
+
+  // Update saveCurrentStep to save all data
+  const saveCurrentStep = async () => {
+    try {
+      setIsSaving(true);
+
+      if (!user?.id) {
+        throw new Error('No user found. Please login again.');
+      }
+
+      // Save current step
+      localStorage.setItem(`referencing_${user.id}_currentStep`, currentStep.toString());
+
+      // Save entire form data
+      localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(formData));
+
+      // Save step status
+      localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
+
+      // Update last saved timestamp
+      setLastSavedSteps(prev => ({
+        ...prev,
+        [currentStep]: new Date()
+      }));
+
+      // Show success message
+      // alert('Data saved successfully!');
+
+    } catch (error) {
+      console.error('Error in save operation:', error);
+      // alert(error instanceof Error ? error.message : 'Failed to submit application');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Add auto-save on form updates
+  useEffect(() => {
+    if (user?.id) {
+      // Save form data whenever it changes
+      localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(formData));
+      // Save step status
+      localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
+      // Save current step
+      localStorage.setItem(`referencing_${user.id}_currentStep`, currentStep.toString());
+    }
+  }, [formData, stepStatus, currentStep, user]);
+
+  const goToStep = (step: number) => {
+    setCurrentStep(step);
+    setIsMenuOpen(false);
+  };
+
+  const nextStep = async () => {
+    if (currentStep < 7) {
+      await saveCurrentStep();
+      setCurrentStep(prev => prev + 1);
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(prev => prev - 1);
+    }
+  };
+
+  const checkFormCompleteness = () => {
+    // Check each section's status
+    const identityComplete = stepStatus[1] === 'complete';
+    const employmentComplete = stepStatus[2] === 'complete';
+    const residentialComplete = stepStatus[3] === 'complete';
+    const financialComplete = stepStatus[4] === 'complete';
+    const guarantorComplete = stepStatus[5] === 'complete';
+    const creditCheckComplete = stepStatus[6] === 'complete';
+    const agentDetailsComplete = stepStatus[7] === 'complete';
+
+    const allComplete =
+      identityComplete &&
+      employmentComplete &&
+      residentialComplete &&
+      financialComplete &&
+      guarantorComplete &&
+      creditCheckComplete &&
+      agentDetailsComplete;
+
+    setIsFormComplete(allComplete);
+    return allComplete;
+  };
+
+  const submitApplication = async () => {
+    const isComplete = checkFormCompleteness();
+    if (!isComplete) {
+      setShowWarningModal(true);
+      return;
+    }
+    proceedWithSubmission();
+  };
+
+  const proceedWithSubmission = async () => {
+    try {
+      setIsSubmitting(true);
+      await saveCurrentStep();
+      const userId = user?.id || '';
+
+      // Get agent details from the form data
+      const agentEmail = formData.agentDetails?.email;
+      const agentName = `${formData.agentDetails?.firstName || ''} ${formData.agentDetails?.lastName || ''}`.trim();
+
+      if (!agentEmail) {
+        throw new Error('Agent email is required. Please complete the Agent Details section.');
+      }
+
+      // Prepare attachments array with proper naming for zip organization
+      const attachments: Attachment[] = [];
+
+      // Helper function to add file if it exists
+      const addFileToAttachments = (storedFile: StoredFile | null, prefix: string, section: string) => {
+        if (storedFile && storedFile.dataUrl) {
+          const file = base64ToFile(storedFile);
+          const fileExtension = storedFile.name.split('.').pop();
+          const sanitizedName = `${formData.identity?.firstName || 'unknown'}_${formData.identity?.lastName || 'unknown'}`;
+          const fileName = `${section}/${prefix}_${sanitizedName}.${fileExtension}`;
+          attachments.push({
+            filename: fileName,
+            content: file
+          });
+        }
+      };
+
+      // Add all files with proper folder structure
+      if (formData.identity?.identityProof) {
+        addFileToAttachments(
+          formData.identity.identityProof as StoredFile,
+          'identity_proof',
+          '1_Identity_Documents'
+        );
+      }
+
+      if (formData.employment?.proofDocument) {
+        addFileToAttachments(
+          formData.employment.proofDocument as StoredFile,
+          'employment_proof',
+          '2_Employment_Documents'
+        );
+      }
+
+      if (formData.residential?.proofDocument) {
+        addFileToAttachments(
+          formData.residential.proofDocument as StoredFile,
+          'residential_proof',
+          '3_Residential_Documents'
+        );
+      }
+
+      if (formData.financial?.proofOfIncomeDocument) {
+        addFileToAttachments(
+          formData.financial.proofOfIncomeDocument as StoredFile,
+          'income_proof',
+          '4_Financial_Documents'
+        );
+      }
+
+      if (formData.guarantor?.identityDocument) {
+        addFileToAttachments(
+          formData.guarantor.identityDocument as StoredFile,
+          'guarantor_proof',
+          '5_Guarantor_Documents'
+        );
+      }
+
+      // Submit the application
+      const submissionResult = await referencingService.submitApplication(userId, {
+        formData,
+        emailContent: {
+          to: agentEmail,
+          subject: `New Tenant Application${formData.residential?.propertyAddress ? ` - ${formData.residential.propertyAddress}` : ''}`,
+          attachments,
+          formData // Pass the entire formData for email template generation
+        }
+      });
+
+      if (!submissionResult.success) {
+        throw new Error(submissionResult.message || 'Failed to submit application');
+      }
+
+      // Send emails to all recipients
+      const emailResults = await emailService.sendMultipleEmails(formData, attachments);
+
+      if (emailResults.error) {
+        console.error('Error sending some emails:', emailResults.error);
+      }
+
+      // Log email sending results
+      console.log('Email sending results:', {
+        agent: emailResults.agent,
+        referee: emailResults.referee,
+        guarantor: emailResults.guarantor
+      });
+
+      // Show success modal
+      setShowSuccessModal(true);
+
+      // Don't clear local storage immediately after submission
+      // Instead, mark the submission as complete
+      if (userId) {
+        localStorage.setItem(`referencing_${userId}_submitted`, 'true');
+      }
+
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      // alert(error instanceof Error ? error.message : 'Failed to submit application');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const WarningModal = () => {
+    if (!showWarningModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+          <div className="flex items-center mb-4">
+            <div className="bg-yellow-100 p-2 rounded-full">
+              <AlertTriangle className="text-yellow-500 w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-semibold ml-3">Incomplete Form</h3>
+          </div>
+
+          <p className="text-gray-600 mb-6">
+            Your form is incomplete. Some information may be missing or incorrect.
+            Are you sure you want to submit anyway?
+          </p>
+
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={() => setShowWarningModal(false)}
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setShowWarningModal(false);
+                proceedWithSubmission();
+              }}
+              className="px-4 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors"
+            >
+              Submit Anyway
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const SuccessModal = () => {
+    if (!showSuccessModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+          <div className="flex items-center mb-4">
+            <div className="bg-green-100 p-2 rounded-full">
+              <CheckCircle className="text-green-500 w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-semibold ml-3">Application Submitted Successfully</h3>
+          </div>
+
+          <p className="text-gray-600 mb-6">
+            Your application has been submitted successfully. The agent will review your documents and contact you shortly.
+          </p>
+
+          <div className="flex justify-end">
+            <button
+              onClick={() => {
+                setShowSuccessModal(false);
+                onClose();
+              }}
+              className="px-4 py-2 bg-[#136C9E] text-white rounded-md hover:bg-opacity-90 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  useEffect(() => {
+    checkFormCompleteness();
+  }, [stepStatus]);
+
+  // Add an effect to update credit check status when identity form changes
+  useEffect(() => {
+    if (formData.identity) {
+      const creditCheckStatus = determineStepStatus('creditCheck', formData);
+      setStepStatus(prev => ({
+        ...prev,
+        6: creditCheckStatus
+      }));
+    }
+  }, [formData.identity]);
+
+  // Update cleanup effect
+  useEffect(() => {
+    if (!isOpen && user?.id) {
+      const isSubmitted = localStorage.getItem(`referencing_${user.id}_submitted`) === 'true';
+      if (isSubmitted) {
+        // Clear storage only if the form was successfully submitted
+        const keysToRemove = [
+          `referencing_${user.id}_formData`,
+          `referencing_${user.id}_stepStatus`,
+          `referencing_${user.id}_currentStep`,
+          `referencing_${user.id}_submitted`
+        ];
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+      }
+    }
+  }, [isOpen, user]);
+
+  const renderFormContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="relative">
+            <h3 className="text-xl font-semibold mb-6">Fill in your personal details below</h3>
+            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              <div>
+                <label className="block text-gray-700 mb-2">First Name</label>
+                <input
+                  type="text"
+                  value={formData.identity.firstName}
+                  onChange={(e) => updateFormData('identity', { firstName: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 mb-2">Last Name</label>
+                <input
+                  type="text"
+                  value={formData.identity.lastName}
+                  onChange={(e) => updateFormData('identity', { lastName: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 mb-2">Email Address</label>
+                <input
+                  type="email"
+                  value={formData.identity.email}
+                  onChange={(e) => updateFormData('identity', { email: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 mb-2">Phone Number</label>
+                <input
+                  type="tel"
+                  value={formData.identity.phoneNumber}
+                  onChange={(e) => updateFormData('identity', { phoneNumber: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 mb-2">Date of Birth</label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={formData.identity.dateOfBirth}
+                    onChange={(e) => {
+                      const selectedDate = new Date(e.target.value);
+                      const today = new Date();
+                      const age = today.getFullYear() - selectedDate.getFullYear();
+                      const monthDiff = today.getMonth() - selectedDate.getMonth();
+
+                      // Adjust age if birthday hasn't occurred this year
+                      const isOldEnough =
+                        age > 18 ||
+                        (age === 18 && monthDiff > 0) ||
+                        (age === 18 && monthDiff === 0 && today.getDate() >= selectedDate.getDate());
+
+                      if (!isOldEnough) {
+                        // Show error state
+                        updateFormData('identity', {
+                          dateOfBirth: e.target.value,
+                          dateOfBirthError: 'You must be at least 18 years old'
+                        });
+                      } else {
+                        // Clear error state
+                        updateFormData('identity', {
+                          dateOfBirth: e.target.value,
+                          dateOfBirthError: undefined
+                        });
+                      }
+                    }}
+                    max={new Date().toISOString().split('T')[0]}
+                    className={`w-full px-4 py-2 border ${formData.identity.dateOfBirthError ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-2 ${formData.identity.dateOfBirthError ? 'focus:ring-red-500' : 'focus:ring-primary'}`}
+                  />
+                  {formData.identity.dateOfBirthError && (
+                    <p className="mt-1 text-sm text-red-500">{formData.identity.dateOfBirthError}</p>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="block text-gray-700 mb-2">Nationality</label>
+                <select
+                  value={formData.identity.nationality}
+                  onChange={(e) => updateFormData('identity', { nationality: e.target.value })}
+                  className={`w-full max-w-md px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${!formData.identity.nationality ? 'text-gray-400' : 'text-gray-900'}`}
+                >
+                  <option value="" disabled>Select Nationality</option>
+                  <option value="United Kingdom">United Kingdom</option>
+                  <option value="United States">United States</option>
+                  <option value="Afghanistan">Afghanistan</option>
+                  <option value="Albania">Albania</option>
+                  <option value="Algeria">Algeria</option>
+                  <option value="Andorra">Andorra</option>
+                  <option value="Angola">Angola</option>
+                  <option value="Argentina">Argentina</option>
+                  <option value="Armenia">Armenia</option>
+                  <option value="Australia">Australia</option>
+                  <option value="Austria">Austria</option>
+                  <option value="Azerbaijan">Azerbaijan</option>
+                  <option value="Bahamas">Bahamas</option>
+                  <option value="Bahrain">Bahrain</option>
+                  <option value="Bangladesh">Bangladesh</option>
+                  <option value="Barbados">Barbados</option>
+                  <option value="Belarus">Belarus</option>
+                  <option value="Belgium">Belgium</option>
+                  <option value="Belize">Belize</option>
+                  <option value="Benin">Benin</option>
+                  <option value="Bhutan">Bhutan</option>
+                  <option value="Bolivia">Bolivia</option>
+                  <option value="Bosnia and Herzegovina">Bosnia and Herzegovina</option>
+                  <option value="Botswana">Botswana</option>
+                  <option value="Brazil">Brazil</option>
+                  <option value="Brunei">Brunei</option>
+                  <option value="Bulgaria">Bulgaria</option>
+                  <option value="Burkina Faso">Burkina Faso</option>
+                  <option value="Burundi">Burundi</option>
+                  <option value="Cambodia">Cambodia</option>
+                  <option value="Cameroon">Cameroon</option>
+                  <option value="Canada">Canada</option>
+                  <option value="Cape Verde">Cape Verde</option>
+                  <option value="Central African Republic">Central African Republic</option>
+                  <option value="Chad">Chad</option>
+                  <option value="Chile">Chile</option>
+                  <option value="China">China</option>
+                  <option value="Colombia">Colombia</option>
+                  <option value="Comoros">Comoros</option>
+                  <option value="Congo">Congo</option>
+                  <option value="Costa Rica">Costa Rica</option>
+                  <option value="Croatia">Croatia</option>
+                  <option value="Cuba">Cuba</option>
+                  <option value="Cyprus">Cyprus</option>
+                  <option value="Czech Republic">Czech Republic</option>
+                  <option value="Denmark">Denmark</option>
+                  <option value="Djibouti">Djibouti</option>
+                  <option value="Dominican Republic">Dominican Republic</option>
+                  <option value="Ecuador">Ecuador</option>
+                  <option value="Egypt">Egypt</option>
+                  <option value="El Salvador">El Salvador</option>
+                  <option value="Estonia">Estonia</option>
+                  <option value="Ethiopia">Ethiopia</option>
+                  <option value="Fiji">Fiji</option>
+                  <option value="Finland">Finland</option>
+                  <option value="France">France</option>
+                  <option value="Gabon">Gabon</option>
+                  <option value="Gambia">Gambia</option>
+                  <option value="Georgia">Georgia</option>
+                  <option value="Germany">Germany</option>
+                  <option value="Ghana">Ghana</option>
+                  <option value="Greece">Greece</option>
+                  <option value="Grenada">Grenada</option>
+                  <option value="Guatemala">Guatemala</option>
+                  <option value="Guinea">Guinea</option>
+                  <option value="Honduras">Honduras</option>
+                  <option value="Hungary">Hungary</option>
+                  <option value="Iceland">Iceland</option>
+                  <option value="India">India</option>
+                  <option value="Indonesia">Indonesia</option>
+                  <option value="Iran">Iran</option>
+                  <option value="Iraq">Iraq</option>
+                  <option value="Ireland">Ireland</option>
+                  <option value="Israel">Israel</option>
+                  <option value="Italy">Italy</option>
+                  <option value="Jamaica">Jamaica</option>
+                  <option value="Japan">Japan</option>
+                  <option value="Jordan">Jordan</option>
+                  <option value="Kazakhstan">Kazakhstan</option>
+                  <option value="Kenya">Kenya</option>
+                  <option value="Kuwait">Kuwait</option>
+                  <option value="Kyrgyzstan">Kyrgyzstan</option>
+                  <option value="Laos">Laos</option>
+                  <option value="Latvia">Latvia</option>
+                  <option value="Lebanon">Lebanon</option>
+                  <option value="Libya">Libya</option>
+                  <option value="Liechtenstein">Liechtenstein</option>
+                  <option value="Lithuania">Lithuania</option>
+                  <option value="Luxembourg">Luxembourg</option>
+                  <option value="Madagascar">Madagascar</option>
+                  <option value="Malawi">Malawi</option>
+                  <option value="Malaysia">Malaysia</option>
+                  <option value="Maldives">Maldives</option>
+                  <option value="Mali">Mali</option>
+                  <option value="Mexico">Mexico</option>
+                  <option value="Moldova">Moldova</option>
+                  <option value="Monaco">Monaco</option>
+                  <option value="Mongolia">Mongolia</option>
+                  <option value="Morocco">Morocco</option>
+                  <option value="Mozambique">Mozambique</option>
+                  <option value="Myanmar">Myanmar</option>
+                  <option value="Namibia">Namibia</option>
+                  <option value="Nepal">Nepal</option>
+                  <option value="Netherlands">Netherlands</option>
+                  <option value="New Zealand">New Zealand</option>
+                  <option value="Nigeria">Nigeria</option>
+                  <option value="North Korea">North Korea</option>
+                  <option value="Norway">Norway</option>
+                  <option value="Oman">Oman</option>
+                  <option value="Pakistan">Pakistan</option>
+                  <option value="Palestine">Palestine</option>
+                  <option value="Peru">Peru</option>
+                  <option value="Philippines">Philippines</option>
+                  <option value="Poland">Poland</option>
+                  <option value="Portugal">Portugal</option>
+                  <option value="Qatar">Qatar</option>
+                  <option value="Romania">Romania</option>
+                  <option value="Russia">Russia</option>
+                  <option value="Saudi Arabia">Saudi Arabia</option>
+                  <option value="South Africa">South Africa</option>
+                  <option value="South Korea">South Korea</option>
+                  <option value="Spain">Spain</option>
+                  <option value="Sri Lanka">Sri Lanka</option>
+                  <option value="Sweden">Sweden</option>
+                  <option value="Switzerland">Switzerland</option>
+                  <option value="Turkey">Turkey</option>
+                  <option value="Ukraine">Ukraine</option>
+                  <option value="Vietnam">Vietnam</option>
+                  <option value="Zimbabwe">Zimbabwe</option>
+                </select>
+              </div>
+            </div>
+            <FileUpload updateFormData={updateFormData} formData={formData} />
+          </div>
+        );
+      case 2:
+        return (
+          <div className="relative">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-800">Fill in your employment details below</h2>
+            </div>
+            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Employment Status</label>
+                <select
+                  value={formData.employment.employmentStatus}
+                  onChange={(e) => updateFormData('employment', { employmentStatus: e.target.value })}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${!formData.employment.employmentStatus ? 'text-gray-400' : 'text-gray-900'}`}
+                >
+                  <option value="" disabled>Select status</option>
+                  <option value="Full-time">Full-time</option>
+                  <option value="Part-time">Part-time</option>
+                  <option value="Self-employed">Self-employed</option>
+                  <option value="Unemployed">Unemployed</option>
+                  <option value="Retired">Retired</option>
+                  <option value="Student">Student</option>
+                </select>
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Company Details</label>
+                <input
+                  type="text"
+                  value={formData.employment.companyDetails}
+                  onChange={(e) => updateFormData('employment', { companyDetails: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Company name"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Length of Employment (Years)</label>
+                <input
+                  type="text"
+                  value={formData.employment.lengthOfEmployment}
+                  onChange={(e) => updateFormData('employment', { lengthOfEmployment: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="2"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Job Position</label>
+                <input
+                  type="text"
+                  value={formData.employment.jobPosition}
+                  onChange={(e) => updateFormData('employment', { jobPosition: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Software Developer"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Referee - Full Name</label>
+                <input
+                  type="text"
+                  value={formData.employment.referenceFullName}
+                  onChange={(e) => updateFormData('employment', { referenceFullName: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="John Smith"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Referee - Email Address</label>
+                <input
+                  type="email"
+                  value={formData.employment.referenceEmail}
+                  onChange={(e) => updateFormData('employment', { referenceEmail: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="john.smith@example.com"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Proof of Employment</label>
+                <select
+                  value={formData.employment.proofType}
+                  onChange={(e) => updateFormData('employment', { proofType: e.target.value })}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${!formData.employment.proofType ? 'text-gray-400' : 'text-gray-900'}`}
+                >
+                  <option value="" disabled>Select proof type</option>
+                  <option value="Payslip">Payslip</option>
+                  <option value="Employment Contract">Employment Contract</option>
+                  <option value="Bank Statement">Bank Statement</option>
+                  <option value="Tax Return">Tax Return</option>
+                </select>
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Referee - Phone Number</label>
+                <input
+                  type="tel"
+                  value={formData.employment.referencePhone}
+                  onChange={(e) => updateFormData('employment', { referencePhone: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="+44 123 456 7890"
+                />
+              </div>
+            </div>
+            <EmploymentUpload updateFormData={updateFormData} formData={formData} />
+          </div>
+        );
+      case 3:
+        return (
+          <div className="relative">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-800">Fill in your residential details below</h2>
+            </div>
+
+            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
+              <div className="col-span-2">
+                <label className="block text-gray-700 mb-2">Do you already have a property you're interested in renting?</label>
+                <select
+                  value={formData.residential.alreadyHavePropertyAddress}
+                  onChange={(e) => updateFormData('residential', { alreadyHavePropertyAddress: e.target.value })}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${!formData.residential.alreadyHavePropertyAddress ? 'text-gray-400' : 'text-gray-900'}`}
+                >
+                  <option value="" disabled>Select</option>
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                </select>
+                {formData.residential.alreadyHavePropertyAddress === 'Yes' && (
+                  <div className="mt-4">
+                    <label className="block text-gray-700 mb-2">Property Address</label>
+                    <textarea
+                      value={formData.residential.propertyAddress}
+                      onChange={(e) => updateFormData('residential', { propertyAddress: e.target.value })}
+                      rows={4}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Enter the address of the property you're interested in"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Reason for leaving Previous Address</label>
+                <textarea
+                  value={formData.residential.reasonForLeaving}
+                  onChange={(e) => updateFormData('residential', { reasonForLeaving: e.target.value })}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Please provide the reason for leaving"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Current Address</label>
+                <textarea
+                  value={formData.residential.currentAddress}
+                  onChange={(e) => updateFormData('residential', { currentAddress: e.target.value })}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Enter your current address"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2 whitespace-nowrap">Previous Address (If less than 3 yrs at current)</label>
+                <input
+                  type="text"
+                  value={formData.residential.previousAddress}
+                  onChange={(e) => updateFormData('residential', { previousAddress: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Enter your previous address"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">How long have you lived at this Address?</label>
+                <select
+                  value={formData.residential.durationAtCurrentAddress}
+                  onChange={(e) => updateFormData('residential', { durationAtCurrentAddress: e.target.value })}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${!formData.residential.durationAtCurrentAddress ? 'text-gray-400' : 'text-gray-900'}`}
+                >
+                  <option value="" disabled>Select duration</option>
+                  <option value="Less than 1 year">Less than 1 year</option>
+                  <option value="1-2 years">1-2 years</option>
+                  <option value="2-3 years">2-3 years</option>
+                </select>
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Proof of Address</label>
+                <select
+                  value={formData.residential.proofType}
+                  onChange={(e) => updateFormData('residential', { proofType: e.target.value })}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${!formData.residential.proofType ? 'text-gray-400' : 'text-gray-900'}`}
+                >
+                  <option value="" disabled>Select proof type</option>
+                  <option value="Utility Bill">Utility Bill</option>
+                  <option value="Bank Statement">Bank Statement</option>
+                  <option value="Council Tax Bill">Council Tax Bill</option>
+                  <option value="Tenancy Agreement">Tenancy Agreement</option>
+                </select>
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Select exact duration at this address</label>
+                <select
+                  value={formData.residential.durationAtPreviousAddress}
+                  onChange={(e) => updateFormData('residential', { durationAtPreviousAddress: e.target.value })}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${!formData.residential.durationAtPreviousAddress ? 'text-gray-400' : 'text-gray-900'}`}
+                >
+                  <option value="" disabled>Select duration</option>
+                  <option value="Less than 1 year">Less than 1 year</option>
+                  <option value="1-2 years">1-2 years</option>
+                  <option value="2-3 years">2-3 years</option>
+                </select>
+              </div>
+            </div>
+            <ResidentialUpload updateFormData={updateFormData} formData={formData} />
+          </div>
+        );
+      case 4:
+        return (
+          <div className="relative">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-800">Fill in your financial details below</h2>
+            </div>
+            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Monthly Income (£)</label>
+                <input
+                  type="number"
+                  value={formData.financial.monthlyIncome}
+                  onChange={(e) => updateFormData('financial', { monthlyIncome: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Enter your monthly income"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Proof of income</label>
+                <select
+                  value={formData.financial.proofOfIncomeType}
+                  onChange={(e) => updateFormData('financial', { proofOfIncomeType: e.target.value })}
+                  className={`w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${!formData.financial.proofOfIncomeType ? 'text-gray-400' : 'text-gray-900'}`}
+                >
+                  <option value="" disabled>Select proof type</option>
+                  <option value="Payslip">Recent Payslip</option>
+                  <option value="Bank Statement">Bank Statement</option>
+                  <option value="Employment Contract">Employment Contract</option>
+                  <option value="Tax Return">Tax Return</option>
+                  <option value="P60">P60</option>
+                </select>
+              </div>
+            </div>
+            <FinancialUpload updateFormData={updateFormData} formData={formData} />
+          </div>
+        );
+      case 5:
+        return (
+          <div className="relative">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-800">Fill in your guarantor's personal details below</h2>
+            </div>
+            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Guarantor's First Name</label>
+                <input
+                  type="text"
+                  value={formData.guarantor.firstName}
+                  onChange={(e) => updateFormData('guarantor', { firstName: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Enter first name"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Guarantor's Last Name</label>
+                <input
+                  type="text"
+                  value={formData.guarantor.lastName}
+                  onChange={(e) => updateFormData('guarantor', { lastName: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Enter last name"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Guarantor's Email Address</label>
+                <input
+                  type="email"
+                  value={formData.guarantor.email}
+                  onChange={(e) => updateFormData('guarantor', { email: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Enter email address"
+                />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-gray-700 mb-2">Guarantor's Phone Number</label>
+                <input
+                  type="tel"
+                  value={formData.guarantor.phoneNumber}
+                  onChange={(e) => updateFormData('guarantor', { phoneNumber: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Enter phone number"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-gray-700 mb-2">Guarantor's Address</label>
+                <textarea
+                  value={formData.guarantor.address}
+                  onChange={(e) => updateFormData('guarantor', { address: e.target.value })}
+                  rows={5}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Enter full address"
+                />
+              </div>
+            </div>
+            <GuarantorUpload updateFormData={updateFormData} formData={formData} />
+          </div>
+        );
+      case 6:
+        return (
+          <div className="relative">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-800">Fill in your personal details below</h2>
+            </div>
+            <div className="bg-white rounded-lg p-6 mb-6">
+              <p className="text-gray-700 mb-6">
+                A Credit check is required to complete your referencing.<br />
+                Your personal information has been filled in automatically.<br />
+                <strong>Check that all your details are correct.</strong>
+              </p>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                <div className="col-span-1">
+                  <label className="block text-gray-700 mb-2">First Name</label>
+                  <input
+                    type="text"
+                    value={formData.identity.firstName}
+                    readOnly
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-gray-700 mb-2">Last Name</label>
+                  <input
+                    type="text"
+                    value={formData.identity.lastName}
+                    readOnly
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-gray-700 mb-2">Email Address</label>
+                  <input
+                    type="email"
+                    value={formData.identity.email}
+                    readOnly
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-gray-700 mb-2">Phone Number</label>
+                  <input
+                    type="tel"
+                    value={formData.identity.phoneNumber}
+                    readOnly
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-gray-700 mb-2">Date of birth</label>
+                  <input
+                    type="text"
+                    value={formData.identity.dateOfBirth}
+                    readOnly
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="rounded-lg p-6 text-center text-white" style={{ backgroundColor: '#136C9E' }}>
+              <div className="flex justify-center mb-2">
+                <div className="rounded-full p-2 w-8 h-8 flex items-center justify-center" style={{ backgroundColor: '#DC5F12' }}>
+                  <Info className="text-white" size={24} />
+                </div>
+              </div>
+              <TypingAnimation text="Coming Soon" className="text-2xl font-medium mb-2" />
+              <p className="text-white text-sm">Automated live credit checks</p>
+            </div>
+          </div>
+        );
+      case 7:
+        return (
+          <div className="relative">
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-800">
+                Fill in the agent's details below
+              </h2>
+            </div>
+            <div className="bg-white rounded-lg p-6 mb-6">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                <div className="col-span-1">
+                  <label className="block text-gray-700 mb-2">Agent's First Name</label>
+                  <input
+                    type="text"
+                    value={formData.agentDetails.firstName || ""}
+                    onChange={(e) =>
+                      updateFormData("agentDetails", {
+                        ...formData.agentDetails,
+                        firstName: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-gray-700 mb-2">Agent's Last Name</label>
+                  <input
+                    type="text"
+                    value={formData.agentDetails.lastName || ""}
+                    onChange={(e) =>
+                      updateFormData("agentDetails", {
+                        ...formData.agentDetails,
+                        lastName: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-gray-700 mb-2">Agent's Email Address</label>
+                  <input
+                    type="email"
+                    value={formData.agentDetails.email || ""}
+                    onChange={(e) =>
+                      updateFormData("agentDetails", {
+                        ...formData.agentDetails,
+                        email: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
+                  />
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-gray-700 mb-2">Agent's Phone Number</label>
+                  <input
+                    type="tel"
+                    value={formData.agentDetails.phoneNumber || ""}
+                    onChange={(e) =>
+                      updateFormData("agentDetails", {
+                        ...formData.agentDetails,
+                        phoneNumber: e.target.value,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 mb-4">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.agentDetails.hasAgreedToCheck || false}
+                  onChange={(e) =>
+                    updateFormData("agentDetails", {
+                      ...formData.agentDetails,
+                      hasAgreedToCheck: e.target.checked,
+                    })
+                  }
+                  className="h-5 w-5 text-primary border-gray-300 rounded focus:ring-primary"
+                />
+                <span className="ml-2 text-gray-700">
+                  I authorise Proptii to perform a credit check using the information provided
+                </span>
+              </label>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto">
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        onClick={onClose}
+      />
+      <div className="relative w-full max-w-5xl mx-auto my-8 bg-white rounded-lg shadow-xl flex overflow-hidden min-h-[600px]">
+        <div className="w-64 bg-gray-50 py-4 px-4 border-r border-gray-200 hidden md:block md:flex flex-col">
+          <div className="mb-6 px-2">
+            <h2 className="text-xl font-bold text-orange-600 mb-2">Referencing Steps</h2>
+          </div>
+          <div className="mb-6 px-2">
+            <p className="text-sm text-gray-600 mb-4">
+              The referencing process verifies renter or buyer identity, financial status, and rental history.
+            </p>
+          </div>
+          <ul className="space-y-1">
+            {renderSidebarNavigation()}
+          </ul>
+          <div className="mt-auto pt-6 px-2">
+            <div className="text-sm text-gray-600 mb-2">Step {currentStep} of 7</div>
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#136C9E] transition-all duration-300"
+                style={{ width: `${(currentStep / 7) * 100}%` }}
+              ></div>
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 flex flex-col max-h-[90vh]">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+            <div className="flex items-center space-x-4">
+              <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-2">
+                <Menu size={24} />
+              </button>
+              <h2 className="text-md font-semibold">Referencing Form</h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors"
+              aria-label="Close modal"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          {isMenuOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+              <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl p-6">
+                <button onClick={() => setIsMenuOpen(false)} className="mb-4">
+                  <X size={24} />
+                </button>
+                <ul className="space-y-4">
+                  {navigationItems.map(({ label, Icon, step }) => (
+                    <li
+                      key={step}
+                      onClick={() => {
+                        goToStep(step);
+                        setIsMenuOpen(false);
+                      }}
+                      className="flex items-center space-x-3 px-4 py-3 cursor-pointer hover:bg-gray-100"
+                    >
+                      <Icon
+                        size={18}
+                        className={currentStep === step ? "text-orange-600" : "text-gray-500"}
+                      />
+                      <span>{label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+          <div className="flex-1 overflow-y-auto p-6 bg-[#f2f7fb]">
+            {renderFormContent()}
+          </div>
+          <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+            <div>
+              {lastSavedSteps[currentStep] && (
+                <div className="flex items-center text-sm text-gray-500 ml-2">
+                  <CheckCircle className="text-green-500 mr-1" fontSize="small" />
+                  <span>Saved</span>
+                </div>
+              )}
+            </div>
+            <div className="flex space-x-3">
+              {currentStep > 1 && (
+                <button
+                  onClick={prevStep}
+                  className="px-6 py-2 border border-[#136C9E] text-[#136C9E] rounded-md hover:bg-[#136C9E] hover:text-white transition-colors"
+                >
+                  Previous
+                </button>
+              )}
+              <button
+                onClick={saveCurrentStep}
+                className="px-6 py-2 bg-gray-100 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-200 transition-colors"
+                disabled={isSaving}
+              >
+                {isSaving ? 'Saving...' : 'Save'}
+              </button>
+              {currentStep < 7 ? (
+                <button
+                  onClick={nextStep}
+                  className="px-6 py-2 bg-[#136C9E] text-white rounded-md hover:bg-[#0F5A82] transition-colors"
+                >
+                  Continue
+                </button>
+              ) : (
+                <button
+                  onClick={submitApplication}
+                  className="px-6 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+      <WarningModal />
+      <SuccessModal />
+    </div>
+  );
+};
+
+export default ReferencingModal;

@@ -1,0 +1,10 @@
+process.env.NODE_ENV = 'test';
+process.env.FUNCTIONS_WORKER_RUNTIME = 'node';
+process.env.COSMOS_DB_CONNECTION_STRING = 'mock_connection_string';
+process.env.COSMOS_DB_DATABASE_NAME = 'mock_database';
+process.env.AZURE_AD_B2C_CLIENT_ID = 'mock_client_id';
+process.env.AZURE_AD_B2C_TENANT_NAME = 'mock_tenant';
+process.env.AZURE_AD_B2C_POLICY_NAME = 'B2C_1_mock_policy';
+process.env.APPINSIGHTS_INSTRUMENTATIONKEY = 'mock_key';
+process.env.API_PREFIX = '/api';
+process.env.ALLOWED_ORIGINS = 'http://localhost:3000'; 
