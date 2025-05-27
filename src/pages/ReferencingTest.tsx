@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Container, Typography, Button, Box, Paper, Grid, Alert } from '@mui/material';
-import ReferencingModal from '../components/referencing/ReferencingModal';
+import ReferencingModal from '../components/ReferencingModal';
 
 /**
  * ReferencingTest page for testing the ReferencingModal component
