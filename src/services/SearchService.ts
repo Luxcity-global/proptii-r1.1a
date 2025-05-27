@@ -5,25 +5,15 @@ interface SearchResponse {
   description: string;
 }
 
-interface PropertySpecs {
-  beds: number;
-  baths: number;
-  propertyType: string;
-}
-
 interface Property {
   id: string;
-  site: 'rightmove' | 'zoopla' | 'openrent' | 'onthemarket';
-  searchLocation: string;
-  searchPrice: string;
-  propertyTypes: string[];
-  searchUrl: string;
-  specs: PropertySpecs;
-  exampleListing: {
-    title: string;
-    price: string;
-    description: string;
-  };
+  title: string;
+  description: string;
+  price: string;
+  location: string;
+  images: string[];
+  source: string;
+  url: string;
 }
 
 export class SearchService {
@@ -31,12 +21,23 @@ export class SearchService {
   private axiosInstance: AxiosInstance;
 
   private constructor() {
+    const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
     this.axiosInstance = axios.create({
-      baseURL: 'http://localhost:3000',
+      baseURL,
       headers: {
         'Content-Type': 'application/json',
       },
+      timeout: 10000, // 10 second timeout
     });
+
+    // Add response interceptor for better error handling
+    this.axiosInstance.interceptors.response.use(
+      response => response,
+      error => {
+        console.error('API Error:', error);
+        return Promise.reject(error);
+      }
+    );
   }
 
   public static getInstance(): SearchService {
@@ -46,112 +47,55 @@ export class SearchService {
     return SearchService.instance;
   }
 
-  private handleError(error: AxiosError): never {
-    console.error('API Error:', error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || error.message);
-  }
-
-  private transformSearchResult(apiResponse: SearchResponse[]): Property[] {
-    // Ensure we have at least 4 results by duplicating if necessary
-    const results = [...apiResponse];
-    while (results.length < 4) {
-      results.push(...apiResponse);
-    }
-    
-    // Take exactly 4 results
-    const fourResults = results.slice(0, 4);
-    
-    // Distribute results across different sites
-    const sites: Property['site'][] = ['rightmove', 'zoopla', 'openrent', 'onthemarket'];
-    
-    return fourResults.map((item, index) => {
-      // Extract location and price from title
-      const locationMatch = item.title.match(/in\s+([^,]+)/i);
-      const priceMatch = item.description.match(/£[\d,]+(\s*pcm)?/i);
-      const bedroomMatch = item.title.match(/(\d+)[\s-]bed/i);
-      
-      const location = locationMatch?.[1] || 'Unknown Location';
-      const price = priceMatch?.[0] || 'Price on Application';
-      const beds = bedroomMatch ? parseInt(bedroomMatch[1]) : 1;
-
-      // Determine property type from description
-      const propertyTypes = [];
-      if (item.title.toLowerCase().includes('flat') || item.title.toLowerCase().includes('apartment')) {
-        propertyTypes.push('Flats', 'Apartments');
-      } else if (item.title.toLowerCase().includes('house')) {
-        propertyTypes.push('Houses');
-      } else {
-        propertyTypes.push('Properties');
-      }
-
-      // Distribute results across sites evenly
-      const site = sites[index % sites.length];
-
-      // Generate search URL based on site and parameters
-      const searchUrl = this.generateSearchUrl(site, location, price);
-
-      return {
-        id: `${site}-${index + 1}`,
-        site,
-        searchLocation: location,
-        searchPrice: price,
-        propertyTypes,
-        searchUrl,
-        specs: {
-          beds,
-          baths: Math.max(1, Math.floor(beds / 2)), // Estimate baths based on beds
-          propertyType: propertyTypes[0]
-        },
-        exampleListing: {
-          title: item.title,
-          price,
-          description: item.description
-        }
-      };
-    });
-  }
-
-  private generateSearchUrl(site: Property['site'], location: string, price: string): string {
-    const priceValue = price.match(/\d+/g)?.[0] || '2000';
-    const locationEncoded = encodeURIComponent(location.toLowerCase().trim());
-    
-    switch (site) {
-      case 'rightmove':
-        return `https://www.rightmove.co.uk/property-to-rent/find.html?locationIdentifier=${locationEncoded}&maxPrice=${priceValue}&propertyTypes=flat,house`;
-      case 'zoopla':
-        return `https://www.zoopla.co.uk/to-rent/property/${locationEncoded}/?price_frequency=per_month&price_max=${priceValue}`;
-      case 'openrent':
-        return `https://www.openrent.co.uk/${locationEncoded}/properties-to-rent?term=${locationEncoded}&prices_max=${priceValue}`;
-      case 'onthemarket':
-        return `https://www.onthemarket.com/to-rent/property/${locationEncoded}/?max-price=${priceValue}-pcm`;
-      default:
-        return '#';
-    }
-  }
-
-  private async checkBackendHealth(): Promise<boolean> {
+  private async ensureBackendRunning(): Promise<void> {
     try {
       const response = await this.axiosInstance.get('/health');
-      return response.data.status === 'ok';
+      if (!response.data?.status === 'ok') {
+        throw new Error('Backend health check failed');
+      }
     } catch (error) {
       console.error('Backend health check failed:', error);
-      if (error.response?.status === 404) {
-        console.error('Backend server is not running. Please start the backend server using: npm run start:backend');
-      }
-      return false;
+      throw new Error('Search service is not available');
     }
   }
 
-  private async ensureBackendRunning(): Promise<void> {
-    const isHealthy = await this.checkBackendHealth();
-    if (!isHealthy) {
-      throw new Error(
-        'Backend service is not running. Please start the backend server using: npm run start:backend'
-      );
+  private handleError(error: AxiosError): never {
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      throw new Error(error.response.data?.message || 'Search request failed');
+    } else if (error.request) {
+      // The request was made but no response was received
+      throw new Error('No response from search service');
+    } else {
+      // Something happened in setting up the request
+      throw new Error('Failed to make search request');
     }
+  }
+
+  private transformSearchResult(data: any[]): Property[] {
+    if (!Array.isArray(data)) {
+      console.warn('Search result is not an array:', data);
+      return [];
+    }
+
+    return data.map(item => ({
+      id: item.id || Math.random().toString(36).substr(2, 9),
+      title: item.title || '',
+      description: item.description || '',
+      price: item.price || '',
+      location: item.location || '',
+      images: Array.isArray(item.images) ? item.images : [],
+      source: item.source || '',
+      url: item.url || ''
+    }));
   }
 
   public async searchProperties(query: string): Promise<Property[]> {
+    if (!query?.trim()) {
+      return [];
+    }
+
     try {
       await this.ensureBackendRunning();
       console.log('Searching properties with query:', query);
@@ -164,31 +108,39 @@ export class SearchService {
         }
       );
 
-      // Transform the API response into our frontend model
       return this.transformSearchResult(response.data);
     } catch (error) {
       console.error('Error during property search:', error);
-      this.handleError(error as AxiosError);
+      throw this.handleError(error as AxiosError);
     }
   }
 
   public async getSuggestions(query: string): Promise<string[]> {
+    if (!query?.trim()) {
+      return [];
+    }
+
     try {
       await this.ensureBackendRunning();
       console.log('Getting suggestions for query:', query);
       
       const response = await this.axiosInstance.post<string[]>(
-        '/search',
+        '/search/suggestions',
         {
           query,
           type: 'suggestions'
         }
       );
 
+      if (!Array.isArray(response.data)) {
+        console.warn('Suggestions response is not an array:', response.data);
+        return [];
+      }
+
       return response.data;
     } catch (error) {
       console.error('Error getting suggestions:', error);
-      this.handleError(error as AxiosError);
+      throw this.handleError(error as AxiosError);
     }
   }
 } 

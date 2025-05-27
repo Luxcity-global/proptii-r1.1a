@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, UseInterceptors, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, UseInterceptors, Logger, HttpException, HttpStatus, Get } from '@nestjs/common';
 import { SearchService } from './search.service';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -11,6 +11,24 @@ export class SearchController {
   private readonly logger = new Logger(SearchController.name);
 
   constructor(private readonly searchService: SearchService) {}
+
+  @Get('health')
+  @ApiOperation({ summary: 'Check search service health' })
+  @ApiResponse({ status: 200, description: 'Service is healthy' })
+  @ApiResponse({ status: 500, description: 'Service is unhealthy' })
+  async healthCheck() {
+    try {
+      await this.searchService.checkHealth();
+      return { status: 'ok', message: 'Search service is healthy' };
+    } catch (error) {
+      this.logger.error('Health check failed:', error);
+      throw new HttpException({
+        status: 'error',
+        message: 'Search service is unhealthy',
+        details: error.message
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
 
   @Post()
   @ApiOperation({ summary: 'Search properties or get suggestions' })

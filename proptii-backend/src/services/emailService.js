@@ -131,11 +131,12 @@ class EmailService {
       // Create zip file of attachments if needed (only for agent emails)
       const emailAttachments = [];
       if (emailType === 'agent' && attachments?.length > 0) {
-        const zipFile = await this.createAttachmentsZip(attachments, parsedFormData?.identity);
-        if (zipFile) {
+        // For agent emails, we expect a single zip file containing all documents
+        const zipAttachment = attachments[0];
+        if (zipAttachment) {
           emailAttachments.push({
-            filename: zipFile.filename,
-            content: zipFile.content,
+            filename: zipAttachment.filename,
+            content: zipAttachment.content,
             contentType: 'application/zip'
           });
         }

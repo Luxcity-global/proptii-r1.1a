@@ -218,32 +218,49 @@ class EmailService {
         // Create zip file
         const zip = new JSZip();
 
-        // Create folders for different types of documents
-        const folders = {
-          '1_Identity_Documents': zip.folder('1_Identity_Documents'),
-          '2_Employment_Documents': zip.folder('2_Employment_Documents'),
-          '3_Residential_Documents': zip.folder('3_Residential_Documents'),
-          '4_Financial_Documents': zip.folder('4_Financial_Documents'),
-          '5_Guarantor_Documents': zip.folder('5_Guarantor_Documents')
-        };
-
-        // Add files to their respective folders
+        // Process each attachment
         for (const attachment of emailContent.attachments) {
-          const folderPath = attachment.filename.split('/')[0];
-          const fileName = attachment.filename.split('/')[1];
-          const folder = folders[folderPath as keyof typeof folders];
+          try {
+            // Get folder path and filename from the attachment's filename
+            const [folderPath, fileName] = attachment.filename.split('/');
 
-          if (folder) {
+            // Get or create the folder in the zip
+            const folder = zip.folder(folderPath);
+            if (!folder) {
+              console.error(`Failed to create/get folder: ${folderPath}`);
+              continue;
+            }
+
+            // Convert File to ArrayBuffer
             const fileArrayBuffer = await attachment.content.arrayBuffer();
+
+            // Add the file to the appropriate folder
+            console.log(`Adding file to zip: ${folderPath}/${fileName}`);
             folder.file(fileName, fileArrayBuffer);
+          } catch (error) {
+            console.error('Error processing attachment:', error);
+            console.error('Attachment details:', {
+              filename: attachment.filename,
+              contentType: attachment.content.type,
+              size: attachment.content.size
+            });
           }
         }
 
         // Generate zip file
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const zipBlob = await zip.generateAsync({
+          type: 'blob',
+          compression: "DEFLATE",
+          compressionOptions: {
+            level: 9
+          }
+        });
+
+        const applicantName = `${emailContent.formData.identity.firstName || 'Unknown'}_${emailContent.formData.identity.lastName || 'User'}`;
+        const timestamp = new Date().toISOString().split('T')[0];
         const zipFile = new File(
           [zipBlob],
-          `${emailContent.formData.identity.firstName}_${emailContent.formData.identity.lastName}_Documents.zip`,
+          `${applicantName}_Documents_${timestamp}.zip`,
           { type: 'application/zip' }
         );
 
