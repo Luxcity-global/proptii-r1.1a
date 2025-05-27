@@ -1,0 +1,56 @@
+# Proptii Project Settings
+# Last updated: 2025-05-26_10-18-05
+
+# Environment Variables
+ENV_VARS=(
+    "VITE_API_URL"
+    "VITE_AZURE_OPENAI_API_KEY"
+    "VITE_AZURE_STORAGE_ACCOUNT"
+    "VITE_AZURE_STORAGE_CONTAINER_NAME"
+    "VITE_AZURE_STORAGE_SAS_TOKEN"
+)
+
+# Required Tools
+REQUIRED_TOOLS=(
+    "node"
+    "npm"
+    "git"
+    "docker"
+)
+
+# Project Structure
+PROJECT_STRUCTURE=(
+    "src/components"
+    "src/hooks"
+    "src/services"
+    "src/utils"
+    "src/pages"
+    "src/docs"
+    "src/tests"
+)
+
+# Database Configuration
+DB_CONFIG=(
+    "host=localhost"
+    "port=5432"
+    "database=proptii"
+    "user=postgres"
+    "password=postgres"
+)
+
+# API Endpoints
+API_ENDPOINTS=(
+    "/api/listings"
+    "/api/search"
+    "/api/images"
+    "/api/auth"
+)
+
+# Documentation Files
+DOCS_FILES=(
+    "docs/best-practices/maintenance.md"
+    "docs/features/agent-portal.md"
+    "docs/features/ai-search-input.md"
+    "docs/development/DevelopmentSetup.md"
+    "docs/backend-integration.md"
+)

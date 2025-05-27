@@ -118,10 +118,17 @@ const Listings: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [properties] = useState(mockProperties);
+  const [hasResults, setHasResults] = useState(true);
 
   const handleSearch = (query: string) => {
     // Implement search logic
     console.log('Searching for:', query);
+    // For now, we'll just filter the mock properties
+    const filteredProperties = mockProperties.filter(property => 
+      property.title.toLowerCase().includes(query.toLowerCase()) ||
+      property.location.address.toLowerCase().includes(query.toLowerCase())
+    );
+    setHasResults(filteredProperties.length > 0);
   };
 
   return (
@@ -132,6 +139,7 @@ const Listings: React.FC = () => {
           onChange={setSearchQuery}
           onSearch={handleSearch}
           className="max-w-3xl mx-auto"
+          hasResults={hasResults}
         />
       </div>
 
