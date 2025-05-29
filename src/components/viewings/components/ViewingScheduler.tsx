@@ -90,6 +90,20 @@ const ViewingScheduler: React.FC = () => {
     });
   };
 
+  const handleUserDetailsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    dispatch({
+      type: 'UPDATE_VIEWING_DETAILS',
+      payload: {
+        ...state.viewingDetails,
+        userDetails: {
+          ...state.viewingDetails?.userDetails,
+          [name]: value,
+        },
+      },
+    });
+  };
+
   return (
     <Box sx={{ p: 2 }}>
       <SectionTitle variant="h6">Schedule Viewing</SectionTitle>
@@ -101,9 +115,47 @@ const ViewingScheduler: React.FC = () => {
         <Grid container spacing={3}>
           <Grid item xs={12}>
             <Typography variant="subtitle1" sx={{ color: DARK_GREY, mb: 2, fontWeight: 500 }}>
+              Your Details
+            </Typography>
+
+            <Box sx={{ mb: 3 }}>
+              <StyledTextField
+                name="fullName"
+                label="Full Name"
+                value={state.viewingDetails?.userDetails?.fullName || ''}
+                onChange={handleUserDetailsChange}
+                fullWidth
+                required
+              />
+            </Box>
+
+            <Box sx={{ mb: 3 }}>
+              <StyledTextField
+                name="email"
+                type="email"
+                label="Email Address"
+                value={state.viewingDetails?.userDetails?.email || ''}
+                onChange={handleUserDetailsChange}
+                fullWidth
+                required
+              />
+            </Box>
+
+            <Box sx={{ mb: 3 }}>
+              <StyledTextField
+                name="phoneNumber"
+                label="Phone Number"
+                value={state.viewingDetails?.userDetails?.phoneNumber || ''}
+                onChange={handleUserDetailsChange}
+                fullWidth
+                required
+              />
+            </Box>
+
+            <Typography variant="subtitle1" sx={{ color: DARK_GREY, mb: 2, mt: 4, fontWeight: 500 }}>
               Viewing Details
             </Typography>
-            
+
             <Box sx={{ mb: 3 }}>
               <StyledTextField
                 type="date"
@@ -111,6 +163,7 @@ const ViewingScheduler: React.FC = () => {
                 value={state.viewingDetails?.date || ''}
                 onChange={handleDateChange}
                 fullWidth
+                required
                 InputLabelProps={{
                   shrink: true,
                 }}
@@ -119,7 +172,7 @@ const ViewingScheduler: React.FC = () => {
                 }}
               />
             </Box>
-            
+
             <Box sx={{ mb: 3 }}>
               <StyledTextField
                 type="time"
@@ -127,6 +180,7 @@ const ViewingScheduler: React.FC = () => {
                 value={state.viewingDetails?.time || ''}
                 onChange={handleTimeChange}
                 fullWidth
+                required
                 InputLabelProps={{
                   shrink: true,
                 }}
@@ -142,6 +196,7 @@ const ViewingScheduler: React.FC = () => {
               label="Viewing Preference"
               value={state.viewingDetails?.preference || ''}
               onChange={handlePreferenceChange}
+              required
             >
               <MenuItem value="in-person">In-Person Viewing</MenuItem>
               <MenuItem value="virtual">Virtual Viewing</MenuItem>

@@ -23,6 +23,8 @@ import ViewingScheduler from './components/ViewingScheduler';
 import ViewingComparison from './components/ViewingComparison';
 import { BookViewingProvider, useBookViewing } from './context/BookViewingContext';
 import { bookingService } from './services/bookingService';
+import { viewingEmailService } from './services/viewingEmailService';
+import { useAuth } from '../../contexts/AuthContext';
 
 import { Home, Event, DoneAll, Close, Warning } from '@mui/icons-material';
 import CheckIcon from '@mui/icons-material/Check';
@@ -195,6 +197,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { state, dispatch } = useBookViewing();
+  const { user } = useAuth();
   const [activeStep, setActiveStep] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -206,6 +209,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
   const isAllDataComplete = () => {
     const property = state.selectedProperty;
     const viewing = state.viewingDetails;
+    const userDetails = viewing?.userDetails;
 
     return property?.street &&
       property?.city &&
@@ -214,7 +218,10 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
       property?.agent?.email &&
       viewing?.date &&
       viewing?.time &&
-      viewing?.preference;
+      viewing?.preference &&
+      userDetails?.fullName &&
+      userDetails?.email &&
+      userDetails?.phoneNumber;
   };
 
   // Check if a section has content
@@ -258,7 +265,25 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           throw new Error('Missing property or viewing details');
         }
 
+        // Save to database
         await bookingService.scheduleViewing(property, viewing);
+
+        // Send emails
+        const emailResult = await viewingEmailService.sendViewingEmails({
+          property,
+          viewing,
+          user: {
+            name: viewing.userDetails?.fullName,
+            email: viewing.userDetails?.email,
+            phoneNumber: viewing.userDetails?.phoneNumber
+          }
+        });
+
+        if (emailResult.error) {
+          console.error('Error sending emails:', emailResult.error);
+          // Continue with success flow even if emails fail
+          // You might want to show a warning to the user
+        }
 
         setSaveComplete(true);
         setShowSavedIndicator(true);

@@ -18,10 +18,15 @@ interface PropertyDetails {
   agent: Agent;
 }
 
-interface ViewingDetails {
-  date: Date | null;
-  time: Date | null;
-  preference: string;
+export interface ViewingDetails {
+  date?: string;
+  time?: string;
+  preference?: string;
+  userDetails?: {
+    fullName?: string;
+    email?: string;
+    phoneNumber?: string;
+  };
 }
 
 interface BookViewingState {
