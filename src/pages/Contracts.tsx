@@ -12,11 +12,11 @@ const ContractsPage = () => {
 
   const handleGetStarted = () => {
     // Commenting out authentication check for now
-    // if (isAuthenticated) {
+     if (isAuthenticated) {
     setIsModalOpen(true);
-    // } else {
-    //   login();
-    // }
+     } else {
+       login();
+     }
   };
 
   return (
@@ -53,7 +53,7 @@ const ContractsPage = () => {
 
           <button
             onClick={handleGetStarted}
-            className="bg-primary text-white px-10 py-4 rounded-lg hover:bg-opacity-90 transition-all text-xl font-medium"
+            className="bg-primary text-white px-10 py-4 rounded-full hover:bg-opacity-90 transition-all text-xl font-medium"
           >
             {isAuthenticated ? 'Start Contracts' : 'Get Started'}
           </button>
