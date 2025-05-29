@@ -11,7 +11,7 @@ export const bookingService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ propertyUrl })
       });
-      
+
       if (!response.ok) throw new Error('Failed to search property');
       return await response.json();
     } catch (error) {
@@ -23,13 +23,13 @@ export const bookingService = {
     try {
       const response = await fetch(`${API_BASE_URL}/api/properties/search-listings`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
         body: JSON.stringify({ searchUrl })
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || 'Failed to search property listings');
@@ -65,7 +65,7 @@ export const bookingService = {
           status: 'PENDING'
         })
       });
-      
+
       if (!response.ok) throw new Error('Failed to schedule viewing');
     } catch (error) {
       throw new Error('Error scheduling viewing: ' + (error as Error).message);
