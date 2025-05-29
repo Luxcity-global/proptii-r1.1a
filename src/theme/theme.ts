@@ -44,8 +44,8 @@ const colors = {
     disabled: '#9E9E9E',
   },
   background: {
-    default: '#FFFFFF',
-    paper: '#F5F5F5',
+    default: '#eeeff4', // Updated main background color
+    paper: '#FFFFFF',  // Keep paper white for contrast
   },
 };
 

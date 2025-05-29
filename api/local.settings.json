@@ -1,0 +1,19 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "",
+    "AZURE_SQL_SERVER": "proptii-sql-server.database.windows.net",
+    "AZURE_SQL_DATABASE": "proptii-db",
+    "AZURE_SQL_USERNAME": "ProptiiAdminLXC001",
+    "AZURE_SQL_PASSWORD": "H0gm@naY007",
+    "AZURE_STORAGE_ACCOUNT_NAME": "proptiir11a",
+    "AZURE_STORAGE_CONTAINER_NAME": "referencing-documents",
+    "AZURE_STORAGE_SAS_TOKEN": "sv=2024-11-04&ss=bfqt&srt=co&sp=rwdlacupiytfx&se=2026-04-15T14:53:58Z&st=2025-04-15T06:53:58Z&spr=https&sig=R8id9aVSoKXxC9eN1ouAtnk5mZI5T4oywA1kSZwle20%3D",
+    "WEBSITE_NODE_DEFAULT_VERSION": "~18",
+    "CORS_ALLOWED_ORIGINS": "http://localhost:5173,https://your-production-domain.com"
+  },
+  "Host": {
+    "CORS": "*"
+  }
+}
