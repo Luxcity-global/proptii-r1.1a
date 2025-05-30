@@ -3,7 +3,7 @@ services:
   - type: web
     name: proptii-frontend
     env: static
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && npm run build:only
     staticPublishPath: ./dist
     pullRequestPreviewsEnabled: true
     envVars:
