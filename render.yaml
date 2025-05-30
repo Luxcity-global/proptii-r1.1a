@@ -12,7 +12,7 @@ services:
       - key: VITE_APP_ENV
         value: production
       - key: VITE_API_URL
-        value: https://proptii-r1-1a.onrender.com
+        value: https://proptii-r1-1a.onrender.com/api
     headers:
       - path: /*
         name: X-Frame-Options
@@ -62,5 +62,5 @@ services:
         value: smtp.gmail.com
       - key: SMTP_PORT
         value: 465
-      - key: VITE_API_URL
-        value: https://proptii-r1-1a.onrender.com
+      - key: FRONTEND_URL
+        value: https://proptii-frontend.onrender.com

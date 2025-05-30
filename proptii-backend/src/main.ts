@@ -29,6 +29,9 @@ async function bootstrap() {
     logger: ['error', 'warn', 'debug', 'log', 'verbose'],
   });
   
+  // Set global prefix for all routes
+  app.setGlobalPrefix('api');
+  
   app.enableCors({
     origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
@@ -58,14 +61,14 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup('api-docs', app, document);
 
   const port = process.env.PORT || 3000;
   
   try {
     await app.listen(port, '0.0.0.0');
     logger.log(`Application is running on: http://localhost:${port}`);
-    logger.log(`Swagger documentation available at: http://localhost:${port}/api`);
+    logger.log(`API documentation available at: http://localhost:${port}/api-docs`);
   } catch (error) {
     logger.error('Failed to start application:', error);
     process.exit(1);
