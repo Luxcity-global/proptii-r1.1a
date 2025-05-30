@@ -46,16 +46,17 @@ services:
     name: proptii-backend
     env: node
     plan: free
-    buildCommand: cd proptii-backend && npm install && npx nest build
+    region: ohio
+    runtime: node
+    buildCommand: cd proptii-backend && ./build.sh
     startCommand: cd proptii-backend && node dist/main.js
     healthCheckPath: /health
+    autoDeploy: true
     envVars:
-      - key: NODE_VERSION
-        value: 18.x
-      - key: PORT
-        value: 3000
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: 3000
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT
