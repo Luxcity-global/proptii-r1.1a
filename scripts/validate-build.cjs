@@ -31,22 +31,31 @@ function validateBuildOutput() {
     const files = fs.readdirSync(distPath, { recursive: true });
     const filesFlat = files.map(file => file.toString());
 
-    for (const pattern of expectedFiles) {
-        const found = filesFlat.some(file =>
-            pattern.includes('*')
-                ? new RegExp(pattern.replace('*', '.*')).test(file)
-                : file === pattern
-        );
-
-        if (!found) {
-            console.error(chalk.red(`❌ Expected file not found: ${pattern}`));
-            process.exit(1);
-        }
+    // Check for index.html
+    if (!filesFlat.includes('index.html')) {
+        console.error(chalk.red('❌ Expected file not found: index.html'));
+        process.exit(1);
     }
 
-    const mainJsFile = fs.readdirSync(distPath).find(file => file.startsWith('index-') && file.endsWith('.js'));
-    if (!mainJsFile) {
-        console.error('❌ Expected file not found: index-*.js');
+    // Check for assets directory
+    const assetsPath = path.join(distPath, 'assets');
+    if (!fs.existsSync(assetsPath)) {
+        console.error(chalk.red('❌ Assets directory not found!'));
+        process.exit(1);
+    }
+
+    // Check for JS and CSS files in assets
+    const assetFiles = fs.readdirSync(assetsPath);
+    const hasJsFile = assetFiles.some(file => file.endsWith('.js'));
+    const hasCssFile = assetFiles.some(file => file.endsWith('.css'));
+
+    if (!hasJsFile) {
+        console.error(chalk.red('❌ No JavaScript file found in assets directory'));
+        process.exit(1);
+    }
+
+    if (!hasCssFile) {
+        console.error(chalk.red('❌ No CSS file found in assets directory'));
         process.exit(1);
     }
 
