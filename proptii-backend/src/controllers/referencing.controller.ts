@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Get, Param, HttpCode } from '@nestjs/common';
 import { ReferencingService } from '../services/referencing.service';
 
-@Controller('api/referencing')
+@Controller('referencing')
 export class ReferencingController {
   constructor(private readonly referencingService: ReferencingService) { }
 

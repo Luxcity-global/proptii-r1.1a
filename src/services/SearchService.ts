@@ -32,8 +32,9 @@ export class SearchService {
   private readonly RETRY_DELAY = 1000; // 1 second
 
   private constructor() {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
     this.axiosInstance = axios.create({
-      baseURL: 'http://localhost:3000',
+      baseURL: apiUrl,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -51,7 +52,7 @@ export class SearchService {
       (response) => response,
       async (error) => {
         const config = error.config;
-        
+
         // If no config or retry count not set, initialize it
         if (!config || !config.retryCount) {
           config.retryCount = 0;
@@ -60,10 +61,10 @@ export class SearchService {
         // Check if we should retry
         if (config.retryCount < this.MAX_RETRIES) {
           config.retryCount += 1;
-          
+
           // Wait before retrying
           await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY * config.retryCount));
-          
+
           // Retry the request
           return this.axiosInstance(config);
         }

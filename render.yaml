@@ -24,6 +24,9 @@ services:
         name: X-XSS-Protection
         value: "1; mode=block"
       - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self' https://proptii-r1-1a.onrender.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://proptii-r1-1a.onrender.com https://*.openai.azure.com;"
+      - path: /*
         name: Cache-Control
         value: no-cache
       - path: /assets/*
@@ -57,10 +60,16 @@ services:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 3000
+        value: 10000
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT
         value: 465
       - key: FRONTEND_URL
         value: https://proptii-frontend.onrender.com
+      - key: AZURE_OPENAI_API_KEY
+        sync: false
+      - key: AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: AZURE_OPENAI_DEPLOYMENT_NAME
+        sync: false
