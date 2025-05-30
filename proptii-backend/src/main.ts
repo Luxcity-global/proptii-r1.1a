@@ -29,8 +29,10 @@ async function bootstrap() {
     logger: ['error', 'warn', 'debug', 'log', 'verbose'],
   });
   
-  // Set global prefix for all routes
-  app.setGlobalPrefix('api');
+  // Set global prefix for all routes except root
+  app.setGlobalPrefix('api', {
+    exclude: ['/'],
+  });
   
   app.enableCors({
     origin: true,

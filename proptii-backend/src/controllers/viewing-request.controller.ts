@@ -3,9 +3,9 @@ import { ViewingRequestService } from '../services/viewing-request.service';
 import { CreateViewingRequestDto, UpdateViewingRequestDto } from '../dtos/viewing-request.dto';
 import { ViewingRequest } from '../entities/viewing-request.entity';
 
-@Controller('api/viewing-requests')
+@Controller('viewing-requests')
 export class ViewingRequestController {
-  constructor(private readonly viewingRequestService: ViewingRequestService) {}
+  constructor(private readonly viewingRequestService: ViewingRequestService) { }
 
   @Post()
   @HttpCode(201)
@@ -33,14 +33,14 @@ export class ViewingRequestController {
     return await this.viewingRequestService.findByAgent(agentId);
   }
 
- /* @Get('available-slots/:propertyId')
-  async getAvailableSlots(
-    @Param('propertyId') propertyId: string,
-    @Query('date') date: string,
-  ): Promise<string[]> {
-    return await this.viewingRequestService.getAvailableSlots(propertyId, new Date(date));
-  }
-*/
+  /* @Get('available-slots/:propertyId')
+   async getAvailableSlots(
+     @Param('propertyId') propertyId: string,
+     @Query('date') date: string,
+   ): Promise<string[]> {
+     return await this.viewingRequestService.getAvailableSlots(propertyId, new Date(date));
+   }
+ */
   @Put(':id')
   async update(
     @Param('id') id: string,

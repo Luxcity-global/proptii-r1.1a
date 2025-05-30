@@ -8,8 +8,15 @@ export class AppController {
   }
 
   @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  getRoot() {
+    return {
+      name: 'Proptii Backend API',
+      version: '1.0.0',
+      status: 'running',
+      timestamp: new Date().toISOString(),
+      docs: '/api-docs',
+      healthCheck: '/api/health'
+    };
   }
 
   @Get('health')
@@ -19,7 +26,8 @@ export class AppController {
       status: 'ok',
       timestamp: new Date().toISOString(),
       service: 'proptii-backend',
-      version: '1.0.0'
+      version: '1.0.0',
+      uptime: process.uptime()
     };
   }
 }
