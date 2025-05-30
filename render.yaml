@@ -12,11 +12,7 @@ services:
       - key: VITE_APP_ENV
         value: production
       - key: VITE_API_URL
-        value: https://proptii-backend.onrender.com
-      - key: VITE_AZURE_AD_CLIENT_ID
-        value: your_client_id_here
-      - key: VITE_AZURE_STORAGE_URL
-        value: your_storage_url_here
+        value: https://proptii-r1-1a.onrender.com
     headers:
       - path: /*
         name: X-Frame-Options

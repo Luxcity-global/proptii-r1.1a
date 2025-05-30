@@ -11,7 +11,11 @@ const expectedFiles = [
 
 // Required environment variables
 const requiredEnvVars = [
-    'VITE_API_URL',
+    'VITE_API_URL'
+];
+
+// Optional environment variables
+const optionalEnvVars = [
     'VITE_AZURE_AD_CLIENT_ID',
     'VITE_AZURE_STORAGE_URL'
 ];
@@ -27,12 +31,8 @@ function validateBuildOutput() {
         process.exit(1);
     }
 
-    // Validate expected files
-    const files = fs.readdirSync(distPath, { recursive: true });
-    const filesFlat = files.map(file => file.toString());
-
     // Check for index.html
-    if (!filesFlat.includes('index.html')) {
+    if (!fs.existsSync(path.join(distPath, 'index.html'))) {
         console.error(chalk.red('❌ Expected file not found: index.html'));
         process.exit(1);
     }
@@ -65,14 +65,23 @@ function validateBuildOutput() {
 function validateEnvironmentVariables() {
     console.log(chalk.blue('Validating environment variables...'));
 
-    const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
-
-    if (missingVars.length > 0) {
+    // Check required variables
+    const missingRequired = requiredEnvVars.filter(varName => !process.env[varName]);
+    if (missingRequired.length > 0) {
         console.error(chalk.red('❌ Missing required environment variables:'));
-        missingVars.forEach(varName => {
+        missingRequired.forEach(varName => {
             console.error(chalk.red(`   - ${varName}`));
         });
         process.exit(1);
+    }
+
+    // Check optional variables
+    const missingOptional = optionalEnvVars.filter(varName => !process.env[varName]);
+    if (missingOptional.length > 0) {
+        console.log(chalk.yellow('⚠️  Missing optional environment variables:'));
+        missingOptional.forEach(varName => {
+            console.log(chalk.yellow(`   - ${varName}`));
+        });
     }
 
     console.log(chalk.green('✓ Environment variables validation successful'));
