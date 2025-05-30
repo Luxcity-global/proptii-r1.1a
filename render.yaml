@@ -46,12 +46,12 @@ services:
     name: proptii-backend
     env: node
     plan: free
-    buildCommand: cd proptii-backend && npm install && npm run build
-    startCommand: cd proptii-backend && npm run start:prod
-    healthCheckPath: /health   # 👈 Add this line here
+    buildCommand: cd proptii-backend && npm install && npx nest build
+    startCommand: cd proptii-backend && node dist/main.js
+    healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
-        value: 18
+        value: 18.x
       - key: PORT
         value: 3000
       - key: NODE_ENV
@@ -61,4 +61,4 @@ services:
       - key: SMTP_PORT
         value: 465
       - key: VITE_API_URL
-        value: https://proptii-backend.onrender.com  # Replace with actual Render backend URL after deploy
+        value: https://proptii-backend.onrender.com
