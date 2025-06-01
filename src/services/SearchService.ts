@@ -154,12 +154,23 @@ export class SearchService {
     }
   }
 
+  private async checkBackendHealth(): Promise<boolean> {
+    try {
+      const response = await this.axiosInstance.get('/health');
+      return response.status === 200;
+    } catch (error) {
+      console.error('Health check failed:', error);
+      return false;
+    }
+  }
+
   private async ensureBackendRunning(): Promise<void> {
     let retries = 0;
     while (retries < this.MAX_RETRIES) {
       try {
         const isHealthy = await this.checkBackendHealth();
         if (isHealthy) {
+          console.log('Backend health check successful');
           return;
         }
       } catch (error) {
@@ -170,9 +181,7 @@ export class SearchService {
         await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY * retries));
       }
     }
-    throw new Error(
-      'Backend service is not running. Please start the backend server using: npm run start:backend'
-    );
+    throw new Error('Backend service is not available. Please try again later.');
   }
 
   public async searchProperties(query: string): Promise<Property[]> {
@@ -245,15 +254,6 @@ export class SearchService {
         message = error;
       }
       throw message;
-    }
-  }
-
-  private async checkBackendHealth(): Promise<boolean> {
-    try {
-      const response = await this.axiosInstance.get('/health');
-      return response.status === 200;
-    } catch (error) {
-      return false;
     }
   }
 } 
