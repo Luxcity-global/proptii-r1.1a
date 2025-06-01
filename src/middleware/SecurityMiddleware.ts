@@ -63,18 +63,18 @@ export class SecurityMiddleware {
     private generateCSP(): string {
         const isDevelopment = import.meta.env.DEV;
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-        const backendDomain = apiUrl.split('/api')[0];
+        const backendDomain = new URL(apiUrl.split('/api')[0]).origin;
 
         const connectSrc = isDevelopment
-            ? "'self' https://proptii.b2clogin.com https://*.azure.com https://*.openai.azure.com http://localhost:* https://proptii-r1-1a.onrender.com"
-            : "'self' https://proptii.b2clogin.com https://*.azure.com https://*.openai.azure.com https://proptii-r1-1a.onrender.com";
+            ? `'self' ${backendDomain} https://proptii.b2clogin.com https://*.azure.com https://*.openai.azure.com http://localhost:*`
+            : `'self' ${backendDomain} https://proptii.b2clogin.com https://*.azure.com https://*.openai.azure.com`;
 
         return [
             "default-src 'self'",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-            "font-src 'self' https://fonts.gstatic.com",
-            "img-src 'self' data: https:",
+            "font-src 'self' https://fonts.gstatic.com data:",
+            "img-src 'self' data: https: blob:",
             `connect-src ${connectSrc}`,
             "frame-src 'self' https://proptii.b2clogin.com",
             "object-src 'none'",
@@ -90,6 +90,7 @@ export class SecurityMiddleware {
         const instance = axios.create({
             baseURL: apiUrl,
             timeout: 10000,
+            withCredentials: true,
             headers: {
                 ...this.securityHeaders,
                 'Content-Type': 'application/json'
@@ -102,6 +103,10 @@ export class SecurityMiddleware {
                 const token = this.getCurrentCSRFToken();
                 if (token && config.headers) {
                     config.headers['X-CSRF-Token'] = token.token;
+                }
+                // Ensure URL starts with /api
+                if (config.url && !config.url.startsWith('/api')) {
+                    config.url = `/api${config.url}`;
                 }
                 return config;
             },
@@ -303,11 +308,10 @@ export class SecurityMiddleware {
     }
 
     private injectSecurityHeaders(): void {
-        // Add meta tags for security
+        // Only inject non-CSP headers via meta tags
         const metaTags = [
             { httpEquiv: 'X-XSS-Protection', content: this.securityHeaders['X-XSS-Protection'] },
             { httpEquiv: 'X-Content-Type-Options', content: this.securityHeaders['X-Content-Type-Options'] },
-            { httpEquiv: 'Content-Security-Policy', content: this.securityHeaders['Content-Security-Policy'] },
             { name: 'referrer', content: this.securityHeaders['Referrer-Policy'] }
         ];
 
