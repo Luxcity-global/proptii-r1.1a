@@ -62,9 +62,12 @@ export class SecurityMiddleware {
 
     private generateCSP(): string {
         const isDevelopment = import.meta.env.DEV;
-        const connectSrc = isDevelopment 
-            ? "'self' https://proptii.b2clogin.com https://*.azure.com http://localhost:*"
-            : "'self' https://proptii.b2clogin.com https://*.azure.com";
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+        const backendDomain = apiUrl.split('/api')[0];
+
+        const connectSrc = isDevelopment
+            ? "'self' https://proptii.b2clogin.com https://*.azure.com https://*.openai.azure.com http://localhost:* https://proptii-r1-1a.onrender.com"
+            : "'self' https://proptii.b2clogin.com https://*.azure.com https://*.openai.azure.com https://proptii-r1-1a.onrender.com";
 
         return [
             "default-src 'self'",
@@ -77,16 +80,20 @@ export class SecurityMiddleware {
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",
-            "frame-ancestors 'self'",
+            "frame-ancestors 'none'",
             "upgrade-insecure-requests"
         ].join('; ');
     }
 
     private createAxiosInstance(): AxiosInstance {
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
         const instance = axios.create({
-            baseURL: import.meta.env.VITE_API_URL,
+            baseURL: apiUrl,
             timeout: 10000,
-            headers: this.securityHeaders
+            headers: {
+                ...this.securityHeaders,
+                'Content-Type': 'application/json'
+            }
         });
 
         // Request interceptor
