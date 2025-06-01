@@ -31,9 +31,7 @@ const Home = () => {
     const checkBackend = async () => {
       try {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-        // Remove /api from the end if it exists
-        const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
-        const response = await fetch(`${baseUrl}/health`);
+        const response = await fetch(`${apiUrl}/health`);
         setIsBackendAvailable(response.ok);
       } catch (error) {
         console.error('Backend health check failed:', error);
