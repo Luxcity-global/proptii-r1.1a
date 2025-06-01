@@ -156,7 +156,7 @@ export class SearchService {
 
   private async checkBackendHealth(): Promise<boolean> {
     try {
-      const response = await this.axiosInstance.get('/health');
+      const response = await this.axiosInstance.get('/api/health');
       return response.status === 200;
     } catch (error) {
       console.error('Health check failed:', error);
@@ -170,7 +170,6 @@ export class SearchService {
       try {
         const isHealthy = await this.checkBackendHealth();
         if (isHealthy) {
-          console.log('Backend health check successful');
           return;
         }
       } catch (error) {
@@ -181,7 +180,7 @@ export class SearchService {
         await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY * retries));
       }
     }
-    throw new Error('Backend service is not available. Please try again later.');
+    throw new Error('Search service is currently unavailable. Please try again later.');
   }
 
   public async searchProperties(query: string): Promise<Property[]> {

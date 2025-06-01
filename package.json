@@ -6,7 +6,7 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "build": "chmod +x scripts/build.sh && ./scripts/build.sh",
+    "build": "vite build && npm run validate-build",
     "build:only": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
