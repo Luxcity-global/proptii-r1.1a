@@ -98,21 +98,6 @@ export default defineConfig({
         drop_debugger: true,
       },
     },
-    assetsDir: 'assets',
-    copyPublicDir: true,
-    rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'index.html'),
-      },
-      output: {
-        assetFileNames: (assetInfo) => {
-          if (assetInfo.name.endsWith('.png') || assetInfo.name.endsWith('.jpg') || assetInfo.name.endsWith('.jpeg')) {
-            return 'images/[name][extname]';
-          }
-          return 'assets/[name]-[hash][extname]';
-        },
-      },
-    },
   },
   optimizeDeps: {
     include: [
@@ -123,5 +108,4 @@ export default defineConfig({
       '@emotion/styled',
     ],
   },
-  publicDir: 'public',
 });

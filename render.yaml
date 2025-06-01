@@ -3,7 +3,7 @@ services:
   - type: web
     name: proptii-frontend
     env: static
-    buildCommand: npm install && mkdir -p dist/images && cp -r public/images/* dist/images/ && npm run build
+    buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     pullRequestPreviewsEnabled: true
     envVars:
@@ -25,7 +25,7 @@ services:
         value: "1; mode=block"
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; connect-src 'self' https://proptii-r1-1a.onrender.com https://*.azure.com https://*.b2clogin.com https://*.openai.azure.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self';"
+        value: "default-src 'self'; connect-src 'self' https://proptii-r1-1a.onrender.com https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-ancestors 'none';"
       - path: /*
         name: Cache-Control
         value: no-cache
@@ -33,9 +33,6 @@ services:
         name: Cache-Control
         value: public, max-age=31536000, immutable
       - path: /static/*
-        name: Cache-Control
-        value: public, max-age=31536000, immutable
-      - path: /images/*
         name: Cache-Control
         value: public, max-age=31536000, immutable
     routes:
@@ -48,9 +45,6 @@ services:
       - type: rewrite
         source: /static/*
         destination: /static/:splat
-      - type: rewrite
-        source: /images/*
-        destination: /images/:splat
 
   # Backend (NestJS)
   - type: web
