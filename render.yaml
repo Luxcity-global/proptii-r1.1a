@@ -25,7 +25,7 @@ services:
         value: "1; mode=block"
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; connect-src 'self' https://proptii-r1-1a.onrender.com https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; frame-src 'self' https://proptii.b2clogin.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+        value: "default-src 'self'; connect-src 'self' https://proptii-r1-1a.onrender.com https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-ancestors 'none';"
       - path: /*
         name: Cache-Control
         value: no-cache
@@ -53,7 +53,7 @@ services:
     plan: free
     buildCommand: cd proptii-backend && npm install && npm run build
     startCommand: cd proptii-backend && npm run start:prod
-    healthCheckPath: /api/health
+    healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
         value: 20.11.1
