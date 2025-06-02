@@ -156,7 +156,7 @@ export class SearchService {
 
   private async checkBackendHealth(): Promise<boolean> {
     try {
-      const response = await this.axiosInstance.get('/api/health');
+      const response = await this.axiosInstance.get('/health');
       return response.status === 200;
     } catch (error) {
       console.error('Health check failed:', error);
@@ -230,11 +230,8 @@ export class SearchService {
     try {
       await this.ensureBackendRunning();
       const response = await this.axiosInstance.post<string[]>(
-        '/search',
-        {
-          query,
-          type: 'suggestions'
-        }
+        '/search/suggestions',
+        { query }
       );
       if (response.data && Array.isArray(response.data)) {
         return response.data;

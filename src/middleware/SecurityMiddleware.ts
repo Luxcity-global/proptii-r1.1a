@@ -62,39 +62,31 @@ export class SecurityMiddleware {
 
     private generateCSP(): string {
         const isDevelopment = import.meta.env.DEV;
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-        const backendDomain = new URL(apiUrl.split('/api')[0]).origin;
-
-        const connectSrc = isDevelopment
-            ? `'self' ${backendDomain} https://proptii.b2clogin.com https://*.azure.com https://*.openai.azure.com http://localhost:*`
-            : `'self' ${backendDomain} https://proptii.b2clogin.com https://*.azure.com https://*.openai.azure.com`;
+        const connectSrc = isDevelopment 
+            ? "'self' https://proptii.b2clogin.com https://*.azure.com http://localhost:*"
+            : "'self' https://proptii.b2clogin.com https://*.azure.com";
 
         return [
             "default-src 'self'",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-            "font-src 'self' https://fonts.gstatic.com data:",
-            "img-src 'self' data: https: blob:",
+            "font-src 'self' https://fonts.gstatic.com",
+            "img-src 'self' data: https:",
             `connect-src ${connectSrc}`,
             "frame-src 'self' https://proptii.b2clogin.com",
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",
-            "frame-ancestors 'none'",
+            "frame-ancestors 'self'",
             "upgrade-insecure-requests"
         ].join('; ');
     }
 
     private createAxiosInstance(): AxiosInstance {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
         const instance = axios.create({
-            baseURL: apiUrl,
+            baseURL: import.meta.env.VITE_API_URL,
             timeout: 10000,
-            withCredentials: true,
-            headers: {
-                ...this.securityHeaders,
-                'Content-Type': 'application/json'
-            }
+            headers: this.securityHeaders
         });
 
         // Request interceptor
@@ -103,10 +95,6 @@ export class SecurityMiddleware {
                 const token = this.getCurrentCSRFToken();
                 if (token && config.headers) {
                     config.headers['X-CSRF-Token'] = token.token;
-                }
-                // Ensure URL starts with /api
-                if (config.url && !config.url.startsWith('/api')) {
-                    config.url = `/api${config.url}`;
                 }
                 return config;
             },
@@ -308,10 +296,11 @@ export class SecurityMiddleware {
     }
 
     private injectSecurityHeaders(): void {
-        // Only inject non-CSP headers via meta tags
+        // Add meta tags for security
         const metaTags = [
             { httpEquiv: 'X-XSS-Protection', content: this.securityHeaders['X-XSS-Protection'] },
             { httpEquiv: 'X-Content-Type-Options', content: this.securityHeaders['X-Content-Type-Options'] },
+            { httpEquiv: 'Content-Security-Policy', content: this.securityHeaders['Content-Security-Policy'] },
             { name: 'referrer', content: this.securityHeaders['Referrer-Policy'] }
         ];
 
