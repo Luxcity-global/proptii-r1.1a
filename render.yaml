@@ -25,7 +25,7 @@ services:
         value: "1; mode=block"
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; connect-src 'self' https://proptii-r1-1a.onrender.com https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-ancestors 'none';"
+        value: "default-src 'self'; connect-src 'self' https://proptii-r1-1a.onrender.com https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com https://proptii-frontend.onrender.com https://proptii-backend.onrender.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; frame-ancestors 'none';"
       - path: /*
         name: Cache-Control
         value: no-cache
