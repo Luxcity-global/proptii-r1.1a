@@ -230,8 +230,11 @@ export class SearchService {
     try {
       await this.ensureBackendRunning();
       const response = await this.axiosInstance.post<string[]>(
-        '/search/suggestions',
-        { query }
+        '/search',
+        {
+          query,
+          type: 'suggestions'
+        }
       );
       if (response.data && Array.isArray(response.data)) {
         return response.data;
