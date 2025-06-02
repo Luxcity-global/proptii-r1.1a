@@ -31,7 +31,7 @@ services:
         value: "1; mode=block"
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; connect-src 'self' https://proptii-r1-1a.onrender.com https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com https://proptii-frontend.onrender.com https://proptii-backend.onrender.com https://*.cognitiveservices.azure.com https://*.onrender.com https://*.onrender.com/api; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; frame-ancestors 'none';"
+        value: "default-src 'self'; connect-src 'self' https://proptii-r1-1a.onrender.com/api/* https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com https://proptii-frontend.onrender.com https://proptii-backend.onrender.com https://*.cognitiveservices.azure.com https://*.onrender.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; frame-ancestors 'none';"
       - path: /*
         name: Cache-Control
         value: no-cache
