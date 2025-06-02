@@ -62,9 +62,13 @@ export class SecurityMiddleware {
 
     private generateCSP(): string {
         const isDevelopment = import.meta.env.DEV;
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        // Remove /api from the end if it exists
+        const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
+        
         const connectSrc = isDevelopment 
-            ? "'self' https://proptii.b2clogin.com https://*.azure.com http://localhost:*"
-            : "'self' https://proptii.b2clogin.com https://*.azure.com";
+            ? "'self' https://proptii.b2clogin.com https://*.azure.com http://localhost:* https://proptii-r1-1a.onrender.com"
+            : `'self' https://proptii.b2clogin.com https://*.azure.com ${baseUrl}`;
 
         return [
             "default-src 'self'",
