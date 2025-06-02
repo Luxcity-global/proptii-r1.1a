@@ -189,7 +189,7 @@ export class SearchService {
       try {
         await this.ensureBackendRunning();
         const response = await this.axiosInstance.post<SearchResponse[]>(
-          '/search',
+          '/api/search',
           {
             query,
             type: 'properties'
@@ -230,7 +230,7 @@ export class SearchService {
     try {
       await this.ensureBackendRunning();
       const response = await this.axiosInstance.post<string[]>(
-        '/search/suggestions',
+        '/api/search/suggestions',
         { query }
       );
       if (response.data && Array.isArray(response.data)) {

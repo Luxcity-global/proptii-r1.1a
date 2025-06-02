@@ -4,40 +4,51 @@ import { PropertyDetails, ViewingDetails } from '../context/BookViewingContext';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
 export const bookingService = {
-  searchProperty: async (propertyUrl: string): Promise<PropertyDetails> => {
+  searchProperty: async (query: string): Promise<PropertyDetails> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/properties/search`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ propertyUrl })
-      });
-
-      if (!response.ok) throw new Error('Failed to search property');
-      return await response.json();
-    } catch (error) {
-      throw new Error('Error searching property: ' + (error as Error).message);
-    }
-  },
-
-  searchPropertyListings: async (searchUrl: string): Promise<PropertyDetails[]> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/properties/search-listings`, {
+      const response = await fetch(`${API_BASE_URL}/api/search`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
         },
-        body: JSON.stringify({ searchUrl })
+        body: JSON.stringify({
+          query,
+          type: 'properties'
+        }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to search property listings');
+        throw new Error('Failed to search property');
       }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error searching property:', error);
+      throw error;
+    }
+  },
+
+  searchPropertyListings: async (propertyUrl: string): Promise<PropertyDetails[]> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: propertyUrl,
+          type: 'properties'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to search property listings');
+      }
+
       return await response.json();
     } catch (error) {
       console.error('Error searching property listings:', error);
-      throw new Error('Error searching property listings: ' + (error as Error).message);
+      throw error;
     }
   },
 
