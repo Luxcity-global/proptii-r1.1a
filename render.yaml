@@ -59,7 +59,7 @@ services:
     plan: free
     buildCommand: cd proptii-backend && npm install && npm run build
     startCommand: cd proptii-backend && npm run start:prod
-    healthCheckPath: /health
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
         value: 20.11.1
