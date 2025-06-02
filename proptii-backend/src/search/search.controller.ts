@@ -5,12 +5,14 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SearchDto } from './dto/search.dto';
 
 @ApiTags('search')
-@Controller('search')
+@Controller('api/search')
 @UseGuards(ThrottlerGuard)
 export class SearchController {
   private readonly logger = new Logger(SearchController.name);
 
-  constructor(private readonly searchService: SearchService) {}
+  constructor(private readonly searchService: SearchService) {
+    this.logger.log('SearchController initialized');
+  }
 
   @Get('health')
   @ApiOperation({ summary: 'Check search service health' })
@@ -38,13 +40,13 @@ export class SearchController {
   async search(@Body() searchDto: SearchDto) {
     try {
       this.logger.log(`Received search request: ${JSON.stringify(searchDto)}`);
-      
+
       if (searchDto.type === 'suggestions') {
         const suggestions = await this.searchService.getSuggestions(searchDto.query);
         this.logger.log(`Returning ${suggestions.length} suggestions`);
         return suggestions;
       }
-      
+
       const results = await this.searchService.searchProperties(searchDto.query);
       this.logger.log(`Returning ${results.length} property results`);
       return results;
