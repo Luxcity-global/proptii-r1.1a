@@ -32,7 +32,7 @@ interface MultiEmailResponse {
 
 const API_BASE_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:10000/api'
-  : 'https://proptii-backend.onrender.com/api';
+  : 'https://proptii-r1-1a.onrender.com/api';
 
 class EmailService {
   private readonly API_URL = API_BASE_URL;
