@@ -11,7 +11,7 @@ interface Attachment {
 
 const API_BASE_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:10000/api'
-  : 'https://proptii-backend.onrender.com/api';
+  : 'https://proptii-r1-1a.onrender.com/api';
 
 /**
  * Interface for document metadata
@@ -59,9 +59,9 @@ class ReferencingService {
         attempt: retryCount + 1
       });
 
-      // Ensure endpoint starts with /api if not already
-      const apiEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
-      const response = await axios.post(`${this.API_URL}${apiEndpoint}`, data, {
+      // Remove /api prefix if it exists in the endpoint
+      const cleanEndpoint = endpoint.startsWith('/api') ? endpoint.substring(4) : endpoint;
+      const response = await axios.post(`${this.API_URL}${cleanEndpoint}`, data, {
         headers: {
           'Content-Type': 'application/json',
         },
