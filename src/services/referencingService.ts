@@ -339,62 +339,37 @@ class ReferencingService {
     }
   }
 
-  async submitApplication(userId: string, data: { formData: any, emailContent: any }) {
+  async submitApplication(userId: string, data: any): Promise<any> {
     try {
-      // First save each section to CosmosDB
-      const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'agent'];
-      const saveResults = await Promise.all(
-        sections.map(async (section) => {
-          if (data.formData[section]) {
-            try {
-              return await this.saveToCosmosDB(`/referencing/${section}`, {
-                ...data.formData[section],
-                userId
-              });
-            } catch (error) {
-              console.error(`Failed to save ${section} data:`, error);
-              return { success: false, section };
-            }
-          }
-          return { success: true, section }; // Skip if no data for this section
-        })
-      );
-
-      // Check if any section failed to save
-      const failedSections = saveResults.filter(result => !result.success);
-      if (failedSections.length > 0) {
-        throw new Error(`Failed to save sections: ${failedSections.map(f => f.section).join(', ')}`);
-      }
-
-      // Then submit the complete form
+      // Submit the complete form
       const formResult = await this.saveToCosmosDB(`/referencing/${userId}/submit`, {
         formData: data.formData,
         userId
       });
 
       if (!formResult.success) {
-        throw new Error('Failed to save complete form data');
+        throw new Error(formResult.error || 'Failed to save complete form data');
       }
 
-      // Finally send emails
-      const emailResult = await emailService.sendMultipleEmails(
-        data.formData,
-        this.prepareAttachments(data.formData)
-      );
+      // Send emails if needed
+      let emailResult = { success: true };
+      if (data.emailContent) {
+        emailResult = await emailService.sendMultipleEmails(
+          data.formData,
+          this.prepareAttachments(data.formData)
+        );
+      }
 
-      // Check if either the form submission was successful or at least one email was sent
-      const isSuccess = formResult.success || emailResult.success;
-
-      if (isSuccess) {
-        // Clear local storage only on successful submission
+      // Clear local storage on successful submission
+      if (formResult.success) {
         this.clearLocalStorage(userId);
       }
 
       return {
-        success: isSuccess,
+        success: true,
         formSubmission: formResult,
         emailSent: emailResult,
-        savedToCosmosDB: true
+        savedToCosmosDB: formResult.success
       };
     } catch (error) {
       console.error('Error submitting application:', error);

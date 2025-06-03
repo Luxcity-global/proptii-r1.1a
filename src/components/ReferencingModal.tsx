@@ -676,10 +676,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       setShowWarningModal(true);
       return;
     }
-    proceedWithSubmission();
-  };
-
-  const proceedWithSubmission = async () => {
     try {
       setIsSubmitting(true);
       await saveCurrentStep();
@@ -693,10 +689,20 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         throw new Error('Agent email is required. Please complete the Agent Details section.');
       }
 
-      // Submit the application
+      // First try to get existing reference data
+      let existingReference;
+      try {
+        const response = await referencingService.getReference(userId);
+        existingReference = response.data;
+      } catch (error) {
+        console.log('No existing reference found, will create new one');
+      }
+
+      // Submit the application with method based on existence
       const result = await referencingService.submitApplication(userId, {
         formData,
-        emailContent: null
+        emailContent: null,
+        isNewReference: !existingReference
       });
 
       if (!result.success) {
@@ -714,8 +720,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         throw new Error('Failed to save application and send emails');
       }
 
-      // Don't clear local storage immediately after submission
-      // Instead, mark the submission as complete
+      // Mark the submission as complete
       if (userId) {
         localStorage.setItem(`referencing_${userId}_submitted`, 'true');
       }
@@ -756,7 +761,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
             <button
               onClick={() => {
                 setShowWarningModal(false);
-                proceedWithSubmission();
+                submitApplication();
               }}
               className="px-4 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors"
             >
