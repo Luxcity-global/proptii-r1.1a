@@ -9,22 +9,8 @@ interface Attachment {
 }
 
 const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:3002'
-  : (import.meta.env.VITE_API_URL || 'http://localhost:3002');
-const COSMOS_DB_ENDPOINT = import.meta.env.VITE_COSMOS_DB_ENDPOINT;
-const COSMOS_DB_KEY = import.meta.env.VITE_COSMOS_DB_KEY;
-const COSMOS_DB_NAME = import.meta.env.VITE_COSMOS_DB_NAME;
-const COSMOS_DB_CONTAINER = import.meta.env.VITE_COSMOS_DB_CONTAINER;
-
-// Validate required environment variables
-if (!COSMOS_DB_ENDPOINT || !COSMOS_DB_KEY || !COSMOS_DB_NAME || !COSMOS_DB_CONTAINER) {
-  console.error('Missing required CosmosDB environment variables:', {
-    hasEndpoint: !!COSMOS_DB_ENDPOINT,
-    hasKey: !!COSMOS_DB_KEY,
-    hasDB: !!COSMOS_DB_NAME,
-    hasContainer: !!COSMOS_DB_CONTAINER
-  });
-}
+  ? 'http://localhost:10000/api'
+  : 'https://proptii-backend.onrender.com/api';
 
 /**
  * Interface for document metadata
@@ -64,38 +50,21 @@ class ReferencingService {
   private readonly API_URL = API_BASE_URL;
 
   private async saveToCosmosDB(endpoint: string, data: any, retryCount = 0): Promise<any> {
-    if (!COSMOS_DB_ENDPOINT || !COSMOS_DB_KEY || !COSMOS_DB_NAME || !COSMOS_DB_CONTAINER) {
-      throw new Error('Missing required CosmosDB configuration');
-    }
-
     try {
-      console.log('Saving to CosmosDB:', {
+      console.log('Saving to backend:', {
         endpoint,
         dataType: data.type,
         userId: data.userId,
         attempt: retryCount + 1
       });
 
-      const response = await axios.post(endpoint, {
-        ...data,
-        dbConfig: {
-          endpoint: COSMOS_DB_ENDPOINT,
-          key: COSMOS_DB_KEY,
-          databaseId: COSMOS_DB_NAME,
-          containerId: COSMOS_DB_CONTAINER
-        }
-      }, {
+      // Ensure endpoint starts with /api if not already
+      const apiEndpoint = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
+      const response = await axios.post(`${this.API_URL}${apiEndpoint}`, data, {
         headers: {
           'Content-Type': 'application/json',
-          'x-cosmos-retry-attempt': retryCount.toString()
         },
-        timeout: 10000 // 10 second timeout
-      });
-
-      console.log('CosmosDB save response:', {
-        status: response.status,
-        success: !!response.data,
-        dataType: data.type
+        timeout: 30000 // 30 second timeout for slower production servers
       });
 
       return response.data;
@@ -103,7 +72,7 @@ class ReferencingService {
       // Handle specific error types
       if (axios.isAxiosError(error)) {
         if (error.code === 'ECONNABORTED') {
-          console.warn('CosmosDB save timeout');
+          console.warn('API save timeout');
           if (retryCount < 3) {
             console.log(`Retrying save attempt ${retryCount + 1}/3`);
             return this.saveToCosmosDB(endpoint, data, retryCount + 1);
@@ -144,26 +113,11 @@ class ReferencingService {
                 throw new Error('Server error. Please try again later.');
               }
           }
-        } else if (error.request) {
-          // Request made but no response
-          if (retryCount < 3) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-            return this.saveToCosmosDB(endpoint, data, retryCount + 1);
-          }
-          throw new Error('Network error. Please check your connection.');
         }
       }
 
-      // Log detailed error information
-      console.error('Failed to save to CosmosDB:', {
-        error: error.message,
-        code: error.code,
-        response: error.response?.data,
-        status: error.response?.status,
-        attempt: retryCount + 1
-      });
-
-      throw new Error(error.response?.data?.message || error.message || 'Failed to save data to database');
+      console.error('Error saving to backend:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Failed to save data');
     }
   }
 
@@ -385,109 +339,23 @@ class ReferencingService {
   }
 
   async submitApplication(userId: string, data: { formData: any, emailContent: any }) {
-    if (!userId) {
-      throw new Error('User ID is required');
-    }
-
     try {
-      console.log('Starting application submission for user:', userId);
-
-      // First, save all form data to CosmosDB
-      const submissionData = {
-        userId,
-        type: 'submission',
-        timestamp: new Date().toISOString(),
-        status: 'submitted',
-        formData: data.formData
-      };
-
-      let cosmosResponse;
-      try {
-        // Save submission data to CosmosDB
-        cosmosResponse = await this.saveToCosmosDB(
-          `${this.API_URL}/api/referencing/submissions`,
-          submissionData
-        );
-
-        console.log('Submission saved to CosmosDB:', {
-          success: !!cosmosResponse,
-          submissionId: cosmosResponse?.id
-        });
-
-        if (!cosmosResponse || !cosmosResponse.success) {
-          throw new Error('Failed to save submission to database');
-        }
-      } catch (dbError) {
-        console.error('Database submission failed:', dbError);
-        throw new Error('Failed to save submission to database. Please try again.');
-      }
-
-      // Prepare attachments for email
-      const formData = new FormData();
-      formData.append('to', data.emailContent.to);
-      formData.append('subject', data.emailContent.subject);
-      formData.append('formData', JSON.stringify(data.formData));
-      formData.append('submissionId', cosmosResponse.id);
-
-      // Add attachments to FormData
-      data.emailContent.attachments.forEach((attachment: any, index: number) => {
-        formData.append(`attachments`, attachment.content, attachment.filename);
+      // Save to backend API
+      const result = await this.saveToCosmosDB(`/referencing/${userId}/submit`, {
+        formData: data.formData,
+        emailContent: data.emailContent,
+        userId // Include userId in the request
       });
 
-      let emailResponse;
-      try {
-        // Send email with attachments
-        emailResponse = await axios.post(
-          `${this.API_URL}/api/referencing/send-email`,
-          formData,
-          {
-            headers: {
-              'Content-Type': 'multipart/form-data'
-            },
-            timeout: 30000 // 30 second timeout for email
-          }
-        );
-
-        console.log('Email send response:', {
-          success: emailResponse.data.success,
-          to: data.emailContent.to
-        });
-
-        if (!emailResponse.data.success) {
-          throw new Error('Failed to send email notification');
-        }
-      } catch (emailError) {
-        console.error('Email sending failed:', emailError);
-        // Don't throw here - we want to return partial success
-        emailResponse = { data: { success: false } };
+      if (result.success) {
+        // Clear local storage only on successful submission
+        this.clearLocalStorage(userId);
       }
 
-      // Return appropriate response based on what succeeded
-      if (cosmosResponse.success && emailResponse.data.success) {
-        return {
-          success: true,
-          submissionId: cosmosResponse.id,
-          message: 'Application submitted successfully and email notification sent'
-        };
-      } else if (cosmosResponse.success) {
-        return {
-          success: true,
-          submissionId: cosmosResponse.id,
-          message: 'Application submitted successfully but email notification failed'
-        };
-      } else {
-        return {
-          success: false,
-          message: 'Failed to submit application. Please try again.'
-        };
-      }
-    } catch (error: any) {
-      console.error('Failed to submit application:', {
-        error: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      throw new Error(error.response?.data?.message || error.message || 'Failed to submit application');
+      return result;
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      throw error;
     }
   }
 
@@ -586,120 +454,24 @@ class ReferencingService {
   }
 
   async saveAgentDetailsData(userId: string, data: any) {
-    try {
-      // Save to local storage first
-      await this.saveToLocalStorage(userId, 'agent-details', data);
-
-      // Save to CosmosDB
-      const cosmosResponse = await this.saveToCosmosDB(
-        `${this.API_URL}/api/referencing/agent`,
-        {
-          userId,
-          ...data,
-          type: 'agent_details',
-          timestamp: new Date().toISOString()
-        }
-      );
-
-      if (!cosmosResponse || !cosmosResponse.success) {
-        console.warn('Failed to save agent details to CosmosDB:', cosmosResponse);
-        throw new Error('Failed to save agent details to database');
-      }
-
-      console.log('Agent details saved successfully:', {
-        localStorageKey: `referencing_${userId}_agent-details`,
-        cosmosResponse: cosmosResponse
-      });
-
-      return {
-        success: true,
-        message: 'Agent details saved successfully',
-        data: cosmosResponse
-      };
-    } catch (error: any) {
-      console.error('Failed to save agent details:', error);
-
-      // If CosmosDB save fails but local storage succeeded
-      const localData = localStorage.getItem(`referencing_${userId}_agent-details`);
-      if (localData) {
-        return {
-          success: false,
-          message: 'Data saved locally but failed to sync with database. Changes will be synced when connection is restored.',
-          data: JSON.parse(localData)
-        };
-      }
-
-      throw error;
-    }
+    return this.saveFormSection(userId, 'agent', data);
   }
 
   private async saveFormSection(userId: string, section: string, data: any) {
-    if (!userId) {
-      throw new Error('User ID is required');
-    }
-
     try {
-      // Get the appropriate validation schema
-      const schemaMap = {
-        'identity': identitySchema,
-        'employment': employmentSchema,
-        'residential': residentialSchema,
-        'financial': financialSchema,
-        'guarantor': guarantorSchema,
-        'agent-details': agentDetailsSchema
-      };
+      // Save to backend API
+      const result = await this.saveToCosmosDB(`/referencing/${section}`, {
+        ...data,
+        userId
+      });
 
-      const validationSchema = schemaMap[section as keyof typeof schemaMap];
-      if (!validationSchema) {
-        throw new Error(`Invalid form section: ${section}`);
-      }
-
-      // Validate the data
-      try {
-        await validationSchema.validate(data, { abortEarly: false });
-      } catch (validationError: any) {
-        console.error('Validation failed:', {
-          section,
-          errors: validationError.errors
-        });
-        throw new Error(`Validation failed: ${validationError.errors.join(', ')}`);
-      }
-
-      // Save to local storage first
+      // Save to local storage as backup
       await this.saveToLocalStorage(userId, section, data);
 
-      // Save to CosmosDB
-      const cosmosResponse = await this.saveToCosmosDB(
-        `${this.API_URL}/api/referencing/${section}`,
-        {
-          userId,
-          ...data,
-          type: section,
-          timestamp: new Date().toISOString()
-        }
-      );
-
-      console.log(`${section} data saved successfully:`, {
-        localStorageKey: `referencing_${userId}_${section}`,
-        cosmosResponse: !!cosmosResponse
-      });
-
-      return cosmosResponse;
-    } catch (error: any) {
-      console.error(`Failed to save ${section} data:`, {
-        error: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-
-      // If CosmosDB save fails but local storage succeeded
-      const localData = localStorage.getItem(`referencing_${userId}_${section}`);
-      if (localData) {
-        console.warn(`${section} data saved to local storage only. Will sync to CosmosDB when connection is restored.`);
-        return JSON.parse(localData);
-      }
-
-      throw new Error(error.response?.data?.message || error.message || `Failed to save ${section} data`);
+      return result;
+    } catch (error) {
+      console.error(`Error saving ${section} data:`, error);
+      throw error;
     }
   }
 
@@ -710,15 +482,8 @@ class ReferencingService {
 
     try {
       // Try to get from CosmosDB first
-      const response = await axios.get(`${API_BASE_URL}/api/referencing/${userId}`, {
-        params: {
-          dbConfig: {
-            endpoint: COSMOS_DB_ENDPOINT,
-            key: COSMOS_DB_KEY,
-            databaseId: COSMOS_DB_NAME,
-            containerId: COSMOS_DB_CONTAINER
-          }
-        }
+      const response = await axios.get(`${API_BASE_URL}/referencing/${userId}`, {
+        timeout: 30000 // 30 second timeout for slower production servers
       });
 
       return response.data;
@@ -740,7 +505,7 @@ class ReferencingService {
         return localData;
       } catch (localError) {
         console.error('Failed to get data from local storage:', localError);
-        throw new Error('Failed to get form data from both CosmosDB and local storage');
+        throw new Error('Failed to get form data from both backend API and local storage');
       }
     }
   }
