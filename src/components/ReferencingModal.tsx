@@ -249,6 +249,11 @@ interface StoredFormData {
   };
 }
 
+interface UploadProps {
+  updateFormData: (step: keyof FormData | string, data: Partial<FormData[keyof FormData]>) => void;
+  formData: FormData;
+}
+
 const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
@@ -350,12 +355,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   }, [stepStatus, user]);
 
-  const updateFormData = (step: keyof FormData, data: Partial<FormData[keyof FormData]>) => {
+  const updateFormData = (step: keyof FormData | string, data: Partial<FormData[keyof FormData]>) => {
     setFormData(prev => {
       const updated = {
         ...prev,
         [step]: {
-          ...prev[step],
+          ...prev[step as keyof FormData],
           ...data
         }
       };
@@ -366,7 +371,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       return updated;
     });
 
-    const stepMap: { [key in keyof FormData]: number } = {
+    const stepMap: { [key: string]: number } = {
       identity: 1,
       employment: 2,
       residential: 3,
@@ -377,7 +382,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     };
 
     const stepIndex = stepMap[step];
-    const status = determineStepStatus(step, { ...formData[step], ...data });
+    const status = determineStepStatus(step as keyof FormData, { ...formData[step as keyof FormData], ...data });
 
     setStepStatus(prev => {
       const updated = {
@@ -688,93 +693,26 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         throw new Error('Agent email is required. Please complete the Agent Details section.');
       }
 
-      // Prepare attachments array with proper naming for zip organization
-      const attachments: Attachment[] = [];
+      // Submit the application
+      const result = await referencingService.submitApplication(userId, {
+        formData,
+        emailContent: null
+      });
 
-      // Helper function to convert stored file to File object and add to attachments
-      const addFileToAttachments = async (storedFile: StoredFile | File | null, prefix: string, section: string) => {
-        if (!storedFile) return;
-
-        let file: File;
-        if ('dataUrl' in storedFile) {
-          // Convert StoredFile to File
-          const arr = storedFile.dataUrl.split(',');
-          const mime = arr[0].match(/:(.*?);/)?.[1];
-          const bstr = atob(arr[1]);
-          let n = bstr.length;
-          const u8arr = new Uint8Array(n);
-          while (n--) {
-            u8arr[n] = bstr.charCodeAt(n);
-          }
-          file = new File([u8arr], storedFile.name, {
-            type: storedFile.type,
-            lastModified: storedFile.lastModified
-          });
-        } else {
-          // It's already a File object
-          file = storedFile;
-        }
-
-        const fileExtension = file.name.split('.').pop();
-        const sanitizedName = `${formData.identity?.firstName || 'unknown'}_${formData.identity?.lastName || 'unknown'}`;
-        const fileName = `${section}/${prefix}_${sanitizedName}.${fileExtension}`;
-        attachments.push({
-          filename: fileName,
-          content: file
-        });
-      };
-
-      // Add all files with proper folder structure
-      if (formData.identity?.identityProof) {
-        await addFileToAttachments(
-          formData.identity.identityProof,
-          'identity_proof',
-          '1_Identity_Documents'
-        );
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to submit application');
       }
 
-      if (formData.employment?.proofDocument) {
-        await addFileToAttachments(
-          formData.employment.proofDocument,
-          'employment_proof',
-          '2_Employment_Documents'
-        );
+      // Show appropriate success/warning message
+      if (result.savedToCosmosDB && result.emailSent?.success) {
+        setShowSuccessModal(true);
+      } else if (result.savedToCosmosDB) {
+        alert('Application saved successfully, but there was an issue sending emails. The team will process your application and contact you.');
+      } else if (result.emailSent?.success) {
+        alert('Emails sent successfully, but there was an issue saving your application. Please try submitting again.');
+      } else {
+        throw new Error('Failed to save application and send emails');
       }
-
-      if (formData.residential?.proofDocument) {
-        await addFileToAttachments(
-          formData.residential.proofDocument,
-          'residential_proof',
-          '3_Residential_Documents'
-        );
-      }
-
-      if (formData.financial?.proofOfIncomeDocument) {
-        await addFileToAttachments(
-          formData.financial.proofOfIncomeDocument,
-          'income_proof',
-          '4_Financial_Documents'
-        );
-      }
-
-      if (formData.guarantor?.identityDocument) {
-        await addFileToAttachments(
-          formData.guarantor.identityDocument,
-          'guarantor_proof',
-          '5_Guarantor_Documents'
-        );
-      }
-
-      // Send emails to all recipients (including agent)
-      const emailResults = await emailService.sendMultipleEmails(formData, attachments);
-
-      if (emailResults.error) {
-        console.error('Error sending some emails:', emailResults.error);
-        throw new Error(emailResults.error);
-      }
-
-      // Show success modal
-      setShowSuccessModal(true);
 
       // Don't clear local storage immediately after submission
       // Instead, mark the submission as complete
@@ -784,7 +722,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
     } catch (error) {
       console.error('Error submitting application:', error);
-      // alert(error instanceof Error ? error.message : 'Failed to submit application');
+      alert(error instanceof Error ? error.message : 'Failed to submit application');
     } finally {
       setIsSubmitting(false);
     }
