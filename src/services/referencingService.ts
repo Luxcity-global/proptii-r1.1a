@@ -339,9 +339,27 @@ class ReferencingService {
     }
   }
 
+  async getReference(userId: string): Promise<any> {
+    try {
+      const response = await axios.get(`${this.API_URL}/referencing/${userId}`);
+      return response;
+    } catch (error) {
+      console.error('Error getting reference:', error);
+      throw error;
+    }
+  }
+
   async submitApplication(userId: string, data: any): Promise<any> {
     try {
-      // Submit the complete form
+      // First save all sections individually
+      const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'agentDetails'];
+      const savePromises = sections.map(section =>
+        this.saveFormSection(userId, section, data.formData[section])
+      );
+
+      await Promise.all(savePromises);
+
+      // Then submit the complete form
       const formResult = await this.saveToCosmosDB(`/referencing/${userId}/submit`, {
         formData: data.formData,
         userId
@@ -351,14 +369,69 @@ class ReferencingService {
         throw new Error(formResult.error || 'Failed to save complete form data');
       }
 
-      // Send emails if needed
-      let emailResult = { success: true };
-      if (data.emailContent) {
-        emailResult = await emailService.sendMultipleEmails(
-          data.formData,
-          this.prepareAttachments(data.formData)
-        );
+      // Prepare and send emails to all recipients
+      const emailPromises = [];
+      const attachments = this.prepareAttachments(data.formData);
+
+      // 1. Send email to user
+      if (data.formData.identity?.email) {
+        emailPromises.push(emailService.sendEmail({
+          to: data.formData.identity.email,
+          subject: 'Your Referencing Application Has Been Submitted',
+          template: 'userSubmission',
+          data: {
+            name: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
+            formData: data.formData
+          },
+          attachments
+        }));
       }
+
+      // 2. Send email to agent
+      if (data.formData.agentDetails?.email) {
+        emailPromises.push(emailService.sendEmail({
+          to: data.formData.agentDetails.email,
+          subject: 'New Referencing Application Received',
+          template: 'agentNotification',
+          data: {
+            applicantName: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
+            formData: data.formData
+          },
+          attachments
+        }));
+      }
+
+      // 3. Send email to referee
+      if (data.formData.employment?.referenceEmail) {
+        emailPromises.push(emailService.sendEmail({
+          to: data.formData.employment.referenceEmail,
+          subject: 'Reference Request for Rental Application',
+          template: 'refereeRequest',
+          data: {
+            refereeName: data.formData.employment.referenceFullName,
+            applicantName: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
+            formData: data.formData
+          }
+        }));
+      }
+
+      // 4. Send email to guarantor
+      if (data.formData.guarantor?.email) {
+        emailPromises.push(emailService.sendEmail({
+          to: data.formData.guarantor.email,
+          subject: 'Guarantor Request for Rental Application',
+          template: 'guarantorRequest',
+          data: {
+            guarantorName: `${data.formData.guarantor.firstName} ${data.formData.guarantor.lastName}`,
+            applicantName: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
+            formData: data.formData
+          }
+        }));
+      }
+
+      // Send all emails in parallel
+      const emailResults = await Promise.allSettled(emailPromises);
+      const emailSuccess = emailResults.every(result => result.status === 'fulfilled');
 
       // Clear local storage on successful submission
       if (formResult.success) {
@@ -368,7 +441,7 @@ class ReferencingService {
       return {
         success: true,
         formSubmission: formResult,
-        emailSent: emailResult,
+        emailSent: { success: emailSuccess },
         savedToCosmosDB: formResult.success
       };
     } catch (error) {

@@ -591,14 +591,39 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         throw new Error('No user found. Please login again.');
       }
 
-      // Save current step
+      // Save current step to local storage
       localStorage.setItem(`referencing_${user.id}_currentStep`, currentStep.toString());
-
-      // Save entire form data
       localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(formData));
-
-      // Save step status
       localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
+
+      // Save to Cosmos DB based on current step
+      let saveResult;
+      switch (currentStep) {
+        case 1:
+          saveResult = await referencingService.saveIdentityData(user.id, formData.identity);
+          break;
+        case 2:
+          saveResult = await referencingService.saveEmploymentData(user.id, formData.employment);
+          break;
+        case 3:
+          saveResult = await referencingService.saveResidentialData(user.id, formData.residential);
+          break;
+        case 4:
+          saveResult = await referencingService.saveFinancialData(user.id, formData.financial);
+          break;
+        case 5:
+          saveResult = await referencingService.saveGuarantorData(user.id, formData.guarantor);
+          break;
+        case 7:
+          saveResult = await referencingService.saveAgentDetailsData(user.id, formData.agentDetails);
+          break;
+        default:
+          saveResult = { success: true }; // Credit check step doesn't need saving
+      }
+
+      if (!saveResult.success) {
+        throw new Error(saveResult.error || 'Failed to save data');
+      }
 
       // Update last saved timestamp
       setLastSavedSteps(prev => ({
@@ -606,12 +631,9 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         [currentStep]: new Date()
       }));
 
-      // Show success message
-      // alert('Data saved successfully!');
-
     } catch (error) {
       console.error('Error in save operation:', error);
-      // alert(error instanceof Error ? error.message : 'Failed to submit application');
+      alert(error instanceof Error ? error.message : 'Failed to save data');
     } finally {
       setIsSaving(false);
     }
