@@ -378,11 +378,10 @@ class ReferencingService {
         emailPromises.push(emailService.sendEmail({
           to: data.formData.identity.email,
           subject: 'Your Referencing Application Has Been Submitted',
-          template: 'userSubmission',
-          data: {
+          html: this.generateEmailContent('userSubmission', {
             name: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
             formData: data.formData
-          },
+          }),
           attachments
         }));
       }
@@ -392,11 +391,10 @@ class ReferencingService {
         emailPromises.push(emailService.sendEmail({
           to: data.formData.agentDetails.email,
           subject: 'New Referencing Application Received',
-          template: 'agentNotification',
-          data: {
+          html: this.generateEmailContent('agentNotification', {
             applicantName: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
             formData: data.formData
-          },
+          }),
           attachments
         }));
       }
@@ -406,12 +404,12 @@ class ReferencingService {
         emailPromises.push(emailService.sendEmail({
           to: data.formData.employment.referenceEmail,
           subject: 'Reference Request for Rental Application',
-          template: 'refereeRequest',
-          data: {
+          html: this.generateEmailContent('refereeRequest', {
             refereeName: data.formData.employment.referenceFullName,
             applicantName: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
             formData: data.formData
-          }
+          }),
+          attachments: [] // Referee doesn't need attachments
         }));
       }
 
@@ -420,12 +418,12 @@ class ReferencingService {
         emailPromises.push(emailService.sendEmail({
           to: data.formData.guarantor.email,
           subject: 'Guarantor Request for Rental Application',
-          template: 'guarantorRequest',
-          data: {
+          html: this.generateEmailContent('guarantorRequest', {
             guarantorName: `${data.formData.guarantor.firstName} ${data.formData.guarantor.lastName}`,
             applicantName: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
             formData: data.formData
-          }
+          }),
+          attachments: [] // Guarantor doesn't need attachments yet
         }));
       }
 
@@ -451,6 +449,40 @@ class ReferencingService {
         error: error instanceof Error ? error.message : 'Failed to submit application',
         savedToCosmosDB: false
       };
+    }
+  }
+
+  private generateEmailContent(template: string, data: any): string {
+    // This is a simple template function - you should replace this with your actual email template system
+    switch (template) {
+      case 'userSubmission':
+        return `
+          <h1>Your Referencing Application Has Been Submitted</h1>
+          <p>Dear ${data.name},</p>
+          <p>Your referencing application has been successfully submitted. We will process your application and contact you shortly.</p>
+        `;
+      case 'agentNotification':
+        return `
+          <h1>New Referencing Application Received</h1>
+          <p>A new referencing application has been submitted by ${data.applicantName}.</p>
+          <p>Please review the attached documents and process the application.</p>
+        `;
+      case 'refereeRequest':
+        return `
+          <h1>Reference Request for Rental Application</h1>
+          <p>Dear ${data.refereeName},</p>
+          <p>${data.applicantName} has listed you as a reference for their rental application.</p>
+          <p>Please provide a reference by responding to this email.</p>
+        `;
+      case 'guarantorRequest':
+        return `
+          <h1>Guarantor Request for Rental Application</h1>
+          <p>Dear ${data.guarantorName},</p>
+          <p>${data.applicantName} has listed you as a guarantor for their rental application.</p>
+          <p>Please review the attached documents and confirm your agreement to act as a guarantor.</p>
+        `;
+      default:
+        return '';
     }
   }
 
