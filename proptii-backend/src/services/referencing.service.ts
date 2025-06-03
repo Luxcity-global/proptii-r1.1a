@@ -24,7 +24,7 @@ export class ReferencingService {
       try {
         // Try to read the existing document
         const { resource: existingDoc } = await this.container.item(documentId).read();
-        
+
         if (existingDoc) {
           // Update existing document
           const updatedData = {
@@ -192,7 +192,7 @@ export class ReferencingService {
   async saveAgentDetailsData(data: any): Promise<any> {
     try {
       console.log('Received agent details data:', JSON.stringify(data, null, 2));
-      
+
       if (!data.userId) {
         throw new Error('userId is required for saving agent details');
       }
@@ -270,13 +270,51 @@ export class ReferencingService {
 
   async submitApplication(userId: string, formData: any): Promise<any> {
     try {
+      // Helper function to save section data
+      const saveSectionData = async (section: string, data: any) => {
+        try {
+          const { resources: existingData } = await this.container.items
+            .query({
+              query: 'SELECT * FROM c WHERE c.type = @type AND c.userId = @userId',
+              parameters: [
+                { name: '@type', value: section },
+                { name: '@userId', value: userId }
+              ]
+            })
+            .fetchAll();
+
+          const sectionData = {
+            ...data,
+            userId,
+            type: section,
+            updatedAt: new Date().toISOString()
+          };
+
+          if (existingData.length > 0) {
+            // Update existing record
+            const { resource } = await this.container.item(existingData[0].id).replace({
+              ...existingData[0],
+              ...sectionData
+            });
+            return resource;
+          } else {
+            // Create new record
+            const { resource } = await this.container.items.create({
+              ...sectionData,
+              createdAt: new Date().toISOString()
+            });
+            return resource;
+          }
+        } catch (error) {
+          throw new Error(`Error saving ${section} data: ${error.message}`);
+        }
+      };
+
       // Save all sections of the form
-      await this.saveIdentityData({ userId, ...formData.identity });
-      await this.saveEmploymentData({ userId, ...formData.employment });
-      await this.saveResidentialData({ userId, ...formData.residential });
-      await this.saveFinancialData({ userId, ...formData.financial });
-      await this.saveGuarantorData({ userId, ...formData.guarantor });
-      await this.saveAgentDetailsData({ userId, ...formData.agentDetails });
+      const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'agentDetails'];
+      const savedSections = await Promise.all(
+        sections.map(section => saveSectionData(section, formData[section]))
+      );
 
       // Create or update application status
       const { resources: existingStatus } = await this.container.items
@@ -305,8 +343,13 @@ export class ReferencingService {
         await this.container.items.create(newStatus);
       }
 
-      return { success: true, message: 'Application submitted successfully' };
+      return {
+        success: true,
+        message: 'Application submitted successfully',
+        sections: savedSections
+      };
     } catch (error) {
+      console.error('Error submitting application:', error);
       throw new Error('Error submitting application: ' + error.message);
     }
   }
