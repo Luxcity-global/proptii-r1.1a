@@ -30,8 +30,8 @@ interface MultiEmailResponse {
 }
 
 const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:3002'
-  : (import.meta.env.VITE_API_URL || 'http://localhost:3002');
+  ? 'http://localhost:10000/api'
+  : 'https://proptii-backend.onrender.com/api';
 
 class EmailService {
   private readonly API_URL = API_BASE_URL;
@@ -269,7 +269,7 @@ class EmailService {
       }
 
       // Send to backend
-      const response = await axios.post(`${this.API_URL}/api/referencing/send-email`, formData, {
+      const response = await axios.post(`${this.API_URL}/referencing/send-email`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -306,44 +306,61 @@ class EmailService {
 
   async sendMultipleEmails(formData: any, attachments: EmailAttachment[] = []): Promise<MultiEmailResponse> {
     try {
-      // Create FormData to handle file uploads
-      const multiFormData = new FormData();
-      multiFormData.append('formData', JSON.stringify(formData));
+      console.log('Starting multiple email submission process...', {
+        hasFormData: !!formData,
+        attachmentsCount: attachments.length
+      });
 
-      // Add attachments if any
-      if (attachments.length > 0) {
-        attachments.forEach(attachment => {
-          multiFormData.append('attachments', attachment.content, attachment.filename);
-        });
+      // Create zip file of attachments
+      const zipFile = await this.createAttachmentsZip(attachments, formData.identity);
+
+      // Generate email HTML
+      const emailHtml = this.generateEmailTemplate(formData);
+
+      // Prepare form data for API
+      const apiFormData = new FormData();
+      apiFormData.append('formData', JSON.stringify(formData));
+      apiFormData.append('emailHtml', emailHtml);
+
+      if (zipFile) {
+        apiFormData.append('attachments', zipFile);
+      }
+
+      // Add recipient information
+      if (formData.agentDetails?.email) {
+        apiFormData.append('agentEmail', formData.agentDetails.email);
+      }
+      if (formData.employment?.referenceEmail) {
+        apiFormData.append('refereeEmail', formData.employment.referenceEmail);
+      }
+      if (formData.guarantor?.email) {
+        apiFormData.append('guarantorEmail', formData.guarantor.email);
+      }
+      if (formData.identity?.email) {
+        apiFormData.append('userEmail', formData.identity.email);
       }
 
       // Send to backend
-      const response = await axios.post(`${this.API_URL}/api/referencing/send-multiple-emails`, multiFormData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        timeout: 60000,
-        maxContentLength: 100 * 1024 * 1024,
-        maxBodyLength: 100 * 1024 * 1024
-      });
+      const response = await axios.post(
+        `${this.API_URL}/referencing/submit-emails`,
+        apiFormData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          timeout: 60000 // 60 second timeout for email with attachments
+        }
+      );
 
-      if (!response.data.success) {
-        throw new Error(response.data.error || 'Failed to send emails');
-      }
+      console.log('Email submission response:', response.data);
 
-      return response.data.results;
-    } catch (error) {
-      console.error('Error sending multiple emails:', error);
-      if (axios.isAxiosError(error)) {
-        console.error('Axios error details:', {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message
-        });
-      }
       return {
-        error: error instanceof Error ? error.message : 'Failed to send emails'
+        success: true,
+        ...response.data
       };
+    } catch (error: any) {
+      console.error('Failed to send emails:', error);
+      throw error;
     }
   }
 

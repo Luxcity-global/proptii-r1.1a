@@ -2,6 +2,7 @@ import apiService, { ApiResponse } from './api';
 import axios from 'axios';
 import { FormSection, ReferencingFormData } from '../types/referencing';
 import { identitySchema, employmentSchema, residentialSchema, financialSchema, guarantorSchema, agentDetailsSchema } from '../types/referencing';
+import emailService from './emailService';
 
 interface Attachment {
   filename: string;
@@ -340,19 +341,32 @@ class ReferencingService {
 
   async submitApplication(userId: string, data: { formData: any, emailContent: any }) {
     try {
-      // Save to backend API
-      const result = await this.saveToCosmosDB(`/referencing/${userId}/submit`, {
+      // First submit the form data
+      const formResult = await this.saveToCosmosDB(`/referencing/${userId}/submit`, {
         formData: data.formData,
-        emailContent: data.emailContent,
-        userId // Include userId in the request
+        userId
       });
 
-      if (result.success) {
+      if (!formResult.success) {
+        throw new Error('Failed to save form data');
+      }
+
+      // Then send emails
+      const emailResult = await emailService.sendMultipleEmails(
+        data.formData,
+        this.prepareAttachments(data.formData)
+      );
+
+      if (emailResult.success) {
         // Clear local storage only on successful submission
         this.clearLocalStorage(userId);
       }
 
-      return result;
+      return {
+        success: true,
+        formSubmission: formResult,
+        emailSent: emailResult
+      };
     } catch (error) {
       console.error('Error submitting application:', error);
       throw error;
