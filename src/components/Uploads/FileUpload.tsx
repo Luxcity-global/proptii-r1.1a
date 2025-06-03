@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import React, { useState } from 'react';
+import { Upload } from 'lucide-react';
 
 interface StoredFile {
   name: string;
@@ -9,122 +10,139 @@ interface StoredFile {
 }
 
 interface FileUploadProps {
-  updateFormData: (section: string, data: any) => void;
+  updateFormData: (step: string, data: any) => void;
   formData: any;
 }
 
-const FileUpload: React.FC<FileUploadProps> = ({ updateFormData, formData }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-  // Load file from formData on mount
-  useEffect(() => {
-    if (formData?.identity?.identityProof?.dataUrl) {
-      setPreview(formData.identity.identityProof.dataUrl);
-    }
-  }, [formData]);
+const FileUpload: React.FC<FileUploadProps> = ({ updateFormData, formData }) => {
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      setSelectedFile(file);
+    const file = event.target.files?.[0];
+    setError(null);
 
-      // Convert file to base64 for storage
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        setPreview(dataUrl);
+    if (!file) return;
 
-        // Create StoredFile object
-        const storedFile: StoredFile = {
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          lastModified: file.lastModified,
-          dataUrl: dataUrl
-        };
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      setError('File size must be less than 5MB');
+      return;
+    }
 
-        // Update form data with stored file
-        updateFormData("identity", { identityProof: storedFile });
-      };
-      reader.readAsDataURL(file);
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('Only JPEG, PNG and PDF files are allowed');
+      return;
+    }
+
+    try {
+      // If it's an image, compress it
+      if (file.type.startsWith('image/')) {
+        const compressedFile = await compressImage(file);
+        updateFormData('identity', { identityProof: compressedFile });
+      } else {
+        updateFormData('identity', { identityProof: file });
+      }
+    } catch (err) {
+      setError('Error processing file. Please try again.');
+      console.error('File processing error:', err);
     }
   };
 
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Could not get canvas context'));
+            return;
+          }
+
+          // Calculate new dimensions while maintaining aspect ratio
+          let width = img.width;
+          let height = img.height;
+          const maxDimension = 1200;
+
+          if (width > height && width > maxDimension) {
+            height = (height * maxDimension) / width;
+            width = maxDimension;
+          } else if (height > maxDimension) {
+            width = (width * maxDimension) / height;
+            height = maxDimension;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error('Could not compress image'));
+                return;
+              }
+              const compressedFile = new File([blob], file.name, {
+                type: file.type,
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            },
+            file.type,
+            0.7 // compression quality
+          );
+        };
+        img.onerror = () => {
+          reject(new Error('Error loading image'));
+        };
+      };
+      reader.onerror = () => {
+        reject(new Error('Error reading file'));
+      };
+    });
+  };
+
   return (
-    <div className="mt-8">
-      {/* Heading */}
-      <h2 className="text-lg font-semibold mb-2">Identity Documents</h2>
-
-      {/* Label */}
-      <label className="block text-gray-700 mb-2">
-        Passport or ID Card <span className="text-red-500">*</span>
-      </label>
-
-      {/* Drag and Drop File Upload */}
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-white">
-        <label
-          htmlFor="identity-proof-upload"
-          className="cursor-pointer flex flex-col items-center justify-center"
-        >
-          {!preview ? (
-            <>
-              {/* Upload Icon */}
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-blue-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-
-              {/* Drag and Drop Text */}
-              <p className="text-gray-600">Drag and drop or click to select</p>
-
-              {/* Accepted Formats */}
-              <p className="text-gray-500 text-sm mt-1">
-                Accepted formats: <span className="font-semibold">.PDF, .DOC, .DOCX, .JPG, .JPEG, .PNG</span>
-              </p>
-
-              {/* File Size Limit */}
-              <p className="text-gray-500 text-sm">Maximum file size: 5.0 MB</p>
-            </>
-          ) : (
-            <div className="w-full">
-              <div className="flex items-center justify-center mb-4">
-                {formData?.identity?.identityProof?.type?.startsWith('image/') ? (
-                  <img src={preview} alt="Preview" className="max-h-32 max-w-full object-contain" />
-                ) : (
-                  <div className="p-4 bg-gray-100 rounded">
-                    <p className="text-gray-600">{formData?.identity?.identityProof?.name}</p>
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  setSelectedFile(null);
-                  setPreview(null);
-                  updateFormData("identity", { identityProof: null });
-                }}
-                className="text-red-500 hover:text-red-700"
-              >
-                Remove File
-              </button>
-            </div>
-          )}
-        </label>
-
-        {/* Hidden File Input */}
-        <input
-          type="file"
-          id="identity-proof-upload"
-          className="hidden"
-          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-          onChange={handleFileChange}
-        />
+    <div className="bg-white rounded-lg p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold">Upload Identity Document</h3>
+        {formData.identity.identityProof && (
+          <span className="text-green-500">✓ File uploaded</span>
+        )}
       </div>
-
-      {/* Helper Text */}
-      <p className="text-gray-500 text-sm mt-2">
-        Please upload a clear copy of your passport or ID card
-      </p>
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+        <div className="flex flex-col items-center">
+          <Upload className="w-12 h-12 text-gray-400 mb-4" />
+          <label className="cursor-pointer bg-[#136C9E] text-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-colors">
+            Choose File
+            <input
+              type="file"
+              className="hidden"
+              onChange={handleFileChange}
+              accept=".jpg,.jpeg,.png,.pdf"
+            />
+          </label>
+          <p className="mt-2 text-sm text-gray-500">
+            Upload your passport, driving license or national ID card
+          </p>
+          {error && (
+            <p className="mt-2 text-sm text-red-500">{error}</p>
+          )}
+          {formData.identity.identityProof && (
+            <p className="mt-2 text-sm text-gray-500">
+              Selected file: {formData.identity.identityProof.name}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
