@@ -22,6 +22,7 @@ interface SendEmailResponse {
 }
 
 interface MultiEmailResponse {
+  success: boolean;
   agent?: boolean;
   referee?: boolean;
   guarantor?: boolean;
@@ -356,16 +357,24 @@ class EmailService {
 
       return {
         success: true,
-        ...response.data
+        agent: response.data.agent,
+        referee: response.data.referee,
+        guarantor: response.data.guarantor,
+        user: response.data.user
       };
     } catch (error: any) {
       console.error('Failed to send emails:', error);
-      throw error;
+      return {
+        success: false,
+        error: error.message || 'Failed to send emails'
+      };
     }
   }
 
   async sendViewingEmails(data: any): Promise<MultiEmailResponse> {
-    const results: MultiEmailResponse = {};
+    const results: MultiEmailResponse = {
+      success: false // Initialize with false
+    };
 
     try {
       // Send email to agent
@@ -392,11 +401,14 @@ class EmailService {
         results.user = userResult.success;
       }
 
+      // Set overall success if at least one email was sent
+      results.success = !!(results.agent || results.user);
+
       return results;
     } catch (error) {
       console.error('Error sending viewing emails:', error);
       return {
-        ...results,
+        success: false,
         error: error instanceof Error ? error.message : 'Failed to send viewing emails'
       };
     }

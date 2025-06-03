@@ -341,35 +341,68 @@ class ReferencingService {
 
   async submitApplication(userId: string, data: { formData: any, emailContent: any }) {
     try {
-      // First submit the form data
+      // First save each section to CosmosDB
+      const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'agent'];
+      const saveResults = await Promise.all(
+        sections.map(async (section) => {
+          if (data.formData[section]) {
+            try {
+              return await this.saveToCosmosDB(`/referencing/${section}`, {
+                ...data.formData[section],
+                userId
+              });
+            } catch (error) {
+              console.error(`Failed to save ${section} data:`, error);
+              return { success: false, section };
+            }
+          }
+          return { success: true, section }; // Skip if no data for this section
+        })
+      );
+
+      // Check if any section failed to save
+      const failedSections = saveResults.filter(result => !result.success);
+      if (failedSections.length > 0) {
+        throw new Error(`Failed to save sections: ${failedSections.map(f => f.section).join(', ')}`);
+      }
+
+      // Then submit the complete form
       const formResult = await this.saveToCosmosDB(`/referencing/${userId}/submit`, {
         formData: data.formData,
         userId
       });
 
       if (!formResult.success) {
-        throw new Error('Failed to save form data');
+        throw new Error('Failed to save complete form data');
       }
 
-      // Then send emails
+      // Finally send emails
       const emailResult = await emailService.sendMultipleEmails(
         data.formData,
         this.prepareAttachments(data.formData)
       );
 
-      if (emailResult.success) {
+      // Check if either the form submission was successful or at least one email was sent
+      const isSuccess = formResult.success || emailResult.success;
+
+      if (isSuccess) {
         // Clear local storage only on successful submission
         this.clearLocalStorage(userId);
       }
 
       return {
-        success: true,
+        success: isSuccess,
         formSubmission: formResult,
-        emailSent: emailResult
+        emailSent: emailResult,
+        savedToCosmosDB: true
       };
     } catch (error) {
       console.error('Error submitting application:', error);
-      throw error;
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to submit application',
+        savedToCosmosDB: false
+      };
     }
   }
 
