@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { referencingService } from '../services/referencingService';
 
 interface FormData {
   fullName: string;
@@ -31,43 +30,14 @@ const ReferencingForm = () => {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const [showIncompleteWarning, setShowIncompleteWarning] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    // Clear validation error when field is modified
-    if (validationErrors[name]) {
-      setValidationErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
-    }
-  };
-
-  const validateForm = (): boolean => {
-    const errors: Record<string, string> = {};
-
-    // Basic validation for required fields
-    if (!formData.fullName.trim()) errors.fullName = 'Full name is required';
-    if (!formData.email.trim()) errors.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Invalid email format';
-    if (!formData.phone.trim()) errors.phone = 'Phone number is required';
-    if (!formData.currentAddress.trim()) errors.currentAddress = 'Current address is required';
-    if (!formData.employmentStatus) errors.employmentStatus = 'Employment status is required';
-    if (!formData.incomeLevel) errors.incomeLevel = 'Income level is required';
-
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
   };
 
   const nextStep = () => {
-    const isValid = validateForm();
-    if (isValid) {
-      setStep(prev => prev + 1);
-    }
+    setStep(prev => prev + 1);
   };
 
   const prevStep = () => {
@@ -76,41 +46,13 @@ const ReferencingForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const isValid = validateForm();
+    setIsSubmitting(true);
 
-    if (!isValid) {
-      setShowIncompleteWarning(true);
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
-
-      // Submit to Cosmos DB
-      const result = await referencingService.submitApplication(user.id, {
-        formData,
-        isNewReference: true
-      });
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to submit application');
-      }
-
-      setSubmitSuccess(true);
-      // Clear form data from local storage after successful submission
-      localStorage.removeItem(`referencing_${user.id}_formData`);
-
-    } catch (error) {
-      console.error('Error submitting application:', error);
-      alert(error instanceof Error ? error.message : 'Failed to submit application');
-    } finally {
+    // Simulate API call
+    setTimeout(() => {
       setIsSubmitting(false);
-      setShowIncompleteWarning(false);
-    }
+      setSubmitSuccess(true);
+    }, 2000);
   };
 
   return (
@@ -138,30 +80,6 @@ const ReferencingForm = () => {
         </div>
       ) : (
         <form onSubmit={handleSubmit}>
-          {showIncompleteWarning && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                <div>
-                  <h4 className="text-sm font-medium text-yellow-800">Incomplete Form</h4>
-                  <p className="text-sm text-yellow-700">Please fill in all required fields before submitting.</p>
-                </div>
-                <button
-                  type="button"
-                  className="ml-auto text-yellow-400 hover:text-yellow-500"
-                  onClick={() => setShowIncompleteWarning(false)}
-                >
-                  <span className="sr-only">Dismiss</span>
-                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
-
           {step === 1 && (
             <div className="space-y-6">
               <h3 className="text-xl font-semibold mb-4">Personal Information</h3>
