@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { CosmosClient, Container } from '@azure/cosmos';
+import { EmailService } from './email.service';
 
 @Injectable()
 export class ReferencingService {
   private container: Container;
 
   constructor(
-    @Inject('COSMOS_CLIENT') private readonly cosmosClient: CosmosClient
+    @Inject('COSMOS_CLIENT') private readonly cosmosClient: CosmosClient,
+    private readonly emailService: EmailService
   ) {
     const database = this.cosmosClient.database(process.env.COSMOS_DB_DATABASE_NAME);
     this.container = database.container('References');
@@ -234,6 +236,85 @@ export class ReferencingService {
     } catch (error) {
       console.error('Error submitting application:', error);
       throw new Error('Error submitting application: ' + error.message);
+    }
+  }
+
+  async sendEmail(emailData: any) {
+    try {
+      return await this.emailService.sendEmail(emailData);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      throw error;
+    }
+  }
+
+  async sendMultipleEmails(emailData: any) {
+    try {
+      return await this.emailService.sendMultipleEmails(emailData);
+    } catch (error) {
+      console.error('Error sending multiple emails:', error);
+      throw error;
+    }
+  }
+
+  async testEmailConfig() {
+    try {
+      const config = {
+        endpoint: process.env.EMAIL_SERVICE_ENDPOINT,
+        key: process.env.EMAIL_SERVICE_KEY,
+        from: process.env.EMAIL_FROM_ADDRESS
+      };
+
+      if (!config.endpoint || !config.key || !config.from) {
+        return {
+          success: false,
+          message: 'Email configuration is incomplete',
+          missingFields: Object.entries(config)
+            .filter(([_, value]) => !value)
+            .map(([key]) => key)
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Email configuration is complete',
+        config: {
+          endpoint: config.endpoint.substring(0, 10) + '...',
+          key: '***********',
+          from: config.from
+        }
+      };
+    } catch (error) {
+      console.error('Error checking email config:', error);
+      throw error;
+    }
+  }
+
+  async testEmail(email: string) {
+    try {
+      const testHtml = `
+        <h1>Email Service Test</h1>
+        <p>This is a test email from Proptii Referencing System.</p>
+        <p>If you're receiving this, the email service is working correctly!</p>
+        <br>
+        <p>Time sent: ${new Date().toLocaleString()}</p>
+      `;
+
+      const result = await this.emailService.sendEmail({
+        to: email,
+        subject: 'Proptii Email Service Test',
+        html: testHtml
+      });
+
+      return {
+        success: true,
+        message: 'Test email sent successfully',
+        messageId: result.messageId,
+        sentTo: email
+      };
+    } catch (error) {
+      console.error('Error sending test email:', error);
+      throw error;
     }
   }
 } 
