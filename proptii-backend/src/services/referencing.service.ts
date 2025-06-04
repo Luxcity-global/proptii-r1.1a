@@ -303,7 +303,8 @@ export class ReferencingService {
       const result = await this.emailService.sendEmail({
         to: email,
         subject: 'Proptii Email Service Test',
-        html: testHtml
+        html: testHtml,
+        attachments: []
       });
 
       return {
