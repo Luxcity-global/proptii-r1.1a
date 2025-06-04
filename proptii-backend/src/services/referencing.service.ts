@@ -188,38 +188,19 @@ export class ReferencingService {
       // Helper function to save section data
       const saveSectionData = async (section: string, data: any) => {
         try {
-          const { resources: existingData } = await this.container.items
-            .query({
-              query: 'SELECT * FROM c WHERE c.type = @type AND c.userId = @userId',
-              parameters: [
-                { name: '@type', value: section },
-                { name: '@userId', value: userId }
-              ]
-            })
-            .fetchAll();
-
+          const documentId = `${section}_${userId}`;
           const sectionData = {
+            id: documentId,
             ...data,
             userId,
             type: section,
+            createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           };
 
-          if (existingData.length > 0) {
-            // Update existing record
-            const { resource } = await this.container.item(existingData[0].id).replace({
-              ...existingData[0],
-              ...sectionData
-            });
-            return resource;
-          } else {
-            // Create new record
-            const { resource } = await this.container.items.create({
-              ...sectionData,
-              createdAt: new Date().toISOString()
-            });
-            return resource;
-          }
+          // Use upsert instead of replace/create
+          const { resource } = await this.container.items.upsert(sectionData);
+          return resource;
         } catch (error) {
           throw new Error(`Error saving ${section} data: ${error.message}`);
         }
@@ -231,32 +212,19 @@ export class ReferencingService {
         sections.map(section => saveSectionData(section, formData[section]))
       );
 
-      // Create or update application status
-      const { resources: existingStatus } = await this.container.items
-        .query({
-          query: 'SELECT * FROM c WHERE c.type = "application_status" AND c.userId = @userId',
-          parameters: [{ name: '@userId', value: userId }]
-        })
-        .fetchAll();
+      // Create or update application status using upsert
+      const statusDocumentId = `application_status_${userId}`;
+      const statusData = {
+        id: statusDocumentId,
+        userId,
+        type: 'application_status',
+        status: 'Submitted',
+        submittedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
 
-      if (existingStatus.length > 0) {
-        const updatedStatus = {
-          ...existingStatus[0],
-          status: 'Submitted',
-          updatedAt: new Date().toISOString()
-        };
-        await this.container.item(existingStatus[0].id).replace(updatedStatus);
-      } else {
-        const newStatus = {
-          userId,
-          type: 'application_status',
-          status: 'Submitted',
-          submittedAt: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        await this.container.items.create(newStatus);
-      }
+      await this.container.items.upsert(statusData);
 
       return {
         success: true,
