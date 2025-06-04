@@ -35,7 +35,7 @@ export class ReferencingController {
     return await this.referencingService.saveGuarantorData(data);
   }
 
-  @Post('agent')
+  @Post('agentDetails')
   @HttpCode(200)
   async saveAgentDetailsData(@Body() data: any) {
     try {
