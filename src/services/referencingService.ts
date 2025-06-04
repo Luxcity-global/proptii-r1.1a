@@ -47,8 +47,20 @@ export interface ApplicationStatus {
   };
 }
 
-class ReferencingService {
-  private readonly API_URL = API_BASE_URL;
+export class ReferencingService {
+  private readonly API_URL: string = API_BASE_URL;
+
+  constructor() { }
+
+  private async saveToLocalStorage(userId: string, section: string, data: any): Promise<void> {
+    try {
+      const key = `referencing_${userId}_${section}`;
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
+      console.error('Error saving to local storage:', error);
+      throw error;
+    }
+  }
 
   private async saveToCosmosDB(endpoint: string, data: any, retryCount = 0): Promise<any> {
     try {
@@ -122,24 +134,9 @@ class ReferencingService {
               }
           }
         }
-
-        console.error('Error saving to backend:', error);
-        throw new Error(error.response?.data?.message || error.message || 'Failed to save data');
       }
-    }
-
-  private async saveToLocalStorage(userId: string, section: string, data: any) {
-    try {
-      const key = `referencing_${userId}_${section}`;
-      const dataToSave = {
-        ...data,
-        timestamp: new Date().toISOString()
-      };
-      localStorage.setItem(key, JSON.stringify(dataToSave));
-      return true;
-    } catch (error) {
-      console.error('Error saving to local storage:', error);
-      return false;
+      console.error('Error saving to backend:', error);
+      throw new Error(error.response?.data?.message || error.message || 'Failed to save data');
     }
   }
 
@@ -510,31 +507,7 @@ class ReferencingService {
     }
   }
 
-  async saveIdentityData(userId: string, data: any) {
-    return this.saveFormSection(userId, 'identity', data);
-  }
-
-  async saveEmploymentData(userId: string, data: any) {
-    return this.saveFormSection(userId, 'employment', data);
-  }
-
-  async saveResidentialData(userId: string, data: any) {
-    return this.saveFormSection(userId, 'residential', data);
-  }
-
-  async saveFinancialData(userId: string, data: any) {
-    return this.saveFormSection(userId, 'financial', data);
-  }
-
-  async saveGuarantorData(userId: string, data: any) {
-    return this.saveFormSection(userId, 'guarantor', data);
-  }
-
-  async saveAgentDetailsData(userId: string, data: any) {
-    return this.saveFormSection(userId, 'agentDetails', data);
-  }
-
-  private async saveFormSection(userId: string, section: string, data: any) {
+  private async saveFormSection(userId: string, section: string, data: any): Promise<any> {
     try {
       // Add userId to the data
       const dataWithUserId = {
@@ -549,7 +522,7 @@ class ReferencingService {
         residential: '/referencing/residential',
         financial: '/referencing/financial',
         guarantor: '/referencing/guarantor',
-        agentDetails: '/referencing/agentDetails'  // Updated endpoint
+        agentDetails: '/referencing/agentDetails'
       };
 
       const endpoint = endpointMap[section];
@@ -568,6 +541,30 @@ class ReferencingService {
       console.error(`Error saving ${section} data:`, error);
       throw error;
     }
+  }
+
+  async saveIdentityData(userId: string, data: any): Promise<any> {
+    return this.saveFormSection(userId, 'identity', data);
+  }
+
+  async saveEmploymentData(userId: string, data: any): Promise<any> {
+    return this.saveFormSection(userId, 'employment', data);
+  }
+
+  async saveResidentialData(userId: string, data: any): Promise<any> {
+    return this.saveFormSection(userId, 'residential', data);
+  }
+
+  async saveFinancialData(userId: string, data: any): Promise<any> {
+    return this.saveFormSection(userId, 'financial', data);
+  }
+
+  async saveGuarantorData(userId: string, data: any): Promise<any> {
+    return this.saveFormSection(userId, 'guarantor', data);
+  }
+
+  async saveAgentDetailsData(userId: string, data: any): Promise<any> {
+    return this.saveFormSection(userId, 'agentDetails', data);
   }
 
   async getFormData(userId: string) {
