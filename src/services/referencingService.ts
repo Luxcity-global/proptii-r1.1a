@@ -349,89 +349,32 @@ class ReferencingService {
     }
   }
 
-  async submitApplication(userId: string, data: any): Promise<any> {
+  async submitApplication(userId: string, data: any) {
     try {
-      // First save all sections individually
+      // Save all sections first
       const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'agentDetails'];
-      const savePromises = sections.map(section =>
+      await Promise.all(sections.map(section =>
         this.saveFormSection(userId, section, data.formData[section])
-      );
+      ));
 
-      await Promise.all(savePromises);
-
-      // Then submit the complete form
+      // Submit to Cosmos DB
       const formResult = await this.saveToCosmosDB(`/referencing/${userId}/submit`, {
         formData: data.formData,
-        userId
+        userId,
+        submittedAt: new Date().toISOString()
       });
 
       if (!formResult.success) {
-        throw new Error(formResult.error || 'Failed to save complete form data');
+        throw new Error(formResult.error || 'Failed to save form data');
       }
 
-      // Prepare and send emails to all recipients
-      const emailPromises = [];
-      const attachments = this.prepareAttachments(data.formData);
+      // Send emails
+      const emailResults = await emailService.sendMultipleEmails({
+        formData: data.formData,
+        submissionId: formResult.id
+      });
 
-      // 1. Send email to user
-      if (data.formData.identity?.email) {
-        emailPromises.push(emailService.sendEmail({
-          to: data.formData.identity.email,
-          subject: 'Your Referencing Application Has Been Submitted',
-          html: this.generateEmailContent('userSubmission', {
-            name: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
-            formData: data.formData
-          }),
-          attachments
-        }));
-      }
-
-      // 2. Send email to agent
-      if (data.formData.agentDetails?.email) {
-        emailPromises.push(emailService.sendEmail({
-          to: data.formData.agentDetails.email,
-          subject: 'New Referencing Application Received',
-          html: this.generateEmailContent('agentNotification', {
-            applicantName: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
-            formData: data.formData
-          }),
-          attachments
-        }));
-      }
-
-      // 3. Send email to referee
-      if (data.formData.employment?.referenceEmail) {
-        emailPromises.push(emailService.sendEmail({
-          to: data.formData.employment.referenceEmail,
-          subject: 'Reference Request for Rental Application',
-          html: this.generateEmailContent('refereeRequest', {
-            refereeName: data.formData.employment.referenceFullName,
-            applicantName: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
-            formData: data.formData
-          }),
-          attachments: [] // Referee doesn't need attachments
-        }));
-      }
-
-      // 4. Send email to guarantor
-      if (data.formData.guarantor?.email) {
-        emailPromises.push(emailService.sendEmail({
-          to: data.formData.guarantor.email,
-          subject: 'Guarantor Request for Rental Application',
-          html: this.generateEmailContent('guarantorRequest', {
-            guarantorName: `${data.formData.guarantor.firstName} ${data.formData.guarantor.lastName}`,
-            applicantName: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
-            formData: data.formData
-          }),
-          attachments: [] // Guarantor doesn't need attachments yet
-        }));
-      }
-
-      // Send all emails in parallel
-      const emailResults = await Promise.allSettled(emailPromises);
-      const emailSuccess = emailResults.every(result => result.status === 'fulfilled');
-
-      // Clear local storage on successful submission
+      // Clear local storage on success
       if (formResult.success) {
         this.clearLocalStorage(userId);
       }
@@ -439,11 +382,12 @@ class ReferencingService {
       return {
         success: true,
         formSubmission: formResult,
-        emailSent: { success: emailSuccess },
-        savedToCosmosDB: formResult.success
+        emailSent: emailResults,
+        savedToCosmosDB: true
       };
+
     } catch (error) {
-      console.error('Error submitting application:', error);
+      console.error('Error in submitApplication:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to submit application',

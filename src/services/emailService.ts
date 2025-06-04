@@ -30,6 +30,22 @@ interface MultiEmailResponse {
   error?: string;
 }
 
+interface MultiEmailParams {
+  formData: {
+    identity?: { email?: string };
+    agentDetails?: { email?: string };
+    employment?: { referenceEmail?: string };
+    guarantor?: { email?: string };
+  };
+  submissionId: string;
+}
+
+interface MultiEmailResult {
+  success: boolean;
+  errors?: any[];
+  error?: string;
+}
+
 const API_BASE_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:10000/api'
   : 'https://proptii-r1-1a.onrender.com/api';
@@ -305,68 +321,73 @@ class EmailService {
     }
   }
 
-  async sendMultipleEmails(formData: any, attachments: EmailAttachment[] = []): Promise<MultiEmailResponse> {
+  async sendMultipleEmails({ formData, submissionId }: MultiEmailParams): Promise<MultiEmailResult> {
     try {
-      console.log('Starting multiple email submission process...', {
-        hasFormData: !!formData,
-        attachmentsCount: attachments.length
-      });
+      const emailPromises = [];
 
-      // Create zip file of attachments
-      const zipFile = await this.createAttachmentsZip(attachments, formData.identity);
-
-      // Generate email HTML
-      const emailHtml = this.generateEmailTemplate(formData);
-
-      // Prepare form data for API
-      const apiFormData = new FormData();
-      apiFormData.append('formData', JSON.stringify(formData));
-      apiFormData.append('emailHtml', emailHtml);
-
-      if (zipFile) {
-        apiFormData.append('attachments', zipFile);
-      }
-
-      // Add recipient information
-      if (formData.agentDetails?.email) {
-        apiFormData.append('agentEmail', formData.agentDetails.email);
-      }
-      if (formData.employment?.referenceEmail) {
-        apiFormData.append('refereeEmail', formData.employment.referenceEmail);
-      }
-      if (formData.guarantor?.email) {
-        apiFormData.append('guarantorEmail', formData.guarantor.email);
-      }
+      // 1. Send email to user
       if (formData.identity?.email) {
-        apiFormData.append('userEmail', formData.identity.email);
+        emailPromises.push(this.sendEmail({
+          to: formData.identity.email,
+          subject: 'Your Referencing Application Has Been Submitted',
+          formData,
+          emailType: 'user',
+          attachments: []
+        }));
       }
 
-      // Send to backend
-      const response = await axios.post(
-        `${this.API_URL}/referencing/submit-emails`,
-        apiFormData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          },
-          timeout: 60000 // 60 second timeout for email with attachments
-        }
-      );
+      // 2. Send email to agent
+      if (formData.agentDetails?.email) {
+        emailPromises.push(this.sendEmail({
+          to: formData.agentDetails.email,
+          subject: 'New Referencing Application Received',
+          formData,
+          emailType: 'agent',
+          attachments: []
+        }));
+      }
 
-      console.log('Email submission response:', response.data);
+      // 3. Send email to referee
+      if (formData.employment?.referenceEmail) {
+        emailPromises.push(this.sendEmail({
+          to: formData.employment.referenceEmail,
+          subject: 'Reference Request for Rental Application',
+          formData,
+          emailType: 'referee',
+          attachments: []
+        }));
+      }
+
+      // 4. Send email to guarantor
+      if (formData.guarantor?.email) {
+        emailPromises.push(this.sendEmail({
+          to: formData.guarantor.email,
+          subject: 'Guarantor Request for Rental Application',
+          formData,
+          emailType: 'guarantor',
+          attachments: []
+        }));
+      }
+
+      // Send all emails in parallel
+      const results = await Promise.allSettled(emailPromises);
+
+      // Check results
+      const success = results.every(result => result.status === 'fulfilled');
+      const errors = results
+        .filter(result => result.status === 'rejected')
+        .map(result => (result as PromiseRejectedResult).reason);
 
       return {
-        success: true,
-        agent: response.data.agent,
-        referee: response.data.referee,
-        guarantor: response.data.guarantor,
-        user: response.data.user
+        success,
+        errors: errors.length > 0 ? errors : undefined
       };
-    } catch (error: any) {
-      console.error('Failed to send emails:', error);
+
+    } catch (error) {
+      console.error('Error sending multiple emails:', error);
       return {
         success: false,
-        error: error.message || 'Failed to send emails'
+        error: error instanceof Error ? error.message : 'Failed to send emails'
       };
     }
   }
