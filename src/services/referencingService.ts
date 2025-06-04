@@ -122,12 +122,11 @@ class ReferencingService {
               }
           }
         }
-      }
 
-      console.error('Error saving to backend:', error);
-      throw new Error(error.response?.data?.message || error.message || 'Failed to save data');
+        console.error('Error saving to backend:', error);
+        throw new Error(error.response?.data?.message || error.message || 'Failed to save data');
+      }
     }
-  }
 
   private async saveToLocalStorage(userId: string, section: string, data: any) {
     try {
@@ -532,18 +531,36 @@ class ReferencingService {
   }
 
   async saveAgentDetailsData(userId: string, data: any) {
-    return this.saveFormSection(userId, 'agent', data);
+    return this.saveFormSection(userId, 'agentDetails', data);
   }
 
   private async saveFormSection(userId: string, section: string, data: any) {
     try {
-      // Save to backend API
-      const result = await this.saveToCosmosDB(`/referencing/${section}`, {
+      // Add userId to the data
+      const dataWithUserId = {
         ...data,
         userId
-      });
+      };
 
-      // Save to local storage as backup
+      // Map section names to their correct endpoints
+      const endpointMap: { [key: string]: string } = {
+        identity: '/referencing/identity',
+        employment: '/referencing/employment',
+        residential: '/referencing/residential',
+        financial: '/referencing/financial',
+        guarantor: '/referencing/guarantor',
+        agentDetails: '/referencing/agentDetails'  // Updated endpoint
+      };
+
+      const endpoint = endpointMap[section];
+      if (!endpoint) {
+        throw new Error(`Invalid section: ${section}`);
+      }
+
+      // Save to backend
+      const result = await this.saveToCosmosDB(endpoint, dataWithUserId);
+
+      // Save to local storage
       await this.saveToLocalStorage(userId, section, data);
 
       return result;

@@ -18,26 +18,18 @@ export class ReferencingService {
         throw new BadRequestException('User ID is required');
       }
 
+      const documentId = `identity_${data.userId}`;
       const newData = {
-        id: `identity_${data.userId}`,
+        id: documentId,
         ...data,
         type: 'identity',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      // Try to create new document
-      try {
-        const { resource } = await this.container.items.create(newData);
-        return { success: true, message: 'Identity data saved successfully', data: resource };
-      } catch (createError: any) {
-        // If document already exists, update it
-        if (createError.code === 409) { // Conflict - document already exists
-          const { resource } = await this.container.item(newData.id).replace(newData);
-          return { success: true, message: 'Identity data updated successfully', data: resource };
-        }
-        throw createError;
-      }
+      const { resource } = await this.container.items.upsert(newData);
+      return resource;
+
     } catch (error) {
       console.error('Error saving identity data:', error);
       throw error;
@@ -50,24 +42,18 @@ export class ReferencingService {
         throw new BadRequestException('User ID is required');
       }
 
+      const documentId = `employment_${data.userId}`;
       const newData = {
-        id: `employment_${data.userId}`,
+        id: documentId,
         ...data,
         type: 'employment',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      try {
-        const { resource } = await this.container.items.create(newData);
-        return { success: true, message: 'Employment data saved successfully', data: resource };
-      } catch (createError: any) {
-        if (createError.code === 409) {
-          const { resource } = await this.container.item(newData.id).replace(newData);
-          return { success: true, message: 'Employment data updated successfully', data: resource };
-        }
-        throw createError;
-      }
+      const { resource } = await this.container.items.upsert(newData);
+      return resource;
+
     } catch (error) {
       console.error('Error saving employment data:', error);
       throw error;
@@ -80,24 +66,18 @@ export class ReferencingService {
         throw new BadRequestException('User ID is required');
       }
 
+      const documentId = `residential_${data.userId}`;
       const newData = {
-        id: `residential_${data.userId}`,
+        id: documentId,
         ...data,
         type: 'residential',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      try {
-        const { resource } = await this.container.items.create(newData);
-        return { success: true, message: 'Residential data saved successfully', data: resource };
-      } catch (createError: any) {
-        if (createError.code === 409) {
-          const { resource } = await this.container.item(newData.id).replace(newData);
-          return { success: true, message: 'Residential data updated successfully', data: resource };
-        }
-        throw createError;
-      }
+      const { resource } = await this.container.items.upsert(newData);
+      return resource;
+
     } catch (error) {
       console.error('Error saving residential data:', error);
       throw error;
@@ -110,24 +90,18 @@ export class ReferencingService {
         throw new BadRequestException('User ID is required');
       }
 
+      const documentId = `financial_${data.userId}`;
       const newData = {
-        id: `financial_${data.userId}`,
+        id: documentId,
         ...data,
         type: 'financial',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      try {
-        const { resource } = await this.container.items.create(newData);
-        return { success: true, message: 'Financial data saved successfully', data: resource };
-      } catch (createError: any) {
-        if (createError.code === 409) {
-          const { resource } = await this.container.item(newData.id).replace(newData);
-          return { success: true, message: 'Financial data updated successfully', data: resource };
-        }
-        throw createError;
-      }
+      const { resource } = await this.container.items.upsert(newData);
+      return resource;
+
     } catch (error) {
       console.error('Error saving financial data:', error);
       throw error;
@@ -140,24 +114,18 @@ export class ReferencingService {
         throw new BadRequestException('User ID is required');
       }
 
+      const documentId = `guarantor_${data.userId}`;
       const newData = {
-        id: `guarantor_${data.userId}`,
+        id: documentId,
         ...data,
         type: 'guarantor',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      try {
-        const { resource } = await this.container.items.create(newData);
-        return { success: true, message: 'Guarantor data saved successfully', data: resource };
-      } catch (createError: any) {
-        if (createError.code === 409) {
-          const { resource } = await this.container.item(newData.id).replace(newData);
-          return { success: true, message: 'Guarantor data updated successfully', data: resource };
-        }
-        throw createError;
-      }
+      const { resource } = await this.container.items.upsert(newData);
+      return resource;
+
     } catch (error) {
       console.error('Error saving guarantor data:', error);
       throw error;
@@ -181,29 +149,9 @@ export class ReferencingService {
         updatedAt: new Date().toISOString()
       };
 
-      try {
-        // First try to read the existing document
-        const { resource: existingDoc } = await this.container.item(documentId, documentId).read();
-
-        if (existingDoc) {
-          // Update existing document
-          const { resource } = await this.container.item(documentId, documentId).replace({
-            ...existingDoc,
-            ...newData,
-            updatedAt: new Date().toISOString()
-          });
-          return { success: true, message: 'Agent details updated successfully', data: resource };
-        }
-      } catch (error) {
-        if (error.code !== 404) {
-          throw error;
-        }
-        // Document doesn't exist, continue to creation
-      }
-
-      // Create new document
-      const { resource } = await this.container.items.create(newData);
-      return { success: true, message: 'Agent details saved successfully', data: resource };
+      // Use upsert instead of replace
+      const { resource } = await this.container.items.upsert(newData);
+      return resource;
 
     } catch (error) {
       console.error('Error saving agent details:', error);
