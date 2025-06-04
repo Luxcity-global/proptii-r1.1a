@@ -170,8 +170,11 @@ export class ReferencingService {
         throw new BadRequestException('User ID is required');
       }
 
+      console.log('Received agent details data:', data);
+
+      const documentId = `agent_details_${data.userId}`;
       const newData = {
-        id: `agent_${data.userId}`,
+        id: documentId,
         ...data,
         type: 'agent_details',
         createdAt: new Date().toISOString(),
@@ -179,15 +182,29 @@ export class ReferencingService {
       };
 
       try {
-        const { resource } = await this.container.items.create(newData);
-        return { success: true, message: 'Agent details saved successfully', data: resource };
-      } catch (createError: any) {
-        if (createError.code === 409) {
-          const { resource } = await this.container.item(newData.id).replace(newData);
+        // First try to read the existing document
+        const { resource: existingDoc } = await this.container.item(documentId, documentId).read();
+
+        if (existingDoc) {
+          // Update existing document
+          const { resource } = await this.container.item(documentId, documentId).replace({
+            ...existingDoc,
+            ...newData,
+            updatedAt: new Date().toISOString()
+          });
           return { success: true, message: 'Agent details updated successfully', data: resource };
         }
-        throw createError;
+      } catch (error) {
+        if (error.code !== 404) {
+          throw error;
+        }
+        // Document doesn't exist, continue to creation
       }
+
+      // Create new document
+      const { resource } = await this.container.items.create(newData);
+      return { success: true, message: 'Agent details saved successfully', data: resource };
+
     } catch (error) {
       console.error('Error saving agent details:', error);
       throw error;

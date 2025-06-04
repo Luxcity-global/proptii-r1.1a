@@ -736,9 +736,9 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     return isComplete;
   };
 
-  const submitApplication = async (force = false) => {
+  const submitApplication = async (event?: React.MouseEvent<HTMLButtonElement>) => {
     const isComplete = checkFormCompleteness();
-    if (!isComplete && !force) {
+    if (!isComplete && !event) {
       setShowWarningModal(true);
       return;
     }
@@ -781,7 +781,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
     } catch (error) {
       console.error('Error submitting application:', error);
-      alert(error instanceof Error ? error.message : 'Failed to submit application');
+      alert(error instanceof Error ? error.message : 'Failed to submit application. Please try again later.');
     } finally {
       setIsSubmitting(false);
     }
@@ -813,7 +813,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               Cancel
             </button>
             <button
-              onClick={() => submitApplication(true)}
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => submitApplication(e)}
               className="px-4 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors"
               disabled={isSubmitting}
             >

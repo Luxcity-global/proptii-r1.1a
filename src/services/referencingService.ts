@@ -76,6 +76,7 @@ class ReferencingService {
           console.warn('API save timeout');
           if (retryCount < 3) {
             console.log(`Retrying save attempt ${retryCount + 1}/3`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
             return this.saveToCosmosDB(endpoint, data, retryCount + 1);
           }
         }
@@ -97,7 +98,12 @@ class ReferencingService {
               throw new Error('Authentication failed. Please check your credentials.');
 
             case 404:
-              throw new Error('The requested resource was not found.');
+              // For 404, try to create the resource
+              if (retryCount < 1) {
+                console.log('Resource not found, attempting to create...');
+                return this.saveToCosmosDB(endpoint.replace('/update/', '/create/'), data, retryCount + 1);
+              }
+              throw new Error('The requested resource could not be created.');
 
             case 409:
               throw new Error('Conflict detected. Please refresh and try again.');
@@ -108,10 +114,11 @@ class ReferencingService {
             default:
               if (statusCode >= 500) {
                 if (retryCount < 3) {
+                  console.log(`Server error (${statusCode}), retrying...`);
                   await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
                   return this.saveToCosmosDB(endpoint, data, retryCount + 1);
                 }
-                throw new Error('Server error. Please try again later.');
+                throw new Error(`Server error (${statusCode}). Please try again later.`);
               }
           }
         }
