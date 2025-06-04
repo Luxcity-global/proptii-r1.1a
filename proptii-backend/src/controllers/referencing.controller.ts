@@ -1,5 +1,6 @@
-import { Controller, Post, Body, Get, Param, HttpCode } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, HttpCode, UseInterceptors, UploadedFiles } from '@nestjs/common';
 import { ReferencingService } from '../services/referencing.service';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 
 @Controller('referencing')
 export class ReferencingController {
@@ -60,5 +61,73 @@ export class ReferencingController {
     @Body() formData: any
   ) {
     return await this.referencingService.submitApplication(userId, formData);
+  }
+
+  @Post('send-email')
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'attachments', maxCount: 10 }]))
+  async sendEmail(
+    @Body() emailData: any,
+    @UploadedFiles() files: { attachments?: Express.Multer.File[] }
+  ) {
+    try {
+      const formData = JSON.parse(emailData.formData);
+      const attachments = files?.attachments?.map(file => ({
+        filename: file.originalname,
+        content: file.buffer
+      })) || [];
+
+      const result = await this.referencingService.sendEmail({
+        to: emailData.to,
+        subject: emailData.subject,
+        formData,
+        attachments,
+        submissionId: emailData.submissionId,
+        emailType: emailData.emailType || 'agent'
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Error sending email:', error);
+      throw error;
+    }
+  }
+
+  @Post('send-multiple-emails')
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'attachments', maxCount: 10 }]))
+  async sendMultipleEmails(
+    @Body() emailData: any,
+    @UploadedFiles() files: { attachments?: Express.Multer.File[] }
+  ) {
+    try {
+      const formData = JSON.parse(emailData.formData);
+      const attachments = files?.attachments?.map(file => ({
+        filename: file.originalname,
+        content: file.buffer
+      })) || [];
+
+      const results = await this.referencingService.sendMultipleEmails({
+        formData,
+        attachments,
+        submissionId: emailData.submissionId
+      });
+
+      return {
+        success: true,
+        results
+      };
+    } catch (error) {
+      console.error('Error sending multiple emails:', error);
+      throw error;
+    }
+  }
+
+  @Get('test-email-config')
+  async testEmailConfig() {
+    return await this.referencingService.testEmailConfig();
+  }
+
+  @Post('test-email')
+  async testEmail(@Body() data: { email: string }) {
+    return await this.referencingService.testEmail(data.email);
   }
 } 
