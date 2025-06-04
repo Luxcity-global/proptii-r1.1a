@@ -47,15 +47,6 @@ export interface ApplicationStatus {
   };
 }
 
-interface SubmissionResult {
-  success: boolean;
-  error?: string;
-  savedToCosmosDB?: boolean;
-  emailSent?: {
-    success: boolean;
-  };
-}
-
 class ReferencingService {
   private readonly API_URL = API_BASE_URL;
 
@@ -358,68 +349,105 @@ class ReferencingService {
     }
   }
 
-  async submitApplication(userId: string, data: { formData: any; isNewReference: boolean }): Promise<SubmissionResult> {
+  async submitApplication(userId: string, data: any): Promise<any> {
     try {
-      // Submit to Cosmos DB
-      const response = await axios.post(`${this.API_URL}/api/referencing/submit`, {
-        userId,
+      // First save all sections individually
+      const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'agentDetails'];
+      const savePromises = sections.map(section =>
+        this.saveFormSection(userId, section, data.formData[section])
+      );
+
+      await Promise.all(savePromises);
+
+      // Then submit the complete form
+      const formResult = await this.saveToCosmosDB(`/referencing/${userId}/submit`, {
         formData: data.formData,
-        isNewReference: data.isNewReference
+        userId
       });
 
-      if (!response.data.success) {
-        throw new Error(response.data.error || 'Failed to submit application');
+      if (!formResult.success) {
+        throw new Error(formResult.error || 'Failed to save complete form data');
       }
 
-      // Send emails
+      // Prepare and send emails to all recipients
       const emailPromises = [];
+      const attachments = this.prepareAttachments(data.formData);
 
-      // 1. Send confirmation email to applicant
-      if (data.formData.email) {
-        emailPromises.push(
-          axios.post(`${this.API_URL}/api/referencing/send-email`, {
-            to: data.formData.email,
-            subject: 'Your Referencing Application Has Been Submitted',
-            emailType: 'applicant',
-            formData: data.formData,
-            submissionId: response.data.submissionId
-          })
-        );
+      // 1. Send email to user
+      if (data.formData.identity?.email) {
+        emailPromises.push(emailService.sendEmail({
+          to: data.formData.identity.email,
+          subject: 'Your Referencing Application Has Been Submitted',
+          html: this.generateEmailContent('userSubmission', {
+            name: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
+            formData: data.formData
+          }),
+          attachments
+        }));
       }
 
-      // 2. Send notification to agent/landlord if email is provided
-      if (data.formData.previousLandlord) {
-        emailPromises.push(
-          axios.post(`${this.API_URL}/api/referencing/send-email`, {
-            to: data.formData.previousLandlord,
-            subject: 'New Referencing Application Received',
-            emailType: 'agent',
-            formData: data.formData,
-            submissionId: response.data.submissionId
-          })
-        );
+      // 2. Send email to agent
+      if (data.formData.agentDetails?.email) {
+        emailPromises.push(emailService.sendEmail({
+          to: data.formData.agentDetails.email,
+          subject: 'New Referencing Application Received',
+          html: this.generateEmailContent('agentNotification', {
+            applicantName: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
+            formData: data.formData
+          }),
+          attachments
+        }));
       }
 
-      // Wait for all emails to be sent
+      // 3. Send email to referee
+      if (data.formData.employment?.referenceEmail) {
+        emailPromises.push(emailService.sendEmail({
+          to: data.formData.employment.referenceEmail,
+          subject: 'Reference Request for Rental Application',
+          html: this.generateEmailContent('refereeRequest', {
+            refereeName: data.formData.employment.referenceFullName,
+            applicantName: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
+            formData: data.formData
+          }),
+          attachments: [] // Referee doesn't need attachments
+        }));
+      }
+
+      // 4. Send email to guarantor
+      if (data.formData.guarantor?.email) {
+        emailPromises.push(emailService.sendEmail({
+          to: data.formData.guarantor.email,
+          subject: 'Guarantor Request for Rental Application',
+          html: this.generateEmailContent('guarantorRequest', {
+            guarantorName: `${data.formData.guarantor.firstName} ${data.formData.guarantor.lastName}`,
+            applicantName: `${data.formData.identity.firstName} ${data.formData.identity.lastName}`,
+            formData: data.formData
+          }),
+          attachments: [] // Guarantor doesn't need attachments yet
+        }));
+      }
+
+      // Send all emails in parallel
       const emailResults = await Promise.allSettled(emailPromises);
       const emailSuccess = emailResults.every(result => result.status === 'fulfilled');
 
+      // Clear local storage on successful submission
+      if (formResult.success) {
+        this.clearLocalStorage(userId);
+      }
+
       return {
         success: true,
-        savedToCosmosDB: true,
-        emailSent: {
-          success: emailSuccess
-        }
+        formSubmission: formResult,
+        emailSent: { success: emailSuccess },
+        savedToCosmosDB: formResult.success
       };
     } catch (error) {
-      console.error('Error in submitApplication:', error);
+      console.error('Error submitting application:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to submit application',
-        savedToCosmosDB: false,
-        emailSent: {
-          success: false
-        }
+        savedToCosmosDB: false
       };
     }
   }
@@ -556,33 +584,56 @@ class ReferencingService {
     return this.saveFormSection(userId, 'agent', data);
   }
 
-  private async saveFormSection(userId: string, section: string, data: any): Promise<{ success: boolean; error?: string }> {
+  private async saveFormSection(userId: string, section: string, data: any) {
     try {
-      const response = await axios.post(`${this.API_URL}/api/referencing/save-section`, {
-        userId,
-        section,
-        data
+      // Save to backend API
+      const result = await this.saveToCosmosDB(`/referencing/${section}`, {
+        ...data,
+        userId
       });
 
-      return {
-        success: true
-      };
+      // Save to local storage as backup
+      await this.saveToLocalStorage(userId, section, data);
+
+      return result;
     } catch (error) {
-      console.error(`Error saving form section ${section}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to save form section'
-      };
+      console.error(`Error saving ${section} data:`, error);
+      throw error;
     }
   }
 
-  async getFormData(userId: string): Promise<any> {
+  async getFormData(userId: string) {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
     try {
-      const response = await axios.get(`${this.API_URL}/api/referencing/${userId}`);
+      // Try to get from CosmosDB first
+      const response = await axios.get(`${API_BASE_URL}/referencing/${userId}`, {
+        timeout: 30000 // 30 second timeout for slower production servers
+      });
+
       return response.data;
-    } catch (error) {
-      console.error('Error getting form data:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('Failed to get form data:', error);
+
+      // If CosmosDB fails, try to get from local storage
+      try {
+        const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'agentDetails'];
+        const localData: any = {};
+
+        sections.forEach(section => {
+          const data = localStorage.getItem(`referencing_${userId}_${section}`);
+          if (data) {
+            localData[section] = JSON.parse(data);
+          }
+        });
+
+        return localData;
+      } catch (localError) {
+        console.error('Failed to get data from local storage:', localError);
+        throw new Error('Failed to get form data from both backend API and local storage');
+      }
     }
   }
 }
