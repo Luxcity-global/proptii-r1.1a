@@ -1,6 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
+interface SendEmailParams {
+    to: string;
+    subject: string;
+    formData?: any;
+    attachments?: any[];
+    submissionId?: string;
+    emailType?: string;
+    html?: string;
+}
+
 @Injectable()
 export class EmailService {
     private transporter: nodemailer.Transporter;
@@ -38,46 +48,46 @@ export class EmailService {
         }
     }
 
-    async sendEmail({ to, subject, formData, attachments, submissionId, emailType = 'agent' }) {
+    async sendEmail(params: SendEmailParams) {
         try {
-            console.log('Preparing email with attachments:', {
-                to,
-                subject,
-                attachmentsCount: attachments?.length || 0,
-                submissionId,
-                emailType
+            console.log('Preparing email:', {
+                to: params.to,
+                subject: params.subject,
+                attachmentsCount: params.attachments?.length || 0,
+                submissionId: params.submissionId,
+                emailType: params.emailType
             });
 
-            // Parse formData if it's a string
-            const parsedFormData = typeof formData === 'string' ? JSON.parse(formData) : formData;
-
-            // Generate HTML content based on email type
-            let html;
-            switch (emailType) {
-                case 'referee':
-                    html = this.generateRefereeEmailTemplate(parsedFormData);
-                    break;
-                case 'guarantor':
-                    html = this.generateGuarantorEmailTemplate(parsedFormData);
-                    break;
-                case 'user':
-                    html = this.generateUserEmailTemplate(parsedFormData);
-                    break;
-                case 'viewing-agent':
-                    html = this.generateViewingAgentEmailTemplate(parsedFormData);
-                    break;
-                case 'viewing-user':
-                    html = this.generateViewingUserEmailTemplate(parsedFormData);
-                    break;
-                default:
-                    html = this.generateAgentEmailTemplate(parsedFormData);
+            // Generate HTML content based on email type and formData
+            let html = params.html;
+            if (params.formData) {
+                const parsedFormData = typeof params.formData === 'string' ? JSON.parse(params.formData) : params.formData;
+                switch (params.emailType) {
+                    case 'referee':
+                        html = this.generateRefereeEmailTemplate(parsedFormData);
+                        break;
+                    case 'guarantor':
+                        html = this.generateGuarantorEmailTemplate(parsedFormData);
+                        break;
+                    case 'user':
+                        html = this.generateUserEmailTemplate(parsedFormData);
+                        break;
+                    case 'viewing-agent':
+                        html = this.generateViewingAgentEmailTemplate(parsedFormData);
+                        break;
+                    case 'viewing-user':
+                        html = this.generateViewingUserEmailTemplate(parsedFormData);
+                        break;
+                    default:
+                        html = this.generateAgentEmailTemplate(parsedFormData);
+                }
             }
 
             // Create zip file of attachments if needed (only for agent emails)
             const emailAttachments = [];
-            if (emailType === 'agent' && attachments?.length > 0) {
+            if (params.emailType === 'agent' && params.attachments?.length > 0) {
                 // For agent emails, we expect a single zip file containing all documents
-                const zipAttachment = attachments[0];
+                const zipAttachment = params.attachments[0];
                 if (zipAttachment) {
                     emailAttachments.push({
                         filename: zipAttachment.filename,
@@ -90,16 +100,16 @@ export class EmailService {
             // Send email
             const result = await this.transporter.sendMail({
                 from: process.env.SMTP_FROM_EMAIL,
-                to,
-                subject,
+                to: params.to,
+                subject: params.subject,
                 html,
                 attachments: emailAttachments
             });
 
             console.log('Email sent successfully:', {
                 messageId: result.messageId,
-                to,
-                subject,
+                to: params.to,
+                subject: params.subject,
                 attachmentsIncluded: emailAttachments.length > 0
             });
 
@@ -148,6 +158,7 @@ export class EmailService {
                         to: employment.referenceEmail,
                         subject: `Reference Request for ${identity.firstName} ${identity.lastName}`,
                         formData: parsedFormData,
+                        attachments: [],
                         submissionId,
                         emailType: 'referee'
                     });
@@ -165,6 +176,7 @@ export class EmailService {
                         to: guarantor.email,
                         subject: `You've Been Chosen as a Guarantor by ${identity.firstName} ${identity.lastName}`,
                         formData: parsedFormData,
+                        attachments: [],
                         submissionId,
                         emailType: 'guarantor'
                     });
@@ -182,6 +194,7 @@ export class EmailService {
                         to: identity.email,
                         subject: 'Summary of Referencing Details Submitted',
                         formData: parsedFormData,
+                        attachments: [],
                         submissionId,
                         emailType: 'user'
                     });
