@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.VITE_API_URL || 'http://localhost:10000/api';
+// Get the API URL from environment variables
+const API_BASE_URL = process.env.VITE_API_URL || 'https://proptii-r1-1a.onrender.com/api';
+
+console.log('Using API URL:', API_BASE_URL);
 
 class ReferencingService {
   async saveIdentityData(data: any) {
