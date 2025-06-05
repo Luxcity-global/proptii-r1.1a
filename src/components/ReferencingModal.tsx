@@ -705,75 +705,22 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   };
 
   const checkFormCompleteness = () => {
-    // Check if all required fields are filled
-    const isComplete =
-      // Identity section
-      Boolean(formData.identity?.firstName) &&
-      Boolean(formData.identity?.lastName) &&
-      Boolean(formData.identity?.email) &&
-      Boolean(formData.identity?.phoneNumber) &&
-      Boolean(formData.identity?.dateOfBirth) &&
-      Boolean(formData.identity?.nationality) &&
-      Boolean(formData.identity?.identityProof) &&
-
-      // Employment section
-      Boolean(formData.employment?.employmentStatus) &&
-      Boolean(formData.employment?.companyDetails) &&
-      Boolean(formData.employment?.lengthOfEmployment) &&
-      Boolean(formData.employment?.jobPosition) &&
-      Boolean(formData.employment?.referenceFullName) &&
-      Boolean(formData.employment?.referenceEmail) &&
-      Boolean(formData.employment?.referencePhone) &&
-      Boolean(formData.employment?.proofType) &&
-      Boolean(formData.employment?.proofDocument) &&
-
-      // Residential section
-      Boolean(formData.residential?.currentAddress) &&
-      Boolean(formData.residential?.durationAtCurrentAddress) &&
-      Boolean(formData.residential?.previousAddress) &&
-      Boolean(formData.residential?.durationAtPreviousAddress) &&
-      Boolean(formData.residential?.reasonForLeaving) &&
-      Boolean(formData.residential?.proofType) &&
-      Boolean(formData.residential?.proofDocument) &&
-
-      // Financial section
-      Boolean(formData.financial?.monthlyIncome) &&
-      Boolean(formData.financial?.proofOfIncomeType) &&
-      Boolean(formData.financial?.proofOfIncomeDocument) &&
-
-      // Guarantor section
-      Boolean(formData.guarantor?.firstName) &&
-      Boolean(formData.guarantor?.lastName) &&
-      Boolean(formData.guarantor?.email) &&
-      Boolean(formData.guarantor?.phoneNumber) &&
-      Boolean(formData.guarantor?.address) &&
-      Boolean(formData.guarantor?.identityDocument) &&
-
-      // Agent details section
-      Boolean(formData.agentDetails?.firstName) &&
-      Boolean(formData.agentDetails?.lastName) &&
-      Boolean(formData.agentDetails?.email) &&
-      Boolean(formData.agentDetails?.phoneNumber) &&
-      Boolean(formData.agentDetails?.hasAgreedToCheck);
-
-    // Update step status based on individual section completeness
-    setStepStatus({
-      1: isComplete ? 'complete' : 'partial',
-      2: isComplete ? 'complete' : 'partial',
-      3: isComplete ? 'complete' : 'partial',
-      4: isComplete ? 'complete' : 'partial',
-      5: isComplete ? 'complete' : 'partial',
-      6: isComplete ? 'complete' : 'partial',
-      7: isComplete ? 'complete' : 'partial'
+    // Check if all required steps are complete (green status)
+    const isComplete = Object.values(stepStatus).every((status, index) => {
+      // Skip credit check step (index 5) as it's optional
+      if (index === 5) return true;
+      return status === 'complete';
     });
 
     setIsFormComplete(isComplete);
     return isComplete;
   };
 
-  const submitApplication = async (event?: React.MouseEvent<HTMLButtonElement>) => {
+  const submitApplication = async (forceSubmit: boolean = false) => {
     const isComplete = checkFormCompleteness();
-    if (!isComplete && !event) {
+
+    // Only show warning if not complete and not forcing submission
+    if (!isComplete && !forceSubmit) {
       setShowWarningModal(true);
       return;
     }
@@ -816,7 +763,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
     } catch (error) {
       console.error('Error submitting application:', error);
-      alert(error instanceof Error ? error.message : 'Failed to submit application. Please try again later.');
+      toast.error(error instanceof Error ? error.message : 'Failed to submit application. Please try again later.');
     } finally {
       setIsSubmitting(false);
     }
@@ -848,7 +795,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               Cancel
             </button>
             <button
-              onClick={(e: React.MouseEvent<HTMLButtonElement>) => submitApplication(e)}
+              onClick={() => submitApplication(true)}
               className="px-4 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors"
               disabled={isSubmitting}
             >
@@ -1733,7 +1680,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                 </button>
               ) : (
                 <button
-                  onClick={submitApplication}
+                  onClick={() => {
+                    const isComplete = checkFormCompleteness();
+                    if (!isComplete) {
+                      setShowWarningModal(true);
+                    } else {
+                      submitApplication();
+                    }
+                  }}
                   className="px-6 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                   disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck}
                 >
