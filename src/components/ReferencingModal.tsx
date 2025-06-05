@@ -600,22 +600,40 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       let saveResult;
       switch (currentStep) {
         case 1:
-          saveResult = await referencingService.saveIdentityData(user.id, formData.identity);
+          saveResult = await referencingService.saveIdentityData(user.id, {
+            ...formData.identity,
+            userId: user.id
+          });
           break;
         case 2:
-          saveResult = await referencingService.saveEmploymentData(user.id, formData.employment);
+          saveResult = await referencingService.saveEmploymentData(user.id, {
+            ...formData.employment,
+            userId: user.id
+          });
           break;
         case 3:
-          saveResult = await referencingService.saveResidentialData(user.id, formData.residential);
+          saveResult = await referencingService.saveResidentialData(user.id, {
+            ...formData.residential,
+            userId: user.id
+          });
           break;
         case 4:
-          saveResult = await referencingService.saveFinancialData(user.id, formData.financial);
+          saveResult = await referencingService.saveFinancialData(user.id, {
+            ...formData.financial,
+            userId: user.id
+          });
           break;
         case 5:
-          saveResult = await referencingService.saveGuarantorData(user.id, formData.guarantor);
+          saveResult = await referencingService.saveGuarantorData(user.id, {
+            ...formData.guarantor,
+            userId: user.id
+          });
           break;
         case 7:
-          saveResult = await referencingService.saveAgentDetailsData(user.id, formData.agentDetails);
+          saveResult = await referencingService.saveAgentDetailsData(user.id, {
+            ...formData.agentDetails,
+            userId: user.id
+          });
           break;
         default:
           saveResult = { success: true }; // Credit check step doesn't need saving
@@ -631,9 +649,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         [currentStep]: new Date()
       }));
 
+      return true;
     } catch (error) {
       console.error('Error in save operation:', error);
       alert(error instanceof Error ? error.message : 'Failed to save data');
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -736,34 +756,37 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     return isComplete;
   };
 
-  const submitApplication = async (event?: React.MouseEvent<HTMLButtonElement>) => {
-    const isComplete = checkFormCompleteness();
-    if (!isComplete && !event) {
-      setShowWarningModal(true);
-      return;
-    }
-
+  const submitApplication = async () => {
     try {
       setIsSubmitting(true);
-      await saveCurrentStep();
-      const userId = user?.id;
+      const saveSuccess = await saveCurrentStep();
 
+      if (!saveSuccess) {
+        throw new Error('Failed to save current step');
+      }
+
+      const userId = user?.id;
       if (!userId) {
         throw new Error('User ID is required for submission');
       }
 
       // Get agent details from the form data
       const agentEmail = formData.agentDetails?.email;
-
       if (!agentEmail) {
         throw new Error('Agent email is required. Please complete the Agent Details section.');
       }
 
       // Submit the application
       const result = await referencingService.submitApplication(userId, {
-        formData,
-        emailContent: null,
-        isNewReference: true
+        formData: {
+          ...formData,
+          identity: { ...formData.identity, userId },
+          employment: { ...formData.employment, userId },
+          residential: { ...formData.residential, userId },
+          financial: { ...formData.financial, userId },
+          guarantor: { ...formData.guarantor, userId },
+          agentDetails: { ...formData.agentDetails, userId }
+        }
       });
 
       if (!result.success) {
@@ -771,7 +794,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       }
 
       // Show success message and clean up
-      if (result.savedToCosmosDB && result.emailSent?.success) {
+      if (result.sections && result.emailResults?.success) {
         setShowSuccessModal(true);
         setShowWarningModal(false);
         localStorage.setItem(`referencing_${userId}_submitted`, 'true');
@@ -779,9 +802,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         throw new Error('Failed to complete submission process');
       }
 
+      return true;
     } catch (error) {
       console.error('Error submitting application:', error);
       alert(error instanceof Error ? error.message : 'Failed to submit application. Please try again later.');
+      return false;
     } finally {
       setIsSubmitting(false);
     }
@@ -813,7 +838,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               Cancel
             </button>
             <button
-              onClick={(e: React.MouseEvent<HTMLButtonElement>) => submitApplication(e)}
+              onClick={submitApplication}
               className="px-4 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors"
               disabled={isSubmitting}
             >

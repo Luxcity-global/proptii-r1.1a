@@ -9,30 +9,45 @@ export class ReferencingController {
   @Post('identity')
   @HttpCode(200)
   async saveIdentityData(@Body() data: any) {
+    if (!data.userId) {
+      throw new Error('User ID is required');
+    }
     return await this.referencingService.saveIdentityData(data);
   }
 
   @Post('employment')
   @HttpCode(200)
   async saveEmploymentData(@Body() data: any) {
+    if (!data.userId) {
+      throw new Error('User ID is required');
+    }
     return await this.referencingService.saveEmploymentData(data);
   }
 
   @Post('residential')
   @HttpCode(200)
   async saveResidentialData(@Body() data: any) {
+    if (!data.userId) {
+      throw new Error('User ID is required');
+    }
     return await this.referencingService.saveResidentialData(data);
   }
 
   @Post('financial')
   @HttpCode(200)
   async saveFinancialData(@Body() data: any) {
+    if (!data.userId) {
+      throw new Error('User ID is required');
+    }
     return await this.referencingService.saveFinancialData(data);
   }
 
   @Post('guarantor')
   @HttpCode(200)
   async saveGuarantorData(@Body() data: any) {
+    if (!data.userId) {
+      throw new Error('User ID is required');
+    }
     return await this.referencingService.saveGuarantorData(data);
   }
 
@@ -40,6 +55,9 @@ export class ReferencingController {
   @HttpCode(200)
   async saveAgentDetailsData(@Body() data: any) {
     try {
+      if (!data.userId) {
+        throw new Error('User ID is required');
+      }
       console.log('Received agent details data:', data);
       const result = await this.referencingService.saveAgentDetailsData(data);
       return result;

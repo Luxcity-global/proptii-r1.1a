@@ -14,151 +14,57 @@ export class ReferencingService {
     this.container = database.container('References');
   }
 
-  async saveIdentityData(data: any): Promise<any> {
+  private async saveFormSection(section: string, data: any): Promise<any> {
     try {
       if (!data.userId) {
         throw new BadRequestException('User ID is required');
       }
 
-      const documentId = `identity_${data.userId}`;
+      const documentId = `${section}_${data.userId}`;
       const newData = {
         id: documentId,
         ...data,
-        type: 'identity',
+        type: section,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
       const { resource } = await this.container.items.upsert(newData);
+      console.log(`${section} data saved:`, {
+        id: resource.id,
+        userId: data.userId,
+        type: section
+      });
       return resource;
-
     } catch (error) {
-      console.error('Error saving identity data:', error);
+      console.error(`Error saving ${section} data:`, error);
       throw error;
     }
+  }
+
+  async saveIdentityData(data: any): Promise<any> {
+    return this.saveFormSection('identity', data);
   }
 
   async saveEmploymentData(data: any): Promise<any> {
-    try {
-      if (!data.userId) {
-        throw new BadRequestException('User ID is required');
-      }
-
-      const documentId = `employment_${data.userId}`;
-      const newData = {
-        id: documentId,
-        ...data,
-        type: 'employment',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      const { resource } = await this.container.items.upsert(newData);
-      return resource;
-
-    } catch (error) {
-      console.error('Error saving employment data:', error);
-      throw error;
-    }
+    return this.saveFormSection('employment', data);
   }
 
   async saveResidentialData(data: any): Promise<any> {
-    try {
-      if (!data.userId) {
-        throw new BadRequestException('User ID is required');
-      }
-
-      const documentId = `residential_${data.userId}`;
-      const newData = {
-        id: documentId,
-        ...data,
-        type: 'residential',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      const { resource } = await this.container.items.upsert(newData);
-      return resource;
-
-    } catch (error) {
-      console.error('Error saving residential data:', error);
-      throw error;
-    }
+    return this.saveFormSection('residential', data);
   }
 
   async saveFinancialData(data: any): Promise<any> {
-    try {
-      if (!data.userId) {
-        throw new BadRequestException('User ID is required');
-      }
-
-      const documentId = `financial_${data.userId}`;
-      const newData = {
-        id: documentId,
-        ...data,
-        type: 'financial',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      const { resource } = await this.container.items.upsert(newData);
-      return resource;
-
-    } catch (error) {
-      console.error('Error saving financial data:', error);
-      throw error;
-    }
+    return this.saveFormSection('financial', data);
   }
 
   async saveGuarantorData(data: any): Promise<any> {
-    try {
-      if (!data.userId) {
-        throw new BadRequestException('User ID is required');
-      }
-
-      const documentId = `guarantor_${data.userId}`;
-      const newData = {
-        id: documentId,
-        ...data,
-        type: 'guarantor',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      const { resource } = await this.container.items.upsert(newData);
-      return resource;
-
-    } catch (error) {
-      console.error('Error saving guarantor data:', error);
-      throw error;
-    }
+    return this.saveFormSection('guarantor', data);
   }
 
   async saveAgentDetailsData(data: any): Promise<any> {
-    try {
-      if (!data.userId) {
-        throw new BadRequestException('User ID is required');
-      }
-
-      console.log('Received agent details data:', data);
-
-      const documentId = `agent_details_${data.userId}`;
-      const newData = {
-        id: documentId,
-        ...data,
-        type: 'agent_details',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      // Use upsert instead of replace
-      const { resource } = await this.container.items.upsert(newData);
-      return resource;
-
-    } catch (error) {
-      console.error('Error saving agent details:', error);
-      throw error;
-    }
+    console.log('Received agent details data:', data);
+    return this.saveFormSection('agent_details', data);
   }
 
   async getFormData(userId: string): Promise<any> {
@@ -181,40 +87,26 @@ export class ReferencingService {
 
       return formData;
     } catch (error) {
-      throw new Error('Error getting form data: ' + error.message);
+      console.error('Error getting form data:', error);
+      throw error;
     }
   }
 
   async submitApplication(userId: string, formData: any): Promise<any> {
     try {
-      // Helper function to save section data
-      const saveSectionData = async (section: string, data: any) => {
-        try {
-          const documentId = `${section}_${userId}`;
-          const sectionData = {
-            id: documentId,
-            ...data,
-            userId,
-            type: section,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-
-          // Use upsert instead of replace/create
-          const { resource } = await this.container.items.upsert(sectionData);
-          return resource;
-        } catch (error) {
-          throw new Error(`Error saving ${section} data: ${error.message}`);
-        }
-      };
-
-      // Save all sections of the form
+      // Save all sections first
       const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'agentDetails'];
       const savedSections = await Promise.all(
-        sections.map(section => saveSectionData(section, formData[section]))
+        sections.map(section => {
+          const sectionData = {
+            ...formData[section],
+            userId
+          };
+          return this.saveFormSection(section === 'agentDetails' ? 'agent_details' : section, sectionData);
+        })
       );
 
-      // Create or update application status using upsert
+      // Create application status
       const statusDocumentId = `application_status_${userId}`;
       const statusData = {
         id: statusDocumentId,
@@ -223,19 +115,32 @@ export class ReferencingService {
         status: 'Submitted',
         submittedAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        sections: savedSections.map(section => section.id)
       };
 
       await this.container.items.upsert(statusData);
+      console.log('Application status saved:', {
+        id: statusDocumentId,
+        userId,
+        status: 'Submitted'
+      });
+
+      // Send emails
+      const emailResults = await this.emailService.sendMultipleEmails({
+        formData,
+        submissionId: statusDocumentId
+      });
 
       return {
         success: true,
         message: 'Application submitted successfully',
-        sections: savedSections
+        sections: savedSections,
+        emailResults
       };
     } catch (error) {
       console.error('Error submitting application:', error);
-      throw new Error('Error submitting application: ' + error.message);
+      throw error;
     }
   }
 
