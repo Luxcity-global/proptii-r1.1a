@@ -762,11 +762,15 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       setIsSubmitting(true);
       setShowWarningModal(false);
 
+      if (!user?.id) {
+        throw new Error('User ID is required for submission');
+      }
+
       // Save current step first
       await saveCurrentStep();
 
       // Submit the application
-      const result = await referencingService.submitApplication(user?.id, {
+      const result = await referencingService.submitApplication(user.id, {
         formData: formData
       });
 
@@ -774,11 +778,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       if (result.success && result.emailSent?.success) {
         setShowSuccessModal(true);
         setShowWarningModal(false);
-        localStorage.setItem(`referencing_${user?.id}_submitted`, 'true');
+        localStorage.setItem(`referencing_${user.id}_submitted`, 'true');
 
         // Clear form data from local storage
         Object.keys(localStorage).forEach(key => {
-          if (key.startsWith(`referencing_${user?.id}`)) {
+          if (key.startsWith(`referencing_${user.id}`)) {
             localStorage.removeItem(key);
           }
         });
@@ -850,7 +854,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       }
     } catch (error) {
       console.error('Error submitting application:', error);
-      toast.error('Failed to submit application. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to submit application. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
