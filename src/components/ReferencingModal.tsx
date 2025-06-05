@@ -597,13 +597,19 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(formData));
       localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
 
-      // Save to Cosmos DB based on current step
-      let saveResult;
+      // Get current section data
+      const section = getCurrentSection();
+      if (!section) {
+        return; // Skip saving for credit check step
+      }
+
       const currentSectionData = {
-        ...formData[getCurrentSection()],
+        ...formData[section],
         userId: user.id
       };
 
+      // Save to Cosmos DB based on current step
+      let saveResult;
       switch (currentStep) {
         case 1:
           saveResult = await referencingService.saveIdentityData(currentSectionData);
