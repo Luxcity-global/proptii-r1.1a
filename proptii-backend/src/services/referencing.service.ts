@@ -252,9 +252,18 @@ export class ReferencingService {
       const { resource: submission } = await this.container.items.upsert(submissionData);
       console.log('Application submitted successfully:', submission.id);
 
-      // Send emails
+      // Prepare attachments from form data
+      const attachments = [];
+      if (formData.identity?.identityProof) attachments.push(formData.identity.identityProof);
+      if (formData.employment?.proofDocument) attachments.push(formData.employment.proofDocument);
+      if (formData.residential?.proofDocument) attachments.push(formData.residential.proofDocument);
+      if (formData.financial?.proofOfIncomeDocument) attachments.push(formData.financial.proofOfIncomeDocument);
+      if (formData.guarantor?.identityDocument) attachments.push(formData.guarantor.identityDocument);
+
+      // Send emails with attachments
       const emailResults = await this.emailService.sendMultipleEmails({
         formData,
+        attachments,
         submissionId: submission.id
       });
 
