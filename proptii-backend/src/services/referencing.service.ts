@@ -211,13 +211,16 @@ export class ReferencingService {
     }
   }
 
-  async submitApplication(userId: string, formData: any): Promise<any> {
+  async submitApplication(userId: string, data: any): Promise<any> {
     try {
       if (!userId) {
         throw new BadRequestException('User ID is required');
       }
 
       console.log('Submitting application for user:', userId);
+
+      // Extract formData from the request
+      const formData = data.formData;
 
       // Save all sections first
       const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'agentDetails'];
@@ -269,8 +272,9 @@ export class ReferencingService {
 
       return {
         success: true,
-        data: submission,
-        emailResults
+        savedToCosmosDB: true,
+        emailSent: emailResults,
+        data: submission
       };
 
     } catch (error) {

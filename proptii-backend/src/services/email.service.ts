@@ -136,69 +136,71 @@ export class EmailService {
             const parsedFormData = typeof formData === 'string' ? JSON.parse(formData) : formData;
             const { identity, employment, guarantor, agentDetails } = parsedFormData;
 
-            // 1. Send email to agent (original functionality)
-            try {
-                const agentResult = await this.sendEmail({
-                    to: agentDetails.email,
-                    subject: `New Referencing Application from ${identity.firstName} ${identity.lastName}`,
-                    formData: parsedFormData,
-                    attachments,
-                    submissionId,
-                    emailType: 'agent'
-                });
-                results.agent = agentResult.success;
-            } catch (error) {
-                console.error('Error sending email to agent:', error);
+            // 1. Send email to agent with all attachments
+            if (agentDetails?.email) {
+                try {
+                    const agentResult = await this.sendEmail({
+                        to: agentDetails.email,
+                        subject: `New Referencing Application from ${identity.firstName} ${identity.lastName}`,
+                        formData: parsedFormData,
+                        attachments, // Only agent gets all attachments
+                        submissionId,
+                        emailType: 'agent'
+                    });
+                    results.agent = agentResult.success;
+                } catch (error) {
+                    console.error('Error sending email to agent:', error);
+                }
             }
 
-            // 2. Send email to referee
-            if (employment.referenceEmail) {
+            // 2. Send email to referee (no attachments)
+            if (employment?.referenceEmail) {
                 try {
                     const refereeResult = await this.sendEmail({
                         to: employment.referenceEmail,
                         subject: `Reference Request for ${identity.firstName} ${identity.lastName}`,
                         formData: parsedFormData,
-                        attachments: [],
+                        attachments: [], // No attachments for referee
                         submissionId,
                         emailType: 'referee'
                     });
-                    results.referee = true;
+                    results.referee = refereeResult.success;
                     console.log('Referee email sent:', refereeResult.messageId);
                 } catch (error) {
                     console.error('Error sending email to referee:', error);
                 }
             }
 
-            // 3. Send email to guarantor
-            if (guarantor.email) {
+            // 3. Send email to guarantor (no attachments)
+            if (guarantor?.email) {
                 try {
                     const guarantorResult = await this.sendEmail({
                         to: guarantor.email,
                         subject: `You've Been Chosen as a Guarantor by ${identity.firstName} ${identity.lastName}`,
                         formData: parsedFormData,
-                        attachments: [],
+                        attachments: [], // No attachments for guarantor
                         submissionId,
                         emailType: 'guarantor'
                     });
-                    results.guarantor = true;
+                    results.guarantor = guarantorResult.success;
                     console.log('Guarantor email sent:', guarantorResult.messageId);
                 } catch (error) {
                     console.error('Error sending email to guarantor:', error);
                 }
             }
 
-            // 4. Send summary email to user
-            if (identity.email) {
+            // 4. Send summary email to user (no attachments)
+            if (identity?.email) {
                 try {
                     const userResult = await this.sendEmail({
                         to: identity.email,
-                        subject: 'Summary of Referencing Details Submitted',
+                        subject: 'Summary of Your Referencing Application',
                         formData: parsedFormData,
-                        attachments: [],
+                        attachments: [], // No attachments for user
                         submissionId,
                         emailType: 'user'
                     });
-                    results.user = true;
+                    results.user = userResult.success;
                     console.log('User summary email sent:', userResult.messageId);
                 } catch (error) {
                     console.error('Error sending email to user:', error);
@@ -206,10 +208,11 @@ export class EmailService {
             }
 
             return {
-                success: results.agent, // Consider main success based on agent email
+                success: Object.values(results).some(result => result), // Success if at least one email sent
                 allEmailsSent: results,
                 messageId: submissionId
             };
+
         } catch (error) {
             console.error('Error in sendMultipleEmails:', error);
             throw error;
