@@ -14,78 +14,197 @@ export class ReferencingService {
     this.container = database.container('References');
   }
 
-  private async saveFormSection(section: string, data: any): Promise<any> {
+  async saveIdentityData(data: any): Promise<any> {
     try {
       if (!data.userId) {
         throw new BadRequestException('User ID is required');
       }
 
-      const documentId = `${section}_${data.userId}`;
+      console.log('Saving identity data:', data);
+
+      const documentId = `identity_${data.userId}`;
       const newData = {
         id: documentId,
         ...data,
-        type: section,
+        type: 'identity',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
       const { resource } = await this.container.items.upsert(newData);
-      console.log(`${section} data saved:`, {
-        id: resource.id,
-        userId: data.userId,
-        type: section
-      });
-      return resource;
+      console.log('Identity data saved successfully:', resource.id);
+      return { success: true, data: resource };
+
     } catch (error) {
-      console.error(`Error saving ${section} data:`, error);
+      console.error('Error saving identity data:', error);
       throw error;
     }
   }
 
-  async saveIdentityData(data: any): Promise<any> {
-    return this.saveFormSection('identity', data);
-  }
-
   async saveEmploymentData(data: any): Promise<any> {
-    return this.saveFormSection('employment', data);
+    try {
+      if (!data.userId) {
+        throw new BadRequestException('User ID is required');
+      }
+
+      console.log('Saving employment data:', data);
+
+      const documentId = `employment_${data.userId}`;
+      const newData = {
+        id: documentId,
+        ...data,
+        type: 'employment',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const { resource } = await this.container.items.upsert(newData);
+      console.log('Employment data saved successfully:', resource.id);
+      return { success: true, data: resource };
+
+    } catch (error) {
+      console.error('Error saving employment data:', error);
+      throw error;
+    }
   }
 
   async saveResidentialData(data: any): Promise<any> {
-    return this.saveFormSection('residential', data);
+    try {
+      if (!data.userId) {
+        throw new BadRequestException('User ID is required');
+      }
+
+      console.log('Saving residential data:', data);
+
+      const documentId = `residential_${data.userId}`;
+      const newData = {
+        id: documentId,
+        ...data,
+        type: 'residential',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const { resource } = await this.container.items.upsert(newData);
+      console.log('Residential data saved successfully:', resource.id);
+      return { success: true, data: resource };
+
+    } catch (error) {
+      console.error('Error saving residential data:', error);
+      throw error;
+    }
   }
 
   async saveFinancialData(data: any): Promise<any> {
-    return this.saveFormSection('financial', data);
+    try {
+      if (!data.userId) {
+        throw new BadRequestException('User ID is required');
+      }
+
+      console.log('Saving financial data:', data);
+
+      const documentId = `financial_${data.userId}`;
+      const newData = {
+        id: documentId,
+        ...data,
+        type: 'financial',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const { resource } = await this.container.items.upsert(newData);
+      console.log('Financial data saved successfully:', resource.id);
+      return { success: true, data: resource };
+
+    } catch (error) {
+      console.error('Error saving financial data:', error);
+      throw error;
+    }
   }
 
   async saveGuarantorData(data: any): Promise<any> {
-    return this.saveFormSection('guarantor', data);
+    try {
+      if (!data.userId) {
+        throw new BadRequestException('User ID is required');
+      }
+
+      console.log('Saving guarantor data:', data);
+
+      const documentId = `guarantor_${data.userId}`;
+      const newData = {
+        id: documentId,
+        ...data,
+        type: 'guarantor',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const { resource } = await this.container.items.upsert(newData);
+      console.log('Guarantor data saved successfully:', resource.id);
+      return { success: true, data: resource };
+
+    } catch (error) {
+      console.error('Error saving guarantor data:', error);
+      throw error;
+    }
   }
 
   async saveAgentDetailsData(data: any): Promise<any> {
-    console.log('Received agent details data:', data);
-    return this.saveFormSection('agent_details', data);
+    try {
+      if (!data.userId) {
+        throw new BadRequestException('User ID is required');
+      }
+
+      console.log('Saving agent details data:', data);
+
+      const documentId = `agent_details_${data.userId}`;
+      const newData = {
+        id: documentId,
+        ...data,
+        type: 'agent_details',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const { resource } = await this.container.items.upsert(newData);
+      console.log('Agent details saved successfully:', resource.id);
+      return { success: true, data: resource };
+
+    } catch (error) {
+      console.error('Error saving agent details:', error);
+      throw error;
+    }
   }
 
   async getFormData(userId: string): Promise<any> {
     try {
-      const { resources } = await this.container.items
-        .query({
-          query: 'SELECT * FROM c WHERE c.userId = @userId',
-          parameters: [{ name: '@userId', value: userId }]
-        })
-        .fetchAll();
+      if (!userId) {
+        throw new BadRequestException('User ID is required');
+      }
 
-      const formData = {
-        identity: resources.find(r => r.type === 'identity') || {},
-        employment: resources.find(r => r.type === 'employment') || {},
-        residential: resources.find(r => r.type === 'residential') || {},
-        financial: resources.find(r => r.type === 'financial') || {},
-        guarantor: resources.find(r => r.type === 'guarantor') || {},
-        agentDetails: resources.find(r => r.type === 'agent_details') || {}
+      console.log('Fetching form data for user:', userId);
+
+      // Query all documents for this user
+      const querySpec = {
+        query: 'SELECT * FROM c WHERE c.userId = @userId',
+        parameters: [{ name: '@userId', value: userId }]
       };
 
-      return formData;
+      const { resources } = await this.container.items.query(querySpec).fetchAll();
+
+      // Organize data by type
+      const formData = {
+        identity: resources.find(r => r.type === 'identity'),
+        employment: resources.find(r => r.type === 'employment'),
+        residential: resources.find(r => r.type === 'residential'),
+        financial: resources.find(r => r.type === 'financial'),
+        guarantor: resources.find(r => r.type === 'guarantor'),
+        agentDetails: resources.find(r => r.type === 'agent_details')
+      };
+
+      console.log('Form data retrieved successfully');
+      return { success: true, data: formData };
+
     } catch (error) {
       console.error('Error getting form data:', error);
       throw error;
@@ -94,84 +213,57 @@ export class ReferencingService {
 
   async submitApplication(userId: string, formData: any): Promise<any> {
     try {
+      if (!userId) {
+        throw new BadRequestException('User ID is required');
+      }
+
+      console.log('Submitting application for user:', userId);
+
       // Save all sections first
       const sections = ['identity', 'employment', 'residential', 'financial', 'guarantor', 'agentDetails'];
       const savedSections = await Promise.all(
         sections.map(section => {
-          const sectionData = {
-            ...formData[section],
+          const sectionData = formData[section];
+          if (!sectionData) {
+            console.warn(`Missing ${section} data in submission`);
+            return null;
+          }
+          return this[`save${section.charAt(0).toUpperCase() + section.slice(1)}Data`]({
+            ...sectionData,
             userId
-          };
-          return this.saveFormSection(section === 'agentDetails' ? 'agent_details' : section, sectionData);
+          });
         })
       );
 
-      // Create application status
-      const statusDocumentId = `application_status_${userId}`;
-      const statusData = {
-        id: statusDocumentId,
+      // Create submission record
+      const submissionId = `submission_${userId}_${Date.now()}`;
+      const submissionData = {
+        id: submissionId,
         userId,
-        type: 'application_status',
-        status: 'Submitted',
+        type: 'submission',
+        status: 'submitted',
+        formData,
+        sections: savedSections.filter(s => s).map(s => s.data.id),
         submittedAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        sections: savedSections.map(section => section.id)
+        updatedAt: new Date().toISOString()
       };
 
-      await this.container.items.upsert(statusData);
-      console.log('Application status saved:', {
-        id: statusDocumentId,
-        userId,
-        status: 'Submitted'
-      });
+      const { resource: submission } = await this.container.items.upsert(submissionData);
+      console.log('Application submitted successfully:', submission.id);
 
-      // Prepare attachments from form data
-      const attachments = [];
-      if (formData.identity?.identityProof) {
-        attachments.push({
-          filename: `identity_proof_${formData.identity.firstName}_${formData.identity.lastName}`,
-          content: formData.identity.identityProof
-        });
-      }
-      if (formData.employment?.proofDocument) {
-        attachments.push({
-          filename: `employment_proof_${formData.identity.firstName}_${formData.identity.lastName}`,
-          content: formData.employment.proofDocument
-        });
-      }
-      if (formData.residential?.proofDocument) {
-        attachments.push({
-          filename: `residential_proof_${formData.identity.firstName}_${formData.identity.lastName}`,
-          content: formData.residential.proofDocument
-        });
-      }
-      if (formData.financial?.proofOfIncomeDocument) {
-        attachments.push({
-          filename: `financial_proof_${formData.identity.firstName}_${formData.identity.lastName}`,
-          content: formData.financial.proofOfIncomeDocument
-        });
-      }
-      if (formData.guarantor?.identityDocument) {
-        attachments.push({
-          filename: `guarantor_proof_${formData.identity.firstName}_${formData.identity.lastName}`,
-          content: formData.guarantor.identityDocument
-        });
-      }
-
-      // Send emails with attachments
+      // Send emails
       const emailResults = await this.emailService.sendMultipleEmails({
         formData,
-        attachments,
-        submissionId: statusDocumentId
+        submissionId: submission.id
       });
 
       return {
         success: true,
-        message: 'Application submitted successfully',
-        sections: savedSections,
+        data: submission,
         emailResults
       };
+
     } catch (error) {
       console.error('Error submitting application:', error);
       throw error;
