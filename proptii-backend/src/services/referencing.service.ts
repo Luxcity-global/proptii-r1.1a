@@ -126,9 +126,43 @@ export class ReferencingService {
         status: 'Submitted'
       });
 
-      // Send emails
+      // Prepare attachments from form data
+      const attachments = [];
+      if (formData.identity?.identityProof) {
+        attachments.push({
+          filename: `identity_proof_${formData.identity.firstName}_${formData.identity.lastName}`,
+          content: formData.identity.identityProof
+        });
+      }
+      if (formData.employment?.proofDocument) {
+        attachments.push({
+          filename: `employment_proof_${formData.identity.firstName}_${formData.identity.lastName}`,
+          content: formData.employment.proofDocument
+        });
+      }
+      if (formData.residential?.proofDocument) {
+        attachments.push({
+          filename: `residential_proof_${formData.identity.firstName}_${formData.identity.lastName}`,
+          content: formData.residential.proofDocument
+        });
+      }
+      if (formData.financial?.proofOfIncomeDocument) {
+        attachments.push({
+          filename: `financial_proof_${formData.identity.firstName}_${formData.identity.lastName}`,
+          content: formData.financial.proofOfIncomeDocument
+        });
+      }
+      if (formData.guarantor?.identityDocument) {
+        attachments.push({
+          filename: `guarantor_proof_${formData.identity.firstName}_${formData.identity.lastName}`,
+          content: formData.guarantor.identityDocument
+        });
+      }
+
+      // Send emails with attachments
       const emailResults = await this.emailService.sendMultipleEmails({
         formData,
+        attachments,
         submissionId: statusDocumentId
       });
 
