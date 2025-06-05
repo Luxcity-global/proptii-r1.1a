@@ -9,6 +9,7 @@ import FinancialUpload from "./Uploads/FinancialUpload";
 import GuarantorUpload from "./Uploads/GuarantorUpload";
 import referencingService from '../services/referencingService';
 import emailService from '../services/emailService';
+import { toast } from 'react-hot-toast';
 
 interface ReferencingModalProps {
   isOpen: boolean;
@@ -759,54 +760,97 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const submitApplication = async () => {
     try {
       setIsSubmitting(true);
-      const saveSuccess = await saveCurrentStep();
+      setShowWarningModal(false);
 
-      if (!saveSuccess) {
-        throw new Error('Failed to save current step');
-      }
-
-      const userId = user?.id;
-      if (!userId) {
-        throw new Error('User ID is required for submission');
-      }
-
-      // Get agent details from the form data
-      const agentEmail = formData.agentDetails?.email;
-      if (!agentEmail) {
-        throw new Error('Agent email is required. Please complete the Agent Details section.');
-      }
+      // Save current step first
+      await saveCurrentStep();
 
       // Submit the application
-      const result = await referencingService.submitApplication(userId, {
-        formData: {
-          ...formData,
-          identity: { ...formData.identity, userId },
-          employment: { ...formData.employment, userId },
-          residential: { ...formData.residential, userId },
-          financial: { ...formData.financial, userId },
-          guarantor: { ...formData.guarantor, userId },
-          agentDetails: { ...formData.agentDetails, userId }
-        }
+      const result = await referencingService.submitApplication(user?.id, {
+        formData: formData
       });
 
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to submit application');
-      }
-
       // Show success message and clean up
-      if (result.sections && result.emailResults?.success) {
+      if (result.success && result.emailSent?.success) {
         setShowSuccessModal(true);
         setShowWarningModal(false);
-        localStorage.setItem(`referencing_${userId}_submitted`, 'true');
-      } else {
-        throw new Error('Failed to complete submission process');
-      }
+        localStorage.setItem(`referencing_${user?.id}_submitted`, 'true');
 
-      return true;
+        // Clear form data from local storage
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith(`referencing_${user?.id}`)) {
+            localStorage.removeItem(key);
+          }
+        });
+
+        // Reset form data
+        setFormData({
+          identity: {
+            firstName: user?.givenName || '',
+            lastName: user?.familyName || '',
+            email: user?.email || '',
+            phoneNumber: '',
+            dateOfBirth: '',
+            dateOfBirthError: undefined,
+            isBritish: true,
+            nationality: 'British',
+            identityProof: null
+          },
+          employment: {
+            employmentStatus: '',
+            companyDetails: '',
+            lengthOfEmployment: '',
+            jobPosition: '',
+            referenceFullName: '',
+            referenceEmail: '',
+            referencePhone: '',
+            proofType: '',
+            proofDocument: null
+          },
+          residential: {
+            currentAddress: '',
+            durationAtCurrentAddress: '',
+            previousAddress: '',
+            durationAtPreviousAddress: '',
+            reasonForLeaving: '',
+            proofType: '',
+            alreadyHavePropertyAddress: '',
+            propertyAddress: '',
+            proofDocument: null
+          },
+          financial: {
+            monthlyIncome: '',
+            proofOfIncomeType: '',
+            proofOfIncomeDocument: null,
+            useOpenBanking: false,
+            isConnectedToOpenBanking: false
+          },
+          guarantor: {
+            firstName: '',
+            lastName: '',
+            email: '',
+            phoneNumber: '',
+            address: '',
+            identityDocument: null
+          },
+          creditCheck: {
+          },
+          agentDetails: {
+            firstName: '',
+            lastName: '',
+            email: '',
+            phoneNumber: '',
+            hasAgreedToCheck: false
+          }
+        });
+        setCurrentStep(1);
+        setStepStatus({});
+      } else {
+        throw new Error(result.error || 'Failed to submit application');
+      }
     } catch (error) {
       console.error('Error submitting application:', error);
-      alert(error instanceof Error ? error.message : 'Failed to submit application. Please try again later.');
-      return false;
+      toast.error('Failed to submit application. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
