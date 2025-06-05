@@ -352,6 +352,66 @@ export class ReferencingService {
     }
   }
 
+  private async saveFormSection(userId: string, section: string, data: any): Promise<any> {
+    try {
+      // Add userId to the data
+      const dataWithUserId = {
+        ...data,
+        userId
+      };
+
+      // Map section names to their correct endpoints
+      const endpointMap: { [key: string]: string } = {
+        identity: '/referencing/identity',
+        employment: '/referencing/employment',
+        residential: '/referencing/residential',
+        financial: '/referencing/financial',
+        guarantor: '/referencing/guarantor',
+        agentDetails: '/referencing/agentDetails'
+      };
+
+      const endpoint = endpointMap[section];
+      if (!endpoint) {
+        throw new Error(`Invalid section: ${section}`);
+      }
+
+      // Save to backend
+      const result = await this.saveToCosmosDB(endpoint, dataWithUserId);
+
+      // Save to local storage
+      await this.saveToLocalStorage(userId, section, data);
+
+      return result;
+    } catch (error) {
+      console.error(`Error saving ${section} data:`, error);
+      throw error;
+    }
+  }
+
+  async saveIdentityData(userId: string, data: any): Promise<any> {
+    return this.saveFormSection(userId, 'identity', data);
+  }
+
+  async saveEmploymentData(userId: string, data: any): Promise<any> {
+    return this.saveFormSection(userId, 'employment', data);
+  }
+
+  async saveResidentialData(userId: string, data: any): Promise<any> {
+    return this.saveFormSection(userId, 'residential', data);
+  }
+
+  async saveFinancialData(userId: string, data: any): Promise<any> {
+    return this.saveFormSection(userId, 'financial', data);
+  }
+
+  async saveGuarantorData(userId: string, data: any): Promise<any> {
+    return this.saveFormSection(userId, 'guarantor', data);
+  }
+
+  async saveAgentDetailsData(userId: string, data: any): Promise<any> {
+    return this.saveFormSection(userId, 'agentDetails', data);
+  }
+
   async submitApplication(userId: string, data: any) {
     try {
       // Save all sections first
@@ -505,66 +565,6 @@ export class ReferencingService {
     } catch (error) {
       console.error('Error clearing local storage:', error);
     }
-  }
-
-  private async saveFormSection(userId: string, section: string, data: any): Promise<any> {
-    try {
-      // Add userId to the data
-      const dataWithUserId = {
-        ...data,
-        userId
-      };
-
-      // Map section names to their correct endpoints
-      const endpointMap: { [key: string]: string } = {
-        identity: '/referencing/identity',
-        employment: '/referencing/employment',
-        residential: '/referencing/residential',
-        financial: '/referencing/financial',
-        guarantor: '/referencing/guarantor',
-        agentDetails: '/referencing/agentDetails'
-      };
-
-      const endpoint = endpointMap[section];
-      if (!endpoint) {
-        throw new Error(`Invalid section: ${section}`);
-      }
-
-      // Save to backend
-      const result = await this.saveToCosmosDB(endpoint, dataWithUserId);
-
-      // Save to local storage
-      await this.saveToLocalStorage(userId, section, data);
-
-      return result;
-    } catch (error) {
-      console.error(`Error saving ${section} data:`, error);
-      throw error;
-    }
-  }
-
-  async saveIdentityData(userId: string, data: any): Promise<any> {
-    return this.saveFormSection(userId, 'identity', data);
-  }
-
-  async saveEmploymentData(userId: string, data: any): Promise<any> {
-    return this.saveFormSection(userId, 'employment', data);
-  }
-
-  async saveResidentialData(userId: string, data: any): Promise<any> {
-    return this.saveFormSection(userId, 'residential', data);
-  }
-
-  async saveFinancialData(userId: string, data: any): Promise<any> {
-    return this.saveFormSection(userId, 'financial', data);
-  }
-
-  async saveGuarantorData(userId: string, data: any): Promise<any> {
-    return this.saveFormSection(userId, 'guarantor', data);
-  }
-
-  async saveAgentDetailsData(userId: string, data: any): Promise<any> {
-    return this.saveFormSection(userId, 'agentDetails', data);
   }
 
   async getFormData(userId: string) {
