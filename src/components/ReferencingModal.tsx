@@ -599,42 +599,29 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
       // Save to Cosmos DB based on current step
       let saveResult;
+      const currentSectionData = {
+        ...formData[getCurrentSection()],
+        userId: user.id
+      };
+
       switch (currentStep) {
         case 1:
-          saveResult = await referencingService.saveIdentityData(user.id, {
-            ...formData.identity,
-            userId: user.id
-          });
+          saveResult = await referencingService.saveIdentityData(currentSectionData);
           break;
         case 2:
-          saveResult = await referencingService.saveEmploymentData(user.id, {
-            ...formData.employment,
-            userId: user.id
-          });
+          saveResult = await referencingService.saveEmploymentData(currentSectionData);
           break;
         case 3:
-          saveResult = await referencingService.saveResidentialData(user.id, {
-            ...formData.residential,
-            userId: user.id
-          });
+          saveResult = await referencingService.saveResidentialData(currentSectionData);
           break;
         case 4:
-          saveResult = await referencingService.saveFinancialData(user.id, {
-            ...formData.financial,
-            userId: user.id
-          });
+          saveResult = await referencingService.saveFinancialData(currentSectionData);
           break;
         case 5:
-          saveResult = await referencingService.saveGuarantorData(user.id, {
-            ...formData.guarantor,
-            userId: user.id
-          });
+          saveResult = await referencingService.saveGuarantorData(currentSectionData);
           break;
         case 7:
-          saveResult = await referencingService.saveAgentDetailsData(user.id, {
-            ...formData.agentDetails,
-            userId: user.id
-          });
+          saveResult = await referencingService.saveAgentDetailsData(currentSectionData);
           break;
         default:
           saveResult = { success: true }; // Credit check step doesn't need saving
@@ -650,13 +637,34 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         [currentStep]: new Date()
       }));
 
-      return true;
+      // Show success message
+      toast.success('Progress saved successfully');
+
     } catch (error) {
       console.error('Error in save operation:', error);
-      alert(error instanceof Error ? error.message : 'Failed to save data');
-      return false;
+      toast.error(error instanceof Error ? error.message : 'Failed to save data');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Helper function to get current section name
+  const getCurrentSection = () => {
+    switch (currentStep) {
+      case 1:
+        return 'identity';
+      case 2:
+        return 'employment';
+      case 3:
+        return 'residential';
+      case 4:
+        return 'financial';
+      case 5:
+        return 'guarantor';
+      case 7:
+        return 'agentDetails';
+      default:
+        return '';
     }
   };
 
@@ -757,104 +765,52 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     return isComplete;
   };
 
-  const submitApplication = async () => {
+  const submitApplication = async (event?: React.MouseEvent<HTMLButtonElement>) => {
+    const isComplete = checkFormCompleteness();
+    if (!isComplete && !event) {
+      setShowWarningModal(true);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      setShowWarningModal(false);
+      await saveCurrentStep();
+      const userId = user?.id;
 
-      if (!user?.id) {
+      if (!userId) {
         throw new Error('User ID is required for submission');
       }
 
-      // Save current step first
-      await saveCurrentStep();
+      // Get agent details from the form data
+      const agentEmail = formData.agentDetails?.email;
+
+      if (!agentEmail) {
+        throw new Error('Agent email is required. Please complete the Agent Details section.');
+      }
 
       // Submit the application
-      const result = await referencingService.submitApplication(user.id, {
-        formData: formData
+      const result = await referencingService.submitApplication(userId, {
+        formData,
+        emailContent: null,
+        isNewReference: true
       });
 
-      // Show success message and clean up
-      if (result.success && result.emailSent?.success) {
-        setShowSuccessModal(true);
-        setShowWarningModal(false);
-        localStorage.setItem(`referencing_${user.id}_submitted`, 'true');
-
-        // Clear form data from local storage
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith(`referencing_${user.id}`)) {
-            localStorage.removeItem(key);
-          }
-        });
-
-        // Reset form data
-        setFormData({
-          identity: {
-            firstName: user?.givenName || '',
-            lastName: user?.familyName || '',
-            email: user?.email || '',
-            phoneNumber: '',
-            dateOfBirth: '',
-            dateOfBirthError: undefined,
-            isBritish: true,
-            nationality: 'British',
-            identityProof: null
-          },
-          employment: {
-            employmentStatus: '',
-            companyDetails: '',
-            lengthOfEmployment: '',
-            jobPosition: '',
-            referenceFullName: '',
-            referenceEmail: '',
-            referencePhone: '',
-            proofType: '',
-            proofDocument: null
-          },
-          residential: {
-            currentAddress: '',
-            durationAtCurrentAddress: '',
-            previousAddress: '',
-            durationAtPreviousAddress: '',
-            reasonForLeaving: '',
-            proofType: '',
-            alreadyHavePropertyAddress: '',
-            propertyAddress: '',
-            proofDocument: null
-          },
-          financial: {
-            monthlyIncome: '',
-            proofOfIncomeType: '',
-            proofOfIncomeDocument: null,
-            useOpenBanking: false,
-            isConnectedToOpenBanking: false
-          },
-          guarantor: {
-            firstName: '',
-            lastName: '',
-            email: '',
-            phoneNumber: '',
-            address: '',
-            identityDocument: null
-          },
-          creditCheck: {
-          },
-          agentDetails: {
-            firstName: '',
-            lastName: '',
-            email: '',
-            phoneNumber: '',
-            hasAgreedToCheck: false
-          }
-        });
-        setCurrentStep(1);
-        setStepStatus({});
-      } else {
+      if (!result.success) {
         throw new Error(result.error || 'Failed to submit application');
       }
+
+      // Show success message and clean up
+      if (result.savedToCosmosDB && result.emailSent?.success) {
+        setShowSuccessModal(true);
+        setShowWarningModal(false);
+        localStorage.setItem(`referencing_${userId}_submitted`, 'true');
+      } else {
+        throw new Error('Failed to complete submission process');
+      }
+
     } catch (error) {
       console.error('Error submitting application:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to submit application. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to submit application. Please try again later.');
     } finally {
       setIsSubmitting(false);
     }
@@ -886,7 +842,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               Cancel
             </button>
             <button
-              onClick={submitApplication}
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => submitApplication(e)}
               className="px-4 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors"
               disabled={isSubmitting}
             >
