@@ -433,13 +433,28 @@ export class EmailService {
     private generateUserEmailTemplate(formData: any): string {
         const { identity, employment, residential, financial, guarantor } = formData;
 
-        // Create a list of uploaded documents
-        const uploadedDocuments = [];
-        if (identity?.identityProof) uploadedDocuments.push('Identity Document');
-        if (employment?.proofDocument) uploadedDocuments.push('Employment Proof');
-        if (residential?.proofDocument) uploadedDocuments.push('Proof of Address');
-        if (financial?.proofOfIncomeDocument) uploadedDocuments.push('Proof of Income');
-        if (guarantor?.identityDocument) uploadedDocuments.push('Guarantor Document');
+        // Helper function to check if a document exists
+        const hasDocument = (section: any, docField: string) => {
+            return section && section[docField] && (section[docField] instanceof File || section[docField].name);
+        };
+
+        // Build documents list
+        const documents = [];
+        if (identity.proofType && hasDocument(identity, 'identityProof')) {
+            documents.push(`Proof of ID (${identity.proofType})`);
+        }
+        if (residential.proofType && hasDocument(residential, 'proofDocument')) {
+            documents.push(`Proof of Address (${residential.proofType})`);
+        }
+        if (employment.proofType && hasDocument(employment, 'proofDocument')) {
+            documents.push(`Employment Document (${employment.proofType})`);
+        }
+        if (financial.proofOfIncomeType && hasDocument(financial, 'proofOfIncomeDocument')) {
+            documents.push(`Financial Document (${financial.proofOfIncomeType})`);
+        }
+        if (hasDocument(guarantor, 'identityDocument')) {
+            documents.push('Guarantor Document');
+        }
 
         return `
       <!DOCTYPE html>
@@ -491,7 +506,7 @@ export class EmailService {
         <div class="section">
           <div class="section-title">📎 Documents Uploaded</div>
           <ul class="document-list">
-            ${uploadedDocuments.map(doc => `<li>${doc}</li>`).join('\n')}
+            ${documents.map(doc => `<li>${doc}</li>`).join('\n')}
           </ul>
         </div>
         
