@@ -432,6 +432,15 @@ export class EmailService {
 
     private generateUserEmailTemplate(formData: any): string {
         const { identity, employment, residential, financial, guarantor } = formData;
+
+        // Create a list of uploaded documents
+        const uploadedDocuments = [];
+        if (identity?.identityProof) uploadedDocuments.push('Identity Document');
+        if (employment?.proofDocument) uploadedDocuments.push('Employment Proof');
+        if (residential?.proofDocument) uploadedDocuments.push('Proof of Address');
+        if (financial?.proofOfIncomeDocument) uploadedDocuments.push('Proof of Income');
+        if (guarantor?.identityDocument) uploadedDocuments.push('Guarantor Document');
+
         return `
       <!DOCTYPE html>
       <html>
@@ -482,7 +491,7 @@ export class EmailService {
         <div class="section">
           <div class="section-title">📎 Documents Uploaded</div>
           <ul class="document-list">
-            ${documents.map(doc => `<li>${doc}</li>`).join('\n')}
+            ${uploadedDocuments.map(doc => `<li>${doc}</li>`).join('\n')}
           </ul>
         </div>
         
