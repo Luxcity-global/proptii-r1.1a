@@ -18,6 +18,12 @@ const Referencing = () => {
   const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
 
   const handleGetStarted = () => {
+    if (!isAuthenticated) {
+      // Redirect to login or trigger login modal
+      login();
+      return;
+    }
+
     const shouldSkipChecklist = localStorage.getItem('skipDocumentChecklist') === 'true';
     if (shouldSkipChecklist) {
       setIsReferencingModalOpen(true);
@@ -27,6 +33,10 @@ const Referencing = () => {
   };
 
   const handleChecklistComplete = () => {
+    if (!isAuthenticated) {
+      login();
+      return;
+    }
     setIsReferencingModalOpen(true);
   };
 
