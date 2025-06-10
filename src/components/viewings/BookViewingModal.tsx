@@ -224,6 +224,59 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
       userDetails?.phoneNumber;
   };
 
+  // Add these validation functions after the isAllDataComplete function
+  const isPropertyDetailsComplete = () => {
+    const property = state.selectedProperty;
+    return !!(
+      property?.street &&
+      property?.city &&
+      property?.postcode &&
+      property?.agent?.name &&
+      property?.agent?.email
+    );
+  };
+
+  const isSchedulingDetailsComplete = () => {
+    const viewing = state.viewingDetails;
+    const userDetails = viewing?.userDetails;
+    return !!(
+      viewing?.date &&
+      viewing?.time &&
+      viewing?.preference &&
+      userDetails?.fullName &&
+      userDetails?.email &&
+      userDetails?.phoneNumber
+    );
+  };
+
+  const getIncompleteFieldsMessage = () => {
+    const messages = [];
+
+    if (!isPropertyDetailsComplete()) {
+      const property = state.selectedProperty;
+      if (!property?.street || !property?.city || !property?.postcode) {
+        messages.push("Property address details");
+      }
+      if (!property?.agent?.name || !property?.agent?.email) {
+        messages.push("Agent contact information");
+      }
+    }
+
+    if (!isSchedulingDetailsComplete()) {
+      const viewing = state.viewingDetails;
+      const userDetails = viewing?.userDetails;
+
+      if (!viewing?.date || !viewing?.time || !viewing?.preference) {
+        messages.push("Viewing date and time preferences");
+      }
+      if (!userDetails?.fullName || !userDetails?.email || !userDetails?.phoneNumber) {
+        messages.push("Your contact details");
+      }
+    }
+
+    return messages;
+  };
+
   // Check if a section has content
   const hasSectionContent = (section: number) => {
     const property = state.selectedProperty;
@@ -332,12 +385,13 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
       case 1:
         return <ViewingScheduler />;
       case 2:
+        const incompleteFields = getIncompleteFieldsMessage();
         return (
           <>
-            {!isAllDataComplete() && (
+            {incompleteFields.length > 0 && (
               <Box sx={{
                 display: 'flex',
-                alignItems: 'center',
+                flexDirection: 'column',
                 gap: 1,
                 bgcolor: alpha('#DC5F12', 0.1),
                 color: '#DC5F12',
@@ -345,10 +399,19 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
                 borderRadius: 1,
                 mb: 2
               }}>
-                <Warning />
-                <Typography>
-                  Please complete all required fields in the previous steps before submitting.
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Warning />
+                  <Typography fontWeight="bold">
+                    Please complete the following information:
+                  </Typography>
+                </Box>
+                <ul style={{ marginLeft: '28px', marginBottom: 0 }}>
+                  {incompleteFields.map((field, index) => (
+                    <li key={index}>
+                      <Typography>{field}</Typography>
+                    </li>
+                  ))}
+                </ul>
               </Box>
             )}
             <ViewingComparison />
