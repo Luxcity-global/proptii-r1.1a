@@ -220,97 +220,299 @@ export class EmailService {
     }
 
     private generateAgentEmailTemplate(formData: any): string {
-        const { identity, employment, residential, financial, guarantor } = formData;
+        const { identity, employment, residential, financial, guarantor, agentDetails } = formData;
         return `
-      <h1>New Referencing Application</h1>
-      <h2>Applicant Details</h2>
-      <p>Name: ${identity.firstName} ${identity.lastName}</p>
-      <p>Email: ${identity.email}</p>
-      <p>Phone: ${identity.phoneNumber}</p>
-
-      <h2>Employment Details</h2>
-      <p>Employer: ${employment.employerName}</p>
-      <p>Position: ${employment.position}</p>
-      <p>Annual Income: £${employment.annualIncome}</p>
-
-      <h2>Residential History</h2>
-      <p>Current Address: ${residential.currentAddress}</p>
-      <p>Time at Address: ${residential.yearsAtAddress} years</p>
-
-      <h2>Financial Information</h2>
-      <p>Monthly Income: £${financial.monthlyIncome}</p>
-      <p>Credit Score: ${financial.creditScore}</p>
-
-      <h2>Guarantor Information</h2>
-      <p>Name: ${guarantor.firstName} ${guarantor.lastName}</p>
-      <p>Email: ${guarantor.email}</p>
-      <p>Phone: ${guarantor.phoneNumber}</p>
+      <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .section { margin-bottom: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 5px; }
+                .section-title { color: #136C9E; margin-bottom: 10px; font-weight: bold; }
+                .info-item { margin: 5px 0; }
+                .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; }
+                .footer-logo { display: flex; align-items: center; margin-top: 16px; }
+                .footer-logo img { height: 40px; margin-right: 10px; }
+                .footer-desc { font-style: italic; color: #555; margin-top: 10px; }
+                .footer-link { color: #136C9E; text-decoration: underline; }
+                hr { border: none; border-top: 1px solid #bbb; margin: 24px 0 16px 0; }
+              </style>
+            </head>
+            <body>
+              <h2>Referencing Application</h2>
+                
+              <p>Hi ${agentDetails.firstName || ''},</p>
+              <p>${identity.firstName || ''} ${identity.lastName || ''} has uploaded their verification documents.</p>
+              <p>The documents include:</p>
+                
+              <div class="section">
+                <div class="section-title">Tenant Information</div>
+                <div class="info-item">First Name: ${identity.firstName || 'N/A'}</div>
+                <div class="info-item">Last Name: ${identity.lastName || 'N/A'}</div>
+                <div class="info-item">Email Address: ${identity.email || 'N/A'}</div>
+                <div class="info-item">Phone Number: ${identity.phoneNumber || 'N/A'}</div>
+                <div class="info-item">Date of Birth: ${identity.dateOfBirth || 'N/A'}</div>
+                <div class="info-item">Nationality: ${identity.nationality || 'N/A'}</div>
+              </div>
+                
+              <div class="section">
+                <div class="section-title">Employment Details</div>
+                <div class="info-item">Employment Status: ${employment.employmentStatus || 'N/A'}</div>
+                <div class="info-item">Company Details: ${employment.companyDetails || 'N/A'}</div>
+                <div class="info-item">Job Position: ${employment.jobPosition || 'N/A'}</div>
+                <div class="info-item">Length of Employment (Years): ${employment.lengthOfEmployment || 'N/A'}</div>
+                <div class="info-item">Proof of Employment: ${employment.proofType || 'N/A'}</div>
+                <div class="info-item">Refree - Full Name: ${employment.referenceFullName || 'N/A'}</div>
+                <div class="info-item">Refree - Email: ${employment.referenceEmail || 'N/A'}</div>
+                <div class="info-item">Refree - Phone: ${employment.referencePhone || 'N/A'}</div>
+              </div>
+                
+              <div class="section">
+                <div class="section-title">Residential History</div>
+                <div class="info-item">Reason for leaving Previous Address: ${residential.reasonForLeaving || 'N/A'}</div>
+                <div class="info-item">Current Address: ${residential.currentAddress || 'N/A'}</div>
+                <div class="info-item">Previous Address (If less than 3 yrs at current): ${residential.previousAddress || 'N/A'}</div>
+                <div class="info-item">How long have you lived at this current Address?: ${residential.durationAtCurrentAddress || 'N/A'}</div>
+                <div class="info-item">Proof of Address: ${residential.proofType || 'N/A'}</div>
+                <div class="info-item">exact duration at previous address: ${residential.durationAtPreviousAddress || 'N/A'}</div>
+              </div>
+                
+              <div class="section">
+                <div class="section-title">Financial Information</div>
+                <div class="info-item">Monthly Income: ${financial.monthlyIncome ? `£${financial.monthlyIncome}` : 'N/A'}</div>
+                <div class="info-item">Proof of Income Type: ${financial.proofOfIncomeType || 'N/A'}</div>
+              </div>
+                
+              <div class="section">
+                <div class="section-title">Guarantor Details</div>
+                <div class="info-item">Guarantor's First Name: ${guarantor.firstName || 'N/A'}</div>
+                <div class="info-item">Guarantor's Last Name: ${guarantor.lastName || 'N/A'}</div>
+                <div class="info-item">Guarantor's Email Address: ${guarantor.email || 'N/A'}</div>
+                <div class="info-item">Guarantor's Phone Number: ${guarantor.phoneNumber || 'N/A'}</div>
+                <div class="info-item">Guarantor's Address: ${guarantor.address || 'N/A'}</div>
+              </div>
+                
+              <p>Once completed, you will receive the confirmation forms from the Referee and Guarantor. Please review all submissions and verify the documents. Once confirmed, you may proceed to accept the user as a tenant.</p>
+                
+              <p>Please contact ${identity.firstName || ''} on ${identity.email || ''} if you need more documents. Let us know if you need support during the verification process.</p>
+                
+              <div style="margin-top: 32px;">
+                Best regards,<br>
+                The Proptii Team
+              </div>
+              <hr />
+              <div class="footer-desc">
+                <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com" class="footer-link">here</a>.</em>
+              </div>
+              <div class="footer-logo">
+                <img src="https://ci3.googleusercontent.com/meips/ADKq_NY8hEqCfpvIsclrL2Y7Bh5rbsplzRLKZCSdpIpnfd0yj3UbdHYRghh_jcqBeTVksaYGkXybNBH7dR78-7qrgfVu81YmwI4tHtHb3B7ILEq32SZW1Rf1WYXK=s0-d-e1-ft#https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png" alt="Proptii Logo" />
+              </div>
+            </body>
+            </html>
     `;
     }
 
     private generateRefereeEmailTemplate(formData: any): string {
-        const { identity, employment } = formData;
+        const { identity, employment, agentDetails } = formData;
         return `
-      <h1>Reference Request</h1>
-      <p>Dear ${employment.referenceName},</p>
-      <p>${identity.firstName} ${identity.lastName} has listed you as a reference for their rental application.</p>
-      <p>Please provide a reference by responding to this email with information about:</p>
-      <ul>
-        <li>Length of employment</li>
-        <li>Position held</li>
-        <li>Salary confirmation</li>
-        <li>Performance and reliability</li>
-      </ul>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .section { margin-bottom: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 5px; }
+          .section-title { color: #136C9E; margin-bottom: 10px; font-weight: bold; }
+          .info-item { margin: 5px 0; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; }
+          .footer-logo { display: flex; align-items: center; margin-top: 16px; }
+          .footer-logo img { height: 40px; margin-right: 10px; }
+          .footer-desc { font-style: italic; color: #555; margin-top: 10px; }
+          .footer-link { color: #136C9E; text-decoration: underline; }
+          hr { border: none; border-top: 1px solid #bbb; margin: 24px 0 16px 0; }
+          .form-link { color: #136C9E; text-decoration: none; font-weight: bold; }
+          .agent-section { margin-top: 20px; padding: 15px; background-color: #f5f5f5; border-radius: 5px; }
+        </style>
+      </head>
+      <body>
+        <p>Hi ${employment.referenceFullName || ''},</p>
+        
+        <p>${identity.firstName} ${identity.lastName} has listed you as a referee in their tenancy application on Proptii.</p>
+        
+        <p>We kindly ask you to confirm the following:</p>
+        <ul>
+          <li>Their current employment status</li>
+          <li>A brief note on their character and reliability</li>
+        </ul>
+        
+        <p>Please complete the short reference form using the link below:</p>
+        <p>👉 <a href="https://docs.google.com/forms/d/e/1FAIpQLScPCYOvh4O-RuceRjFc5BTmghho1QmhHlGu9jkEA5uSSGaZ3g/viewform?usp=preview" class="form-link">Reference Form Link</a></p>
+        
+        <p>Once submitted, your response will be shared directly with the letting agent handling the application.</p>
+        
+        <div class="agent-section">
+          <strong>Agent Contact for Reference Only:</strong><br>
+          Name: ${agentDetails.firstName || ''} ${agentDetails.lastName || ''}<br>
+          Email: ${agentDetails.email || ''}<br>
+          Phone: ${agentDetails.phoneNumber || ''}
+        </div>
+        
+        <p>Thank you for taking the time to assist in this process. Your input helps support a smooth and fair tenancy journey.</p>
+        
+        <p>Best regards,<br>
+        The Proptii Team</p>
+        
+        <hr />
+        <div class="footer-desc">
+          <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com" class="footer-link">here</a>.</em>
+        </div>
+        <div class="footer-logo">
+          <img src="https://ci3.googleusercontent.com/meips/ADKq_NY8hEqCfpvIsclrL2Y7Bh5rbsplzRLKZCSdpIpnfd0yj3UbdHYRghh_jcqBeTVksaYGkXybNBH7dR78-7qrgfVu81YmwI4tHtHb3B7ILEq32SZW1Rf1WYXK=s0-d-e1-ft#https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png" alt="Proptii Logo" />
+        </div>
+      </body>
+      </html>
     `;
     }
 
     private generateGuarantorEmailTemplate(formData: any): string {
-        const { identity, guarantor } = formData;
+        const { identity, guarantor, agentDetails } = formData;
         return `
-      <h1>Guarantor Request</h1>
-      <p>Dear ${guarantor.firstName} ${guarantor.lastName},</p>
-      <p>${identity.firstName} ${identity.lastName} has listed you as a guarantor for their rental application.</p>
-      <p>As a guarantor, you would be responsible for:</p>
-      <ul>
-        <li>Ensuring rent payments are made on time</li>
-        <li>Covering any unpaid rent or damages</li>
-        <li>Being legally bound to the tenancy agreement</li>
-      </ul>
-      <p>Please respond to this email to confirm your agreement to act as a guarantor.</p>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .section { margin-bottom: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 5px; }
+          .section-title { color: #136C9E; margin-bottom: 10px; font-weight: bold; }
+          .info-item { margin: 5px 0; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; }
+          .footer-logo { display: flex; align-items: center; margin-top: 16px; }
+          .footer-logo img { height: 40px; margin-right: 10px; }
+          .footer-desc { font-style: italic; color: #555; margin-top: 10px; }
+          .footer-link { color: #136C9E; text-decoration: underline; }
+          hr { border: none; border-top: 1px solid #bbb; margin: 24px 0 16px 0; }
+          .form-link { color: #136C9E; text-decoration: none; font-weight: bold; }
+          .agent-section { margin-top: 20px; padding: 15px; background-color: #f5f5f5; border-radius: 5px; }
+        </style>
+      </head>
+      <body>
+        <p>Hi ${guarantor.firstName || ''},</p>
+        
+        <p>${identity.firstName} ${identity.lastName} has selected you as their guarantor for a rental application on Proptii.</p>
+        
+        <p>Please review the guarantor terms and let us know if you accept this responsibility.</p>
+        
+        <p>If you agree, simply sign the form below to confirm your acceptance:</p>
+        <p>👉 <a href="https://docs.google.com/forms/d/e/1FAIpQLScZAljnM4q5IcBDmsK3E32MprXfXxgHn62zYUGDyQ8GJFXlNQ/viewform?usp=header" class="form-link">Guarantor Form Link</a></p>
+        
+        <p>Your signed form will be securely shared with the letting agent managing the application.</p>
+        
+        <div class="agent-section">
+          <strong>Agent Contact for Reference Only:</strong><br>
+          Name: ${agentDetails.firstName || ''} ${agentDetails.lastName || ''}<br>
+          Email: ${agentDetails.email || ''}<br>
+          Phone: ${agentDetails.phoneNumber || ''}
+        </div>
+        
+        <p>Thank you for supporting ${identity.firstName} in this process.</p>
+        
+        <p>Warm regards,<br>
+        The Proptii Team</p>
+        
+        <hr />
+        <div class="footer-desc">
+          <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com" class="footer-link">here</a>.</em>
+        </div>
+        <div class="footer-logo">
+          <img src="https://ci3.googleusercontent.com/meips/ADKq_NY8hEqCfpvIsclrL2Y7Bh5rbsplzRLKZCSdpIpnfd0yj3UbdHYRghh_jcqBeTVksaYGkXybNBH7dR78-7qrgfVu81YmwI4tHtHb3B7ILEq32SZW1Rf1WYXK=s0-d-e1-ft#https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png" alt="Proptii Logo" />
+        </div>
+      </body>
+      </html>
     `;
     }
 
     private generateUserEmailTemplate(formData: any): string {
         const { identity, employment, residential, financial, guarantor } = formData;
         return `
-      <h1>Your Referencing Application Summary</h1>
-      <p>Dear ${identity.firstName} ${identity.lastName},</p>
-      <p>Your referencing application has been submitted successfully. Here's a summary of your application:</p>
-
-      <h2>Personal Details</h2>
-      <p>Name: ${identity.firstName} ${identity.lastName}</p>
-      <p>Email: ${identity.email}</p>
-      <p>Phone: ${identity.phoneNumber}</p>
-
-      <h2>Employment Information</h2>
-      <p>Employer: ${employment.employerName}</p>
-      <p>Position: ${employment.position}</p>
-      <p>Annual Income: £${employment.annualIncome}</p>
-
-      <h2>Residential History</h2>
-      <p>Current Address: ${residential.currentAddress}</p>
-      <p>Time at Address: ${residential.yearsAtAddress} years</p>
-
-      <h2>Financial Details</h2>
-      <p>Monthly Income: £${financial.monthlyIncome}</p>
-      <p>Credit Score: ${financial.creditScore}</p>
-
-      <h2>Guarantor Details</h2>
-      <p>Name: ${guarantor.firstName} ${guarantor.lastName}</p>
-      <p>Email: ${guarantor.email}</p>
-      <p>Phone: ${guarantor.phoneNumber}</p>
-
-      <p>We will process your application and contact you shortly.</p>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .section { margin-bottom: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 5px; }
+          .section-title { color: #136C9E; margin-bottom: 10px; font-weight: bold; }
+          .info-item { margin: 5px 0; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; }
+          .footer-logo { display: flex; align-items: center; margin-top: 16px; }
+          .footer-logo img { height: 40px; margin-right: 10px; }
+          .footer-desc { font-style: italic; color: #555; margin-top: 10px; }
+          .footer-link { color: #136C9E; text-decoration: underline; }
+          hr { border: none; border-top: 1px solid #bbb; margin: 24px 0 16px 0; }
+          .next-steps { background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }
+          .next-steps li { margin-bottom: 10px; }
+          .document-list { list-style-type: none; padding-left: 0; }
+          .document-list li { margin-bottom: 8px; }
+          .document-list li:before { content: "📎"; margin-right: 8px; }
+        </style>
+      </head>
+      <body>
+        <h2>Summary of Referencing Details Submitted</h2>
+        
+        <p>Hi ${identity.firstName || ''},</p>
+        <p>Thank you for completing your referencing forms and uploading your documents on Proptii. We've successfully received the following:</p>
+        
+        <div class="section">
+          <div class="section-title">Referencing Details You Provided</div>
+          <div class="info-item">Current Employer: ${employment.companyDetails || 'Not provided'}</div>
+          <div class="info-item">Job Title: ${employment.jobPosition || 'Not provided'}</div>
+          <div class="info-item">Monthly Income: ${financial.monthlyIncome ? `£${financial.monthlyIncome}` : 'Not provided'}</div>
+          
+          <div class="info-item">
+            <strong>Referees Listed:</strong><br/>
+            ${employment.referenceFullName ? `${employment.referenceFullName} (${employment.referenceEmail})` : 'No referee provided'}
+          </div>
+          
+          <div class="info-item">
+            <strong>Guarantor:</strong><br/>
+            ${guarantor.firstName ? `${guarantor.firstName} ${guarantor.lastName} (${guarantor.email})` : 'No guarantor provided'}
+          </div>
+        </div>
+        
+        <hr/>
+        
+        <div class="section">
+          <div class="section-title">📎 Documents Uploaded</div>
+          <ul class="document-list">
+            ${documents.map(doc => `<li>${doc}</li>`).join('\n')}
+          </ul>
+        </div>
+        
+        <hr/>
+        
+        <div class="next-steps">
+          <div class="section-title">✅ What Happens Next?</div>
+          <ul>
+            <li>Your referees and guarantor (if listed) will be contacted to provide their responses.</li>
+            <li>The letting agent will review your submission and verify the documents.</li>
+            <li>We'll notify you once your application has been reviewed and accepted.</li>
+          </ul>
+          <p>If you need to update anything or have questions, feel free to reply to this email.</p>
+        </div>
+        
+        <p>Thanks for choosing Proptii — we're here to make renting easy!</p>
+        
+        <div style="margin-top: 32px;">
+          Best regards,<br>
+          The Proptii Team
+        </div>
+        <hr />
+        <div class="footer-desc">
+          <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com" class="footer-link">here</a>.</em>
+        </div>
+        <div class="footer-logo">
+          <img src="https://ci3.googleusercontent.com/meips/ADKq_NY8hEqCfpvIsclrL2Y7Bh5rbsplzRLKZCSdpIpnfd0yj3UbdHYRghh_jcqBeTVksaYGkXybNBH7dR78-7qrgfVu81YmwI4tHtHb3B7ILEq32SZW1Rf1WYXK=s0-d-e1-ft#https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png" alt="Proptii Logo" />
+        </div>
+      </body>
+      </html>
     `;
     }
 
