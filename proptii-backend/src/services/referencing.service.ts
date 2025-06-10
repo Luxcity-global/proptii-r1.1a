@@ -186,8 +186,8 @@ export class ReferencingService {
 
       // Query all documents for this user
       const querySpec = {
-        query: 'SELECT * FROM c WHERE c.userId = @userId',
-        parameters: [{ name: '@userId', value: userId }]
+          query: 'SELECT * FROM c WHERE c.userId = @userId',
+          parameters: [{ name: '@userId', value: userId }]
       };
 
       const { resources } = await this.container.items.query(querySpec).fetchAll();
@@ -242,15 +242,15 @@ export class ReferencingService {
       const submissionId = `submission_${userId}_${Date.now()}`;
       const submissionData = {
         id: submissionId,
-        userId,
+          userId,
         type: 'submission',
         status: 'submitted',
         formData,
         sections: savedSections.filter(s => s).map(s => s.data.id),
-        submittedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
+          submittedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
 
       const { resource: submission } = await this.container.items.upsert(submissionData);
       console.log('Application submitted successfully:', submission.id);
