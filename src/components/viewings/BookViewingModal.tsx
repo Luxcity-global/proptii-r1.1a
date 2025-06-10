@@ -327,8 +327,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           viewing,
           user: {
             name: viewing.userDetails?.fullName,
-            email: viewing.userDetails?.email,
-            phoneNumber: viewing.userDetails?.phoneNumber
+            email: viewing.userDetails?.email
           }
         });
 
@@ -378,42 +377,91 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     onClose();
   };
 
+  const getStepWarningMessage = (step: number) => {
+    const messages = [];
+
+    switch (step) {
+      case 0: // Property Details
+        const property = state.selectedProperty;
+        if (!property?.street || !property?.city || !property?.postcode) {
+          messages.push("Property address details");
+        }
+        if (!property?.agent?.name || !property?.agent?.email) {
+          messages.push("Agent contact information");
+        }
+        break;
+
+      case 1: // Schedule Viewing
+        const viewing = state.viewingDetails;
+        const userDetails = viewing?.userDetails;
+        if (!viewing?.date || !viewing?.time || !viewing?.preference) {
+          messages.push("Viewing date and time preferences");
+        }
+        if (!userDetails?.fullName || !userDetails?.email || !userDetails?.phoneNumber) {
+          messages.push("Your contact details");
+        }
+        break;
+
+      case 2: // Confirmation
+        return getIncompleteFieldsMessage();
+    }
+
+    return messages;
+  };
+
+  const WarningMessage = ({ messages }: { messages: string[] }) => {
+    if (messages.length === 0) return null;
+
+    return (
+      <Box sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1,
+        bgcolor: alpha('#DC5F12', 0.1),
+        color: '#DC5F12',
+        p: 2,
+        borderRadius: 1,
+        mb: 2
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Warning />
+          <Typography fontWeight="bold">
+            Please complete the following information:
+          </Typography>
+        </Box>
+        <ul style={{ marginLeft: '28px', marginBottom: 0 }}>
+          {messages.map((message, index) => (
+            <li key={index}>
+              <Typography>{message}</Typography>
+            </li>
+          ))}
+        </ul>
+      </Box>
+    );
+  };
+
   const renderStepContent = () => {
+    const warningMessages = getStepWarningMessage(activeStep);
+
     switch (activeStep) {
       case 0:
-        return <PropertySelector />;
-      case 1:
-        return <ViewingScheduler />;
-      case 2:
-        const incompleteFields = getIncompleteFieldsMessage();
         return (
           <>
-            {incompleteFields.length > 0 && (
-              <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 1,
-                bgcolor: alpha('#DC5F12', 0.1),
-                color: '#DC5F12',
-                p: 2,
-                borderRadius: 1,
-                mb: 2
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Warning />
-                  <Typography fontWeight="bold">
-                    Please complete the following information:
-                  </Typography>
-                </Box>
-                <ul style={{ marginLeft: '28px', marginBottom: 0 }}>
-                  {incompleteFields.map((field, index) => (
-                    <li key={index}>
-                      <Typography>{field}</Typography>
-                    </li>
-                  ))}
-                </ul>
-              </Box>
-            )}
+            <WarningMessage messages={warningMessages} />
+            <PropertySelector />
+          </>
+        );
+      case 1:
+        return (
+          <>
+            <WarningMessage messages={warningMessages} />
+            <ViewingScheduler />
+          </>
+        );
+      case 2:
+        return (
+          <>
+            <WarningMessage messages={warningMessages} />
             <ViewingComparison />
           </>
         );
