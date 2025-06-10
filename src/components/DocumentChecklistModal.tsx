@@ -59,9 +59,9 @@ const DocumentChecklistModal: React.FC<DocumentChecklistModalProps> = ({
                 <div className="bg-[#F8F9FF] rounded-xl p-4 mb-4 border-2 border-[#136C9E]">
                     <ul className="space-y-2.5">
                         {[
-                            'Your passport or driver\'s license',
+                            'Your passport or drivers license',
                             'Pay slips and employment contract',
-                            'Your current utility bill',
+                            'Your current residence utility bill',
                             '6 month\'s bank statement',
                             'Your guarantor\'s passport or drivers license'
                         ].map((item, index) => (
