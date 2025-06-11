@@ -19,6 +19,8 @@ services:
         sync: false
       - key: VITE_AZURE_OPENAI_DEPLOYMENT_NAME
         sync: false
+      - key: VITE_GOOGLE_SHEETS_API_ENDPOINT
+        value: https://proptii-r1-1a-1.onrender.com/api/sheets
     headers:
       - path: /*
         name: X-Frame-Options
