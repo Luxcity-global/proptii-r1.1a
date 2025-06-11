@@ -67,15 +67,15 @@ export class SecurityMiddleware {
         const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
         
         const connectSrc = isDevelopment 
-            ? "'self' https://proptii.b2clogin.com https://*.azure.com http://localhost:* https://proptii-r1-1a.onrender.com"
-            : `'self' https://proptii.b2clogin.com https://*.azure.com ${baseUrl}`;
+            ? "'self' https://proptii.b2clogin.com https://*.azure.com http://localhost:* https://proptii-r1-1a.onrender.com https://proptii-r1-1a-1.onrender.com"
+            : `'self' https://proptii.b2clogin.com https://*.azure.com ${baseUrl} https://proptii-r1-1a-1.onrender.com`;
 
         return [
             "default-src 'self'",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-            "font-src 'self' https://fonts.gstatic.com",
-            "img-src 'self' data: https:",
+            "font-src 'self' https://fonts.gstatic.com data:",
+            "img-src 'self' data: https: blob:",
             `connect-src ${connectSrc}`,
             "frame-src 'self' https://proptii.b2clogin.com",
             "object-src 'none'",
