@@ -4,7 +4,7 @@ const router = express.Router();
 
 // Configure Google Sheets
 const auth = new google.auth.GoogleAuth({
-    keyFile: process.env.GOOGLE_SHEETS_CREDENTIALS_PATH,
+    credentials: JSON.parse(process.env.GOOGLE_SHEETS_CREDENTIALS_JSON),
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
