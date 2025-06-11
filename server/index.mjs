@@ -18,7 +18,13 @@ const app = express();
 
 // Enable CORS for all routes with proper configuration for file uploads
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3002'],
+    origin: [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'http://localhost:3002',
+        'https://proptii-frontend.onrender.com',
+        'https://proptii-r1-1a-1.onrender.com'
+    ],
     methods: ['GET', 'POST', 'OPTIONS'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'multipart/form-data', 'Origin', 'Accept'],
