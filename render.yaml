@@ -81,3 +81,5 @@ services:
         sync: false
       - key: AZURE_OPENAI_DEPLOYMENT_NAME
         sync: false
+      - key: GOOGLE_SHEETS_CREDENTIALS_JSON
+        sync: false
