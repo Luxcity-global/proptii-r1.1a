@@ -12,12 +12,21 @@ export class SheetsService {
 
     private async init() {
         try {
+            if (!process.env.GOOGLE_SHEETS_CREDENTIALS_JSON) {
+                this.logger.error(
+                    'GOOGLE_SHEETS_CREDENTIALS_JSON environment variable not set.',
+                );
+                return;
+            }
+
+            const credentials = JSON.parse(process.env.GOOGLE_SHEETS_CREDENTIALS_JSON);
+
             const auth = new google.auth.GoogleAuth({
-                keyFile: process.env.GOOGLE_SHEETS_CREDENTIALS_PATH,
+                credentials,
                 scopes: ['https://www.googleapis.com/auth/spreadsheets'],
             });
-            const client = await auth.getClient();
-            this.sheets = google.sheets({ version: 'v4', auth: client });
+
+            this.sheets = google.sheets({ version: 'v4', auth });
             this.logger.log('Google Sheets API initialized successfully');
         } catch (error) {
             this.logger.error('Failed to initialize Google Sheets API', error.stack);
