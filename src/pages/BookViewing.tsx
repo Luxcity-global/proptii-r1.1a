@@ -64,7 +64,7 @@ const BookViewing = () => {
       </section>
 
       {/* Steps Section */}
-      <section className="relative bg-cover bg-center bg-no-repeat py-24 px-8 min-h-[600px] flex items-center justify-center" style={{ backgroundImage: "url('/public/images/Referencing.png')" }}>
+      <section className="relative bg-cover bg-center bg-no-repeat py-24 px-8 min-h-[600px] flex items-center justify-center" style={{ backgroundImage: "url('/images/Referencing.png')" }}>
         {/* Container with spacing */}
         <div className="relative container mx-auto flex flex-col md:flex-row items-center gap-12 lg:px-32">
           {/* Left Section - Text Content */}
