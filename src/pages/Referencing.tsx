@@ -82,17 +82,17 @@ const Referencing = () => {
       </section>
 
       {/* Steps Section */}
-      <section className="relative bg-cover bg-center bg-no-repeat py-24 px-8 min-h-[600px] flex items-center justify-center" style={{ backgroundImage: "url('/public/images/Referencing.png')" }}>
+      <section className="relative bg-cover bg-center bg-no-repeat py-24 px-8 min-h-[600px] flex items-center justify-center" style={{ backgroundImage: "url('/images/Referencing.png')" }}>
         {/* Container with spacing */}
         <div className="relative container mx-auto flex flex-col md:flex-row items-center gap-12 lg:px-32">
           {/* Left Section - Text Content */}
           <div className="md:w-1/2 space-y-10 md:text-left md:mr-12">
             <h2 className="text-3xl font-bold text-[#136C9E] leading-tight">
-            All your referencing, sorted in one place
+              All your referencing, sorted in one place
             </h2>
             <p className="text-gray-600 text-lg leading-relaxed">
-            No more chasing employers or guarantors. Our platform collects your details, reaches out to your referees, 
-            and shares the full package with agents—fast and securely.
+              No more chasing employers or guarantors. Our platform collects your details, reaches out to your referees,
+              and shares the full package with agents—fast and securely.
             </p>
             <button
               onClick={handleGetStarted}
