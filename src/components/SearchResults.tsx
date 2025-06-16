@@ -30,6 +30,10 @@ interface Property {
   petFriendly?: boolean;
   garden?: boolean;
   parking?: boolean;
+  bedrooms?: number;
+  baths?: number;
+  propertyType?: string;
+  description?: string;
 }
 
 interface SearchResultsProps {
@@ -98,26 +102,25 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   return (
     <div className="space-y-8" role="region" aria-label="Property search results">
       <h2 className="text-2xl font-semibold mb-6" tabIndex={0}>Search Results</h2>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {mappedResults.map((property) => (
           <div key={property.id} className="bg-white rounded-lg shadow-lg overflow-hidden" tabIndex={0} aria-label={`Property card: ${property.title}`}>
             {/* Fixed height header section */}
             <div className="bg-[#f2f1eb] px-6 py-4 border-b h-[120px] flex items-center justify-between">
-              <img 
+              <img
                 src={SITE_LOGOS[property.site]}
                 alt={`${property.site} logo`}
-                className={`object-contain ${
-                  property.site === 'zoopla' 
-                    ? 'h-[40px]' // Reduced from 61.5px by 6 points
-                    : 'h-[100px]' // Previous 50px doubled
-                }`}
+                className={`object-contain ${property.site === 'zoopla'
+                  ? 'h-[40px]' // Reduced from 61.5px by 6 points
+                  : 'h-[100px]' // Previous 50px doubled
+                  }`}
               />
             </div>
 
             <div className="p-6">
               {/* Location and Price Badges */}
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4 justify-center md:justify-start">
                 <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
                   {property.searchLocation}
                 </span>
@@ -127,9 +130,9 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               </div>
 
               {/* Property Types */}
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4 justify-center md:justify-start">
                 {property.propertyTypes.map((type, index) => (
-                  <span 
+                  <span
                     key={index}
                     className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
                   >
@@ -139,7 +142,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               </div>
 
               {/* Feature Badges */}
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4 justify-center md:justify-start">
                 {property.furnished && (
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Furnished</span>
                 )}
@@ -156,7 +159,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               </div>
 
               {/* Property Specs */}
-              <div className="flex items-center gap-4 mb-4 text-gray-600">
+              <div className="flex items-center gap-4 mb-4 text-gray-600 justify-center md:justify-start">
                 <div className="flex items-center gap-1">
                   <BedDouble className="w-5 h-5" />
                   <span>{property.specs?.beds ?? property.bedrooms ?? 'N/A'} beds</span>
@@ -172,22 +175,24 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               </div>
 
               {/* Example Listing */}
-              <div className="mb-6">
+              <div className="mb-6 text-center md:text-left">
                 <h3 className="text-lg font-semibold mb-2">{property.exampleListing.title}</h3>
                 <p className="text-gray-600 text-sm">{property.exampleListing.description}</p>
               </div>
 
               {/* External Link */}
-              <a 
-                href={property.searchUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-opacity-90 transition-all"
-                aria-label={`View listings for ${property.title} on ${property.site}`}
-              >
-                <Home className="w-4 h-4" />
-                View Listings on {property.site.charAt(0).toUpperCase() + property.site.slice(1)}
-              </a>
+              <div className="flex justify-center md:justify-start">
+                <a
+                  href={property.searchUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-opacity-90 transition-all"
+                  aria-label={`View listings for ${property.title} on ${property.site}`}
+                >
+                  <Home className="w-4 h-4" />
+                  View Listings on {property.site.charAt(0).toUpperCase() + property.site.slice(1)}
+                </a>
+              </div>
             </div>
           </div>
         ))}
