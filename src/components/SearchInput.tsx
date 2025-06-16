@@ -284,14 +284,14 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         <div className="bg-white rounded-full p-2 flex items-center shadow-xl">
           {!isMobile && (
             <>
-              <button 
+              <button
                 type="button"
                 className="p-3 text-gray-400 hover:text-gray-600 transition-colors"
                 aria-label="Search by image"
               >
                 <Camera className="w-6 h-6" />
               </button>
-              <button 
+              <button
                 type="button"
                 className="p-3 text-gray-400 hover:text-gray-600 transition-colors"
                 aria-label="Search by voice"
@@ -304,9 +304,8 @@ export const SearchInput: React.FC<SearchInputProps> = ({
             <input
               ref={inputRef}
               type="text"
-              className={`w-full px-4 pr-10 py-3 bg-transparent text-gray-900 text-lg rounded-full border-none transition-all duration-150 ${
-                isFocused ? 'bg-[#F6F6F6]' : 'bg-transparent'
-              } ${error ? 'border-red-500' : 'border-gray-300'}`}
+              className={`w-full px-4 pr-10 py-3 bg-transparent text-gray-900 text-lg rounded-full border-none transition-all duration-150 ${isFocused ? 'bg-[#F6F6F6]' : 'bg-transparent'
+                } ${error ? 'border-red-500' : 'border-gray-300'}`}
               placeholder={placeholder}
               value={query}
               onChange={handleInputChange}
@@ -342,16 +341,15 @@ export const SearchInput: React.FC<SearchInputProps> = ({
             </div>
           )}
           <button
-            className={`bg-primary text-white p-3 rounded-full transition-all shadow-md ${
-              isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-opacity-90'
-            }`}
+            className={`bg-primary text-white p-3 rounded-full transition-all shadow-md ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-opacity-90'
+              }`}
             type="submit"
             disabled={isLoading}
           >
             {isLoading ? (
               <LoadingSpinner size="small" className="border-white" />
             ) : (
-              <img 
+              <img
                 src="/images/ai-search-plane-icon-new-wht-1.png"
                 alt="Search"
                 className="w-9 h-9"
@@ -454,7 +452,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       )}
 
       {/* Interactive filter chips below input */}
-      <div className="mt-2 flex flex-wrap gap-2 items-center" aria-label="Filter chips" role="group">
+      <div className="mt-2 flex flex-wrap gap-2 items-center justify-center sm:justify-start" aria-label="Filter chips" role="group">
         {filterOptions.map((filter) => (
           <button
             key={filter}
@@ -466,11 +464,10 @@ export const SearchInput: React.FC<SearchInputProps> = ({
                 handleFilterChange(filter);
               }
             }}
-            className={`px-3 py-1 rounded-full text-sm border transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-gray-200 ${
-              activeFilters.includes(filter)
-                ? 'bg-[#E1C387] text-black border-[#E1C387]'
-                : 'bg-[#FBFBFB] text-gray-700 border-gray-200 hover:bg-gray-100'
-            }`}
+            className={`px-3 py-1 rounded-full text-sm border transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-gray-200 ${activeFilters.includes(filter)
+              ? 'bg-[#E1C387] text-black border-[#E1C387]'
+              : 'bg-[#FBFBFB] text-gray-700 border-gray-200 hover:bg-gray-100'
+              }`}
             aria-pressed={activeFilters.includes(filter)}
             tabIndex={0}
           >
