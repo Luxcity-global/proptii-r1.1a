@@ -30,6 +30,7 @@ interface Property {
   petFriendly?: boolean;
   garden?: boolean;
   parking?: boolean;
+  // Additional properties that might come from backend
   bedrooms?: number;
   baths?: number;
   propertyType?: string;
@@ -69,7 +70,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
       exampleListing: property.exampleListing || {
         title: property.title,
         price: property.price,
-        description: property.description,
+        description: property.description || '',
       },
       propertyTypes: property.propertyTypes || (property.propertyType ? [property.propertyType] : []),
       searchLocation: property.searchLocation || property.location || '',
@@ -162,15 +163,15 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               <div className="flex items-center gap-4 mb-4 text-gray-600 justify-center md:justify-start">
                 <div className="flex items-center gap-1">
                   <BedDouble className="w-5 h-5" />
-                  <span>{property.specs?.beds ?? property.bedrooms ?? 'N/A'} beds</span>
+                  <span>{property.specs?.beds ?? 'N/A'} beds</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Bath className="w-5 h-5" />
-                  <span>{property.specs?.baths ?? property.baths ?? 'N/A'} baths</span>
+                  <span>{property.specs?.baths ?? 'N/A'} baths</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Building2 className="w-5 h-5" />
-                  <span>{property.specs?.propertyType ?? property.propertyType ?? 'N/A'}</span>
+                  <span>{property.specs?.propertyType ?? 'N/A'}</span>
                 </div>
               </div>
 
