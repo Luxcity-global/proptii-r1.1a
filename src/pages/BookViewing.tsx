@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -10,10 +10,64 @@ import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 import { Pagination, Navigation } from "swiper/modules";
 
+// Custom styles for Swiper
+const swiperStyles = `
+  .swiper-container .swiper-pagination-bullet {
+    background-color: #58B2E8;
+    opacity: 0.5;
+  }
+  
+  .swiper-container .swiper-pagination-bullet-active {
+    background-color: #58B2E8;
+    opacity: 1;
+  }
+  
+  .swiper-container .swiper-button-next,
+  .swiper-container .swiper-button-prev {
+    color: #58B2E8;
+    width: 24px;
+    height: 24px;
+  }
+  
+  .swiper-container .swiper-button-next:after,
+  .swiper-container .swiper-button-prev:after {
+    font-size: 18px;
+  }
+  
+  @media (max-width: 768px) {
+    .swiper-container .swiper-button-next,
+    .swiper-container .swiper-button-prev {
+      display: none;
+    }
+  }
+`;
 
 const BookViewing = () => {
   const { isAuthenticated, login } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    // Inject custom styles
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = swiperStyles;
+    document.head.appendChild(styleElement);
+
+    return () => {
+      document.head.removeChild(styleElement);
+    };
+  }, []);
 
   const handleGetStarted = () => {
     if (!isAuthenticated) {
@@ -64,15 +118,15 @@ const BookViewing = () => {
       </section>
 
       {/* Steps Section */}
-      <section className="relative bg-cover bg-center bg-no-repeat py-24 px-8 min-h-[600px] flex items-center justify-center" style={{ backgroundImage: "url('/images/Referencing.png')" }}>
+      <section className="relative bg-cover bg-center bg-no-repeat py-16 md:py-24 px-4 md:px-8 min-h-[600px] flex items-center justify-center" style={{ backgroundImage: "url('/images/Referencing.png')" }}>
         {/* Container with spacing */}
-        <div className="relative container mx-auto flex flex-col md:flex-row items-center gap-12 lg:px-32">
+        <div className="relative container mx-auto flex flex-col md:flex-row items-center gap-8 md:gap-12 max-w-6xl">
           {/* Left Section - Text Content */}
-          <div className="md:w-1/2 space-y-10 md:text-left md:mr-12">
-            <h2 className="text-3xl font-bold text-[#136C9E] leading-tight">
+          <div className="w-full md:w-1/2 space-y-6 md:space-y-10 text-center md:text-left">
+            <h2 className="text-2xl md:text-3xl font-bold text-[#136C9E] leading-tight">
               Property viewings made easy.
             </h2>
-            <p className="text-gray-600 text-lg leading-relaxed">
+            <p className="text-gray-600 text-base md:text-lg leading-relaxed">
               Simply share the listing link and your preferred date and time—our AI takes it from there. We'll contact the agent and confirm your appointment, so you can focus on finding the right home.
             </p>
             <button
@@ -80,78 +134,63 @@ const BookViewing = () => {
               className="bg-orange-600 text-white font-medium px-6 py-3 rounded-lg hover:bg-orange-700 transition-all duration-300 shadow-md hover:shadow-lg">
               {isAuthenticated ? 'Start booking viewings' : 'Get Started'}
             </button>
-
           </div>
 
           {/* Right Section - Swiper Carousel */}
-          <div className="md:w-2/5 flex justify-center">
-            <Swiper
-              modules={[Pagination, Navigation]}
-              pagination={{ clickable: true }}
-              navigation
-              spaceBetween={20} /* Increase spacing for better layout */
-              slidesPerView={1}
-              className="w-full max-w-md"
-              style={{
-                "--swiper-navigation-color": "#58B2E8", // Lighter color for better contrast
-                "--swiper-pagination-color": "#58B2E8",
-                "--swiper-navigation-size": "24px" // Reduce navigation icon size
-              }}
-            >
-              {/* Slide 1 */}
-              <SwiperSlide>
-                <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
-                  <div className="bg-white p-1 rounded-lg inline-block mb-12">
-                    <img src="/images/BV 1.png" alt="icon" className="h-20 w-20" />
+          <div className="w-full md:w-1/2 flex justify-center">
+            <div className="w-full max-w-sm md:max-w-md">
+              <Swiper
+                modules={[Pagination, Navigation]}
+                pagination={{
+                  clickable: true,
+                  dynamicBullets: true
+                }}
+                navigation={!isMobile}
+                spaceBetween={20}
+                slidesPerView={1}
+                className="w-full swiper-container"
+              >
+                {/* Slide 1 */}
+                <SwiperSlide>
+                  <div className="bg-[#136C9E] text-white py-8 md:py-10 px-4 md:px-6 rounded-3xl text-center shadow-lg mx-2">
+                    <div className="bg-white p-1 rounded-lg inline-block mb-8 md:mb-12">
+                      <img src="/images/BV 1.png" alt="icon" className="h-16 w-16 md:h-20 md:w-20" />
+                    </div>
+                    <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">01. Input the Property Details</h3>
+                    <p className="text-gray-100 text-sm md:text-base mb-4 md:mb-6">
+                      Input the details of the property you intend to view as well as the details of the agent.
+                    </p>
                   </div>
-                  <h3 className="text-lg font-semibold mb-4">01. Input the Property Details</h3>
-                  <p className="text-gray-100 mb-6">
-                    Input the details of the property you intend to view as well as the details of the agent.
-                  </p>
-                </div>
-              </SwiperSlide>
+                </SwiperSlide>
 
-              {/* Slide 2 
-              <SwiperSlide>
-                <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
-                  <div className="bg-white p-1 rounded-lg inline-block mb-12">
-                    <img src="/images/BV 2.png" alt="icon" className="h-20 w-20" />
+                {/* Slide 2 */}
+                <SwiperSlide>
+                  <div className="bg-[#136C9E] text-white py-8 md:py-10 px-4 md:px-6 rounded-3xl text-center shadow-lg mx-2">
+                    <div className="bg-white p-1 rounded-lg inline-block mb-8 md:mb-12">
+                      <img src="/images/BV 3.png" alt="icon" className="h-16 w-16 md:h-20 md:w-20" />
+                    </div>
+                    <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">02. Confirm your Booking Details</h3>
+                    <p className="text-gray-100 text-sm md:text-base mb-4 md:mb-6">
+                      Please go through all the inputed information to ensure their accuracy.
+                    </p>
                   </div>
-                  <h3 className="text-lg font-semibold mb-4">02. Complete the form</h3>
-                  <p className="text-gray-100 mb-6">
-                    To proceed with your booking, fill the forms so we can assist you make the booking.
-                  </p>
-                </div>
-              </SwiperSlide>*/}
+                </SwiperSlide>
 
-              {/* Slide 3 */}
-              <SwiperSlide>
-                <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
-                  <div className="bg-white p-1 rounded-lg inline-block mb-12">
-                    <img src="/images/BV 3.png" alt="icon" className="h-20 w-20" />
+                {/* Slide 3 */}
+                <SwiperSlide>
+                  <div className="bg-[#136C9E] text-white py-8 md:py-10 px-4 md:px-6 rounded-3xl text-center shadow-lg mx-2">
+                    <div className="bg-white p-1 rounded-lg inline-block mb-8 md:mb-12">
+                      <img src="/images/BV 4.png" alt="icon" className="h-16 w-16 md:h-20 md:w-20" />
+                    </div>
+                    <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">03. Await your Booking Summary</h3>
+                    <p className="text-gray-100 text-sm md:text-base mb-4 md:mb-6">
+                      Summary of the booking will be sent to your email and to the agent who will confirm your appointemnt.
+                    </p>
                   </div>
-                  <h3 className="text-lg font-semibold mb-4">02. Confirm your Booking Details</h3>
-                  <p className="text-gray-100 mb-6">
-                    Please go through all the inputed information to ensure their accuracy.
-                  </p>
-                </div>
-              </SwiperSlide>
-
-              {/* Slide 4 */}
-              <SwiperSlide>
-                <div className="bg-[#136C9E] text-white py-10 px-6 rounded-3xl text-center shadow-lg">
-                  <div className="bg-white p-1 rounded-lg inline-block mb-12">
-                    <img src="/images/BV 4.png" alt="icon" className="h-20 w-20" />
-                  </div>
-                  <h3 className="text-lg font-semibold mb-4">03. Await your Booking Summary</h3>
-                  <p className="text-gray-100 mb-6">
-                    Summary of the booking will be sent to your email and to the agent who will confirm your appointemnt.
-                  </p>
-                </div>
-              </SwiperSlide>
-            </Swiper>
+                </SwiperSlide>
+              </Swiper>
+            </div>
           </div>
-
         </div>
       </section>
 
