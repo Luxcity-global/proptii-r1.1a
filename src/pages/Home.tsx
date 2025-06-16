@@ -20,6 +20,7 @@ const Home = () => {
     isLoading,
     error,
     response,
+    loadingProgress,
     handleSearch: executeSearch,
   } = useSearch();
 
@@ -47,8 +48,8 @@ const Home = () => {
   const ProgressBar = () => (
     <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden mt-4">
       <div
-        className="h-full bg-orange-500 transition-all duration-300 ease-out animate-pulse"
-        style={{ width: '100%' }}
+        className="h-full bg-orange-500 transition-all duration-300 ease-out"
+        style={{ width: `${loadingProgress}%` }}
       />
     </div>
   );
@@ -62,7 +63,7 @@ const Home = () => {
     if (searchQuery.trim()) {
       try {
         const results = await executeSearch();
-        setHasResults(results ? results.length > 0 : false);
+        setHasResults(results && results.length > 0);
       } catch (error) {
         setHasResults(false);
       }
@@ -92,7 +93,7 @@ const Home = () => {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative flex items-center pt-20 pb-8 md:pt-0 md:pb-0" style={{ minHeight: 'calc(80vh - 80px)' }}>
+      <section className={`${(query || response || isLoading || error) ? 'h-auto min-h-[60vh] py-8' : 'h-[80vh]'} relative flex items-center pt-20 md:pt-0`}>
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img
@@ -104,16 +105,16 @@ const Home = () => {
           <div className="absolute inset-0 bg-black bg-opacity-40"></div>
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full py-8 md:py-0">
           {/* User Type Selection */}
           <div className="mb-8 md:mb-12">
             <div className="inline-flex rounded-full bg-white p-1 shadow-lg">
-              <button className="px-6 md:px-8 py-2 md:py-3 rounded-full bg-primary text-white font-semibold transition-all text-sm md:text-base">
+              <button className="px-6 md:px-8 py-3 rounded-full bg-primary text-white font-semibold transition-all text-sm md:text-base">
                 Tenant
               </button>
               <Link
                 to="/Agent"
-                className="px-6 md:px-8 py-2 md:py-3 rounded-full text-gray-700 hover:bg-gray-50 font-semibold transition-all text-sm md:text-base"
+                className="px-6 md:px-8 py-3 rounded-full text-gray-700 hover:bg-gray-50 font-semibold transition-all text-sm md:text-base"
               >
                 Agent
               </Link>
@@ -121,23 +122,25 @@ const Home = () => {
           </div>
 
           {/* Main Heading */}
-          <h3 className="text-2xl sm:text-3xl md:text-6xl font-bold mb-4 md:mb-6 font-archive leading-tight">
+          <h3 className="text-2xl md:text-6xl font-bold mb-4 md:mb-6 font-archive leading-tight">
             Find Your Dream Home
           </h3>
 
           {/* Subheading */}
-          <p className="text-base sm:text-lg md:text-2xl mb-8 md:mb-12 max-w-2xl mx-auto font-light px-4">
+          <p className="text-lg md:text-2xl mb-8 md:mb-12 max-w-2xl mx-auto font-light px-4">
             We make finding and securing your home easy, every step of the way.
           </p>
 
           {/* Search Bar */}
-          <div className="max-w-2xl mx-auto px-4">
+          <div className="max-w-2xl mx-auto px-4 md:px-0">
             <SearchInput
               onSearch={handleSearch}
+              isLoading={isLoading}
               value={query}
               onChange={setQuery}
               hasResults={hasResults}
             />
+            {isLoading && <ProgressBar />}
             {!isBackendAvailable && (
               <p className="text-yellow-500 mt-2 text-sm md:text-base">
                 Search service is currently unavailable. Please try again later.
@@ -153,7 +156,7 @@ const Home = () => {
           <div className="max-w-7xl mx-auto px-4">
             <ErrorBoundary fallback={<SearchResultsFallback />}>
               <SearchResults
-                searchResponse={response || []}
+                searchResponse={response}
                 isLoading={isLoading}
                 error={error}
               />
