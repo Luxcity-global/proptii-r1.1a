@@ -121,7 +121,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 
             <div className="p-6">
               {/* Location and Price Badges */}
-              <div className="flex flex-wrap gap-2 mb-4 justify-center md:justify-start">
+              <div className="flex flex-wrap gap-2 mb-4 justify-center sm:justify-start">
                 <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
                   {property.searchLocation}
                 </span>
@@ -131,7 +131,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               </div>
 
               {/* Property Types */}
-              <div className="flex flex-wrap gap-2 mb-4 justify-center md:justify-start">
+              <div className="flex flex-wrap gap-2 mb-4 justify-center sm:justify-start">
                 {property.propertyTypes.map((type, index) => (
                   <span
                     key={index}
@@ -143,7 +143,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               </div>
 
               {/* Feature Badges */}
-              <div className="flex flex-wrap gap-2 mb-4 justify-center md:justify-start">
+              <div className="flex flex-wrap gap-2 mb-4 justify-center sm:justify-start">
                 {property.furnished && (
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Furnished</span>
                 )}
@@ -160,7 +160,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               </div>
 
               {/* Property Specs */}
-              <div className="flex items-center gap-4 mb-4 text-gray-600 justify-center md:justify-start">
+              <div className="flex flex-wrap items-center gap-4 mb-4 text-gray-600 justify-center sm:justify-start">
                 <div className="flex items-center gap-1">
                   <BedDouble className="w-5 h-5" />
                   <span>{property.specs?.beds ?? 'N/A'} beds</span>
@@ -176,13 +176,13 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               </div>
 
               {/* Example Listing */}
-              <div className="mb-6 text-center md:text-left">
+              <div className="mb-6 text-center sm:text-left">
                 <h3 className="text-lg font-semibold mb-2">{property.exampleListing.title}</h3>
                 <p className="text-gray-600 text-sm">{property.exampleListing.description}</p>
               </div>
 
               {/* External Link */}
-              <div className="flex justify-center md:justify-start">
+              <div className="flex justify-center sm:justify-start">
                 <a
                   href={property.searchUrl}
                   target="_blank"
