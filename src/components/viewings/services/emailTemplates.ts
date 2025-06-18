@@ -1,30 +1,54 @@
 import { PropertyDetails, ViewingDetails } from '../context/BookViewingContext';
 
 interface EmailTemplateData {
-    property: PropertyDetails;
-    viewing: ViewingDetails;
-    user: {
-        name?: string;
-        email?: string;
-        phoneNumber?: string;
-    };
+  property: PropertyDetails;
+  viewing: ViewingDetails;
+  user: {
+    name?: string;
+    email?: string;
+    phoneNumber?: string;
+  };
 }
 
-export const generateAgentEmailTemplate = (data: EmailTemplateData): string => {
-    const { property, viewing, user } = data;
-    const viewingDate = new Date(viewing.date!).toLocaleDateString('en-GB', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-    const viewingTime = new Date(viewing.time!).toLocaleTimeString('en-GB', {
+// Helper function to format time strings properly
+const formatTimeString = (timeString: string): string => {
+  // If time is in HH:MM format, convert to 12-hour format
+  if (/^\d{2}:\d{2}$/.test(timeString)) {
+    const [hours, minutes] = timeString.split(':');
+    const hour = parseInt(hours, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    return `${displayHour}:${minutes} ${ampm}`;
+  }
+
+  // If it's already a full datetime, parse it normally
+  try {
+    const date = new Date(timeString);
+    if (!isNaN(date.getTime())) {
+      return date.toLocaleTimeString('en-GB', {
         hour: '2-digit',
         minute: '2-digit',
         hour12: true
-    });
+      });
+    }
+  } catch (error) {
+    console.error('Error formatting time:', error);
+  }
 
-    return `
+  return timeString; // Return as-is if can't parse
+};
+
+export const generateAgentEmailTemplate = (data: EmailTemplateData): string => {
+  const { property, viewing, user } = data;
+  const viewingDate = new Date(viewing.date!).toLocaleDateString('en-GB', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  const viewingTime = formatTimeString(viewing.time!);
+
+  return `
     <!DOCTYPE html>
     <html>
     <head>
@@ -66,22 +90,18 @@ export const generateAgentEmailTemplate = (data: EmailTemplateData): string => {
 };
 
 export const generateUserEmailTemplate = (data: EmailTemplateData): string => {
-    const { property, viewing, user } = data;
-    const viewingDate = new Date(viewing.date!).toLocaleDateString('en-GB', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-    const viewingTime = new Date(viewing.time!).toLocaleTimeString('en-GB', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-    });
+  const { property, viewing, user } = data;
+  const viewingDate = new Date(viewing.date!).toLocaleDateString('en-GB', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  const viewingTime = formatTimeString(viewing.time!);
 
-    const userName = user.name?.split(' ')[0] || 'there';
+  const userName = user.name?.split(' ')[0] || 'there';
 
-    return `
+  return `
     <!DOCTYPE html>
     <html>
     <head>
