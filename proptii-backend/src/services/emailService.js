@@ -509,19 +509,43 @@ class EmailService {
       </html>`;
   }
 
+  // Helper method to format time strings properly
+  formatTimeString(timeString) {
+    // If time is in HH:MM format, convert to 12-hour format
+    if (/^\d{2}:\d{2}$/.test(timeString)) {
+      const [hours, minutes] = timeString.split(':');
+      const hour = parseInt(hours, 10);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      return `${displayHour}:${minutes} ${ampm}`;
+    }
+
+    // If it's already a full datetime, parse it normally
+    try {
+      const date = new Date(timeString);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleTimeString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+      }
+    } catch (error) {
+      console.error('Error formatting time:', error);
+    }
+
+    return timeString; // Return as-is if can't parse
+  }
+
   generateViewingAgentEmailTemplate(formData) {
-    const { property, viewing, user } = formData;
+    const { property, viewing } = formData;
     const viewingDate = new Date(viewing.date).toLocaleDateString('en-GB', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
-    const viewingTime = new Date(viewing.time).toLocaleTimeString('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
+    const viewingTime = this.formatTimeString(viewing.time);
 
     return `
       <!DOCTYPE html>
@@ -553,8 +577,8 @@ class EmailService {
             <p>Type: ${viewing.preference === 'virtual' ? 'Virtual Viewing' : 'In-Person Viewing'}</p>
             
             <h3>Viewer Details:</h3>
-            <p>Name: ${user.name || 'Not provided'}</p>
-            <p>Email: ${user.email || 'Not provided'}</p>
+            <p>Name: ${viewing.user?.name || 'Not provided'}</p>
+            <p>Email: ${viewing.user?.email || 'Not provided'}</p>
           </div>
           
           <p>Please review this request and confirm the viewing time with the potential viewer.</p>
@@ -578,11 +602,7 @@ class EmailService {
       month: 'long',
       day: 'numeric'
     });
-    const viewingTime = new Date(viewing.time).toLocaleTimeString('en-GB', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
+    const viewingTime = this.formatTimeString(viewing.time);
 
     return `
       <!DOCTYPE html>
