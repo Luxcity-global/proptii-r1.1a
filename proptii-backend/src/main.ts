@@ -33,12 +33,12 @@ async function bootstrap() {
   // Configure body parser to handle larger payloads for file uploads
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
+  
   // Set global prefix for all routes except root
   app.setGlobalPrefix('api', {
     exclude: ['/'],
   });
-
+  
   app.enableCors({
     origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
@@ -71,7 +71,7 @@ async function bootstrap() {
   SwaggerModule.setup('api-docs', app, document);
 
   const port = process.env.PORT || 3000;
-
+  
   try {
     await app.listen(port, '0.0.0.0');
     logger.log(`Application is running on: http://localhost:${port}`);
