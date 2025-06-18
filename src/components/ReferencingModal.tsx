@@ -446,7 +446,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
   // Initialize step status based on current form data
   useEffect(() => {
-    const initialStatus = {
+    const newStatus = {
       1: determineStepStatus('identity', formData.identity),
       2: determineStepStatus('employment', formData.employment),
       3: determineStepStatus('residential', formData.residential),
@@ -455,8 +455,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       6: determineStepStatus('creditCheck', formData),
       7: determineStepStatus('agentDetails', formData.agentDetails)
     };
-    setStepStatus(initialStatus);
-  }, [formData]);
+
+    setStepStatus(newStatus);
+
+    // Save to localStorage
+    if (user?.id) {
+      localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(newStatus));
+    }
+  }, [formData, user?.id]);
 
   // Load status from localStorage on mount
   useEffect(() => {
@@ -472,20 +478,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   }, [user]);
 
-  // Save status to localStorage whenever it changes
-  useEffect(() => {
-    if (user?.id) {
-      localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
-    }
-  }, [stepStatus, user]);
-
   // Process file uploads with compression
   const processFileUpload = async (file: File): Promise<StoredFile> => {
     return await fileToStoredFile(file);
   };
 
   const updateFormData = async (step: keyof FormData | string, data: Partial<FormData[keyof FormData]>) => {
-    let processedData = { ...data };
+    let processedData: any = { ...data };
     let hasFilesToProcess = false;
 
     // Check and process file uploads
@@ -494,7 +493,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       setIsProcessingFile(true);
       toast.loading('Processing identity proof...', { id: 'file-processing' });
       try {
-        processedData.identityProof = await processFileUpload((data as any).identityProof);
+        (processedData as any).identityProof = await processFileUpload((data as any).identityProof);
       } catch (error) {
         console.error('Error processing identity proof:', error);
         toast.error('Failed to process identity proof. Please try again.');
@@ -509,7 +508,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       setIsProcessingFile(true);
       toast.loading('Processing document...', { id: 'file-processing' });
       try {
-        processedData.proofDocument = await processFileUpload((data as any).proofDocument);
+        (processedData as any).proofDocument = await processFileUpload((data as any).proofDocument);
       } catch (error) {
         console.error('Error processing proof document:', error);
         toast.error('Failed to process proof document. Please try again.');
@@ -524,7 +523,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       setIsProcessingFile(true);
       toast.loading('Processing identity document...', { id: 'file-processing' });
       try {
-        processedData.identityDocument = await processFileUpload(data.identityDocument);
+        (processedData as any).identityDocument = await processFileUpload((data as any).identityDocument);
       } catch (error) {
         console.error('Error processing identity document:', error);
         toast.error('Failed to process identity document. Please try again.');
@@ -534,12 +533,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       }
     }
 
-    if ('proofOfIncomeDocument' in data && data.proofOfIncomeDocument instanceof File) {
+    if ('proofOfIncomeDocument' in data && (data as any).proofOfIncomeDocument instanceof File) {
       hasFilesToProcess = true;
       setIsProcessingFile(true);
       toast.loading('Processing income document...', { id: 'file-processing' });
       try {
-        processedData.proofOfIncomeDocument = await processFileUpload(data.proofOfIncomeDocument);
+        (processedData as any).proofOfIncomeDocument = await processFileUpload((data as any).proofOfIncomeDocument);
       } catch (error) {
         console.error('Error processing proof of income document:', error);
         toast.error('Failed to process proof of income document. Please try again.');
@@ -568,37 +567,38 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       if (user?.id) {
         localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(updated));
       }
+
+      // Update step status immediately after form data update
+      const stepMap: { [key: string]: number } = {
+        identity: 1,
+        employment: 2,
+        residential: 3,
+        financial: 4,
+        guarantor: 5,
+        creditCheck: 6,
+        agentDetails: 7
+      };
+
+      const stepIndex = stepMap[step];
+      if (stepIndex) {
+        const currentStepData = { ...updated[step as keyof FormData] };
+        const status = determineStepStatus(step as keyof FormData, currentStepData);
+
+        setStepStatus(prevStatus => {
+          const newStatus = {
+            ...prevStatus,
+            [stepIndex]: status
+          };
+          // Save step status to localStorage
+          if (user?.id) {
+            localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(newStatus));
+          }
+          return newStatus;
+        });
+      }
+
       return updated;
     });
-
-    // Update step status
-    const stepMap: { [key: string]: number } = {
-      identity: 1,
-      employment: 2,
-      residential: 3,
-      financial: 4,
-      guarantor: 5,
-      creditCheck: 6,
-      agentDetails: 7
-    };
-
-    const stepIndex = stepMap[step];
-    if (stepIndex) {
-      const currentStepData = { ...formData[step as keyof FormData], ...processedData };
-      const status = determineStepStatus(step as keyof FormData, currentStepData);
-
-      setStepStatus(prev => {
-        const updated = {
-          ...prev,
-          [stepIndex]: status
-        };
-        // Save step status to localStorage
-        if (user?.id) {
-          localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(updated));
-        }
-        return updated;
-      });
-    }
   };
 
   const determineStepStatus = (step: keyof FormData, data: any): 'empty' | 'partial' | 'complete' => {
@@ -691,6 +691,17 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 'agentDetails':
         const hasAnyAgentData = data.firstName || data.lastName || data.email || data.phoneNumber;
         const hasAllAgentFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck;
+
+        console.log('Agent Details Status Check:', {
+          data,
+          hasAnyAgentData,
+          hasAllAgentFields,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          phoneNumber: data.phoneNumber,
+          hasAgreedToCheck: data.hasAgreedToCheck
+        });
 
         if (!hasAnyAgentData) {
           return 'empty';
