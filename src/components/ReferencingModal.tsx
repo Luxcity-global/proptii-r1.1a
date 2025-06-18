@@ -153,13 +153,35 @@ const navigationItems: NavigationItem[] = [
 ];
 
 // Add a helper function to convert File to StoredFile format
-const fileToStoredFile = (file: File) => {
-  return {
-    name: file.name,
-    type: file.type,
-    size: file.size,
-    lastModified: file.lastModified
-  };
+const fileToStoredFile = async (file: File): Promise<StoredFile> => {
+  let processedFile = file;
+
+  // Compress image files to stay under size limits
+  if (file.type.startsWith('image/')) {
+    try {
+      processedFile = await compressImage(file, 300); // Compress to ~300KB max
+      console.log(`Compressed ${file.name} from ${(file.size / 1024).toFixed(1)}KB to ${(processedFile.size / 1024).toFixed(1)}KB`);
+    } catch (error) {
+      console.warn('Image compression failed, using original file:', error);
+      processedFile = file;
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      resolve({
+        name: processedFile.name,
+        type: processedFile.type,
+        size: processedFile.size,
+        lastModified: processedFile.lastModified,
+        dataUrl: dataUrl
+      });
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(processedFile);
+  });
 };
 
 // Add interfaces for stored file data
@@ -255,6 +277,92 @@ interface UploadProps {
   formData: FormData;
 }
 
+// Image compression utility
+const compressImage = (file: File, maxSizeKB: number = 300): Promise<File> => {
+  return new Promise((resolve) => {
+    // Check if file is already small enough
+    if (file.size <= maxSizeKB * 1024) {
+      console.log(`File ${file.name} is already small enough (${(file.size / 1024).toFixed(1)}KB)`);
+      resolve(file);
+      return;
+    }
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    img.onload = () => {
+      // Calculate dimensions to maintain aspect ratio
+      let { width, height } = img;
+      const maxDimension = 1200; // Max width or height
+
+      if (width > height) {
+        if (width > maxDimension) {
+          height = (height * maxDimension) / width;
+          width = maxDimension;
+        }
+      } else {
+        if (height > maxDimension) {
+          width = (width * maxDimension) / height;
+          height = maxDimension;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      // Draw and compress
+      ctx?.drawImage(img, 0, 0, width, height);
+
+      // Start with quality 0.7 and reduce if needed
+      let quality = 0.7;
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      const tryCompress = () => {
+        attempts++;
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+
+            const compressedSizeKB = compressedFile.size / 1024;
+            console.log(`Compression attempt ${attempts}: ${compressedSizeKB.toFixed(1)}KB at quality ${quality.toFixed(1)}`);
+
+            // If still too large and we can try again, reduce quality
+            if (compressedFile.size > maxSizeKB * 1024 && quality > 0.1 && attempts < maxAttempts) {
+              quality -= 0.1;
+              tryCompress();
+            } else {
+              // Final validation - if still too large, warn and proceed
+              if (compressedFile.size > 500 * 1024) { // 500KB warning threshold
+                console.warn(`Compressed file ${file.name} is still large: ${compressedSizeKB.toFixed(1)}KB`);
+                toast.error(`File ${file.name} is large (${compressedSizeKB.toFixed(1)}KB) and may cause issues`);
+              }
+
+              console.log(`Final compressed size: ${compressedSizeKB.toFixed(1)}KB (was ${(file.size / 1024).toFixed(1)}KB)`);
+              resolve(compressedFile);
+            }
+          } else {
+            console.warn('Compression failed, using original file');
+            resolve(file); // Fallback to original if compression fails
+          }
+        }, 'image/jpeg', quality);
+      };
+
+      tryCompress();
+    };
+
+    img.onerror = () => {
+      console.warn('Image loading failed, using original file');
+      resolve(file); // Fallback to original if loading fails
+    };
+    img.src = URL.createObjectURL(file);
+  });
+};
+
 const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
@@ -325,6 +433,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const [lastSavedSteps, setLastSavedSteps] = useState<{ [key: number]: Date | null }>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [stepStatus, setStepStatus] = useState<{ [key: number]: 'empty' | 'partial' | 'complete' }>({
     1: 'empty',
     2: 'empty',
@@ -370,15 +479,91 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   }, [stepStatus, user]);
 
-  const updateFormData = (step: keyof FormData | string, data: Partial<FormData[keyof FormData]>) => {
+  // Process file uploads with compression
+  const processFileUpload = async (file: File): Promise<StoredFile> => {
+    return await fileToStoredFile(file);
+  };
+
+  const updateFormData = async (step: keyof FormData | string, data: Partial<FormData[keyof FormData]>) => {
+    let processedData = { ...data };
+    let hasFilesToProcess = false;
+
+    // Check and process file uploads
+    if ('identityProof' in data && (data as any).identityProof instanceof File) {
+      hasFilesToProcess = true;
+      setIsProcessingFile(true);
+      toast.loading('Processing identity proof...', { id: 'file-processing' });
+      try {
+        processedData.identityProof = await processFileUpload((data as any).identityProof);
+      } catch (error) {
+        console.error('Error processing identity proof:', error);
+        toast.error('Failed to process identity proof. Please try again.');
+        setIsProcessingFile(false);
+        toast.dismiss('file-processing');
+        return;
+      }
+    }
+
+    if ('proofDocument' in data && (data as any).proofDocument instanceof File) {
+      hasFilesToProcess = true;
+      setIsProcessingFile(true);
+      toast.loading('Processing document...', { id: 'file-processing' });
+      try {
+        processedData.proofDocument = await processFileUpload((data as any).proofDocument);
+      } catch (error) {
+        console.error('Error processing proof document:', error);
+        toast.error('Failed to process proof document. Please try again.');
+        setIsProcessingFile(false);
+        toast.dismiss('file-processing');
+        return;
+      }
+    }
+
+    if ('identityDocument' in data && (data as any).identityDocument instanceof File) {
+      hasFilesToProcess = true;
+      setIsProcessingFile(true);
+      toast.loading('Processing identity document...', { id: 'file-processing' });
+      try {
+        processedData.identityDocument = await processFileUpload(data.identityDocument);
+      } catch (error) {
+        console.error('Error processing identity document:', error);
+        toast.error('Failed to process identity document. Please try again.');
+        setIsProcessingFile(false);
+        toast.dismiss('file-processing');
+        return;
+      }
+    }
+
+    if ('proofOfIncomeDocument' in data && data.proofOfIncomeDocument instanceof File) {
+      hasFilesToProcess = true;
+      setIsProcessingFile(true);
+      toast.loading('Processing income document...', { id: 'file-processing' });
+      try {
+        processedData.proofOfIncomeDocument = await processFileUpload(data.proofOfIncomeDocument);
+      } catch (error) {
+        console.error('Error processing proof of income document:', error);
+        toast.error('Failed to process proof of income document. Please try again.');
+        setIsProcessingFile(false);
+        toast.dismiss('file-processing');
+        return;
+      }
+    }
+
+    if (hasFilesToProcess) {
+      setIsProcessingFile(false);
+      toast.dismiss('file-processing');
+      toast.success('File processed successfully!');
+    }
+
     setFormData(prev => {
       const updated = {
         ...prev,
         [step]: {
           ...prev[step as keyof FormData],
-          ...data
+          ...processedData
         }
       };
+
       // Save the entire form data to local storage
       if (user?.id) {
         localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(updated));
@@ -386,6 +571,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       return updated;
     });
 
+    // Update step status
     const stepMap: { [key: string]: number } = {
       identity: 1,
       employment: 2,
@@ -397,29 +583,35 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     };
 
     const stepIndex = stepMap[step];
-    const status = determineStepStatus(step as keyof FormData, { ...formData[step as keyof FormData], ...data });
+    if (stepIndex) {
+      const currentStepData = { ...formData[step as keyof FormData], ...processedData };
+      const status = determineStepStatus(step as keyof FormData, currentStepData);
 
-    setStepStatus(prev => {
-      const updated = {
-        ...prev,
-        [stepIndex]: status
-      };
-      // Save step status to localStorage
-      if (user?.id) {
-        localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(updated));
-      }
-      return updated;
-    });
+      setStepStatus(prev => {
+        const updated = {
+          ...prev,
+          [stepIndex]: status
+        };
+        // Save step status to localStorage
+        if (user?.id) {
+          localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(updated));
+        }
+        return updated;
+      });
+    }
   };
 
   const determineStepStatus = (step: keyof FormData, data: any): 'empty' | 'partial' | 'complete' => {
+    if (!data) return 'empty';
+
     switch (step) {
       case 'identity':
         const hasAnyIdentityData = data.firstName || data.lastName || data.email ||
           data.phoneNumber || data.dateOfBirth || data.nationality;
         const hasAllIdentityFields = data.firstName && data.lastName && data.email &&
           data.phoneNumber && data.dateOfBirth && data.nationality;
-        const hasIdentityDocument = data.identityProof && (data.identityProof instanceof File || data.identityProof.name);
+        const hasIdentityDocument = data.identityProof &&
+          (data.identityProof instanceof File || (data.identityProof.name && data.identityProof.dataUrl));
 
         if (!hasAnyIdentityData && !hasIdentityDocument) {
           return 'empty';
@@ -434,7 +626,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           data.referenceFullName || data.referenceEmail || data.referencePhone || data.proofType || data.lengthOfEmployment;
         const hasAllEmploymentFields = data.employmentStatus && data.companyDetails && data.jobPosition &&
           data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType && data.lengthOfEmployment;
-        const hasEmploymentDocument = data.proofDocument && (data.proofDocument instanceof File || data.proofDocument.name);
+        const hasEmploymentDocument = data.proofDocument &&
+          (data.proofDocument instanceof File || (data.proofDocument.name && data.proofDocument.dataUrl));
 
         if (!hasAnyEmploymentData && !hasEmploymentDocument) {
           return 'empty';
@@ -450,7 +643,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType;
         const hasAllResidentialFields = data.currentAddress && data.durationAtCurrentAddress &&
           data.previousAddress && data.durationAtPreviousAddress && data.reasonForLeaving && data.proofType;
-        const hasResidentialDocument = data.proofDocument && (data.proofDocument instanceof File || data.proofDocument.name);
+        const hasResidentialDocument = data.proofDocument &&
+          (data.proofDocument instanceof File || (data.proofDocument.name && data.proofDocument.dataUrl));
 
         if (!hasAnyResidentialData && !hasResidentialDocument) {
           return 'empty';
@@ -461,22 +655,26 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         return 'partial';
 
       case 'financial':
-        const hasAnyFinancialData = data.proofOfIncomeType || data.monthlyIncome;
-        const hasAllFinancialFields = data.proofOfIncomeType && data.monthlyIncome;
-        const hasFinancialDocument = data.proofOfIncomeDocument && (data.proofOfIncomeDocument instanceof File || data.proofOfIncomeDocument.name);
+        const hasAnyFinancialData = data.monthlyIncome || data.proofOfIncomeType || data.useOpenBanking;
+        const hasAllFinancialFields = data.monthlyIncome && data.proofOfIncomeType;
+        const hasFinancialDocument = data.proofOfIncomeDocument &&
+          (data.proofOfIncomeDocument instanceof File || (data.proofOfIncomeDocument.name && data.proofOfIncomeDocument.dataUrl));
 
         if (!hasAnyFinancialData && !hasFinancialDocument) {
           return 'empty';
         }
-        if (hasAllFinancialFields && hasFinancialDocument) {
+        if (hasAllFinancialFields && (hasFinancialDocument || data.useOpenBanking)) {
           return 'complete';
         }
         return 'partial';
 
       case 'guarantor':
-        const hasAnyGuarantorData = data.firstName || data.lastName || data.email || data.phoneNumber || data.address;
-        const hasAllGuarantorFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
-        const hasGuarantorDocument = data.identityDocument && (data.identityDocument instanceof File || data.identityDocument.name);
+        const hasAnyGuarantorData = data.firstName || data.lastName || data.email ||
+          data.phoneNumber || data.address;
+        const hasAllGuarantorFields = data.firstName && data.lastName && data.email &&
+          data.phoneNumber && data.address;
+        const hasGuarantorDocument = data.identityDocument &&
+          (data.identityDocument instanceof File || (data.identityDocument.name && data.identityDocument.dataUrl));
 
         if (!hasAnyGuarantorData && !hasGuarantorDocument) {
           return 'empty';
@@ -487,23 +685,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         return 'partial';
 
       case 'creditCheck':
-        const identityData = formData.identity || {};
-        const hasAnyCreditCheckData = identityData.firstName || identityData.lastName || identityData.email ||
-          identityData.phoneNumber || identityData.dateOfBirth;
-        const hasCriticalIdentityInfo =
-          identityData.firstName &&
-          identityData.lastName &&
-          identityData.email &&
-          identityData.phoneNumber &&
-          identityData.dateOfBirth;
-
-        if (!hasAnyCreditCheckData) {
-          return 'empty';
-        }
-        if (hasCriticalIdentityInfo) {
-          return 'complete';
-        }
-        return 'partial';
+        // Credit check step is always complete as it doesn't require input
+        return 'complete';
 
       case 'agentDetails':
         const hasAnyAgentData = data.firstName || data.lastName || data.email || data.phoneNumber;
@@ -1655,13 +1838,21 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   };
 
+  // Handle modal close with cleanup
+  const handleClose = () => {
+    setIsProcessingFile(false);
+    setShowWarningModal(false);
+    setShowSuccessModal(false);
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto">
       <div
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-        onClick={onClose}
+        onClick={handleClose}
       />
       <div className="relative w-full max-w-5xl mx-auto my-8 bg-white rounded-lg shadow-xl flex overflow-hidden min-h-[600px]">
         <div className="w-64 bg-gray-50 py-4 px-4 border-r border-gray-200 hidden md:block md:flex flex-col">
@@ -1695,7 +1886,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               <h2 className="text-md font-semibold">Referencing Form</h2>
             </div>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors"
               aria-label="Close modal"
             >
