@@ -335,6 +335,20 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     7: 'empty'
   });
 
+  // Initialize step status based on current form data
+  useEffect(() => {
+    const initialStatus = {
+      1: determineStepStatus('identity', formData.identity),
+      2: determineStepStatus('employment', formData.employment),
+      3: determineStepStatus('residential', formData.residential),
+      4: determineStepStatus('financial', formData.financial),
+      5: determineStepStatus('guarantor', formData.guarantor),
+      6: determineStepStatus('creditCheck', formData),
+      7: determineStepStatus('agentDetails', formData.agentDetails)
+    };
+    setStepStatus(initialStatus);
+  }, [formData]);
+
   // Load status from localStorage on mount
   useEffect(() => {
     if (user?.id) {
@@ -401,67 +415,81 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const determineStepStatus = (step: keyof FormData, data: any): 'empty' | 'partial' | 'complete' => {
     switch (step) {
       case 'identity':
+        const hasAnyIdentityData = data.firstName || data.lastName || data.email ||
+          data.phoneNumber || data.dateOfBirth || data.nationality;
         const hasAllIdentityFields = data.firstName && data.lastName && data.email &&
           data.phoneNumber && data.dateOfBirth && data.nationality;
         const hasIdentityDocument = data.identityProof && (data.identityProof instanceof File || data.identityProof.name);
 
+        if (!hasAnyIdentityData && !hasIdentityDocument) {
+          return 'empty';
+        }
         if (hasAllIdentityFields && hasIdentityDocument) {
           return 'complete';
         }
-        if (hasAllIdentityFields || hasIdentityDocument || data.firstName || data.lastName ||
-          data.email || data.phoneNumber || data.dateOfBirth || data.nationality) {
-          return 'partial';
-        }
-        return 'empty';
+        return 'partial';
 
       case 'employment':
+        const hasAnyEmploymentData = data.employmentStatus || data.companyDetails || data.jobPosition ||
+          data.referenceFullName || data.referenceEmail || data.referencePhone || data.proofType || data.lengthOfEmployment;
         const hasAllEmploymentFields = data.employmentStatus && data.companyDetails && data.jobPosition &&
           data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType && data.lengthOfEmployment;
         const hasEmploymentDocument = data.proofDocument && (data.proofDocument instanceof File || data.proofDocument.name);
 
-        if (hasAllEmploymentFields && hasEmploymentDocument)
+        if (!hasAnyEmploymentData && !hasEmploymentDocument) {
+          return 'empty';
+        }
+        if (hasAllEmploymentFields && hasEmploymentDocument) {
           return 'complete';
-        if (hasAllEmploymentFields || hasEmploymentDocument || data.employmentStatus || data.companyDetails ||
-          data.jobPosition || data.referenceFullName || data.referenceEmail || data.referencePhone ||
-          data.proofType || data.lengthOfEmployment)
-          return 'partial';
-        return 'empty';
+        }
+        return 'partial';
 
       case 'residential':
+        const hasAnyResidentialData = data.currentAddress || data.durationAtCurrentAddress ||
+          data.previousAddress || data.alreadyHavePropertyAddress || data.propertyAddress ||
+          data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType;
         const hasAllResidentialFields = data.currentAddress && data.durationAtCurrentAddress &&
           data.previousAddress && data.durationAtPreviousAddress && data.reasonForLeaving && data.proofType;
         const hasResidentialDocument = data.proofDocument && (data.proofDocument instanceof File || data.proofDocument.name);
 
-        if (hasAllResidentialFields && hasResidentialDocument)
+        if (!hasAnyResidentialData && !hasResidentialDocument) {
+          return 'empty';
+        }
+        if (hasAllResidentialFields && hasResidentialDocument) {
           return 'complete';
-        if (hasAllResidentialFields || hasResidentialDocument || data.currentAddress || data.durationAtCurrentAddress ||
-          data.previousAddress || data.alreadyHavePropertyAddress || data.propertyAddress || data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType)
-          return 'partial';
-        return 'empty';
+        }
+        return 'partial';
 
       case 'financial':
+        const hasAnyFinancialData = data.proofOfIncomeType || data.monthlyIncome;
         const hasAllFinancialFields = data.proofOfIncomeType && data.monthlyIncome;
         const hasFinancialDocument = data.proofOfIncomeDocument && (data.proofOfIncomeDocument instanceof File || data.proofOfIncomeDocument.name);
 
-        if (hasAllFinancialFields && hasFinancialDocument)
+        if (!hasAnyFinancialData && !hasFinancialDocument) {
+          return 'empty';
+        }
+        if (hasAllFinancialFields && hasFinancialDocument) {
           return 'complete';
-        if (hasAllFinancialFields || hasFinancialDocument || data.proofOfIncomeType || data.monthlyIncome)
-          return 'partial';
-        return 'empty';
+        }
+        return 'partial';
 
       case 'guarantor':
+        const hasAnyGuarantorData = data.firstName || data.lastName || data.email || data.phoneNumber || data.address;
         const hasAllGuarantorFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
         const hasGuarantorDocument = data.identityDocument && (data.identityDocument instanceof File || data.identityDocument.name);
 
-        if (hasAllGuarantorFields && hasGuarantorDocument)
+        if (!hasAnyGuarantorData && !hasGuarantorDocument) {
+          return 'empty';
+        }
+        if (hasAllGuarantorFields && hasGuarantorDocument) {
           return 'complete';
-        if (hasAllGuarantorFields || hasGuarantorDocument || data.firstName || data.lastName || data.email ||
-          data.phoneNumber || data.address)
-          return 'partial';
-        return 'empty';
+        }
+        return 'partial';
 
       case 'creditCheck':
         const identityData = formData.identity || {};
+        const hasAnyCreditCheckData = identityData.firstName || identityData.lastName || identityData.email ||
+          identityData.phoneNumber || identityData.dateOfBirth;
         const hasCriticalIdentityInfo =
           identityData.firstName &&
           identityData.lastName &&
@@ -469,20 +497,25 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           identityData.phoneNumber &&
           identityData.dateOfBirth;
 
+        if (!hasAnyCreditCheckData) {
+          return 'empty';
+        }
         if (hasCriticalIdentityInfo) {
           return 'complete';
-        } else if (identityData.firstName || identityData.lastName || identityData.email ||
-          identityData.phoneNumber || identityData.dateOfBirth) {
-          return 'partial';
         }
-        return 'empty';
+        return 'partial';
 
       case 'agentDetails':
-        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck)
+        const hasAnyAgentData = data.firstName || data.lastName || data.email || data.phoneNumber;
+        const hasAllAgentFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck;
+
+        if (!hasAnyAgentData) {
+          return 'empty';
+        }
+        if (hasAllAgentFields) {
           return 'complete';
-        if (data.firstName || data.lastName || data.email || data.phoneNumber)
-          return 'partial';
-        return 'empty';
+        }
+        return 'partial';
 
       default:
         return 'empty';
@@ -512,7 +545,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           dotColor = 'bg-green-500';
           break;
         default:
-          dotColor = 'bg-gray-300';
+          dotColor = '';
       }
 
       return (
