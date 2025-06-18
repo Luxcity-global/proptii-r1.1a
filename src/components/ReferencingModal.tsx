@@ -444,7 +444,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     7: 'empty'
   });
 
-  // Initialize step status based on current form data
+  // Load status from localStorage on mount (only once)
+  useEffect(() => {
+    if (user?.id) {
+      // Don't load step status from localStorage - let it be calculated from current formData
+    }
+  }, [user?.id]);
+
+  // Calculate step status based on current form data (runs after data changes)
   useEffect(() => {
     const newStatus = {
       1: determineStepStatus('identity', formData.identity),
@@ -456,27 +463,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       7: determineStepStatus('agentDetails', formData.agentDetails)
     };
 
+    console.log('📊 Calculated Status:', newStatus);
+    console.log('👤 Agent Details Data:', formData.agentDetails);
+
     setStepStatus(newStatus);
-
-    // Save to localStorage
-    if (user?.id) {
-      localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(newStatus));
-    }
-  }, [formData, user?.id]);
-
-  // Load status from localStorage on mount
-  useEffect(() => {
-    if (user?.id) {
-      const savedStatus = localStorage.getItem(`referencing_${user.id}_stepStatus`);
-      if (savedStatus) {
-        try {
-          setStepStatus(JSON.parse(savedStatus));
-        } catch (e) {
-          console.error('Failed to parse saved step status:', e);
-        }
-      }
-    }
-  }, [user]);
+  }, [formData]);
 
   // Process file uploads with compression
   const processFileUpload = async (file: File): Promise<StoredFile> => {
@@ -692,17 +683,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         const hasAnyAgentData = data.firstName || data.lastName || data.email || data.phoneNumber;
         const hasAllAgentFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck;
 
-        console.log('Agent Details Status Check:', {
-          data,
-          hasAnyAgentData,
-          hasAllAgentFields,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          phoneNumber: data.phoneNumber,
-          hasAgreedToCheck: data.hasAgreedToCheck
-        });
-
         if (!hasAnyAgentData) {
           return 'empty';
         }
@@ -778,15 +758,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   }, [user]);
 
-  // Update the useEffect for loading stored data
+  // Load stored data on mount
   useEffect(() => {
     if (user?.id) {
       try {
-        // Load step status
-        const savedStatus = localStorage.getItem(`referencing_${user.id}_stepStatus`);
-        if (savedStatus) {
-          setStepStatus(JSON.parse(savedStatus));
-        }
+        // Don't load step status from localStorage - let it be calculated from formData
 
         // Load current step
         const savedStep = localStorage.getItem(`referencing_${user.id}_currentStep`);
@@ -810,7 +786,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   }, [user]);
 
-  // Update saveCurrentStep to save all data
+  // Save current step and all data
   const saveCurrentStep = async () => {
     try {
       setIsSaving(true);
