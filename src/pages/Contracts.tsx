@@ -41,12 +41,12 @@ const ContractsPage = () => {
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center w-full">
           {/* Main Heading */}
           <h3 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight text-white">
-          Rental Agreements Made Simple.<br />
+            Rental Agreements Made Simple.<br />
           </h3>
 
           {/* Subheading */}
           <p className="text-xl md:text-2xl mb-12 max-w-3xl mx-auto font-light text-white">
-          Fast digital signing, safe storage, and effortless sharing.
+            Fast digital signing, safe storage, and effortless sharing.
           </p>
 
           <button
@@ -70,12 +70,12 @@ const ContractsPage = () => {
         </div>
 
         {/* Coming Soon Overlay */}
-        <div className="absolute inset-0 z-20 bg-black bg-opacity-70 flex flex-col items-center justify-center">
-          <h3 className="text-4xl md:text-6xl text-white font-bold mb-4 animate-pulse">
+        <div className="absolute inset-0 z-20 bg-black bg-opacity-70 flex flex-col items-center justify-center px-4">
+          <h3 className="text-3xl md:text-4xl lg:text-6xl text-white font-bold mb-4 animate-pulse text-center">
             Coming Soon
           </h3>
-          <div className="typing-text">
-            <p className="text-xl text-white opacity-80">
+          <div className="typing-text max-w-sm md:max-w-md lg:max-w-lg mx-auto">
+            <p className="text-base md:text-lg lg:text-xl text-white opacity-80 text-center px-2">
               We're working hard to bring you this feature
             </p>
           </div>
@@ -86,7 +86,7 @@ const ContractsPage = () => {
             <div className="md:w-1/2 text-left space-y-14">
               <h2 className="text-4xl md:text-5xl font-bold font-archive text-[#136C9E]">Securely store rental documents.</h2>
               <p className="text-lg text-gray-600">
-              Our platform lets tenants sign contracts digitally, store them safely, and share instantly with landlords or agents—no more printing, scanning, or searching.
+                Our platform lets tenants sign contracts digitally, store them safely, and share instantly with landlords or agents—no more printing, scanning, or searching.
               </p>
               <button
                 onClick={handleGetStarted}
