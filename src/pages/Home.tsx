@@ -95,12 +95,14 @@ const Home = () => {
       {/* Hero Section */}
       <section className={`${(query || response || isLoading || error) ? 'h-auto min-h-[60vh] py-8' : 'h-[80vh]'} relative flex items-center pt-20 md:pt-0`}>
         {/* Background Image */}
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 overflow-hidden">
           <img
             src="/images/01_Lady_Child_Family_BG.jpg"
-            alt="Mother and child smiling"
-            className="w-full h-full object-cover"
+            alt="Hero background"
             loading="eager"
+            fetchPriority="high"
+            className="w-full h-full object-cover"
+            sizes="100vw"
           />
           <div className="absolute inset-0 bg-black bg-opacity-40"></div>
         </div>
@@ -170,8 +172,9 @@ const Home = () => {
         {/* Background Image (Blobs) */}
         <img
           src="/images/middle-section.png"
-          alt="Decorative background"
-          className="absolute top-0 left-0 w-full h-full object-cover opacity-50"
+          alt="Background design"
+          loading="lazy"
+          className="absolute inset-0 w-full h-full object-cover"
         />
 
         <div className="max-w-7xl mx-auto px-4 relative z-10">
@@ -181,9 +184,10 @@ const Home = () => {
               <div className="mb-5 md:mb-6">
                 <img
                   src="/images/viewing-room.jpg"
-                  alt="Modern living room"
-                  className="w-full h-44 md:h-48 object-cover rounded-2xl"
-                  style={{ objectPosition: 'center 30%' }}
+                  alt="Viewing room"
+                  loading="lazy"
+                  className="w-full h-full object-cover rounded-lg"
+                  sizes="(max-width: 768px) 100vw, 50vw"
                 />
               </div>
               <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Book Viewing</h3>
@@ -202,9 +206,10 @@ const Home = () => {
               <div className="mb-5 md:mb-6">
                 <img
                   src="/images/referencing-person.jpg"
-                  alt="Professional woman with tablet"
-                  className="w-full h-44 md:h-48 object-cover rounded-2xl"
-                  style={{ objectPosition: 'center 20%' }}
+                  alt="Referencing process"
+                  loading="lazy"
+                  className="w-full h-full object-cover rounded-lg"
+                  sizes="(max-width: 768px) 100vw, 50vw"
                 />
               </div>
               <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Referencing</h3>
@@ -223,8 +228,10 @@ const Home = () => {
               <div className="mb-5 md:mb-6">
                 <img
                   src="/images/modern-building.jpg"
-                  alt="Modern glass building"
-                  className="w-full h-44 md:h-48 object-cover rounded-2xl"
+                  alt="Modern building"
+                  loading="lazy"
+                  className="w-full h-full object-cover rounded-lg"
+                  sizes="(max-width: 768px) 100vw, 50vw"
                 />
               </div>
               <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Contract</h3>
