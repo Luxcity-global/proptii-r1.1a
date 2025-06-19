@@ -974,13 +974,17 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     return isComplete;
   };
 
-  const submitApplication = async (event?: React.MouseEvent<HTMLButtonElement>) => {
+  const submitApplication = async (force: boolean = false) => {
     const isComplete = checkFormCompleteness();
 
-    // Always show warning modal if form is incomplete
-    if (!isComplete) {
+    if (!isComplete && !force) {
       setShowWarningModal(true);
       return;
+    }
+
+    // Hide the warning modal if it was open
+    if (showWarningModal) {
+      setShowWarningModal(false);
     }
 
     try {
@@ -1030,50 +1034,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const WarningModal = () => {
     if (!showWarningModal) return null;
 
-    const handleSubmitAnyway = async () => {
-      setShowWarningModal(false);
-      try {
-        setIsSubmitting(true);
-        await saveCurrentStep();
-        const userId = user?.id;
-
-        if (!userId) {
-          throw new Error('User ID is required for submission');
-        }
-
-        const agentEmail = formData.agentDetails?.email;
-
-        if (!agentEmail) {
-          throw new Error('Agent email is required. Please complete the Agent Details section.');
-        }
-
-        // Submit the application
-        const result = await referencingService.submitApplication(userId, {
-          formData,
-          emailContent: null,
-          isNewReference: true
-        });
-
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to submit application');
-        }
-
-        // Show success message and clean up
-        if (result.savedToCosmosDB && result.emailSent?.success) {
-          setShowSuccessModal(true);
-          localStorage.setItem(`referencing_${userId}_submitted`, 'true');
-        } else {
-          throw new Error('Failed to complete submission process');
-        }
-
-      } catch (error) {
-        console.error('Error submitting application:', error);
-        alert(error instanceof Error ? error.message : 'Failed to submit application. Please try again later.');
-      } finally {
-        setIsSubmitting(false);
-      }
-    };
-
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
         <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
@@ -1097,7 +1057,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               Cancel
             </button>
             <button
-              onClick={handleSubmitAnyway}
+              onClick={() => submitApplication(true)}
               className="px-4 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors"
               disabled={isSubmitting}
             >
@@ -1112,10 +1072,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const SuccessModal = () => {
     if (!showSuccessModal) return null;
 
-    const handleSuccessClose = () => {
+    const handleClose = () => {
       setShowSuccessModal(false);
-      setShowWarningModal(false);
-      setIsProcessingFile(false);
       // Clear form data from localStorage if user is logged in
       if (user?.id) {
         const keysToRemove = [
@@ -1131,8 +1089,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     };
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+        onClick={handleClose}
+      >
+        <div
+          className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="flex items-center mb-4">
             <div className="bg-green-100 p-2 rounded-full">
               <CheckCircle className="text-green-500 w-6 h-6" />
@@ -1146,7 +1110,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
           <div className="flex justify-end">
             <button
-              onClick={handleSuccessClose}
+              onClick={handleClose}
               className="px-4 py-2 bg-[#136C9E] text-white rounded-md hover:bg-opacity-90 transition-colors"
             >
               Close
@@ -2005,7 +1969,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                 </button>
               ) : (
                 <button
-                  onClick={submitApplication}
+                  onClick={() => submitApplication()}
                   className="px-6 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                   disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck}
                 >
