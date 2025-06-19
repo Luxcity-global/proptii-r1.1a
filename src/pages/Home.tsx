@@ -149,7 +149,7 @@ const Home = () => {
 
       {/* Display Search Results */}
       {(query || response || isLoading || error) && (
-        <section className="py-12 bg-gray-50 relative z-5">
+        <section className="pt-24 pb-12 bg-gray-50 relative z-5">
           <div className="max-w-7xl mx-auto px-4">
             <ErrorBoundary fallback={<SearchResultsFallback />}>
               <SearchResults

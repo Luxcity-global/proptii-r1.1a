@@ -105,7 +105,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     <div className="space-y-8" role="region" aria-label="Property search results">
       <h2 className="text-2xl font-semibold mb-6" tabIndex={0}>Search Results</h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
         {mappedResults.map((property) => (
           <Tooltip
             key={property.id}
@@ -130,9 +130,9 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
             }
             position="top"
             maxWidth="max-w-sm"
-            className="w-full"
+            className="w-full h-full flex"
           >
-            <div className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300" tabIndex={0} aria-label={`Property card: ${property.title}`}>
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 w-full flex flex-col" tabIndex={0} aria-label={`Property card: ${property.title}`}>
               {/* Fixed height header section */}
               <div className="bg-[#f2f1eb] px-6 py-4 border-b h-[120px] flex items-center justify-between">
                 <img
@@ -145,7 +145,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
                 />
               </div>
 
-              <div className="p-6">
+              <div className="p-6 flex-1">
                 {/* Location and Price Badges */}
                 <div className="flex flex-wrap gap-2 mb-4 justify-center sm:justify-start">
                   <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
