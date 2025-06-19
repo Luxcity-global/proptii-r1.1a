@@ -32,6 +32,8 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const localStorageService = LocalStorageService.getInstance();
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
+  // Commented out filter state and options
+  /*
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const filterOptions = [
     '2+ Beds',
@@ -42,6 +44,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     'Pet Friendly',
     'Furnished',
   ];
+  */
 
   const {
     suggestions: searchSuggestions,
@@ -73,15 +76,15 @@ export const SearchInput: React.FC<SearchInputProps> = ({
 
   useEffect(() => {
     if (debouncedQuery) {
-      getSuggestions(debouncedQuery).catch((err) => {
-        setError(err.message);
+      getSuggestions(debouncedQuery).catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : String(err));
       });
     }
   }, [debouncedQuery, getSuggestions]);
 
   useEffect(() => {
     if (searchError) {
-      setError(searchError.message);
+      setError(String(searchError));
     }
   }, [searchError]);
 
@@ -90,7 +93,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     retry();
     if (debouncedQuery) {
       getSuggestions(debouncedQuery).catch((err) => {
-        setError(err.message);
+        setError(err instanceof Error ? err.message : String(err));
       });
     }
   }, [debouncedQuery, getSuggestions, retry]);
@@ -181,6 +184,8 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Commented out filter-related functions
+  /*
   const toggleFilter = (filter: string) => {
     setActiveFilters((prev) =>
       prev.includes(filter)
@@ -239,6 +244,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       onSearch(`${query} ${filterSummary}`.trim());
     }
   };
+  */
 
   const renderNoResults = () => {
     if (!hasResults && query.trim() && !isLoading) {
@@ -451,8 +457,8 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         </div>
       )}
 
-      {/* Interactive filter chips below input */}
-      <div className="mt-2 flex flex-wrap gap-2 items-center justify-center sm:justify-start" aria-label="Filter chips" role="group">
+      {/* Interactive filter chips below input - Commented out */}
+      {/*
         {filterOptions.map((filter) => (
           <button
             key={filter}
@@ -484,7 +490,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
             Clear Filters
           </button>
         )}
-      </div>
+      */}
     </div>
   );
 }; 
