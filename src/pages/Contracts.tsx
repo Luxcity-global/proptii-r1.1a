@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -6,10 +6,24 @@ import FAQSection from '../components/FAQSection';
 import ContractModal from '../components/contract/ContractModal';
 import '../styles/typing.css';
 
+// Add preload link for the hero image
+const heroImageUrl = '/images/01_Man_Woman_Office_BG.jpg';
+const preloadHeroImage = () => {
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = 'image';
+  link.href = heroImageUrl;
+  document.head.appendChild(link);
+};
 
 const ContractsPage = () => {
   const { isAuthenticated, login } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Preload hero image when component mounts
+  useEffect(() => {
+    preloadHeroImage();
+  }, []);
 
   const handleGetStarted = () => {
     // Commenting out authentication check for now
@@ -24,16 +38,17 @@ const ContractsPage = () => {
     <div className="min-h-screen font-nunito">
       <Navbar />
 
-      {/* Hero Section - always visible regardless of authentication status */}
+      {/* Hero Section */}
       <section className="h-[80vh] relative flex items-center overflow-hidden">
         {/* Background Image */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           <img
-            src="/images/01_Man_Woman_Office_BG.jpg"
-            alt="Family enjoying dinner together"
+            src={heroImageUrl}
+            alt="Business professionals in office setting"
             className="w-full h-full object-cover"
             loading="eager"
             fetchPriority="high"
+            decoding="sync"
             sizes="100vw"
           />
           {/* Overlay to ensure text readability */}

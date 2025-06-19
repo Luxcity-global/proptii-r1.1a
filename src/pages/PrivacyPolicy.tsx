@@ -1,24 +1,39 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Link } from 'react-router-dom';
 
+// Add preload link for the hero image
+const heroImageUrl = '/images/Privacy-Policy-Hero.png';
+const preloadHeroImage = () => {
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = 'image';
+  link.href = heroImageUrl;
+  document.head.appendChild(link);
+};
+
 const PrivacyPolicy = () => {
+  // Preload hero image when component mounts
+  useEffect(() => {
+    preloadHeroImage();
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
       {/* Hero Section */}
       <section
         className="relative h-[80vh] bg-cover bg-center overflow-hidden"
-        style={{ backgroundImage: 'url("/images/Privacy-Policy-Hero.png")' }}
       >
         <div className="absolute inset-0 z-0 overflow-hidden">
           <img
-            src="/images/Privacy-Policy-Hero.png"
+            src={heroImageUrl}
             alt="Privacy Policy Hero"
             className="w-full h-full object-cover"
             loading="eager"
             fetchPriority="high"
+            decoding="sync"
             sizes="100vw"
           />
           <div className="absolute inset-0 bg-[#0A2342]/80"></div>

@@ -1,12 +1,27 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 
+// Add preload link for the hero image
+const heroImageUrl = '/images/hero-agent-happy-couple.jpg';
+const preloadHeroImage = () => {
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = 'image';
+  link.href = heroImageUrl;
+  document.head.appendChild(link);
+};
+
 const AgentHome = () => {
   const navigate = useNavigate();
+
+  // Preload hero image when component mounts
+  useEffect(() => {
+    preloadHeroImage();
+  }, []);
 
   return (
     <div className="min-h-screen font-nunito">
@@ -17,11 +32,12 @@ const AgentHome = () => {
         {/* Background Image */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           <img
-            src="/images/hero-agent-happy-couple.jpg"
+            src={heroImageUrl}
             alt="Happy couple with agent"
             className="w-full h-full object-cover"
             loading="eager"
             fetchPriority="high"
+            decoding="sync"
             sizes="100vw"
           />
           <div className="absolute inset-0 bg-black bg-opacity-40"></div>
