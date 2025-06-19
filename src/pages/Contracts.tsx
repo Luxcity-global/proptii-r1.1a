@@ -27,12 +27,14 @@ const ContractsPage = () => {
       {/* Hero Section - always visible regardless of authentication status */}
       <section className="h-[80vh] relative flex items-center overflow-hidden">
         {/* Background Image */}
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 overflow-hidden">
           <img
             src="/images/01_Man_Woman_Office_BG.jpg"
             alt="Family enjoying dinner together"
             className="w-full h-full object-cover"
             loading="eager"
+            fetchPriority="high"
+            sizes="100vw"
           />
           {/* Overlay to ensure text readability */}
           <div className="absolute inset-0 bg-black bg-opacity-30 z-1"></div>
@@ -60,12 +62,13 @@ const ContractsPage = () => {
       {/* Contracts Section */}
       <section className="py-20 bg-white relative overflow-hidden">
         {/* Background Image */}
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 overflow-hidden">
           <img
             src="/images/Contract-bg.png"
             alt="Contracts background"
             className="w-full h-full object-cover"
-            loading="eager"
+            loading="lazy"
+            sizes="100vw"
           />
         </div>
 
@@ -101,6 +104,8 @@ const ContractsPage = () => {
                 src="/images/R 9.png"
                 alt="Contract illustration"
                 className="w-2.5/4 h-auto"
+                loading="lazy"
+                sizes="(max-width: 768px) 100vw, 50vw"
               />
             </div>
           </div>

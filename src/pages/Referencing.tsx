@@ -101,12 +101,14 @@ const Referencing = () => {
       {/* Hero Section - always visible regardless of authentication status */}
       <section className="h-[80vh] relative flex items-center overflow-hidden">
         {/* Background Image */}
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 overflow-hidden">
           <img
             src="/images/pablo-merchan-montes-wYOPqmtDD0w-unsplash.jpg"
             alt="Family enjoying dinner together"
             className="w-full h-full object-cover"
             loading="eager"
+            fetchPriority="high"
+            sizes="100vw"
           />
           {/* Overlay to ensure text readability */}
           <div className="absolute inset-0 bg-black bg-opacity-30 z-1"></div>
@@ -173,7 +175,13 @@ const Referencing = () => {
                 <SwiperSlide>
                   <div className="bg-[#136C9E] text-white py-8 md:py-10 px-4 md:px-6 rounded-3xl text-center shadow-lg mx-2">
                     <div className="bg-white p-1 rounded-lg inline-block mb-8 md:mb-12">
-                      <img src="/images/1-Review.png" alt="icon" className="h-16 w-16 md:h-20 md:w-20" />
+                      <img
+                        src="/images/1-Review.png"
+                        alt="icon"
+                        className="h-16 w-16 md:h-20 md:w-20"
+                        loading="lazy"
+                        sizes="(max-width: 768px) 64px, 80px"
+                      />
                     </div>
                     <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">01. Review the Document Checklist</h3>
                     <p className="text-gray-100 text-sm md:text-base mb-4 md:mb-6">
@@ -186,7 +194,13 @@ const Referencing = () => {
                 <SwiperSlide>
                   <div className="bg-[#136C9E] text-white py-8 md:py-10 px-4 md:px-6 rounded-3xl text-center shadow-lg mx-2">
                     <div className="bg-white p-1 rounded-lg inline-block mb-8 md:mb-12">
-                      <img src="/images/2-Upload.png" alt="icon" className="h-16 w-16 md:h-20 md:w-20" />
+                      <img
+                        src="/images/2-Upload.png"
+                        alt="icon"
+                        className="h-16 w-16 md:h-20 md:w-20"
+                        loading="lazy"
+                        sizes="(max-width: 768px) 64px, 80px"
+                      />
                     </div>
                     <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">02. Fill the Forms</h3>
                     <p className="text-gray-100 text-sm md:text-base mb-4 md:mb-6">
@@ -199,7 +213,13 @@ const Referencing = () => {
                 <SwiperSlide>
                   <div className="bg-[#136C9E] text-white py-8 md:py-10 px-4 md:px-6 rounded-3xl text-center shadow-lg mx-2">
                     <div className="bg-white p-1 rounded-lg inline-block mb-8 md:mb-12">
-                      <img src="/images/3-Respond.png" alt="icon" className="h-16 w-16 md:h-20 md:w-20" />
+                      <img
+                        src="/images/3-Respond.png"
+                        alt="icon"
+                        className="h-16 w-16 md:h-20 md:w-20"
+                        loading="lazy"
+                        sizes="(max-width: 768px) 64px, 80px"
+                      />
                     </div>
                     <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">03. Respond to Any Follow-Ups</h3>
                     <p className="text-gray-100 text-sm md:text-base mb-4 md:mb-6">
@@ -212,7 +232,13 @@ const Referencing = () => {
                 <SwiperSlide>
                   <div className="bg-[#136C9E] text-white py-8 md:py-10 px-4 md:px-6 rounded-3xl text-center shadow-lg mx-2">
                     <div className="bg-white p-1 rounded-lg inline-block mb-8 md:mb-12">
-                      <img src="/images/4-Receive.png" alt="icon" className="h-16 w-16 md:h-20 md:w-20" />
+                      <img
+                        src="/images/4-Receive.png"
+                        alt="icon"
+                        className="h-16 w-16 md:h-20 md:w-20"
+                        loading="lazy"
+                        sizes="(max-width: 768px) 64px, 80px"
+                      />
                     </div>
                     <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">04. Receive Feedback</h3>
                     <p className="text-gray-100 text-sm md:text-base mb-4 md:mb-6">

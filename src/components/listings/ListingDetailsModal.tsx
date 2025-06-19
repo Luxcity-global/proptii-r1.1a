@@ -14,7 +14,12 @@ interface Property {
     postcode: string;
     coordinates: [number, number];
   };
-  images: string[];
+  images: {
+    src: string;
+    alt: string;
+    loading: string;
+    sizes: string;
+  }[];
   features: string[];
   description: string;
   agent: {
@@ -89,9 +94,11 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
           {/* Image Carousel */}
           <div className="relative h-[32rem] rounded-lg overflow-hidden">
             <img
-              src={property.images[currentImageIndex]}
-              alt={`Property view ${currentImageIndex + 1}`}
+              src={property.images[currentImageIndex].src}
+              alt={property.images[currentImageIndex].alt}
               className="w-full h-full object-cover"
+              loading={currentImageIndex === 0 ? "eager" : "lazy"}
+              sizes="(max-width: 768px) 100vw, 75vw"
             />
             
             {/* Property Type and Availability Badges */}
@@ -143,9 +150,11 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
                 }`}
               >
                 <img
-                  src={image}
-                  alt={`Thumbnail ${index + 1}`}
+                  src={image.src}
+                  alt={image.alt}
                   className="w-full h-full object-cover"
+                  loading="lazy"
+                  sizes="80px"
                 />
               </button>
             ))}
