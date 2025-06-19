@@ -89,7 +89,7 @@ const Home = () => {
       <Navbar />
 
       {/* Hero Section */}
-      <section className={`${(query || response || isLoading || error) ? 'h-auto min-h-[60vh] py-8' : 'h-[80vh]'} relative flex items-center pt-20 md:pt-0`}>
+      <section className={`${(query || response || isLoading || error) ? 'h-auto min-h-[60vh] py-8' : 'h-[80vh]'} relative flex items-center pt-20 md:pt-0 z-10`}>
         {/* Background Image */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           <img
@@ -149,7 +149,7 @@ const Home = () => {
 
       {/* Display Search Results */}
       {(query || response || isLoading || error) && (
-        <section className="py-12 bg-gray-50 relative z-10">
+        <section className="py-12 bg-gray-50 relative z-5">
           <div className="max-w-7xl mx-auto px-4">
             <ErrorBoundary fallback={<SearchResultsFallback />}>
               <SearchResults
@@ -163,7 +163,7 @@ const Home = () => {
       )}
 
       {/**The new services section */}
-      <section className="relative py-16 md:py-20 bg-[#f9f5f0]">
+      <section className="relative py-16 md:py-20 bg-[#f9f5f0] z-20">
         {/* Background Image (Blobs) */}
         <img
           src="/images/middle-section.png"
