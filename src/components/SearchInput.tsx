@@ -5,6 +5,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { ErrorMessage } from './ErrorMessage';
 import { LoadingSpinner } from './LoadingSpinner';
 import { LocalStorageService } from '../services/LocalStorageService';
+import { GuideTooltip } from './GuideTooltip';
 
 interface SearchInputProps {
   onSearch: (query: string) => void;
@@ -286,84 +287,92 @@ export const SearchInput: React.FC<SearchInputProps> = ({
 
   return (
     <div className={`relative ${className}`}>
-      <form onSubmit={handleSubmit} className="relative">
-        <div className="bg-white rounded-full p-2 flex items-center shadow-xl">
-          {!isMobile && (
-            <>
-              <button
-                type="button"
-                className="p-3 text-gray-400 hover:text-gray-600 transition-colors"
-                aria-label="Search by image"
-              >
-                <Camera className="w-6 h-6" />
-              </button>
-              <button
-                type="button"
-                className="p-3 text-gray-400 hover:text-gray-600 transition-colors"
-                aria-label="Search by voice"
-              >
-                <Mic className="w-6 h-6" />
-              </button>
-            </>
-          )}
-          <div className="relative flex-1">
-            <input
-              ref={inputRef}
-              type="text"
-              className={`w-full px-4 pr-10 py-3 bg-transparent text-gray-900 text-lg rounded-full border-none transition-all duration-150 ${isFocused ? 'bg-[#F6F6F6]' : 'bg-transparent'
-                } ${error ? 'border-red-500' : 'border-gray-300'}`}
-              placeholder={placeholder}
-              value={query}
-              onChange={handleInputChange}
-              onFocus={handleInputFocus}
-              onBlur={() => setTimeout(() => setIsFocused(false), 300)}
-              onKeyDown={handleKeyDown}
-              aria-label="Search properties"
-              aria-invalid={!!error}
-              aria-describedby={error ? 'search-error' : undefined}
-              aria-autocomplete="list"
-              aria-controls="search-suggestions-list"
-              role="combobox"
-              autoComplete="off"
-              style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={handleClear}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                aria-label="Clear search"
-                tabIndex={0}
-              >
-                <X className="w-5 h-5" />
-              </button>
+      <GuideTooltip
+        content="Our AI-powered search understands natural language queries. Try searching for 'modern 2-bedroom flat in Central London with parking' or 'pet-friendly house under £2000 near good schools'. The AI will analyze your requirements and find the best matching properties across multiple platforms including Rightmove, Zoopla, OpenRent, and OnTheMarket."
+        title="How AI Search Works"
+        position="bottom"
+        maxWidth="400px"
+        showIcon={false}
+      >
+        <form onSubmit={handleSubmit} className="relative">
+          <div className="bg-white rounded-full p-2 flex items-center shadow-xl">
+            {!isMobile && (
+              <>
+                <button
+                  type="button"
+                  className="p-3 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Search by image"
+                >
+                  <Camera className="w-6 h-6" />
+                </button>
+                <button
+                  type="button"
+                  className="p-3 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Search by voice"
+                >
+                  <Mic className="w-6 h-6" />
+                </button>
+              </>
             )}
-          </div>
-          <div className="w-2" />
-          {isOffline && (
-            <div className="px-3 text-yellow-600 flex items-center">
-              <WifiOff className="w-5 h-5 mr-1" />
-              <span className="text-sm">Offline</span>
-            </div>
-          )}
-          <button
-            className={`bg-primary text-white p-3 rounded-full transition-all shadow-md ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-opacity-90'
-              }`}
-            type="submit"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <LoadingSpinner size="small" className="border-white" />
-            ) : (
-              <img
-                src="/images/ai-search-plane-icon-new-wht-1.png"
-                alt="Search"
-                className="w-9 h-9"
+            <div className="relative flex-1">
+              <input
+                ref={inputRef}
+                type="text"
+                className={`w-full px-4 pr-10 py-3 bg-transparent text-gray-900 text-lg rounded-full border-none transition-all duration-150 ${isFocused ? 'bg-[#F6F6F6]' : 'bg-transparent'
+                  } ${error ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder={placeholder}
+                value={query}
+                onChange={handleInputChange}
+                onFocus={handleInputFocus}
+                onBlur={() => setTimeout(() => setIsFocused(false), 300)}
+                onKeyDown={handleKeyDown}
+                aria-label="Search properties"
+                aria-invalid={!!error}
+                aria-describedby={error ? 'search-error' : undefined}
+                aria-autocomplete="list"
+                aria-controls="search-suggestions-list"
+                role="combobox"
+                autoComplete="off"
+                style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
               />
+              {query && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Clear search"
+                  tabIndex={0}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+            <div className="w-2" />
+            {isOffline && (
+              <div className="px-3 text-yellow-600 flex items-center">
+                <WifiOff className="w-5 h-5 mr-1" />
+                <span className="text-sm">Offline</span>
+              </div>
             )}
-          </button>
-        </div>
-      </form>
+            <button
+              className={`bg-primary text-white p-3 rounded-full transition-all shadow-md ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-opacity-90'
+                }`}
+              type="submit"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <LoadingSpinner size="small" className="border-white" />
+              ) : (
+                <img
+                  src="/images/ai-search-plane-icon-new-wht-1.png"
+                  alt="Search"
+                  className="w-9 h-9"
+                />
+              )}
+            </button>
+          </div>
+        </form>
+      </GuideTooltip>
 
       {error && (
         <div className="mt-2 flex items-center justify-between">

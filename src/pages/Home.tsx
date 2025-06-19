@@ -20,7 +20,6 @@ const Home = () => {
     isLoading,
     error,
     response,
-    loadingProgress,
     handleSearch: executeSearch,
   } = useSearch();
 
@@ -44,15 +43,7 @@ const Home = () => {
     checkBackend();
   }, []);
 
-  // Progress bar component
-  const ProgressBar = () => (
-    <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden mt-4">
-      <div
-        className="h-full bg-orange-500 transition-all duration-300 ease-out"
-        style={{ width: `${loadingProgress}%` }}
-      />
-    </div>
-  );
+  // Progress bar component (removed loadingProgress)
 
   const handleSearch = async (searchQuery: string) => {
     if (!isBackendAvailable) {
@@ -63,7 +54,7 @@ const Home = () => {
     if (searchQuery.trim()) {
       try {
         const results = await executeSearch();
-        setHasResults(results && results.length > 0);
+        setHasResults(Boolean(results && results.length > 0));
       } catch (error) {
         setHasResults(false);
       }
@@ -137,12 +128,10 @@ const Home = () => {
           <div className="max-w-2xl mx-auto px-4 md:px-0">
             <SearchInput
               onSearch={handleSearch}
-              isLoading={isLoading}
               value={query}
               onChange={setQuery}
               hasResults={hasResults}
             />
-            {isLoading && <ProgressBar />}
             {!isBackendAvailable && (
               <p className="text-yellow-500 mt-2 text-sm md:text-base">
                 Search service is currently unavailable. Please try again later.
@@ -158,7 +147,7 @@ const Home = () => {
           <div className="max-w-7xl mx-auto px-4">
             <ErrorBoundary fallback={<SearchResultsFallback />}>
               <SearchResults
-                searchResponse={response}
+                searchResponse={response || []}
                 isLoading={isLoading}
                 error={error}
               />
