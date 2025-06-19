@@ -596,100 +596,92 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     if (!data) return 'empty';
 
     switch (step) {
-      case 'identity':
-        const hasAnyIdentityData = data.firstName || data.lastName || data.email ||
-          data.phoneNumber || data.dateOfBirth || data.nationality;
-        const hasAllIdentityFields = data.firstName && data.lastName && data.email &&
-          data.phoneNumber && data.dateOfBirth && data.nationality;
-        const hasIdentityDocument = data.identityProof &&
-          (data.identityProof instanceof File || (data.identityProof.name && data.identityProof.dataUrl));
+      case 'identity': {
+        const hasAnyData = Object.values(data).some(value => !!value);
+        const hasAllFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.dateOfBirth && data.nationality;
+        const hasDocument = data.identityProof?.name && data.identityProof?.dataUrl;
 
-        if (!hasAnyIdentityData && !hasIdentityDocument) {
-          return 'empty';
-        }
-        if (hasAllIdentityFields && hasIdentityDocument) {
-          return 'complete';
-        }
+        if (!hasAnyData) return 'empty';
+        if (hasAllFields && hasDocument) return 'complete';
         return 'partial';
+      }
 
-      case 'employment':
-        const hasAnyEmploymentData = data.employmentStatus || data.companyDetails || data.jobPosition ||
-          data.referenceFullName || data.referenceEmail || data.referencePhone || data.proofType || data.lengthOfEmployment;
-        const hasAllEmploymentFields = data.employmentStatus && data.companyDetails && data.jobPosition &&
-          data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType && data.lengthOfEmployment;
-        const hasEmploymentDocument = data.proofDocument &&
-          (data.proofDocument instanceof File || (data.proofDocument.name && data.proofDocument.dataUrl));
+      case 'employment': {
+        const nonApplicableStatus = ['Unemployed', 'Retired', 'Student'];
+        if (nonApplicableStatus.includes(data.employmentStatus)) {
+          return data.employmentStatus ? 'complete' : 'empty';
+        }
 
-        if (!hasAnyEmploymentData && !hasEmploymentDocument) {
-          return 'empty';
-        }
-        if (hasAllEmploymentFields && hasEmploymentDocument) {
-          return 'complete';
-        }
+        const hasAnyData = Object.values(data).some(value => !!value);
+        const hasAllFields = data.employmentStatus && data.companyDetails && data.lengthOfEmployment && data.jobPosition && data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType;
+        const hasDocument = data.proofDocument?.name && data.proofDocument?.dataUrl;
+
+        if (!hasAnyData) return 'empty';
+        if (hasAllFields && hasDocument) return 'complete';
         return 'partial';
+      }
 
-      case 'residential':
-        const hasAnyResidentialData = data.currentAddress || data.durationAtCurrentAddress ||
-          data.previousAddress || data.alreadyHavePropertyAddress || data.propertyAddress ||
-          data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType;
-        const hasAllResidentialFields = data.currentAddress && data.durationAtCurrentAddress &&
-          data.previousAddress && data.durationAtPreviousAddress && data.reasonForLeaving && data.proofType;
-        const hasResidentialDocument = data.proofDocument &&
-          (data.proofDocument instanceof File || (data.proofDocument.name && data.proofDocument.dataUrl));
+      case 'residential': {
+        const hasAnyData = Object.values(data).some(value => !!value);
 
-        if (!hasAnyResidentialData && !hasResidentialDocument) {
-          return 'empty';
+        let requiredFields = [
+          'currentAddress', 'durationAtCurrentAddress', 'reasonForLeaving', 'proofType', 'alreadyHavePropertyAddress'
+        ];
+
+        if (data.alreadyHavePropertyAddress === 'Yes') {
+          requiredFields.push('propertyAddress');
         }
-        if (hasAllResidentialFields && hasResidentialDocument) {
-          return 'complete';
+
+        const needsPreviousAddress = data.durationAtCurrentAddress && data.durationAtCurrentAddress !== '2-3 years';
+        if (needsPreviousAddress) {
+          requiredFields.push('previousAddress', 'durationAtPreviousAddress');
         }
+
+        const hasAllFields = requiredFields.every(field => !!data[field]);
+        const hasDocument = data.proofDocument?.name && data.proofDocument?.dataUrl;
+
+        if (!hasAnyData) return 'empty';
+        if (hasAllFields && hasDocument) return 'complete';
         return 'partial';
+      }
 
-      case 'financial':
-        const hasAnyFinancialData = data.monthlyIncome || data.proofOfIncomeType || data.useOpenBanking;
-        const hasAllFinancialFields = data.monthlyIncome && data.proofOfIncomeType;
-        const hasFinancialDocument = data.proofOfIncomeDocument &&
-          (data.proofOfIncomeDocument instanceof File || (data.proofOfIncomeDocument.name && data.proofOfIncomeDocument.dataUrl));
+      case 'financial': {
+        const hasAnyData = Object.values(data).some(value => !!value);
+        const hasAllFields = data.monthlyIncome && data.proofOfIncomeType;
+        const hasDocument = data.proofOfIncomeDocument?.name && data.proofOfIncomeDocument?.dataUrl;
+        const isOpenBanking = data.useOpenBanking;
 
-        if (!hasAnyFinancialData && !hasFinancialDocument) {
-          return 'empty';
-        }
-        if (hasAllFinancialFields && (hasFinancialDocument || data.useOpenBanking)) {
-          return 'complete';
-        }
+        if (!hasAnyData) return 'empty';
+        if (hasAllFields && (hasDocument || isOpenBanking)) return 'complete';
         return 'partial';
+      }
 
-      case 'guarantor':
-        const hasAnyGuarantorData = data.firstName || data.lastName || data.email ||
-          data.phoneNumber || data.address;
-        const hasAllGuarantorFields = data.firstName && data.lastName && data.email &&
-          data.phoneNumber && data.address;
-        const hasGuarantorDocument = data.identityDocument &&
-          (data.identityDocument instanceof File || (data.identityDocument.name && data.identityDocument.dataUrl));
+      case 'guarantor': {
+        // This section is optional, so it's 'complete' if empty.
+        const hasAnyData = Object.values(data).some(value => !!value && value !== null);
+        if (!hasAnyData) return 'complete';
 
-        if (!hasAnyGuarantorData && !hasGuarantorDocument) {
-          return 'empty';
-        }
-        if (hasAllGuarantorFields && hasGuarantorDocument) {
-          return 'complete';
-        }
+        const hasAllFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
+        const hasDocument = data.identityDocument?.name && data.identityDocument?.dataUrl;
+
+        if (hasAllFields && hasDocument) return 'complete';
         return 'partial';
+      }
 
-      case 'creditCheck':
-        // Credit check step is always complete as it doesn't require input
-        return 'complete';
+      case 'creditCheck': {
+        const identityData = (data as FormData).identity;
+        const hasRequiredIdentityFields = identityData.firstName && identityData.lastName && identityData.email && identityData.phoneNumber && identityData.dateOfBirth;
+        return hasRequiredIdentityFields ? 'complete' : 'empty';
+      }
 
-      case 'agentDetails':
-        const hasAnyAgentData = data.firstName || data.lastName || data.email || data.phoneNumber;
-        const hasAllAgentFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck;
+      case 'agentDetails': {
+        const hasAnyData = Object.values(data).some(value => !!value);
+        const hasAllFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck;
 
-        if (!hasAnyAgentData) {
-          return 'empty';
-        }
-        if (hasAllAgentFields) {
-          return 'complete';
-        }
+        if (!hasAnyData) return 'empty';
+        if (hasAllFields) return 'complete';
         return 'partial';
+      }
 
       default:
         return 'empty';
