@@ -127,10 +127,10 @@ const Referencing = () => {
             sizes="100vw"
           />
           {/* Overlay to ensure text readability */}
-          <div className="absolute inset-0 bg-black bg-opacity-30 z-1"></div>
+          <div className="absolute inset-0 bg-black bg-opacity-30 z-10"></div>
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 text-center w-full">
+        <div className="relative z-20 max-w-7xl mx-auto px-4 text-center w-full">
           {/* Main Heading */}
           <h3 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight text-white">
             Verify Your Identity,<br />
