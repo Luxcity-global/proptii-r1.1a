@@ -76,13 +76,7 @@ const ScrollableContent = styled(Box)(({ theme }) => ({
   flexDirection: 'column',
 }));
 
-const StickyWarning = styled(Box)(({ theme }) => ({
-  position: 'sticky',
-  top: 0,
-  zIndex: 1,
-  padding: theme.spacing(3, 3, 0, 3),
-  backgroundColor: BACKGROUND_BLUE,
-}));
+
 
 const StepSidebar = styled(Box)(({ theme }) => ({
   width: '280px',
@@ -397,6 +391,10 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     setActiveStep((prevStep) => prevStep - 1);
   };
 
+  const handleCloseWarning = () => {
+    setShowStepWarning(false);
+  };
+
   const handleSuccessClose = () => {
     setShowSuccess(false);
     dispatch({ type: 'RESET_STATE' });
@@ -436,63 +434,85 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     return messages;
   };
 
-  const WarningMessage = ({ messages }: { messages: string[] }) => {
-    if (messages.length === 0) return null;
-
+  const WarningPopup = ({ messages, open, onClose }: { messages: string[]; open: boolean; onClose: () => void }) => {
     return (
-      <Box sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: { xs: 0.5, sm: 1 },
-        bgcolor: alpha('#DC5F12', 0.1),
-        color: '#DC5F12',
-        p: { xs: 1.5, sm: 2 },
-        borderRadius: 1,
-        mb: 2,
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 } }}>
-          <Warning sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }} />
-          <Typography
-            fontWeight="bold"
-            sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}
-          >
-            Please complete the following information:
-          </Typography>
-        </Box>
-        <ul style={{
-          marginLeft: isMobile ? '20px' : '28px',
-          marginBottom: 0,
-          paddingLeft: 0
-        }}>
-          {messages.map((message, index) => (
-            <li key={index}>
-              <Typography sx={{ fontSize: { xs: '0.85rem', sm: '1rem' } }}>
-                {message}
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="sm"
+        fullWidth
+        sx={{
+          '& .MuiDialog-paper': {
+            borderRadius: 2,
+            [theme.breakpoints.down('sm')]: {
+              margin: 2,
+              maxWidth: 'calc(100% - 32px)',
+            }
+          }
+        }}
+      >
+        <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: { xs: 1, sm: 1.5 },
+            color: '#DC5F12',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 } }}>
+              <Warning sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }} />
+              <Typography
+                variant="h6"
+                fontWeight="bold"
+                sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
+              >
+                Missing Information
               </Typography>
-            </li>
-          ))}
-        </ul>
-      </Box>
+            </Box>
+            <Typography sx={{ fontSize: { xs: '0.9rem', sm: '1rem' }, mb: 1 }}>
+              Please complete the following information before continuing:
+            </Typography>
+            <ul style={{
+              marginLeft: 0,
+              paddingLeft: isMobile ? '16px' : '20px',
+              marginBottom: 0
+            }}>
+              {messages.map((message, index) => (
+                <li key={index} style={{ marginBottom: '4px' }}>
+                  <Typography sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
+                    {message}
+                  </Typography>
+                </li>
+              ))}
+            </ul>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: { xs: 2, sm: 3 }, pt: 0 }}>
+          <Button
+            onClick={onClose}
+            variant="contained"
+            sx={{
+              bgcolor: BLUE_COLOR,
+              '&:hover': {
+                bgcolor: BLUE_COLOR,
+                opacity: 0.9
+              },
+              fontSize: { xs: '0.9rem', sm: '1rem' }
+            }}
+          >
+            Got it
+          </Button>
+        </DialogActions>
+      </Dialog>
     );
   };
 
   const renderStepContent = () => {
-    const warningMessages = showStepWarning && activeStep < 2 ? getStepWarningMessage(activeStep) : [];
-
     return (
-      <>
-        {warningMessages.length > 0 && (
-          <StickyWarning>
-            <WarningMessage messages={warningMessages} />
-          </StickyWarning>
-        )}
-        <ScrollableContent>
-          {activeStep === 0 && <PropertySelector />}
-          {activeStep === 1 && <ViewingScheduler />}
-          {activeStep === 2 && <ViewingComparison />}
-        </ScrollableContent>
-      </>
+      <ScrollableContent>
+        {activeStep === 0 && <PropertySelector />}
+        {activeStep === 1 && <ViewingScheduler />}
+        {activeStep === 2 && <ViewingComparison />}
+      </ScrollableContent>
     );
   };
 
@@ -692,6 +712,12 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           </Button>
         </DialogActions>
       </Dialog>
+
+      <WarningPopup
+        messages={showStepWarning && activeStep < 2 ? getStepWarningMessage(activeStep) : []}
+        open={showStepWarning}
+        onClose={handleCloseWarning}
+      />
     </>
   );
 };
