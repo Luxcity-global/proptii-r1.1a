@@ -1035,7 +1035,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     if (!showWarningModal) return null;
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center">
         <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
           <div className="flex items-center mb-4">
             <div className="bg-yellow-100 p-2 rounded-full">
@@ -1090,7 +1090,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
     return (
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+        className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center"
         onClick={handleClose}
       >
         <div
@@ -1906,7 +1906,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
             </button>
           </div>
           {isMenuOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-[70]">
               <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl p-6">
                 <button onClick={() => setIsMenuOpen(false)} className="mb-4">
                   <X size={24} />
