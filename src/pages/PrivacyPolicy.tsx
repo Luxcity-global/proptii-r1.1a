@@ -9,10 +9,20 @@ const PrivacyPolicy = () => {
       <Navbar />
       {/* Hero Section */}
       <section
-        className="relative h-[80vh] bg-cover bg-center"
+        className="relative h-[80vh] bg-cover bg-center overflow-hidden"
         style={{ backgroundImage: 'url("/images/Privacy-Policy-Hero.png")' }}
       >
-        <div className="absolute inset-0 bg-[#0A2342]/80"></div>
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          <img
+            src="/images/Privacy-Policy-Hero.png"
+            alt="Privacy Policy Hero"
+            className="w-full h-full object-cover"
+            loading="eager"
+            fetchPriority="high"
+            sizes="100vw"
+          />
+          <div className="absolute inset-0 bg-[#0A2342]/80"></div>
+        </div>
         <div className="relative z-10 container mx-auto px-4 h-screen flex flex-col justify-center items-center text-center">
           <h1 className="text-5xl md:text-7xl font-bold text-white font-archivo">
             Privacy Policy

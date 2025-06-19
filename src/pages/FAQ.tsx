@@ -153,10 +153,20 @@ const FAQ = () => {
             <Navbar />
             {/* Hero Section */}
             <section
-                className="relative h-[80vh] bg-cover bg-center"
+                className="relative h-[80vh] bg-cover bg-center overflow-hidden"
                 style={{ backgroundImage: 'url("/images/FAQ-Hero.png")' }}
             >
-                <div className="absolute inset-0 bg-[#0A2342]/80"></div>
+                <div className="absolute inset-0 z-0 overflow-hidden">
+                    <img
+                        src="/images/FAQ-Hero.png"
+                        alt="FAQ Hero"
+                        className="w-full h-full object-cover"
+                        loading="eager"
+                        fetchPriority="high"
+                        sizes="100vw"
+                    />
+                    <div className="absolute inset-0 bg-[#0A2342]/80"></div>
+                </div>
                 <div className="relative z-10 container mx-auto px-4 h-full flex flex-col justify-center items-center text-center">
                     <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
                         Frequently Asked Questions
@@ -196,6 +206,15 @@ const FAQ = () => {
                     scrollPaddingTop: '6rem'
                 }}
             >
+                <div className="absolute inset-0 z-0 overflow-hidden">
+                    <img
+                        src="/images/Contract-bg.png"
+                        alt="FAQ Background"
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        sizes="100vw"
+                    />
+                </div>
                 <div className="max-w-4xl mx-auto px-4">
                     <div className="space-y-4">
                         {faqSections.map((section) => (

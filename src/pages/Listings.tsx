@@ -19,7 +19,12 @@ const mockProperties = [
       postcode: 'SW1A 1AA',
       coordinates: [51.5074, -0.1278]
     },
-    images: ['https://placehold.co/600x400'],
+    images: [{
+      src: 'https://placehold.co/600x400',
+      alt: 'Modern 2 Bed Apartment',
+      loading: 'lazy',
+      sizes: '(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw'
+    }],
     features: ['Furnished', 'Parking', 'Gym', 'Pet Friendly', 'Garden Access', 'Bike Storage'],
     description: 'Beautiful modern apartment in the heart of London with excellent transport links and local amenities.',
     agent: {
@@ -50,7 +55,12 @@ const mockProperties = [
       postcode: 'NW3 2PT',
       coordinates: [51.5225, -0.1389]
     },
-    images: ['https://placehold.co/600x400'],
+    images: [{
+      src: 'https://placehold.co/600x400',
+      alt: 'Spacious 3 Bed House',
+      loading: 'lazy',
+      sizes: '(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw'
+    }],
     features: [
       'Garden',
       'Off-street Parking',
@@ -88,7 +98,12 @@ const mockProperties = [
       postcode: 'NW8 7DH',
       coordinates: [51.5315, -0.1740]
     },
-    images: ['https://placehold.co/600x400'],
+    images: [{
+      src: 'https://placehold.co/600x400',
+      alt: 'Luxury 1 Bed Flat',
+      loading: 'lazy',
+      sizes: '(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw'
+    }],
     features: [
       'Concierge',
       'Balcony',
@@ -124,7 +139,7 @@ const Listings: React.FC = () => {
     // Implement search logic
     console.log('Searching for:', query);
     // For now, we'll just filter the mock properties
-    const filteredProperties = mockProperties.filter(property => 
+    const filteredProperties = mockProperties.filter(property =>
       property.title.toLowerCase().includes(query.toLowerCase()) ||
       property.location.address.toLowerCase().includes(query.toLowerCase())
     );
@@ -148,17 +163,15 @@ const Listings: React.FC = () => {
         <div className="flex items-center space-x-4">
           <button
             onClick={() => setViewMode('grid')}
-            className={`p-2 rounded-lg ${
-              viewMode === 'grid' ? 'bg-primary text-white' : 'bg-gray-100'
-            }`}
+            className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-primary text-white' : 'bg-gray-100'
+              }`}
           >
             <Grid className="w-5 h-5" />
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`p-2 rounded-lg ${
-              viewMode === 'list' ? 'bg-primary text-white' : 'bg-gray-100'
-            }`}
+            className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-primary text-white' : 'bg-gray-100'
+              }`}
           >
             <List className="w-5 h-5" />
           </button>
@@ -169,11 +182,10 @@ const Listings: React.FC = () => {
       </div>
 
       <div
-        className={`grid gap-6 ${
-          viewMode === 'grid'
+        className={`grid gap-6 ${viewMode === 'grid'
             ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
             : 'grid-cols-1'
-        }`}
+          }`}
       >
         {properties.map((property) => (
           <ListingCard
