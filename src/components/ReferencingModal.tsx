@@ -613,11 +613,18 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         }
 
         const hasAnyData = Object.values(data).some(value => !!value);
-        const hasAllFields = data.employmentStatus && data.companyDetails && data.lengthOfEmployment && data.jobPosition && data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType;
-        const hasDocument = data.proofDocument?.name && data.proofDocument?.dataUrl;
+
+        // For employed statuses, require all employment fields
+        if (data.employmentStatus && !nonApplicableStatus.includes(data.employmentStatus)) {
+          const hasAllFields = data.employmentStatus && data.companyDetails && data.lengthOfEmployment && data.jobPosition && data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType;
+          const hasDocument = data.proofDocument?.name && data.proofDocument?.dataUrl;
+
+          if (!hasAnyData) return 'empty';
+          if (hasAllFields && hasDocument) return 'complete';
+          return 'partial';
+        }
 
         if (!hasAnyData) return 'empty';
-        if (hasAllFields && hasDocument) return 'complete';
         return 'partial';
       }
 
@@ -646,19 +653,19 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       }
 
       case 'financial': {
-        const hasAnyData = Object.values(data).some(value => !!value);
+        const hasAnyData = Object.values(data).some(value => !!value && value !== false);
         const hasAllFields = data.monthlyIncome && data.proofOfIncomeType;
         const hasDocument = data.proofOfIncomeDocument?.name && data.proofOfIncomeDocument?.dataUrl;
-        const isOpenBanking = data.useOpenBanking;
+        const isOpenBankingConnected = data.useOpenBanking && data.isConnectedToOpenBanking;
 
         if (!hasAnyData) return 'empty';
-        if (hasAllFields && (hasDocument || isOpenBanking)) return 'complete';
+        if (hasAllFields && (hasDocument || isOpenBankingConnected)) return 'complete';
         return 'partial';
       }
 
       case 'guarantor': {
         // This section is optional, so it's 'complete' if empty.
-        const hasAnyData = Object.values(data).some(value => !!value && value !== null);
+        const hasAnyData = Object.values(data).some(value => !!value && value !== null && value !== '');
         if (!hasAnyData) return 'complete';
 
         const hasAllFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
@@ -900,70 +907,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   };
 
   const checkFormCompleteness = () => {
-    // Check if all required fields are filled
-    const isComplete =
-      // Identity section
-      Boolean(formData.identity?.firstName) &&
-      Boolean(formData.identity?.lastName) &&
-      Boolean(formData.identity?.email) &&
-      Boolean(formData.identity?.phoneNumber) &&
-      Boolean(formData.identity?.dateOfBirth) &&
-      Boolean(formData.identity?.nationality) &&
-      Boolean(formData.identity?.identityProof) &&
+    // Check if all required fields are filled based on individual step completion
+    const allStepsComplete = Object.values(stepStatus).every(status => status === 'complete');
 
-      // Employment section
-      Boolean(formData.employment?.employmentStatus) &&
-      Boolean(formData.employment?.companyDetails) &&
-      Boolean(formData.employment?.lengthOfEmployment) &&
-      Boolean(formData.employment?.jobPosition) &&
-      Boolean(formData.employment?.referenceFullName) &&
-      Boolean(formData.employment?.referenceEmail) &&
-      Boolean(formData.employment?.referencePhone) &&
-      Boolean(formData.employment?.proofType) &&
-      Boolean(formData.employment?.proofDocument) &&
-
-      // Residential section
-      Boolean(formData.residential?.currentAddress) &&
-      Boolean(formData.residential?.durationAtCurrentAddress) &&
-      Boolean(formData.residential?.previousAddress) &&
-      Boolean(formData.residential?.durationAtPreviousAddress) &&
-      Boolean(formData.residential?.reasonForLeaving) &&
-      Boolean(formData.residential?.proofType) &&
-      Boolean(formData.residential?.proofDocument) &&
-
-      // Financial section
-      Boolean(formData.financial?.monthlyIncome) &&
-      Boolean(formData.financial?.proofOfIncomeType) &&
-      Boolean(formData.financial?.proofOfIncomeDocument) &&
-
-      // Guarantor section
-      Boolean(formData.guarantor?.firstName) &&
-      Boolean(formData.guarantor?.lastName) &&
-      Boolean(formData.guarantor?.email) &&
-      Boolean(formData.guarantor?.phoneNumber) &&
-      Boolean(formData.guarantor?.address) &&
-      Boolean(formData.guarantor?.identityDocument) &&
-
-      // Agent details section
-      Boolean(formData.agentDetails?.firstName) &&
-      Boolean(formData.agentDetails?.lastName) &&
-      Boolean(formData.agentDetails?.email) &&
-      Boolean(formData.agentDetails?.phoneNumber) &&
-      Boolean(formData.agentDetails?.hasAgreedToCheck);
-
-    // Update step status based on individual section completeness
-    setStepStatus({
-      1: isComplete ? 'complete' : 'partial',
-      2: isComplete ? 'complete' : 'partial',
-      3: isComplete ? 'complete' : 'partial',
-      4: isComplete ? 'complete' : 'partial',
-      5: isComplete ? 'complete' : 'partial',
-      6: isComplete ? 'complete' : 'partial',
-      7: isComplete ? 'complete' : 'partial'
-    });
-
-    setIsFormComplete(isComplete);
-    return isComplete;
+    setIsFormComplete(allStepsComplete);
+    return allStepsComplete;
   };
 
   const submitApplication = async (force: boolean = false) => {
