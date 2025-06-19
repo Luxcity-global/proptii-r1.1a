@@ -10,6 +10,7 @@ interface TooltipProps {
   showIcon?: boolean;
   iconClassName?: string;
   maxWidth?: string;
+  disabled?: boolean;
 }
 
 export const Tooltip: React.FC<TooltipProps> = ({
@@ -20,7 +21,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
   trigger = 'hover',
   showIcon = false,
   iconClassName = '',
-  maxWidth = 'max-w-xs'
+  maxWidth = 'max-w-xs',
+  disabled = false
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
@@ -79,19 +81,19 @@ export const Tooltip: React.FC<TooltipProps> = ({
   }, [isVisible, position]);
 
   const handleMouseEnter = () => {
-    if (trigger === 'hover') {
+    if (trigger === 'hover' && !disabled) {
       setIsVisible(true);
     }
   };
 
   const handleMouseLeave = () => {
-    if (trigger === 'hover') {
+    if (trigger === 'hover' && !disabled) {
       setIsVisible(false);
     }
   };
 
   const handleClick = () => {
-    if (trigger === 'click') {
+    if (trigger === 'click' && !disabled) {
       setIsVisible(!isVisible);
     }
   };
@@ -128,7 +130,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
         )}
       </div>
 
-      {isVisible && (
+      {isVisible && !disabled && (
         <div
           ref={tooltipRef}
           className={`fixed z-[9999] ${maxWidth} p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl 

@@ -306,6 +306,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         position="top"
         maxWidth="max-w-sm"
         className="w-full block"
+        disabled={query.trim().length > 0}
       >
         <form onSubmit={handleSubmit} className="relative w-full">
           <div className="bg-white rounded-full p-2 flex items-center shadow-xl">
