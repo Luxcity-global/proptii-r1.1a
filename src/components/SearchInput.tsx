@@ -306,10 +306,10 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         }
         position="bottom"
         maxWidth="max-w-sm"
-        className="w-full"
+        className="w-full block"
       >
-        <form onSubmit={handleSubmit} className="relative">
-          <div className="bg-white rounded-full p-2 flex items-center shadow-xl">
+        <form onSubmit={handleSubmit} className="relative w-full">
+          <div className="bg-white rounded-full p-2 flex items-center shadow-xl w-full">
             {!isMobile && (
               <>
                 <button
@@ -409,7 +409,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       {isFocused && (searchSuggestions.length > 0 || getSearchHistory().slice(0, 3).length > 0) && (
         <div
           ref={suggestionsRef}
-          className="absolute w-full mt-2 bg-white rounded-xl shadow-lg overflow-hidden z-50 max-h-[300px] overflow-y-auto"
+          className="absolute w-full mt-2 bg-white rounded-xl shadow-lg overflow-hidden z-[60] max-h-[300px] overflow-y-auto"
         >
           <ul className="py-1" id="search-suggestions-list" role="listbox">
             {searchSuggestions.map((suggestion, index) => (
@@ -454,7 +454,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
 
       {/* Show recent searches below input */}
       {getSearchHistory().slice(0, 3).length > 0 && (
-        <div className="mt-2 bg-white rounded-xl shadow p-3 relative">
+        <div className="mt-2 bg-white rounded-xl shadow p-3 relative z-[60]">
           {/* Clear history X button */}
           <button
             type="button"
