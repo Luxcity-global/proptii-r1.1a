@@ -1066,9 +1066,34 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const SuccessModal = () => {
     if (!showSuccessModal) return null;
 
+    const handleSuccessClose = (e: React.MouseEvent) => {
+      e.stopPropagation(); // Stop event propagation
+      setShowSuccessModal(false);
+      setShowWarningModal(false);
+      setIsProcessingFile(false);
+      // Clear form data from localStorage if user is logged in
+      if (user?.id) {
+        const keysToRemove = [
+          `referencing_${user.id}_formData`,
+          `referencing_${user.id}_stepStatus`,
+          `referencing_${user.id}_currentStep`,
+          `referencing_${user.id}_submitted`
+        ];
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+      }
+      // Close the main modal
+      onClose();
+    };
+
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+        onClick={handleSuccessClose} // Close when clicking the backdrop
+      >
+        <div
+          className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl"
+          onClick={(e) => e.stopPropagation()} // Prevent closing when clicking the modal content
+        >
           <div className="flex items-center mb-4">
             <div className="bg-green-100 p-2 rounded-full">
               <CheckCircle className="text-green-500 w-6 h-6" />
@@ -1082,10 +1107,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
           <div className="flex justify-end">
             <button
-              onClick={() => {
-                setShowSuccessModal(false);
-                onClose();
-              }}
+              onClick={handleSuccessClose}
               className="px-4 py-2 bg-[#136C9E] text-white rounded-md hover:bg-opacity-90 transition-colors"
             >
               Close
