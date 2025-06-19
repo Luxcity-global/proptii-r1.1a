@@ -43,6 +43,16 @@ const swiperStyles = `
   }
 `;
 
+// Add preload link for the hero image
+const heroImageUrl = '/images/pablo-merchan-montes-wYOPqmtDD0w-unsplash.jpg';
+const preloadHeroImage = () => {
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = 'image';
+  link.href = heroImageUrl;
+  document.head.appendChild(link);
+};
+
 const Referencing = () => {
   const { isAuthenticated, login } = useAuth();
   const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
@@ -69,6 +79,11 @@ const Referencing = () => {
     return () => {
       document.head.removeChild(styleElement);
     };
+  }, []);
+
+  // Preload hero image when component mounts
+  useEffect(() => {
+    preloadHeroImage();
   }, []);
 
   const handleGetStarted = () => {
@@ -103,11 +118,12 @@ const Referencing = () => {
         {/* Background Image */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           <img
-            src="/images/pablo-merchan-montes-wYOPqmtDD0w-unsplash.jpg"
+            src={heroImageUrl}
             alt="Family enjoying dinner together"
             className="w-full h-full object-cover"
             loading="eager"
             fetchPriority="high"
+            decoding="sync"
             sizes="100vw"
           />
           {/* Overlay to ensure text readability */}
