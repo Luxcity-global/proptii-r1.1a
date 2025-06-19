@@ -1,6 +1,6 @@
 import React from 'react';
 import { ExternalLink, BedDouble, Bath, Building2, Home } from 'lucide-react';
-import { GuideTooltip } from './GuideTooltip';
+import { Tooltip } from './Tooltip';
 
 interface PropertySpecs {
   beds: number;
@@ -107,15 +107,32 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {mappedResults.map((property) => (
-          <GuideTooltip
+          <Tooltip
             key={property.id}
-            content="Found a property you're interested in? Come back to our site with the agent's contact information, and we'll help you proceed with booking a viewing or starting the referencing process. We streamline the entire journey from property discovery to securing your new home."
-            title="Next Steps"
+            content={
+              <div className="space-y-2">
+                <h4 className="font-semibold text-orange-400">🏠 Next Steps</h4>
+                <p className="text-sm leading-relaxed">
+                  Found a property you like? Come back to our site with the agent's contact information!
+                </p>
+                <div className="text-xs space-y-1 bg-gray-800 p-2 rounded">
+                  <p className="text-yellow-300">📞 We can help you with:</p>
+                  <ul className="ml-2 space-y-1 text-gray-300">
+                    <li>• Book viewing appointments</li>
+                    <li>• Complete referencing process</li>
+                    <li>• Handle contract negotiations</li>
+                  </ul>
+                </div>
+                <p className="text-xs text-gray-300">
+                  Let us make your property journey seamless!
+                </p>
+              </div>
+            }
             position="top"
-            maxWidth="350px"
-            showIcon={false}
+            maxWidth="max-w-sm"
+            className="w-full"
           >
-            <div className="bg-white rounded-lg shadow-lg overflow-hidden" tabIndex={0} aria-label={`Property card: ${property.title}`}>
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300" tabIndex={0} aria-label={`Property card: ${property.title}`}>
               {/* Fixed height header section */}
               <div className="bg-[#f2f1eb] px-6 py-4 border-b h-[120px] flex items-center justify-between">
                 <img
@@ -205,7 +222,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
                 </div>
               </div>
             </div>
-          </GuideTooltip>
+          </Tooltip>
         ))}
       </div>
     </div>
