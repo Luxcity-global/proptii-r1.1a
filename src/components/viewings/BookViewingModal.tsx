@@ -16,8 +16,7 @@ import {
   Step,
   StepLabel,
   LinearProgress,
-  CircularProgress,
-  StepperProps
+  CircularProgress
 } from '@mui/material';
 import PropertySelector from './components/PropertySelector';
 import ViewingScheduler from './components/ViewingScheduler';
@@ -221,6 +220,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
+  const [showStepWarning, setShowStepWarning] = useState(false);
 
   // Validation function for final submission
   const isAllDataComplete = () => {
@@ -318,6 +318,15 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
   };
 
   const handleNext = async () => {
+    // Check if current step has missing fields (only for steps 0 and 1)
+    if (activeStep < 2) {
+      const warningMessages = getStepWarningMessage(activeStep);
+      if (warningMessages.length > 0) {
+        setShowStepWarning(true);
+        return; // Don't proceed if fields are missing
+      }
+    }
+
     // If we're on the confirmation step, check if all data is complete
     if (activeStep === steps.length - 1 && !isAllDataComplete()) {
       return; // Don't proceed if data is incomplete
@@ -384,6 +393,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
   };
 
   const handleBack = () => {
+    setShowStepWarning(false);
     setActiveStep((prevStep) => prevStep - 1);
   };
 
@@ -433,55 +443,33 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
       <Box sx={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 1,
+        gap: { xs: 0.5, sm: 1 },
         bgcolor: alpha('#DC5F12', 0.1),
         color: '#DC5F12',
-        p: theme.spacing(2),
+        p: { xs: 1.5, sm: 2 },
         borderRadius: 1,
         mb: 2,
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        [theme.breakpoints.down('sm')]: {
-          p: theme.spacing(1.5),
-          mb: 1,
-          gap: 0.5
-        }
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
-        <Box sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          [theme.breakpoints.down('sm')]: {
-            gap: 0.5
-          }
-        }}>
-          <Warning sx={{
-            [theme.breakpoints.down('sm')]: {
-              fontSize: '1.2rem'
-            }
-          }} />
-          <Typography fontWeight="bold" sx={{
-            [theme.breakpoints.down('sm')]: {
-              fontSize: '0.9rem'
-            }
-          }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 } }}>
+          <Warning sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }} />
+          <Typography
+            fontWeight="bold"
+            sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}
+          >
             Please complete the following information:
           </Typography>
         </Box>
         <ul style={{
-          marginLeft: '28px',
+          marginLeft: isMobile ? '20px' : '28px',
           marginBottom: 0,
-          [theme.breakpoints.down('sm')]: {
-            marginLeft: '24px',
-            marginTop: '4px'
-          }
+          paddingLeft: 0
         }}>
           {messages.map((message, index) => (
             <li key={index}>
-              <Typography sx={{
-                [theme.breakpoints.down('sm')]: {
-                  fontSize: '0.85rem'
-                }
-              }}>{message}</Typography>
+              <Typography sx={{ fontSize: { xs: '0.85rem', sm: '1rem' } }}>
+                {message}
+              </Typography>
             </li>
           ))}
         </ul>
@@ -490,7 +478,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
   };
 
   const renderStepContent = () => {
-    const warningMessages = getStepWarningMessage(activeStep);
+    const warningMessages = showStepWarning && activeStep < 2 ? getStepWarningMessage(activeStep) : [];
 
     return (
       <>
@@ -508,10 +496,18 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     );
   };
 
-  // Reset saved indicator when changing steps
+  // Reset saved indicator and warnings when changing steps
   useEffect(() => {
     setShowSavedIndicator(false);
+    setShowStepWarning(false);
   }, [activeStep]);
+
+  // Reset warning when state changes (user fills fields)
+  useEffect(() => {
+    if (showStepWarning) {
+      setShowStepWarning(false);
+    }
+  }, [state.selectedProperty, state.viewingDetails]);
 
   return (
     <>
