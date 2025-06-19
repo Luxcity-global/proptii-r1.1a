@@ -42,20 +42,20 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
     switch (position) {
       case 'top':
-        top = triggerRect.top - tooltipRect.height - 8;
+        top = triggerRect.top - tooltipRect.height - 12;
         left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
         break;
       case 'bottom':
-        top = triggerRect.bottom + 8;
+        top = triggerRect.bottom + 12;
         left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
         break;
       case 'left':
         top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
-        left = triggerRect.left - tooltipRect.width - 8;
+        left = triggerRect.left - tooltipRect.width - 12;
         break;
       case 'right':
         top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
-        left = triggerRect.right + 8;
+        left = triggerRect.right + 12;
         break;
     }
 
@@ -98,7 +98,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
   const getArrowClasses = () => {
     const baseArrowClasses = "absolute w-3 h-3 bg-gray-900 transform rotate-45";
-    
+
     switch (position) {
       case 'top':
         return `${baseArrowClasses} -bottom-1.5 left-1/2 -translate-x-1/2`;
@@ -120,7 +120,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
-        className={`relative inline-flex items-center ${className}`}
+        className={`relative ${className.includes('w-full') ? 'w-full' : 'inline-flex items-center'} ${className}`}
       >
         {children}
         {showIcon && (
@@ -131,7 +131,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
       {isVisible && (
         <div
           ref={tooltipRef}
-          className={`fixed z-[1000] ${maxWidth} p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl 
+          className={`fixed z-[100] ${maxWidth} p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl 
             transform transition-all duration-200 ease-out opacity-100 scale-100`}
           style={{
             top: `${tooltipPosition.top}px`,
