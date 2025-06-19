@@ -15,12 +15,14 @@ const AgentHome = () => {
       {/* Hero Section */}
       <section className="h-[80vh] relative flex items-center">
         {/* Background Image */}
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 overflow-hidden">
           <img
             src="/images/hero-agent-happy-couple.jpg"
             alt="Happy couple with agent"
             className="w-full h-full object-cover"
             loading="eager"
+            fetchPriority="high"
+            sizes="100vw"
           />
           <div className="absolute inset-0 bg-black bg-opacity-40"></div>
         </div>
@@ -67,7 +69,9 @@ const AgentHome = () => {
         <img
           src="/images/middle-section.png"
           alt="Decorative background"
-          className="absolute top-0 left-0 w-full h-full object-cover opacity-50"
+          className="absolute inset-0 w-full h-full object-cover opacity-50"
+          loading="lazy"
+          sizes="100vw"
         />
 
         <div className="max-w-7xl mx-auto px-4 relative z-10">
@@ -78,8 +82,9 @@ const AgentHome = () => {
                 <img
                   src="/images/viewing-room.jpg"
                   alt="Modern living room"
-                  className="w-full h-44 md:h-48 object-cover rounded-2xl"
-                  style={{ objectPosition: 'center 30%' }}
+                  className="w-full h-full object-cover rounded-lg"
+                  loading="lazy"
+                  sizes="(max-width: 768px) 100vw, 50vw"
                 />
               </div>
               <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Book Viewing</h3>
@@ -99,8 +104,9 @@ const AgentHome = () => {
                 <img
                   src="/images/referencing-person.jpg"
                   alt="Professional woman with tablet"
-                  className="w-full h-44 md:h-48 object-cover rounded-2xl"
-                  style={{ objectPosition: 'center 20%' }}
+                  className="w-full h-full object-cover rounded-lg"
+                  loading="lazy"
+                  sizes="(max-width: 768px) 100vw, 50vw"
                 />
               </div>
               <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Referencing</h3>
@@ -120,7 +126,9 @@ const AgentHome = () => {
                 <img
                   src="/images/modern-building.jpg"
                   alt="Modern glass building"
-                  className="w-full h-44 md:h-48 object-cover rounded-2xl"
+                  className="w-full h-full object-cover rounded-lg"
+                  loading="lazy"
+                  sizes="(max-width: 768px) 100vw, 50vw"
                 />
               </div>
               <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Contract</h3>

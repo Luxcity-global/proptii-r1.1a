@@ -85,6 +85,8 @@ const AboutUs = () => {
                 src="/images/About-us-AI.png"
                 alt="AI in Real Estate"
                 className="w-full max-w-md h-auto max-h-[500px] object-contain"
+                loading="lazy"
+                sizes="(max-width: 768px) 100vw, 500px"
               />
             </div>
 
@@ -95,12 +97,13 @@ const AboutUs = () => {
       {/* How We Are Different Section */}
       <section className="py-24 bg-gradient-to-br from-blue-50/50 to-orange-50/50 relative overflow-hidden">
         {/* Background Image */}
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 overflow-hidden">
           <img
             src="/images/h-w-a-d-bg.png"
             alt="Contracts background"
             className="w-full h-full object-cover"
-            loading="eager"
+            loading="lazy"
+            sizes="100vw"
           />
         </div>
 
@@ -215,6 +218,8 @@ const AboutUs = () => {
                 src="/images/how-we-are.png"
                 alt="Happy family with their new home"
                 className="w-full h-2/5 rounded-3xl shadow-xl object-cover"
+                loading="lazy"
+                sizes="(max-width: 768px) 100vw, 40vw"
               />
             </div>
 
@@ -224,6 +229,8 @@ const AboutUs = () => {
                 src="/images/how-we-are.png"
                 alt="Happy family with their new home"
                 className="w-4/5 mx-auto rounded-3xl shadow-xl object-cover h-64"
+                loading="lazy"
+                sizes="80vw"
               />
             </div>
           </div>

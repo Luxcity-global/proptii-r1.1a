@@ -15,7 +15,12 @@ interface Property {
     postcode: string;
     coordinates: [number, number];
   };
-  images: string[];
+  images: {
+    src: string;
+    alt: string;
+    loading: string;
+    sizes: string;
+  }[];
   features: string[];
   description: string;
   agent: {
@@ -73,27 +78,27 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
 
   const cardContent = (
     <div
-      className={`bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow ${
-        viewMode === 'list' ? 'flex' : ''
-      }`}
+      className={`bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow ${viewMode === 'list' ? 'flex' : ''
+        }`}
     >
-      <div 
+      <div
         className={`relative ${viewMode === 'list' ? 'w-1/2' : 'w-full'}`}
       >
         <div className="flex h-64 p-2 gap-2">
           {/* Main large image */}
           <div className="w-2/3 h-full relative rounded-lg overflow-hidden" onClick={(e) => handleImageClick(0, e)}>
             <img
-              src={imagePaths.main}
-              alt="Main property view"
+              src={property.images[0].src}
+              alt={property.images[0].alt}
               className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+              loading={property.images[0].loading}
+              sizes={property.images[0].sizes}
             />
             <div className="absolute top-2 left-2 flex flex-col gap-2">
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                property.type === 'rent' 
-                  ? 'bg-blue-500 text-white' 
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${property.type === 'rent'
+                  ? 'bg-blue-500 text-white'
                   : 'bg-purple-500 text-white'
-              }`}>
+                }`}>
                 {property.type === 'rent' ? 'To Rent' : 'For Sale'}
               </span>
               {property.isAvailableNow && (
@@ -108,37 +113,21 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
           </div>
 
           {/* Side images */}
-          <div className="w-1/3 h-full flex flex-col gap-2">
-            <div className="h-1/3 relative rounded-lg overflow-hidden" onClick={(e) => handleImageClick(1, e)}>
-              <img
-                src={imagePaths.side1}
-                alt="Living room"
-                className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
-              />
-              <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
-                Living
+          <div className="w-1/3 flex flex-col gap-2">
+            {property.images.slice(1, 4).map((image, index) => (
+              <div key={index} className="h-1/3 relative rounded-lg overflow-hidden" onClick={(e) => handleImageClick(index + 1, e)}>
+                <img
+                  src={image.src}
+                  alt={image.alt}
+                  className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                  loading={image.loading}
+                  sizes={image.sizes}
+                />
+                <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
+                  View {index + 2}
+                </div>
               </div>
-            </div>
-            <div className="h-1/3 relative rounded-lg overflow-hidden" onClick={(e) => handleImageClick(2, e)}>
-              <img
-                src={imagePaths.side2}
-                alt="Kitchen"
-                className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
-              />
-              <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
-                Kitchen
-              </div>
-            </div>
-            <div className="h-1/3 relative rounded-lg overflow-hidden" onClick={(e) => handleImageClick(3, e)}>
-              <img
-                src={imagePaths.side3}
-                alt="Garden"
-                className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
-              />
-              <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
-                Garden
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
@@ -148,9 +137,8 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
               e.stopPropagation();
               setIsSaved(!isSaved);
             }}
-            className={`p-1.5 rounded-full ${
-              isSaved ? 'text-red-500' : 'text-gray-600'
-            } hover:bg-gray-100`}
+            className={`p-1.5 rounded-full ${isSaved ? 'text-red-500' : 'text-gray-600'
+              } hover:bg-gray-100`}
           >
             <Heart className="w-4 h-4" />
           </button>
@@ -167,7 +155,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
       </div>
 
       {/* Rest of the card content */}
-      <div 
+      <div
         className={`p-4 ${viewMode === 'list' ? 'w-1/2' : ''}`}
         onClick={() => setShowModal(true)}
       >
@@ -187,12 +175,12 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center text-gray-600 mb-3">
           <MapPin className="w-4 h-4 mr-1" />
           <span className="text-sm">{property.location.address}</span>
         </div>
-        
+
         <div className="flex items-center space-x-4 text-gray-600 mb-4">
           <div className="flex items-center">
             <BedDouble className="w-4 h-4 mr-1" />

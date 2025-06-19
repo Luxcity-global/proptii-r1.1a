@@ -27,12 +27,14 @@ const AgentContractLanding = () => {
             {/* Hero Section */}
             <section className="h-[80vh] relative flex items-center">
                 {/* Background Image */}
-                <div className="absolute inset-0 z-0">
+                <div className="absolute inset-0 z-0 overflow-hidden">
                     <img
                         src="/images/modern-building.jpg"
                         alt="Modern building"
                         className="w-full h-full object-cover"
                         loading="eager"
+                        fetchPriority="high"
+                        sizes="100vw"
                     />
                     <div className="absolute inset-0 bg-black bg-opacity-40"></div>
                 </div>
@@ -73,12 +75,13 @@ const AgentContractLanding = () => {
             {/* Contracts Section */}
             <section className="py-20 bg-white relative overflow-hidden">
                 {/* Background Image */}
-                <div className="absolute inset-0 z-0">
+                <div className="absolute inset-0 z-0 overflow-hidden">
                     <img
                         src="/images/Contract-bg.png"
                         alt="Contracts background"
                         className="w-full h-full object-cover"
-                        loading="eager"
+                        loading="lazy"
+                        sizes="100vw"
                     />
                 </div>
 
@@ -114,6 +117,8 @@ const AgentContractLanding = () => {
                                 src="/images/R 9.png"
                                 alt="Contract illustration"
                                 className="w-2.5/4 h-auto"
+                                loading="lazy"
+                                sizes="(max-width: 768px) 100vw, 50vw"
                             />
                         </div>
                     </div>
