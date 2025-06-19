@@ -16,7 +16,8 @@ import {
   Step,
   StepLabel,
   LinearProgress,
-  CircularProgress
+  CircularProgress,
+  StepperProps
 } from '@mui/material';
 import PropertySelector from './components/PropertySelector';
 import ViewingScheduler from './components/ViewingScheduler';
@@ -435,21 +436,52 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         gap: 1,
         bgcolor: alpha('#DC5F12', 0.1),
         color: '#DC5F12',
-        p: 2,
+        p: theme.spacing(2),
         borderRadius: 1,
         mb: 2,
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        [theme.breakpoints.down('sm')]: {
+          p: theme.spacing(1.5),
+          mb: 1,
+          gap: 0.5
+        }
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Warning />
-          <Typography fontWeight="bold">
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          [theme.breakpoints.down('sm')]: {
+            gap: 0.5
+          }
+        }}>
+          <Warning sx={{
+            [theme.breakpoints.down('sm')]: {
+              fontSize: '1.2rem'
+            }
+          }} />
+          <Typography fontWeight="bold" sx={{
+            [theme.breakpoints.down('sm')]: {
+              fontSize: '0.9rem'
+            }
+          }}>
             Please complete the following information:
           </Typography>
         </Box>
-        <ul style={{ marginLeft: '28px', marginBottom: 0 }}>
+        <ul style={{
+          marginLeft: '28px',
+          marginBottom: 0,
+          [theme.breakpoints.down('sm')]: {
+            marginLeft: '24px',
+            marginTop: '4px'
+          }
+        }}>
           {messages.map((message, index) => (
             <li key={index}>
-              <Typography>{message}</Typography>
+              <Typography sx={{
+                [theme.breakpoints.down('sm')]: {
+                  fontSize: '0.85rem'
+                }
+              }}>{message}</Typography>
             </li>
           ))}
         </ul>
@@ -462,9 +494,11 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
 
     return (
       <>
-        <StickyWarning>
-          <WarningMessage messages={warningMessages} />
-        </StickyWarning>
+        {warningMessages.length > 0 && (
+          <StickyWarning>
+            <WarningMessage messages={warningMessages} />
+          </StickyWarning>
+        )}
         <ScrollableContent>
           {activeStep === 0 && <PropertySelector />}
           {activeStep === 1 && <ViewingScheduler />}
