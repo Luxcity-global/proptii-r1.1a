@@ -61,11 +61,27 @@ const StyledDialog = styled(Dialog)(({ theme }) => ({
 
 const ContentSection = styled(Box)(({ theme }) => ({
   flex: 1,
-  padding: theme.spacing(3),
   display: 'flex',
   flexDirection: 'column',
   backgroundColor: BACKGROUND_BLUE,
+  position: 'relative',
+  overflow: 'hidden',
+}));
+
+const ScrollableContent = styled(Box)(({ theme }) => ({
+  flex: 1,
+  padding: theme.spacing(3),
   overflow: 'auto',
+  display: 'flex',
+  flexDirection: 'column',
+}));
+
+const StickyWarning = styled(Box)(({ theme }) => ({
+  position: 'sticky',
+  top: 0,
+  zIndex: 1,
+  padding: theme.spacing(3, 3, 0, 3),
+  backgroundColor: BACKGROUND_BLUE,
 }));
 
 const StepSidebar = styled(Box)(({ theme }) => ({
@@ -421,7 +437,8 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         color: '#DC5F12',
         p: 2,
         borderRadius: 1,
-        mb: 2
+        mb: 2,
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Warning />
@@ -443,31 +460,18 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
   const renderStepContent = () => {
     const warningMessages = getStepWarningMessage(activeStep);
 
-    switch (activeStep) {
-      case 0:
-        return (
-          <>
-            <WarningMessage messages={warningMessages} />
-            <PropertySelector />
-          </>
-        );
-      case 1:
-        return (
-          <>
-            <WarningMessage messages={warningMessages} />
-            <ViewingScheduler />
-          </>
-        );
-      case 2:
-        return (
-          <>
-            <WarningMessage messages={warningMessages} />
-            <ViewingComparison />
-          </>
-        );
-      default:
-        return null;
-    }
+    return (
+      <>
+        <StickyWarning>
+          <WarningMessage messages={warningMessages} />
+        </StickyWarning>
+        <ScrollableContent>
+          {activeStep === 0 && <PropertySelector />}
+          {activeStep === 1 && <ViewingScheduler />}
+          {activeStep === 2 && <ViewingComparison />}
+        </ScrollableContent>
+      </>
+    );
   };
 
   // Reset saved indicator when changing steps
