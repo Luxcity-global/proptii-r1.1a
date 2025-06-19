@@ -5,7 +5,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { ErrorMessage } from './ErrorMessage';
 import { LoadingSpinner } from './LoadingSpinner';
 import { LocalStorageService } from '../services/LocalStorageService';
-import { GuideTooltip } from './GuideTooltip';
+import { Tooltip } from './Tooltip';
 
 interface SearchInputProps {
   onSearch: (query: string) => void;
@@ -287,12 +287,26 @@ export const SearchInput: React.FC<SearchInputProps> = ({
 
   return (
     <div className={`relative ${className}`}>
-      <GuideTooltip
-        content="Our AI-powered search understands natural language queries. Try searching for 'modern 2-bedroom flat in Central London with parking' or 'pet-friendly house under £2000 near good schools'. The AI will analyze your requirements and find the best matching properties across multiple platforms including Rightmove, Zoopla, OpenRent, and OnTheMarket."
-        title="How AI Search Works"
+      <Tooltip
+        content={
+          <div className="space-y-2">
+            <h4 className="font-semibold text-orange-400">🤖 AI-Powered Search</h4>
+            <p className="text-sm leading-relaxed">
+              Our intelligent search understands natural language. Try queries like:
+            </p>
+            <ul className="text-xs space-y-1 ml-2">
+              <li>• "2 bedroom flat in London under £2000"</li>
+              <li>• "Pet-friendly house with garden"</li>
+              <li>• "Studio apartment near tube station"</li>
+            </ul>
+            <p className="text-xs text-gray-300 mt-2">
+              We search across multiple property sites to find your perfect match!
+            </p>
+          </div>
+        }
         position="bottom"
-        maxWidth="400px"
-        showIcon={false}
+        maxWidth="max-w-sm"
+        className="w-full"
       >
         <form onSubmit={handleSubmit} className="relative">
           <div className="bg-white rounded-full p-2 flex items-center shadow-xl">
@@ -372,7 +386,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
             </button>
           </div>
         </form>
-      </GuideTooltip>
+      </Tooltip>
 
       {error && (
         <div className="mt-2 flex items-center justify-between">
