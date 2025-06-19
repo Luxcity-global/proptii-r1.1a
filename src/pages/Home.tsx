@@ -43,7 +43,12 @@ const Home = () => {
     checkBackend();
   }, []);
 
-  // Progress bar component (removed loadingProgress)
+  // Progress bar component (simplified since loadingProgress is not available)
+  const ProgressBar = () => (
+    <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden mt-4">
+      <div className="h-full bg-orange-500 transition-all duration-300 ease-out animate-pulse w-full" />
+    </div>
+  );
 
   const handleSearch = async (searchQuery: string) => {
     if (!isBackendAvailable) {
@@ -54,7 +59,7 @@ const Home = () => {
     if (searchQuery.trim()) {
       try {
         const results = await executeSearch();
-        setHasResults(Boolean(results && results.length > 0));
+        setHasResults(results ? results.length > 0 : false);
       } catch (error) {
         setHasResults(false);
       }
@@ -132,6 +137,7 @@ const Home = () => {
               onChange={setQuery}
               hasResults={hasResults}
             />
+            {isLoading && <ProgressBar />}
             {!isBackendAvailable && (
               <p className="text-yellow-500 mt-2 text-sm md:text-base">
                 Search service is currently unavailable. Please try again later.
