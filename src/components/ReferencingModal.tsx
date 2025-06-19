@@ -976,7 +976,9 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
   const submitApplication = async (event?: React.MouseEvent<HTMLButtonElement>) => {
     const isComplete = checkFormCompleteness();
-    if (!isComplete && !event) {
+
+    // Always show warning modal if form is incomplete
+    if (!isComplete) {
       setShowWarningModal(true);
       return;
     }
@@ -1066,8 +1068,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const SuccessModal = () => {
     if (!showSuccessModal) return null;
 
-    const handleSuccessClose = (e: React.MouseEvent) => {
-      e.stopPropagation(); // Stop event propagation
+    const handleSuccessClose = (e?: React.MouseEvent) => {
+      if (e) {
+        e.stopPropagation();
+      }
       setShowSuccessModal(false);
       setShowWarningModal(false);
       setIsProcessingFile(false);
@@ -1085,20 +1089,36 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       onClose();
     };
 
+    // Handle backdrop click
+    const handleBackdropClick = (e: React.MouseEvent) => {
+      if (e.target === e.currentTarget) {
+        handleSuccessClose();
+      }
+    };
+
     return (
       <div
         className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
-        onClick={handleSuccessClose} // Close when clicking the backdrop
+        onClick={handleBackdropClick}
       >
         <div
           className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl"
-          onClick={(e) => e.stopPropagation()} // Prevent closing when clicking the modal content
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center mb-4">
-            <div className="bg-green-100 p-2 rounded-full">
-              <CheckCircle className="text-green-500 w-6 h-6" />
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              <div className="bg-green-100 p-2 rounded-full">
+                <CheckCircle className="text-green-500 w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-semibold ml-3">Application Submitted Successfully</h3>
             </div>
-            <h3 className="text-lg font-semibold ml-3">Application Submitted Successfully</h3>
+            <button
+              onClick={handleSuccessClose}
+              className="text-gray-500 hover:text-gray-700"
+              aria-label="Close modal"
+            >
+              <X size={20} />
+            </button>
           </div>
 
           <p className="text-gray-600 mb-6">
