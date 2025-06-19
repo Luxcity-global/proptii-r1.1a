@@ -297,19 +297,18 @@ export const SearchInput: React.FC<SearchInputProps> = ({
             <ul className="text-xs space-y-1 ml-2">
               <li>• "2 bedroom flat in London under £2000"</li>
               <li>• "Pet-friendly house with garden"</li>
-              <li>• "Studio apartment near tube station"</li>
             </ul>
             <p className="text-xs text-gray-300 mt-2">
               We search across multiple property sites to find your perfect match!
             </p>
           </div>
         }
-        position="bottom"
+        position="top"
         maxWidth="max-w-sm"
         className="w-full block"
       >
         <form onSubmit={handleSubmit} className="relative w-full">
-          <div className="bg-white rounded-full p-2 flex items-center shadow-xl w-full">
+          <div className="bg-white rounded-full p-2 flex items-center shadow-xl">
             {!isMobile && (
               <>
                 <button
@@ -409,7 +408,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       {isFocused && (searchSuggestions.length > 0 || getSearchHistory().slice(0, 3).length > 0) && (
         <div
           ref={suggestionsRef}
-          className="absolute w-full mt-2 bg-white rounded-xl shadow-lg overflow-hidden z-[60] max-h-[300px] overflow-y-auto"
+          className="absolute w-full mt-2 bg-white rounded-xl shadow-lg overflow-hidden z-50 max-h-[300px] overflow-y-auto"
         >
           <ul className="py-1" id="search-suggestions-list" role="listbox">
             {searchSuggestions.map((suggestion, index) => (
@@ -454,7 +453,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
 
       {/* Show recent searches below input */}
       {getSearchHistory().slice(0, 3).length > 0 && (
-        <div className="mt-2 bg-white rounded-xl shadow p-3 relative z-[60]">
+        <div className="mt-2 bg-white rounded-xl shadow p-3 relative">
           {/* Clear history X button */}
           <button
             type="button"
