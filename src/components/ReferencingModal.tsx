@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { X, Menu, User, Briefcase, Home, Euro, Users, CreditCard, CheckCircle, PoundSterling, AlertTriangle, Info, Upload } from 'lucide-react';
+import { X, Menu, User, Briefcase, Home, Euro, Users, CreditCard, CheckCircle, PoundSterling, AlertTriangle, Info, Upload, CheckCircle as CheckCircle2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import FileUpload from "./Uploads/FileUpload";
 import EmploymentUpload from "./Uploads/EmploymentUpload";
@@ -974,11 +974,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     return isComplete;
   };
 
-  const submitApplication = async (event?: React.MouseEvent<HTMLButtonElement>) => {
+  const submitApplication = async (event?: React.MouseEvent<HTMLButtonElement>, forceSubmit: boolean = false) => {
     const isComplete = checkFormCompleteness();
 
-    // Always show warning modal if form is incomplete
-    if (!isComplete) {
+    // Show warning modal if form is incomplete and not forcing submission
+    if (!isComplete && !forceSubmit) {
       setShowWarningModal(true);
       return;
     }
@@ -1053,7 +1053,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               Cancel
             </button>
             <button
-              onClick={(e: React.MouseEvent<HTMLButtonElement>) => submitApplication(e)}
+              onClick={() => submitApplication(undefined, true)}
               className="px-4 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors"
               disabled={isSubmitting}
             >
@@ -1068,10 +1068,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const SuccessModal = () => {
     if (!showSuccessModal) return null;
 
-    const handleSuccessClose = (e?: React.MouseEvent) => {
-      if (e) {
-        e.stopPropagation();
-      }
+    const handleSuccessClose = () => {
       setShowSuccessModal(false);
       setShowWarningModal(false);
       setIsProcessingFile(false);
@@ -1089,36 +1086,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       onClose();
     };
 
-    // Handle backdrop click
-    const handleBackdropClick = (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget) {
-        handleSuccessClose();
-      }
-    };
-
     return (
-      <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
-        onClick={handleBackdropClick}
-      >
-        <div
-          className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <div className="bg-green-100 p-2 rounded-full">
-                <CheckCircle className="text-green-500 w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-semibold ml-3">Application Submitted Successfully</h3>
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+          <div className="flex items-center mb-4">
+            <div className="bg-green-100 p-2 rounded-full">
+              <CheckCircle2 className="text-green-500 w-6 h-6" />
             </div>
-            <button
-              onClick={handleSuccessClose}
-              className="text-gray-500 hover:text-gray-700"
-              aria-label="Close modal"
-            >
-              <X size={20} />
-            </button>
+            <h3 className="text-lg font-semibold ml-3">Application Submitted Successfully</h3>
           </div>
 
           <p className="text-gray-600 mb-6">
@@ -1128,7 +1103,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           <div className="flex justify-end">
             <button
               onClick={handleSuccessClose}
-              className="px-4 py-2 bg-[#136C9E] text-white rounded-md hover:bg-opacity-90 transition-colors"
+              className="px-4 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors"
             >
               Close
             </button>
@@ -1986,7 +1961,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                 </button>
               ) : (
                 <button
-                  onClick={submitApplication}
+                  onClick={() => submitApplication(undefined, true)}
                   className="px-6 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                   disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck}
                 >
