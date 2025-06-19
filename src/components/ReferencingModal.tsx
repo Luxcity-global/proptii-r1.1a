@@ -1851,24 +1851,61 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                 <button onClick={() => setIsMenuOpen(false)} className="mb-4">
                   <X size={24} />
                 </button>
-                <ul className="space-y-4">
-                  {navigationItems.map(({ label, Icon, step }) => (
-                    <li
-                      key={step}
-                      onClick={() => {
-                        goToStep(step);
-                        setIsMenuOpen(false);
-                      }}
-                      className="flex items-center space-x-3 px-4 py-3 cursor-pointer hover:bg-gray-100"
-                    >
-                      <Icon
-                        size={18}
-                        className={currentStep === step ? "text-orange-600" : "text-gray-500"}
-                      />
-                      <span>{label}</span>
-                    </li>
-                  ))}
+                <div className="mb-6">
+                  <h2 className="text-lg font-bold text-orange-600 mb-2">Referencing Steps</h2>
+                  <p className="text-sm text-gray-600">
+                    The referencing process verifies renter or buyer identity, financial status, and rental history.
+                  </p>
+                </div>
+                <ul className="space-y-1">
+                  {navigationItems.map(({ label, Icon, step }) => {
+                    const status = stepStatus[step];
+                    const shouldShowDot = status !== 'empty';
+                    let dotColor = '';
+                    switch (status) {
+                      case 'partial':
+                        dotColor = 'bg-orange-500';
+                        break;
+                      case 'complete':
+                        dotColor = 'bg-green-500';
+                        break;
+                      default:
+                        dotColor = '';
+                    }
+
+                    return (
+                      <li
+                        key={step}
+                        onClick={() => {
+                          goToStep(step);
+                          setIsMenuOpen(false);
+                        }}
+                        className={`flex items-center space-x-3 px-4 py-3 cursor-pointer transition-all ${currentStep === step
+                          ? 'bg-blue-100 text-black font-semibold rounded-lg'
+                          : 'text-gray-600 hover:bg-gray-100'
+                          }`}
+                      >
+                        <Icon size={18} className={currentStep === step ? 'text-orange-600' : 'text-gray-500'} />
+                        <span>{label}</span>
+                        {shouldShowDot && (
+                          <span
+                            className={`ml-auto w-3 h-3 rounded-full ${dotColor}`}
+                            title={`Status: ${status}`}
+                          />
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
+                <div className="mt-auto pt-6">
+                  <div className="text-sm text-gray-600 mb-2">Step {currentStep} of 7</div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#136C9E] transition-all duration-300"
+                      style={{ width: `${(currentStep / 7) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
