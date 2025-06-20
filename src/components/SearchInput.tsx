@@ -289,7 +289,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     <div className={`relative ${className}`}>
       <Tooltip
         content={
-          <div className="space-y-2">
+          <div className="space-y-2 text-left">
             <h4 className="font-semibold text-orange-400">🤖 AI-Powered Search</h4>
             <p className="text-sm leading-relaxed">
               Our intelligent search understands natural language. Try queries like:
