@@ -61,14 +61,15 @@ export const Tooltip: React.FC<TooltipProps> = ({
         break;
     }
 
-    // Ensure tooltip stays within viewport
-    if (left < 8) left = 8;
-    if (left + tooltipRect.width > viewport.width - 8) {
-      left = viewport.width - tooltipRect.width - 8;
+    // Ensure tooltip stays within viewport with extra mobile padding
+    const mobilePadding = window.innerWidth < 768 ? 16 : 8;
+    if (left < mobilePadding) left = mobilePadding;
+    if (left + tooltipRect.width > viewport.width - mobilePadding) {
+      left = viewport.width - tooltipRect.width - mobilePadding;
     }
-    if (top < 8) top = 8;
-    if (top + tooltipRect.height > viewport.height - 8) {
-      top = viewport.height - tooltipRect.height - 8;
+    if (top < mobilePadding) top = mobilePadding;
+    if (top + tooltipRect.height > viewport.height - mobilePadding) {
+      top = viewport.height - tooltipRect.height - mobilePadding;
     }
 
     setTooltipPosition({ top, left });
@@ -99,7 +100,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
   };
 
   const getArrowClasses = () => {
-    const baseArrowClasses = "absolute w-3 h-3 bg-gray-900 transform rotate-45";
+    const baseArrowClasses = "absolute w-3 h-3 transform rotate-45";
+    const arrowStyle = { backgroundColor: '#136C9E' };
 
     switch (position) {
       case 'top':
@@ -133,16 +135,17 @@ export const Tooltip: React.FC<TooltipProps> = ({
       {isVisible && !disabled && (
         <div
           ref={tooltipRef}
-          className={`fixed z-[9999] ${maxWidth} p-3 bg-gray-900 text-white text-sm rounded-lg shadow-xl 
+          className={`fixed z-[9999] ${maxWidth} p-3 text-white text-sm rounded-lg shadow-xl 
             transform transition-all duration-200 ease-out opacity-100 scale-100`}
           style={{
+            backgroundColor: '#136C9E',
             top: `${tooltipPosition.top}px`,
             left: `${tooltipPosition.left}px`,
           }}
           onMouseEnter={() => trigger === 'hover' && setIsVisible(true)}
           onMouseLeave={() => trigger === 'hover' && setIsVisible(false)}
         >
-          <div className={getArrowClasses()}></div>
+          <div className={getArrowClasses()} style={{ backgroundColor: '#136C9E' }}></div>
           <div className="relative z-10">
             {typeof content === 'string' ? (
               <p className="leading-relaxed">{content}</p>

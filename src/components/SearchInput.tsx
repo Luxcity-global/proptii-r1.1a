@@ -294,11 +294,14 @@ export const SearchInput: React.FC<SearchInputProps> = ({
             <p className="text-sm leading-relaxed">
               Our intelligent search understands natural language. Try queries like:
             </p>
-            <ul className="text-xs space-y-1 ml-2">
-              <li>• "2 bedroom flat in London under £2000"</li>
-              <li>• "Pet-friendly house with garden"</li>
-            </ul>
-            <p className="text-xs text-gray-300 mt-2">
+            <div className="text-xs space-y-1 bg-gray-800 p-2 rounded">
+              <p className="text-yellow-300">💡 Example searches:</p>
+              <ul className="ml-2 space-y-1 text-gray-300">
+                <li>• "2 bedroom flat in London under £2000"</li>
+                <li>• "Pet-friendly house with garden"</li>
+              </ul>
+            </div>
+            <p className="text-xs text-gray-300">
               We search across multiple property sites to find your perfect match!
             </p>
           </div>
