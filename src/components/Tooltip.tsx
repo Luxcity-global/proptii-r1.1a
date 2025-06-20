@@ -41,35 +41,50 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
     let top = 0;
     let left = 0;
+    const isMobile = window.innerWidth < 768;
 
-    switch (position) {
-      case 'top':
-        top = triggerRect.top - tooltipRect.height - 8;
-        left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
-        break;
-      case 'bottom':
-        top = triggerRect.bottom + 8;
-        left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
-        break;
-      case 'left':
-        top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
-        left = triggerRect.left - tooltipRect.width - 8;
-        break;
-      case 'right':
-        top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
-        left = triggerRect.right + 8;
-        break;
-    }
+    // Special positioning for mobile to keep tooltip above search bar
+    if (isMobile && position === 'top') {
+      // Position tooltip fixed above the search bar, centered horizontally
+      top = triggerRect.top - tooltipRect.height - 12;
+      left = (viewport.width - tooltipRect.width) / 2; // Center horizontally
 
-    // Ensure tooltip stays within viewport with extra mobile padding
-    const mobilePadding = window.innerWidth < 768 ? 16 : 8;
-    if (left < mobilePadding) left = mobilePadding;
-    if (left + tooltipRect.width > viewport.width - mobilePadding) {
-      left = viewport.width - tooltipRect.width - mobilePadding;
-    }
-    if (top < mobilePadding) top = mobilePadding;
-    if (top + tooltipRect.height > viewport.height - mobilePadding) {
-      top = viewport.height - tooltipRect.height - mobilePadding;
+      // Ensure it doesn't go above navbar (minimum top position)
+      const navbarHeight = 80; // Adjust based on your navbar height
+      if (top < navbarHeight) {
+        top = navbarHeight + 8;
+      }
+    } else {
+      // Original positioning logic for desktop and other positions
+      switch (position) {
+        case 'top':
+          top = triggerRect.top - tooltipRect.height - 8;
+          left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
+          break;
+        case 'bottom':
+          top = triggerRect.bottom + 8;
+          left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
+          break;
+        case 'left':
+          top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
+          left = triggerRect.left - tooltipRect.width - 8;
+          break;
+        case 'right':
+          top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
+          left = triggerRect.right + 8;
+          break;
+      }
+
+      // Ensure tooltip stays within viewport with extra mobile padding
+      const mobilePadding = isMobile ? 16 : 8;
+      if (left < mobilePadding) left = mobilePadding;
+      if (left + tooltipRect.width > viewport.width - mobilePadding) {
+        left = viewport.width - tooltipRect.width - mobilePadding;
+      }
+      if (top < mobilePadding) top = mobilePadding;
+      if (top + tooltipRect.height > viewport.height - mobilePadding) {
+        top = viewport.height - tooltipRect.height - mobilePadding;
+      }
     }
 
     setTooltipPosition({ top, left });
@@ -101,10 +116,18 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
   const getArrowClasses = () => {
     const baseArrowClasses = "absolute w-3 h-3 transform rotate-45";
-    const arrowStyle = { backgroundColor: '#136C9E' };
+    const isMobile = window.innerWidth < 768;
 
     switch (position) {
       case 'top':
+        // For mobile, we need to calculate the arrow position relative to the search bar
+        if (isMobile && triggerRef.current) {
+          const triggerRect = triggerRef.current.getBoundingClientRect();
+          const triggerCenter = triggerRect.left + triggerRect.width / 2;
+          const tooltipLeft = (window.innerWidth - (tooltipRef.current?.getBoundingClientRect().width || 300)) / 2;
+          const arrowOffset = triggerCenter - tooltipLeft;
+          return `${baseArrowClasses} -bottom-1.5`;
+        }
         return `${baseArrowClasses} -bottom-1.5 left-1/2 -translate-x-1/2`;
       case 'bottom':
         return `${baseArrowClasses} -top-1.5 left-1/2 -translate-x-1/2`;
@@ -145,7 +168,15 @@ export const Tooltip: React.FC<TooltipProps> = ({
           onMouseEnter={() => trigger === 'hover' && setIsVisible(true)}
           onMouseLeave={() => trigger === 'hover' && setIsVisible(false)}
         >
-          <div className={getArrowClasses()} style={{ backgroundColor: '#1976D2' }}></div>
+          <div
+            className={getArrowClasses()}
+            style={{
+              backgroundColor: '#1976D2',
+              ...(window.innerWidth < 768 && position === 'top' && triggerRef.current ? {
+                left: `${triggerRef.current.getBoundingClientRect().left + triggerRef.current.getBoundingClientRect().width / 2 - (window.innerWidth - (tooltipRef.current?.getBoundingClientRect().width || 300)) / 2 - 6}px`
+              } : {})
+            }}
+          ></div>
           <div className="relative z-10">
             {typeof content === 'string' ? (
               <p className="leading-relaxed">{content}</p>
