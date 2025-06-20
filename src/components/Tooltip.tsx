@@ -138,14 +138,14 @@ export const Tooltip: React.FC<TooltipProps> = ({
           className={`fixed z-[9999] ${maxWidth} p-3 text-white text-sm rounded-lg shadow-xl 
             transform transition-all duration-200 ease-out opacity-100 scale-100`}
           style={{
-            backgroundColor: '#136C9E',
+            backgroundColor: '#1976D2',
             top: `${tooltipPosition.top}px`,
             left: `${tooltipPosition.left}px`,
           }}
           onMouseEnter={() => trigger === 'hover' && setIsVisible(true)}
           onMouseLeave={() => trigger === 'hover' && setIsVisible(false)}
         >
-          <div className={getArrowClasses()} style={{ backgroundColor: '#136C9E' }}></div>
+          <div className={getArrowClasses()} style={{ backgroundColor: '#1976D2' }}></div>
           <div className="relative z-10">
             {typeof content === 'string' ? (
               <p className="leading-relaxed">{content}</p>
