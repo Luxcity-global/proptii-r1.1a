@@ -289,27 +289,41 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     <div className={`relative ${className}`}>
       <Tooltip
         content={
-          <div className="space-y-2 text-left">
-            <h4 className="font-semibold text-orange-400">🤖 AI-Powered Search</h4>
-            <p className="text-sm leading-relaxed">
-              Our intelligent search understands natural language. Try queries like:
+          <div className="space-y-3 text-left">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                🤖
+              </div>
+              <h4 className="font-bold text-white text-lg">AI-Powered Search</h4>
+            </div>
+            <p className="text-white/90 text-sm leading-relaxed mb-3">
+              Enter your preferred location, property type (house or apartment), number of bedrooms and bathrooms, and your monthly rent budget. We'll fetch listings for you from Zoopla and OpenRent.
             </p>
-            <div className="text-xs space-y-1 bg-gray-800 p-2 rounded">
-              <p className="text-yellow-300">💡 Example searches:</p>
-              <ul className="ml-2 space-y-1 text-gray-300">
-                <li>• "2 bedroom flat in London under £2000"</li>
-                <li>• "Pet-friendly house with garden"</li>
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center text-xs">
+                  💡
+                </div>
+                <p className="text-yellow-200 font-semibold text-sm">Try these examples:</p>
+              </div>
+              <ul className="space-y-1 text-white/80 text-sm">
+                <li className="flex items-start gap-2">
+                  <span className="text-white/60 text-xs mt-1">•</span>
+                  <span>"2 bedroom flat in London under £2000"</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-white/60 text-xs mt-1">•</span>
+                  <span>"Pet-friendly house with garden in Manchester"</span>
+                </li>
               </ul>
             </div>
-            <p className="text-xs text-gray-300">
-              We search across multiple property sites to find your perfect match!
-            </p>
           </div>
         }
         position="top"
         maxWidth="max-w-sm"
         className="w-full block"
         disabled={query.trim().length > 0}
+        variant="ai-search"
       >
         <form onSubmit={handleSubmit} className="relative w-full">
           <div className="bg-white rounded-full p-2 flex items-center shadow-xl">
