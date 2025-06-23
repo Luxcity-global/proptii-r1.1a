@@ -10,6 +10,7 @@ import {
   Divider
 } from '@mui/material';
 import { useBookViewing } from '../context/BookViewingContext';
+import { Tooltip } from '../../Tooltip';
 
 // Constants
 const BLUE_COLOR = '#136C9E';
@@ -149,13 +150,20 @@ const PropertySelector: React.FC = () => {
             />
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
-                <StyledTextField
-                  fullWidth
-                  label="Agent Email"
-                  type="email"
-                  value={state.selectedProperty?.agent?.email || ''}
-                  onChange={handleAgentChange('email')}
-                />
+                <Tooltip
+                  content="If the email isn't listed on the property page, try searching for the agency's contact details online and add the agent's email address here."
+                  position="top"
+                  maxWidth="max-w-sm"
+                  trigger="hover"
+                >
+                  <StyledTextField
+                    fullWidth
+                    label="Agent Email"
+                    type="email"
+                    value={state.selectedProperty?.agent?.email || ''}
+                    onChange={handleAgentChange('email')}
+                  />
+                </Tooltip>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <StyledTextField
