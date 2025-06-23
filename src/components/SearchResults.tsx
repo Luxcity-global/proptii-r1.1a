@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ExternalLink, BedDouble, Bath, Building2, Home } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 
@@ -56,6 +56,19 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   isLoading,
   error
 }) => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // Map backend property objects to a consistent structure for rendering
   const mappedResults = (searchResponse || []).map((property, idx) => {
     // If property.specs exists, use it; otherwise, map flat fields
@@ -113,6 +126,9 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
             position="top"
             maxWidth="max-w-sm"
             className="w-full h-full flex"
+            trigger={isMobile ? "auto-mobile" : "hover"}
+            autoShowDelay={1500}
+            autoHideDelay={4000}
           >
             <div className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 w-full flex flex-col" tabIndex={0} aria-label={`Property card: ${property.title}`}>
               {/* Fixed height header section */}

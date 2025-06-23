@@ -6,11 +6,13 @@ interface TooltipProps {
   children: React.ReactNode;
   position?: 'top' | 'bottom' | 'left' | 'right';
   className?: string;
-  trigger?: 'hover' | 'click';
+  trigger?: 'hover' | 'click' | 'auto-mobile';
   showIcon?: boolean;
   iconClassName?: string;
   maxWidth?: string;
   disabled?: boolean;
+  autoShowDelay?: number; // Time in ms before auto-showing on mobile
+  autoHideDelay?: number; // Time in ms before auto-hiding on mobile
 }
 
 export const Tooltip: React.FC<TooltipProps> = ({
@@ -22,12 +24,42 @@ export const Tooltip: React.FC<TooltipProps> = ({
   showIcon = false,
   iconClassName = '',
   maxWidth = 'max-w-xs',
-  disabled = false
+  disabled = false,
+  autoShowDelay = 2000,
+  autoHideDelay = 5000
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const autoShowTimeoutRef = useRef<NodeJS.Timeout>();
+  const autoHideTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Auto-show/hide functionality for mobile
+  useEffect(() => {
+    const isMobile = window.innerWidth < 768;
+
+    if (trigger === 'auto-mobile' && isMobile && !disabled) {
+      // Auto-show after delay
+      autoShowTimeoutRef.current = setTimeout(() => {
+        setIsVisible(true);
+
+        // Auto-hide after another delay
+        autoHideTimeoutRef.current = setTimeout(() => {
+          setIsVisible(false);
+        }, autoHideDelay);
+      }, autoShowDelay);
+    }
+
+    return () => {
+      if (autoShowTimeoutRef.current) {
+        clearTimeout(autoShowTimeoutRef.current);
+      }
+      if (autoHideTimeoutRef.current) {
+        clearTimeout(autoHideTimeoutRef.current);
+      }
+    };
+  }, [trigger, autoShowDelay, autoHideDelay, disabled]);
 
   const calculatePosition = () => {
     if (!triggerRef.current || !tooltipRef.current) return;
@@ -122,15 +154,15 @@ export const Tooltip: React.FC<TooltipProps> = ({
       case 'top':
         // For mobile, we need to calculate the arrow position relative to the search bar
         if (isMobile && triggerRef.current) {
-          return `${baseArrowClasses} -bottom-3 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[12px] border-l-transparent border-r-transparent border-t-[#136C9D]`;
+          return `${baseArrowClasses} -bottom-3 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[12px] border-l-transparent border-r-transparent border-t-white`;
         }
-        return `${baseArrowClasses} -bottom-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[12px] border-l-transparent border-r-transparent border-t-[#136C9D]`;
+        return `${baseArrowClasses} -bottom-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[12px] border-l-transparent border-r-transparent border-t-white`;
       case 'bottom':
-        return `${baseArrowClasses} -top-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-r-[12px] border-b-[12px] border-l-transparent border-r-transparent border-b-[#136C9D]`;
+        return `${baseArrowClasses} -top-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-r-[12px] border-b-[12px] border-l-transparent border-r-transparent border-b-white`;
       case 'left':
-        return `${baseArrowClasses} -right-3 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[12px] border-b-[12px] border-l-[12px] border-t-transparent border-b-transparent border-l-[#136C9D]`;
+        return `${baseArrowClasses} -right-3 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[12px] border-b-[12px] border-l-[12px] border-t-transparent border-b-transparent border-l-white`;
       case 'right':
-        return `${baseArrowClasses} -left-3 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[12px] border-b-[12px] border-r-[12px] border-t-transparent border-b-transparent border-r-[#136C9D]`;
+        return `${baseArrowClasses} -left-3 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[12px] border-b-[12px] border-r-[12px] border-t-transparent border-b-transparent border-r-white`;
       default:
         return baseArrowClasses;
     }
@@ -168,17 +200,17 @@ export const Tooltip: React.FC<TooltipProps> = ({
       {isVisible && !disabled && (
         <div
           ref={tooltipRef}
-          className={`fixed z-[9999] text-white shadow-2xl 
+          className={`fixed z-[9999] text-black
             transform transition-all duration-300 ease-out opacity-100 scale-100`}
           style={{
-            backgroundColor: '#136C9D',
+            backgroundColor: '#ffffff',
             top: `${tooltipPosition.top}px`,
             left: `${tooltipPosition.left}px`,
             borderRadius: '20px',
             minWidth: '280px',
             maxWidth: window.innerWidth < 768 ? '320px' : '380px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 10px 20px -5px rgba(0, 0, 0, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+            border: '1px solid rgba(0, 0, 0, 0.08)',
           }}
           onMouseEnter={() => trigger === 'hover' && setIsVisible(true)}
           onMouseLeave={() => trigger === 'hover' && setIsVisible(false)}
@@ -192,9 +224,9 @@ export const Tooltip: React.FC<TooltipProps> = ({
           {/* Chat bubble content with left-aligned text */}
           <div className="relative z-10 p-4 md:p-5 text-left">
             {typeof content === 'string' ? (
-              <p className="leading-relaxed text-sm md:text-base font-medium text-left">{content}</p>
+              <p className="leading-relaxed text-sm md:text-base font-medium text-left text-gray-900">{content}</p>
             ) : (
-              <div className="leading-relaxed text-sm md:text-base font-medium text-left">
+              <div className="leading-relaxed text-sm md:text-base font-medium text-left text-gray-900">
                 {content}
               </div>
             )}
