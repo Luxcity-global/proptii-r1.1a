@@ -109,45 +109,10 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
         {mappedResults.map((property) => (
           <Tooltip
             key={property.id}
-            content={
-              <div className="space-y-3 text-left">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                    🏠
-                  </div>
-                  <h4 className="font-bold text-white text-lg">Search Results Guide</h4>
-                </div>
-                <p className="text-white/90 text-sm leading-relaxed">
-                  Browse the listings and save the URL of any property you're interested in.
-                </p>
-                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-5 h-5 bg-pink-400 rounded-full flex items-center justify-center text-xs">
-                      💡
-                    </div>
-                    <p className="text-pink-200 font-semibold text-sm">What to do next:</p>
-                  </div>
-                  <ul className="space-y-1 text-white/80 text-sm">
-                    <li className="flex items-start gap-2">
-                      <span className="text-white/60 text-xs mt-1">•</span>
-                      <span>Click "View Listings" to explore properties</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-white/60 text-xs mt-1">•</span>
-                      <span>Copy the URL of properties you like</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-white/60 text-xs mt-1">•</span>
-                      <span>Return here to start your referencing</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            }
+            content="Browse the listings and save the URL of any property you're interested in."
             position="top"
             maxWidth="max-w-sm"
             className="w-full h-full flex"
-            variant="search-results"
           >
             <div className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 w-full flex flex-col" tabIndex={0} aria-label={`Property card: ${property.title}`}>
               {/* Fixed height header section */}

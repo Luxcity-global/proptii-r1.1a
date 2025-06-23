@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Info, Lightbulb, Search } from 'lucide-react';
+import { Info } from 'lucide-react';
 
 interface TooltipProps {
   content: string | React.ReactNode;
@@ -11,7 +11,6 @@ interface TooltipProps {
   iconClassName?: string;
   maxWidth?: string;
   disabled?: boolean;
-  variant?: 'default' | 'ai-search' | 'search-results';
 }
 
 export const Tooltip: React.FC<TooltipProps> = ({
@@ -23,8 +22,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   showIcon = false,
   iconClassName = '',
   maxWidth = 'max-w-xs',
-  disabled = false,
-  variant = 'default'
+  disabled = false
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
@@ -45,42 +43,40 @@ export const Tooltip: React.FC<TooltipProps> = ({
     let left = 0;
     const isMobile = window.innerWidth < 768;
 
-    // Increased padding for better mobile experience
-    const mobilePadding = isMobile ? 20 : 12;
-
     // Special positioning for mobile to keep tooltip above search bar
     if (isMobile && position === 'top') {
       // Position tooltip fixed above the search bar, centered horizontally
-      top = triggerRect.top - tooltipRect.height - 16;
+      top = triggerRect.top - tooltipRect.height - 20;
       left = (viewport.width - tooltipRect.width) / 2; // Center horizontally
 
       // Ensure it doesn't go above navbar (minimum top position)
       const navbarHeight = 80; // Adjust based on your navbar height
       if (top < navbarHeight) {
-        top = navbarHeight + 12;
+        top = navbarHeight + 8;
       }
     } else {
       // Original positioning logic for desktop and other positions
       switch (position) {
         case 'top':
-          top = triggerRect.top - tooltipRect.height - 12;
+          top = triggerRect.top - tooltipRect.height - 16;
           left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
           break;
         case 'bottom':
-          top = triggerRect.bottom + 12;
+          top = triggerRect.bottom + 16;
           left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
           break;
         case 'left':
           top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
-          left = triggerRect.left - tooltipRect.width - 12;
+          left = triggerRect.left - tooltipRect.width - 16;
           break;
         case 'right':
           top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
-          left = triggerRect.right + 12;
+          left = triggerRect.right + 16;
           break;
       }
 
       // Ensure tooltip stays within viewport with extra mobile padding
+      const mobilePadding = isMobile ? 20 : 12;
       if (left < mobilePadding) left = mobilePadding;
       if (left + tooltipRect.width > viewport.width - mobilePadding) {
         left = viewport.width - tooltipRect.width - mobilePadding;
@@ -100,14 +96,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
     }
   }, [isVisible, position]);
 
-  useEffect(() => {
-    if (isVisible) {
-      const handleResize = () => calculatePosition();
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
-    }
-  }, [isVisible]);
-
   const handleMouseEnter = () => {
     if (trigger === 'hover' && !disabled) {
       setIsVisible(true);
@@ -126,29 +114,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
     }
   };
 
-  const getVariantStyles = () => {
-    switch (variant) {
-      case 'ai-search':
-        return {
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          borderColor: '#667eea'
-        };
-      case 'search-results':
-        return {
-          background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-          borderColor: '#f093fb'
-        };
-      default:
-        return {
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          borderColor: '#667eea'
-        };
-    }
-  };
-
   const getArrowClasses = () => {
-    const baseArrowClasses = "absolute w-4 h-4 transform rotate-45 border";
-    const variantStyles = getVariantStyles();
+    const baseArrowClasses = "absolute w-4 h-4 transform rotate-45";
     const isMobile = window.innerWidth < 768;
 
     switch (position) {
@@ -173,8 +140,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
     }
   };
 
-  const variantStyles = getVariantStyles();
-
   return (
     <>
       <div
@@ -186,39 +151,47 @@ export const Tooltip: React.FC<TooltipProps> = ({
       >
         {children}
         {showIcon && (
-          <Info className={`w-4 h-4 ml-2 text-gray-400 hover:text-gray-600 transition-colors ${iconClassName}`} />
+          <Info className={`w-4 h-4 ml-1 text-gray-400 hover:text-gray-600 transition-colors ${iconClassName}`} />
         )}
       </div>
 
       {isVisible && !disabled && (
         <div
           ref={tooltipRef}
-          className={`fixed z-[9999] ${maxWidth} rounded-xl shadow-2xl border-2
+          className={`fixed z-[9999] ${maxWidth} text-white text-sm shadow-2xl 
             transform transition-all duration-300 ease-out opacity-100 scale-100`}
           style={{
-            background: variantStyles.background,
-            borderColor: variantStyles.borderColor,
+            backgroundColor: '#136C9D',
             top: `${tooltipPosition.top}px`,
             left: `${tooltipPosition.left}px`,
+            borderRadius: '16px',
+            border: '2px solid #136C9D',
+            minWidth: '280px',
+            maxWidth: window.innerWidth < 768 ? '320px' : '360px',
           }}
           onMouseEnter={() => trigger === 'hover' && setIsVisible(true)}
           onMouseLeave={() => trigger === 'hover' && setIsVisible(false)}
         >
+          {/* Chat bubble arrow */}
           <div
             className={getArrowClasses()}
             style={{
-              background: variantStyles.background,
-              borderColor: variantStyles.borderColor,
+              backgroundColor: '#136C9D',
+              border: '2px solid #136C9D',
               ...(window.innerWidth < 768 && position === 'top' && triggerRef.current ? {
-                left: `${triggerRef.current.getBoundingClientRect().left + triggerRef.current.getBoundingClientRect().width / 2 - (window.innerWidth - (tooltipRef.current?.getBoundingClientRect().width || 300)) / 2 - 8}px`
+                left: `${triggerRef.current.getBoundingClientRect().left + triggerRef.current.getBoundingClientRect().width / 2 - (window.innerWidth - (tooltipRef.current?.getBoundingClientRect().width || 320)) / 2 - 8}px`
               } : {})
             }}
           ></div>
-          <div className="relative z-10 p-4 text-white">
+
+          {/* Chat bubble content */}
+          <div className="relative z-10 p-4 md:p-5">
             {typeof content === 'string' ? (
-              <p className="leading-relaxed text-sm md:text-base">{content}</p>
+              <p className="leading-relaxed text-sm md:text-base font-medium">{content}</p>
             ) : (
-              content
+              <div className="leading-relaxed text-sm md:text-base font-medium">
+                {content}
+              </div>
             )}
           </div>
         </div>
