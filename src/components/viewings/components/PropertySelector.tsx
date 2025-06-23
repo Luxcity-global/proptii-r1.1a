@@ -99,7 +99,7 @@ const PropertySelector: React.FC = () => {
             </Typography>
             <Tooltip
               content="Copy the property and agent details from the listing and enter them into the form. We'll take it from there and help you contact the agent."
-              position="top"
+              position="bottom"
               className="w-full block"
               disabled={(state.selectedProperty?.street || '').trim().length > 0}
             >
@@ -159,7 +159,7 @@ const PropertySelector: React.FC = () => {
               <Grid item xs={12} sm={6}>
                 <Tooltip
                   content="If the email isn't listed on the property page, try searching for the agency's contact details online and add the agent's email address here."
-                  position="top"
+                  position="bottom"
                   className="w-full block"
                   disabled={(state.selectedProperty?.agent?.email || '').trim().length > 0}
                 >
