@@ -1942,47 +1942,58 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-[#f2f7fb]">
             {renderFormContent()}
           </div>
-          <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-t border-gray-200 flex justify-between items-center">
-            <div>
-              {lastSavedSteps[currentStep] && (
-                <div className="flex items-center text-sm text-gray-500 ml-2">
-                  <CheckCircle className="text-green-500 mr-1" fontSize="small" />
-                  <span>Saved</span>
+          <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-t border-gray-200">
+            <div className="flex justify-between items-start">
+              <div>
+                {lastSavedSteps[currentStep] && (
+                  <div className="flex items-center text-sm text-gray-500 ml-2">
+                    <CheckCircle className="text-green-500 mr-1" fontSize="small" />
+                    <span>Saved</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Right angle triangle button layout */}
+              <div className="relative">
+                {/* Save button positioned at top right */}
+                <div className="flex justify-end mb-2">
+                  <button
+                    onClick={saveCurrentStep}
+                    className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base bg-gray-100 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-200 transition-colors"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </button>
                 </div>
-              )}
-            </div>
-            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-              {currentStep > 1 && (
-                <button
-                  onClick={prevStep}
-                  className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base border border-[#136C9E] text-[#136C9E] rounded-md hover:bg-[#136C9E] hover:text-white transition-colors"
-                >
-                  Previous
-                </button>
-              )}
-              <button
-                onClick={saveCurrentStep}
-                className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base bg-gray-100 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-200 transition-colors"
-                disabled={isSaving}
-              >
-                {isSaving ? 'Saving...' : 'Save'}
-              </button>
-              {currentStep < 7 ? (
-                <button
-                  onClick={nextStep}
-                  className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base bg-[#136C9E] text-white rounded-md hover:bg-[#0F5A82] transition-colors"
-                >
-                  Continue
-                </button>
-              ) : (
-                <button
-                  onClick={() => submitApplication()}
-                  className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck}
-                >
-                  {isSubmitting ? 'Submitting...' : 'Submit Application'}
-                </button>
-              )}
+
+                {/* Bottom row: Previous and Continue/Submit side by side */}
+                <div className="flex space-x-3">
+                  {currentStep > 1 && (
+                    <button
+                      onClick={prevStep}
+                      className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base border border-[#136C9E] text-[#136C9E] rounded-md hover:bg-[#136C9E] hover:text-white transition-colors"
+                    >
+                      Previous
+                    </button>
+                  )}
+                  {currentStep < 7 ? (
+                    <button
+                      onClick={nextStep}
+                      className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base bg-[#136C9E] text-white rounded-md hover:bg-[#0F5A82] transition-colors"
+                    >
+                      Continue
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => submitApplication()}
+                      className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck}
+                    >
+                      {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
