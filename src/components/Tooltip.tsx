@@ -75,6 +75,24 @@ export const Tooltip: React.FC<TooltipProps> = ({
     let left = 0;
     const isMobile = window.innerWidth < 768;
 
+    // Check if we're inside a modal (Material-UI dialog or similar)
+    const isInModal = () => {
+      let parent = triggerRef.current?.parentElement;
+      while (parent) {
+        const computedStyle = window.getComputedStyle(parent);
+        if (computedStyle.position === 'fixed' &&
+          (parent.classList.contains('MuiDialog-paper') ||
+            parent.classList.contains('MuiModal-root') ||
+            parent.getAttribute('role') === 'dialog')) {
+          return parent;
+        }
+        parent = parent.parentElement;
+      }
+      return null;
+    };
+
+    const modalContainer = isInModal();
+
     // Special positioning for mobile to keep tooltip above search bar
     if (isMobile && position === 'top') {
       // Position tooltip fixed above the search bar, centered horizontally
@@ -92,6 +110,14 @@ export const Tooltip: React.FC<TooltipProps> = ({
         case 'top':
           top = triggerRect.top - tooltipRect.height - 16;
           left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
+
+          // Special handling for modals: if tooltip would appear above modal, show below instead
+          if (modalContainer) {
+            const modalRect = modalContainer.getBoundingClientRect();
+            if (top < modalRect.top + 60) { // 60px buffer from top of modal
+              top = triggerRect.bottom + 16; // Position below instead
+            }
+          }
           break;
         case 'bottom':
           top = triggerRect.bottom + 16;
@@ -107,15 +133,41 @@ export const Tooltip: React.FC<TooltipProps> = ({
           break;
       }
 
-      // Ensure tooltip stays within viewport with extra mobile padding
-      const mobilePadding = isMobile ? 20 : 12;
-      if (left < mobilePadding) left = mobilePadding;
-      if (left + tooltipRect.width > viewport.width - mobilePadding) {
-        left = viewport.width - tooltipRect.width - mobilePadding;
-      }
-      if (top < mobilePadding) top = mobilePadding;
-      if (top + tooltipRect.height > viewport.height - mobilePadding) {
-        top = viewport.height - tooltipRect.height - mobilePadding;
+      // Enhanced boundary checking for modals
+      let padding = isMobile ? 20 : 12;
+      let minTop = padding;
+
+      if (modalContainer) {
+        const modalRect = modalContainer.getBoundingClientRect();
+        // Use modal boundaries instead of viewport
+        padding = 16; // More generous padding within modals
+        minTop = modalRect.top + padding;
+
+        // Ensure tooltip stays within modal horizontally
+        if (left < modalRect.left + padding) {
+          left = modalRect.left + padding;
+        }
+        if (left + tooltipRect.width > modalRect.right - padding) {
+          left = modalRect.right - tooltipRect.width - padding;
+        }
+
+        // Ensure tooltip stays within modal vertically
+        if (top < modalRect.top + padding) {
+          top = modalRect.top + padding;
+        }
+        if (top + tooltipRect.height > modalRect.bottom - padding) {
+          top = modalRect.bottom - tooltipRect.height - padding;
+        }
+      } else {
+        // Standard viewport boundary checking
+        if (left < padding) left = padding;
+        if (left + tooltipRect.width > viewport.width - padding) {
+          left = viewport.width - tooltipRect.width - padding;
+        }
+        if (top < minTop) top = minTop;
+        if (top + tooltipRect.height > viewport.height - padding) {
+          top = viewport.height - tooltipRect.height - padding;
+        }
       }
     }
 
@@ -150,11 +202,38 @@ export const Tooltip: React.FC<TooltipProps> = ({
     const baseArrowClasses = "absolute";
     const isMobile = window.innerWidth < 768;
 
+    // Check if we're in a modal and position was adjusted
+    const isInModal = () => {
+      let parent = triggerRef.current?.parentElement;
+      while (parent) {
+        const computedStyle = window.getComputedStyle(parent);
+        if (computedStyle.position === 'fixed' &&
+          (parent.classList.contains('MuiDialog-paper') ||
+            parent.classList.contains('MuiModal-root') ||
+            parent.getAttribute('role') === 'dialog')) {
+          return true;
+        }
+        parent = parent.parentElement;
+      }
+      return false;
+    };
+
+    const inModal = isInModal();
+
     switch (position) {
       case 'top':
         // For mobile, we need to calculate the arrow position relative to the search bar
         if (isMobile && triggerRef.current) {
           return `${baseArrowClasses} -bottom-3 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[12px] border-l-transparent border-r-transparent border-t-white`;
+        }
+        // For modal context, if tooltip appears below due to constraint, use bottom arrow
+        if (inModal && triggerRef.current && tooltipRef.current) {
+          const triggerRect = triggerRef.current.getBoundingClientRect();
+          const tooltipRect = tooltipRef.current.getBoundingClientRect();
+          if (tooltipRect.top > triggerRect.bottom) {
+            // Tooltip is below trigger, use top arrow
+            return `${baseArrowClasses} -top-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-r-[12px] border-b-[12px] border-l-transparent border-r-transparent border-b-white`;
+          }
         }
         return `${baseArrowClasses} -bottom-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[12px] border-l-transparent border-r-transparent border-t-white`;
       case 'bottom':
@@ -200,8 +279,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
       {isVisible && !disabled && (
         <div
           ref={tooltipRef}
-          className={`fixed z-[9999] text-black
-            transform transition-all duration-300 ease-out opacity-100 scale-100`}
+          className={`fixed text-black transform transition-all duration-300 ease-out opacity-100 scale-100`}
           style={{
             backgroundColor: '#ffffff',
             top: `${tooltipPosition.top}px`,
@@ -211,6 +289,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
             maxWidth: window.innerWidth < 768 ? '320px' : '380px',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
             border: '1px solid rgba(0, 0, 0, 0.08)',
+            zIndex: 10000, // Higher z-index for modal contexts
           }}
           onMouseEnter={() => trigger === 'hover' && setIsVisible(true)}
           onMouseLeave={() => trigger === 'hover' && setIsVisible(false)}
