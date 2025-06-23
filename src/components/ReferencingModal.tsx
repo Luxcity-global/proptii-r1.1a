@@ -567,7 +567,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
       // Ultra-fast localStorage save using requestIdleCallback for better performance
       if (user?.id) {
-        if (window.requestIdleCallback) {
+        if (typeof window.requestIdleCallback !== 'undefined') {
           requestIdleCallback(() => {
             localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(updated));
           });
@@ -1128,8 +1128,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 1:
         return (
           <div className="relative">
-            <h3 className="text-xl font-semibold mb-6">Fill in your personal details below</h3>
-            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6">Fill in your personal details below</h3>
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6 grid grid-cols-1 md:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
               <div>
                 <label className="block text-gray-700 mb-2">First Name</label>
                 <input
@@ -1352,11 +1352,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 2:
         return (
           <div className="relative">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Fill in your employment details below</h2>
+            <div className="mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your employment details below</h2>
             </div>
-            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
-              <div className="col-span-1">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Employment Status</label>
                 <select
                   value={formData.employment.employmentStatus}
@@ -1372,7 +1372,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   <option value="Student">Student</option>
                 </select>
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Company Details</label>
                 <input
                   type="text"
@@ -1382,7 +1382,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Company name"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Length of Employment (Years)</label>
                 <input
                   type="text"
@@ -1392,7 +1392,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="2"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Job Position</label>
                 <input
                   type="text"
@@ -1402,7 +1402,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Software Developer"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Referee - Full Name</label>
                 <input
                   type="text"
@@ -1412,7 +1412,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="John Smith"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Referee - Email Address</label>
                 <input
                   type="email"
@@ -1422,7 +1422,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="john.smith@example.com"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Proof of Employment</label>
                 <select
                   value={formData.employment.proofType}
@@ -1436,7 +1436,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   <option value="Tax Return">Tax Return</option>
                 </select>
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Referee - Phone Number</label>
                 <input
                   type="tel"
@@ -1453,12 +1453,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 3:
         return (
           <div className="relative">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Fill in your residential details below</h2>
+            <div className="mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your residential details below</h2>
             </div>
 
-            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
-              <div className="col-span-2">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+              <div className="col-span-1 sm:col-span-2">
                 <label className="block text-gray-700 mb-2">Do you already have a property you're interested in renting?</label>
                 <select
                   value={formData.residential.alreadyHavePropertyAddress}
@@ -1484,8 +1484,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               </div>
             </div>
 
-            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
-              <div className="col-span-1">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Reason for leaving Previous Address</label>
                 <textarea
                   value={formData.residential.reasonForLeaving}
@@ -1495,7 +1495,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Please provide the reason for leaving"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Current Address</label>
                 <textarea
                   value={formData.residential.currentAddress}
@@ -1505,7 +1505,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Enter your current address"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2 whitespace-nowrap">Previous Address (If less than 3 yrs at current)</label>
                 <input
                   type="text"
@@ -1515,7 +1515,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Enter your previous address"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">How long have you lived at this Address?</label>
                 <select
                   value={formData.residential.durationAtCurrentAddress}
@@ -1528,7 +1528,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   <option value="2-3 years">2-3 years</option>
                 </select>
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Proof of Address</label>
                 <select
                   value={formData.residential.proofType}
@@ -1542,7 +1542,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   <option value="Tenancy Agreement">Tenancy Agreement</option>
                 </select>
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Select exact duration at this address</label>
                 <select
                   value={formData.residential.durationAtPreviousAddress}
@@ -1562,11 +1562,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 4:
         return (
           <div className="relative">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Fill in your financial details below</h2>
+            <div className="mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your financial details below</h2>
             </div>
-            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
-              <div className="col-span-1">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Monthly Income (£)</label>
                 <input
                   type="number"
@@ -1576,7 +1576,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Enter your monthly income"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Proof of income</label>
                 <select
                   value={formData.financial.proofOfIncomeType}
@@ -1598,11 +1598,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 5:
         return (
           <div className="relative">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Fill in your guarantor's personal details below</h2>
+            <div className="mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your guarantor's personal details below</h2>
             </div>
-            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
-              <div className="col-span-1">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Guarantor's First Name</label>
                 <input
                   type="text"
@@ -1612,7 +1612,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Enter first name"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Guarantor's Last Name</label>
                 <input
                   type="text"
@@ -1622,7 +1622,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Enter last name"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Guarantor's Email Address</label>
                 <input
                   type="email"
@@ -1632,7 +1632,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Enter email address"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Guarantor's Phone Number</label>
                 <input
                   type="tel"
@@ -1642,7 +1642,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Enter phone number"
                 />
               </div>
-              <div className="col-span-2">
+              <div className="col-span-1 sm:col-span-2">
                 <label className="block text-gray-700 mb-2">Guarantor's Address</label>
                 <textarea
                   value={formData.guarantor.address}
@@ -1659,17 +1659,17 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 6:
         return (
           <div className="relative">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Fill in your personal details below</h2>
+            <div className="mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your personal details below</h2>
             </div>
-            <div className="bg-white rounded-lg p-6 mb-6">
-              <p className="text-gray-700 mb-6">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6">
+              <p className="text-sm sm:text-base text-gray-700 mb-4 sm:mb-6">
                 A Credit check is required to complete your referencing.<br />
                 Your personal information has been filled in automatically.<br />
                 <strong>Check that all your details are correct.</strong>
               </p>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                <div className="col-span-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">First Name</label>
                   <input
                     type="text"
@@ -1678,7 +1678,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
                   />
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Last Name</label>
                   <input
                     type="text"
@@ -1687,7 +1687,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
                   />
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Email Address</label>
                   <input
                     type="email"
@@ -1696,7 +1696,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
                   />
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Phone Number</label>
                   <input
                     type="tel"
@@ -1705,7 +1705,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
                   />
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Date of birth</label>
                   <input
                     type="text"
@@ -1730,14 +1730,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 7:
         return (
           <div className="relative">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">
+            <div className="mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
                 Fill in the agent's details below
               </h2>
             </div>
-            <div className="bg-white rounded-lg p-6 mb-6">
-              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                <div className="col-span-1">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Agent's First Name</label>
                   <input
                     type="text"
@@ -1751,7 +1751,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
                   />
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Agent's Last Name</label>
                   <input
                     type="text"
@@ -1765,7 +1765,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
                   />
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Agent's Email Address</label>
                   <input
                     type="email"
@@ -1779,7 +1779,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
                   />
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Agent's Phone Number</label>
                   <input
                     type="tel"
@@ -1831,12 +1831,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-2 sm:p-4">
       <div
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
         onClick={handleClose}
       />
-      <div className="relative w-full max-w-5xl mx-auto my-8 bg-white rounded-lg shadow-xl flex overflow-hidden min-h-[600px]">
+      <div className="relative w-full max-w-sm sm:max-w-md md:max-w-4xl lg:max-w-5xl mx-auto my-2 sm:my-4 md:my-8 bg-white rounded-lg shadow-xl flex overflow-hidden min-h-[90vh] sm:min-h-[600px]">
         <div className="w-64 bg-gray-50 py-4 px-4 border-r border-gray-200 hidden md:block md:flex flex-col">
           <div className="mb-6 px-2">
             <h2 className="text-xl font-bold text-orange-600 mb-2">Referencing Steps</h2>
@@ -1860,30 +1860,30 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           </div>
         </div>
         <div className="flex-1 flex flex-col max-h-[90vh]">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center space-x-4">
-              <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-2">
-                <Menu size={24} />
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-1 sm:p-2">
+                <Menu size={20} className="sm:w-6 sm:h-6" />
               </button>
-              <h2 className="text-md font-semibold">Referencing Form</h2>
+              <h2 className="text-sm sm:text-md font-semibold">Referencing Form</h2>
             </div>
             <button
               onClick={handleClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors"
+              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors"
               aria-label="Close modal"
             >
-              <X size={18} />
+              <X size={16} className="sm:w-[18px] sm:h-[18px]" />
             </button>
           </div>
           {isMenuOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-50 z-[70]">
-              <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl p-6">
-                <button onClick={() => setIsMenuOpen(false)} className="mb-4">
-                  <X size={24} />
+              <div className="fixed inset-y-0 left-0 w-64 sm:w-72 bg-white shadow-xl p-4 sm:p-6">
+                <button onClick={() => setIsMenuOpen(false)} className="mb-4 p-1">
+                  <X size={20} className="sm:w-6 sm:h-6" />
                 </button>
-                <div className="mb-6">
-                  <h2 className="text-lg font-bold text-orange-600 mb-2">Referencing Steps</h2>
-                  <p className="text-sm text-gray-600">
+                <div className="mb-4 sm:mb-6">
+                  <h2 className="text-base sm:text-lg font-bold text-orange-600 mb-2">Referencing Steps</h2>
+                  <p className="text-xs sm:text-sm text-gray-600">
                     The referencing process verifies renter or buyer identity, financial status, and rental history.
                   </p>
                 </div>
@@ -1939,10 +1939,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               </div>
             </div>
           )}
-          <div className="flex-1 overflow-y-auto p-6 bg-[#f2f7fb]">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-[#f2f7fb]">
             {renderFormContent()}
           </div>
-          <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+          <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-t border-gray-200 flex justify-between items-center">
             <div>
               {lastSavedSteps[currentStep] && (
                 <div className="flex items-center text-sm text-gray-500 ml-2">
@@ -1951,18 +1951,18 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                 </div>
               )}
             </div>
-            <div className="flex space-x-3">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
               {currentStep > 1 && (
                 <button
                   onClick={prevStep}
-                  className="px-6 py-2 border border-[#136C9E] text-[#136C9E] rounded-md hover:bg-[#136C9E] hover:text-white transition-colors"
+                  className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base border border-[#136C9E] text-[#136C9E] rounded-md hover:bg-[#136C9E] hover:text-white transition-colors"
                 >
                   Previous
                 </button>
               )}
               <button
                 onClick={saveCurrentStep}
-                className="px-6 py-2 bg-gray-100 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-200 transition-colors"
+                className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base bg-gray-100 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-200 transition-colors"
                 disabled={isSaving}
               >
                 {isSaving ? 'Saving...' : 'Save'}
@@ -1970,14 +1970,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               {currentStep < 7 ? (
                 <button
                   onClick={nextStep}
-                  className="px-6 py-2 bg-[#136C9E] text-white rounded-md hover:bg-[#0F5A82] transition-colors"
+                  className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base bg-[#136C9E] text-white rounded-md hover:bg-[#0F5A82] transition-colors"
                 >
                   Continue
                 </button>
               ) : (
                 <button
                   onClick={() => submitApplication()}
-                  className="px-6 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                   disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck}
                 >
                   {isSubmitting ? 'Submitting...' : 'Submit Application'}
