@@ -97,12 +97,19 @@ const PropertySelector: React.FC = () => {
             <Typography variant="subtitle1" sx={{ color: DARK_GREY, mb: 2, fontWeight: 500 }}>
               Property Address
             </Typography>
-            <StyledTextField
-              fullWidth
-              label="First line of address"
-              value={state.selectedProperty?.street || ''}
-              onChange={handlePropertyChange('street')}
-            />
+            <Tooltip
+              content="Copy the property and agent details from the listing and enter them into the form. We'll take it from there and help you contact the agent."
+              position="top"
+              className="w-full block"
+              disabled={(state.selectedProperty?.street || '').trim().length > 0}
+            >
+              <StyledTextField
+                fullWidth
+                label="First line of address"
+                value={state.selectedProperty?.street || ''}
+                onChange={handlePropertyChange('street')}
+              />
+            </Tooltip>
             <Grid container spacing={2}>
               <Grid item xs={12} sm={4}>
                 <StyledTextField
@@ -153,8 +160,8 @@ const PropertySelector: React.FC = () => {
                 <Tooltip
                   content="If the email isn't listed on the property page, try searching for the agency's contact details online and add the agent's email address here."
                   position="top"
-                  maxWidth="max-w-sm"
-                  trigger="hover"
+                  className="w-full block"
+                  disabled={(state.selectedProperty?.agent?.email || '').trim().length > 0}
                 >
                   <StyledTextField
                     fullWidth
