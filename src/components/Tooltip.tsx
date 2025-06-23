@@ -13,9 +13,10 @@ interface TooltipProps {
   disabled?: boolean;
   autoShowDelay?: number; // Time in ms before auto-showing on mobile
   autoHideDelay?: number; // Time in ms before auto-hiding on mobile
+  forcePosition?: boolean; // New prop to force position for form inputs
 }
 
-export const Tooltip: React.FC<TooltipProps> = ({
+export const Tooltip = ({
   content,
   children,
   position = 'top',
@@ -26,7 +27,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
   maxWidth = 'max-w-xs',
   disabled = false,
   autoShowDelay = 2000,
-  autoHideDelay = 5000
+  autoHideDelay = 5000,
+  forcePosition = false
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
@@ -35,16 +37,98 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const autoShowTimeoutRef = useRef<NodeJS.Timeout>();
   const autoHideTimeoutRef = useRef<NodeJS.Timeout>();
 
+  const calculatePosition = () => {
+    if (!triggerRef.current || !tooltipRef.current) return;
+
+    const triggerRect = triggerRef.current.getBoundingClientRect();
+    const tooltipRect = tooltipRef.current.getBoundingClientRect();
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight
+    };
+
+    let top = 0;
+    let left = 0;
+    const isMobile = window.innerWidth < 768;
+    const isFormInput = triggerRef.current.querySelector('input, textarea, select') !== null;
+
+    // Special positioning for form inputs or when position is forced
+    if (isFormInput || forcePosition) {
+      // Position tooltip above the input field
+      top = triggerRect.top - tooltipRect.height - 12;
+      left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
+
+      // Ensure tooltip stays within viewport
+      if (left < 16) left = 16;
+      if (left + tooltipRect.width > viewport.width - 16) {
+        left = viewport.width - tooltipRect.width - 16;
+      }
+
+      // If there's not enough space above, show below
+      if (top < 16) {
+        top = triggerRect.bottom + 12;
+      }
+
+      // Ensure minimum distance from top of viewport
+      const minTopDistance = 16;
+      if (top < minTopDistance) {
+        top = minTopDistance;
+      }
+    }
+    // Special positioning for mobile
+    else if (isMobile && position === 'top') {
+      top = triggerRect.top - tooltipRect.height - 20;
+      left = (viewport.width - tooltipRect.width) / 2;
+
+      const navbarHeight = 80;
+      if (top < navbarHeight) {
+        top = navbarHeight + 8;
+      }
+    }
+    // Default positioning logic
+    else {
+      switch (position) {
+        case 'top':
+          top = triggerRect.top - tooltipRect.height - 16;
+          left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
+          break;
+        case 'bottom':
+          top = triggerRect.bottom + 16;
+          left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
+          break;
+        case 'left':
+          top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
+          left = triggerRect.left - tooltipRect.width - 16;
+          break;
+        case 'right':
+          top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
+          left = triggerRect.right + 16;
+          break;
+      }
+
+      // Viewport constraints
+      const padding = isMobile ? 20 : 12;
+      if (left < padding) left = padding;
+      if (left + tooltipRect.width > viewport.width - padding) {
+        left = viewport.width - tooltipRect.width - padding;
+      }
+      if (top < padding) top = padding;
+      if (top + tooltipRect.height > viewport.height - padding) {
+        top = viewport.height - tooltipRect.height - padding;
+      }
+    }
+
+    setTooltipPosition({ top, left });
+  };
+
   // Auto-show/hide functionality for mobile
   useEffect(() => {
     const isMobile = window.innerWidth < 768;
 
     if (trigger === 'auto-mobile' && isMobile && !disabled) {
-      // Auto-show after delay
       autoShowTimeoutRef.current = setTimeout(() => {
         setIsVisible(true);
 
-        // Auto-hide after another delay
         autoHideTimeoutRef.current = setTimeout(() => {
           setIsVisible(false);
         }, autoHideDelay);
@@ -61,122 +145,17 @@ export const Tooltip: React.FC<TooltipProps> = ({
     };
   }, [trigger, autoShowDelay, autoHideDelay, disabled]);
 
-  const calculatePosition = () => {
-    if (!triggerRef.current || !tooltipRef.current) return;
-
-    const triggerRect = triggerRef.current.getBoundingClientRect();
-    const tooltipRect = tooltipRef.current.getBoundingClientRect();
-    const viewport = {
-      width: window.innerWidth,
-      height: window.innerHeight
-    };
-
-    let top = 0;
-    let left = 0;
-    const isMobile = window.innerWidth < 768;
-
-    // Check if we're inside a modal (Material-UI dialog or similar)
-    const isInModal = () => {
-      let parent = triggerRef.current?.parentElement;
-      while (parent) {
-        const computedStyle = window.getComputedStyle(parent);
-        if (computedStyle.position === 'fixed' &&
-          (parent.classList.contains('MuiDialog-paper') ||
-            parent.classList.contains('MuiModal-root') ||
-            parent.getAttribute('role') === 'dialog')) {
-          return parent;
-        }
-        parent = parent.parentElement;
-      }
-      return null;
-    };
-
-    const modalContainer = isInModal();
-
-    // Special positioning for mobile to keep tooltip above search bar
-    if (isMobile && position === 'top') {
-      // Position tooltip fixed above the search bar, centered horizontally
-      top = triggerRect.top - tooltipRect.height - 20;
-      left = (viewport.width - tooltipRect.width) / 2; // Center horizontally
-
-      // Ensure it doesn't go above navbar (minimum top position)
-      const navbarHeight = 80; // Adjust based on your navbar height
-      if (top < navbarHeight) {
-        top = navbarHeight + 8;
-      }
-    } else {
-      // Original positioning logic for desktop and other positions
-      switch (position) {
-        case 'top':
-          top = triggerRect.top - tooltipRect.height - 16;
-          left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
-
-          // Special handling for modals: if tooltip would appear above modal, show below instead
-          if (modalContainer) {
-            const modalRect = modalContainer.getBoundingClientRect();
-            if (top < modalRect.top + 60) { // 60px buffer from top of modal
-              top = triggerRect.bottom + 16; // Position below instead
-            }
-          }
-          break;
-        case 'bottom':
-          top = triggerRect.bottom + 16;
-          left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
-          break;
-        case 'left':
-          top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
-          left = triggerRect.left - tooltipRect.width - 16;
-          break;
-        case 'right':
-          top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
-          left = triggerRect.right + 16;
-          break;
-      }
-
-      // Enhanced boundary checking for modals
-      let padding = isMobile ? 20 : 12;
-      let minTop = padding;
-
-      if (modalContainer) {
-        const modalRect = modalContainer.getBoundingClientRect();
-        // Use modal boundaries instead of viewport
-        padding = 16; // More generous padding within modals
-        minTop = modalRect.top + padding;
-
-        // Ensure tooltip stays within modal horizontally
-        if (left < modalRect.left + padding) {
-          left = modalRect.left + padding;
-        }
-        if (left + tooltipRect.width > modalRect.right - padding) {
-          left = modalRect.right - tooltipRect.width - padding;
-        }
-
-        // Ensure tooltip stays within modal vertically
-        if (top < modalRect.top + padding) {
-          top = modalRect.top + padding;
-        }
-        if (top + tooltipRect.height > modalRect.bottom - padding) {
-          top = modalRect.bottom - tooltipRect.height - padding;
-        }
-      } else {
-        // Standard viewport boundary checking
-        if (left < padding) left = padding;
-        if (left + tooltipRect.width > viewport.width - padding) {
-          left = viewport.width - tooltipRect.width - padding;
-        }
-        if (top < minTop) top = minTop;
-        if (top + tooltipRect.height > viewport.height - padding) {
-          top = viewport.height - tooltipRect.height - padding;
-        }
-      }
-    }
-
-    setTooltipPosition({ top, left });
-  };
-
   useEffect(() => {
     if (isVisible) {
       calculatePosition();
+      // Recalculate position on scroll and resize
+      const handleUpdate = () => calculatePosition();
+      window.addEventListener('scroll', handleUpdate, true);
+      window.addEventListener('resize', handleUpdate);
+      return () => {
+        window.removeEventListener('scroll', handleUpdate, true);
+        window.removeEventListener('resize', handleUpdate);
+      };
     }
   }, [isVisible, position]);
 
@@ -202,38 +181,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
     const baseArrowClasses = "absolute";
     const isMobile = window.innerWidth < 768;
 
-    // Check if we're in a modal and position was adjusted
-    const isInModal = () => {
-      let parent = triggerRef.current?.parentElement;
-      while (parent) {
-        const computedStyle = window.getComputedStyle(parent);
-        if (computedStyle.position === 'fixed' &&
-          (parent.classList.contains('MuiDialog-paper') ||
-            parent.classList.contains('MuiModal-root') ||
-            parent.getAttribute('role') === 'dialog')) {
-          return true;
-        }
-        parent = parent.parentElement;
-      }
-      return false;
-    };
-
-    const inModal = isInModal();
-
     switch (position) {
       case 'top':
-        // For mobile, we need to calculate the arrow position relative to the search bar
         if (isMobile && triggerRef.current) {
           return `${baseArrowClasses} -bottom-3 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[12px] border-l-transparent border-r-transparent border-t-white`;
-        }
-        // For modal context, if tooltip appears below due to constraint, use bottom arrow
-        if (inModal && triggerRef.current && tooltipRef.current) {
-          const triggerRect = triggerRef.current.getBoundingClientRect();
-          const tooltipRect = tooltipRef.current.getBoundingClientRect();
-          if (tooltipRect.top > triggerRect.bottom) {
-            // Tooltip is below trigger, use top arrow
-            return `${baseArrowClasses} -top-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-r-[12px] border-b-[12px] border-l-transparent border-r-transparent border-b-white`;
-          }
         }
         return `${baseArrowClasses} -bottom-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[12px] border-l-transparent border-r-transparent border-t-white`;
       case 'bottom':
@@ -254,7 +205,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
       const triggerRect = triggerRef.current.getBoundingClientRect();
       const triggerCenter = triggerRect.left + triggerRect.width / 2;
       const tooltipLeft = (window.innerWidth - (tooltipRef.current?.getBoundingClientRect().width || 320)) / 2;
-      const arrowOffset = triggerCenter - tooltipLeft - 12; // 12px is half the arrow width
+      const arrowOffset = triggerCenter - tooltipLeft - 12;
       return { left: `${Math.max(12, Math.min(arrowOffset, (tooltipRef.current?.getBoundingClientRect().width || 320) - 24))}px` };
     }
 
@@ -269,6 +220,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
         className={`relative inline-flex items-center ${className}`}
+        style={{ width: '100%' }}
       >
         {children}
         {showIcon && (
@@ -279,7 +231,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
       {isVisible && !disabled && (
         <div
           ref={tooltipRef}
-          className={`fixed text-black transform transition-all duration-300 ease-out opacity-100 scale-100`}
+          className={`fixed z-[9999] text-black
+            transform transition-all duration-300 ease-out opacity-100 scale-100`}
           style={{
             backgroundColor: '#ffffff',
             top: `${tooltipPosition.top}px`,
@@ -289,18 +242,15 @@ export const Tooltip: React.FC<TooltipProps> = ({
             maxWidth: window.innerWidth < 768 ? '320px' : '380px',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
             border: '1px solid rgba(0, 0, 0, 0.08)',
-            zIndex: 10000, // Higher z-index for modal contexts
           }}
           onMouseEnter={() => trigger === 'hover' && setIsVisible(true)}
           onMouseLeave={() => trigger === 'hover' && setIsVisible(false)}
         >
-          {/* Speech bubble arrow using CSS borders */}
           <div
             className={getArrowClasses()}
             style={getArrowPosition()}
           ></div>
 
-          {/* Chat bubble content with left-aligned text */}
           <div className="relative z-10 p-4 md:p-5 text-left">
             {typeof content === 'string' ? (
               <p className="leading-relaxed text-sm md:text-base font-medium text-left text-gray-900">{content}</p>
