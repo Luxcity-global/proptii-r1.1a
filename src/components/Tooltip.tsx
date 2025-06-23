@@ -16,7 +16,7 @@ interface TooltipProps {
   forcePosition?: boolean; // New prop to force position for form inputs
 }
 
-export const Tooltip = ({
+export const Tooltip: React.FC<TooltipProps> = ({
   content,
   children,
   position = 'top',
@@ -52,27 +52,44 @@ export const Tooltip = ({
     const isMobile = window.innerWidth < 768;
     const isFormInput = triggerRef.current.querySelector('input, textarea, select') !== null;
 
+    // Find the closest modal container to constrain positioning
+    const modalContainer = triggerRef.current.closest('[role="dialog"], .MuiDialog-paper, .modal');
+    const containerRect = modalContainer ? modalContainer.getBoundingClientRect() : null;
+
     // Special positioning for form inputs or when position is forced
     if (isFormInput || forcePosition) {
       // Position tooltip above the input field
       top = triggerRect.top - tooltipRect.height - 12;
       left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
 
-      // Ensure tooltip stays within viewport
-      if (left < 16) left = 16;
-      if (left + tooltipRect.width > viewport.width - 16) {
-        left = viewport.width - tooltipRect.width - 16;
-      }
+      // If we're in a modal, constrain to modal bounds
+      if (containerRect) {
+        const modalPadding = 16;
+        const modalLeft = containerRect.left + modalPadding;
+        const modalRight = containerRect.right - modalPadding;
+        const modalTop = containerRect.top + modalPadding;
 
-      // If there's not enough space above, show below
-      if (top < 16) {
-        top = triggerRect.bottom + 12;
-      }
+        // Ensure tooltip stays within modal horizontal bounds
+        if (left < modalLeft) {
+          left = modalLeft;
+        }
+        if (left + tooltipRect.width > modalRight) {
+          left = modalRight - tooltipRect.width;
+        }
 
-      // Ensure minimum distance from top of viewport
-      const minTopDistance = 16;
-      if (top < minTopDistance) {
-        top = minTopDistance;
+        // Ensure tooltip stays within modal vertical bounds
+        if (top < modalTop) {
+          top = triggerRect.bottom + 12; // Show below if not enough space above
+        }
+      } else {
+        // Fallback to viewport constraints
+        if (left < 16) left = 16;
+        if (left + tooltipRect.width > viewport.width - 16) {
+          left = viewport.width - tooltipRect.width - 16;
+        }
+        if (top < 16) {
+          top = triggerRect.bottom + 12;
+        }
       }
     }
     // Special positioning for mobile
@@ -209,6 +226,24 @@ export const Tooltip = ({
       return { left: `${Math.max(12, Math.min(arrowOffset, (tooltipRef.current?.getBoundingClientRect().width || 320) - 24))}px` };
     }
 
+    // For form inputs, center the arrow relative to the trigger element
+    if (triggerRef.current && tooltipRef.current) {
+      const triggerRect = triggerRef.current.getBoundingClientRect();
+      const tooltipRect = tooltipRef.current.getBoundingClientRect();
+      const triggerCenter = triggerRect.left + triggerRect.width / 2;
+      const tooltipLeft = tooltipPosition.left;
+      const arrowOffset = triggerCenter - tooltipLeft - 12; // 12px is half the arrow width
+
+      // Constrain arrow position within tooltip bounds
+      const tooltipWidth = tooltipRect.width || 300;
+      const minArrowPos = 12;
+      const maxArrowPos = tooltipWidth - 24;
+
+      return {
+        left: `${Math.max(minArrowPos, Math.min(arrowOffset, maxArrowPos))}px`
+      };
+    }
+
     return {};
   };
 
@@ -237,9 +272,9 @@ export const Tooltip = ({
             backgroundColor: '#ffffff',
             top: `${tooltipPosition.top}px`,
             left: `${tooltipPosition.left}px`,
-            borderRadius: '20px',
-            minWidth: '280px',
-            maxWidth: window.innerWidth < 768 ? '320px' : '380px',
+            borderRadius: '12px',
+            width: window.innerWidth < 768 ? '280px' : '300px',
+            maxWidth: '90vw',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
             border: '1px solid rgba(0, 0, 0, 0.08)',
           }}
@@ -251,11 +286,11 @@ export const Tooltip = ({
             style={getArrowPosition()}
           ></div>
 
-          <div className="relative z-10 p-4 md:p-5 text-left">
+          <div className="relative z-10 p-3 md:p-4 text-left">
             {typeof content === 'string' ? (
-              <p className="leading-relaxed text-sm md:text-base font-medium text-left text-gray-900">{content}</p>
+              <p className="leading-relaxed text-sm font-medium text-left text-gray-900 m-0">{content}</p>
             ) : (
-              <div className="leading-relaxed text-sm md:text-base font-medium text-left text-gray-900">
+              <div className="leading-relaxed text-sm font-medium text-left text-gray-900">
                 {content}
               </div>
             )}
