@@ -4,7 +4,6 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import BookViewingModal from '../components/viewings/BookViewingModal';
-import { Tooltip } from '../components/Tooltip';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import 'swiper/css/navigation';
@@ -111,19 +110,12 @@ const BookViewing = () => {
             We make finding and securing your home easy,every step of the way,
           </p>
 
-          <Tooltip
-            content="Copy the property and agent details from the listing and enter them into the form. We'll take it from there and help you contact the agent."
-            position="top"
-            maxWidth="max-w-sm"
-            trigger="hover"
+          <button
+            onClick={handleGetStarted}
+            className="bg-primary text-white px-10 py-4 rounded-full hover:bg-opacity-90 transition-all text-xl font-medium"
           >
-            <button
-              onClick={handleGetStarted}
-              className="bg-primary text-white px-10 py-4 rounded-full hover:bg-opacity-90 transition-all text-xl font-medium"
-            >
-              {isAuthenticated ? 'Start booking viewings' : 'Get Started'}
-            </button>
-          </Tooltip>
+            {isAuthenticated ? 'Start booking viewings' : 'Get Started'}
+          </button>
         </div>
       </section>
 
@@ -139,18 +131,11 @@ const BookViewing = () => {
             <p className="text-gray-600 text-base md:text-lg leading-relaxed">
               Simply share the listing link and your preferred date and time—our AI takes it from there. We'll contact the agent and confirm your appointment, so you can focus on finding the right home.
             </p>
-            <Tooltip
-              content="Copy the property and agent details from the listing and enter them into the form. We'll take it from there and help you contact the agent."
-              position="top"
-              maxWidth="max-w-sm"
-              trigger="hover"
-            >
-              <button
-                onClick={handleGetStarted}
-                className="bg-orange-600 text-white font-medium px-6 py-3 rounded-lg hover:bg-orange-700 transition-all duration-300 shadow-md hover:shadow-lg">
-                {isAuthenticated ? 'Start booking viewings' : 'Get Started'}
-              </button>
-            </Tooltip>
+            <button
+              onClick={handleGetStarted}
+              className="bg-orange-600 text-white font-medium px-6 py-3 rounded-lg hover:bg-orange-700 transition-all duration-300 shadow-md hover:shadow-lg">
+              {isAuthenticated ? 'Start booking viewings' : 'Get Started'}
+            </button>
           </div>
 
           {/* Right Section - Swiper Carousel */}
