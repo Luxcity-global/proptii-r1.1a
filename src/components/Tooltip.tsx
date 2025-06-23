@@ -115,29 +115,39 @@ export const Tooltip: React.FC<TooltipProps> = ({
   };
 
   const getArrowClasses = () => {
-    const baseArrowClasses = "absolute w-4 h-4 transform rotate-45";
+    const baseArrowClasses = "absolute";
     const isMobile = window.innerWidth < 768;
 
     switch (position) {
       case 'top':
         // For mobile, we need to calculate the arrow position relative to the search bar
         if (isMobile && triggerRef.current) {
-          const triggerRect = triggerRef.current.getBoundingClientRect();
-          const triggerCenter = triggerRect.left + triggerRect.width / 2;
-          const tooltipLeft = (window.innerWidth - (tooltipRef.current?.getBoundingClientRect().width || 300)) / 2;
-          const arrowOffset = triggerCenter - tooltipLeft;
-          return `${baseArrowClasses} -bottom-2`;
+          return `${baseArrowClasses} -bottom-3 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[12px] border-l-transparent border-r-transparent border-t-[#136C9D]`;
         }
-        return `${baseArrowClasses} -bottom-2 left-1/2 -translate-x-1/2`;
+        return `${baseArrowClasses} -bottom-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-r-[12px] border-t-[12px] border-l-transparent border-r-transparent border-t-[#136C9D]`;
       case 'bottom':
-        return `${baseArrowClasses} -top-2 left-1/2 -translate-x-1/2`;
+        return `${baseArrowClasses} -top-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[12px] border-r-[12px] border-b-[12px] border-l-transparent border-r-transparent border-b-[#136C9D]`;
       case 'left':
-        return `${baseArrowClasses} -right-2 top-1/2 -translate-y-1/2`;
+        return `${baseArrowClasses} -right-3 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[12px] border-b-[12px] border-l-[12px] border-t-transparent border-b-transparent border-l-[#136C9D]`;
       case 'right':
-        return `${baseArrowClasses} -left-2 top-1/2 -translate-y-1/2`;
+        return `${baseArrowClasses} -left-3 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[12px] border-b-[12px] border-r-[12px] border-t-transparent border-b-transparent border-r-[#136C9D]`;
       default:
         return baseArrowClasses;
     }
+  };
+
+  const getArrowPosition = () => {
+    const isMobile = window.innerWidth < 768;
+
+    if (isMobile && position === 'top' && triggerRef.current) {
+      const triggerRect = triggerRef.current.getBoundingClientRect();
+      const triggerCenter = triggerRect.left + triggerRect.width / 2;
+      const tooltipLeft = (window.innerWidth - (tooltipRef.current?.getBoundingClientRect().width || 320)) / 2;
+      const arrowOffset = triggerCenter - tooltipLeft - 12; // 12px is half the arrow width
+      return { left: `${Math.max(12, Math.min(arrowOffset, (tooltipRef.current?.getBoundingClientRect().width || 320) - 24))}px` };
+    }
+
+    return {};
   };
 
   return (
@@ -158,38 +168,33 @@ export const Tooltip: React.FC<TooltipProps> = ({
       {isVisible && !disabled && (
         <div
           ref={tooltipRef}
-          className={`fixed z-[9999] ${maxWidth} text-white text-sm shadow-2xl 
+          className={`fixed z-[9999] text-white shadow-2xl 
             transform transition-all duration-300 ease-out opacity-100 scale-100`}
           style={{
             backgroundColor: '#136C9D',
             top: `${tooltipPosition.top}px`,
             left: `${tooltipPosition.left}px`,
-            borderRadius: '16px',
-            border: '2px solid #136C9D',
+            borderRadius: '20px',
             minWidth: '280px',
-            maxWidth: window.innerWidth < 768 ? '320px' : '360px',
+            maxWidth: window.innerWidth < 768 ? '320px' : '380px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 10px 20px -5px rgba(0, 0, 0, 0.1)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
           }}
           onMouseEnter={() => trigger === 'hover' && setIsVisible(true)}
           onMouseLeave={() => trigger === 'hover' && setIsVisible(false)}
         >
-          {/* Chat bubble arrow */}
+          {/* Speech bubble arrow using CSS borders */}
           <div
             className={getArrowClasses()}
-            style={{
-              backgroundColor: '#136C9D',
-              border: '2px solid #136C9D',
-              ...(window.innerWidth < 768 && position === 'top' && triggerRef.current ? {
-                left: `${triggerRef.current.getBoundingClientRect().left + triggerRef.current.getBoundingClientRect().width / 2 - (window.innerWidth - (tooltipRef.current?.getBoundingClientRect().width || 320)) / 2 - 8}px`
-              } : {})
-            }}
+            style={getArrowPosition()}
           ></div>
 
-          {/* Chat bubble content */}
-          <div className="relative z-10 p-4 md:p-5">
+          {/* Chat bubble content with left-aligned text */}
+          <div className="relative z-10 p-4 md:p-5 text-left">
             {typeof content === 'string' ? (
-              <p className="leading-relaxed text-sm md:text-base font-medium">{content}</p>
+              <p className="leading-relaxed text-sm md:text-base font-medium text-left">{content}</p>
             ) : (
-              <div className="leading-relaxed text-sm md:text-base font-medium">
+              <div className="leading-relaxed text-sm md:text-base font-medium text-left">
                 {content}
               </div>
             )}
