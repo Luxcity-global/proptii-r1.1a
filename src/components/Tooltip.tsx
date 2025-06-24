@@ -58,57 +58,35 @@ export const Tooltip: React.FC<TooltipProps> = ({
     // Special positioning for form inputs or when position is forced
     if (isFormInput || forcePosition) {
       // Calculate basic position above the input
-      top = triggerRect.top - tooltipRect.height - 12;
+      top = triggerRect.top - tooltipRect.height - 8;
 
       // For modal containers, use a more conservative positioning approach
       if (modalContainer) {
         const modalRect = modalContainer.getBoundingClientRect();
 
-        // Calculate responsive tooltip width
-        const tooltipWidth = Math.min(300, modalRect.width - 32);
-
-        // Position tooltip centered above the input, but constrained within modal
-        const modalPadding = isMobile ? 8 : 16;
-        const availableWidth = modalRect.width - (modalPadding * 2);
-        const maxTooltipWidth = Math.min(tooltipWidth, availableWidth);
+        // Position tooltip within modal bounds, centered above the input
+        const inputCenter = triggerRect.left + triggerRect.width / 2;
+        const tooltipWidth = 300; // Fixed width we set in styles
 
         // Center the tooltip above the input field
-        const inputCenter = triggerRect.left + triggerRect.width / 2;
-        const idealLeft = inputCenter - maxTooltipWidth / 2;
+        left = inputCenter - tooltipWidth / 2;
 
-        // Ensure tooltip stays within modal bounds
+        // Ensure tooltip doesn't go outside modal bounds
+        const modalPadding = 20;
         const modalLeft = modalRect.left + modalPadding;
         const modalRight = modalRect.right - modalPadding;
 
-        left = Math.max(modalLeft, Math.min(idealLeft, modalRight - maxTooltipWidth));
-
-        // Debug logging (remove after testing)
-        console.log('Tooltip positioning:', {
-          modalRect: { left: modalRect.left, right: modalRect.right, width: modalRect.width },
-          inputCenter,
-          tooltipWidth: maxTooltipWidth,
-          idealLeft,
-          finalLeft: left,
-          constraints: { modalLeft, modalRight }
-        });
-
-        // Ensure tooltip doesn't go above modal or below the modal header
-        const modalHeaderHeight = isMobile ? 56 : 64; // Smaller header on mobile
-        const minTopPosition = modalRect.top + modalHeaderHeight + 8;
-
-        if (top < minTopPosition) {
-          // If there's not enough space above, position below the input
-          top = triggerRect.bottom + 8;
-
-          // If positioning below would go outside modal, force it above with minimum spacing
-          if (top + tooltipRect.height > modalRect.bottom - 16) {
-            top = Math.max(minTopPosition, triggerRect.top - tooltipRect.height - 8);
-          }
+        // Constrain to modal horizontal bounds
+        if (left < modalLeft) {
+          left = modalLeft;
+        }
+        if (left + tooltipWidth > modalRight) {
+          left = modalRight - tooltipWidth;
         }
 
-        // Ensure tooltip doesn't go below modal bottom
-        if (top + tooltipRect.height > modalRect.bottom - 16) {
-          top = modalRect.bottom - tooltipRect.height - 16;
+        // Ensure tooltip doesn't go above modal
+        if (top < modalRect.top + 10) {
+          top = triggerRect.bottom + 8; // Show below input if no space above
         }
       } else {
         // Fallback positioning for non-modal contexts
@@ -199,52 +177,14 @@ export const Tooltip: React.FC<TooltipProps> = ({
       calculatePosition();
       // Recalculate position on scroll and resize
       const handleUpdate = () => calculatePosition();
-
-      // Listen for scroll events on both window and modal containers
       window.addEventListener('scroll', handleUpdate, true);
       window.addEventListener('resize', handleUpdate);
-
-      // Find modal container and listen for its scroll events too
-      const modalContainer = triggerRef.current?.closest('[role="dialog"], .MuiDialog-paper, .modal, .MuiDialog-container');
-      const scrollableContent = triggerRef.current?.closest('[class*="ScrollableContent"], [class*="scrollable"]');
-
-      if (modalContainer) {
-        modalContainer.addEventListener('scroll', handleUpdate, true);
-      }
-      if (scrollableContent && scrollableContent !== modalContainer) {
-        scrollableContent.addEventListener('scroll', handleUpdate, true);
-      }
-
       return () => {
         window.removeEventListener('scroll', handleUpdate, true);
         window.removeEventListener('resize', handleUpdate);
-        if (modalContainer) {
-          modalContainer.removeEventListener('scroll', handleUpdate, true);
-        }
-        if (scrollableContent && scrollableContent !== modalContainer) {
-          scrollableContent.removeEventListener('scroll', handleUpdate, true);
-        }
       };
     }
   }, [isVisible, position]);
-
-  // Add event listeners for input field interactions
-  useEffect(() => {
-    if (triggerRef.current) {
-      const inputElement = triggerRef.current.querySelector('input, textarea, select');
-      if (inputElement) {
-        inputElement.addEventListener('focus', handleInputFocus);
-        inputElement.addEventListener('input', handleInputChange);
-        inputElement.addEventListener('change', handleInputChange);
-
-        return () => {
-          inputElement.removeEventListener('focus', handleInputFocus);
-          inputElement.removeEventListener('input', handleInputChange);
-          inputElement.removeEventListener('change', handleInputChange);
-        };
-      }
-    }
-  }, [trigger, disabled]);
 
   const handleMouseEnter = () => {
     if (trigger === 'hover' && !disabled) {
@@ -261,23 +201,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const handleClick = () => {
     if (trigger === 'click' && !disabled) {
       setIsVisible(!isVisible);
-    }
-  };
-
-  // Handle focus events on input fields to hide tooltips
-  const handleInputFocus = () => {
-    if (trigger === 'hover' && !disabled) {
-      setIsVisible(false);
-    }
-  };
-
-  const handleInputBlur = () => {
-    // Optional: Could show tooltip again on blur if needed
-  };
-
-  const handleInputChange = () => {
-    if (trigger === 'hover' && !disabled) {
-      setIsVisible(false);
     }
   };
 
@@ -321,17 +244,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
       const tooltipLeft = tooltipPosition.left;
       const arrowOffset = triggerCenter - tooltipLeft - 12; // 12px is half the arrow width
 
-      // Get actual tooltip width (could be smaller in modals)
-      const modalContainer = triggerRef.current.closest('[role="dialog"], .MuiDialog-paper, .modal, .MuiDialog-container');
-      let tooltipWidth = 300;
-      if (modalContainer) {
-        const modalRect = modalContainer.getBoundingClientRect();
-        const modalPadding = window.innerWidth < 768 ? 16 : 32;
-        tooltipWidth = Math.min(300, modalRect.width - modalPadding);
-      }
-
-      const minArrowPos = 24; // Minimum distance from tooltip edge to keep arrow visible
-      const maxArrowPos = tooltipWidth - 36; // Maximum distance (accounting for arrow width and padding)
+      // Constrain arrow position within tooltip bounds (300px width)
+      const tooltipWidth = 300;
+      const minArrowPos = 16; // Minimum distance from tooltip edge
+      const maxArrowPos = tooltipWidth - 28; // Maximum distance (accounting for arrow width)
 
       return {
         left: `${Math.max(minArrowPos, Math.min(arrowOffset, maxArrowPos))}px`
@@ -360,25 +276,16 @@ export const Tooltip: React.FC<TooltipProps> = ({
       {isVisible && !disabled && (
         <div
           ref={tooltipRef}
-          className={`fixed text-black pointer-events-none
+          className={`fixed z-[9999] text-black pointer-events-none
             transform transition-all duration-300 ease-out opacity-100 scale-100`}
           style={{
             backgroundColor: '#ffffff',
             top: `${tooltipPosition.top}px`,
             left: `${tooltipPosition.left}px`,
             borderRadius: '12px',
-            width: (() => {
-              const modalContainer = triggerRef.current?.closest('[role="dialog"], .MuiDialog-paper, .modal, .MuiDialog-container');
-              if (modalContainer) {
-                const modalRect = modalContainer.getBoundingClientRect();
-                const modalPadding = window.innerWidth < 768 ? 16 : 32;
-                return `${Math.min(300, modalRect.width - modalPadding)}px`;
-              }
-              return window.innerWidth < 768 ? `${Math.min(300, window.innerWidth - 32)}px` : '300px';
-            })(),
+            width: '300px',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
             border: '1px solid rgba(0, 0, 0, 0.08)',
-            zIndex: 10000, // Ensure it appears above modal content
           }}
           onMouseEnter={() => {
             if (trigger === 'hover') {
