@@ -53,50 +53,44 @@ export const Tooltip: React.FC<TooltipProps> = ({
     const isFormInput = triggerRef.current.querySelector('input, textarea, select') !== null;
 
     // Find the closest modal or dialog container
-    const modalContainer = triggerRef.current.closest('[role="dialog"], .MuiDialog-paper, .modal, .MuiDialog-container');
+    const modalContainer = triggerRef.current.closest('[role="dialog"], .MuiDialog-paper, .modal, .MuiDialog-container, .MuiDialog-root');
 
     // Special positioning for form inputs or when position is forced
     if (isFormInput || forcePosition) {
-      // Calculate basic position above the input
+      const tooltipWidth = 300;
+
+      // Always center the tooltip above the input field first
+      const triggerCenter = triggerRect.left + triggerRect.width / 2;
+      left = triggerCenter - tooltipWidth / 2;
       top = triggerRect.top - tooltipRect.height - 8;
 
-      // For modal containers, use a more conservative positioning approach
+      // Then check modal constraints if we're in a modal
       if (modalContainer) {
         const modalRect = modalContainer.getBoundingClientRect();
-
-        // Position tooltip within modal bounds, centered above the input
-        const inputCenter = triggerRect.left + triggerRect.width / 2;
-        const tooltipWidth = 300; // Fixed width we set in styles
-
-        // Center the tooltip above the input field
-        left = inputCenter - tooltipWidth / 2;
-
-        // Ensure tooltip doesn't go outside modal bounds
         const modalPadding = 20;
+
+        // Ensure tooltip stays within modal horizontal bounds
         const modalLeft = modalRect.left + modalPadding;
         const modalRight = modalRect.right - modalPadding;
 
-        // Constrain to modal horizontal bounds
         if (left < modalLeft) {
           left = modalLeft;
-        }
-        if (left + tooltipWidth > modalRight) {
+        } else if (left + tooltipWidth > modalRight) {
           left = modalRight - tooltipWidth;
         }
 
         // Ensure tooltip doesn't go above modal
         if (top < modalRect.top + 10) {
-          top = triggerRect.bottom + 8; // Show below input if no space above
+          top = triggerRect.bottom + 8; // Show below if no space above
         }
       } else {
-        // Fallback positioning for non-modal contexts
-        left = triggerRect.left + (triggerRect.width - 300) / 2;
-
-        // Viewport constraints
-        if (left < 16) left = 16;
-        if (left + 300 > viewport.width - 16) {
-          left = viewport.width - 316; // 300 + 16
+        // Viewport constraints for non-modal contexts
+        if (left < 16) {
+          left = 16;
+        } else if (left + tooltipWidth > viewport.width - 16) {
+          left = viewport.width - tooltipWidth - 16;
         }
+
         if (top < 16) {
           top = triggerRect.bottom + 8;
         }

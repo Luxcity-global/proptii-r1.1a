@@ -125,10 +125,10 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
             content="Browse the listings and save the URL of any property you're interested in."
             position="top"
             maxWidth="max-w-sm"
-            className="w-full h-full flex"
+            className="w-full block"
             trigger={isMobile ? "auto-mobile" : "hover"}
-            autoShowDelay={1500}
-            autoHideDelay={4000}
+            autoShowDelay={2500}
+            autoHideDelay={7000}
           >
             <div className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 w-full flex flex-col" tabIndex={0} aria-label={`Property card: ${property.title}`}>
               {/* Fixed height header section */}
