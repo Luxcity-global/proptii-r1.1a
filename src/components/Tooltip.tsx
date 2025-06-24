@@ -58,7 +58,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
     // Special positioning for form inputs or when position is forced
     if (isFormInput || forcePosition) {
       // Calculate basic position above the input
-      top = triggerRect.top - tooltipRect.height - 8;
+      top = triggerRect.top - tooltipRect.height - 12;
 
       // For modal containers, use a more conservative positioning approach
       if (modalContainer) {
@@ -66,13 +66,13 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
         // Position tooltip within modal bounds, centered above the input
         const inputCenter = triggerRect.left + triggerRect.width / 2;
-        const tooltipWidth = 300; // Fixed width we set in styles
+        const tooltipWidth = isMobile ? Math.min(300, viewport.width - 32) : 300; // Responsive width on mobile
 
         // Center the tooltip above the input field
         left = inputCenter - tooltipWidth / 2;
 
         // Ensure tooltip doesn't go outside modal bounds
-        const modalPadding = 20;
+        const modalPadding = isMobile ? 8 : 16;
         const modalLeft = modalRect.left + modalPadding;
         const modalRight = modalRect.right - modalPadding;
 
@@ -84,9 +84,23 @@ export const Tooltip: React.FC<TooltipProps> = ({
           left = modalRight - tooltipWidth;
         }
 
-        // Ensure tooltip doesn't go above modal
-        if (top < modalRect.top + 10) {
-          top = triggerRect.bottom + 8; // Show below input if no space above
+        // Ensure tooltip doesn't go above modal or below the modal header
+        const modalHeaderHeight = isMobile ? 56 : 64; // Smaller header on mobile
+        const minTopPosition = modalRect.top + modalHeaderHeight + 8;
+
+        if (top < minTopPosition) {
+          // If there's not enough space above, position below the input
+          top = triggerRect.bottom + 8;
+
+          // If positioning below would go outside modal, force it above with minimum spacing
+          if (top + tooltipRect.height > modalRect.bottom - 16) {
+            top = Math.max(minTopPosition, triggerRect.top - tooltipRect.height - 8);
+          }
+        }
+
+        // Ensure tooltip doesn't go below modal bottom
+        if (top + tooltipRect.height > modalRect.bottom - 16) {
+          top = modalRect.bottom - tooltipRect.height - 16;
         }
       } else {
         // Fallback positioning for non-modal contexts
@@ -177,11 +191,31 @@ export const Tooltip: React.FC<TooltipProps> = ({
       calculatePosition();
       // Recalculate position on scroll and resize
       const handleUpdate = () => calculatePosition();
+
+      // Listen for scroll events on both window and modal containers
       window.addEventListener('scroll', handleUpdate, true);
       window.addEventListener('resize', handleUpdate);
+
+      // Find modal container and listen for its scroll events too
+      const modalContainer = triggerRef.current?.closest('[role="dialog"], .MuiDialog-paper, .modal, .MuiDialog-container');
+      const scrollableContent = triggerRef.current?.closest('[class*="ScrollableContent"], [class*="scrollable"]');
+
+      if (modalContainer) {
+        modalContainer.addEventListener('scroll', handleUpdate, true);
+      }
+      if (scrollableContent && scrollableContent !== modalContainer) {
+        scrollableContent.addEventListener('scroll', handleUpdate, true);
+      }
+
       return () => {
         window.removeEventListener('scroll', handleUpdate, true);
         window.removeEventListener('resize', handleUpdate);
+        if (modalContainer) {
+          modalContainer.removeEventListener('scroll', handleUpdate, true);
+        }
+        if (scrollableContent && scrollableContent !== modalContainer) {
+          scrollableContent.removeEventListener('scroll', handleUpdate, true);
+        }
       };
     }
   }, [isVisible, position]);
@@ -246,8 +280,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
       // Constrain arrow position within tooltip bounds (300px width)
       const tooltipWidth = 300;
-      const minArrowPos = 16; // Minimum distance from tooltip edge
-      const maxArrowPos = tooltipWidth - 28; // Maximum distance (accounting for arrow width)
+      const minArrowPos = 24; // Minimum distance from tooltip edge to keep arrow visible
+      const maxArrowPos = tooltipWidth - 36; // Maximum distance (accounting for arrow width and padding)
 
       return {
         left: `${Math.max(minArrowPos, Math.min(arrowOffset, maxArrowPos))}px`
@@ -276,16 +310,17 @@ export const Tooltip: React.FC<TooltipProps> = ({
       {isVisible && !disabled && (
         <div
           ref={tooltipRef}
-          className={`fixed z-[9999] text-black pointer-events-none
+          className={`fixed text-black pointer-events-none
             transform transition-all duration-300 ease-out opacity-100 scale-100`}
           style={{
             backgroundColor: '#ffffff',
             top: `${tooltipPosition.top}px`,
             left: `${tooltipPosition.left}px`,
             borderRadius: '12px',
-            width: '300px',
+            width: window.innerWidth < 768 ? `${Math.min(300, window.innerWidth - 32)}px` : '300px',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
             border: '1px solid rgba(0, 0, 0, 0.08)',
+            zIndex: 10000, // Ensure it appears above modal content
           }}
           onMouseEnter={() => {
             if (trigger === 'hover') {
