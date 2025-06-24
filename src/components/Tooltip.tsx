@@ -64,25 +64,33 @@ export const Tooltip: React.FC<TooltipProps> = ({
       if (modalContainer) {
         const modalRect = modalContainer.getBoundingClientRect();
 
-        // Position tooltip within modal bounds, centered above the input
-        const inputCenter = triggerRect.left + triggerRect.width / 2;
-        const tooltipWidth = isMobile ? Math.min(300, viewport.width - 32) : 300; // Responsive width on mobile
+        // Calculate responsive tooltip width
+        const tooltipWidth = Math.min(300, modalRect.width - 32);
+
+        // Position tooltip centered above the input, but constrained within modal
+        const modalPadding = isMobile ? 8 : 16;
+        const availableWidth = modalRect.width - (modalPadding * 2);
+        const maxTooltipWidth = Math.min(tooltipWidth, availableWidth);
 
         // Center the tooltip above the input field
-        left = inputCenter - tooltipWidth / 2;
+        const inputCenter = triggerRect.left + triggerRect.width / 2;
+        const idealLeft = inputCenter - maxTooltipWidth / 2;
 
-        // Ensure tooltip doesn't go outside modal bounds
-        const modalPadding = isMobile ? 8 : 16;
+        // Ensure tooltip stays within modal bounds
         const modalLeft = modalRect.left + modalPadding;
         const modalRight = modalRect.right - modalPadding;
 
-        // Constrain to modal horizontal bounds
-        if (left < modalLeft) {
-          left = modalLeft;
-        }
-        if (left + tooltipWidth > modalRight) {
-          left = modalRight - tooltipWidth;
-        }
+        left = Math.max(modalLeft, Math.min(idealLeft, modalRight - maxTooltipWidth));
+
+        // Debug logging (remove after testing)
+        console.log('Tooltip positioning:', {
+          modalRect: { left: modalRect.left, right: modalRect.right, width: modalRect.width },
+          inputCenter,
+          tooltipWidth: maxTooltipWidth,
+          idealLeft,
+          finalLeft: left,
+          constraints: { modalLeft, modalRight }
+        });
 
         // Ensure tooltip doesn't go above modal or below the modal header
         const modalHeaderHeight = isMobile ? 56 : 64; // Smaller header on mobile
@@ -220,6 +228,24 @@ export const Tooltip: React.FC<TooltipProps> = ({
     }
   }, [isVisible, position]);
 
+  // Add event listeners for input field interactions
+  useEffect(() => {
+    if (triggerRef.current) {
+      const inputElement = triggerRef.current.querySelector('input, textarea, select');
+      if (inputElement) {
+        inputElement.addEventListener('focus', handleInputFocus);
+        inputElement.addEventListener('input', handleInputChange);
+        inputElement.addEventListener('change', handleInputChange);
+
+        return () => {
+          inputElement.removeEventListener('focus', handleInputFocus);
+          inputElement.removeEventListener('input', handleInputChange);
+          inputElement.removeEventListener('change', handleInputChange);
+        };
+      }
+    }
+  }, [trigger, disabled]);
+
   const handleMouseEnter = () => {
     if (trigger === 'hover' && !disabled) {
       setIsVisible(true);
@@ -235,6 +261,23 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const handleClick = () => {
     if (trigger === 'click' && !disabled) {
       setIsVisible(!isVisible);
+    }
+  };
+
+  // Handle focus events on input fields to hide tooltips
+  const handleInputFocus = () => {
+    if (trigger === 'hover' && !disabled) {
+      setIsVisible(false);
+    }
+  };
+
+  const handleInputBlur = () => {
+    // Optional: Could show tooltip again on blur if needed
+  };
+
+  const handleInputChange = () => {
+    if (trigger === 'hover' && !disabled) {
+      setIsVisible(false);
     }
   };
 
@@ -278,8 +321,15 @@ export const Tooltip: React.FC<TooltipProps> = ({
       const tooltipLeft = tooltipPosition.left;
       const arrowOffset = triggerCenter - tooltipLeft - 12; // 12px is half the arrow width
 
-      // Constrain arrow position within tooltip bounds (300px width)
-      const tooltipWidth = 300;
+      // Get actual tooltip width (could be smaller in modals)
+      const modalContainer = triggerRef.current.closest('[role="dialog"], .MuiDialog-paper, .modal, .MuiDialog-container');
+      let tooltipWidth = 300;
+      if (modalContainer) {
+        const modalRect = modalContainer.getBoundingClientRect();
+        const modalPadding = window.innerWidth < 768 ? 16 : 32;
+        tooltipWidth = Math.min(300, modalRect.width - modalPadding);
+      }
+
       const minArrowPos = 24; // Minimum distance from tooltip edge to keep arrow visible
       const maxArrowPos = tooltipWidth - 36; // Maximum distance (accounting for arrow width and padding)
 
@@ -317,7 +367,15 @@ export const Tooltip: React.FC<TooltipProps> = ({
             top: `${tooltipPosition.top}px`,
             left: `${tooltipPosition.left}px`,
             borderRadius: '12px',
-            width: window.innerWidth < 768 ? `${Math.min(300, window.innerWidth - 32)}px` : '300px',
+            width: (() => {
+              const modalContainer = triggerRef.current?.closest('[role="dialog"], .MuiDialog-paper, .modal, .MuiDialog-container');
+              if (modalContainer) {
+                const modalRect = modalContainer.getBoundingClientRect();
+                const modalPadding = window.innerWidth < 768 ? 16 : 32;
+                return `${Math.min(300, modalRect.width - modalPadding)}px`;
+              }
+              return window.innerWidth < 768 ? `${Math.min(300, window.innerWidth - 32)}px` : '300px';
+            })(),
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
             border: '1px solid rgba(0, 0, 0, 0.08)',
             zIndex: 10000, // Ensure it appears above modal content
