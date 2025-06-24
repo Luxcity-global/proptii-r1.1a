@@ -52,47 +52,57 @@ export const Tooltip: React.FC<TooltipProps> = ({
     const isMobile = window.innerWidth < 768;
     const isFormInput = triggerRef.current.querySelector('input, textarea, select') !== null;
 
-    // Find the closest modal container to constrain positioning
-    const modalContainer = triggerRef.current.closest('[role="dialog"], .MuiDialog-paper, .modal');
-    const containerRect = modalContainer ? modalContainer.getBoundingClientRect() : null;
+    // Find the closest modal or dialog container
+    const modalContainer = triggerRef.current.closest('[role="dialog"], .MuiDialog-paper, .modal, .MuiDialog-container');
 
     // Special positioning for form inputs or when position is forced
     if (isFormInput || forcePosition) {
-      // Position tooltip above the input field
-      top = triggerRect.top - tooltipRect.height - 12;
-      left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
+      // Calculate basic position above the input
+      top = triggerRect.top - tooltipRect.height - 8;
 
-      // If we're in a modal, constrain to modal bounds
-      if (containerRect) {
-        const modalPadding = 16;
-        const modalLeft = containerRect.left + modalPadding;
-        const modalRight = containerRect.right - modalPadding;
-        const modalTop = containerRect.top + modalPadding;
+      // For modal containers, use a more conservative positioning approach
+      if (modalContainer) {
+        const modalRect = modalContainer.getBoundingClientRect();
 
-        // Ensure tooltip stays within modal horizontal bounds
+        // Position tooltip within modal bounds, centered above the input
+        const inputCenter = triggerRect.left + triggerRect.width / 2;
+        const tooltipWidth = 300; // Fixed width we set in styles
+
+        // Center the tooltip above the input field
+        left = inputCenter - tooltipWidth / 2;
+
+        // Ensure tooltip doesn't go outside modal bounds
+        const modalPadding = 20;
+        const modalLeft = modalRect.left + modalPadding;
+        const modalRight = modalRect.right - modalPadding;
+
+        // Constrain to modal horizontal bounds
         if (left < modalLeft) {
           left = modalLeft;
         }
-        if (left + tooltipRect.width > modalRight) {
-          left = modalRight - tooltipRect.width;
+        if (left + tooltipWidth > modalRight) {
+          left = modalRight - tooltipWidth;
         }
 
-        // Ensure tooltip stays within modal vertical bounds
-        if (top < modalTop) {
-          top = triggerRect.bottom + 12; // Show below if not enough space above
+        // Ensure tooltip doesn't go above modal
+        if (top < modalRect.top + 10) {
+          top = triggerRect.bottom + 8; // Show below input if no space above
         }
       } else {
-        // Fallback to viewport constraints
+        // Fallback positioning for non-modal contexts
+        left = triggerRect.left + (triggerRect.width - 300) / 2;
+
+        // Viewport constraints
         if (left < 16) left = 16;
-        if (left + tooltipRect.width > viewport.width - 16) {
-          left = viewport.width - tooltipRect.width - 16;
+        if (left + 300 > viewport.width - 16) {
+          left = viewport.width - 316; // 300 + 16
         }
         if (top < 16) {
-          top = triggerRect.bottom + 12;
+          top = triggerRect.bottom + 8;
         }
       }
     }
-    // Special positioning for mobile
+    // Special positioning for mobile search tooltips
     else if (isMobile && position === 'top') {
       top = triggerRect.top - tooltipRect.height - 20;
       left = (viewport.width - tooltipRect.width) / 2;
@@ -102,7 +112,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
         top = navbarHeight + 8;
       }
     }
-    // Default positioning logic
+    // Default positioning logic for other tooltips
     else {
       switch (position) {
         case 'top':
@@ -123,7 +133,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
           break;
       }
 
-      // Viewport constraints
+      // Viewport constraints for default positioning
       const padding = isMobile ? 20 : 12;
       if (left < padding) left = padding;
       if (left + tooltipRect.width > viewport.width - padding) {
@@ -218,7 +228,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const getArrowPosition = () => {
     const isMobile = window.innerWidth < 768;
 
-    if (isMobile && position === 'top' && triggerRef.current) {
+    // Special handling for mobile search tooltips
+    if (isMobile && position === 'top' && triggerRef.current && !forcePosition) {
       const triggerRect = triggerRef.current.getBoundingClientRect();
       const triggerCenter = triggerRect.left + triggerRect.width / 2;
       const tooltipLeft = (window.innerWidth - (tooltipRef.current?.getBoundingClientRect().width || 320)) / 2;
@@ -226,18 +237,17 @@ export const Tooltip: React.FC<TooltipProps> = ({
       return { left: `${Math.max(12, Math.min(arrowOffset, (tooltipRef.current?.getBoundingClientRect().width || 320) - 24))}px` };
     }
 
-    // For form inputs, center the arrow relative to the trigger element
-    if (triggerRef.current && tooltipRef.current) {
+    // For form inputs and modal tooltips, center the arrow relative to the trigger element
+    if (triggerRef.current && (forcePosition || triggerRef.current.querySelector('input, textarea, select'))) {
       const triggerRect = triggerRef.current.getBoundingClientRect();
-      const tooltipRect = tooltipRef.current.getBoundingClientRect();
       const triggerCenter = triggerRect.left + triggerRect.width / 2;
       const tooltipLeft = tooltipPosition.left;
       const arrowOffset = triggerCenter - tooltipLeft - 12; // 12px is half the arrow width
 
-      // Constrain arrow position within tooltip bounds
-      const tooltipWidth = tooltipRect.width || 300;
-      const minArrowPos = 12;
-      const maxArrowPos = tooltipWidth - 24;
+      // Constrain arrow position within tooltip bounds (300px width)
+      const tooltipWidth = 300;
+      const minArrowPos = 16; // Minimum distance from tooltip edge
+      const maxArrowPos = tooltipWidth - 28; // Maximum distance (accounting for arrow width)
 
       return {
         left: `${Math.max(minArrowPos, Math.min(arrowOffset, maxArrowPos))}px`
@@ -254,8 +264,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
-        className={`relative inline-flex items-center ${className}`}
-        style={{ width: '100%' }}
+        className={`relative ${className}`}
+        style={{ display: 'block', width: '100%' }}
       >
         {children}
         {showIcon && (
@@ -266,27 +276,34 @@ export const Tooltip: React.FC<TooltipProps> = ({
       {isVisible && !disabled && (
         <div
           ref={tooltipRef}
-          className={`fixed z-[9999] text-black
+          className={`fixed z-[9999] text-black pointer-events-none
             transform transition-all duration-300 ease-out opacity-100 scale-100`}
           style={{
             backgroundColor: '#ffffff',
             top: `${tooltipPosition.top}px`,
             left: `${tooltipPosition.left}px`,
             borderRadius: '12px',
-            width: window.innerWidth < 768 ? '280px' : '300px',
-            maxWidth: '90vw',
+            width: '300px',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
             border: '1px solid rgba(0, 0, 0, 0.08)',
           }}
-          onMouseEnter={() => trigger === 'hover' && setIsVisible(true)}
-          onMouseLeave={() => trigger === 'hover' && setIsVisible(false)}
+          onMouseEnter={() => {
+            if (trigger === 'hover') {
+              setIsVisible(true);
+            }
+          }}
+          onMouseLeave={() => {
+            if (trigger === 'hover') {
+              setIsVisible(false);
+            }
+          }}
         >
           <div
             className={getArrowClasses()}
             style={getArrowPosition()}
           ></div>
 
-          <div className="relative z-10 p-3 md:p-4 text-left">
+          <div className="relative z-10 p-3 text-left pointer-events-auto">
             {typeof content === 'string' ? (
               <p className="leading-relaxed text-sm font-medium text-left text-gray-900 m-0">{content}</p>
             ) : (
