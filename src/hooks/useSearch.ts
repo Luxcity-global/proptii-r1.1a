@@ -12,7 +12,7 @@ interface SearchState {
   query: string;
 }
 
-export const useSearch = () => {
+export const useSearch = (onSearch?: (query: string) => void) => {
   const [state, setState] = useState<SearchState>({
     suggestions: [],
     isLoading: false,
@@ -104,7 +104,7 @@ export const useSearch = () => {
         }));
       }
     }
-  }, [searchService]);
+  }, [searchService, localStorageService]);
 
   const searchProperties = useCallback(async (query: string) => {
     if (!query.trim()) {
@@ -128,6 +128,9 @@ export const useSearch = () => {
         retryCount: 0,
         response: results
       }));
+      if (onSearch) {
+        onSearch(query);
+      }
       return results;
     } catch (error) {
       if (error.name === 'AbortError') return; // Ignore aborted requests
@@ -153,10 +156,14 @@ export const useSearch = () => {
       }));
       throw typeof error === 'string' ? error : (error instanceof Error ? error.message : 'Failed to search properties');
     }
-  }, [searchService]);
+  }, [searchService, localStorageService, onSearch]);
 
   const retry = useCallback(() => {
     setState(prev => ({ ...prev, error: null, retryCount: 0 }));
+  }, []);
+
+  const clearError = useCallback((err?: string) => {
+    setState(prev => ({ ...prev, error: err || null }));
   }, []);
 
   const handleSearch = useCallback(async () => {
@@ -182,6 +189,7 @@ export const useSearch = () => {
     getSuggestions,
     searchProperties,
     retry,
+    clearError,
     setQuery,
     handleSearch,
     saveSearch,

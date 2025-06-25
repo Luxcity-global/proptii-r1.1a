@@ -27,11 +27,15 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   const {
     query,
     setQuery,
-    searchSuggestions,
+    suggestions: searchSuggestions,
     isLoading,
     error,
     handleSearch,
-    clearError
+    clearError,
+    getSuggestions,
+    retry,
+    saveSearch,
+    getSearchHistory
   } = useSearch(onSearch);
 
   const [isFocused, setIsFocused] = useState(false);
@@ -43,13 +47,6 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   const debouncedQuery = useDebounce(query, 300);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const localStorageService = LocalStorageService.getInstance();
-
-  const {
-    getSuggestions,
-    retry,
-    saveSearch,
-    getSearchHistory
-  } = useSearch();
 
   // Check if device is mobile
   useEffect(() => {
