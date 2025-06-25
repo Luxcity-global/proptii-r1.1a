@@ -127,8 +127,8 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
             maxWidth="max-w-sm"
             className="w-full block"
             trigger={isMobile ? "auto-mobile" : "hover"}
-            autoShowDelay={2500}
-            autoHideDelay={7000}
+            autoShowDelay={0}
+            autoHideDelay={60000}
           >
             <div className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 w-full flex flex-col" tabIndex={0} aria-label={`Property card: ${property.title}`}>
               {/* Fixed height header section */}
