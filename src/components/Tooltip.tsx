@@ -53,38 +53,63 @@ export const Tooltip: React.FC<TooltipProps> = ({
     const isFormInput = triggerRef.current.querySelector('input, textarea, select') !== null;
 
     // Find the closest modal or dialog container
-    const modalContainer = triggerRef.current.closest('[role="dialog"], .MuiDialog-paper, .modal, .MuiDialog-container, .MuiDialog-root');
+    const modalContainer = triggerRef.current.closest('[role="dialog"], .MuiDialog-paper, .modal, .MuiDialog-container, .MuiDialog-root, .MuiDialogContent-root');
 
     // Special positioning for form inputs or when position is forced
     if (isFormInput || forcePosition) {
-      const tooltipWidth = 300;
+      const tooltipWidth = 340;
 
       // Always center the tooltip above the input field first
       const triggerCenter = triggerRect.left + triggerRect.width / 2;
       left = triggerCenter - tooltipWidth / 2;
       top = triggerRect.top - tooltipRect.height - 8;
 
-      // Then check modal constraints if we're in a modal
-      if (modalContainer) {
-        const modalRect = modalContainer.getBoundingClientRect();
-        const modalPadding = 20;
+      // Find the closest scrollable container to use as a boundary
+      let scrollableContainer = null;
+      if (triggerRef.current) {
+        let parent = triggerRef.current.parentElement;
+        while (parent) {
+          const style = window.getComputedStyle(parent);
+          if (style.overflow === 'auto' || style.overflow === 'scroll' || style.overflowY === 'auto' || style.overflowY === 'scroll') {
+            scrollableContainer = parent;
+            break;
+          }
+          if (parent.tagName === 'BODY') break;
+          parent = parent.parentElement;
+        }
+      }
 
-        // Ensure tooltip stays within modal horizontal bounds
-        const modalLeft = modalRect.left + modalPadding;
-        const modalRight = modalRect.right - modalPadding;
+      const boundaryContainer = scrollableContainer || modalContainer;
 
-        if (left < modalLeft) {
-          left = modalLeft;
-        } else if (left + tooltipWidth > modalRight) {
-          left = modalRight - tooltipWidth;
+      // Then check boundary constraints
+      if (boundaryContainer) {
+        const boundaryRect = boundaryContainer.getBoundingClientRect();
+        const scrollbarWidth = boundaryContainer.offsetWidth - boundaryContainer.clientWidth;
+        const boundaryPadding = 16;
+
+        const boundaryLeft = boundaryRect.left + boundaryPadding;
+        const boundaryRight = boundaryRect.right - boundaryPadding - scrollbarWidth;
+
+        // Ideal centered position
+        const centeredLeft = triggerRect.left + (triggerRect.width / 2) - (tooltipWidth / 2);
+
+        // Check for right overflow and adjust
+        if (centeredLeft + tooltipWidth > boundaryRight) {
+          // Align tooltip's right edge with the input's right edge
+          left = triggerRect.right - tooltipWidth;
+        } else {
+          left = centeredLeft;
         }
 
-        // Ensure tooltip doesn't go above modal
-        if (top < modalRect.top + 10) {
+        // Finally, ensure it doesn't overflow to the left
+        left = Math.max(left, boundaryLeft);
+
+        // Ensure tooltip doesn't go above the boundary container
+        if (top < boundaryRect.top) {
           top = triggerRect.bottom + 8; // Show below if no space above
         }
       } else {
-        // Viewport constraints for non-modal contexts
+        // Fallback to viewport constraints if no boundary container found
         if (left < 16) {
           left = 16;
         } else if (left + tooltipWidth > viewport.width - 16) {
@@ -238,8 +263,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
       const tooltipLeft = tooltipPosition.left;
       const arrowOffset = triggerCenter - tooltipLeft - 12; // 12px is half the arrow width
 
-      // Constrain arrow position within tooltip bounds (300px width)
-      const tooltipWidth = 300;
+      // Constrain arrow position within tooltip bounds (340px width)
+      const tooltipWidth = 340;
       const minArrowPos = 16; // Minimum distance from tooltip edge
       const maxArrowPos = tooltipWidth - 28; // Maximum distance (accounting for arrow width)
 
@@ -277,7 +302,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
             top: `${tooltipPosition.top}px`,
             left: `${tooltipPosition.left}px`,
             borderRadius: '12px',
-            width: '300px',
+            width: '340px',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.05)',
             border: '1px solid rgba(0, 0, 0, 0.08)',
           }}
