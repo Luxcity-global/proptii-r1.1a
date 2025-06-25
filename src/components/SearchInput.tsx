@@ -24,34 +24,27 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   value,
   onChange
 }) => {
-  const [query, setQuery] = useState(value || '');
+  const {
+    query,
+    setQuery,
+    searchSuggestions,
+    isLoading,
+    error,
+    handleSearch,
+    clearError
+  } = useSearch(onSearch);
+
   const [isFocused, setIsFocused] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [isMobile, setIsMobile] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [tooltipStep, setTooltipStep] = useState(1);
   const inputRef = useRef<HTMLInputElement>(null);
   const debouncedQuery = useDebounce(query, 300);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const localStorageService = LocalStorageService.getInstance();
-  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
-  // Commented out filter state and options
-  /*
-  const [activeFilters, setActiveFilters] = useState<string[]>([]);
-  const filterOptions = [
-    '2+ Beds',
-    'Houses',
-    'Flats',
-    '£1000-£2000',
-    '£2000-£3000',
-    'Pet Friendly',
-    'Furnished',
-  ];
-  */
 
   const {
-    suggestions: searchSuggestions,
-    isLoading,
-    error: searchError,
-    isOffline,
     getSuggestions,
     retry,
     saveSearch,
@@ -78,23 +71,17 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   useEffect(() => {
     if (debouncedQuery) {
       getSuggestions(debouncedQuery).catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : String(err));
+        clearError(err instanceof Error ? err.message : String(err));
       });
     }
   }, [debouncedQuery, getSuggestions]);
 
-  useEffect(() => {
-    if (searchError) {
-      setError(String(searchError));
-    }
-  }, [searchError]);
-
   const handleRetry = useCallback(() => {
-    setError(null);
+    clearError();
     retry();
     if (debouncedQuery) {
       getSuggestions(debouncedQuery).catch((err) => {
-        setError(err instanceof Error ? err.message : String(err));
+        clearError(err instanceof Error ? err.message : String(err));
       });
     }
   }, [debouncedQuery, getSuggestions, retry]);
@@ -102,7 +89,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setQuery(newValue);
-    setError(null);
+    clearError();
     if (onChange) {
       onChange(newValue);
     }
@@ -110,25 +97,25 @@ export const SearchInput: React.FC<SearchInputProps> = ({
 
   const handleSuggestionClick = useCallback((suggestion: string) => {
     setQuery(suggestion);
-    setError(null);
+    clearError();
     if (onChange) {
       onChange(suggestion);
     }
     saveSearch(suggestion);
-    onSearch(suggestion);
+    handleSearch(suggestion);
     setIsFocused(false);
-  }, [onSearch, onChange, saveSearch]);
+  }, [handleSearch, onChange, saveSearch]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) {
-      setError('Please enter a search query');
+      clearError('Please enter a search query');
       return;
     }
-    setError(null);
+    clearError();
     saveSearch(query);
-    onSearch(query);
-  }, [query, onSearch, saveSearch]);
+    handleSearch(query);
+  }, [query, handleSearch, saveSearch]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     const allSuggestions = [...searchSuggestions, ...getSearchHistory().slice(0, 3)];
@@ -149,7 +136,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     } else if (e.key === 'Escape') {
       setIsFocused(false);
       setHighlightedIndex(-1);
-      setError(null);
+      clearError();
     }
   }, [searchSuggestions, getSearchHistory, highlightedIndex, handleSuggestionClick]);
 
@@ -159,7 +146,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
 
   const handleClear = useCallback(() => {
     setQuery('');
-    setError(null);
+    clearError();
     if (onChange) {
       onChange('');
     }
@@ -184,68 +171,6 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  // Commented out filter-related functions
-  /*
-  const toggleFilter = (filter: string) => {
-    setActiveFilters((prev) =>
-      prev.includes(filter)
-        ? prev.filter((f) => f !== filter)
-        : [...prev, filter]
-    );
-  };
-
-  // Enhanced filterMap to support min/max for price and beds
-  const filterMap: Record<string, any> = {
-    '2+ Beds': { minBeds: 2 },
-    'Houses': { propertyType: 'House' },
-    'Flats': { propertyType: 'Flat' },
-    '£1000-£2000': { minPrice: 1000, maxPrice: 2000 },
-    '£2000-£3000': { minPrice: 2000, maxPrice: 3000 },
-    'Pet Friendly': { petFriendly: true },
-    'Furnished': { furnished: true },
-  };
-
-  // Build enhanced filter object from active filters
-  const buildFiltersObject = () => {
-    return activeFilters.reduce((acc, label) => {
-      const filter = filterMap[label];
-      if (!filter) return acc;
-      Object.entries(filter).forEach(([key, value]) => {
-        acc[key] = value;
-      });
-      return acc;
-    }, {} as Record<string, any>);
-  };
-
-  // Build human-readable filter summary
-  const buildFilterSummary = () => activeFilters.join(', ');
-
-  // Enhanced handleFilterChange
-  const handleFilterChange = (filter: string) => {
-    toggleFilter(filter);
-    // Build filters object and summary
-    const newActiveFilters = activeFilters.includes(filter)
-      ? activeFilters.filter(f => f !== filter)
-      : [...activeFilters, filter];
-    const filtersObj = newActiveFilters.reduce((acc, label) => {
-      const filter = filterMap[label];
-      if (!filter) return acc;
-      Object.entries(filter).forEach(([key, value]) => {
-        acc[key] = value;
-      });
-      return acc;
-    }, {} as Record<string, any>);
-    const filterSummary = newActiveFilters.join(', ');
-    // Try to call onSearch with both query and filters
-    if (onSearch.length >= 2) {
-      // @ts-ignore
-      onSearch(query, filtersObj);
-    } else {
-      onSearch(`${query} ${filterSummary}`.trim());
-    }
-  };
-  */
 
   const renderNoResults = () => {
     if (!hasResults && query.trim() && !isLoading) {
@@ -278,17 +203,52 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     return null;
   };
 
-  // Add clearRecentSearches function
   const clearRecentSearches = () => {
     localStorageService.set('search_history', []);
-    // Force re-render by updating state
-    setQuery(''); // Optionally reset input
+    setQuery('');
+  };
+
+  // Tooltip content for step 1
+  const getTooltipContent = () => {
+    if (tooltipStep === 1) {
+      return (
+        <div className="space-y-3">
+          <p className="leading-relaxed text-sm font-medium text-left text-gray-900 m-0">
+            Enter your preferred location, property type (house or apartment), number of bedrooms and bathrooms.
+          </p>
+          <div className="flex justify-end">
+            <button
+              onClick={() => setTooltipStep(2)}
+              className="bg-black text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-800 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      );
+    } else {
+      return (
+        <div className="space-y-3">
+          <p className="leading-relaxed text-sm font-medium text-left text-gray-900 m-0">
+            Include your monthly rent budget and we'll fetch listings for you from Zoopla and OpenRent.
+          </p>
+          <div className="flex justify-end">
+            <button
+              onClick={() => setTooltipStep(1)}
+              className="bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-300 transition-colors"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      );
+    }
   };
 
   return (
     <div className={`relative ${className}`}>
       <Tooltip
-        content="Enter your preferred location, property type (house or apartment), number of bedrooms and bathrooms, and your monthly rent budget. We'll fetch listings for you from Zoopla and OpenRent."
+        content={getTooltipContent()}
         position="top"
         maxWidth="max-w-sm"
         className="w-full block"
@@ -438,10 +398,8 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         </div>
       )}
 
-      {/* Show recent searches below input */}
       {getSearchHistory().slice(0, 3).length > 0 && (
         <div className="mt-2 bg-white rounded-xl shadow p-3 relative">
-          {/* Clear history X button */}
           <button
             type="button"
             className="absolute top-2 right-2 text-gray-400 hover:text-red-500 text-lg"
@@ -465,41 +423,6 @@ export const SearchInput: React.FC<SearchInputProps> = ({
           </div>
         </div>
       )}
-
-      {/* Interactive filter chips below input - Commented out */}
-      {/*
-        {filterOptions.map((filter) => (
-          <button
-            key={filter}
-            type="button"
-            onClick={() => handleFilterChange(filter)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleFilterChange(filter);
-              }
-            }}
-            className={`px-3 py-1 rounded-full text-sm border transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-gray-200 ${activeFilters.includes(filter)
-              ? 'bg-[#E1C387] text-black border-[#E1C387]'
-              : 'bg-[#FBFBFB] text-gray-700 border-gray-200 hover:bg-gray-100'
-              }`}
-            aria-pressed={activeFilters.includes(filter)}
-            tabIndex={0}
-          >
-            {filter}
-          </button>
-        ))}
-        {activeFilters.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setActiveFilters([])}
-            className="ml-2 px-3 py-1 rounded-full text-sm border border-gray-300 bg-white text-gray-600 hover:bg-gray-100 transition-colors"
-            aria-label="Clear all filters"
-          >
-            Clear Filters
-          </button>
-        )}
-      */}
     </div>
   );
 }; 
