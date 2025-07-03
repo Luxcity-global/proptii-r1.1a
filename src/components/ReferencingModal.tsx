@@ -1143,8 +1143,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 1:
         return (
           <div className="relative">
-            <h3 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6">Fill in your personal details below</h3>
-            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6 grid grid-cols-1 md:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+            <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 md:mb-6">Fill in your personal details below</h3>
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 grid grid-cols-1 md:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
               <div>
                 <label className="block text-gray-700 mb-2">First Name</label>
                 <input
@@ -1367,10 +1367,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 2:
         return (
           <div className="relative">
-            <div className="mb-4 sm:mb-6">
+            <div className="mb-3 sm:mb-4 md:mb-6">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your employment details below</h2>
             </div>
-            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
               <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Employment Status</label>
                 <select
@@ -1468,11 +1468,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 3:
         return (
           <div className="relative">
-            <div className="mb-4 sm:mb-6">
+            <div className="mb-3 sm:mb-4 md:mb-6">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your residential details below</h2>
             </div>
 
-            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
               <div className="col-span-1 sm:col-span-2">
                 <label className="block text-gray-700 mb-2">Do you already have a property you're interested in renting?</label>
                 <select
@@ -1499,7 +1499,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               </div>
             </div>
 
-            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
               <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Reason for leaving Previous Address</label>
                 <textarea
@@ -1577,10 +1577,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 4:
         return (
           <div className="relative">
-            <div className="mb-4 sm:mb-6">
+            <div className="mb-3 sm:mb-4 md:mb-6">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your financial details below</h2>
             </div>
-            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
               <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Monthly Income (£)</label>
                 <input
@@ -1613,7 +1613,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 5:
         return (
           <div className="relative">
-            <div className="mb-4 sm:mb-6">
+            <div className="mb-3 sm:mb-4 md:mb-6">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your guarantor's personal details below</h2>
               <p className="text-sm text-gray-600 mt-2">
                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
@@ -1622,7 +1622,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                 This section is optional. Please skip if you don't need a guarantor.
               </p>
             </div>
-            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
               <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Guarantor's First Name</label>
                 <input
@@ -1751,12 +1751,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 7:
         return (
           <div className="relative">
-            <div className="mb-4 sm:mb-6">
+            <div className="mb-3 sm:mb-4 md:mb-6">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
                 Fill in the agent's details below
               </h2>
             </div>
-            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
                 <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Agent's First Name</label>
@@ -1816,7 +1816,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                 </div>
               </div>
             </div>
-            <div className="mt-4 mb-4">
+            <div className="mt-3 mb-3 sm:mt-4 sm:mb-4">
               <label className="flex items-center">
                 <input
                   type="checkbox"
@@ -1852,12 +1852,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto p-1 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       <div
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
         onClick={handleClose}
       />
-      <div className="relative w-full max-w-sm sm:max-w-md md:max-w-4xl lg:max-w-5xl mx-auto my-1 sm:my-4 md:my-8 bg-white rounded-lg shadow-xl flex overflow-hidden min-h-[95vh] max-h-[98vh] sm:min-h-[600px] sm:max-h-[85vh]">
+      <div className="relative w-full max-w-sm sm:max-w-md md:max-w-4xl lg:max-w-5xl mx-auto my-2 sm:my-4 md:my-8 bg-white rounded-lg shadow-xl flex overflow-hidden h-[85vh] sm:h-[80vh] md:min-h-[600px] max-h-[90vh]">
         <div className="w-64 bg-gray-50 py-4 px-4 border-r border-gray-200 hidden md:block md:flex flex-col">
           <div className="mb-6 px-2">
             <h2 className="text-xl font-bold text-orange-600 mb-2">Referencing Steps</h2>
@@ -1880,8 +1880,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
             </div>
           </div>
         </div>
-        <div className="flex-1 flex flex-col max-h-full">
-                      <div className="flex items-center justify-between px-2 xs:px-4 sm:px-6 py-2 xs:py-3 sm:py-4 border-b border-gray-200">
+        <div className="flex-1 flex flex-col max-h-[90vh]">
+          <div className="flex items-center justify-between px-3 sm:px-6 py-2 sm:py-4 border-b border-gray-200">
             <div className="flex items-center space-x-2 sm:space-x-4">
               <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-1 sm:p-2">
                 <Menu size={20} className="sm:w-6 sm:h-6" />
@@ -1898,7 +1898,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           </div>
           {isMenuOpen && (
             <div className="fixed inset-0 bg-black bg-opacity-50 z-[70]">
-              <div className="fixed inset-y-0 left-0 w-64 sm:w-72 bg-white shadow-xl p-4 sm:p-6 overflow-y-auto">
+              <div className="fixed inset-y-0 left-0 w-64 sm:w-72 bg-white shadow-xl p-4 sm:p-6">
                 <button onClick={() => setIsMenuOpen(false)} className="mb-4 p-1">
                   <X size={20} className="sm:w-6 sm:h-6" />
                 </button>
@@ -1961,10 +1961,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               </div>
             </div>
           )}
-          <div className="flex-1 overflow-y-auto p-2 xs:p-3 sm:p-4 md:p-6 bg-[#f2f7fb] min-h-0">
+          <div className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-6 bg-[#f2f7fb]">
             {renderFormContent()}
           </div>
-          <div className="px-2 xs:px-3 sm:px-4 md:px-6 py-2 xs:py-3 sm:py-4 border-t border-gray-200">
+          <div className="px-3 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4 border-t border-gray-200 flex-shrink-0">
             {/* Mobile Layout (default) - Triangle arrangement */}
             <div className="flex justify-between items-start md:hidden">
               <div>
