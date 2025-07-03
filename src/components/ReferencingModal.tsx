@@ -148,7 +148,7 @@ const navigationItems: NavigationItem[] = [
   { label: "Residential", Icon: Home, step: 3 },
   { label: "Financial", Icon: Euro, step: 4 },
   { label: "Guarantor", Icon: Users, step: 5 },
-  { label: "Credit Check", Icon: CreditCard, step: 6 },
+  // { label: "Credit Check", Icon: CreditCard, step: 6 },
   { label: "Agent Details", Icon: User, step: 7 }
 ];
 
@@ -434,14 +434,15 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [fileCache, setFileCache] = useState<Map<string, StoredFile>>(new Map());
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [stepStatus, setStepStatus] = useState<{ [key: number]: 'empty' | 'partial' | 'complete' }>({
-    1: 'empty',
-    2: 'empty',
-    3: 'empty',
-    4: 'empty',
-    5: 'empty',
-    6: 'empty',
-    7: 'empty'
+    1: 'partial', // Orange by default
+    2: 'partial', // Orange by default
+    3: 'partial', // Orange by default
+    4: 'partial', // Orange by default
+    5: 'partial', // Orange by default (even for optional guarantor)
+    // 6: 'empty', // Credit check step commented out
+    7: 'partial' // Orange by default
   });
 
   // Load status from localStorage on mount (only once)
@@ -459,7 +460,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       3: determineStepStatus('residential', formData.residential),
       4: determineStepStatus('financial', formData.financial),
       5: determineStepStatus('guarantor', formData.guarantor),
-      6: determineStepStatus('creditCheck', formData),
+      // 6: determineStepStatus('creditCheck', formData), // Credit check step commented out
       7: determineStepStatus('agentDetails', formData.agentDetails)
     };
 
@@ -586,7 +587,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         residential: 3,
         financial: 4,
         guarantor: 5,
-        creditCheck: 6,
+        // creditCheck: 6, // Credit check step commented out
         agentDetails: 7
       };
 
@@ -609,44 +610,38 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   };
 
   const determineStepStatus = (step: keyof FormData, data: any): 'empty' | 'partial' | 'complete' => {
-    if (!data) return 'empty';
+    if (!data) return 'partial'; // Default to orange (partial) instead of empty
 
     switch (step) {
       case 'identity': {
-        const hasAnyData = Object.values(data).some(value => !!value);
-        const hasAllFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.dateOfBirth && data.nationality;
-        const hasDocument = data.identityProof?.name && data.identityProof?.dataUrl;
+        const hasAllRequiredFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.dateOfBirth && data.nationality && !data.dateOfBirthError;
+        const hasRequiredDocument = data.identityProof?.name && data.identityProof?.dataUrl;
 
-        if (!hasAnyData) return 'empty';
-        if (hasAllFields && hasDocument) return 'complete';
-        return 'partial';
+        // Only return green when completely filled
+        if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
+        return 'partial'; // Always orange until complete
       }
 
       case 'employment': {
         const nonApplicableStatus = ['Unemployed', 'Retired', 'Student'];
+        
+        // For non-applicable statuses, only status selection is required
         if (nonApplicableStatus.includes(data.employmentStatus)) {
-          return data.employmentStatus ? 'complete' : 'empty';
+          return 'complete';
         }
 
-        const hasAnyData = Object.values(data).some(value => !!value);
-
-        // For employed statuses, require all employment fields
+        // For employed statuses, require all employment fields AND document
         if (data.employmentStatus && !nonApplicableStatus.includes(data.employmentStatus)) {
-          const hasAllFields = data.employmentStatus && data.companyDetails && data.lengthOfEmployment && data.jobPosition && data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType;
-          const hasDocument = data.proofDocument?.name && data.proofDocument?.dataUrl;
+          const hasAllRequiredFields = data.employmentStatus && data.companyDetails && data.lengthOfEmployment && data.jobPosition && data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType;
+          const hasRequiredDocument = data.proofDocument?.name && data.proofDocument?.dataUrl;
 
-          if (!hasAnyData) return 'empty';
-          if (hasAllFields && hasDocument) return 'complete';
-          return 'partial';
+          if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
         }
 
-        if (!hasAnyData) return 'empty';
-        return 'partial';
+        return 'partial'; // Always orange until complete
       }
 
       case 'residential': {
-        const hasAnyData = Object.values(data).some(value => !!value);
-
         let requiredFields = [
           'currentAddress', 'durationAtCurrentAddress', 'reasonForLeaving', 'proofType', 'alreadyHavePropertyAddress'
         ];
@@ -660,54 +655,51 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           requiredFields.push('previousAddress', 'durationAtPreviousAddress');
         }
 
-        const hasAllFields = requiredFields.every(field => !!data[field]);
-        const hasDocument = data.proofDocument?.name && data.proofDocument?.dataUrl;
+        const hasAllRequiredFields = requiredFields.every(field => !!data[field]);
+        const hasRequiredDocument = data.proofDocument?.name && data.proofDocument?.dataUrl;
 
-        if (!hasAnyData) return 'empty';
-        if (hasAllFields && hasDocument) return 'complete';
-        return 'partial';
+        // Only return green when completely filled
+        if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
+        return 'partial'; // Always orange until complete
       }
 
       case 'financial': {
-        const hasAnyData = Object.values(data).some(value => !!value && value !== false);
-        const hasAllFields = data.monthlyIncome && data.proofOfIncomeType;
-        const hasDocument = data.proofOfIncomeDocument?.name && data.proofOfIncomeDocument?.dataUrl;
+        const hasAllRequiredFields = data.monthlyIncome && data.proofOfIncomeType;
+        const hasRequiredDocument = data.proofOfIncomeDocument?.name && data.proofOfIncomeDocument?.dataUrl;
         const isOpenBankingConnected = data.useOpenBanking && data.isConnectedToOpenBanking;
 
-        if (!hasAnyData) return 'empty';
-        if (hasAllFields && (hasDocument || isOpenBankingConnected)) return 'complete';
-        return 'partial';
+        // Only return green when completely filled
+        if (hasAllRequiredFields && (hasRequiredDocument || isOpenBankingConnected)) return 'complete';
+        return 'partial'; // Always orange until complete
       }
 
       case 'guarantor': {
-        // This section is optional, so it's 'complete' if empty.
+        // Guarantor section is completely optional
         const hasAnyData = Object.values(data).some(value => !!value && value !== null && value !== '');
-        if (!hasAnyData) return 'complete';
+        
+        // If some data is entered, all fields + document must be complete for green
+        if (hasAnyData) {
+          const hasAllRequiredFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
+          const hasRequiredDocument = data.identityDocument?.name && data.identityDocument?.dataUrl;
 
-        const hasAllFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
-        const hasDocument = data.identityDocument?.name && data.identityDocument?.dataUrl;
-
-        if (hasAllFields && hasDocument) return 'complete';
+          if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
+          return 'partial'; // Orange if partially filled
+        }
+        
+        // If no data entered, it's still orange by default (will be handled in the form completion check)
         return 'partial';
-      }
-
-      case 'creditCheck': {
-        const identityData = (data as FormData).identity;
-        const hasRequiredIdentityFields = identityData.firstName && identityData.lastName && identityData.email && identityData.phoneNumber && identityData.dateOfBirth;
-        return hasRequiredIdentityFields ? 'complete' : 'empty';
       }
 
       case 'agentDetails': {
-        const hasAnyData = Object.values(data).some(value => !!value);
-        const hasAllFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck;
+        const hasAllRequiredFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck;
 
-        if (!hasAnyData) return 'empty';
-        if (hasAllFields) return 'complete';
-        return 'partial';
+        // Only return green when completely filled
+        if (hasAllRequiredFields) return 'complete';
+        return 'partial'; // Always orange until complete
       }
 
       default:
-        return 'empty';
+        return 'partial'; // Default to orange instead of empty
     }
   };
 
@@ -718,14 +710,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       { icon: Home, text: 'Residential', step: 3, dataKey: 'residential' },
       { icon: PoundSterling, text: 'Financial', step: 4, dataKey: 'financial' },
       { icon: Users, text: 'Guarantor', step: 5, dataKey: 'guarantor' },
-      { icon: CreditCard, text: 'Credit Check', step: 6, dataKey: 'creditCheck' },
+      // { icon: CreditCard, text: 'Credit Check', step: 6, dataKey: 'creditCheck' },
       { icon: User, text: 'Agent Details', step: 7, dataKey: 'agentDetails' }
     ];
 
     return steps.map(({ icon: Icon, text, step, dataKey }) => {
       const status = stepStatus[step];
-      const shouldShowDot = status !== 'empty';
-      let dotColor = '';
+      let dotColor = 'bg-orange-500'; // Default to orange
       switch (status) {
         case 'partial':
           dotColor = 'bg-orange-500';
@@ -733,8 +724,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         case 'complete':
           dotColor = 'bg-green-500';
           break;
+        case 'empty':
+          dotColor = 'bg-orange-500'; // Show orange even for empty
+          break;
         default:
-          dotColor = '';
+          dotColor = 'bg-orange-500';
       }
 
       return (
@@ -748,12 +742,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         >
           <Icon size={18} className={currentStep === step ? 'text-orange-600' : 'text-gray-500'} />
           <span>{text}</span>
-          {shouldShowDot && (
-            <span
-              className={`ml-auto w-3 h-3 rounded-full ${dotColor}`}
-              title={`Status: ${status}`}
-            />
-          )}
+          {/* Always show dot for all statuses */}
+          <span
+            className={`ml-auto w-3 h-3 rounded-full ${dotColor}`}
+            title={`Status: ${status}`}
+          />
         </li>
       );
     });
@@ -844,6 +837,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         case 5:
           saveResult = await referencingService.saveGuarantorData(currentSectionData);
           break;
+        // case 6: // Credit check step commented out
         case 7:
           saveResult = await referencingService.saveAgentDetailsData(currentSectionData);
           break;
@@ -863,6 +857,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
       // Show success message
       toast.success('Progress saved successfully');
+      
+      // Show save success indicator
+      setShowSaveSuccess(true);
+      
+      // Auto-hide save success after 3 seconds
+      setTimeout(() => {
+        setShowSaveSuccess(false);
+      }, 3000);
 
     } catch (error) {
       console.error('Error in save operation:', error);
@@ -885,6 +887,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         return 'financial';
       case 5:
         return 'guarantor';
+      // case 6: // Credit check step commented out
       case 7:
         return 'agentDetails';
       default:
@@ -912,22 +915,34 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const nextStep = async () => {
     if (currentStep < 7) {
       await saveCurrentStep();
-      setCurrentStep(prev => prev + 1);
+      // Skip step 6 (credit check) - jump from step 5 to step 7
+      if (currentStep === 5) {
+        setCurrentStep(7);
+      } else {
+        setCurrentStep(prev => prev + 1);
+      }
     }
   };
 
   const prevStep = () => {
     if (currentStep > 1) {
-      setCurrentStep(prev => prev - 1);
+      // Skip step 6 (credit check) - jump from step 7 to step 5
+      if (currentStep === 7) {
+        setCurrentStep(5);
+      } else {
+        setCurrentStep(prev => prev - 1);
+      }
     }
   };
 
   const checkFormCompleteness = () => {
-    // Check if all required fields are filled based on individual step completion
-    const allStepsComplete = Object.values(stepStatus).every(status => status === 'complete');
+    // Check if all required steps are complete (excluding optional guarantor step)
+    const requiredSteps = [1, 2, 3, 4, 7]; // Identity, Employment, Residential, Financial, Agent Details
+    const requiredStepsComplete = requiredSteps.every(stepNumber => stepStatus[stepNumber] === 'complete');
 
-    setIsFormComplete(allStepsComplete);
-    return allStepsComplete;
+    // Guarantor step (5) is optional - it doesn't affect form completeness
+    setIsFormComplete(requiredStepsComplete);
+    return requiredStepsComplete;
   };
 
   // Optimized submission process
@@ -1069,7 +1084,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         >
           <div className="flex items-center mb-4">
             <div className="bg-green-100 p-2 rounded-full">
-              <CheckCircle className="text-green-500 w-6 h-6" />
+              <CheckCircle className="text-green-500 w-7 h-7" />
             </div>
             <h3 className="text-lg font-semibold ml-3">Application Submitted Successfully</h3>
           </div>
@@ -1096,15 +1111,15 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   }, [stepStatus]);
 
   // Add an effect to update credit check status when identity form changes
-  useEffect(() => {
-    if (formData.identity) {
-      const creditCheckStatus = determineStepStatus('creditCheck', formData);
-      setStepStatus(prev => ({
-        ...prev,
-        6: creditCheckStatus
-      }));
-    }
-  }, [formData.identity]);
+  // useEffect(() => {
+  //   if (formData.identity) {
+  //     const creditCheckStatus = determineStepStatus('creditCheck', formData);
+  //     setStepStatus(prev => ({
+  //       ...prev,
+  //       6: creditCheckStatus
+  //     }));
+  //   }
+  // }, [formData.identity]);
 
   // Update cleanup effect
   useEffect(() => {
@@ -1600,6 +1615,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
           <div className="relative">
             <div className="mb-4 sm:mb-6">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your guarantor's personal details below</h2>
+              <p className="text-sm text-gray-600 mt-2">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
+                  Optional
+                </span>
+                This section is optional. Please skip if you don't need a guarantor.
+              </p>
             </div>
             <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
               <div className="col-span-1 sm:col-span-1">
@@ -1656,7 +1677,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
             <GuarantorUpload updateFormData={updateFormData} formData={formData} />
           </div>
         );
-      case 6:
+      {/*case 6:
         return (
           <div className="relative">
             <div className="mb-4 sm:mb-6">
@@ -1726,7 +1747,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               <p className="text-white text-sm">Automated live credit checks</p>
             </div>
           </div>
-        );
+        );*/}
       case 7:
         return (
           <div className="relative">
@@ -1850,11 +1871,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
             {renderSidebarNavigation()}
           </ul>
           <div className="mt-auto pt-6 px-2">
-            <div className="text-sm text-gray-600 mb-2">Step {currentStep} of 7</div>
+            <div className="text-sm text-gray-600 mb-2">Step {currentStep > 5 ? currentStep - 1 : currentStep} of 6</div>
             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
                 className="h-full bg-[#136C9E] transition-all duration-300"
-                style={{ width: `${(currentStep / 7) * 100}%` }}
+                style={{ width: `${((currentStep > 5 ? currentStep - 1 : currentStep) / 6) * 100}%` }}
               ></div>
             </div>
           </div>
@@ -1890,8 +1911,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                 <ul className="space-y-1">
                   {navigationItems.map(({ label, Icon, step }) => {
                     const status = stepStatus[step];
-                    const shouldShowDot = status !== 'empty';
-                    let dotColor = '';
+                    let dotColor = 'bg-orange-500'; // Default to orange
                     switch (status) {
                       case 'partial':
                         dotColor = 'bg-orange-500';
@@ -1899,8 +1919,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                       case 'complete':
                         dotColor = 'bg-green-500';
                         break;
+                      case 'empty':
+                        dotColor = 'bg-orange-500'; // Show orange even for empty
+                        break;
                       default:
-                        dotColor = '';
+                        dotColor = 'bg-orange-500';
                     }
 
                     return (
@@ -1917,22 +1940,21 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                       >
                         <Icon size={18} className={currentStep === step ? 'text-orange-600' : 'text-gray-500'} />
                         <span>{label}</span>
-                        {shouldShowDot && (
-                          <span
-                            className={`ml-auto w-3 h-3 rounded-full ${dotColor}`}
-                            title={`Status: ${status}`}
-                          />
-                        )}
+                        {/* Always show dot for all statuses */}
+                        <span
+                          className={`ml-auto w-3 h-3 rounded-full ${dotColor}`}
+                          title={`Status: ${status}`}
+                        />
                       </li>
                     );
                   })}
                 </ul>
                 <div className="mt-auto pt-6">
-                  <div className="text-sm text-gray-600 mb-2">Step {currentStep} of 7</div>
+                  <div className="text-sm text-gray-600 mb-2">Step {currentStep > 5 ? currentStep - 1 : currentStep} of 6</div>
                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-[#136C9E] transition-all duration-300"
-                      style={{ width: `${(currentStep / 7) * 100}%` }}
+                      style={{ width: `${((currentStep > 5 ? currentStep - 1 : currentStep) / 6) * 100}%` }}
                     ></div>
                   </div>
                 </div>
@@ -1943,23 +1965,24 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
             {renderFormContent()}
           </div>
           <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-t border-gray-200">
-            <div className="flex justify-between items-start">
+            {/* Mobile Layout (default) - Triangle arrangement */}
+            <div className="flex justify-between items-start md:hidden">
               <div>
-                {lastSavedSteps[currentStep] && (
+                {(lastSavedSteps[currentStep] || showSaveSuccess) && (
                   <div className="flex items-center text-sm text-gray-500 ml-2">
-                    <CheckCircle className="text-green-500 mr-1" fontSize="small" />
+                    <CheckCircle className="text-green-500 mr-1" size={20} />
                     <span>Saved</span>
                   </div>
                 )}
               </div>
 
-              {/* Right angle triangle button layout */}
+              {/* Right angle triangle button layout for mobile */}
               <div className="relative">
                 {/* Save button positioned at top right */}
                 <div className="flex justify-end mb-2">
                   <button
                     onClick={saveCurrentStep}
-                    className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base bg-gray-100 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-200 transition-colors"
+                    className="px-3 sm:px-4 py-2 text-sm bg-gray-100 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-200 transition-colors"
                     disabled={isSaving}
                   >
                     {isSaving ? 'Saving...' : 'Save'}
@@ -1971,7 +1994,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   {currentStep > 1 && (
                     <button
                       onClick={prevStep}
-                      className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base border border-[#136C9E] text-[#136C9E] rounded-md hover:bg-[#136C9E] hover:text-white transition-colors"
+                      className="px-3 sm:px-4 py-2 text-sm border border-[#136C9E] text-[#136C9E] rounded-md hover:bg-[#136C9E] hover:text-white transition-colors"
                     >
                       Previous
                     </button>
@@ -1979,20 +2002,68 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   {currentStep < 7 ? (
                     <button
                       onClick={nextStep}
-                      className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base bg-[#136C9E] text-white rounded-md hover:bg-[#0F5A82] transition-colors"
+                      className="px-3 sm:px-4 py-2 text-sm bg-[#136C9E] text-white rounded-md hover:bg-[#0F5A82] transition-colors"
                     >
                       Continue
                     </button>
                   ) : (
                     <button
                       onClick={() => submitApplication()}
-                      className="px-3 sm:px-4 md:px-6 py-2 text-sm sm:text-base bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      className="px-3 sm:px-4 py-2 text-sm bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
                       disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck}
                     >
                       {isSubmitting ? 'Submitting...' : 'Submit Application'}
                     </button>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Desktop Layout - Horizontal arrangement */}
+            <div className="hidden md:flex md:justify-between md:items-center">
+              {/* Save success indicator on the left */}
+              <div>
+                {(lastSavedSteps[currentStep] || showSaveSuccess) && (
+                  <div className="flex items-center text-sm text-gray-500">
+                    <CheckCircle className="text-green-500 mr-1" size={20} />
+                    <span>Saved</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Buttons horizontally aligned on the right */}
+              <div className="flex items-center space-x-3">
+                {currentStep > 1 && (
+                  <button
+                    onClick={prevStep}
+                    className="px-4 md:px-6 py-2 text-base border border-[#136C9E] text-[#136C9E] rounded-md hover:bg-[#136C9E] hover:text-white transition-colors"
+                  >
+                    Previous
+                  </button>
+                )}
+                <button
+                  onClick={saveCurrentStep}
+                  className="px-4 md:px-6 py-2 text-base bg-gray-100 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-200 transition-colors"
+                  disabled={isSaving}
+                >
+                  {isSaving ? 'Saving...' : 'Save'}
+                </button>
+                {currentStep < 7 ? (
+                  <button
+                    onClick={nextStep}
+                    className="px-4 md:px-6 py-2 text-base bg-[#136C9E] text-white rounded-md hover:bg-[#0F5A82] transition-colors"
+                  >
+                    Continue
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => submitApplication()}
+                    className="px-4 md:px-6 py-2 text-base bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck}
+                  >
+                    {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
