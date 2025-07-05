@@ -211,7 +211,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       return (
         <div className="space-y-3">
           <p className="leading-relaxed text-sm font-medium text-left text-gray-900 m-0">
-            Enter your preferred location, property type (house or apartment), number of bedrooms and bathrooms.
+            Enter your preferred location, property type (house or apartment), number of bedrooms and bathrooms using natural language.
           </p>
           <div className="flex justify-end">
             <button
