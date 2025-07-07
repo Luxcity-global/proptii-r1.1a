@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ExternalLink, BedDouble, Bath, Building2, Home } from 'lucide-react';
 import { Tooltip } from './Tooltip';
-import SearchResultsModal from './SearchResultsModal';
 
 interface PropertySpecs {
   beds: number;
@@ -58,8 +57,6 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   error
 }) => {
   const [isMobile, setIsMobile] = useState(false);
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -72,23 +69,12 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const handlePropertyClick = (property: Property) => {
-    setSelectedProperty(property);
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedProperty(null);
-  };
-
   // Map backend property objects to a consistent structure for rendering
   const mappedResults = (searchResponse || []).map((property, idx) => {
     // If property.specs exists, use it; otherwise, map flat fields
-    const specs: PropertySpecs = property.specs || {
-      beds: typeof property.bedrooms === 'number' ? property.bedrooms : parseInt(String(property.bedrooms)) || 0,
-      baths: typeof property.baths === 'number' ? property.baths : parseInt(String(property.baths)) || 0,
-      area: 'N/A',
+    const specs = property.specs || {
+      beds: property.bedrooms ?? 'N/A',
+      baths: property.baths ?? 'N/A',
       propertyType: property.propertyType ?? 'N/A',
     };
     return {
@@ -219,29 +205,24 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
                   <p className="text-gray-600 text-sm">{property.exampleListing.description}</p>
                 </div>
 
-                {/* View Property Button - Updated to open modal */}
+                {/* External Link */}
                 <div className="flex justify-center sm:justify-start">
-                  <button
-                    onClick={() => handlePropertyClick(property)}
+                  <a
+                    href={property.searchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-opacity-90 transition-all"
                     aria-label={`View listings for ${property.title} on ${property.site}`}
                   >
                     <Home className="w-4 h-4" />
                     View Listings on {property.site.charAt(0).toUpperCase() + property.site.slice(1)}
-                  </button>
+                  </a>
                 </div>
               </div>
             </div>
           </Tooltip>
         ))}
       </div>
-
-      {/* Add the modal */}
-      <SearchResultsModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        property={selectedProperty}
-      />
     </div>
   );
 }; 
