@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ExternalLink, BedDouble, Bath, Building2, Home } from 'lucide-react';
 import { Tooltip } from './Tooltip';
-import SearchResultsModal from './SearchResultsModal';
 
 interface PropertySpecs {
   beds: number;
@@ -58,9 +57,6 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   error
 }) => {
   const [isMobile, setIsMobile] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedUrl, setSelectedUrl] = useState<string>('');
-  const [selectedSite, setSelectedSite] = useState<string>('');
 
   useEffect(() => {
     const checkMobile = () => {
@@ -72,18 +68,6 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-
-  const handleViewListings = (url: string, site: string) => {
-    setSelectedUrl(url);
-    setSelectedSite(site);
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setSelectedUrl('');
-    setSelectedSite('');
-  };
 
   // Map backend property objects to a consistent structure for rendering
   const mappedResults = (searchResponse || []).map((property, idx) => {
@@ -223,27 +207,22 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 
                 {/* External Link */}
                 <div className="flex justify-center sm:justify-start">
-                  <button
-                    onClick={() => handleViewListings(property.searchUrl || '', property.site)}
+                  <a
+                    href={property.searchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-opacity-90 transition-all"
                     aria-label={`View listings for ${property.title} on ${property.site}`}
                   >
                     <Home className="w-4 h-4" />
                     View Listings on {property.site.charAt(0).toUpperCase() + property.site.slice(1)}
-                  </button>
+                  </a>
                 </div>
               </div>
             </div>
           </Tooltip>
         ))}
       </div>
-
-      <SearchResultsModal
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        url={selectedUrl}
-        siteName={selectedSite}
-      />
     </div>
   );
 }; 
