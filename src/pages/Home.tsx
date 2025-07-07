@@ -89,7 +89,7 @@ const Home = () => {
       <Navbar />
 
       {/* Hero Section */}
-      <section className={`${(query || response || isLoading || error) ? 'h-auto min-h-[60vh] py-8 pt-24' : 'h-[80vh] pt-24'} relative flex items-center md:pt-0 z-10`}>
+      <section className={`${(query || response || isLoading || error) ? 'h-auto min-h-[80vh] py-8 pt-24 md:min-h-[90vh] md:py-12' : 'h-[80vh] pt-24'} relative flex items-center md:pt-0 z-10`}>
         {/* Background Image */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           <img
