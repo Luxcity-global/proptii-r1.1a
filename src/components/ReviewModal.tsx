@@ -51,21 +51,21 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
         userId: userId || undefined
       };
 
-      console.log('Review submitted:', reviewData);
-      const result = await reviewService.submitReview(reviewData);
-      console.log('Review submission result:', result);
-      
-      // Show appropriate success message based on submission method
-      if (result.method === 'google_sheets') {
-        toast.success('Thank you for your feedback! Your review has been recorded.');
-      } else if (result.method === 'api_fallback') {
-        toast.success('Thank you for your feedback! Your review has been saved.');
-      } else if (result.method === 'local_storage') {
-        toast.success('Thank you for your feedback! Your review will be submitted when connection is restored.');
-      } else {
-        toast.success('Thank you for your feedback!');
+      // Try to submit to the API, but don't fail if API is not available
+      try {
+        await reviewService.submitReview(reviewData);
+        console.log('Review submitted to API:', reviewData);
+      } catch (apiError) {
+        // Fallback: just log the review data if API is not available
+        console.log('API not available, review data logged locally:', reviewData);
+        
+        // Store in localStorage as backup
+        const existingReviews = JSON.parse(localStorage.getItem('proptii_reviews') || '[]');
+        existingReviews.push(reviewData);
+        localStorage.setItem('proptii_reviews', JSON.stringify(existingReviews));
       }
       
+      toast.success('Thank you for your feedback!');
       onClose();
       
       // Reset form
