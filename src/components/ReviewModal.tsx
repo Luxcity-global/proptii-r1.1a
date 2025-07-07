@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { X, Star } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import reviewService from '../services/reviewService';
 
 interface ReviewModalProps {
   isOpen: boolean;
@@ -42,27 +41,32 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
     setIsSubmitting(true);
 
     try {
-      const reviewData = {
-        rating,
-        feedback: feedback.trim() || undefined,
-        userType,
-        timestamp: new Date().toISOString(),
-        source: 'referencing_completion',
-        userId: userId || undefined
-      };
+      // Submit to Google Sheets
+      console.log('Submitting review to:', import.meta.env.VITE_GOOGLE_SHEETS_API_ENDPOINT + '/submit');
+      const response = await fetch(
+        `${import.meta.env.VITE_GOOGLE_SHEETS_API_ENDPOINT}/submit`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            spreadsheetId: '1WBACyGHtXUMfD9UeCUYcBM-2McIB3UJywcYWSPwj5nk',
+            data: {
+              timestamp: new Date().toISOString(),
+              rating: rating,
+              feedback: feedback.trim() || 'No feedback provided',
+              userType: userType,
+              userId: userId || 'Anonymous',
+              source: 'referencing_completion'
+            }
+          })
+        }
+      );
 
-      // Try to submit to the API, but don't fail if API is not available
-      try {
-        await reviewService.submitReview(reviewData);
-        console.log('Review submitted to API:', reviewData);
-      } catch (apiError) {
-        // Fallback: just log the review data if API is not available
-        console.log('API not available, review data logged locally:', reviewData);
-        
-        // Store in localStorage as backup
-        const existingReviews = JSON.parse(localStorage.getItem('proptii_reviews') || '[]');
-        existingReviews.push(reviewData);
-        localStorage.setItem('proptii_reviews', JSON.stringify(existingReviews));
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit review');
       }
       
       toast.success('Thank you for your feedback!');
@@ -72,8 +76,27 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
       setRating(0);
       setFeedback('');
     } catch (error) {
-      console.error('Error submitting review:', error);
-      toast.error('Failed to submit review. Please try again.');
+      console.error('Failed to submit review:', error);
+      // Fallback: store in localStorage as backup
+      const reviewData = {
+        rating,
+        feedback: feedback.trim() || 'No feedback provided',
+        userType,
+        timestamp: new Date().toISOString(),
+        source: 'referencing_completion',
+        userId: userId || 'Anonymous'
+      };
+      
+      const existingReviews = JSON.parse(localStorage.getItem('proptii_reviews') || '[]');
+      existingReviews.push(reviewData);
+      localStorage.setItem('proptii_reviews', JSON.stringify(existingReviews));
+      
+      toast.success('Thank you for your feedback!');
+      onClose();
+      
+      // Reset form
+      setRating(0);
+      setFeedback('');
     } finally {
       setIsSubmitting(false);
     }
