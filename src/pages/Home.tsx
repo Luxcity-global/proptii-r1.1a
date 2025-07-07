@@ -105,7 +105,7 @@ const Home = () => {
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full py-8 md:py-0">
           {/* User Type Selection */}
-          <div className="mb-8 md:mb-12">
+          <div className="mt-8 md:mt-12 mb-8 md:mb-12">
             <div className="inline-flex rounded-full bg-white p-1 shadow-lg">
               <button className="px-6 md:px-8 py-3 rounded-full bg-primary text-white font-semibold transition-all text-sm md:text-base">
                 Tenant
