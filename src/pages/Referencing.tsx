@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import ReferencingModal from '../components/ReferencingModal';
+import ReviewModal from '../components/ReviewModal';
 import DocumentChecklistModal from '../components/DocumentChecklistModal';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
@@ -54,9 +55,10 @@ const preloadHeroImage = () => {
 };
 
 const Referencing = () => {
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated, login, user } = useAuth();
   const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
   const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -107,6 +109,15 @@ const Referencing = () => {
       return;
     }
     setIsReferencingModalOpen(true);
+  };
+
+  const handleSubmissionComplete = () => {
+    // Show review modal after referencing modal is closed
+    setIsReviewModalOpen(true);
+  };
+
+  const handleReviewModalClose = () => {
+    setIsReviewModalOpen(false);
   };
 
   return (
@@ -282,6 +293,14 @@ const Referencing = () => {
       <ReferencingModal
         isOpen={isReferencingModalOpen}
         onClose={() => setIsReferencingModalOpen(false)}
+        onSubmissionComplete={handleSubmissionComplete}
+      />
+
+      <ReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={handleReviewModalClose}
+        userType="tenant"
+        userId={user?.id}
       />
     </div>
   );

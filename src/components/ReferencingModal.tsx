@@ -14,6 +14,7 @@ import { toast } from 'react-hot-toast';
 interface ReferencingModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSubmissionComplete?: () => void;
 }
 
 // Form data types for different steps
@@ -362,7 +363,7 @@ const compressImage = (file: File, maxSizeKB: number = 150): Promise<File> => {
   });
 };
 
-const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) => {
+const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, onSubmissionComplete }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -1059,6 +1060,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
     const handleClose = () => {
       setShowSuccessModal(false);
+      
       // Clear form data from localStorage if user is logged in
       if (user?.id) {
         const keysToRemove = [
@@ -1069,8 +1071,17 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         ];
         keysToRemove.forEach(key => localStorage.removeItem(key));
       }
-      // Close the main modal
+      
+      // Close the main modal first
       onClose();
+      
+      // Then trigger the review modal in the parent component
+      if (onSubmissionComplete) {
+        // Use setTimeout to ensure the modal is fully closed before showing review
+        setTimeout(() => {
+          onSubmissionComplete();
+        }, 100);
+      }
     };
 
     return (

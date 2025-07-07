@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import ReferencingModal from '../components/ReferencingModal';
+import ReviewModal from '../components/ReviewModal';
 import { 
   mockSaveSectionData as saveSectionData, 
   mockUploadDocument as uploadDocument, 
@@ -19,6 +20,7 @@ const createMockFile = (name: string, type: string, size: number) => {
 const TestReferencingPage: React.FC = () => {
   const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [applicationId, setApplicationId] = useState('test-app-123');
   const [logs, setLogs] = useState<string[]>([]);
   const [isRunningTest, setIsRunningTest] = useState(false);
@@ -36,6 +38,15 @@ const TestReferencingPage: React.FC = () => {
 
   const clearLogs = () => {
     setLogs([]);
+  };
+
+  const handleSubmissionComplete = () => {
+    // Show review modal after referencing modal is closed
+    setIsReviewModalOpen(true);
+  };
+
+  const handleReviewModalClose = () => {
+    setIsReviewModalOpen(false);
   };
 
   const runAutomatedTest = async () => {
@@ -283,14 +294,18 @@ const TestReferencingPage: React.FC = () => {
         </div>
       </div>
       
-      {isModalOpen && (
-        <ReferencingModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          applicationId={applicationId}
-          propertyAddress="123 Test Street, London, SW1 1AA"
-        />
-      )}
+      <ReferencingModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmissionComplete={handleSubmissionComplete}
+      />
+      
+      <ReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={handleReviewModalClose}
+        userType="tenant"
+        userId={user?.id}
+      />
     </div>
   );
 };
