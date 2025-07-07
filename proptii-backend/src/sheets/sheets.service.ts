@@ -40,20 +40,45 @@ export class SheetsService {
 
         try {
             this.logger.log(`Submitting data to spreadsheet: ${spreadsheetId}`);
+            this.logger.log(`Data received: ${JSON.stringify(data)}`);
+            
             const formattedTimestamp = new Date(data.timestamp).toLocaleString();
-            const values = [
-                [
-                    formattedTimestamp,
-                    data.subject,
-                    data.heading,
-                    data.body,
-                    data.userEmail,
-                ],
-            ];
+            let values: any[][] = [];
+            let range: string = '';
+
+            // Detect data type and format accordingly
+            if (data.rating !== undefined) {
+                // Review data format
+                values = [
+                    [
+                        formattedTimestamp,
+                        data.rating,
+                        data.feedback || 'No feedback provided',
+                        data.userType || 'Unknown',
+                        data.userId || 'Anonymous',
+                        data.source || 'Unknown'
+                    ]
+                ];
+                range = 'Sheet1!A:F'; // 6 columns for review data
+                this.logger.log('Processing as review data');
+            } else {
+                // Help form data format (existing)
+                values = [
+                    [
+                        formattedTimestamp,
+                        data.subject,
+                        data.heading,
+                        data.body,
+                        data.userEmail,
+                    ],
+                ];
+                range = 'Sheet1!A:E'; // 5 columns for help form data
+                this.logger.log('Processing as help form data');
+            }
 
             const response = await this.sheets.spreadsheets.values.append({
                 spreadsheetId,
-                range: 'Sheet1!A:E',
+                range,
                 valueInputOption: 'USER_ENTERED',
                 insertDataOption: 'INSERT_ROWS',
                 resource: {
