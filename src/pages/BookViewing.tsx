@@ -239,6 +239,7 @@ const BookViewing = () => {
         onClose={handleReviewModalClose}
         userType="tenant"
         userId={user?.id}
+        userEmail={user?.email}
         source="viewing_completion"
       />
     </div>
