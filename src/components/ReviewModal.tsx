@@ -135,7 +135,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
         <div className="p-6">
           <p className="text-gray-600 mb-6 text-center">
             {source === 'viewing_completion' 
-              ? 'How was your experience with the viewing booking process?'
+              ? 'How was your experience with the book viewing process?'
               : 'How was your experience with the referencing process?'
             }
           </p>
