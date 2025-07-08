@@ -305,6 +305,7 @@ const TestReferencingPage: React.FC = () => {
         onClose={handleReviewModalClose}
         userType="tenant"
         userId={user?.id}
+        userEmail={user?.email}
         source="referencing_completion"
       />
     </div>
