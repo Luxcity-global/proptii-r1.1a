@@ -193,17 +193,18 @@ interface PropertyDetails {
 interface BookViewingModalProps {
   open: boolean;
   onClose: () => void;
+  onSubmissionComplete?: () => void;
 }
 
-const BookViewingModal: React.FC<BookViewingModalProps> = ({ open, onClose }) => {
+const BookViewingModal: React.FC<BookViewingModalProps> = ({ open, onClose, onSubmissionComplete }) => {
   return (
     <BookViewingProvider>
-      <BookViewingModalContent open={open} onClose={onClose} />
+      <BookViewingModalContent open={open} onClose={onClose} onSubmissionComplete={onSubmissionComplete} />
     </BookViewingProvider>
   );
 };
 
-const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClose }) => {
+const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClose, onSubmissionComplete }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { state, dispatch } = useBookViewing();
@@ -399,7 +400,16 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     setShowSuccess(false);
     dispatch({ type: 'RESET_STATE' });
     setActiveStep(0);
+    
+    // Close the main modal first
     onClose();
+    
+    // Then trigger the review modal in the parent component after a short delay
+    if (onSubmissionComplete) {
+      setTimeout(() => {
+        onSubmissionComplete();
+      }, 300);
+    }
   };
 
   const getStepWarningMessage = (step: number) => {

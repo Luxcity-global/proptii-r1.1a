@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import BookViewingModal from '../components/viewings/BookViewingModal';
+import ReviewModal from '../components/ReviewModal';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import 'swiper/css';
 import 'swiper/css/navigation';
@@ -43,8 +44,9 @@ const swiperStyles = `
 `;
 
 const BookViewing = () => {
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated, login, user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -75,6 +77,15 @@ const BookViewing = () => {
       return;
     }
     setIsModalOpen(true);
+  };
+
+  const handleSubmissionComplete = () => {
+    // Show review modal after viewing booking modal is closed
+    setIsReviewModalOpen(true);
+  };
+
+  const handleReviewModalClose = () => {
+    setIsReviewModalOpen(false);
   };
 
   return (
@@ -220,6 +231,15 @@ const BookViewing = () => {
       <BookViewingModal
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onSubmissionComplete={handleSubmissionComplete}
+      />
+
+      <ReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={handleReviewModalClose}
+        userType="tenant"
+        userId={user?.id}
+        source="viewing_completion"
       />
     </div>
   );

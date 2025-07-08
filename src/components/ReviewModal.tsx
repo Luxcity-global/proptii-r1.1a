@@ -7,9 +7,10 @@ interface ReviewModalProps {
   onClose: () => void;
   userType: 'tenant' | 'landlord';
   userId?: string;
+  source?: 'viewing_completion' | 'referencing_completion';
 }
 
-const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, userId }) => {
+const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, userId, source = 'referencing_completion' }) => {
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [feedback, setFeedback] = useState<string>('');
@@ -58,7 +59,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
               feedback: feedback.trim() || 'No feedback provided',
               userType: userType,
               userId: userId || 'Anonymous',
-              source: 'referencing_completion'
+              source: source
             }
           })
         }
@@ -83,7 +84,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
         feedback: feedback.trim() || 'No feedback provided',
         userType,
         timestamp: new Date().toISOString(),
-        source: 'referencing_completion',
+        source: source,
         userId: userId || 'Anonymous'
       };
       
@@ -133,7 +134,10 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
         {/* Content */}
         <div className="p-6">
           <p className="text-gray-600 mb-6 text-center">
-            How was your experience with the referencing process?
+            {source === 'viewing_completion' 
+              ? 'How was your experience with the viewing booking process?'
+              : 'How was your experience with the referencing process?'
+            }
           </p>
 
           {/* Star Rating */}
