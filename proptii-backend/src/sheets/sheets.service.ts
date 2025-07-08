@@ -49,6 +49,16 @@ export class SheetsService {
             // Detect data type and format accordingly
             if (data.rating !== undefined) {
                 // Review data format
+                this.logger.log('Review data details:', {
+                    timestamp: data.timestamp,
+                    rating: data.rating,
+                    feedback: data.feedback,
+                    userType: data.userType,
+                    userId: data.userId,
+                    userEmail: data.userEmail,
+                    source: data.source
+                });
+                
                 values = [
                     [
                         formattedTimestamp,
@@ -56,11 +66,12 @@ export class SheetsService {
                         data.feedback || 'No feedback provided',
                         data.userType || 'Unknown',
                         data.userId || 'Anonymous',
+                        data.userEmail || 'No email provided',
                         data.source || 'Unknown'
                     ]
                 ];
-                range = 'Sheet1!A:F'; // 6 columns for review data
-                this.logger.log('Processing as review data');
+                range = 'Sheet1!A:G'; // 7 columns for review data (added userEmail)
+                this.logger.log('Processing as review data with 7 columns:', values[0]);
             } else {
                 // Help form data format (existing)
                 values = [
