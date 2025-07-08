@@ -34,6 +34,16 @@ router.post('/submit', async (req, res) => {
         // Detect data type and format accordingly
         if (data.rating !== undefined) {
             // Review data format
+            console.log('Review data received:', {
+                timestamp: data.timestamp,
+                rating: data.rating,
+                feedback: data.feedback,
+                userType: data.userType,
+                userId: data.userId,
+                userEmail: data.userEmail,
+                source: data.source
+            });
+            
             values = [
                 [
                     formattedTimestamp,
@@ -46,7 +56,8 @@ router.post('/submit', async (req, res) => {
                 ]
             ];
             range = 'Sheet1!A:G'; // 7 columns for review data (added userEmail)
-            console.log('Processing as review data');
+            console.log('Processing as review data with 7 columns:', values[0]);
+            console.log('Using range:', range);
         } else {
             // Help form data format (existing)
             values = [
