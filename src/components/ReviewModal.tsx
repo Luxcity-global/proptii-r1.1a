@@ -7,10 +7,11 @@ interface ReviewModalProps {
   onClose: () => void;
   userType: 'tenant' | 'landlord';
   userId?: string;
+  userEmail?: string;
   source?: 'viewing_completion' | 'referencing_completion';
 }
 
-const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, userId, source = 'referencing_completion' }) => {
+const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, userId, userEmail, source = 'referencing_completion' }) => {
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [feedback, setFeedback] = useState<string>('');
@@ -59,6 +60,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
               feedback: feedback.trim() || 'No feedback provided',
               userType: userType,
               userId: userId || 'Anonymous',
+              userEmail: userEmail || 'No email provided',
               source: source
             }
           })
@@ -85,7 +87,8 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
         userType,
         timestamp: new Date().toISOString(),
         source: source,
-        userId: userId || 'Anonymous'
+        userId: userId || 'Anonymous',
+        userEmail: userEmail || 'No email provided'
       };
       
       const existingReviews = JSON.parse(localStorage.getItem('proptii_reviews') || '[]');
