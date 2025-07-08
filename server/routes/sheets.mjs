@@ -41,10 +41,11 @@ router.post('/submit', async (req, res) => {
                     data.feedback || 'No feedback provided',
                     data.userType || 'Unknown',
                     data.userId || 'Anonymous',
+                    data.userEmail || 'No email provided',
                     data.source || 'Unknown'
                 ]
             ];
-            range = 'Sheet1!A:F'; // 6 columns for review data
+            range = 'Sheet1!A:G'; // 7 columns for review data (added userEmail)
             console.log('Processing as review data');
         } else {
             // Help form data format (existing)
