@@ -97,9 +97,9 @@ const ContractsPage = () => {
               We're working hard to bring you this feature
             </p>
           </div>
-        </div>
+        </div> 
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 md:pl-14 opacity-50">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 md:pl-14">
           <div className="flex flex-col md:flex-row items-center justify-between space-y-8 md:space-y-0 md:space-x-8">
             <div className="md:w-1/2 text-left space-y-14">
               <h2 className="text-4xl md:text-5xl font-bold font-archive text-[#136C9E]">Securely store rental documents.</h2>
@@ -109,7 +109,6 @@ const ContractsPage = () => {
               <button
                 onClick={handleGetStarted}
                 className="bg-[#E76F51] text-white px-6 py-3 rounded-md hover:bg-opacity-90 transition-all text-lg font-medium"
-                disabled
               >
                 Get started
               </button>

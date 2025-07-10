@@ -25,6 +25,7 @@ const Home = () => {
 
   const [isBackendAvailable, setIsBackendAvailable] = useState(true);
   const [hasResults, setHasResults] = useState(true);
+  const [searchInputHeight, setSearchInputHeight] = useState(50);
 
   useEffect(() => {
     const checkBackend = async () => {
@@ -66,6 +67,17 @@ const Home = () => {
     }
   };
 
+  const handleSearchInputHeightChange = (height: number) => {
+    setSearchInputHeight(height);
+  };
+
+  // Calculate dynamic padding based on search input height
+  const getDynamicPadding = () => {
+    const baseHeight = 50;
+    const extraHeight = Math.max(0, searchInputHeight - baseHeight);
+    return extraHeight * 0.5; // Adjust multiplier as needed
+  };
+
   // Search results fallback UI
   const SearchResultsFallback = () => (
     <div className="p-8 bg-white rounded-lg shadow-md">
@@ -89,7 +101,10 @@ const Home = () => {
       <Navbar />
 
       {/* Hero Section */}
-      <section className={`${(query || response || isLoading || error) ? 'h-auto min-h-[80vh] py-8 pt-24 md:min-h-[90vh] md:py-12' : 'h-[80vh] pt-24'} relative flex items-center md:pt-0 z-10`}>
+      <section 
+        className={`${(query || response || isLoading || error) ? 'h-auto min-h-[85vh] py-8 pt-32 md:min-h-[95vh] md:py-12' : 'h-[85vh] pt-32'} relative flex items-center md:pt-0 z-10`}
+        style={{ paddingBottom: `${getDynamicPadding()}px` }}
+      >
         {/* Background Image */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           <img
@@ -105,7 +120,7 @@ const Home = () => {
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full py-8 md:py-0">
           {/* User Type Selection */}
-          <div className="mt-8 md:mt-12 mb-8 md:mb-12">
+          <div className="mt-16 md:mt-20 mb-8 md:mb-12">
             <div className="inline-flex rounded-full bg-white p-1 shadow-lg">
               <button className="px-6 md:px-8 py-3 rounded-full bg-primary text-white font-semibold transition-all text-sm md:text-base">
                 Tenant
@@ -130,12 +145,13 @@ const Home = () => {
           </p>
 
           {/* Search Bar */}
-          <div className="max-w-2xl mx-auto px-4 md:px-0">
+          <div className="max-w-3xl mx-auto px-4 md:px-0">
             <SearchInput
               onSearch={handleSearch}
               value={query}
               onChange={setQuery}
               hasResults={hasResults}
+              onHeightChange={handleSearchInputHeightChange}
             />
             {isLoading && <ProgressBar />}
             {!isBackendAvailable && (
