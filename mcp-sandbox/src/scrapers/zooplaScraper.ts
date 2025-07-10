@@ -649,8 +649,22 @@ export async function scrapeZooplaWithQuery(query: string, filters?: any): Promi
   console.log(`🏠 [ZOOPLA_MAIN] [${scrapingId}] Starting Zoopla scraping for: "${query}"`);
   
   try {
-    // Try Puppeteer first for better results
-    console.log(`🔍 [ZOOPLA_MAIN] [${scrapingId}] Attempting Puppeteer scraping...`);
+    // Try Cloudflare bypass first (new enhanced approach)
+    console.log(`🛡️ [ZOOPLA_MAIN] [${scrapingId}] Attempting Cloudflare bypass scraping...`);
+    try {
+      const { scrapeZooplaWithCloudflareBypass } = await import('./zooplaCloudflareBypass');
+      const bypassProperties = await scrapeZooplaWithCloudflareBypass(query, filters);
+      
+      if (bypassProperties.length > 0) {
+        console.log(`✅ [ZOOPLA_MAIN] [${scrapingId}] Cloudflare bypass successful: ${bypassProperties.length} properties`);
+        return bypassProperties;
+      }
+    } catch (bypassError) {
+      console.warn(`⚠️ [ZOOPLA_MAIN] [${scrapingId}] Cloudflare bypass failed, trying standard methods:`, bypassError.message);
+    }
+    
+    // Try Puppeteer as fallback
+    console.log(`🔍 [ZOOPLA_MAIN] [${scrapingId}] Attempting standard Puppeteer scraping...`);
     const puppeteerProperties = await scrapeZooplaWithPuppeteer(query, filters);
     
     if (puppeteerProperties.length > 0) {
