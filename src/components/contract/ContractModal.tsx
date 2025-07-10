@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Menu, UploadCloud, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Menu, UploadCloud, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as pdfjs from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
@@ -17,6 +17,133 @@ interface Template {
   uploadDate: string;
   fileUrl: string;
   imagePreview: string | null;
+  file?: File; // Store the actual file object
+  fileData?: string; // Base64 encoded file data for storage
+  fileSize?: number; // File size in bytes
+}
+
+// Storage service for managing template persistence
+class TemplateStorageService {
+  private static STORAGE_KEY = 'contract_templates';
+  private static DELETED_STORAGE_KEY = 'deleted_contract_templates';
+  private static MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit
+
+  static async saveTemplates(templates: Template[]): Promise<void> {
+    try {
+      const templatesToStore = await Promise.all(
+        templates.map(async (template) => {
+          const storageTemplate = { ...template };
+          
+          // Remove file object and blob URL before storage
+          delete storageTemplate.file;
+          delete storageTemplate.fileUrl;
+          
+          // Convert file to base64 if not already done and file exists
+          if (template.file && !template.fileData) {
+            if (template.file.size > this.MAX_FILE_SIZE) {
+              console.warn(`File ${template.name} is too large for storage (${(template.file.size / 1024 / 1024).toFixed(2)}MB)`);
+              return null; // Skip large files
+            }
+            
+            try {
+              const arrayBuffer = await template.file.arrayBuffer();
+              const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+              storageTemplate.fileData = base64;
+              storageTemplate.fileSize = template.file.size;
+            } catch (error) {
+              console.error('Error converting file to base64:', error);
+              return null;
+            }
+          }
+          
+          return storageTemplate;
+        })
+      );
+
+      const validTemplates = templatesToStore.filter(t => t !== null);
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(validTemplates));
+      console.log(`Saved ${validTemplates.length} templates to storage`);
+    } catch (error) {
+      console.error('Error saving templates:', error);
+      if (error instanceof Error && error.name === 'QuotaExceededError') {
+        alert('Storage quota exceeded. Some files may be too large to save.');
+      }
+    }
+  }
+
+  static async loadTemplates(): Promise<Template[]> {
+    try {
+      const stored = localStorage.getItem(this.STORAGE_KEY);
+      if (!stored) return [];
+
+      const templates: Template[] = JSON.parse(stored);
+      
+      // Reconstruct file objects and blob URLs
+      const reconstructedTemplates = templates.map((template) => {
+        if (template.fileData) {
+          try {
+            // Convert base64 back to file
+            const binaryString = atob(template.fileData);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+            
+            const file = new File([bytes], template.name, { type: 'application/pdf' });
+            const fileUrl = URL.createObjectURL(file);
+            
+            return {
+              ...template,
+              file,
+              fileUrl
+            };
+          } catch (error) {
+            console.error('Error reconstructing file:', error);
+            return null;
+          }
+        }
+        return template;
+      }).filter(t => t !== null) as Template[];
+
+      console.log(`Loaded ${reconstructedTemplates.length} templates from storage`);
+      return reconstructedTemplates;
+    } catch (error) {
+      console.error('Error loading templates:', error);
+      return [];
+    }
+  }
+
+  static async saveDeletedTemplates(templates: Template[]): Promise<void> {
+    try {
+      const templatesToStore = templates.map(template => {
+        const storageTemplate = { ...template };
+        delete storageTemplate.file;
+        delete storageTemplate.fileUrl;
+        return storageTemplate;
+      });
+      
+      localStorage.setItem(this.DELETED_STORAGE_KEY, JSON.stringify(templatesToStore));
+      console.log(`Saved ${templatesToStore.length} deleted templates to storage`);
+    } catch (error) {
+      console.error('Error saving deleted templates:', error);
+    }
+  }
+
+  static loadDeletedTemplates(): Template[] {
+    try {
+      const stored = localStorage.getItem(this.DELETED_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error('Error loading deleted templates:', error);
+      return [];
+    }
+  }
+
+  static clearStorage(): void {
+    localStorage.removeItem(this.STORAGE_KEY);
+    localStorage.removeItem(this.DELETED_STORAGE_KEY);
+    console.log('Template storage cleared');
+  }
 }
 
 const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
@@ -28,10 +155,68 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate(); // Initialize navigation
   const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  
+  // PDF Preview states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [pdfDocument, setPdfDocument] = useState<any>(null);
+  const [isLoadingPdf, setIsLoadingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // New state to track if we're in customize mode and which template is being customized
   const [customizeMode, setCustomizeMode] = useState(false);
   const [customizingTemplateId, setCustomizingTemplateId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load templates from storage on component mount
+  useEffect(() => {
+    const loadStoredTemplates = async () => {
+      try {
+        const storedTemplates = await TemplateStorageService.loadTemplates();
+        const storedDeletedTemplates = TemplateStorageService.loadDeletedTemplates();
+        
+        setUploadedTemplates(storedTemplates);
+        setDeletedTemplates(storedDeletedTemplates);
+        
+        console.log(`Loaded ${storedTemplates.length} templates and ${storedDeletedTemplates.length} deleted templates`);
+      } catch (error) {
+        console.error('Error loading templates from storage:', error);
+      }
+    };
+
+    if (isOpen) {
+      loadStoredTemplates();
+    }
+  }, [isOpen]);
+
+  // Save templates to storage whenever they change
+  useEffect(() => {
+    const saveTemplates = async () => {
+      if (uploadedTemplates.length > 0) {
+        setIsSaving(true);
+        await TemplateStorageService.saveTemplates(uploadedTemplates);
+        setIsSaving(false);
+      }
+    };
+    
+    saveTemplates();
+  }, [uploadedTemplates]);
+
+  // Save deleted templates to storage whenever they change
+  useEffect(() => {
+    if (deletedTemplates.length > 0) {
+      TemplateStorageService.saveDeletedTemplates(deletedTemplates);
+    }
+  }, [deletedTemplates]);
+
+  // Clear all storage (for testing)
+  const handleClearStorage = () => {
+    TemplateStorageService.clearStorage();
+    setUploadedTemplates([]);
+    setDeletedTemplates([]);
+    alert('All template storage has been cleared!');
+  };
 
 
   // Toggle sidebar visibility
@@ -79,8 +264,10 @@ const findCustomizedTemplate = () => {
   // Handle Restore (Move to Uploaded Templates)
   const handleRestore = (templateId: string) => {
     const restoredTemplate = deletedTemplates.find(template => template.id === templateId);
-    setDeletedTemplates(deletedTemplates.filter(template => template.id !== templateId));
-    setUploadedTemplates([...uploadedTemplates, restoredTemplate]);
+    if (restoredTemplate) {
+      setDeletedTemplates(deletedTemplates.filter(template => template.id !== templateId));
+      setUploadedTemplates([...uploadedTemplates, restoredTemplate]);
+    }
   };
 
   // Handle Permanent Delete (Remove from Deleted Templates)
@@ -91,33 +278,61 @@ const findCustomizedTemplate = () => {
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    console.log("File selected:", file?.name, "Type:", file?.type, "Size:", file?.size);
+    
     if (file && file.type === "application/pdf") {
-      const fileUrl = URL.createObjectURL(file);
-      const imagePreview = await generatePdfPreview(fileUrl);
+      try {
+        const fileUrl = URL.createObjectURL(file);
+        console.log("Created blob URL:", fileUrl);
+        
+        const imagePreview = await generatePdfPreview(file);
+        console.log("Generated preview:", imagePreview ? "Success" : "Failed");
 
-      const newTemplate: Template = {
-        id: `${file.name}-${Date.now()}`,
-        name: file.name,
-        uploadDate: new Date().toLocaleDateString(),
-        fileUrl,
-        imagePreview,
-      };
-      setUploadedTemplates([...uploadedTemplates, newTemplate]);
+        const newTemplate: Template = {
+          id: `${file.name}-${Date.now()}`,
+          name: file.name,
+          uploadDate: new Date().toLocaleDateString(),
+          fileUrl,
+          imagePreview,
+          file: file, // Store the actual file object
+        };
+        setUploadedTemplates([...uploadedTemplates, newTemplate]);
+        console.log("Template added successfully");
+      } catch (error) {
+        console.error("Error processing uploaded file:", error);
+      }
+    } else {
+      console.warn("Invalid file type or no file selected");
     }
+    
+    // Reset the file input to allow re-uploading the same file
+    event.target.value = '';
   };
 
-  const generatePdfPreview = async (fileUrl: string): Promise<string | null> => {
+  const generatePdfPreview = async (file: File): Promise<string | null> => {
     try {
-      const loadingTask = pdfjs.getDocument(fileUrl);
+      console.log("Generating preview for file:", file.name);
+      
+      // Use the File object directly
+      const arrayBuffer = await file.arrayBuffer();
+      console.log("File loaded for preview, size:", arrayBuffer.byteLength, "bytes");
+      
+      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
       const pdf = await loadingTask.promise;
+      console.log("PDF loaded for preview, pages:", pdf.numPages);
+      
       const page = await pdf.getPage(1);
+      console.log("First page loaded for preview");
 
       const scale = 1.5;
       const viewport = page.getViewport({ scale });
       const canvas = document.createElement("canvas");
       const context = canvas.getContext("2d");
 
-      if (!context) return null;
+      if (!context) {
+        console.error("Could not get canvas context for preview");
+        return null;
+      }
 
       canvas.width = viewport.width;
       canvas.height = viewport.height;
@@ -128,6 +343,7 @@ const findCustomizedTemplate = () => {
       };
 
       await page.render(renderContext).promise;
+      console.log("Preview image generated successfully");
 
       return canvas.toDataURL("image/png");
     } catch (error) {
@@ -136,13 +352,109 @@ const findCustomizedTemplate = () => {
     }
   };
 
-  const handlePreview = (fileUrl: string) => {
-    setPreviewFile(fileUrl);
+  const handlePreview = async (template: Template) => {
+    console.log("Starting PDF preview for:", template.name);
+    setPreviewFile(template.fileUrl);
+    setIsLoadingPdf(true);
+    setPdfError(null);
+    setPdfDocument(null);
+    
+    try {
+      let arrayBuffer: ArrayBuffer;
+      
+      if (template.file) {
+        // Use the stored File object directly
+        console.log("Using stored file object, size:", template.file.size, "bytes");
+        arrayBuffer = await template.file.arrayBuffer();
+      } else {
+        // Fallback to fetching blob URL (though this will likely fail due to CSP)
+        console.log("No file object found, attempting to fetch blob...");
+        const response = await fetch(template.fileUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch blob: ${response.status}`);
+        }
+        arrayBuffer = await response.arrayBuffer();
+      }
+      
+      console.log("File data loaded, size:", arrayBuffer.byteLength, "bytes");
+      
+      console.log("Loading PDF document from ArrayBuffer...");
+      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      console.log("PDF loaded successfully, pages:", pdf.numPages);
+      
+      setPdfDocument(pdf);
+      setTotalPages(pdf.numPages);
+      setCurrentPage(1);
+      setIsLoadingPdf(false);
+    } catch (error) {
+      console.error("Error loading PDF for preview:", error);
+      setPdfError(`Failed to load PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setIsLoadingPdf(false);
+    }
   };
 
   const closePreview = () => {
     setPreviewFile(null);
+    setPdfDocument(null);
+    setCurrentPage(1);
+    setTotalPages(0);
+    setIsLoadingPdf(false);
+    setPdfError(null);
   };
+
+  const renderPage = async (pageNumber: number) => {
+    if (!pdfDocument || !canvasRef.current) {
+      console.log("Cannot render page - missing document or canvas");
+      return;
+    }
+
+    try {
+      console.log(`Rendering page ${pageNumber}...`);
+      const page = await pdfDocument.getPage(pageNumber);
+      const canvas = canvasRef.current;
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        console.error("Could not get canvas context");
+        return;
+      }
+
+      const viewport = page.getViewport({ scale: 1.5 });
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+
+      const renderContext = {
+        canvasContext: context,
+        viewport,
+      };
+
+      await page.render(renderContext).promise;
+      console.log(`Page ${pageNumber} rendered successfully`);
+    } catch (error) {
+      console.error("Error rendering PDF page:", error);
+      setPdfError(`Failed to render page ${pageNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  // Effect to render page when currentPage changes
+  useEffect(() => {
+    if (pdfDocument && canvasRef.current) {
+      renderPage(currentPage);
+    }
+  }, [currentPage, pdfDocument]);
 
   if (!isOpen) return null;
 
@@ -182,6 +494,28 @@ const findCustomizedTemplate = () => {
               </svg>
               Go To Dashboard
             </button>
+
+            {/* Storage Status */}
+            <div className="mt-6 p-3 bg-gray-50 rounded-md text-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="font-medium text-gray-700">Auto-Save</span>
+                {isSaving && <span className="text-orange-500">Saving...</span>}
+              </div>
+              <p className="text-gray-600">
+                Templates: {uploadedTemplates.length} stored
+              </p>
+              
+              {/* Clear Storage Button (for testing) */}
+              <button 
+                onClick={handleClearStorage}
+                className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
+              >
+                Clear All Storage
+              </button>
+            </div>
           </div>
         )}
 
@@ -228,7 +562,7 @@ const findCustomizedTemplate = () => {
                     src={template.imagePreview}
                     alt={`Template ${String.fromCharCode(65 + index)}`} // A, B, C, D
                     className="w-44 h-56 object-cover rounded-lg border cursor-pointer"
-                    onClick={() => handlePreview(template.fileUrl)}
+                    onClick={() => handlePreview(template)}
                   />
                 ) : (
                   <div key={index} className="w-44 h-56 rounded-lg border bg-gray-200 flex items-center justify-center text-gray-500">
@@ -264,20 +598,24 @@ const findCustomizedTemplate = () => {
     <div>
       <h3 className="text-lg font-semibold text-gray-700 mb-3">Your Templates</h3>
       {/* Uploaded Templates Table */}
-      <table className="w-full border-collapse">
+      <table className="w-full border-collapse table-fixed">
         <thead>
           <tr className="bg-gray-100 text-gray-700">
-            <th className="p-2 border text-left">Template</th>
-            <th className="p-2 border text-center">Date</th>
-            <th className="p-2 border text-right">Actions</th>
+            <th className="p-2 border text-left w-2/5">Template</th>
+            <th className="p-2 border text-center w-1/5">Date</th>
+            <th className="p-2 border text-right w-2/5">Actions</th>
           </tr>
         </thead>
         <tbody>
           {uploadedTemplates.map((template) => (
             <tr key={template.id} className="border-t">
-              <td className="p-2 border text-left">{template.name}</td>
-              <td className="p-2 border text-left">{template.uploadDate}</td>
-              <td className="p-2 border text-right space-x-2">
+              <td className="p-2 border text-left max-w-0 w-2/5">
+                <div className="truncate" title={template.name}>
+                  {template.name}
+                </div>
+              </td>
+              <td className="p-2 border text-left w-1/5">{template.uploadDate}</td>
+              <td className="p-2 border text-right space-x-2 w-2/5">
                 {/* Manage Button */}
                 <button
                   onClick={() => setDropdownOpen(dropdownOpen === template.id ? null : template.id)}
@@ -286,7 +624,7 @@ const findCustomizedTemplate = () => {
                   Manage
                 </button>
                 <button
-                  onClick={() => handlePreview(template.fileUrl)}
+                  onClick={() => handlePreview(template)}
                   className="bg-[#136C9E] text-white px-4 py-1 rounded-full hover:bg-[#0F5B88]"
                 >
                   Preview
@@ -342,20 +680,24 @@ const findCustomizedTemplate = () => {
   ) : (
     <div>
       <h3 className="text-lg font-semibold text-gray-700 mb-3">Deleted Templates</h3>
-      <table className="w-full border-collapse">
+      <table className="w-full border-collapse table-fixed">
         <thead>
           <tr className="bg-gray-100 text-gray-700">
-            <th className="p-2 border text-left">Template</th>
-            <th className="p-2 border text-left">Date</th>
-            <th className="p-2 border text-right">Actions</th>
+            <th className="p-2 border text-left w-2/5">Template</th>
+            <th className="p-2 border text-left w-1/5">Date</th>
+            <th className="p-2 border text-right w-2/5">Actions</th>
           </tr>
         </thead>
         <tbody>
           {deletedTemplates.map((template) => (
             <tr key={template.id} className="border-t">
-              <td className="p-2 border text-left">{template.name}</td>
-              <td className="p-2 border text-left">{template.uploadDate}</td>
-              <td className="p-2 border text-right space-x-2">
+              <td className="p-2 border text-left max-w-0 w-2/5">
+                <div className="truncate" title={template.name}>
+                  {template.name}
+                </div>
+              </td>
+              <td className="p-2 border text-left w-1/5">{template.uploadDate}</td>
+              <td className="p-2 border text-right space-x-2 w-2/5">
                 <button className="border border-red-500 text-red-500 px-4 py-1 rounded-full hover:bg-red-50"
                 onClick={() => setConfirmDelete(template.id)}
                 >
@@ -394,11 +736,102 @@ const findCustomizedTemplate = () => {
 
       {previewFile && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={closePreview}>
-          <div className="bg-white p-4 rounded-md shadow-lg relative w-3/4 h-3/4" onClick={(e) => e.stopPropagation()}>
-            <button className="absolute top-2 right-2 text-gray-700 hover:text-gray-900" onClick={closePreview}>
-              <X size={24} />
-            </button>
-            <embed src={previewFile} type="application/pdf" width="100%" height="100%" />
+          <div className="bg-white p-4 rounded-md shadow-lg relative w-3/5 h-4/5 flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* Header with close button and page info */}
+            <div className="flex justify-between items-center mb-4 border-b pb-2">
+              <div className="flex items-center space-x-4">
+                <h3 className="text-lg font-semibold text-gray-800">PDF Preview</h3>
+                {totalPages > 0 && (
+                  <span className="text-sm text-gray-600">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                )}
+              </div>
+              <button 
+                className="text-gray-700 hover:text-gray-900 p-1" 
+                onClick={closePreview}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* PDF Canvas Container */}
+            <div className="flex-1 flex items-center justify-center overflow-auto bg-gray-100 rounded">
+              <canvas 
+                ref={canvasRef}
+                className="max-w-full max-h-full shadow-lg"
+                style={{ display: pdfDocument && !isLoadingPdf && !pdfError ? 'block' : 'none' }}
+              />
+              
+              {/* Loading indicator */}
+              {isLoadingPdf && (
+                <div className="flex flex-col items-center justify-center space-y-2">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  <div className="text-gray-500">Loading PDF...</div>
+                </div>
+              )}
+
+              {/* Error message */}
+              {pdfError && (
+                <div className="flex flex-col items-center justify-center space-y-2 p-4">
+                  <div className="text-red-500 text-center">
+                    <div className="font-semibold">Error loading PDF</div>
+                    <div className="text-sm mt-1">{pdfError}</div>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      const template = [...uploadedTemplates, ...deletedTemplates].find(t => t.fileUrl === previewFile);
+                      if (template) handlePreview(template);
+                    }}
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {/* No document state */}
+              {!isLoadingPdf && !pdfError && !pdfDocument && (
+                <div className="text-gray-500">
+                  No PDF loaded
+                </div>
+              )}
+            </div>
+
+            {/* Navigation Controls */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center space-x-4 mt-4 pt-2 border-t">
+                <button
+                  onClick={goToPrevPage}
+                  disabled={currentPage === 1}
+                  className={`flex items-center space-x-1 px-3 py-2 rounded ${
+                    currentPage === 1 
+                      ? 'text-gray-400 cursor-not-allowed' 
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <ChevronLeft size={16} />
+                  <span>Previous</span>
+                </button>
+                
+                <span className="text-sm text-gray-600 font-medium">
+                  {currentPage} / {totalPages}
+                </span>
+                
+                <button
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                  className={`flex items-center space-x-1 px-3 py-2 rounded ${
+                    currentPage === totalPages 
+                      ? 'text-gray-400 cursor-not-allowed' 
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <span>Next</span>
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

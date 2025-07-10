@@ -14,6 +14,7 @@ interface SearchInputProps {
   hasResults?: boolean;
   value?: string;
   onChange?: (value: string) => void;
+  onHeightChange?: (height: number) => void;
 }
 
 export const SearchInput: React.FC<SearchInputProps> = ({
@@ -22,7 +23,8 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   className = '',
   hasResults = true,
   value,
-  onChange
+  onChange,
+  onHeightChange
 }) => {
   const {
     query,
@@ -43,7 +45,8 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   const [isMobile, setIsMobile] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [tooltipStep, setTooltipStep] = useState(1);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [textareaHeight, setTextareaHeight] = useState(50); // Reduced initial height
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const debouncedQuery = useDebounce(query, 300);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const localStorageService = LocalStorageService.getInstance();
@@ -63,34 +66,59 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     if (value !== undefined) {
       setQuery(value);
     }
-  }, [value]);
+  }, [value, setQuery]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (inputRef.current) {
+      const textarea = inputRef.current;
+      // Reset height to calculate new height
+      textarea.style.height = 'auto';
+      
+      // Calculate new height
+      const scrollHeight = textarea.scrollHeight;
+      const lineHeight = 24; // Approximate line height in pixels
+      const maxLines = 5;
+      const maxHeight = lineHeight * maxLines;
+      
+      let newHeight;
+      if (scrollHeight <= maxHeight) {
+        newHeight = Math.max(scrollHeight, 50); // Reduced minimum to 50px
+        textarea.style.overflowY = 'hidden';
+      } else {
+        newHeight = maxHeight;
+        textarea.style.overflowY = 'auto';
+      }
+      
+      textarea.style.height = `${newHeight}px`;
+      setTextareaHeight(newHeight);
+      
+      // Notify parent of height change
+      if (onHeightChange) {
+        onHeightChange(newHeight);
+      }
+    }
+  }, [query, onHeightChange]);
 
   useEffect(() => {
     if (debouncedQuery) {
       getSuggestions(debouncedQuery).catch((err: unknown) => {
-        clearError(err instanceof Error ? err.message : String(err));
+        console.error('Failed to get suggestions:', err);
+        clearError();
       });
     }
-  }, [debouncedQuery, getSuggestions]);
+  }, [debouncedQuery, getSuggestions, clearError]);
 
   const handleRetry = useCallback(() => {
     clearError();
     retry();
     if (debouncedQuery) {
       getSuggestions(debouncedQuery).catch((err) => {
-        clearError(err instanceof Error ? err.message : String(err));
+        console.error('Failed to get suggestions on retry:', err);
+        clearError();
       });
     }
-  }, [debouncedQuery, getSuggestions, retry]);
-
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setQuery(newValue);
-    clearError();
-    if (onChange) {
-      onChange(newValue);
-    }
-  }, [onChange]);
+  }, [debouncedQuery, getSuggestions, retry, clearError]);
 
   const handleSuggestionClick = useCallback((suggestion: string) => {
     setQuery(suggestion);
@@ -101,20 +129,20 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     saveSearch(suggestion);
     handleSearch(suggestion);
     setIsFocused(false);
-  }, [handleSearch, onChange, saveSearch]);
+  }, [handleSearch, onChange, saveSearch, clearError, setQuery]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) {
-      clearError('Please enter a search query');
+      // Don't proceed with empty query, but don't set error message here
       return;
     }
     clearError();
     saveSearch(query);
     handleSearch(query);
-  }, [query, handleSearch, saveSearch]);
+  }, [query, handleSearch, saveSearch, clearError]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const allSuggestions = [...searchSuggestions, ...getSearchHistory().slice(0, 3)];
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -130,12 +158,15 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       if (selected) {
         handleSuggestionClick(selected);
       }
+    } else if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e as any); // Handle submit on Enter without Shift
     } else if (e.key === 'Escape') {
       setIsFocused(false);
       setHighlightedIndex(-1);
       clearError();
     }
-  }, [searchSuggestions, getSearchHistory, highlightedIndex, handleSuggestionClick]);
+  }, [searchSuggestions, getSearchHistory, highlightedIndex, handleSuggestionClick, clearError, handleSubmit]);
 
   useEffect(() => {
     setHighlightedIndex(-1);
@@ -148,7 +179,16 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       onChange('');
     }
     inputRef.current?.focus();
-  }, [onChange]);
+  }, [onChange, clearError, setQuery]);
+
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    setQuery(newValue);
+    clearError();
+    if (onChange) {
+      onChange(newValue);
+    }
+  }, [onChange, clearError, setQuery]);
 
   const handleInputFocus = useCallback(() => {
     setIsFocused(true);
@@ -252,30 +292,12 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         disabled={query.trim().length > 0}
       >
         <form onSubmit={handleSubmit} className="relative w-full">
-          <div className="bg-white rounded-full p-2 flex items-center shadow-xl">
-            {!isMobile && (
-              <>
-                <button
-                  type="button"
-                  className="p-3 text-gray-400 hover:text-gray-600 transition-colors"
-                  aria-label="Search by image"
-                >
-                  <Camera className="w-6 h-6" />
-                </button>
-                <button
-                  type="button"
-                  className="p-3 text-gray-400 hover:text-gray-600 transition-colors"
-                  aria-label="Search by voice"
-                >
-                  <Mic className="w-6 h-6" />
-                </button>
-              </>
-            )}
-            <div className="relative flex-1">
-              <input
+          <div className="bg-white rounded-3xl p-3 shadow-xl">
+            {/* Input Section */}
+            <div className="relative mb-2">
+              <textarea
                 ref={inputRef}
-                type="text"
-                className={`w-full px-4 pr-10 py-3 bg-transparent text-gray-900 text-lg rounded-full border-none transition-all duration-150 ${isFocused ? 'bg-[#F6F6F6]' : 'bg-transparent'
+                className={`w-full px-4 py-2 bg-transparent text-gray-900 text-lg rounded-2xl border-none transition-all duration-150 resize-none ${isFocused ? 'bg-[#F6F6F6]' : 'bg-transparent'
                   } ${error ? 'border-red-500' : 'border-gray-300'}`}
                 placeholder={placeholder}
                 value={query}
@@ -290,43 +312,65 @@ export const SearchInput: React.FC<SearchInputProps> = ({
                 aria-controls="search-suggestions-list"
                 role="combobox"
                 autoComplete="off"
-                style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
+                rows={1}
+                style={{ 
+                  outline: 'none', 
+                  boxShadow: 'none', 
+                  border: 'none',
+                  minHeight: '50px',
+                  lineHeight: '24px'
+                }}
               />
-              {query && (
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                  aria-label="Clear search"
-                  tabIndex={0}
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
             </div>
-            <div className="w-2" />
-            {isOffline && (
-              <div className="px-3 text-yellow-600 flex items-center">
-                <WifiOff className="w-5 h-5 mr-1" />
-                <span className="text-sm">Offline</span>
+
+            {/* Icons Section */}
+            <div className="flex items-center justify-between">
+              {/* Left side icons */}
+              <div className="flex items-center gap-2">
+                {!isMobile && (
+                  <>
+                    <button
+                      type="button"
+                      className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100"
+                      aria-label="Search by image"
+                    >
+                      <Camera className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100"
+                      aria-label="Search by voice"
+                    >
+                      <Mic className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
+                {isOffline && (
+                  <div className="px-2 text-yellow-600 flex items-center">
+                    <WifiOff className="w-4 h-4 mr-1" />
+                    <span className="text-sm">Offline</span>
+                  </div>
+                )}
               </div>
-            )}
-            <button
-              className={`bg-primary text-white p-3 rounded-full transition-all shadow-md ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-opacity-90'
-                }`}
-              type="submit"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <LoadingSpinner size="small" className="border-white" />
-              ) : (
-                <img
-                  src="/images/ai-search-plane-icon-new-wht-1.png"
-                  alt="Search"
-                  className="w-9 h-9"
-                />
-              )}
-            </button>
+
+              {/* Right side - Search button */}
+              <button
+                className={`bg-primary text-white p-3 rounded-full transition-all shadow-md ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-opacity-90'
+                  }`}
+                type="submit"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <LoadingSpinner size="small" className="border-white" />
+                ) : (
+                  <img
+                    src="/images/ai-search-plane-icon-new-wht-1.png"
+                    alt="Search"
+                    className="w-7 h-7"
+                  />
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </Tooltip>
