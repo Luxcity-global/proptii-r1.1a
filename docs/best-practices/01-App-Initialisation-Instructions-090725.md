@@ -205,9 +205,53 @@ git --version
    ```
 
 4. **Configure environment variables:**
-   - Refer to the Google Docs "environment" file for MCP-specific variables
-   - Set up backend variables in the `mcp-sandbox/.env` file
-   - Set up frontend variables in the `mcp-sandbox/frontend/.env` file
+
+   **Backend Environment (mcp-sandbox/.env):**
+
+   ```bash
+   # Server Configuration
+   PORT=3002
+   NODE_ENV=development
+
+   # Real Scraping Configuration
+   ENABLE_REAL_SCRAPING=true
+
+   # API Configuration
+   API_BASE_URL=http://localhost:3002
+
+   # Scraping Settings
+   SCRAPING_RATE_LIMIT=2000
+   MAX_SCRAPING_PAGES=4
+   SCRAPING_TIMEOUT=30000
+
+   # Cache Configuration
+   CACHE_EXPIRY=3600
+   REDIS_ENABLED=false
+
+   # CORS Configuration
+   CORS_ORIGIN=http://localhost:5180
+
+   # Logging
+   LOG_LEVEL=debug
+   ```
+
+   **Frontend Environment (mcp-sandbox/frontend/.env):**
+
+   ```bash
+   # API Configuration
+   VITE_API_URL=http://localhost:3002
+   VITE_APP_URL=http://localhost:5180
+
+   # Feature Flags
+   VITE_ENABLE_DEBUG=true
+   VITE_ENABLE_MOCK_DATA=false
+
+   # Development Settings
+   VITE_DEV_MODE=true
+   VITE_LOG_LEVEL=debug
+   ```
+
+   **Note:** The restart scripts will automatically create these files from `.env.example` templates if they don't exist.
 
 ### Step 2: Using the Restart Script
 
@@ -219,16 +263,33 @@ git --version
    cd mcp-sandbox
    ```
 
-2. **Make the script executable (if needed):**
+2. **Choose the appropriate script for your platform:**
+
+   **For Linux/macOS (Bash):**
 
    ```bash
+   # Make the script executable (if needed)
    chmod +x restart-mcp-sandbox.sh
-   ```
 
-3. **Run the restart script:**
-   ```bash
+   # Run the restart script
    ./restart-mcp-sandbox.sh
    ```
+
+   **For Windows (PowerShell):**
+
+   ```powershell
+   # Run the PowerShell script
+   .\restart-mcp-sandbox.ps1
+   ```
+
+3. **Script features:**
+   - Automatically creates `.env` files from `.env.example` if missing
+   - Installs dependencies if `node_modules` directories don't exist
+   - Validates environment configuration
+   - Handles port conflicts automatically (Vite auto-selects available ports)
+   - Provides comprehensive status feedback
+   - Opens browser automatically
+   - Cross-platform support (Bash and PowerShell)
 
 ### What the Restart Script Does
 
@@ -321,18 +382,71 @@ If you prefer manual setup or the script fails:
 
    ```bash
    curl http://localhost:3002/health
-   # Should return a health status response
+   # Should return a comprehensive health status with environment info
+   ```
+
+   **Expected Response:**
+
+   ```json
+   {
+     "status": "healthy",
+     "timestamp": "2025-01-11T10:00:00.000Z",
+     "service": "MCP Sandbox Server",
+     "version": "1.0.0",
+     "environment": {
+       "nodeEnv": "development",
+       "port": 3002,
+       "corsOrigin": "http://localhost:5180"
+     },
+     "features": {
+       "realScraping": true,
+       "redisEnabled": false,
+       "cacheExpiry": "3600"
+     }
+   }
    ```
 
 2. **Frontend Access:**
 
    - Open browser to `http://localhost:5180`
    - Verify the MCP sandbox interface loads
-   - Check for any console errors
+   - Check browser console for any errors
 
 3. **API Documentation:**
    - Access `http://localhost:3002/api/mcp/docs`
    - Verify API documentation is available
+
+### MCP Sandbox Troubleshooting
+
+#### Common Issues
+
+**Port Already in Use:**
+
+```bash
+# Windows PowerShell
+Get-NetTCPConnection -LocalPort 3002 | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+Get-NetTCPConnection -LocalPort 5180 | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+
+# Linux/macOS
+lsof -ti:3002 | xargs kill -9
+lsof -ti:5180 | xargs kill -9
+```
+
+**Environment File Missing:**
+
+```bash
+# The restart scripts will automatically create .env files from .env.example
+# If .env.example is missing, create it manually with the variables shown above
+```
+
+**Build Failures:**
+
+```bash
+# Clean build
+rm -rf dist node_modules
+npm install
+npm run build
+```
 
 ---
 

@@ -650,18 +650,19 @@ export async function scrapeZooplaWithQuery(query: string, filters?: any): Promi
   
   try {
     // Try Cloudflare bypass first (new enhanced approach)
-    console.log(`🛡️ [ZOOPLA_MAIN] [${scrapingId}] Attempting Cloudflare bypass scraping...`);
-    try {
-      const { scrapeZooplaWithCloudflareBypass } = await import('./zooplaCloudflareBypass');
-      const bypassProperties = await scrapeZooplaWithCloudflareBypass(query, filters);
-      
-      if (bypassProperties.length > 0) {
-        console.log(`✅ [ZOOPLA_MAIN] [${scrapingId}] Cloudflare bypass successful: ${bypassProperties.length} properties`);
-        return bypassProperties;
-      }
-    } catch (bypassError) {
-      console.warn(`⚠️ [ZOOPLA_MAIN] [${scrapingId}] Cloudflare bypass failed, trying standard methods:`, bypassError.message);
-    }
+    // Temporarily disabled due to TypeScript compilation issues
+    console.log(`🛡️ [ZOOPLA_MAIN] [${scrapingId}] Cloudflare bypass temporarily disabled, using standard methods...`);
+    // try {
+    //   const { scrapeZooplaWithCloudflareBypass } = await import('./zooplaCloudflareBypass');
+    //   const bypassProperties = await scrapeZooplaWithCloudflareBypass(query, filters);
+    //   
+    //   if (bypassProperties.length > 0) {
+    //     console.log(`✅ [ZOOPLA_MAIN] [${scrapingId}] Cloudflare bypass successful: ${bypassProperties.length} properties`);
+    //     return bypassProperties;
+    //   }
+    // } catch (bypassError) {
+    //   console.warn(`⚠️ [ZOOPLA_MAIN] [${scrapingId}] Cloudflare bypass failed, trying standard methods:`, (bypassError as Error).message);
+    // }
     
     // Try Puppeteer as fallback
     console.log(`🔍 [ZOOPLA_MAIN] [${scrapingId}] Attempting standard Puppeteer scraping...`);
