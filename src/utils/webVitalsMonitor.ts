@@ -14,7 +14,7 @@ class WebVitalsMonitor {
     constructor() {
         this.appInsights = new ApplicationInsights({
             config: {
-                instrumentationKey: process.env.VITE_APP_INSIGHTS_INSTRUMENTATION_KEY,
+                instrumentationKey: import.meta.env.VITE_APP_INSIGHTS_INSTRUMENTATION_KEY,
                 enableAutoRouteTracking: true,
                 enableCorsCorrelation: true,
                 enableRequestTracking: true,

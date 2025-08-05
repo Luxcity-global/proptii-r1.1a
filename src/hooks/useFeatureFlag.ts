@@ -7,7 +7,7 @@ export const useFeatureFlag = (featureName: keyof typeof featureFlags) => {
 
 export const useFeatureFlags = () => {
     return useMemo(() => {
-        const currentEnv = process.env.VITE_ENVIRONMENT || 'development';
+        const currentEnv = import.meta.env.VITE_ENVIRONMENT || 'development';
         return Object.entries(featureFlags).reduce((acc, [name, flag]) => {
             acc[name as keyof typeof featureFlags] = flag.isEnabled && flag.environments.includes(currentEnv as any);
             return acc;

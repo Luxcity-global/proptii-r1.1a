@@ -39,7 +39,7 @@ export class AccountRecoveryService {
     private constructor() {
         this.appInsights = new ApplicationInsights({
             config: {
-                connectionString: process.env.REACT_APP_APPINSIGHTS_CONNECTION_STRING,
+                connectionString: import.meta.env.VITE_APP_INSIGHTS_CONNECTION_STRING,
                 enableAutoRouteTracking: true,
             }
         });

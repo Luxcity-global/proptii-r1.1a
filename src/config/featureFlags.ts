@@ -13,42 +13,42 @@ type FeatureFlag = z.infer<typeof featureFlagSchema>;
 // Feature flags configuration
 const featureFlags: Record<string, FeatureFlag> = {
     debugLogging: {
-        isEnabled: process.env.VITE_ENABLE_DEBUG_LOGGING === 'true',
+        isEnabled: import.meta.env.VITE_ENABLE_DEBUG_LOGGING === 'true',
         description: 'Enable detailed logging for debugging purposes',
         environments: ['development', 'staging'],
     },
     performanceMonitoring: {
-        isEnabled: process.env.VITE_ENABLE_PERFORMANCE_MONITORING === 'true',
+        isEnabled: import.meta.env.VITE_ENABLE_PERFORMANCE_MONITORING === 'true',
         description: 'Enable performance monitoring and metrics collection',
         environments: ['staging', 'production'],
     },
     errorReporting: {
-        isEnabled: process.env.VITE_ENABLE_ERROR_REPORTING === 'true',
+        isEnabled: import.meta.env.VITE_ENABLE_ERROR_REPORTING === 'true',
         description: 'Enable error reporting and tracking',
         environments: ['staging', 'production'],
     },
     detailedErrors: {
-        isEnabled: process.env.VITE_ENABLE_DETAILED_ERRORS === 'true',
+        isEnabled: import.meta.env.VITE_ENABLE_DETAILED_ERRORS === 'true',
         description: 'Show detailed error messages',
         environments: ['development'],
     },
     betaFeatures: {
-        isEnabled: process.env.VITE_ENABLE_BETA_FEATURES === 'true',
+        isEnabled: import.meta.env.VITE_ENABLE_BETA_FEATURES === 'true',
         description: 'Enable beta features for testing',
         environments: ['development', 'staging'],
     },
     maintenanceMode: {
-        isEnabled: process.env.VITE_ENABLE_MAINTENANCE_MODE === 'true',
+        isEnabled: import.meta.env.VITE_ENABLE_MAINTENANCE_MODE === 'true',
         description: 'Enable maintenance mode',
         environments: ['development', 'staging', 'production'],
     },
     securityHeaders: {
-        isEnabled: process.env.VITE_ENABLE_SECURITY_HEADERS === 'true',
+        isEnabled: import.meta.env.VITE_ENABLE_SECURITY_HEADERS === 'true',
         description: 'Enable security headers',
         environments: ['staging', 'production'],
     },
     caching: {
-        isEnabled: process.env.VITE_ENABLE_CACHING === 'true',
+        isEnabled: import.meta.env.VITE_ENABLE_CACHING === 'true',
         description: 'Enable response caching',
         environments: ['staging', 'production'],
     },
@@ -59,13 +59,13 @@ export const isFeatureEnabled = (featureName: keyof typeof featureFlags): boolea
     const flag = featureFlags[featureName];
     if (!flag) return false;
 
-    const currentEnv = process.env.VITE_ENVIRONMENT || 'development';
+    const currentEnv = import.meta.env.VITE_ENVIRONMENT || 'development';
     return flag.isEnabled && flag.environments.includes(currentEnv as any);
 };
 
 // Helper function to get all enabled features for current environment
 export const getEnabledFeatures = (): string[] => {
-    const currentEnv = process.env.VITE_ENVIRONMENT || 'development';
+    const currentEnv = import.meta.env.VITE_ENVIRONMENT || 'development';
     return Object.entries(featureFlags)
         .filter(([_, flag]) => flag.isEnabled && flag.environments.includes(currentEnv as any))
         .map(([name]) => name);
