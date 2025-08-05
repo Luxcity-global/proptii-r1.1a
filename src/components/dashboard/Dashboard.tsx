@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, CssBaseline, useTheme, useMediaQuery } from '@mui/material';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import DashboardSidebar from './ui/DashboardSidebar';
 import DashboardHeader from './ui/DashboardHeader';
 import { HomeIcon } from 'lucide-react';
@@ -123,13 +123,23 @@ export const DASHBOARD_SECTIONS = [
 
 const Dashboard: React.FC = () => {
   const theme = useTheme();
+  const location = useLocation();
   const [activeSection, setActiveSection] = useState('dashboard');
 
   // Update activeSection based on the current route
   useEffect(() => {
-    const currentSection = DASHBOARD_SECTIONS.find((section) =>
-      section && location.pathname.startsWith(section.path)
+    const currentPath = location.pathname;
+    
+    // First, try to find an exact match
+    let currentSection = DASHBOARD_SECTIONS.find((section) =>
+      section && currentPath === section.path
     );
+    
+    // If no exact match, check if we're on the dashboard home (which should match /dashboard exactly)
+    if (!currentSection && currentPath === '/dashboard') {
+      currentSection = DASHBOARD_SECTIONS.find((section) => section.id === 'dashboard');
+    }
+    
     if (currentSection) {
       setActiveSection(currentSection.id);
     }

@@ -75,7 +75,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     <SidebarContainer sx={{ width: isCollapsed ? 60 : 220 }}>
       {/* Logo */}
       <LogoContainer>
-        <IconButton onClick={() => navigate('/referencing')}>
+        <IconButton onClick={() => navigate('/')}>
           <img
             src={isCollapsed ? '/images/Proptii ico.png' : '/images/proptii-logo.png'}
             alt="Proptii"
