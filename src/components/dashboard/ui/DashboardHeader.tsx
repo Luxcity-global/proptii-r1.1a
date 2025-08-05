@@ -17,13 +17,7 @@ import EmailIcon from '@mui/icons-material/Email';
 import { BLUE_COLOR } from '../Dashboard';
 
 interface DashboardHeaderProps {
-  user?: {
-    id: string;
-    email: string;
-    givenName?: string;
-    familyName?: string;
-    name?: string;
-  } | null;
+  userName: string;
 }
 
 const HeaderPaper = styled(Paper)(({ theme }) => ({
@@ -41,12 +35,9 @@ const ProfileAvatar = styled(Avatar)(({ theme }) => ({
   width: 80,
   height: 80,
   marginRight: theme.spacing(3),
-  background: 'linear-gradient(135deg, #FF6B35 0%, #F7931E 100%)',
+  backgroundColor: '#F5F6FA',
   border: '1px solid',
   borderColor: theme.palette.divider,
-  color: 'white',
-  fontWeight: 'bold',
-  fontSize: '24px',
   '& img': {
     objectFit: 'cover'
   }
@@ -98,43 +89,7 @@ const Logo = styled('img')({
 /**
  * Dashboard header component with user information and welcome message
  */
-const DashboardHeader: React.FC<DashboardHeaderProps> = ({ user }) => {
-  // Generate display name from user data
-  const getDisplayName = () => {
-    if (!user) return 'Guest User';
-    
-    if (user.name) return user.name;
-    if (user.givenName && user.familyName) return `${user.givenName} ${user.familyName}`;
-    if (user.givenName) return user.givenName;
-    if (user.familyName) return user.familyName;
-    
-    // Fallback to email if no name is available
-    return user.email.split('@')[0];
-  };
-
-  // Generate avatar initials (first 2 letters)
-  const getAvatarInitials = () => {
-    const displayName = getDisplayName();
-    if (displayName === 'Guest User') return 'GU';
-    
-    const words = displayName.split(' ');
-    if (words.length >= 2) {
-      return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
-    }
-    return displayName.substring(0, 2).toUpperCase();
-  };
-
-  const displayName = getDisplayName();
-  const avatarInitials = getAvatarInitials();
-  
-  // Debug logging
-  console.log('DashboardHeader - User data:', user);
-  console.log('DashboardHeader - User email:', user?.email);
-  console.log('DashboardHeader - User name:', user?.name);
-  console.log('DashboardHeader - User givenName:', user?.givenName);
-  console.log('DashboardHeader - User familyName:', user?.familyName);
-  console.log('DashboardHeader - Display name:', displayName);
-  console.log('DashboardHeader - Avatar initials:', avatarInitials);
+const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName }) => {
   return (
     <HeaderPaper elevation={0}>
       <Grid container spacing={3}>
@@ -142,14 +97,15 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ user }) => {
         <Grid item xs={12} md={4}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <ProfileAvatar 
-              alt={displayName}
+              alt={userName}
+              src="/images/avatar-placeholder.jpg"
             >
-              {avatarInitials}
+              {userName.charAt(0)}
             </ProfileAvatar>
             <Box sx={{ ml: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <Typography variant="h5" fontWeight={500} sx={{ mr: 1 }}>
-                  {displayName}
+                  {userName}
                 </Typography>
                 <VerifiedChip
                   icon={<VerifiedIcon />}
@@ -208,9 +164,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ user }) => {
               >
           <EmailIcon sx={{ color: '#3B63B5' }} />
               </Box>
-                              <Typography sx={{ color: '#374957' }}>
-                  {user?.email || (user?.name ? `${user.name.toLowerCase().replace(' ', '.')}@example.com` : 'user@example.com')}
-                </Typography>
+              <Typography sx={{ color: '#374957' }}>TosinLanipekun@Luxcity.omnicrosoft</Typography>
             </ContactItem>
           </Box>
         </Grid>

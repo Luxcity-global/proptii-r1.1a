@@ -12,111 +12,6 @@ import { msalConfig, loginRequest, b2cPolicies } from '../config/authConfig';
 import SessionManager from '../services/SessionManager';
 import SecurityMiddleware from '../middleware/SecurityMiddleware';
 import SecurityPolicyService from '../services/SecurityPolicyService';
-import GraphService from '../services/graphService';
-
-// Function to extract user details from ID token claims
-const extractUserDetailsFromClaims = async (instance: any, account: AccountInfo) => {
-  try {
-    console.log('AuthContext - Attempting to extract user details from ID token claims...');
-    console.log('AuthContext - Account for claims extraction:', account);
-    
-    // Get ID token with all available scopes
-    console.log('AuthContext - Requesting ID token with scopes:', loginRequest.scopes);
-    const idToken = await instance.acquireTokenSilent({
-      ...loginRequest,
-      account: account
-    });
-    
-    console.log('AuthContext - ID token acquired successfully:', !!idToken.accessToken);
-    console.log('AuthContext - ID token scopes:', idToken.scopes);
-    
-    if (idToken && idToken.idTokenClaims) {
-      const claims = idToken.idTokenClaims as any;
-      console.log('AuthContext - Full ID token claims:', claims);
-      console.log('AuthContext - All claim keys:', Object.keys(claims));
-      
-      // Log all potential email-related fields
-      const emailFields = {
-        email: claims.email,
-        emails: claims.emails,
-        upn: claims.upn,
-        preferred_username: claims.preferred_username,
-        unique_name: claims.unique_name,
-        name: claims.name,
-        given_name: claims.given_name,
-        family_name: claims.family_name,
-        sub: claims.sub,
-        oid: claims.oid,
-        tid: claims.tid,
-        aud: claims.aud,
-        iss: claims.iss,
-        iat: claims.iat,
-        exp: claims.exp,
-        nbf: claims.nbf,
-        ver: claims.ver,
-        tfp: claims.tfp,
-        auth_time: claims.auth_time,
-        nonce: claims.nonce,
-        acr: claims.acr,
-        amr: claims.amr,
-        azp: claims.azp,
-        azpacr: claims.azpacr,
-        idp: claims.idp,
-        idp_access_token: claims.idp_access_token,
-        login_hint: claims.login_hint,
-        sid: claims.sid,
-        utid: claims.utid,
-        rh: claims.rh,
-        xms_cc: claims.xms_cc,
-        xms_tcdt: claims.xms_tcdt,
-        xms_tdbr: claims.xms_tdbr,
-        xms_tdbt: claims.xms_tdbt,
-        xms_tdbu: claims.xms_tdbu,
-        xms_tdbv: claims.xms_tdbv,
-        xms_tdbx: claims.xms_tdbx,
-        xms_tdby: claims.xms_tdby,
-        xms_tdbz: claims.xms_tdbz
-      };
-      
-      console.log('AuthContext - Email-related fields in claims:', emailFields);
-      
-      // Try to extract email from various possible fields
-      let email = claims.email || 
-                  claims.emails?.[0] || 
-                  claims.upn || 
-                  claims.preferred_username ||
-                  claims.unique_name ||
-                  account.username ||
-                  '';
-      
-      // If email is still empty, try to construct it from other fields
-      if (!email && claims.given_name && claims.family_name) {
-        email = `${claims.given_name.toLowerCase()}.${claims.family_name.toLowerCase()}@proptii.com`;
-        console.log('AuthContext - Constructed email from name:', email);
-      }
-      
-      console.log('AuthContext - Final extracted email:', email);
-      
-      return {
-        email: email,
-        givenName: claims.given_name || account.name?.split(' ')[0],
-        familyName: claims.family_name || account.name?.split(' ').slice(1).join(' '),
-        displayName: claims.name || account.name
-      };
-    } else {
-      console.log('AuthContext - No ID token or claims found');
-      return null;
-    }
-  } catch (error) {
-    console.error('AuthContext - Error extracting user details from claims:', error);
-    console.error('AuthContext - Error details:', {
-      name: (error as any).name,
-      message: (error as any).message,
-      stack: (error as any).stack
-    });
-    return null;
-  }
-};
 
 // Singleton pattern for MSAL instance
 let msalInstance: PublicClientApplication | null = null;
@@ -203,179 +98,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const securityMiddleware = SecurityMiddleware.getInstance();
 
   useEffect(() => {
-    console.log('AuthContext - useEffect triggered');
-    console.log('AuthContext - accounts length:', accounts.length);
-    console.log('AuthContext - inProgress:', inProgress);
-    
     const initializeAuth = async () => {
       try {
-        console.log('AuthContext - initializeAuth started');
         // Handle redirect response if any
         await instance.handleRedirectPromise();
 
         if (accounts.length > 0) {
           const currentAccount = accounts[0];
-          console.log('AuthContext - Current account object:', currentAccount);
-          console.log('AuthContext - Account username:', currentAccount.username);
-          console.log('AuthContext - Account name:', currentAccount.name);
-          console.log('AuthContext - Account localAccountId:', currentAccount.localAccountId);
-          console.log('AuthContext - Account homeAccountId:', currentAccount.homeAccountId);
-          
-          // Try to get user details from Microsoft Graph API first
-          let userEmail = currentAccount.username;
-          let givenName = currentAccount.name?.split(' ')[0];
-          let familyName = currentAccount.name?.split(' ').slice(1).join(' ');
-          let displayName = currentAccount.name;
-          
-          console.log('AuthContext - Initial userEmail from username:', userEmail);
-          
-                                          try {
-             console.log('AuthContext - Starting user details retrieval process...');
-             console.log('AuthContext - Current account username:', currentAccount.username);
-             console.log('AuthContext - Current account name:', currentAccount.name);
-             
-             // For B2C, the username field often contains the email
-             // Let's first check what we have in the account object
-             console.log('AuthContext - Account object details:', {
-               username: currentAccount.username,
-               name: currentAccount.name,
-               localAccountId: currentAccount.localAccountId,
-               homeAccountId: currentAccount.homeAccountId,
-               environment: currentAccount.environment,
-               tenantId: currentAccount.tenantId
-             });
-             
-             // Try to get the ID token to see what claims are available
-             console.log('AuthContext - Attempting to get ID token from account...');
-             const idToken = await instance.acquireTokenSilent({
-               ...loginRequest,
-               account: currentAccount
-             });
-             
-             console.log('AuthContext - ID token acquired:', !!idToken);
-             console.log('AuthContext - ID token scopes:', idToken?.scopes);
-             
-             if (idToken && idToken.idTokenClaims) {
-               const claims = idToken.idTokenClaims as any;
-               console.log('AuthContext - Full ID token claims:', claims);
-               console.log('AuthContext - All claim keys:', Object.keys(claims));
-               
-               // For B2C, let's check all possible email fields
-               const emailFields = {
-                 email: claims.email,
-                 emails: claims.emails,
-                 upn: claims.upn,
-                 preferred_username: claims.preferred_username,
-                 unique_name: claims.unique_name,
-                 name: claims.name,
-                 given_name: claims.given_name,
-                 family_name: claims.family_name,
-                 // B2C specific fields
-                 signInName: claims.signInName,
-                 emails_0: claims.emails?.[0],
-                 emails_1: claims.emails?.[1],
-                 // Additional fields that might contain email
-                 sub: claims.sub,
-                 oid: claims.oid,
-                 tid: claims.tid,
-                 tfp: claims.tfp
-               };
-               
-               console.log('AuthContext - Email-related fields in claims:', emailFields);
-               
-               // For B2C, the username field is often the email
-               let email = currentAccount.username || '';
-               
-               // If username doesn't look like an email, try claims
-               if (!email.includes('@')) {
-                 email = claims.email || 
-                         claims.emails?.[0] || 
-                         claims.signInName ||
-                         claims.upn || 
-                         claims.preferred_username ||
-                         claims.unique_name ||
-                         '';
-               }
-               
-               console.log('AuthContext - Extracted email from claims:', email);
-               
-               // If we still don't have a real email, try Microsoft Graph API
-               if (!email || !email.includes('@')) {
-                 console.log('AuthContext - No email found in claims, trying Microsoft Graph API...');
-                 const graphService = GraphService.getInstance();
-                 const graphUser = await graphService.getUserDetails(instance, currentAccount);
-                 
-                 if (graphUser) {
-                   console.log('AuthContext - Graph API user data:', graphUser);
-                   email = graphUser.mail || graphUser.userPrincipalName || email;
-                   console.log('AuthContext - Email from Graph API:', email);
-                   
-                   // Update other fields from Graph API if available
-                   if (graphUser.givenName) givenName = graphUser.givenName;
-                   if (graphUser.surname) familyName = graphUser.surname;
-                   if (graphUser.displayName) displayName = graphUser.displayName;
-                 }
-               }
-               
-               // Only construct email if we couldn't find a real one AND we have name fields
-               if (!email && claims.given_name && claims.family_name) {
-                 email = `${claims.given_name.toLowerCase()}.${claims.family_name.toLowerCase()}@proptii.com`;
-                 console.log('AuthContext - Constructed email from name (fallback):', email);
-               }
-               
-               userEmail = email;
-               givenName = claims.given_name || currentAccount.name?.split(' ')[0];
-               familyName = claims.family_name || currentAccount.name?.split(' ').slice(1).join(' ');
-               displayName = claims.name || currentAccount.name;
-               
-               console.log('AuthContext - Final user details - Email:', userEmail, 'Name:', displayName);
-             } else {
-               console.log('AuthContext - No ID token or claims found, trying Microsoft Graph API...');
-               
-               // Try Microsoft Graph API as fallback
-               const graphService = GraphService.getInstance();
-               const graphUser = await graphService.getUserDetails(instance, currentAccount);
-               
-               if (graphUser) {
-                 console.log('AuthContext - Graph API user data:', graphUser);
-                 userEmail = graphUser.mail || graphUser.userPrincipalName || currentAccount.username || '';
-                 givenName = graphUser.givenName || currentAccount.name?.split(' ')[0] || '';
-                 familyName = graphUser.surname || currentAccount.name?.split(' ').slice(1).join(' ') || '';
-                 displayName = graphUser.displayName || currentAccount.name || '';
-               } else {
-                 // For B2C, username is often the email
-                 userEmail = currentAccount.username || '';
-                 givenName = currentAccount.name?.split(' ')[0] || '';
-                 familyName = currentAccount.name?.split(' ').slice(1).join(' ') || '';
-                 displayName = currentAccount.name || '';
-               }
-             }
-           } catch (error) {
-             console.log('AuthContext - Error getting user details, using fallback values:', error);
-             console.log('AuthContext - Error details:', {
-               name: (error as any).name,
-               message: (error as any).message,
-               stack: (error as any).stack
-             });
-             
-             // Use account defaults if claims extraction fails
-             userEmail = currentAccount.username || '';
-             givenName = currentAccount.name?.split(' ')[0] || '';
-             familyName = currentAccount.name?.split(' ').slice(1).join(' ') || '';
-             displayName = currentAccount.name || '';
-           }
-          
-          console.log('AuthContext - Final user details - Email:', userEmail, 'Name:', displayName);
           setIsAuthenticated(true);
           setUser({
             id: currentAccount.localAccountId || currentAccount.homeAccountId,
-            givenName: givenName,
-            familyName: familyName,
-            email: userEmail,
-            name: displayName,
+            givenName: currentAccount.name?.split(' ')[0],
+            familyName: currentAccount.name?.split(' ').slice(1).join(' '),
+            email: currentAccount.username,
+            name: currentAccount.name,
             roles: ['tenant'] // Default role for new users
           });
-          console.log('AuthContext - User object set successfully');
 
           // Try silent token acquisition
           await instance.acquireTokenSilent({
@@ -438,185 +176,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Try popup login
       const result = await instance.loginPopup(loginRequest);
 
-      if (result && result.account) {
-        console.log('AuthContext - Login result account object:', result.account);
-        console.log('AuthContext - Login result account username:', result.account.username);
-        console.log('AuthContext - Login result account name:', result.account.name);
-        
-        // Try to get user details from Microsoft Graph API first
-        let userEmail = result.account.username || '';
-        let givenName = result.account.name?.split(' ')[0];
-        let familyName = result.account.name?.split(' ').slice(1).join(' ');
-        let displayName = result.account.name;
-        
-        console.log('AuthContext - Login initial userEmail from username:', userEmail);
-        
-                 try {
-           console.log('AuthContext - Login: Starting user details retrieval process...');
-           console.log('AuthContext - Login: Result account username:', result.account.username);
-           console.log('AuthContext - Login: Result account name:', result.account.name);
-           
-           // For B2C, the username field often contains the email
-           console.log('AuthContext - Login: Account object details:', {
-             username: result.account.username,
-             name: result.account.name,
-             localAccountId: result.account.localAccountId,
-             homeAccountId: result.account.homeAccountId,
-             environment: result.account.environment,
-             tenantId: result.account.tenantId
-           });
-           
-           // Check if we have ID token claims from the login result
-           if (result.idTokenClaims) {
-             const claims = result.idTokenClaims as any;
-             console.log('AuthContext - Login: Full ID token claims:', claims);
-             console.log('AuthContext - Login: All claim keys:', Object.keys(claims));
-             
-             // For B2C, let's check all possible email fields
-             const emailFields = {
-               email: claims.email,
-               emails: claims.emails,
-               upn: claims.upn,
-               preferred_username: claims.preferred_username,
-               unique_name: claims.unique_name,
-               name: claims.name,
-               given_name: claims.given_name,
-               family_name: claims.family_name,
-               // B2C specific fields
-               signInName: claims.signInName,
-               emails_0: claims.emails?.[0],
-               emails_1: claims.emails?.[1],
-               // Additional fields that might contain email
-               sub: claims.sub,
-               oid: claims.oid,
-               tid: claims.tid,
-               tfp: claims.tfp
-             };
-             
-             console.log('AuthContext - Login: Email-related fields in claims:', emailFields);
-             
-             // For B2C, the username field is often the email
-             let email = result.account.username || '';
-             
-             // If username doesn't look like an email, try claims
-             if (!email.includes('@')) {
-               email = claims.email || 
-                       claims.emails?.[0] || 
-                       claims.signInName ||
-                       claims.upn || 
-                       claims.preferred_username ||
-                       claims.unique_name ||
-                       '';
-             }
-             
-                           console.log('AuthContext - Login: Extracted email from claims:', email);
-              
-              // If we still don't have a real email, try Microsoft Graph API
-              if (!email || !email.includes('@')) {
-                console.log('AuthContext - Login: No email found in claims, trying Microsoft Graph API...');
-                const graphService = GraphService.getInstance();
-                const graphUser = await graphService.getUserDetails(instance, result.account);
-                
-                if (graphUser) {
-                  console.log('AuthContext - Login: Graph API user data:', graphUser);
-                  email = graphUser.mail || graphUser.userPrincipalName || email;
-                  console.log('AuthContext - Login: Email from Graph API:', email);
-                  
-                  // Update other fields from Graph API if available
-                  if (graphUser.givenName) givenName = graphUser.givenName;
-                  if (graphUser.surname) familyName = graphUser.surname;
-                  if (graphUser.displayName) displayName = graphUser.displayName;
-                }
-              }
-              
-              // Only construct email if we couldn't find a real one AND we have name fields
-              if (!email && claims.given_name && claims.family_name) {
-                email = `${claims.given_name.toLowerCase()}.${claims.family_name.toLowerCase()}@proptii.com`;
-                console.log('AuthContext - Login: Constructed email from name (fallback):', email);
-              }
-             
-             userEmail = email;
-             givenName = claims.given_name || result.account.name?.split(' ')[0];
-             familyName = claims.family_name || result.account.name?.split(' ').slice(1).join(' ');
-             displayName = claims.name || result.account.name;
-             
-             console.log('AuthContext - Login: Final user details - Email:', userEmail, 'Name:', displayName);
-           } else {
-             console.log('AuthContext - Login: No ID token claims in result, trying to get from account...');
-             
-             // Try to get the ID token directly from the account
-             const idToken = await instance.acquireTokenSilent({
-               ...loginRequest,
-               account: result.account
-             });
-             
-             if (idToken && idToken.idTokenClaims) {
-               const claims = idToken.idTokenClaims as any;
-               console.log('AuthContext - Login: ID token claims from account:', claims);
-               
-               // For B2C, the username field is often the email
-               let email = result.account.username || '';
-               
-               // If username doesn't look like an email, try claims
-               if (!email.includes('@')) {
-                 email = claims.email || 
-                         claims.emails?.[0] || 
-                         claims.signInName ||
-                         claims.upn || 
-                         claims.preferred_username ||
-                         claims.unique_name ||
-                         '';
-               }
-               
-               if (!email && claims.given_name && claims.family_name) {
-                 email = `${claims.given_name.toLowerCase()}.${claims.family_name.toLowerCase()}@proptii.com`;
-               }
-               
-               userEmail = email;
-               givenName = claims.given_name || result.account.name?.split(' ')[0];
-               familyName = claims.family_name || result.account.name?.split(' ').slice(1).join(' ');
-               displayName = claims.name || result.account.name;
-             } else {
-               console.log('AuthContext - Login: No ID token claims found, using account defaults');
-               // For B2C, username is often the email
-               userEmail = result.account.username || '';
-               givenName = result.account.name?.split(' ')[0] || '';
-               familyName = result.account.name?.split(' ').slice(1).join(' ') || '';
-               displayName = result.account.name || '';
-             }
-           }
-         } catch (error) {
-           console.log('AuthContext - Login: Error getting user details, using fallback values:', error);
-           console.log('AuthContext - Login: Error details:', {
-             name: (error as any).name,
-             message: (error as any).message,
-             stack: (error as any).stack
-           });
-           
-           // Use account defaults if claims extraction fails
-           userEmail = result.account.username || '';
-           givenName = result.account.name?.split(' ')[0] || '';
-           familyName = result.account.name?.split(' ').slice(1).join(' ') || '';
-           displayName = result.account.name || '';
-         }
-        
-        console.log('AuthContext - Login final user details - Email:', userEmail, 'Name:', displayName);
-        
+      if (result) {
         // Dispatch auth state change event with success status
         window.dispatchEvent(new CustomEvent('auth-state-changed', {
           detail: {
             success: true,
-            userId: result.account.localAccountId || result.account.homeAccountId
+            userId: result.account?.localAccountId || result.account?.homeAccountId
           }
         }));
 
         setIsAuthenticated(true);
         setUser({
-          id: result.account.localAccountId || result.account.homeAccountId || '',
-          email: userEmail,
-          name: displayName,
-          givenName: givenName,
-          familyName: familyName,
+          id: result.account?.localAccountId || result.account?.homeAccountId || '',
+          email: result.account?.username || '',
+          name: result.account?.name,
+          givenName: result.account?.name?.split(' ')[0],
+          familyName: result.account?.name?.split(' ').slice(1).join(' '),
           roles: ['tenant'] // Default role for new users
         });
 

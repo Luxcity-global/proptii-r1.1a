@@ -3,24 +3,19 @@ import { captureException, init } from '@sentry/react';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { AppError, ErrorContext, ErrorResponse } from '../types/error';
 
-// Initialize Sentry for error tracking only if DSN is provided
-const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
-if (sentryDsn && sentryDsn !== '[DEVELOPMENT_SENTRY_DSN]' && sentryDsn !== '[PRODUCTION_SENTRY_DSN]') {
-    init({
-        dsn: sentryDsn,
-        environment: import.meta.env.VITE_ENVIRONMENT,
-        tracesSampleRate: 1.0,
-        beforeSend(event) {
-            // Don't send events in development
-            if (import.meta.env.DEV) {
-                return null;
-            }
-            return event;
-        },
-    });
-} else {
-    console.log('Sentry disabled - no valid DSN provided');
-}
+// Initialize Sentry for error tracking
+init({
+    dsn: import.meta.env.VITE_SENTRY_DSN,
+    environment: import.meta.env.VITE_ENVIRONMENT,
+    tracesSampleRate: 1.0,
+    beforeSend(event) {
+        // Don't send events in development
+        if (import.meta.env.DEV) {
+            return null;
+        }
+        return event;
+    },
+});
 
 // Retry configuration
 const MAX_RETRIES = 3;

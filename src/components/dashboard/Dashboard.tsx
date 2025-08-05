@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Box, CssBaseline, useTheme, useMediaQuery } from '@mui/material';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import DashboardSidebar from './ui/DashboardSidebar';
 import DashboardHeader from './ui/DashboardHeader';
 import { HomeIcon } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
 
 // Define color constants (matching ReferencingModal)
 export const BLUE_COLOR = '#136C9E';
@@ -47,7 +46,7 @@ export const DASHBOARD_SECTIONS = [
         />
       </g>
     </svg>
-  )},
+  )},,
   { id: 'viewings', label: 'Viewings', path: '/dashboard/viewings', icon: (isSelected: boolean) => (
     <svg
       width="20"
@@ -64,7 +63,7 @@ export const DASHBOARD_SECTIONS = [
         />
       </g>
     </svg>
-  )},
+  )},,
   { id: 'tenant-contracts', label: 'Contracts', path: '/dashboard/tenant-contracts', icon: (isSelected: boolean) => (
     <svg
       width="20"
@@ -123,47 +122,31 @@ export const DASHBOARD_SECTIONS = [
 interface DashboardSidebarProps {
   activeSection: string;
   onSectionChange: (sectionId: string) => void;
+  isCollapsed: boolean; // Ensure this property is included in the props
 }
 
 const Dashboard: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md')); // Detect mobile/tablet view
   const [activeSection, setActiveSection] = useState('dashboard');
-  const { user, isAuthenticated, isLoading } = useAuth();
-  const location = useLocation();
-  
-  // Debug logging
-  console.log('Dashboard - User:', user);
-  console.log('Dashboard - Is authenticated:', isAuthenticated);
-  console.log('Dashboard - Is loading:', isLoading);
-  console.log('Dashboard - Current pathname:', location.pathname);
+  const [isCollapsed, setIsCollapsed] = useState(false); // State to control sidebar collapse
+
+  // Removed duplicate declaration of handleSectionChange
+
+  // Automatically collapse the sidebar on mobile/tablet view
+  useEffect(() => {
+    setIsCollapsed(isMobile);
+  }, [isMobile]);
 
   // Update activeSection based on the current route
   useEffect(() => {
-    // Find the most specific matching section
-    let matchedSection = null;
-    
-    for (const section of DASHBOARD_SECTIONS) {
-      if (section && location.pathname === section.path) {
-        // Exact match takes priority
-        matchedSection = section;
-        break;
-      } else if (section && location.pathname.startsWith(section.path + '/')) {
-        // Path starts with section path followed by a slash
-        matchedSection = section;
-      }
+    const currentSection = DASHBOARD_SECTIONS.find((section) =>
+      section && location.pathname.startsWith(section.path)
+    );
+    if (currentSection) {
+      setActiveSection(currentSection.id);
     }
-    
-    // Special case for dashboard home
-    if (location.pathname === '/dashboard' || location.pathname === '/dashboard/') {
-      matchedSection = DASHBOARD_SECTIONS.find(section => section.id === 'dashboard');
-    }
-    
-    if (matchedSection) {
-      console.log('Dashboard - Setting active section to:', matchedSection.id);
-      setActiveSection(matchedSection.id);
-    }
-  }, [location.pathname]);
+  }, [location]);
 
   const handleSectionChange = (sectionId: string) => {
     setActiveSection(sectionId);
@@ -186,7 +169,10 @@ const Dashboard: React.FC = () => {
         <DashboardSidebar
           activeSection={activeSection}
           onSectionChange={handleSectionChange}
-        />
+          isCollapsed={isCollapsed} // Pass collapse state to the sidebar
+          onToggleCollapse={function (): void {
+            throw new Error('Function not implemented.');
+          } }        />
 
         {/* Main content */}
         <Box
@@ -199,7 +185,7 @@ const Dashboard: React.FC = () => {
             flexDirection: 'column',
           }}
         >
-          <DashboardHeader user={user} />
+          <DashboardHeader userName="Tosin Lanipekun" />
 
           <Box sx={{ flexGrow: 1, mt: 2 }}>
             <Outlet />
