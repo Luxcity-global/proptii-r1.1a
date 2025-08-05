@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Heart, Share2, MapPin, BedDouble, Bath, Square, Phone, Mail, MessageCircle, Building2 } from 'lucide-react';
 import ListingDetailsModal from './ListingDetailsModal';
+import { useSavedProperties } from '../../context/SavedPropertiesContext';
 
 interface Property {
   id: string;
@@ -45,9 +46,11 @@ interface ListingCardProps {
 }
 
 const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
-  const [isSaved, setIsSaved] = useState(false);
+  const { isPropertySaved, saveProperty, removeSavedProperty } = useSavedProperties();
   const [showModal, setShowModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  
+  const isSaved = isPropertySaved(property.id);
 
   // Placeholder image paths - these will be replaced with actual images
   const imagePaths = {
@@ -135,12 +138,16 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setIsSaved(!isSaved);
+              if (isSaved) {
+                removeSavedProperty(property.id);
+              } else {
+                saveProperty(property);
+              }
             }}
             className={`p-1.5 rounded-full ${isSaved ? 'text-red-500' : 'text-gray-600'
               } hover:bg-gray-100`}
           >
-            <Heart className="w-4 h-4" />
+            <Heart className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
           </button>
           <button
             onClick={(e) => {

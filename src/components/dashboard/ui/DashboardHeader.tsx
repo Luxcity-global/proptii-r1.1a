@@ -15,9 +15,10 @@ import VerifiedIcon from '@mui/icons-material/Verified';
 import PhoneIcon from '@mui/icons-material/Phone';
 import EmailIcon from '@mui/icons-material/Email';
 import { BLUE_COLOR } from '../Dashboard';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface DashboardHeaderProps {
-  userName: string;
+  userName?: string; // Make optional since we'll get it from auth context
 }
 
 const HeaderPaper = styled(Paper)(({ theme }) => ({
@@ -31,13 +32,35 @@ const HeaderPaper = styled(Paper)(({ theme }) => ({
   boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.05)'
 }));
 
+// Function to generate gradient colors based on user name with deep, rich colors
+const generateGradientColors = (name: string): string => {
+  const colors = [
+    'linear-gradient(135deg, #232526 0%, #414345 100%)', // deep gray/black
+    'linear-gradient(135deg, #0f2027 0%, #2c5364 100%)', // deep blue
+    'linear-gradient(135deg, #1a2980 0%, #26d0ce 100%)', // blue/teal
+    'linear-gradient(135deg, #200122 0%, #6f0000 100%)', // deep purple/red
+    'linear-gradient(135deg, #373b44 0%, #4286f4 100%)', // blue/gray
+    'linear-gradient(135deg, #141e30 0%, #243b55 100%)', // navy
+    'linear-gradient(135deg, #42275a 0%, #734b6d 100%)', // purple
+    'linear-gradient(135deg, #134e5e 0%, #71b280 100%)', // teal/green
+    'linear-gradient(135deg, #000428 0%, #004e92 100%)', // deep blue
+    'linear-gradient(135deg, #870000 0%, #190a05 100%)', // deep red/brown
+  ];
+  // Use the name to consistently select a gradient
+  const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return colors[hash % colors.length];
+};
+
 const ProfileAvatar = styled(Avatar)(({ theme }) => ({
   width: 80,
   height: 80,
   marginRight: theme.spacing(3),
-  backgroundColor: '#F5F6FA',
   border: '1px solid',
   borderColor: theme.palette.divider,
+  fontSize: '2rem',
+  fontWeight: 700,
+  color: '#fff',
+  textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)',
   '& img': {
     objectFit: 'cover'
   }
@@ -90,6 +113,25 @@ const Logo = styled('img')({
  * Dashboard header component with user information and welcome message
  */
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName }) => {
+  const { user } = useAuth();
+  
+  // Use authenticated user data or fallback to prop
+  const displayName = user?.name || userName || 'User';
+  const userEmail = user?.email || 'user@example.com';
+  const userPhone = '+44 7911 123456'; // Default phone number
+  
+  // Generate initials from the user's name
+  const getInitials = (name: string): string => {
+    const names = name.split(' ');
+    if (names.length >= 2) {
+      return (names[0].charAt(0) + names[1].charAt(0)).toUpperCase();
+    }
+    return name.charAt(0).toUpperCase();
+  };
+  
+  const initials = getInitials(displayName);
+  const gradientBackground = generateGradientColors(displayName);
+  
   return (
     <HeaderPaper elevation={0}>
       <Grid container spacing={3}>
@@ -97,15 +139,18 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName }) => {
         <Grid item xs={12} md={4}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <ProfileAvatar 
-              alt={userName}
-              src="/images/avatar-placeholder.jpg"
+              alt={displayName}
+              sx={{ 
+                background: gradientBackground,
+                color: '#fff'
+              }}
             >
-              {userName.charAt(0)}
+              {initials}
             </ProfileAvatar>
             <Box sx={{ ml: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                 <Typography variant="h5" fontWeight={500} sx={{ mr: 1 }}>
-                  {userName}
+                  {displayName}
                 </Typography>
                 <VerifiedChip
                   icon={<VerifiedIcon />}
@@ -164,7 +209,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName }) => {
               >
           <EmailIcon sx={{ color: '#3B63B5' }} />
               </Box>
-              <Typography sx={{ color: '#374957' }}>TosinLanipekun@Luxcity.omnicrosoft</Typography>
+              <Typography sx={{ color: '#374957' }}>{userEmail}</Typography>
             </ContactItem>
           </Box>
         </Grid>
