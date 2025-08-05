@@ -2,7 +2,7 @@ import { onCLS, onFID, onLCP, onFCP, onTTFB } from 'web-vitals';
 import { ApplicationInsights } from '@microsoft/applicationinsights-web';
 
 class WebVitalsMonitor {
-    private appInsights: ApplicationInsights;
+    private appInsights: ApplicationInsights | null = null;
     private readonly thresholds = {
         LCP: 2500, // 2.5 seconds
         FID: 100,  // 100 milliseconds
@@ -12,17 +12,22 @@ class WebVitalsMonitor {
     };
 
     constructor() {
-        this.appInsights = new ApplicationInsights({
-            config: {
-                instrumentationKey: process.env.VITE_APP_INSIGHTS_INSTRUMENTATION_KEY,
-                enableAutoRouteTracking: true,
-                enableCorsCorrelation: true,
-                enableRequestTracking: true,
-                enableAjaxPerfTracking: true,
-                enableUnhandledPromiseRejectionTracking: true
-            }
-        });
-        this.appInsights.loadAppInsights();
+        const appInsightsKey = import.meta.env.VITE_APP_INSIGHTS_INSTRUMENTATION_KEY;
+        if (appInsightsKey && appInsightsKey !== '[DEVELOPMENT_APP_INSIGHTS_KEY]' && appInsightsKey !== '[PRODUCTION_APP_INSIGHTS_KEY]') {
+            this.appInsights = new ApplicationInsights({
+                config: {
+                    instrumentationKey: appInsightsKey,
+                    enableAutoRouteTracking: true,
+                    enableCorsCorrelation: true,
+                    enableRequestTracking: true,
+                    enableAjaxPerfTracking: true,
+                    enableUnhandledPromiseRejectionTracking: true
+                }
+            });
+            this.appInsights.loadAppInsights();
+        } else {
+            console.log('Web Vitals Monitor disabled - no valid App Insights key provided');
+        }
     }
 
     public initialize(): void {
@@ -68,29 +73,33 @@ class WebVitalsMonitor {
     }
 
     private trackMetric(name: string, value: number): void {
-        this.appInsights.trackMetric({
-            name: `WebVitals.${name}`,
-            average: value,
-            properties: {
-                pageUrl: window.location.href,
-                pageTitle: document.title,
-                timestamp: new Date().toISOString()
-            }
-        });
+        if (this.appInsights) {
+            this.appInsights.trackMetric({
+                name: `WebVitals.${name}`,
+                average: value,
+                properties: {
+                    pageUrl: window.location.href,
+                    pageTitle: document.title,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
     }
 
     private sendAlert(metricName: string, value: number): void {
-        this.appInsights.trackEvent({
-            name: 'WebVitalsAlert',
-            properties: {
-                metric: metricName,
-                value: value.toString(),
-                threshold: this.thresholds[metricName].toString(),
-                pageUrl: window.location.href,
-                pageTitle: document.title,
-                timestamp: new Date().toISOString()
-            }
-        });
+        if (this.appInsights) {
+            this.appInsights.trackEvent({
+                name: 'WebVitalsAlert',
+                properties: {
+                    metric: metricName,
+                    value: value.toString(),
+                    threshold: this.thresholds[metricName].toString(),
+                    pageUrl: window.location.href,
+                    pageTitle: document.title,
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
     }
 }
 

@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
 import { MSALProviderWrapper } from './contexts/AuthContext';
 import { AuthProvider } from './context/AuthContext';
+import { AppWrapper } from './components/AppWrapper';
 import Home from './pages/Home';
 import { LoginPage } from './pages/Login';
 import { RegisterPage } from './pages/Register';
@@ -35,7 +36,8 @@ export const App: React.FC = () => {
       <CssBaseline />
       <MSALProviderWrapper>
         <AuthProvider>
-          <Routes>
+          <AppWrapper>
+            <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<LoginPage />} />
@@ -80,6 +82,7 @@ export const App: React.FC = () => {
             {/* Catch-all route for 404 */}
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
+          </AppWrapper>
         </AuthProvider>
       </MSALProviderWrapper>
     </ErrorBoundary>

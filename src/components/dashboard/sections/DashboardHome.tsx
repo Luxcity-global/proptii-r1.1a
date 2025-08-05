@@ -20,6 +20,7 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import ImageIcon from '@mui/icons-material/Image';
 import NorthEastIcon from '@mui/icons-material/NorthEast';
 import { useDashboardData } from '../../../hooks/useDashboardData';
+import { useSavedProperties } from '../../../context/SavedPropertiesContext';
 import { formatCurrency, formatDate, formatFileSize } from '../../../utils/formatters';
 
 
@@ -124,11 +125,17 @@ const DashboardHome: React.FC = () => {
     isLoading, 
     error, 
     dashboardSummary, 
-    savedProperties, 
     viewings,
     upcomingViewings,
     files 
   } = useDashboardData();
+  
+  // Use actual saved properties from context instead of mock data
+  const { savedProperties, isLoading: savedPropertiesLoading } = useSavedProperties();
+  
+  // Debug logging
+  console.log('DashboardHome - Saved properties:', savedProperties);
+  console.log('DashboardHome - Saved properties loading:', savedPropertiesLoading);
 
   const data = [
     { name: 'Total', value: dashboardSummary?.viewings.total || 0 },
@@ -178,7 +185,7 @@ const DashboardHome: React.FC = () => {
               </Box>
               <Box sx={{ mt: 'auto' }}>
                 <StatsNumber>
-                  {dashboardSummary?.savedSearches.count || 0}
+                  {savedPropertiesLoading ? '...' : savedProperties.length}
                 </StatsNumber>
                 <Typography variant="body2" sx={{ opacity: 0.8 }}>
                   Listings
@@ -192,36 +199,30 @@ const DashboardHome: React.FC = () => {
           
           <CardContent >
             <GoToButton to="/dashboard/saved-searches">
-            Go to Saved Searches
+            Go to Saved Properties
               <NorthEastIcon />
             </GoToButton>
             
-            {savedProperties.slice(0, 4).map((property) => (
-              <PropertyListItem key={property.id} height={'35%'} >
+            {savedProperties.slice(0, 4).map((savedProperty) => (
+              <PropertyListItem key={savedProperty.id} height={'35%'} >
                 <Box sx={{ display: 'flex', alignItems: 'center', width: '100%',  }}>
                   <PropertyImage
-                    src="/images/detached-house.jpg"
-                    alt={property.address}
+                    src={savedProperty.property.images[0]?.src || "/images/detached-house.jpg"}
+                    alt={savedProperty.property.title}
                   />
                   <Box sx={{ flexGrow: 1, ml: 2 }}>
                     <Typography variant="body1" fontWeight={500}>
-                      {formatCurrency(property.price)}
+                      {formatCurrency(savedProperty.property.price)}
                     </Typography>
                     <Typography variant="caption" color="textSecondary" sx={{ display: 'block' }}>
-                      {property.address}, {property.city}
+                      {savedProperty.property.location.address}, {savedProperty.property.location.city}
                     </Typography>
                   </Box>
                 </Box>
               </PropertyListItem>
             ))}
             
-            {savedProperties.length === 0 && (
-              <Box sx={{ py: 2, textAlign: 'center' }}>
-                <Typography variant="body2" color="textSecondary">
-                  No saved properties found
-                </Typography>
-              </Box>
-            )}
+
           </CardContent>
         </DashboardCard>
       </Grid>

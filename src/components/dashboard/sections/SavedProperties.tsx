@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Grid,
   Paper,
@@ -21,9 +21,11 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import BathtubIcon from '@mui/icons-material/Bathtub';
 import KingBedIcon from '@mui/icons-material/KingBed';
 import HomeIcon from '@mui/icons-material/Home';
-import { useDashboardData } from '../../../hooks/useDashboardData';
+import { useSavedProperties } from '../../../context/SavedPropertiesContext';
 import { formatCurrency, formatDate } from '../../../utils/formatters';
 import { AlignJustify } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import ListingDetailsModal from '../../listings/ListingDetailsModal';
 
 const PropertyImage = styled('img')({
   width: '100%',
@@ -37,7 +39,24 @@ const PropertyImage = styled('img')({
  * SavedProperties component to display properties saved by the user
  */
 const SavedProperties: React.FC = () => {  
-  const { isLoading, error, savedProperties } = useDashboardData();
+  const { savedProperties, isLoading, error, removeSavedProperty } = useSavedProperties();
+  const navigate = useNavigate();
+  
+  // State for modal management
+  const [selectedProperty, setSelectedProperty] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Handler to open the property details modal
+  const handleViewDetails = (property: any) => {
+    setSelectedProperty(property.property);
+    setIsModalOpen(true);
+  };
+
+  // Handler to close the modal
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedProperty(null);
+  };
 
   if (isLoading) {
     return (
@@ -63,6 +82,7 @@ const SavedProperties: React.FC = () => {
         </Typography>
         <Button 
             variant="contained" 
+            onClick={() => navigate('/listings')}
             sx={{ 
             backgroundColor: '#DC5F12', // Use custom color here
             borderRadius: 2,
@@ -90,6 +110,7 @@ const SavedProperties: React.FC = () => {
           <Button 
             variant="contained" 
             color="primary" 
+            onClick={() => navigate('/listings')}
             sx={{ mt: 2, borderRadius: 2, textTransform: 'none' }}
           >
             Browse Properties
@@ -115,8 +136,8 @@ const SavedProperties: React.FC = () => {
               }}>
                 <Box sx={{ position: 'relative' }}>
                 <PropertyImage
-                    src="/images/detached-house.jpg"
-                    alt={property.address}
+                    src={property.property.images[0]?.src || "/images/detached-house.jpg"}
+                    alt={property.property.title}
                   />
                   
                   <Box sx={{ 
@@ -127,7 +148,15 @@ const SavedProperties: React.FC = () => {
                     borderRadius: '50%',
                     p: 0.5
                   }}>
-                    <IconButton size="small" color="error" aria-label="remove from saved">
+                    <IconButton 
+                      size="small" 
+                      color="error" 
+                      aria-label="remove from saved"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeSavedProperty(property.propertyId);
+                      }}
+                    >
                       <FavoriteIcon />
                     </IconButton>
                   </Box>
@@ -142,38 +171,38 @@ const SavedProperties: React.FC = () => {
                     px: 2
                   }}>
                     <Typography variant="h6" component="div">
-                      {formatCurrency(property.price)}
+                      {formatCurrency(property.property.price)}
                     </Typography>
                   </Box>
                 </Box>
                 
                 <CardContent sx={{ flexGrow: 1 }}>
                   <Typography variant="body1" fontWeight={500}>
-                    {property.address}
+                    {property.property.title}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', my: 1 }}>
                     <LocationOnIcon fontSize="small" sx={{ color: 'text.secondary', mr: 0.5 }} />
                     <Typography variant="body2" color="text.secondary">
-                      {property.city}, {property.postcode}
+                      {property.property.location.city}, {property.property.location.postcode}
                     </Typography>
                   </Box>
                   
                   <Box sx={{ display: 'flex', mt: 2, justifyContent: 'start', gap: 1 }}>
                     <Chip 
                       icon={<KingBedIcon style={{color: '#D68552'}} /> } 
-                      label={`${property.bedrooms} ${property.bedrooms === 1 ? 'Bed' : 'Beds'}`}
+                      label={`${property.property.bedrooms} ${property.property.bedrooms === 1 ? 'Bed' : 'Beds'}`}
                       size="small"
                       sx={{ mr: 1 }}
                     />
                     <Chip 
                       icon={<BathtubIcon style={{color: '#357E99'}} />} 
-                      label={`${property.bathrooms} ${property.bathrooms === 1 ? 'Bath' : 'Baths'}`}
+                      label={`${property.property.bathrooms} ${property.property.bathrooms === 1 ? 'Bath' : 'Baths'}`}
                       size="small"
                       sx={{ mr: 1 }}
                     />
                     <Chip 
                       icon={<HomeIcon style={{color: '#1E9674'}} />} 
-                      label={property.propertyType}
+                      label={property.property.type === 'rent' ? 'To Rent' : 'For Sale'}
                       size="small"
                     />
                   </Box>
@@ -188,6 +217,7 @@ const SavedProperties: React.FC = () => {
                   <Button 
                     size="small" 
                     variant="contained"
+                    onClick={() => handleViewDetails(property)}
                     sx={{ 
                       borderRadius: 4,
                       textTransform: 'none',
@@ -201,6 +231,14 @@ const SavedProperties: React.FC = () => {
             </Grid>
           ))}
         </Grid>
+      )}
+      
+      {/* Property Details Modal */}
+      {isModalOpen && selectedProperty && (
+        <ListingDetailsModal
+          property={selectedProperty}
+          onClose={handleCloseModal}
+        />
       )}
     </Box>
   );

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Heart, Share2, MapPin, BedDouble, Bath, Square, Phone, Mail, MessageCircle, Building2 } from 'lucide-react';
 import ListingDetailsModal from './ListingDetailsModal';
+import { useSavedProperties } from '../../context/SavedPropertiesContext';
 
 interface Property {
   id: string;
@@ -45,9 +46,11 @@ interface ListingCardProps {
 }
 
 const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
+  const { saveProperty, removeSavedProperty, isPropertySaved } = useSavedProperties();
   const [isSaved, setIsSaved] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Placeholder image paths - these will be replaced with actual images
   const imagePaths = {
@@ -74,6 +77,34 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
     e.stopPropagation();
     setSelectedImageIndex(index);
     setShowModal(true);
+  };
+
+  // Check if property is saved on mount
+  useEffect(() => {
+    setIsSaved(isPropertySaved(property.id));
+  }, [property.id, isPropertySaved]);
+
+  const handleSaveToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (isSaving) return;
+    
+    setIsSaving(true);
+    try {
+      if (isSaved) {
+        await removeSavedProperty(property.id);
+        setIsSaved(false);
+      } else {
+        await saveProperty(property);
+        setIsSaved(true);
+      }
+    } catch (error) {
+      console.error('Error toggling saved property:', error);
+      // Revert the UI state on error
+      setIsSaved(!isSaved);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const cardContent = (
@@ -133,14 +164,12 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
 
         <div className="absolute top-2 right-2 flex space-x-2 bg-white bg-opacity-90 rounded-full p-1">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsSaved(!isSaved);
-            }}
+            onClick={handleSaveToggle}
+            disabled={isSaving}
             className={`p-1.5 rounded-full ${isSaved ? 'text-red-500' : 'text-gray-600'
-              } hover:bg-gray-100`}
+              } hover:bg-gray-100 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            <Heart className="w-4 h-4" />
+            <Heart className={`w-4 h-4 ${isSaving ? 'animate-pulse' : ''}`} />
           </button>
           <button
             onClick={(e) => {
