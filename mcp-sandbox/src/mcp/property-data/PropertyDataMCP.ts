@@ -10,6 +10,8 @@ import {
   getTransformationStats,
   OpenrentProperty 
 } from '../../utils/schemaTransformer';
+import { scrapeRightmoveWithQuery, RightmoveQuery } from '../../scrapers/rightmoveScraper';
+import { transformRightmoveProperties } from '../../utils/rightmoveTransformer';
 
 export interface Property {
   id: string;
@@ -776,71 +778,19 @@ export class PropertyDataMCP {
    * Enhanced search properties with real data support and query parsing
    */
   async searchPropertiesWithRealData(query: string, filters?: any, useRealData: boolean = false): Promise<Property[]> {
-    const searchId = Math.random().toString(36).substr(2, 9);
-    console.log(`🔍 [ENHANCED_SEARCH] [${searchId}] Enhanced search for: "${query}" (real: ${useRealData})`);
-    
-    try {
-      // Parse the query to extract structured parameters
-      const { parseSearchQuery } = await import('../../utils/queryParser');
-      const parsedQuery = parseSearchQuery(query);
-      console.log(`🔍 [ENHANCED_SEARCH] [${searchId}] Parsed query:`, parsedQuery);
-      
-      // Combine parsed query with provided filters
-      const enhancedFilters = {
-        ...filters,
-        location: parsedQuery.location,
-        bedrooms: parsedQuery.bedrooms,
-        propertyType: parsedQuery.propertyType,
-        ...parsedQuery.priceRange
-      };
-      
-      console.log(`🔍 [ENHANCED_SEARCH] [${searchId}] Enhanced filters:`, enhancedFilters);
-      
-      // Check cache first
-      const cacheKey = this.generateCacheKey(query, { ...enhancedFilters, realData: useRealData });
-      const cachedResult = await this.getFromCache(cacheKey);
-      
-      if (cachedResult) {
-        console.log(`📋 [ENHANCED_SEARCH] [${searchId}] Cache hit`);
-        return cachedResult;
-      }
-
-      // Get data (real or mock)
-      console.log(`🔍 [ENHANCED_SEARCH] [${searchId}] Getting real property data with useRealData: ${useRealData}`);
-      const properties = await this.getRealPropertyData(query, useRealData);
-      console.log(`🔍 [ENHANCED_SEARCH] [${searchId}] Got ${properties.length} properties from getRealPropertyData`);
-      
-      // Apply enhanced filters (temporarily disabled for debugging)
-      let filteredProperties = properties;
-      console.log(`🔍 [ENHANCED_SEARCH] [${searchId}] Skipping filters for debugging: ${properties.length} properties`);
-      
-      // if (enhancedFilters && Object.keys(enhancedFilters).length > 0) {
-      //   filteredProperties = this.applyFilters(properties, enhancedFilters);
-      //   console.log(`🔍 [ENHANCED_SEARCH] [${searchId}] Applied filters: ${properties.length} → ${filteredProperties.length} properties`);
-      // }
-      
-      // Add search scores
-      const scoredProperties = filteredProperties.map(property => ({
-        ...property,
-        metadata: {
-          ...property.metadata,
-          searchScore: this.calculateSearchScore(property, query)
-        }
-      }));
-      
-      // Cache results
-      await this.setCache(cacheKey, scoredProperties);
-      
-      console.log(`✅ [ENHANCED_SEARCH] [${searchId}] Search completed: ${scoredProperties.length} properties`);
-      console.log(`📍 [ENHANCED_SEARCH] [${searchId}] Location: ${parsedQuery.location}, Bedrooms: ${parsedQuery.bedrooms || 'any'}, Type: ${parsedQuery.propertyType || 'any'}`);
-      
-      return scoredProperties;
-      
-    } catch (error) {
-      console.error(`❌ [ENHANCED_SEARCH] [${searchId}] Enhanced search failed:`, error);
+    if (!this.realScrapingEnabled) {
       // Fallback to original search method
-      return this.searchProperties(query, filters);
+      return this.generateMockProperties().slice(0, 10);
     }
+    // Fetch from both OpenRent and Rightmove concurrently
+    const [openrentResult, rightmoveResult] = await Promise.allSettled([
+      this.scrapeOpenrent(query, filters),
+      this.fetchFromRightmove(query, filters)
+    ]);
+    const openrentProps = openrentResult.status === 'fulfilled' ? openrentResult.value : [];
+    const rightmoveProps = rightmoveResult.status === 'fulfilled' ? rightmoveResult.value : [];
+    // Combine and return
+    return [...openrentProps, ...rightmoveProps];
   }
 
   /**
@@ -1192,5 +1142,24 @@ export class PropertyDataMCP {
     });
 
     return [rightmoveProperty, ...rest];
+  }
+
+  private async fetchFromRightmove(query: string, filters?: any): Promise<Property[]> {
+    try {
+      // Build RightmoveQuery from parsed query/filters (simplified for now)
+      const parsed: RightmoveQuery = {
+        location: query,
+        minPrice: filters?.minPrice,
+        maxPrice: filters?.maxPrice,
+        minBedrooms: filters?.bedrooms,
+        propertyType: filters?.propertyType,
+        listingType: 'to-rent', // TODO: support for-sale
+      };
+      const rawResults = await scrapeRightmoveWithQuery(parsed, 3);
+      return transformRightmoveProperties(rawResults);
+    } catch (error) {
+      console.error('[Rightmove] Error fetching or transforming:', error);
+      return [];
+    }
   }
 } 

@@ -26,7 +26,7 @@
 const axios = require('axios');
 
 // Configuration
-const BASE_URL = process.env.API_BASE_URL || 'http://localhost:3001/api';
+const BASE_URL = process.env.API_BASE_URL || 'http://localhost:3002/api/mcp';
 const API_TIMEOUT = 30000; // 30 seconds
 
 // Colors for console output

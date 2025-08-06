@@ -86,8 +86,11 @@ export class SecurityMiddleware {
     }
 
     private createAxiosInstance(): AxiosInstance {
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+        // Remove /api from the end if it exists to avoid double /api prefix
+        const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
         const instance = axios.create({
-            baseURL: import.meta.env.VITE_API_URL,
+            baseURL: baseUrl,
             timeout: 10000,
             headers: this.securityHeaders
         });

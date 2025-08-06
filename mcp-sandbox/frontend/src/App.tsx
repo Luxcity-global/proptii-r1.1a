@@ -6,8 +6,12 @@ import SmartSearchBar from './components/SmartSearchBar';
 import IntelligentFilterPanel from './components/IntelligentFilterPanel';
 import AIIntelligencePanel from './components/AIIntelligencePanel';
 import RealTimeScrapingPanel from './components/RealTimeScrapingPanel';
+import AreaInsightPanel from './components/AreaInsightPanel';
+import AreaMap from './components/AreaMap';
 import { mockProperties } from './data/mockProperties';
 import { searchProperties } from './services/api';
+import { areaInsightService } from './services/areaInsightService';
+import { AreaInsight } from './types/areaInsight';
 import { Brain, Sparkles } from 'lucide-react';
 
 interface MarketInsight {
@@ -109,6 +113,9 @@ function App() {
   const [showFilters, setShowFilters] = useState(false);
   const [showAIInsights, setShowAIInsights] = useState(false);
   const [useRealData, setUseRealData] = useState(true);
+  const [areaInsight, setAreaInsight] = useState<AreaInsight | null>(null);
+  const [areaInsightLoading, setAreaInsightLoading] = useState(false);
+  const [areaInsightError, setAreaInsightError] = useState<string | null>(null);
 
   // Load recent searches from localStorage
   useEffect(() => {
@@ -204,6 +211,9 @@ function App() {
     setCurrentPage(1);
     setLoading(true);
     setError(null);
+    setAreaInsightLoading(true);
+    setAreaInsightError(null);
+    setAreaInsight(null); // Clear previous area insight for new search
     
     // Save to recent searches
     saveRecentSearch(query);
@@ -246,6 +256,29 @@ function App() {
         if (results.metadata) {
           console.log('📊 [APP] Search metadata:', results.metadata);
         }
+        
+        // Fetch area insights
+        try {
+          console.log('🏘️ [APP] Fetching area insights for:', query);
+          const insight = await areaInsightService.getAreaInsight({
+            location: query,
+            useRealData,
+            propertyType: filters?.propertyType,
+            bedrooms: filters?.bedrooms
+          });
+          
+          if (insight) {
+            console.log('✅ [APP] Area insight received:', insight);
+            setAreaInsight(insight);
+          } else {
+            console.log('⚠️ [APP] No area insight available for:', query);
+            setAreaInsight(null);
+          }
+        } catch (insightError) {
+          console.error('❌ [APP] Area insight fetch failed:', insightError);
+          setAreaInsightError('Unable to load area information');
+          setAreaInsight(null);
+        }
       }
       
     } catch (err: any) {
@@ -284,6 +317,7 @@ function App() {
       console.log('⚠️ [APP] Error state set with fallback message');
     } finally {
       setLoading(false);
+      setAreaInsightLoading(false);
       console.log('🏁 [APP] Search process completed, loading set to false');
     }
   };
@@ -495,53 +529,107 @@ function App() {
               justifyContent: 'space-between',
               marginBottom: '24px'
             }}>
-              <h2 style={{ fontSize: 28, fontWeight: 700, color: '#23272f', margin: 0 }}>
-                {getResultsTitle()}
-              </h2>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button
-                  onClick={() => setShowAIInsights(true)}
-                  style={{
-                    background: 'linear-gradient(135deg, #E65D24 0%, #FF6B35 100%)',
-                    border: 'none',
-                    borderRadius: '12px',
-                    padding: '8px 16px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#fff',
-                    boxShadow: '0 4px 12px rgba(230, 93, 36, 0.3)',
-                  }}
-                >
-                  <Brain style={{ width: 16, height: 16 }} />
-                  AI Insights
-                </button>
-                <button
-                  onClick={() => setShowFilters(true)}
-                  style={{
-                    background: '#fff',
-                    border: '1px solid #e5e5e5',
-                    borderRadius: '12px',
-                    padding: '8px 16px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: '#23272f',
-                  }}
-                >
-                  <svg width="16" height="16" fill="none" stroke="#E65D24" strokeWidth="2" viewBox="0 0 24 24">
-                    <polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46"/>
-                  </svg>
-                  Smart Filters
-                </button>
+              <div>
+                <h2 style={{ fontSize: 28, fontWeight: 700, color: '#23272f', margin: 0 }}>
+                  {getResultsTitle()}
+                </h2>
+                {filteredProperties.length > 0 && (
+                  <p style={{ fontSize: 16, color: '#6b7280', margin: '4px 0 0 0' }}>
+                    {filteredProperties.length} Search results
+                  </p>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: 14, color: '#6b7280', fontWeight: 500 }}>Sort by:</span>
+                  <select
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #e5e5e5',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      fontSize: '14px',
+                      color: '#6b7280',
+                      cursor: 'pointer',
+                      outline: 'none'
+                    }}
+                    defaultValue="newest"
+                  >
+                    <option value="newest">Newest</option>
+                    <option value="price-low">Price: Low to High</option>
+                    <option value="price-high">Price: High to Low</option>
+                    <option value="popularity">Popularity</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button
+                    onClick={() => setShowAIInsights(true)}
+                    style={{
+                      background: 'linear-gradient(135deg, #E65D24 0%, #FF6B35 100%)',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '8px 16px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      color: '#fff',
+                      boxShadow: '0 4px 12px rgba(230, 93, 36, 0.3)',
+                    }}
+                  >
+                    <Brain style={{ width: 16, height: 16 }} />
+                    AI Insights
+                  </button>
+                  <button
+                    onClick={() => setShowFilters(true)}
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #e5e5e5',
+                      borderRadius: '12px',
+                      padding: '8px 16px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      color: '#23272f',
+                    }}
+                  >
+                    <svg width="16" height="16" fill="none" stroke="#E65D24" strokeWidth="2" viewBox="0 0 24 24">
+                      <polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46"/>
+                    </svg>
+                    Smart Filters
+                  </button>
+                </div>
               </div>
             </div>
+            
+            {/* Area Insight and Map Section */}
+            {(areaInsight || areaInsightLoading || areaInsightError) && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '24px',
+                marginBottom: '32px'
+              }}>
+                <AreaInsightPanel
+                  areaInsight={areaInsight}
+                  loading={areaInsightLoading}
+                  error={areaInsightError}
+                />
+                <AreaMap
+                  location={areaInsight?.location || searchQuery}
+                  properties={filteredProperties.map(p => ({
+                    id: p.id,
+                    address: p.address,
+                    price: p.price
+                  }))}
+                />
+              </div>
+            )}
             
             {loading ? (
               <div style={{ color: '#888', fontSize: 20, margin: '48px 0', textAlign: 'center' }}>

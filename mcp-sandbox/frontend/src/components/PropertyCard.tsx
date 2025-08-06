@@ -23,6 +23,7 @@ interface Property {
     name: string;
   };
   actions: Array<{ type: string; label: string }>;
+  source: string; // Added source property
 }
 
 interface PropertyCardProps {
@@ -247,6 +248,21 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onCardClick }) =>
             </button>
           </div>
         </div>
+      </div>
+      {/* Source Badge */}
+      <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2 }}>
+        <span style={{
+          background: '#23272f',
+          color: '#fff',
+          borderRadius: 8,
+          padding: '2px 10px',
+          fontSize: 12,
+          fontWeight: 600,
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+        }}>
+          {property.source}
+        </span>
       </div>
     </div>
   );

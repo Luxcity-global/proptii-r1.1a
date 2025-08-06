@@ -73,6 +73,27 @@ export class SessionManager {
     private sessionConflicts: Map<string, SessionConflict[]> = new Map();
     private currentVersion = 1;
 
+    private decodeKeySafely(): Uint8Array {
+        try {
+            return new Uint8Array(
+                atob(this.encryptionKey)
+                    .split('')
+                    .map(c => c.charCodeAt(0))
+            );
+        } catch (error) {
+            // If atob fails, generate a new key
+            console.warn('Invalid encryption key, generating new one:', error);
+            const newKeyBytes = new Uint8Array(32);
+            crypto.getRandomValues(newKeyBytes);
+            this.encryptionKey = btoa(String.fromCharCode(...newKeyBytes));
+            return new Uint8Array(
+                atob(this.encryptionKey)
+                    .split('')
+                    .map(c => c.charCodeAt(0))
+            );
+        }
+    }
+
     private constructor() {
         this.appInsights = new ApplicationInsights({
             config: {
@@ -103,10 +124,10 @@ export class SessionManager {
             this.encryptionKey = String.fromCharCode(...keyBytes);
         } else {
             // Generate a fixed 256-bit key (32 bytes) for development
-            this.encryptionKey = Array.from(new Uint8Array(32))
-                .map(() => Math.floor(Math.random() * 256))
-                .map(b => String.fromCharCode(b))
-                .join('');
+            const keyBytes = new Uint8Array(32);
+            crypto.getRandomValues(keyBytes);
+            // Convert to base64 string for consistent encoding
+            this.encryptionKey = btoa(String.fromCharCode(...keyBytes));
         }
 
         this.initializeSession();
@@ -358,9 +379,12 @@ export class SessionManager {
             const encoder = new TextEncoder();
             const dataBuffer = encoder.encode(jsonStr);
 
+            // Decode base64 key back to bytes
+            const keyBytes = this.decodeKeySafely();
+
             const key = await crypto.subtle.importKey(
                 'raw',
-                encoder.encode(this.encryptionKey),
+                keyBytes,
                 { name: 'AES-GCM' },
                 false,
                 ['encrypt']
@@ -399,9 +423,12 @@ export class SessionManager {
             const iv = combined.slice(0, 12);
             const data = combined.slice(12);
 
+            // Decode base64 key back to bytes
+            const keyBytes = this.decodeKeySafely();
+
             const key = await crypto.subtle.importKey(
                 'raw',
-                new TextEncoder().encode(this.encryptionKey),
+                keyBytes,
                 { name: 'AES-GCM' },
                 false,
                 ['decrypt']

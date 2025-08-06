@@ -81,7 +81,9 @@ app.get('/health', (req, res) => {
       search: 'POST /api/mcp/search',
       property: 'GET /api/mcp/property/:id',
       neighborhood: 'GET /api/mcp/neighborhood/:postcode',
-      agent: 'GET /api/mcp/agent/:id'
+      agent: 'GET /api/mcp/agent/:id',
+      areaInsights: 'POST /api/mcp/area-insights',
+      areaInsightsCache: 'GET/DELETE /api/mcp/area-insights/cache'
     }
   };
 
@@ -129,7 +131,10 @@ app.use((req, res) => {
       'POST /api/mcp/search',
       'GET /api/mcp/property/:id',
       'GET /api/mcp/neighborhood/:postcode',
-      'GET /api/mcp/agent/:id'
+      'GET /api/mcp/agent/:id',
+      'POST /api/mcp/area-insights',
+      'GET /api/mcp/area-insights/cache',
+      'DELETE /api/mcp/area-insights/cache'
     ]
   });
 });

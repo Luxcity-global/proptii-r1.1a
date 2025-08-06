@@ -33,8 +33,10 @@ export class SearchService {
 
   private constructor() {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+    // Remove /api from the end if it exists to avoid double /api prefix
+    const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
     this.axiosInstance = axios.create({
-      baseURL: apiUrl,
+      baseURL: baseUrl,
       headers: {
         'Content-Type': 'application/json',
       },

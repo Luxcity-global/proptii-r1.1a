@@ -1,7 +1,75 @@
 const API_BASE_URL = import.meta.env.VITE_MCP_API_URL || 'http://localhost:3002/api/mcp';
 
+// TypeScript interfaces for better type safety
+interface BackendProperty {
+  id: string;
+  status?: string;
+  title: string;
+  price?: {
+    amount: number;
+    type?: string;
+    period?: string;
+  };
+  location?: {
+    address: string;
+  };
+  address?: string;
+  specifications?: {
+    bedrooms: number;
+    bathrooms: number;
+    totalArea: number;
+  };
+  images?: Array<{
+    src: string;
+    alt: string;
+  }>;
+  agent?: {
+    company: string;
+    name: string;
+  };
+  metadata?: {
+    source: string;
+  };
+}
+
+interface SearchOptions {
+  useRealData?: boolean;
+  sources?: string[];
+  filters?: Record<string, unknown>;
+  page?: number;
+  limit?: number;
+  includeAreaInsights?: boolean;
+}
+
+interface ScrapingOptions {
+  source: string;
+  query: string;
+  pages?: number;
+  filters?: Record<string, unknown>;
+}
+
+interface BackendResponse {
+  success?: boolean;
+  data?: {
+    properties?: BackendProperty[];
+  };
+  results?: BackendProperty[];
+  properties?: BackendProperty[];
+  metadata?: {
+    total?: number;
+    page?: number;
+    limit?: number;
+    sources?: string[];
+    useRealData?: boolean;
+    scrapingTime?: number | null;
+    cacheStatus?: string;
+  };
+  intelligence?: unknown;
+  areaInsights?: unknown;
+}
+
 // Transform backend property format to frontend PropertyCard format
-function transformProperty(backendProperty: any) {
+function transformProperty(backendProperty: BackendProperty) {
   console.log('🔄 [FRONTEND] Transforming property:', backendProperty.id);
   
   // Determine if this is a rental or sale property
@@ -25,7 +93,7 @@ function transformProperty(backendProperty: any) {
     area: backendProperty.specifications?.totalArea || 0,
     areaUnit: 'sq ft',
     images: backendProperty.images && backendProperty.images.length > 0 
-      ? backendProperty.images.map((img: any, index: number) => ({
+      ? backendProperty.images.map((img, index) => ({
           src: img.src || '',
           alt: img.alt || backendProperty.title,
           label: img.alt || `Property image ${index + 1}`
@@ -44,18 +112,13 @@ function transformProperty(backendProperty: any) {
       { type: 'chat', label: 'Chat' },
       { type: 'call', label: 'Call' },
       { type: 'email', label: 'Email' }
-    ]
+    ],
+    source: backendProperty.metadata?.source || backendProperty.agent?.company || 'Unknown',
   };
 }
 
 // Enhanced search with real-time scraping support
-export async function searchProperties(query: string, options?: {
-  useRealData?: boolean;
-  sources?: string[];
-  filters?: any;
-  page?: number;
-  limit?: number;
-}) {
+export async function searchProperties(query: string, options?: SearchOptions) {
   console.log('🚀 [FRONTEND] Starting enhanced property search...');
   console.log('📍 [FRONTEND] API Base URL:', API_BASE_URL);
   console.log('🔍 [FRONTEND] Search Query:', query);
@@ -95,7 +158,7 @@ export async function searchProperties(query: string, options?: {
       throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     }
     
-    const data = await res.json();
+    const data: BackendResponse = await res.json();
     console.log('✅ [FRONTEND] Response data received:', data);
     console.log('📋 [FRONTEND] Data structure:', {
       hasSuccess: 'success' in data,
@@ -127,16 +190,17 @@ export async function searchProperties(query: string, options?: {
         scrapingTime: data.metadata?.scrapingTime || null,
         cacheStatus: data.metadata?.cacheStatus || 'miss'
       },
-      intelligence: data.intelligence || null
+      intelligence: data.intelligence || null,
+      areaInsights: data.areaInsights || null
     };
   } catch (error) {
     const endTime = Date.now();
     console.error('💥 [FRONTEND] Search request failed after:', endTime - startTime, 'ms');
     console.error('💥 [FRONTEND] Error details:', error);
-    console.error('💥 [FRONTEND] Error type:', error.constructor.name);
-    console.error('💥 [FRONTEND] Error message:', error.message);
+    console.error('💥 [FRONTEND] Error type:', (error as Error).constructor?.name);
+    console.error('💥 [FRONTEND] Error message:', (error as Error).message);
     
-    if (error instanceof TypeError && error.message.includes('fetch')) {
+    if (error instanceof TypeError && (error as Error).message.includes('fetch')) {
       console.error('🌐 [FRONTEND] Network error - backend may be unavailable');
     }
     
@@ -145,12 +209,7 @@ export async function searchProperties(query: string, options?: {
 }
 
 // Trigger real-time scraping
-export async function triggerScraping(options: {
-  source: string;
-  query: string;
-  pages?: number;
-  filters?: any;
-}) {
+export async function triggerScraping(options: ScrapingOptions) {
   console.log('🔄 [FRONTEND] Triggering real-time scraping...');
   console.log('⚙️ [FRONTEND] Scraping options:', options);
   

@@ -2,6 +2,7 @@ import { Router, Request, Response, RequestHandler } from 'express';
 import { ProptiiMCPOrchestrator } from '../mcp/ProptiiMCPOrchestrator';
 import { PropertyDataMCP } from '../mcp/property-data/PropertyDataMCP';
 import { NeighborhoodMCP } from '../mcp/neighborhood/NeighborhoodMCP';
+import { areaInsightService, AreaInsightRequest } from '../services/areaInsightService';
 
 const router = Router();
 const orchestrator = new ProptiiMCPOrchestrator();
@@ -539,5 +540,125 @@ router.get('/sources', async (req, res) => {
     });
   }
 });
+
+// ===== PHASE 2: AREA INSIGHT ROUTES =====
+const areaInsightHandler: RequestHandler = async (req, res) => {
+  const requestId = Math.random().toString(36).substr(2, 9);
+  const requestStartTime = Date.now();
+  
+  console.log(`🏘️ [AREA-INSIGHT] [${requestId}] Area insight request received`);
+  console.log(`📊 [AREA-INSIGHT] [${requestId}] Request body:`, req.body);
+  
+  try {
+    const { location, propertyType, bedrooms, useRealData } = req.body;
+    
+    if (!location || !location.trim()) {
+      console.log(`⚠️ [AREA-INSIGHT] [${requestId}] Empty location received`);
+      res.status(400).json({
+        success: false,
+        error: 'Location cannot be empty',
+        requestId: requestId
+      });
+      return;
+    }
+    
+    console.log(`🔍 [AREA-INSIGHT] [${requestId}] Fetching area insight for: "${location}"`);
+    
+    const areaInsightRequest: AreaInsightRequest = {
+      location: location.trim(),
+      propertyType,
+      bedrooms,
+      useRealData: useRealData || false
+    };
+    
+    const areaInsight = await areaInsightService.getAreaInsight(areaInsightRequest);
+    
+    if (!areaInsight) {
+      console.log(`⚠️ [AREA-INSIGHT] [${requestId}] No area insight found for: "${location}"`);
+      res.status(404).json({
+        success: false,
+        error: 'Area insight not found',
+        location: location,
+        requestId: requestId
+      });
+      return;
+    }
+    
+    const responseData = {
+      success: true,
+      data: {
+        areaInsight: areaInsight
+      },
+      timestamp: new Date().toISOString(),
+      location: location,
+      requestId: requestId
+    };
+    
+    console.log(`✅ [AREA-INSIGHT] [${requestId}] Area insight fetched successfully`);
+    console.log(`📊 [AREA-INSIGHT] [${requestId}] Response structure:`, {
+      hasAreaInsight: 'areaInsight' in responseData.data,
+      location: responseData.data.areaInsight?.location,
+      hasAmenities: responseData.data.areaInsight?.amenities?.length > 0,
+      hasTransport: responseData.data.areaInsight?.transport?.length > 0
+    });
+    
+    res.json(responseData);
+    
+    const requestEndTime = Date.now();
+    console.log(`✅ [AREA-INSIGHT] [${requestId}] Request completed in:`, requestEndTime - requestStartTime, 'ms');
+    
+  } catch (error) {
+    const requestEndTime = Date.now();
+    console.error(`❌ [AREA-INSIGHT] [${requestId}] Error after:`, requestEndTime - requestStartTime, 'ms');
+    console.error(`❌ [AREA-INSIGHT] [${requestId}] Error details:`, error);
+    
+    res.status(500).json({
+      success: false,
+      error: 'Area insight fetch failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      requestId: requestId
+    });
+  }
+};
+
+const areaInsightCacheHandler: RequestHandler = async (req, res) => {
+  const requestId = Math.random().toString(36).substr(2, 9);
+  
+  try {
+    const { location } = req.query;
+    
+    if (req.method === 'DELETE') {
+      await areaInsightService.clearCache(location as string);
+      res.json({
+        success: true,
+        message: 'Area insight cache cleared successfully',
+        location: location || 'all',
+        timestamp: new Date().toISOString(),
+        requestId: requestId
+      });
+    } else {
+      const cacheStats = await areaInsightService.getCacheStats();
+      res.json({
+        success: true,
+        data: cacheStats,
+        timestamp: new Date().toISOString(),
+        requestId: requestId
+      });
+    }
+  } catch (error) {
+    console.error(`❌ [AREA-INSIGHT-CACHE] [${requestId}] Error:`, error);
+    res.status(500).json({
+      success: false,
+      error: 'Area insight cache operation failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      requestId: requestId
+    });
+  }
+};
+
+// Register area insight routes
+router.post('/area-insights', areaInsightHandler);
+router.get('/area-insights/cache', areaInsightCacheHandler);
+router.delete('/area-insights/cache', areaInsightCacheHandler);
 
 export { router as mcpRoutes }; 
