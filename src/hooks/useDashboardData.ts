@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { 
   dashboardService, 
   DashboardSummary, 
@@ -28,6 +29,7 @@ interface DashboardData {
  * This centralizes data fetching across different dashboard sections
  */
 export const useDashboardData = (): DashboardData => {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null);
@@ -36,6 +38,9 @@ export const useDashboardData = (): DashboardData => {
   const [referencingApplications, setReferencingApplications] = useState<ReferencingApplication[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [files, setFiles] = useState<UserFile[]>([]);
+
+  // Create dashboard service with user ID
+  const dashboardServiceInstance = createDashboardService(user?.id);
 
   const fetchDashboardData = async () => {
     setIsLoading(true);
@@ -51,12 +56,12 @@ export const useDashboardData = (): DashboardData => {
         contractsResponse,
         filesResponse
       ] = await Promise.all([
-        dashboardService.getDashboardSummary(),
-        dashboardService.getSavedProperties(),
-        dashboardService.getViewings(),
-        dashboardService.getReferencingApplications(),
-        dashboardService.getContracts(),
-        dashboardService.getUserFiles()
+        dashboardServiceInstance.getDashboardSummary(),
+        dashboardServiceInstance.getSavedProperties(),
+        dashboardServiceInstance.getViewings(),
+        dashboardServiceInstance.getReferencingApplications(),
+        dashboardServiceInstance.getContracts(),
+        dashboardServiceInstance.getUserFiles()
       ]);
 
       if (dashboardResponse.success && dashboardResponse.data) {

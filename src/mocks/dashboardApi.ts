@@ -1,4 +1,5 @@
 import { ApiResponse } from '../services/api';
+import { ReferencingProgressService } from '../services/referencingProgressService';
 
 // Import ReferencingModal constants for consistency
 const BLUE_COLOR = '#136C9E';
@@ -25,9 +26,8 @@ export interface DashboardSummary {
     residential: boolean,
     financial: boolean,
     guarantor: boolean,
+    creditCheck: boolean,
     agentDetails: boolean,
-    
-    
   };
   contracts: {
     pending: number;
@@ -113,8 +113,37 @@ export interface UserFile {
   url: string;
 }
 
-// Mock data for dashboard
-const mockDashboardData: DashboardSummary = {
+// Function to get real referencing data from localStorage
+const getRealReferencingData = (userId?: string): DashboardSummary['referencing'] => {
+  // Use provided user ID or fallback to default
+  const currentUserId = userId || 'default-user';
+  
+  // Get form data from localStorage
+  const formData = ReferencingProgressService.getFormDataFromStorage(currentUserId);
+  
+  if (formData) {
+    // Convert real form data to dashboard format
+    return ReferencingProgressService.convertToDashboardSummary(formData, currentUserId);
+  }
+  
+  // Fallback to default data if no form data exists
+  return {
+    status: 'not_started',
+    progress: 0,
+    completedSteps: 0,
+    totalSteps: 7,
+    identity: false,
+    employment: false,
+    residential: false,
+    financial: false,
+    guarantor: false,
+    creditCheck: false,
+    agentDetails: false
+  };
+};
+
+// Function to create dashboard data with real referencing data
+const createDashboardData = (userId?: string): DashboardSummary => ({
   savedSearches: {
     count: 3,
     recentSearches: [
@@ -133,29 +162,7 @@ const mockDashboardData: DashboardSummary = {
       time: '14:00'
     }
   },
-  referencing: {
-    status: 'not_started',
-    identity: true,
-    employment: true,
-    residential: true,
-    financial: true,
-    guarantor: true,
-    agentDetails: true,
-    get progress() {
-      return [
-        this.identity,
-        this.employment,
-        this.residential,
-        this.financial,
-        this.guarantor,
-        this.agentDetails
-      ].reduce((acc, curr) => acc + (curr ? 1 : 0), 0);
-    },
-    get completedSteps() {
-      return this.progress;
-    },
-    totalSteps: 6,
-  },
+  referencing: getRealReferencingData(userId),
   contracts: {
     pending: 0,
     signed: 1,
@@ -232,7 +239,7 @@ const mockDashboardData: DashboardSummary = {
       }
     ]
   }
-};
+});
 
 // Mock saved properties
 const mockSavedProperties: SavedProperty[] = [
@@ -377,31 +384,61 @@ const mockContracts: Contract[] = [
 ];
 
 // Mock files
-const mockFiles: UserFile[] = mockDashboardData.files.recentlyAdded.map(file => ({
-  id: file.id,
-  name: file.name,
-  type: file.type,
-  size: file.size,
-  uploadedAt: file.date,
-  category: file.name.toLowerCase().includes('passport') || file.name.toLowerCase().includes('photo') 
-    ? 'identity' 
-    : file.name.toLowerCase().includes('bank') 
-      ? 'financial'
-      : file.name.toLowerCase().includes('address') || file.name.toLowerCase().includes('utility')
-        ? 'residential'
-        : file.name.toLowerCase().includes('employment') // Ensure "Employment Contract" is categorized here
-          ? 'employment'
-          : 'other',
-  url: file.url
-}));
+const mockFiles: UserFile[] = [
+  { 
+    id: '1', 
+    name: 'Passport.jpg', 
+    type: 'image/jpeg', 
+    uploadedAt: '2023-12-01T14:30:00Z',
+    size: 1240000,
+    category: 'identity',
+    url: 'https://example.com/files/passport.jpg'
+  },
+  { 
+    id: '2', 
+    name: 'Bank Statement.pdf', 
+    type: 'application/pdf', 
+    uploadedAt: '2023-11-29T10:15:00Z',
+    size: 2450000,
+    category: 'financial',
+    url: 'https://example.com/files/bank_statement.pdf'
+  },
+  { 
+    id: '3', 
+    name: 'Rental Contract.pdf', 
+    type: 'application/pdf', 
+    uploadedAt: '2023-11-25T16:45:00Z',
+    size: 3200000,
+    category: 'contract',
+    url: 'https://example.com/files/rental_contract.pdf'
+  },
+  { 
+    id: '4', 
+    name: 'Proof of Address.pdf', 
+    type: 'application/pdf', 
+    uploadedAt: '2023-11-23T09:20:00Z',
+    size: 1800000,
+    category: 'residential',
+    url: 'https://example.com/files/proof_of_address.pdf'
+  },
+  { 
+    id: '5', 
+    name: 'Employment Contract.pdf', 
+    type: 'application/pdf', 
+    uploadedAt: '2023-11-18T11:30:00Z',
+    size: 2700000,
+    category: 'employment',
+    url: 'https://example.com/files/employment_contract.pdf'
+  }
+];
 
 // Mock API endpoints for dashboard
-export const mockGetDashboardSummary = async (): Promise<ApiResponse<DashboardSummary>> => {
+export const mockGetDashboardSummary = async (userId?: string): Promise<ApiResponse<DashboardSummary>> => {
   try {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 800));
     
-    return { success: true, data: mockDashboardData };
+    return { success: true, data: createDashboardData(userId) };
   } catch (error: any) {
     console.error('Mock API Error:', error);
     return {

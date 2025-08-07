@@ -10,6 +10,7 @@ import GuarantorUpload from "./Uploads/GuarantorUpload";
 import referencingService from '../services/referencingService';
 import emailService from '../services/emailService';
 import { toast } from 'react-hot-toast';
+import { StorageManager } from '../utils/storageManager';
 
 interface ReferencingModalProps {
   isOpen: boolean;
@@ -153,46 +154,23 @@ const navigationItems: NavigationItem[] = [
   { label: "Agent Details", Icon: User, step: 7 }
 ];
 
-// Ultra-fast file processing with aggressive optimization
-const fileToStoredFile = async (file: File): Promise<StoredFile> => {
-  let processedFile = file;
-
-  // Only compress if file is large (>500KB) to save processing time
-  if (file.type.startsWith('image/') && file.size > 500 * 1024) {
-    try {
-      processedFile = await compressImage(file, 150); // More aggressive compression
-      console.log(`Fast compressed ${file.name} from ${(file.size / 1024).toFixed(1)}KB to ${(processedFile.size / 1024).toFixed(1)}KB`);
-    } catch (error) {
-      console.warn('Compression failed, using original file:', error);
-      processedFile = file;
-    }
+// Process file for storage with validation
+const processFileForStorage = async (file: File): Promise<StoredFile> => {
+  // Validate file size
+  if (!StorageManager.validateFileSize(file)) {
+    throw new Error(`File ${file.name} is too large. Maximum size is 5MB.`);
   }
 
-  // Use faster file reading with timeout
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    const timeout = setTimeout(() => {
-      reader.abort();
-      reject(new Error('File reading timeout'));
-    }, 5000); // 5 second timeout
-
-    reader.onload = () => {
-      clearTimeout(timeout);
-      const dataUrl = reader.result as string;
-      resolve({
-        name: processedFile.name,
-        type: processedFile.type,
-        size: processedFile.size,
-        lastModified: processedFile.lastModified,
-        dataUrl: dataUrl
-      });
-    };
-    reader.onerror = () => {
-      clearTimeout(timeout);
-      reject(new Error('File reading failed'));
-    };
-    reader.readAsDataURL(processedFile);
-  });
+  // Convert file to base64
+  const dataUrl = await StorageManager.fileToBase64(file);
+  
+  return {
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    lastModified: file.lastModified,
+    dataUrl: dataUrl
+  };
 };
 
 // Add interfaces for stored file data
@@ -222,6 +200,50 @@ const base64ToFile = (storedFile: StoredFile): File => {
     type: storedFile.type,
     lastModified: storedFile.lastModified
   });
+};
+
+// Convert stored form data back to regular form data with File objects
+const convertStoredFormData = (storedData: any): FormData => {
+  const convertFile = (storedFile: StoredFile | null): File | null => {
+    if (!storedFile || !storedFile.dataUrl) return null;
+    try {
+      return base64ToFile(storedFile);
+    } catch (error) {
+      console.error('Error converting stored file:', error);
+      return null;
+    }
+  };
+
+  return {
+    identity: {
+      ...storedData.identity,
+      identityProof: convertFile(storedData.identity?.identityProof)
+    },
+    employment: {
+      ...storedData.employment,
+      proofDocument: convertFile(storedData.employment?.proofDocument)
+    },
+    residential: {
+      ...storedData.residential,
+      proofDocument: convertFile(storedData.residential?.proofDocument)
+    },
+    financial: {
+      ...storedData.financial,
+      proofOfIncomeDocument: convertFile(storedData.financial?.proofOfIncomeDocument)
+    },
+    guarantor: {
+      ...storedData.guarantor,
+      identityDocument: convertFile(storedData.guarantor?.identityDocument)
+    },
+    creditCheck: storedData.creditCheck || {},
+    agentDetails: storedData.agentDetails || {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phoneNumber: '',
+      hasAgreedToCheck: false
+    }
+  };
 };
 
 interface StoredFormData {
@@ -288,80 +310,7 @@ interface UploadProps {
   formData: FormData;
 }
 
-// Ultra-fast image compression with minimal quality for speed
-const compressImage = (file: File, maxSizeKB: number = 150): Promise<File> => {
-  return new Promise((resolve) => {
-    // Check if file is already small enough
-    if (file.size <= maxSizeKB * 1024) {
-      console.log(`File ${file.name} is already small enough (${(file.size / 1024).toFixed(1)}KB)`);
-      resolve(file);
-      return;
-    }
 
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-
-    // Add timeout for image loading
-    const timeout = setTimeout(() => {
-      console.warn('Image loading timeout, using original file');
-      resolve(file);
-    }, 3000);
-
-    img.onload = () => {
-      clearTimeout(timeout);
-
-      // Calculate dimensions - more aggressive scaling for speed
-      let { width, height } = img;
-      const maxDimension = 600; // Further reduced for faster processing
-
-      if (width > height) {
-        if (width > maxDimension) {
-          height = (height * maxDimension) / width;
-          width = maxDimension;
-        }
-      } else {
-        if (height > maxDimension) {
-          width = (width * maxDimension) / height;
-          height = maxDimension;
-        }
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-
-      // Draw with optimized settings
-      ctx?.drawImage(img, 0, 0, width, height);
-
-      // Single-pass compression for speed
-      const quality = 0.4; // Very aggressive quality for speed
-
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const compressedFile = new File([blob], file.name, {
-            type: 'image/jpeg',
-            lastModified: Date.now(),
-          });
-
-          const compressedSizeKB = compressedFile.size / 1024;
-          console.log(`Ultra-fast compressed: ${compressedSizeKB.toFixed(1)}KB (was ${(file.size / 1024).toFixed(1)}KB)`);
-          resolve(compressedFile);
-        } else {
-          console.warn('Compression failed, using original file');
-          resolve(file);
-        }
-      }, 'image/jpeg', quality);
-    };
-
-    img.onerror = () => {
-      clearTimeout(timeout);
-      console.warn('Image loading failed, using original file');
-      resolve(file);
-    };
-
-    img.src = URL.createObjectURL(file);
-  });
-};
 
 const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, onSubmissionComplete }) => {
   const { user } = useAuth();
@@ -446,12 +395,143 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
     7: 'partial' // Orange by default
   });
 
-  // Load status from localStorage on mount (only once)
+  // Load saved form data from localStorage on mount (only once when modal opens)
   useEffect(() => {
-    if (user?.id) {
-      // Don't load step status from localStorage - let it be calculated from current formData
+    if (user?.id && isOpen) {
+      const loadSavedData = async () => {
+        try {
+          // Load saved form data
+          const savedFormData = StorageManager.getItem(`${user.id}_formData`);
+          if (savedFormData) {
+            console.log('📥 Loading saved form data:', savedFormData);
+            
+            // Debug: Check if files exist in the saved data
+            if (savedFormData.identity?.identityProof) {
+              console.log('🔍 Identity file in saved data:', {
+                name: savedFormData.identity.identityProof.name,
+                hasDataUrl: !!savedFormData.identity.identityProof.dataUrl,
+                size: savedFormData.identity.identityProof.size
+              });
+            }
+            if (savedFormData.employment?.proofDocument) {
+              console.log('🔍 Employment file in saved data:', {
+                name: savedFormData.employment.proofDocument.name,
+                hasDataUrl: !!savedFormData.employment.proofDocument.dataUrl,
+                size: savedFormData.employment.proofDocument.size
+              });
+            }
+            
+            // Restore form data with files if they exist
+            const restoredFormData = {
+              identity: {
+                ...savedFormData.identity,
+                identityProof: savedFormData.identity?.identityProof?.dataUrl 
+                  ? (() => {
+                      try {
+                        console.log('🔍 Restoring identity file:', savedFormData.identity.identityProof.name);
+                        // Keep the original StoredFile object with dataUrl for UI compatibility
+                        return savedFormData.identity.identityProof;
+                      } catch (error) {
+                        console.error('❌ Error restoring identity file:', error);
+                        return null;
+                      }
+                    })()
+                  : null
+              },
+              employment: {
+                ...savedFormData.employment,
+                proofDocument: savedFormData.employment?.proofDocument?.dataUrl
+                  ? (() => {
+                      try {
+                        console.log('🔍 Restoring employment file:', savedFormData.employment.proofDocument.name);
+                        // Keep the original StoredFile object with dataUrl for UI compatibility
+                        return savedFormData.employment.proofDocument;
+                      } catch (error) {
+                        console.error('❌ Error restoring employment file:', error);
+                        return null;
+                      }
+                    })()
+                  : null
+              },
+              residential: {
+                ...savedFormData.residential,
+                proofDocument: savedFormData.residential?.proofDocument?.dataUrl
+                  ? (() => {
+                      try {
+                        console.log('🔍 Restoring residential file:', savedFormData.residential.proofDocument.name);
+                        // Keep the original StoredFile object with dataUrl for UI compatibility
+                        return savedFormData.residential.proofDocument;
+                      } catch (error) {
+                        console.error('❌ Error restoring residential file:', error);
+                        return null;
+                      }
+                    })()
+                  : null
+              },
+              financial: {
+                ...savedFormData.financial,
+                proofOfIncomeDocument: savedFormData.financial?.proofOfIncomeDocument?.dataUrl
+                  ? (() => {
+                      try {
+                        console.log('🔍 Restoring financial file:', savedFormData.financial.proofOfIncomeDocument.name);
+                        // Keep the original StoredFile object with dataUrl for UI compatibility
+                        return savedFormData.financial.proofOfIncomeDocument;
+                      } catch (error) {
+                        console.error('❌ Error restoring financial file:', error);
+                        return null;
+                      }
+                    })()
+                  : null
+              },
+              guarantor: {
+                ...savedFormData.guarantor,
+                identityDocument: savedFormData.guarantor?.identityDocument?.dataUrl
+                  ? (() => {
+                      try {
+                        console.log('🔍 Restoring guarantor file:', savedFormData.guarantor.identityDocument.name);
+                        // Keep the original StoredFile object with dataUrl for UI compatibility
+                        return savedFormData.guarantor.identityDocument;
+                      } catch (error) {
+                        console.error('❌ Error restoring guarantor file:', error);
+                        return null;
+                      }
+                    })()
+                  : null
+              },
+              creditCheck: savedFormData.creditCheck || {},
+              agentDetails: savedFormData.agentDetails || {
+                firstName: '',
+                lastName: '',
+                email: '',
+                phoneNumber: '',
+                hasAgreedToCheck: false
+              }
+            };
+            setFormData(restoredFormData);
+            console.log('✅ Form data restored successfully');
+          }
+
+          // Load saved current step
+          const savedCurrentStep = StorageManager.getItem(`${user.id}_currentStep`);
+          if (savedCurrentStep && typeof savedCurrentStep === 'number') {
+            console.log('📥 Loading saved current step:', savedCurrentStep);
+            setCurrentStep(savedCurrentStep);
+          }
+
+          // Load saved step status
+          const savedStepStatus = StorageManager.getItem(`${user.id}_stepStatus`);
+          if (savedStepStatus) {
+            console.log('📥 Loading saved step status:', savedStepStatus);
+            setStepStatus(savedStepStatus);
+          }
+        } catch (error) {
+          console.error('Error loading saved form data:', error);
+        }
+      };
+
+      loadSavedData();
     }
-  }, [user?.id]);
+  }, [user?.id, isOpen]); // Only depend on user.id and isOpen, not formData
 
   // Calculate step status based on current form data (runs after data changes)
   useEffect(() => {
@@ -468,10 +548,20 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
     console.log('📊 Calculated Status:', newStatus);
     console.log('👤 Agent Details Data:', formData.agentDetails);
 
-    setStepStatus(newStatus);
+    // Only update step status if it's different from current
+    setStepStatus(prevStatus => {
+      const hasChanged = Object.keys(newStatus).some(key => 
+        prevStatus[parseInt(key)] !== newStatus[parseInt(key)]
+      );
+      
+      if (hasChanged) {
+        return newStatus;
+      }
+      return prevStatus;
+    });
   }, [formData]);
 
-  // Ultra-fast file processing with caching to avoid reprocessing
+  // Process file upload with caching to avoid reprocessing
   const processFileUpload = async (file: File): Promise<StoredFile> => {
     // Create a cache key based on file properties
     const cacheKey = `${file.name}_${file.size}_${file.lastModified}`;
@@ -483,7 +573,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
     }
 
     // Process the file
-    const storedFile = await fileToStoredFile(file);
+    const storedFile = await processFileForStorage(file);
 
     // Cache the result for future use
     setFileCache(prev => new Map(prev.set(cacheKey, storedFile)));
@@ -567,16 +657,16 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
         }
       };
 
-      // Ultra-fast localStorage save using requestIdleCallback for better performance
+      // Ultra-fast localStorage save using StorageManager for better performance and quota handling
       if (user?.id) {
         if (typeof window.requestIdleCallback !== 'undefined') {
           requestIdleCallback(() => {
-            localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(updated));
+            StorageManager.setItem(`referencing_${user.id}_formData`, updated);
           });
         } else {
           // Fallback for browsers without requestIdleCallback
           setTimeout(() => {
-            localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(updated));
+            StorageManager.setItem(`referencing_${user.id}_formData`, updated);
           }, 0);
         }
       }
@@ -767,33 +857,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
     }
   }, [user]);
 
-  // Load stored data on mount
-  useEffect(() => {
-    if (user?.id) {
-      try {
-        // Don't load step status from localStorage - let it be calculated from formData
 
-        // Load current step
-        const savedStep = localStorage.getItem(`referencing_${user.id}_currentStep`);
-        if (savedStep) {
-          setCurrentStep(parseInt(savedStep, 10));
-        }
-
-        // Load entire form data at once
-        const savedFormData = localStorage.getItem(`referencing_${user.id}_formData`);
-        if (savedFormData) {
-          const parsedData = JSON.parse(savedFormData);
-          setFormData(prev => ({
-            ...prev,
-            ...parsedData
-          }));
-        }
-
-      } catch (e) {
-        console.error('Failed to load saved data:', e);
-      }
-    }
-  }, [user]);
 
   // Save current step and all data
   const saveCurrentStep = async () => {
@@ -804,10 +868,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
         throw new Error('No user found. Please login again.');
       }
 
-      // Save current step to local storage
-      localStorage.setItem(`referencing_${user.id}_currentStep`, currentStep.toString());
-      localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(formData));
-      localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
+      // Save current step to local storage using StorageManager
+      StorageManager.setItem(`${user.id}_currentStep`, currentStep);
+      StorageManager.setItem(`${user.id}_formData`, formData);
+      StorageManager.setItem(`${user.id}_stepStatus`, stepStatus);
 
       // Get current section data
       const section = getCurrentSection();
@@ -896,17 +960,28 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
     }
   };
 
-  // Add auto-save on form updates
+  // Add auto-save on form updates (debounced to prevent excessive saves)
   useEffect(() => {
-    if (user?.id) {
-      // Save form data whenever it changes
-      localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(formData));
-      // Save step status
-      localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
-      // Save current step
-      localStorage.setItem(`referencing_${user.id}_currentStep`, currentStep.toString());
+    if (user?.id && isOpen) {
+      const timeoutId = setTimeout(() => {
+        console.log('💾 Auto-saving form data...', { currentStep, stepStatus });
+        
+        // Save form data with files included
+        const formDataSuccess = StorageManager.setItem(`${user.id}_formData`, formData);
+        const stepStatusSuccess = StorageManager.setItem(`${user.id}_stepStatus`, stepStatus);
+        const currentStepSuccess = StorageManager.setItem(`${user.id}_currentStep`, currentStep);
+        
+        // Log warnings if storage fails
+        if (!formDataSuccess || !stepStatusSuccess || !currentStepSuccess) {
+          console.warn('Some form data could not be saved due to storage limitations');
+        } else {
+          console.log('✅ Form data saved successfully');
+        }
+      }, 500); // Debounce for 500ms
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [formData, stepStatus, currentStep, user]);
+  }, [formData, stepStatus, currentStep, user?.id, isOpen]);
 
   const goToStep = (step: number) => {
     setCurrentStep(step);
@@ -1003,7 +1078,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
 
       // Non-blocking localStorage operations
       setTimeout(() => {
-        localStorage.setItem(`referencing_${userId}_submitted`, 'true');
+        StorageManager.setItem(`${userId}_submitted`, true);
       }, 0);
 
       // Show instant success feedback
@@ -1060,17 +1135,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
 
     const handleClose = () => {
       setShowSuccessModal(false);
-      
-      // Clear form data from localStorage if user is logged in
-      if (user?.id) {
-        const keysToRemove = [
-          `referencing_${user.id}_formData`,
-          `referencing_${user.id}_stepStatus`,
-          `referencing_${user.id}_currentStep`,
-          `referencing_${user.id}_submitted`
-        ];
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-      }
       
       // Close the main modal first
       onClose();
@@ -1132,22 +1196,22 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
   //   }
   // }, [formData.identity]);
 
-  // Update cleanup effect
+  // Update cleanup effect - only clear data when form is successfully submitted
   useEffect(() => {
     if (!isOpen && user?.id) {
-      const isSubmitted = localStorage.getItem(`referencing_${user.id}_submitted`) === 'true';
-      if (isSubmitted) {
+      const isSubmitted = StorageManager.getItem(`${user.id}_submitted`);
+      console.log('🔍 Cleanup effect - Modal closed, checking submission status:', isSubmitted);
+      
+      if (isSubmitted === true) {
+        console.log('🧹 Clearing form data after successful submission');
         // Clear storage only if the form was successfully submitted
-        const keysToRemove = [
-          `referencing_${user.id}_formData`,
-          `referencing_${user.id}_stepStatus`,
-          `referencing_${user.id}_currentStep`,
-          `referencing_${user.id}_submitted`
-        ];
-        keysToRemove.forEach(key => localStorage.removeItem(key));
+        StorageManager.clearReferencingData(user.id);
+        StorageManager.removeItem(`${user.id}_submitted`);
+      } else {
+        console.log('💾 Keeping form data - form not submitted yet');
       }
     }
-  }, [isOpen, user]);
+  }, [isOpen, user?.id]); // Only depend on user.id, not the entire user object
 
   const renderFormContent = () => {
     switch (currentStep) {

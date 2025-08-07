@@ -1,4 +1,5 @@
 import { ApiResponse } from './api';
+import { ReferencingProgressService } from './referencingProgressService';
 import {
   DashboardSummary,
   SavedProperty,
@@ -29,8 +30,10 @@ export interface DashboardServiceInterface {
 
 // Implementation using mock data for testing
 class MockDashboardService implements DashboardServiceInterface {
+  constructor(private userId?: string) {}
+
   getDashboardSummary(): Promise<ApiResponse<DashboardSummary>> {
-    return mockGetDashboardSummary();
+    return mockGetDashboardSummary(this.userId);
   }
 
   getSavedProperties(): Promise<ApiResponse<SavedProperty[]>> {
@@ -94,9 +97,9 @@ class RealDashboardService implements DashboardServiceInterface {
 }
 
 // Factory function to create the appropriate dashboard service based on configuration
-export const createDashboardService = (): DashboardServiceInterface => {
+export const createDashboardService = (userId?: string): DashboardServiceInterface => {
   return USE_MOCK_DATA 
-    ? new MockDashboardService() 
+    ? new MockDashboardService(userId) 
     : new RealDashboardService();
 };
 
