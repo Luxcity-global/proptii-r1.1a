@@ -21,6 +21,12 @@ const FileUpload: React.FC<FileUploadProps> = ({ updateFormData, formData }) => 
   useEffect(() => {
     if (formData?.identity?.identityProof?.dataUrl) {
       setPreview(formData.identity.identityProof.dataUrl);
+      // Also set selectedFile to indicate we have a file loaded
+      setSelectedFile(formData.identity.identityProof as any);
+    } else {
+      // Clear both states if no file in formData
+      setPreview(null);
+      setSelectedFile(null);
     }
   }, [formData]);
 

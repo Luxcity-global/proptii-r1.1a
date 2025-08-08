@@ -21,6 +21,12 @@ const EmploymentUpload: React.FC<EmploymentUploadProps> = ({ updateFormData, for
   useEffect(() => {
     if (formData?.employment?.proofDocument?.dataUrl) {
       setPreview(formData.employment.proofDocument.dataUrl);
+      // Also set selectedFile to indicate we have a file loaded
+      setSelectedFile(formData.employment.proofDocument as any);
+    } else {
+      // Clear both states if no file in formData
+      setPreview(null);
+      setSelectedFile(null);
     }
   }, [formData]);
 

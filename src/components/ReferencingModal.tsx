@@ -661,12 +661,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       if (user?.id) {
         if (typeof window.requestIdleCallback !== 'undefined') {
           requestIdleCallback(() => {
-            StorageManager.setItem(`referencing_${user.id}_formData`, updated);
+            StorageManager.setItem(`${user.id}_formData`, updated);
           });
         } else {
           // Fallback for browsers without requestIdleCallback
           setTimeout(() => {
-            StorageManager.setItem(`referencing_${user.id}_formData`, updated);
+            StorageManager.setItem(`${user.id}_formData`, updated);
           }, 0);
         }
       }
