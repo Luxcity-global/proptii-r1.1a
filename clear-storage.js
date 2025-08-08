@@ -1,24 +1,42 @@
-// Clear all referencing-related data from localStorage
-console.log('🧹 Clearing all referencing-related data from localStorage...');
+// Clear all referencing-related data from localStorage and IndexedDB
+console.log('🧹 Clearing all referencing-related data...');
 
+// Clear localStorage
 const keysToRemove = [];
 
-// Get all localStorage keys
 for (let i = 0; i < localStorage.length; i++) {
   const key = localStorage.key(i);
-  if (key) {
-    // Remove any keys that start with 'referencing_' (including double-prefixed ones)
-    if (key.startsWith('referencing_')) {
-      keysToRemove.push(key);
-    }
+  if (key && key.startsWith('referencing_')) {
+    keysToRemove.push(key);
   }
 }
 
-// Remove the keys
 keysToRemove.forEach(key => {
   localStorage.removeItem(key);
-  console.log(`🗑️ Removed: ${key}`);
+  console.log(`🗑️ Removed from localStorage: ${key}`);
 });
 
-console.log(`✅ Cleared ${keysToRemove.length} referencing-related items from localStorage`);
-console.log('🔄 Please refresh the page and try uploading files again');
+console.log(`✅ Cleared ${keysToRemove.length} localStorage items`);
+
+// Clear IndexedDB
+const clearIndexedDB = async () => {
+  try {
+    // Delete the entire database
+    const deleteRequest = indexedDB.deleteDatabase('ReferencingDB');
+    
+    deleteRequest.onsuccess = () => {
+      console.log('🗑️ Cleared IndexedDB database: ReferencingDB');
+      console.log('🔄 Please refresh the page and test the new IndexedDB implementation');
+    };
+    
+    deleteRequest.onerror = () => {
+      console.log('⚠️ Could not clear IndexedDB (may not exist yet)');
+      console.log('🔄 Please refresh the page and test the new IndexedDB implementation');
+    };
+  } catch (error) {
+    console.log('⚠️ IndexedDB not available:', error);
+    console.log('🔄 Please refresh the page and test the new IndexedDB implementation');
+  }
+};
+
+clearIndexedDB();

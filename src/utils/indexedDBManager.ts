@@ -34,7 +34,7 @@ export class IndexedDBManager {
         // Create object store if it doesn't exist
         if (!db.objectStoreNames.contains(this.STORE_NAME)) {
           const store = db.createObjectStore(this.STORE_NAME, { keyPath: 'key' });
-          store.createIndex('key', 'key', { unique: true });
+          store.createIndex('userId', 'userId', { unique: false });
           console.log('✅ IndexedDB store created');
         }
       };
@@ -42,7 +42,7 @@ export class IndexedDBManager {
   }
 
   /**
-   * Save data to IndexedDB
+   * Set data in IndexedDB
    */
   static async setItem(key: string, value: any): Promise<boolean> {
     try {
@@ -55,15 +55,19 @@ export class IndexedDBManager {
       const transaction = this.db.transaction([this.STORE_NAME], 'readwrite');
       const store = transaction.objectStore(this.STORE_NAME);
 
-      const item = {
+      // Extract user ID from key (assuming format: userId_formData)
+      const userId = key.split('_')[0];
+
+      const data = {
         key: key,
+        userId: userId,
         value: value,
         timestamp: Date.now()
       };
 
-      const request = store.put(item);
+      const request = store.put(data);
 
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         request.onsuccess = () => {
           console.log(`✅ Saved ${key} to IndexedDB`);
           resolve(true);
@@ -71,7 +75,7 @@ export class IndexedDBManager {
 
         request.onerror = () => {
           console.error('Error saving to IndexedDB:', request.error);
-          reject(request.error);
+          resolve(false);
         };
       });
     } catch (error) {
@@ -95,7 +99,7 @@ export class IndexedDBManager {
       const store = transaction.objectStore(this.STORE_NAME);
       const request = store.get(key);
 
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         request.onsuccess = () => {
           if (request.result) {
             console.log(`📥 Retrieved ${key} from IndexedDB`);
@@ -108,7 +112,7 @@ export class IndexedDBManager {
 
         request.onerror = () => {
           console.error('Error reading from IndexedDB:', request.error);
-          reject(request.error);
+          resolve(null);
         };
       });
     } catch (error) {
@@ -132,7 +136,7 @@ export class IndexedDBManager {
       const store = transaction.objectStore(this.STORE_NAME);
       const request = store.delete(key);
 
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         request.onsuccess = () => {
           console.log(`🗑️ Removed ${key} from IndexedDB`);
           resolve(true);
@@ -140,7 +144,7 @@ export class IndexedDBManager {
 
         request.onerror = () => {
           console.error('Error removing from IndexedDB:', request.error);
-          reject(request.error);
+          resolve(false);
         };
       });
     } catch (error) {
@@ -150,9 +154,9 @@ export class IndexedDBManager {
   }
 
   /**
-   * Clear all referencing data for a user
+   * Clear all data for a specific user
    */
-  static async clearUserData(userId: string): Promise<void> {
+  static async clearUserData(userId: string): Promise<boolean> {
     try {
       await this.init();
       
@@ -162,36 +166,34 @@ export class IndexedDBManager {
 
       const transaction = this.db.transaction([this.STORE_NAME], 'readwrite');
       const store = transaction.objectStore(this.STORE_NAME);
-      const request = store.openCursor();
+      const index = store.index('userId');
+      const request = index.openCursor(IDBKeyRange.only(userId));
 
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         request.onsuccess = (event) => {
           const cursor = (event.target as IDBRequest).result;
           if (cursor) {
-            const key = cursor.key as string;
-            if (key.startsWith(userId)) {
-              cursor.delete();
-              console.log(`🗑️ Removed user data: ${key}`);
-            }
+            cursor.delete();
             cursor.continue();
           } else {
-            console.log('✅ All user data cleared from IndexedDB');
-            resolve();
+            console.log(`🗑️ Cleared all data for user ${userId} from IndexedDB`);
+            resolve(true);
           }
         };
 
         request.onerror = () => {
-          console.error('Error clearing user data:', request.error);
-          reject(request.error);
+          console.error('Error clearing user data from IndexedDB:', request.error);
+          resolve(false);
         };
       });
     } catch (error) {
       console.error('Error in clearUserData:', error);
+      return false;
     }
   }
 
   /**
-   * Get all keys for a user
+   * Get all keys for a specific user
    */
   static async getUserKeys(userId: string): Promise<string[]> {
     try {
@@ -203,18 +205,16 @@ export class IndexedDBManager {
 
       const transaction = this.db.transaction([this.STORE_NAME], 'readonly');
       const store = transaction.objectStore(this.STORE_NAME);
-      const request = store.openCursor();
+      const index = store.index('userId');
+      const request = index.openCursor(IDBKeyRange.only(userId));
 
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         const keys: string[] = [];
-
+        
         request.onsuccess = (event) => {
           const cursor = (event.target as IDBRequest).result;
           if (cursor) {
-            const key = cursor.key as string;
-            if (key.startsWith(userId)) {
-              keys.push(key);
-            }
+            keys.push(cursor.value.key);
             cursor.continue();
           } else {
             resolve(keys);
@@ -222,8 +222,8 @@ export class IndexedDBManager {
         };
 
         request.onerror = () => {
-          console.error('Error getting user keys:', request.error);
-          reject(request.error);
+          console.error('Error getting user keys from IndexedDB:', request.error);
+          resolve([]);
         };
       });
     } catch (error) {
@@ -246,11 +246,13 @@ export class IndexedDBManager {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
-        resolve(reader.result as string);
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Failed to convert file to base64'));
+        }
       };
-      reader.onerror = () => {
-        reject(new Error('Failed to read file'));
-      };
+      reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
   }
@@ -267,13 +269,14 @@ export class IndexedDBManager {
     while (n--) {
       u8arr[n] = bstr.charCodeAt(n);
     }
-    return new File([u8arr], fileName, { type: mime });
+    const blob = new Blob([u8arr], { type: mime });
+    return new File([blob], fileName, { type: fileType });
   }
 
   /**
    * Get database size information
    */
-  static async getDatabaseInfo(): Promise<{ size: number; keys: string[] }> {
+  static async getDatabaseInfo(): Promise<{ totalSize: number; userCount: number; keyCount: number }> {
     try {
       await this.init();
       
@@ -285,22 +288,27 @@ export class IndexedDBManager {
       const store = transaction.objectStore(this.STORE_NAME);
       const request = store.getAll();
 
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         request.onsuccess = () => {
-          const items = request.result;
-          const keys = items.map(item => item.key);
-          const size = JSON.stringify(items).length;
-          resolve({ size, keys });
+          const data = request.result;
+          const totalSize = JSON.stringify(data).length;
+          const userIds = new Set(data.map(item => item.userId));
+          
+          resolve({
+            totalSize,
+            userCount: userIds.size,
+            keyCount: data.length
+          });
         };
 
         request.onerror = () => {
           console.error('Error getting database info:', request.error);
-          reject(request.error);
+          resolve({ totalSize: 0, userCount: 0, keyCount: 0 });
         };
       });
     } catch (error) {
       console.error('Error in getDatabaseInfo:', error);
-      return { size: 0, keys: [] };
+      return { totalSize: 0, userCount: 0, keyCount: 0 };
     }
   }
 }

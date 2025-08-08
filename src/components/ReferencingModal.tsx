@@ -10,7 +10,7 @@ import GuarantorUpload from "./Uploads/GuarantorUpload";
 import referencingService from '../services/referencingService';
 import emailService from '../services/emailService';
 import { toast } from 'react-hot-toast';
-import { StorageManager } from '../utils/storageManager';
+import { IndexedDBManager } from '../utils/indexedDBManager';
 
 interface ReferencingModalProps {
   isOpen: boolean;
@@ -157,19 +157,19 @@ const navigationItems: NavigationItem[] = [
 // Process file for storage with validation
 const processFileForStorage = async (file: File): Promise<StoredFile> => {
   // Validate file size
-  if (!StorageManager.validateFileSize(file)) {
+  if (!IndexedDBManager.validateFileSize(file)) {
     throw new Error(`File ${file.name} is too large. Maximum size is 5MB.`);
   }
 
   // Convert file to base64
-  const dataUrl = await StorageManager.fileToBase64(file);
+  const dataUrl = await IndexedDBManager.fileToBase64(file);
   
   return {
     name: file.name,
     type: file.type,
     size: file.size,
     lastModified: file.lastModified,
-    dataUrl: dataUrl
+        dataUrl: dataUrl
   };
 };
 
@@ -400,8 +400,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
     if (user?.id && isOpen) {
       const loadSavedData = async () => {
         try {
-          // Load saved form data
-          const savedFormData = StorageManager.getItem(`${user.id}_formData`);
+                // Load saved form data
+      const savedFormData = await IndexedDBManager.getItem(`${user.id}_formData`);
           if (savedFormData) {
             console.log('📥 Loading saved form data:', savedFormData);
             
@@ -512,14 +512,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
           }
 
           // Load saved current step
-          const savedCurrentStep = StorageManager.getItem(`${user.id}_currentStep`);
+          const savedCurrentStep = await IndexedDBManager.getItem(`${user.id}_currentStep`);
           if (savedCurrentStep && typeof savedCurrentStep === 'number') {
             console.log('📥 Loading saved current step:', savedCurrentStep);
             setCurrentStep(savedCurrentStep);
           }
 
           // Load saved step status
-          const savedStepStatus = StorageManager.getItem(`${user.id}_stepStatus`);
+          const savedStepStatus = await IndexedDBManager.getItem(`${user.id}_stepStatus`);
           if (savedStepStatus) {
             console.log('📥 Loading saved step status:', savedStepStatus);
             setStepStatus(savedStepStatus);
@@ -550,9 +550,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
 
     // Only update step status if it's different from current
     setStepStatus(prevStatus => {
-      const hasChanged = Object.keys(newStatus).some(key => 
-        prevStatus[parseInt(key)] !== newStatus[parseInt(key)]
-      );
+      const hasChanged = Object.keys(newStatus).some(key => {
+        const stepKey = parseInt(key);
+        return prevStatus[stepKey as keyof typeof prevStatus] !== newStatus[stepKey as keyof typeof newStatus];
+      });
       
       if (hasChanged) {
         return newStatus;
@@ -657,16 +658,16 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
         }
       };
 
-      // Ultra-fast localStorage save using StorageManager for better performance and quota handling
+      // Ultra-fast IndexedDB save for better performance and large data handling
       if (user?.id) {
         if (typeof window.requestIdleCallback !== 'undefined') {
-          requestIdleCallback(() => {
-            StorageManager.setItem(`${user.id}_formData`, updated);
+          requestIdleCallback(async () => {
+            await IndexedDBManager.setItem(`${user.id}_formData`, updated);
           });
         } else {
           // Fallback for browsers without requestIdleCallback
-          setTimeout(() => {
-            StorageManager.setItem(`${user.id}_formData`, updated);
+          setTimeout(async () => {
+            await IndexedDBManager.setItem(`${user.id}_formData`, updated);
           }, 0);
         }
       }
@@ -868,10 +869,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
         throw new Error('No user found. Please login again.');
       }
 
-      // Save current step to local storage using StorageManager
-      StorageManager.setItem(`${user.id}_currentStep`, currentStep);
-      StorageManager.setItem(`${user.id}_formData`, formData);
-      StorageManager.setItem(`${user.id}_stepStatus`, stepStatus);
+      // Save current step to IndexedDB
+      await IndexedDBManager.setItem(`${user.id}_currentStep`, currentStep);
+      await IndexedDBManager.setItem(`${user.id}_formData`, formData);
+      await IndexedDBManager.setItem(`${user.id}_stepStatus`, stepStatus);
 
       // Get current section data
       const section = getCurrentSection();
@@ -963,13 +964,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
   // Add auto-save on form updates (debounced to prevent excessive saves)
   useEffect(() => {
     if (user?.id && isOpen) {
-      const timeoutId = setTimeout(() => {
+      const timeoutId = setTimeout(async () => {
         console.log('💾 Auto-saving form data...', { currentStep, stepStatus });
         
         // Save form data with files included
-        const formDataSuccess = StorageManager.setItem(`${user.id}_formData`, formData);
-        const stepStatusSuccess = StorageManager.setItem(`${user.id}_stepStatus`, stepStatus);
-        const currentStepSuccess = StorageManager.setItem(`${user.id}_currentStep`, currentStep);
+        const formDataSuccess = await IndexedDBManager.setItem(`${user.id}_formData`, formData);
+        const stepStatusSuccess = await IndexedDBManager.setItem(`${user.id}_stepStatus`, stepStatus);
+        const currentStepSuccess = await IndexedDBManager.setItem(`${user.id}_currentStep`, currentStep);
         
         // Log warnings if storage fails
         if (!formDataSuccess || !stepStatusSuccess || !currentStepSuccess) {
@@ -1076,9 +1077,9 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       setShowSuccessModal(true);
       setShowWarningModal(false);
 
-      // Non-blocking localStorage operations
-      setTimeout(() => {
-        StorageManager.setItem(`${userId}_submitted`, true);
+      // Non-blocking IndexedDB operations
+      setTimeout(async () => {
+        await IndexedDBManager.setItem(`${userId}_submitted`, true);
       }, 0);
 
       // Show instant success feedback
@@ -1199,17 +1200,21 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
   // Update cleanup effect - only clear data when form is successfully submitted
   useEffect(() => {
     if (!isOpen && user?.id) {
-      const isSubmitted = StorageManager.getItem(`${user.id}_submitted`);
-      console.log('🔍 Cleanup effect - Modal closed, checking submission status:', isSubmitted);
+      const checkSubmissionStatus = async () => {
+        const isSubmitted = await IndexedDBManager.getItem(`${user.id}_submitted`);
+        console.log('🔍 Cleanup effect - Modal closed, checking submission status:', isSubmitted);
+        
+        if (isSubmitted === true) {
+          console.log('🧹 Clearing form data after successful submission');
+          // Clear storage only if the form was successfully submitted
+          await IndexedDBManager.clearUserData(user.id);
+          await IndexedDBManager.removeItem(`${user.id}_submitted`);
+        } else {
+          console.log('💾 Keeping form data - form not submitted yet');
+        }
+      };
       
-      if (isSubmitted === true) {
-        console.log('🧹 Clearing form data after successful submission');
-        // Clear storage only if the form was successfully submitted
-        StorageManager.clearReferencingData(user.id);
-        StorageManager.removeItem(`${user.id}_submitted`);
-      } else {
-        console.log('💾 Keeping form data - form not submitted yet');
-      }
+      checkSubmissionStatus();
     }
   }, [isOpen, user?.id]); // Only depend on user.id, not the entire user object
 
