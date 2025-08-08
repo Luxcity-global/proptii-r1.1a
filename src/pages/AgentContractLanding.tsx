@@ -33,7 +33,7 @@ const AgentContractLanding = () => {
                         alt="Modern building"
                         className="w-full h-full object-cover"
                         loading="eager"
-                        fetchPriority="high"
+                        fetchpriority="high"
                         sizes="100vw"
                     />
                     <div className="absolute inset-0 bg-black bg-opacity-40"></div>

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   dashboardService, 
+  createDashboardService,
   DashboardSummary, 
   SavedProperty, 
   PropertyViewing, 
@@ -39,12 +40,14 @@ export const useDashboardData = (): DashboardData => {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [files, setFiles] = useState<UserFile[]>([]);
 
-  // Create dashboard service with user ID
-  const dashboardServiceInstance = createDashboardService(user?.id);
-
   const fetchDashboardData = async () => {
+    console.log('🚀 fetchDashboardData called with user?.id:', user?.id);
     setIsLoading(true);
     setError(null);
+    
+    // Create dashboard service with current user ID
+    const dashboardServiceInstance = createDashboardService(user?.id);
+    console.log('🔧 Created dashboard service instance for user:', user?.id);
     
     try {
       // Fetch all data in parallel for better performance
@@ -64,9 +67,12 @@ export const useDashboardData = (): DashboardData => {
         dashboardServiceInstance.getUserFiles()
       ]);
 
+      console.log('📋 Dashboard response:', dashboardResponse);
       if (dashboardResponse.success && dashboardResponse.data) {
+        console.log('✅ Setting dashboard summary:', dashboardResponse.data);
         setDashboardSummary(dashboardResponse.data);
       } else if (!dashboardResponse.success) {
+        console.error('❌ Dashboard response failed:', dashboardResponse.error);
         setError(dashboardResponse.error || 'Failed to fetch dashboard summary');
       }
 
@@ -107,10 +113,16 @@ export const useDashboardData = (): DashboardData => {
     }
   };
 
-  // Load data on initial mount
+  // Load data on initial mount and when user changes
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    console.log('🔄 useDashboardData useEffect triggered with user?.id:', user?.id);
+    if (user?.id) { // Only fetch data if user ID is available
+      console.log('📊 Fetching dashboard data for user:', user.id);
+      fetchDashboardData();
+    } else {
+      console.log('⏳ No user ID available, skipping dashboard data fetch');
+    }
+  }, [user?.id]); // Re-run when user.id changes
 
   // Filter viewings for convenience
   const upcomingViewings = viewings.filter(viewing => viewing.status === 'upcoming');

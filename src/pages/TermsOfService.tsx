@@ -17,7 +17,7 @@ const TermsOfService = () => {
                         alt="Terms of Service Hero"
                         className="w-full h-full object-cover"
                         loading="eager"
-                        fetchPriority="high"
+                        fetchpriority="high"
                         sizes="100vw"
                     />
                     <div className="absolute inset-0 bg-[#0A2342]/80"></div>

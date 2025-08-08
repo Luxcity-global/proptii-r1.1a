@@ -101,7 +101,7 @@ const BookViewing = () => {
             alt="Family enjoying dinner together"
             className="w-full h-full object-cover"
             loading="eager"
-            fetchPriority="high"
+            fetchpriority="high"
             sizes="100vw"
           />
           {/* Overlay to ensure text readability */}

@@ -1,20 +1,30 @@
-import { FormData } from '../types/referencing';
 import { DashboardSummary } from '../mocks/dashboardApi';
-import { StorageManager } from '../utils/storageManager';
+import { IndexedDBManager } from '../utils/indexedDBManager';
+
+// Define the actual FormData interface that matches what's stored in IndexedDB
+interface FormData {
+  identity: any;
+  employment: any;
+  residential: any;
+  financial: any;
+  guarantor: any;
+  creditCheck: any;
+  agentDetails: any;
+}
 
 /**
  * Service to read referencing form data from localStorage and convert it to dashboard format
  */
 export class ReferencingProgressService {
   /**
-   * Read form data from localStorage for a specific user
+   * Read form data from IndexedDB for a specific user
    */
-  static getFormDataFromStorage(userId: string): FormData | null {
+  static async getFormDataFromStorage(userId: string): Promise<FormData | null> {
     try {
       const storageKey = `${userId}_formData`;
-      return StorageManager.getItem(storageKey);
+      return await IndexedDBManager.getItem(storageKey);
     } catch (error) {
-      console.error('Error reading form data from localStorage:', error);
+      console.error('Error reading form data from IndexedDB:', error);
       return null;
     }
   }
@@ -65,7 +75,10 @@ export class ReferencingProgressService {
     return !!(
       data.employmentStatus?.trim() &&
       data.companyDetails?.trim() &&
-      data.jobPosition?.trim()
+      data.jobPosition?.trim() &&
+      data.referenceFullName?.trim() &&
+      data.referenceEmail?.trim() &&
+      data.referencePhone?.trim()
     );
   }
 
@@ -75,7 +88,8 @@ export class ReferencingProgressService {
   private static isResidentialCompleted(data: any): boolean {
     return !!(
       data.currentAddress?.trim() &&
-      data.durationAtCurrentAddress?.trim()
+      data.durationAtCurrentAddress?.trim() &&
+      data.proofType?.trim()
     );
   }
 
@@ -84,9 +98,8 @@ export class ReferencingProgressService {
    */
   private static isFinancialCompleted(data: any): boolean {
     return !!(
-      data.proofOfIncomeType?.trim() ||
-      data.proofOfIncomeDocument ||
-      data.openBankingConsent === true
+      data.monthlyIncome?.trim() &&
+      (data.proofOfIncomeType?.trim() || data.proofOfIncomeDocument)
     );
   }
 
@@ -94,10 +107,12 @@ export class ReferencingProgressService {
    * Check if guarantor section is completed
    */
   private static isGuarantorCompleted(data: any): boolean {
-    // Guarantor might be optional, so we check if it's either completed or explicitly skipped
     return !!(
-      (data.firstName?.trim() && data.lastName?.trim() && data.email?.trim()) ||
-      data.isNotRequired === true
+      data.firstName?.trim() &&
+      data.lastName?.trim() &&
+      data.email?.trim() &&
+      data.phoneNumber?.trim() &&
+      data.address?.trim()
     );
   }
 
@@ -113,9 +128,10 @@ export class ReferencingProgressService {
    */
   private static isAgentDetailsCompleted(data: any): boolean {
     return !!(
-      data.agentName?.trim() &&
-      data.agentEmail?.trim() &&
-      data.agentPhone?.trim()
+      data.firstName?.trim() &&
+      data.lastName?.trim() &&
+      data.email?.trim() &&
+      data.phoneNumber?.trim()
     );
   }
 
@@ -163,9 +179,13 @@ export class ReferencingProgressService {
    * Convert form data to dashboard summary format
    */
   static convertToDashboardSummary(formData: FormData, userId: string): DashboardSummary['referencing'] {
-    const progressData = this.calculateProgress(formData);
+    console.log('🔄 Converting form data to dashboard summary for user:', userId);
+    console.log('📋 Input form data:', formData);
     
-    return {
+    const progressData = this.calculateProgress(formData);
+    console.log('📊 Calculated progress data:', progressData);
+    
+    const result: DashboardSummary['referencing'] = {
       status: progressData.progress === 0 ? 'not_started' : 
               progressData.progress === 100 ? 'completed' : 'in_progress',
       progress: progressData.progress,
@@ -173,32 +193,35 @@ export class ReferencingProgressService {
       totalSteps: progressData.totalSteps,
       ...progressData.sectionStatus
     };
+    
+    console.log('✅ Final dashboard summary result:', result);
+    return result;
   }
 
   /**
-   * Get current step from localStorage
+   * Get current step from IndexedDB
    */
-  static getCurrentStep(userId: string): number {
+  static async getCurrentStep(userId: string): Promise<number> {
     try {
       const storageKey = `${userId}_currentStep`;
-      const currentStep = StorageManager.getItem(storageKey);
+      const currentStep = await IndexedDBManager.getItem(storageKey);
       return currentStep ? parseInt(currentStep, 10) : 1;
     } catch (error) {
-      console.error('Error reading current step from localStorage:', error);
+      console.error('Error reading current step from IndexedDB:', error);
       return 1;
     }
   }
 
   /**
-   * Get last saved timestamp from localStorage
+   * Get last saved timestamp from IndexedDB
    */
-  static getLastSaved(userId: string): Date | null {
+  static async getLastSaved(userId: string): Promise<Date | null> {
     try {
       const storageKey = `${userId}_lastSaved`;
-      const lastSaved = StorageManager.getItem(storageKey);
+      const lastSaved = await IndexedDBManager.getItem(storageKey);
       return lastSaved ? new Date(parseInt(lastSaved, 10)) : null;
     } catch (error) {
-      console.error('Error reading last saved timestamp from localStorage:', error);
+      console.error('Error reading last saved timestamp from IndexedDB:', error);
       return null;
     }
   }

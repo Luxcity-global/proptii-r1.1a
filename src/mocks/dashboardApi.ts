@@ -114,20 +114,32 @@ export interface UserFile {
 }
 
 // Function to get real referencing data from localStorage
-const getRealReferencingData = (userId?: string): DashboardSummary['referencing'] => {
+const getRealReferencingData = async (userId?: string): Promise<DashboardSummary['referencing']> => {
   // Use provided user ID or fallback to default
   const currentUserId = userId || 'default-user';
   
-  // Get form data from localStorage
-  const formData = ReferencingProgressService.getFormDataFromStorage(currentUserId);
+  console.log('🔍 getRealReferencingData called with userId:', currentUserId);
   
-  if (formData) {
-    // Convert real form data to dashboard format
-    return ReferencingProgressService.convertToDashboardSummary(formData, currentUserId);
+  try {
+    // Get form data from IndexedDB
+    const formData = await ReferencingProgressService.getFormDataFromStorage(currentUserId);
+    
+    console.log('📊 Form data retrieved from IndexedDB:', formData);
+    
+    if (formData) {
+      // Convert real form data to dashboard format
+      const dashboardData = ReferencingProgressService.convertToDashboardSummary(formData, currentUserId);
+      console.log('📈 Converted to dashboard format:', dashboardData);
+      return dashboardData;
+    } else {
+      console.log('⚠️ No form data found for user:', currentUserId);
+    }
+  } catch (error) {
+    console.error('❌ Error getting real referencing data:', error);
   }
   
   // Fallback to default data if no form data exists
-  return {
+  const fallbackData: DashboardSummary['referencing'] = {
     status: 'not_started',
     progress: 0,
     completedSteps: 0,
@@ -140,10 +152,13 @@ const getRealReferencingData = (userId?: string): DashboardSummary['referencing'
     creditCheck: false,
     agentDetails: false
   };
+  
+  console.log('🔄 Using fallback data:', fallbackData);
+  return fallbackData;
 };
 
 // Function to create dashboard data with real referencing data
-const createDashboardData = (userId?: string): DashboardSummary => ({
+const createDashboardData = async (userId?: string): Promise<DashboardSummary> => ({
   savedSearches: {
     count: 3,
     recentSearches: [
@@ -162,7 +177,7 @@ const createDashboardData = (userId?: string): DashboardSummary => ({
       time: '14:00'
     }
   },
-  referencing: getRealReferencingData(userId),
+  referencing: await getRealReferencingData(userId),
   contracts: {
     pending: 0,
     signed: 1,
@@ -438,7 +453,8 @@ export const mockGetDashboardSummary = async (userId?: string): Promise<ApiRespo
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 800));
     
-    return { success: true, data: createDashboardData(userId) };
+    const dashboardData = await createDashboardData(userId);
+    return { success: true, data: dashboardData };
   } catch (error: any) {
     console.error('Mock API Error:', error);
     return {

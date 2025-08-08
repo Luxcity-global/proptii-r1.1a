@@ -133,7 +133,7 @@ const Referencing = () => {
             alt="Family enjoying dinner together"
             className="w-full h-full object-cover"
             loading="eager"
-            fetchPriority="high"
+            fetchpriority="high"
             decoding="sync"
             sizes="100vw"
           />
