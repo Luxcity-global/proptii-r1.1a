@@ -12,6 +12,17 @@ interface FormData {
   agentDetails: any;
 }
 
+// Add interface for file data that matches UserFile structure
+export interface ReferencingFile {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  uploadedAt: string;
+  category: 'identity' | 'employment' | 'residential' | 'financial' | 'guarantor';
+  url: string;
+}
+
 /**
  * Service to read referencing form data from localStorage and convert it to dashboard format
  */
@@ -226,3 +237,96 @@ export class ReferencingProgressService {
     }
   }
 }
+
+// Function to get actual uploaded files from referencing form data
+export const getReferencingFiles = async (userId?: string): Promise<ReferencingFile[]> => {
+  try {
+    console.log('🔍 Getting referencing files for user:', userId);
+    
+    if (!userId) {
+      console.log('❌ No user ID provided');
+      return [];
+    }
+
+    const formData = await ReferencingProgressService.getFormDataFromStorage(userId);
+    if (!formData) {
+      console.log('❌ No form data found for user:', userId);
+      return [];
+    }
+
+    const files: ReferencingFile[] = [];
+    let fileId = 1;
+
+    // Extract files from each section
+    if (formData.identity?.identityProof) {
+      const file = formData.identity.identityProof;
+      files.push({
+        id: `identity_${fileId++}`,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        uploadedAt: new Date(file.lastModified).toISOString(),
+        category: 'identity',
+        url: file.dataUrl // Use dataUrl as the URL for viewing
+      });
+    }
+
+    if (formData.employment?.proofDocument) {
+      const file = formData.employment.proofDocument;
+      files.push({
+        id: `employment_${fileId++}`,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        uploadedAt: new Date(file.lastModified).toISOString(),
+        category: 'employment',
+        url: file.dataUrl
+      });
+    }
+
+    if (formData.residential?.proofDocument) {
+      const file = formData.residential.proofDocument;
+      files.push({
+        id: `residential_${fileId++}`,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        uploadedAt: new Date(file.lastModified).toISOString(),
+        category: 'residential',
+        url: file.dataUrl
+      });
+    }
+
+    if (formData.financial?.proofOfIncomeDocument) {
+      const file = formData.financial.proofOfIncomeDocument;
+      files.push({
+        id: `financial_${fileId++}`,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        uploadedAt: new Date(file.lastModified).toISOString(),
+        category: 'financial',
+        url: file.dataUrl
+      });
+    }
+
+    if (formData.guarantor?.identityDocument) {
+      const file = formData.guarantor.identityDocument;
+      files.push({
+        id: `guarantor_${fileId++}`,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        uploadedAt: new Date(file.lastModified).toISOString(),
+        category: 'guarantor',
+        url: file.dataUrl
+      });
+    }
+
+    console.log('📁 Found files:', files.length);
+    return files;
+  } catch (error) {
+    console.error('❌ Error getting referencing files:', error);
+    return [];
+  }
+};

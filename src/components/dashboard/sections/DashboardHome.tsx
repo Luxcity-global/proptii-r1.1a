@@ -135,6 +135,9 @@ const DashboardHome: React.FC = () => {
   // Debug logging
   console.log('🏠 DashboardHome - dashboardSummary:', dashboardSummary);
   console.log('🏠 DashboardHome - referencing data:', dashboardSummary?.referencing);
+  console.log('📁 DashboardHome - files:', files);
+  console.log('📁 DashboardHome - files length:', files?.length || 0);
+  console.log('📁 DashboardHome - files details:', files?.map(f => ({ name: f.name, type: f.type, size: f.size })));
 
   const data = [
     { name: 'Total', value: dashboardSummary?.viewings.total || 0 },
@@ -732,6 +735,7 @@ const DashboardHome: React.FC = () => {
             <Typography variant="h6" color='#374957' fontWeight="bold">Uploaded Files</Typography>
             </div>
             <Grid container spacing={2} sx={{ mt: 2 }} height={'100%'} width={'100%'}>
+            {(() => { console.log('🎨 Rendering files section with', files.length, 'files'); return null; })()}
        {files.slice(0, 8).map((file) => (
        <Grid item xs={6} sm={3} md={2} lg={1.5} key={file.id} width={'100%'}>
        <Box
@@ -741,7 +745,29 @@ const DashboardHome: React.FC = () => {
           alignItems: 'start',
           cursor: 'pointer', // Add pointer cursor to indicate clickability
         }}
-        onClick={() => window.open(file.url, '_blank')} // Open the file in a new tab
+        onClick={() => {
+          // Handle both data URLs and regular URLs
+          if (file.url.startsWith('data:')) {
+            // For data URLs, open in new window
+            const newWindow = window.open();
+            if (newWindow) {
+              newWindow.document.write(`
+                <html>
+                  <head><title>${file.name}</title></head>
+                  <body style="margin:0;padding:20px;">
+                    ${file.type.startsWith('image/') 
+                      ? `<img src="${file.url}" style="max-width:100%;height:auto;" alt="${file.name}">`
+                      : `<iframe src="${file.url}" style="width:100%;height:90vh;border:none;"></iframe>`
+                    }
+                  </body>
+                </html>
+              `);
+            }
+          } else {
+            // For regular URLs, open directly
+            window.open(file.url, '_blank');
+          }
+        }}
         >
         <Paper
           elevation={0}
@@ -772,7 +798,10 @@ const DashboardHome: React.FC = () => {
         <Grid item xs={12}>
         <Box sx={{ py: 2, textAlign: 'center' }}>
         <Typography variant="body2" color="textSecondary">
-          No files uploaded yet
+          No files uploaded yet. Upload files in the referencing form to see them here.
+        </Typography>
+        <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 1 }}>
+          Debug: Files array length is {files?.length || 0}
         </Typography>
        </Box>
         </Grid>

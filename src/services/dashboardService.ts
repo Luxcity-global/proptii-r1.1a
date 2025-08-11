@@ -53,7 +53,8 @@ class MockDashboardService implements DashboardServiceInterface {
   }
 
   getUserFiles(): Promise<ApiResponse<UserFile[]>> {
-    return mockGetUserFiles();
+    console.log('MockDashboardService.getUserFiles called. this.userId:', this.userId);
+    return mockGetUserFiles(this.userId);
   }
 }
 

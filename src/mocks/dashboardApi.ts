@@ -1,5 +1,5 @@
 import { ApiResponse } from '../services/api';
-import { ReferencingProgressService } from '../services/referencingProgressService';
+import { ReferencingProgressService, getReferencingFiles } from '../services/referencingProgressService';
 
 // Import ReferencingModal constants for consistency
 const BLUE_COLOR = '#136C9E';
@@ -109,7 +109,7 @@ export interface UserFile {
   type: string;
   size: number;
   uploadedAt: string;
-  category: 'identity' | 'employment' | 'residential' | 'financial' | 'contract' | 'other';
+  category: 'identity' | 'employment' | 'residential' | 'financial' | 'guarantor' | 'contract' | 'other';
   url: string;
 }
 
@@ -524,12 +524,24 @@ export const mockGetContracts = async (): Promise<ApiResponse<Contract[]>> => {
   }
 };
 
-export const mockGetUserFiles = async (): Promise<ApiResponse<UserFile[]>> => {
+export const mockGetUserFiles = async (userId?: string): Promise<ApiResponse<UserFile[]>> => {
   try {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 750));
     
-    return { success: true, data: mockFiles };
+    console.log('📁 Getting user files for:', userId);
+    
+    // Get real files from referencing form data
+    const realFiles = await getReferencingFiles(userId);
+    
+    // If no real files found, fall back to mock files
+    if (realFiles.length === 0) {
+      console.log('📁 No real files found, using mock files');
+      return { success: true, data: mockFiles };
+    }
+    
+    console.log('📁 Returning real files:', realFiles.length);
+    return { success: true, data: realFiles };
   } catch (error: any) {
     console.error('Mock API Error:', error);
     return {

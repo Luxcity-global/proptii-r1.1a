@@ -18,6 +18,8 @@ This document serves as the central guidance and overview for integrating tenant
 - [x] **Dashboard Integration Fix**: Fixed `ReferenceError: createDashboardService is not defined`
 - [x] **Dashboard-Form Communication Fix**: Fixed dashboard not reflecting form progress
 - [x] **React Warnings Fixed**: Fixed `fetchPriority` and `clipPath` warnings across all components
+- [x] **YourFiles Integration**: Implemented display of actual uploaded files from referencing process in YourFiles dashboard page
+- [x] **Guarantor Section**: Added new "Guarantor Files" section to YourFiles page alongside existing sections
 
 ### 🔧 Current Issue: Dashboard Loading Problem (August 8, 2025)
 
@@ -96,6 +98,36 @@ This document serves as the central guidance and overview for integrating tenant
 - **Progress Tracking**: Dashboard now reflects actual form completion status
 - **User Authentication**: Proper user ID handling for data retrieval
 - **Data Persistence**: Form data persists across page navigation
+
+### ✅ YourFiles Integration Complete (August 8, 2025):
+- **Real File Display**: YourFiles page now shows actual uploaded files from the referencing process instead of mock data
+- **Guarantor Section**: Added new "Guarantor Files" section alongside Identity, Employment, Financial, and Residential sections
+- **File Categories**: Files are automatically categorized based on their upload section in the referencing form
+- **Data URL Support**: Enhanced file viewing to handle both data URLs (from IndexedDB) and regular URLs
+- **User-Specific Files**: Files are fetched based on the authenticated user's ID
+- **File Operations**: View and Download functionality works with both data URLs and regular URLs
+
+**🔧 Technical Implementation:**
+- **New Service Function**: Added `getReferencingFiles()` in `referencingProgressService.ts` to extract files from IndexedDB
+- **Updated API**: Modified `mockGetUserFiles()` to accept user ID and return real files with fallback to mock data
+- **Enhanced Component**: Updated `YourFiles.tsx` to use authentication context and handle data URLs
+- **Interface Updates**: Extended `UserFile` interface to include 'guarantor' category
+- **File Viewing**: Implemented smart file viewing that handles images and documents differently
+
+**📁 File Categories Supported:**
+- **Identity**: Files uploaded in the Identity section (identityProof)
+- **Employment**: Files uploaded in the Employment section (proofDocument)
+- **Residential**: Files uploaded in the Residential section (proofDocument)
+- **Financial**: Files uploaded in the Financial section (proofOfIncomeDocument)
+- **Guarantor**: Files uploaded in the Guarantor section (identityDocument)
+
+**🔄 Data Flow:**
+1. User authenticates and navigates to YourFiles page
+2. Component fetches user ID from AuthContext
+3. `mockGetUserFiles(userId)` calls `getReferencingFiles(userId)`
+4. Service extracts files from IndexedDB form data
+5. Files are categorized and displayed in appropriate sections
+6. Users can view and download files using enhanced file handling
 
 ## Project Overview
 **Objective**: Link the tenant referencing form progress to dashboard tracker cards, ensuring seamless data flow and user experience between form completion and dashboard tracking.

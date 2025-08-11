@@ -1,53 +1,48 @@
-# Browser Cache Clearing Instructions
+# Clear Browser Cache Instructions
 
-## Issue
-The dashboard is not reflecting form progress due to two main issues:
-1. **Authentication Context Mismatch**: The dashboard was using the wrong authentication context, causing it to receive `undefined` user ID
-2. **Browser Caching**: The browser is using cached JavaScript files, preventing the updated code from loading
+## Why Clear Cache?
+The browser cache stores old versions of files, which can prevent you from seeing the latest changes. If you're seeing "wrong files" or old data, clearing the cache will help.
 
-## Solution: Clear Browser Cache
+## How to Clear Cache
 
-### Method 1: Hard Refresh (Recommended)
-1. **Chrome/Edge**: Press `Ctrl + Shift + R` (Windows) or `Cmd + Shift + R` (Mac)
-2. **Firefox**: Press `Ctrl + F5` (Windows) or `Cmd + Shift + R` (Mac)
-3. **Safari**: Press `Cmd + Option + R` (Mac)
+### Chrome/Edge:
+1. Press `Ctrl + Shift + Delete` (Windows) or `Cmd + Shift + Delete` (Mac)
+2. Set time range to "All time"
+3. Check these boxes:
+   - Browsing history
+   - Cookies and other site data
+   - Cached images and files
+4. Click "Clear data"
+5. Refresh the page with `Ctrl + F5` (Windows) or `Cmd + Shift + R` (Mac)
 
-### Method 2: Clear Cache via Developer Tools
-1. Open Developer Tools (`F12` or `Ctrl + Shift + I`)
-2. Right-click the refresh button in the browser
-3. Select "Empty Cache and Hard Reload"
+### Firefox:
+1. Press `Ctrl + Shift + Delete` (Windows) or `Cmd + Shift + Delete` (Mac)
+2. Set time range to "Everything"
+3. Check these boxes:
+   - Browsing & Download History
+   - Cookies
+   - Cache
+4. Click "Clear Now"
+5. Refresh the page with `Ctrl + F5` (Windows) or `Cmd + Shift + R` (Mac)
 
-### Method 3: Clear All Browser Data
-1. Open browser settings
-2. Go to Privacy & Security
-3. Clear browsing data
-4. Select "Cached images and files"
-5. Click "Clear data"
+### Safari:
+1. Go to Safari menu → Preferences → Advanced
+2. Check "Show Develop menu in menu bar"
+3. Go to Develop menu → Empty Caches
+4. Refresh the page with `Cmd + Shift + R`
 
-## What to Look For
-After clearing cache and refreshing, you should see these new console logs:
+## Alternative: Hard Refresh
+If you don't want to clear all cache, try a hard refresh:
+- Windows: `Ctrl + F5`
+- Mac: `Cmd + Shift + R`
 
-```
-🔄 useDashboardData useEffect triggered with user?.id: [user-id]
-📊 Fetching dashboard data for user: [user-id]
-🚀 fetchDashboardData called with user?.id: [user-id]
-🔧 Created dashboard service instance for user: [user-id]
-🔍 getRealReferencingData called with userId: [user-id]
-📊 Form data retrieved from IndexedDB: [form-data]
-🔄 Converting form data to dashboard summary for user: [user-id]
-📋 Input form data: [form-data]
-📊 Calculated progress data: [progress-data]
-✅ Final dashboard summary result: [result]
-📋 Dashboard response: [response]
-✅ Setting dashboard summary: [summary]
-🏠 DashboardHome - dashboardSummary: [summary]
-🏠 DashboardHome - referencing data: [referencing-data]
-```
+## After Clearing Cache:
+1. Go to the dashboard
+2. Check the console logs to see if the correct files are being fetched
+3. The "Uploaded Files" section should now show the actual files from your referencing form
 
-## Expected Result
-The dashboard should now show the actual progress from your referencing form instead of showing `null` or `undefined`.
-
-## If Still Not Working
-1. Check if the console logs appear (if not, cache wasn't cleared properly)
-2. Verify that the user ID in the logs matches the user ID from the form logs
-3. Check if there are any JavaScript errors in the console
+## Still Having Issues?
+If you're still seeing wrong files after clearing cache:
+1. Check the browser console for any error messages
+2. Make sure you're logged in with the correct user account
+3. Try opening the site in an incognito/private window

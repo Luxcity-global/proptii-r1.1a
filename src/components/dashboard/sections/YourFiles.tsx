@@ -1,18 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Paper, Button, ButtonGroup } from '@mui/material';
-import { mockGetUserFiles } from '../../../mocks/dashboardApi';
 import { UserFile } from '../../../mocks/dashboardApi';
 import { formatDate } from '../../../utils/formatters';
+import { useAuth } from '../../../contexts/AuthContext';
+import { createDashboardService } from '../../../services/dashboardService';
 
 const FileTable: React.FC = () => {
+  const { user } = useAuth();
   const [files, setFiles] = useState<UserFile[]>([]);
   const [groupedFiles, setGroupedFiles] = useState<Record<string, UserFile[]>>({});
   const [activeCategory, setActiveCategory] = useState<string>('identity'); // Default to 'identity'
 
-  // Fetch files from the mock API
+  // Fetch files from the dashboard service
   useEffect(() => {
     const fetchFiles = async () => {
-      const response = await mockGetUserFiles();
+      console.log('🔍 YourFiles - Fetching files for user:', user?.id);
+      const dashboardService = createDashboardService(user?.id);
+      const response = await dashboardService.getUserFiles();
       if (response.success) {
         setFiles(response.data || []);
 
@@ -25,13 +29,16 @@ const FileTable: React.FC = () => {
           return acc;
         }, {});
         setGroupedFiles(grouped);
+        console.log('📁 YourFiles - Grouped files:', grouped);
       } else {
-        console.error('Failed to fetch files:', response.error);
+        console.error('YourFiles - Failed to fetch files:', response.error);
       }
     };
 
-    fetchFiles();
-  }, []);
+    if (user?.id) {
+      fetchFiles();
+    }
+  }, [user?.id]);
 
   // Render the table for the active category
   const renderTable = (category: string) => {
@@ -60,7 +67,29 @@ const FileTable: React.FC = () => {
                   <Button
                     variant="outlined"
                     color="primary"
-                    onClick={() => window.open(file.url, '_blank')}
+                    onClick={() => {
+                      // Handle both data URLs and regular URLs
+                      if (file.url.startsWith('data:')) {
+                        // For data URLs, open in new window
+                        const newWindow = window.open();
+                        if (newWindow) {
+                          newWindow.document.write(`
+                            <html>
+                              <head><title>${file.name}</title></head>
+                              <body style="margin:0;padding:20px;">
+                                ${file.type.startsWith('image/') 
+                                  ? `<img src="${file.url}" style="max-width:100%;height:auto;" alt="${file.name}">`
+                                  : `<iframe src="${file.url}" style="width:100%;height:90vh;border:none;"></iframe>`
+                                }
+                              </body>
+                            </html>
+                          `);
+                        }
+                      } else {
+                        // For regular URLs, open directly
+                        window.open(file.url, '_blank');
+                      }
+                    }}
                     sx={{ marginRight: 1 }}
                   >
                     View
@@ -148,6 +177,16 @@ const FileTable: React.FC = () => {
           }}
         >
           Employment Files
+        </Button>
+        <Button 
+          onClick={() => setActiveCategory('guarantor')} 
+          sx={{ 
+            backgroundColor: activeCategory === 'guarantor' ? '#1976d2' : '#e0e0e0', 
+            color: activeCategory === 'guarantor' ? '#ffffff' : '#000000',
+            '&:hover': { backgroundColor: activeCategory === 'guarantor' ? '#1565c0' : '#d5d5d5' }
+          }}
+        >
+          Guarantor Files
         </Button>
       </ButtonGroup>
 
