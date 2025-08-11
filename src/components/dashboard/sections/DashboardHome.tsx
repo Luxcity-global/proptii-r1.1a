@@ -393,7 +393,7 @@ const DashboardHome: React.FC = () => {
               </Box>
               <Box sx={{ mt: 'auto' }}>
                 <StatsNumber>
-                  {dashboardSummary?.referencing.progress || 0}
+                  {dashboardSummary?.referencing.progress || 0}{dashboardSummary?.referencing.progress === 4 ? '' : '%'}
                 </StatsNumber>
                 <Typography variant="body2" sx={{ opacity: 0.8 }}>
                   Reference Progress
@@ -571,7 +571,7 @@ const DashboardHome: React.FC = () => {
             </g>
           </svg>
         ) : (
-          <StatsNumber style={{ zIndex: 20, fill: 'white' }}>{referencingProgress}</StatsNumber>
+                          <StatsNumber style={{ zIndex: 20, fill: 'white' }}>{referencingProgress}{referencingProgress === 4 ? '' : '%'}</StatsNumber>
         )}
       </div>
       </div>

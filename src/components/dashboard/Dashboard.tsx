@@ -137,7 +137,10 @@ const Dashboard: React.FC = () => {
     
     // If no exact match, check if we're on the dashboard home (which should match /dashboard exactly)
     if (!currentSection && currentPath === '/dashboard') {
-      currentSection = DASHBOARD_SECTIONS.find((section) => section.id === 'dashboard');
+      const dashboardSection = DASHBOARD_SECTIONS.find((section) => section.id === 'dashboard');
+      if (dashboardSection) {
+        currentSection = dashboardSection;
+      }
     }
     
     if (currentSection) {

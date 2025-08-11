@@ -247,7 +247,7 @@ const TenantReferencing: React.FC = () => {
                   </svg>
                 ) : (
                   <StatsNumber style={{ zIndex: 20, fill: 'white' }}>
-                    {referencingProgress}
+                    {referencingProgress}%
                   </StatsNumber>
                 )}
               </div>
