@@ -354,6 +354,30 @@ const mockViewings: PropertyViewing[] = [
     notes: 'Excellent property, considered making an offer',
     agentName: 'James Taylor',
     agentContact: 'james.t@luxcity.com'
+  },
+  {
+    id: '6',
+    propertyId: '6',
+    propertyAddress: '15 Oak Avenue, Manchester',
+    propertyImageUrl: '/images/property6.jpg',
+    date: '2023-11-15',
+    time: '15:00',
+    status: 'cancelled',
+    notes: 'Cancelled due to scheduling conflict',
+    agentName: 'Lisa Anderson',
+    agentContact: 'lisa.a@luxcity.com'
+  },
+  {
+    id: '7',
+    propertyId: '7',
+    propertyAddress: '89 Pine Street, Manchester',
+    propertyImageUrl: '/images/property7.jpg',
+    date: '2023-11-20',
+    time: '09:30',
+    status: 'cancelled',
+    notes: 'Property no longer available',
+    agentName: 'Robert Clark',
+    agentContact: 'robert.c@luxcity.com'
   }
 ];
 

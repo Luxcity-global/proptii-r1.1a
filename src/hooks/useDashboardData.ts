@@ -19,6 +19,7 @@ interface DashboardData {
   viewings: PropertyViewing[];
   upcomingViewings: PropertyViewing[];
   pastViewings: PropertyViewing[];
+  cancelledViewings: PropertyViewing[];
   referencingApplications: ReferencingApplication[];
   contracts: Contract[];
   files: UserFile[];
@@ -127,6 +128,7 @@ export const useDashboardData = (): DashboardData => {
   // Filter viewings for convenience
   const upcomingViewings = viewings.filter(viewing => viewing.status === 'upcoming');
   const pastViewings = viewings.filter(viewing => viewing.status === 'completed');
+  const cancelledViewings = viewings.filter(viewing => viewing.status === 'cancelled');
 
   return {
     isLoading,
@@ -136,6 +138,7 @@ export const useDashboardData = (): DashboardData => {
     viewings,
     upcomingViewings,
     pastViewings,
+    cancelledViewings,
     referencingApplications,
     contracts,
     files,
