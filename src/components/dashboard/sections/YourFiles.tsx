@@ -121,7 +121,7 @@ const FileTable: React.FC = () => {
       <Typography variant="h6" gutterBottom>
         User Files
       </Typography>
-       <div className="Yourfilescard bg-white p-4 rounded-lg shadow flex items-center" style={{ gap: '1rem', display: 'flex', flexDirection: 'row', justifyContent: 'start', alignItems: 'start', height: 'auto', width: '230px', border: '1px solid #81B0F8'}}>
+               <div className="Yourfilescard bg-white p-4 rounded-lg shadow flex items-center" style={{ gap: '1rem', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 'auto', width: '230px', border: '1px solid #81B0F8'}}>
                 <div style={{ gap: '0.2rem', display: 'flex', flexDirection: 'column', justifyContent: 'start', alignItems: 'start', }}>
                     <h2 className="text-xl font-semibold">{files.length}</h2>
                   <p className="text-gray-600">Your files</p>
@@ -136,59 +136,40 @@ const FileTable: React.FC = () => {
               </div>
 
       {/* Navigation Buttons */}
-      <ButtonGroup variant="contained" aria-label="outlined primary button group" sx={{ marginBottom: 2, padding: 2, gap:4, backgroundColor: '#FFFFFF', width: '100%', borderRadius: 2 }}>
-        <Button 
-          onClick={() => setActiveCategory('identity')} 
-          sx={{ 
-            backgroundColor: activeCategory === 'identity' ? '#1976d2' : '#e0e0e0', 
-            color: activeCategory === 'identity' ? '#ffffff' : '#000000',
-            '&:hover': { backgroundColor: activeCategory === 'identity' ? '#1565c0' : '#d5d5d5' },
-            borderRadius: 2,
-          }}
-        >
-          Identity Files
-        </Button>
-        <Button 
-          onClick={() => setActiveCategory('financial')} 
-          sx={{ 
-            backgroundColor: activeCategory === 'financial' ? '#1976d2' : '#e0e0e0', 
-            color: activeCategory === 'financial' ? '#ffffff' : '#000000',
-            '&:hover': { backgroundColor: activeCategory === 'financial' ? '#1565c0' : '#d5d5d5' }
-          }}
-        >
-          Financial Files
-        </Button>
-        <Button 
-          onClick={() => setActiveCategory('residential')} 
-          sx={{ 
-            backgroundColor: activeCategory === 'residential' ? '#1976d2' : '#e0e0e0', 
-            color: activeCategory === 'residential' ? '#ffffff' : '#000000',
-            '&:hover': { backgroundColor: activeCategory === 'residential' ? '#1565c0' : '#d5d5d5' }
-          }}
-        >
-          Residential Files
-        </Button>
-        <Button 
-          onClick={() => setActiveCategory('employment')} 
-          sx={{ 
-            backgroundColor: activeCategory === 'employment' ? '#1976d2' : '#e0e0e0', 
-            color: activeCategory === 'employment' ? '#ffffff' : '#000000',
-            '&:hover': { backgroundColor: activeCategory === 'employment' ? '#1565c0' : '#d5d5d5' }
-          }}
-        >
-          Employment Files
-        </Button>
-        <Button 
-          onClick={() => setActiveCategory('guarantor')} 
-          sx={{ 
-            backgroundColor: activeCategory === 'guarantor' ? '#1976d2' : '#e0e0e0', 
-            color: activeCategory === 'guarantor' ? '#ffffff' : '#000000',
-            '&:hover': { backgroundColor: activeCategory === 'guarantor' ? '#1565c0' : '#d5d5d5' }
-          }}
-        >
-          Guarantor Files
-        </Button>
-      </ButtonGroup>
+      <div className="bg-white p-4 rounded-lg shadow mb-4">
+        <nav className="flex space-x-4">
+          <button
+            className={`px-4 py-2 rounded-lg ${activeCategory === 'identity' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+            onClick={() => setActiveCategory('identity')}
+          >
+            Identity Files
+          </button>
+          <button
+            className={`px-4 py-2 rounded-lg ${activeCategory === 'financial' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+            onClick={() => setActiveCategory('financial')}
+          >
+            Financial Files
+          </button>
+          <button
+            className={`px-4 py-2 rounded-lg ${activeCategory === 'residential' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+            onClick={() => setActiveCategory('residential')}
+          >
+            Residential Files
+          </button>
+          <button
+            className={`px-4 py-2 rounded-lg ${activeCategory === 'employment' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+            onClick={() => setActiveCategory('employment')}
+          >
+            Employment Files
+          </button>
+          <button
+            className={`px-4 py-2 rounded-lg ${activeCategory === 'guarantor' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+            onClick={() => setActiveCategory('guarantor')}
+          >
+            Guarantor Files
+          </button>
+        </nav>
+      </div>
 
       {/* Render the table for the selected category */}
       {renderTable(activeCategory)}

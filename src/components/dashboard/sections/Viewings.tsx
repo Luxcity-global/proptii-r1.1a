@@ -22,6 +22,8 @@ import {
   TextField,
   IconButton
 } from '@mui/material';
+import Lottie from 'lottie-react';
+import successConfettiAnimation from '../../../../public/animated_icons/success confetti.json';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PersonIcon from '@mui/icons-material/Person';
@@ -585,29 +587,43 @@ const Viewings: React.FC = () => {
       >
         <DialogTitle sx={{ pb: 1 }}>
           <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6" fontWeight={600} color="success.main">
+            <Box flex={1} />
+            <Typography variant="h4" fontWeight={300} color="success.main">
               Reschedule Request Sent
             </Typography>
-            <IconButton onClick={handleCloseRescheduleSuccessModal} size="small">
-              <CloseIcon />
-            </IconButton>
+            <Box flex={1} display="flex" justifyContent="flex-end">
+              <IconButton onClick={handleCloseRescheduleSuccessModal} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Box>
           </Box>
         </DialogTitle>
         
-        <DialogContent sx={{ pb: 2 }}>
+        <DialogContent sx={{ pb: 2, textAlign: 'center' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1, mt: 2 }}>
+            <Lottie 
+              animationData={successConfettiAnimation} 
+              style={{ width: 160, height: 160 }}
+              loop={true}
+              autoplay={true}
+            />
+          </Box>
+          
           <Typography variant="body1" sx={{ mb: 3 }}>
             Your reschedule request has been sent to the estate agent. They will contact you shortly to confirm the new viewing time.
           </Typography>
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, pb: 3 }}>
+        <DialogActions sx={{ px: 3, pb: 3, justifyContent: 'center' }}>
           <Button
             onClick={handleCloseRescheduleSuccessModal}
             variant="contained"
             sx={{ 
-              borderRadius: 2,
+              borderRadius: 50,
               textTransform: 'none',
               minWidth: 100,
+              px: 3,
+              py: 1.5,
               bgcolor: '#DC5F12',
               '&:hover': {
                 bgcolor: '#C44E0F'
@@ -752,33 +768,58 @@ const Viewings: React.FC = () => {
       >
         <DialogTitle sx={{ pb: 1 }}>
           <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6" fontWeight={600} color="success.main">
+            <Box flex={1} />
+            <Typography variant="h4" fontWeight={300} color="success.main">
               Viewing Cancelled Successfully
             </Typography>
-            <IconButton onClick={handleCloseSuccessModal} size="small">
-              <CloseIcon />
-            </IconButton>
+            <Box flex={1} display="flex" justifyContent="flex-end">
+              <IconButton onClick={handleCloseSuccessModal} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Box>
           </Box>
         </DialogTitle>
         
-        <DialogContent sx={{ pb: 2 }}>
+        <DialogContent sx={{ pb: 2, textAlign: 'center' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3, mt: 2 }}>
+            <Lottie 
+              animationData={successConfettiAnimation} 
+              style={{ width: 160, height: 160 }}
+              loop={true}
+              autoplay={true}
+            />
+          </Box>
+          
+          <Typography variant="body1" sx={{ mb: 0 }}>
+            Your viewing has been cancelled successfully,
+          </Typography>
           <Typography variant="body1" sx={{ mb: 3 }}>
-            Your viewing has been cancelled successfully. The estate agent has been notified.
+            and the estate agent has been notified.
           </Typography>
           
-          <Typography variant="body1" sx={{ mb: 3 }}>
-            Don't worry! You can easily find another property using our AI-powered search tool.
-          </Typography>
+          <Box sx={{ 
+            bgcolor: '#E3F2FD', 
+            borderRadius: 2, 
+            p: 2, 
+            mb: 3,
+            border: '1px solid #BBDEFB'
+          }}>
+            <Typography variant="body1" sx={{ color: '#424242' }}>
+              Don't worry! You can easily find another property using our AI-powered search tool.
+            </Typography>
+          </Box>
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, pb: 3 }}>
+        <DialogActions sx={{ px: 3, pb: 3, justifyContent: 'center' }}>
           <Button
             onClick={handleCloseSuccessModal}
             variant="outlined"
             sx={{ 
-              borderRadius: 2,
+              borderRadius: 50,
               textTransform: 'none',
-              minWidth: 100
+              minWidth: 100,
+              px: 3,
+              py: 1.5
             }}
           >
             Close
@@ -787,9 +828,11 @@ const Viewings: React.FC = () => {
             onClick={handleFindProperty}
             variant="contained"
             sx={{ 
-              borderRadius: 2,
+              borderRadius: 50,
               textTransform: 'none',
               minWidth: 100,
+              px: 3,
+              py: 1.5,
               bgcolor: '#DC5F12',
               '&:hover': {
                 bgcolor: '#C44E0F'

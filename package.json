@@ -130,6 +130,7 @@
     "glob": "^10.3.10",
     "googleapis": "^149.0.0",
     "jszip": "^3.10.1",
+    "lottie-react": "^2.4.1",
     "lucide-react": "^0.330.0",
     "multer": "^2.0.0",
     "nodemailer": "^7.0.3",
