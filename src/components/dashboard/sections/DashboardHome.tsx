@@ -127,6 +127,8 @@ const DashboardHome: React.FC = () => {
     dashboardSummary, 
     viewings,
     upcomingViewings,
+    pastViewings,
+    cancelledViewings,
     files 
   } = useDashboardData();
   
@@ -140,9 +142,9 @@ const DashboardHome: React.FC = () => {
   console.log('📁 DashboardHome - files details:', files?.map(f => ({ name: f.name, type: f.type, size: f.size })));
 
   const data = [
-    { name: 'Total', value: dashboardSummary?.viewings.total || 0 },
-    { name: 'Completed', value: dashboardSummary?.viewings.past || 0 },
-    { name: 'Upcoming', value: dashboardSummary?.viewings.upcoming || 0 }
+    { name: 'Total', value: upcomingViewings.length + pastViewings.length + cancelledViewings.length },
+    { name: 'Completed', value: pastViewings.length },
+    { name: 'Upcoming', value: upcomingViewings.length }
   ];
 
   
@@ -259,7 +261,7 @@ const DashboardHome: React.FC = () => {
               </Box>
               <Box sx={{ mt: 'auto' }}>
                 <StatsNumber>
-                    {dashboardSummary?.viewings.total || 0}
+                    {upcomingViewings.length + pastViewings.length + cancelledViewings.length}
                 </StatsNumber>
                 <Typography variant="body2" sx={{ opacity: 0.8 }}>
                   Total Viewings
@@ -303,9 +305,17 @@ const DashboardHome: React.FC = () => {
                 { <Box sx={{ display: 'flex', flex:'row', justifyContent: 'start', alignItems: 'end', gap:3, height: '100%', pt: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'end', justifyContent: 'center' }}>
                 <Box sx={{ textAlign: 'center' }}>
-                  <Box sx={{ height: `${(dashboardSummary?.viewings.total || 0) * 30}px`, width: 50, bgcolor: '#C4A86E', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                  <Box sx={{ 
+                    height: `${(upcomingViewings.length + pastViewings.length + cancelledViewings.length) * 30}px`, 
+                    width: 50, 
+                    background: 'linear-gradient(180deg, #9C27B0 0%, #6A1B9A 100%)',
+                    borderRadius: 2, 
+                    display: 'flex', 
+                    alignItems: 'flex-end', 
+                    justifyContent: 'center' 
+                  }}>
                   <Typography variant="body2" color="white" sx={{ mb: 1 }}>
-                  {dashboardSummary?.viewings.total || 0}
+                  {upcomingViewings.length + pastViewings.length + cancelledViewings.length}
                   </Typography>
                   </Box>
                 </Box>
@@ -313,9 +323,17 @@ const DashboardHome: React.FC = () => {
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'end', justifyContent: 'center', mt: 2 }}>
                 <Box sx={{ textAlign: 'center' }}>
-                  <Box sx={{ height: `${(dashboardSummary?.viewings.past || 0) * 30}px`, width: 50, bgcolor: '#E1C387', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                  <Box sx={{ 
+                    height: `${pastViewings.length * 30}px`, 
+                    width: 50, 
+                    background: 'linear-gradient(180deg, #4CAF50 0%, #2E7D32 100%)',
+                    borderRadius: 2, 
+                    display: 'flex', 
+                    alignItems: 'flex-end', 
+                    justifyContent: 'center' 
+                  }}>
                   <Typography variant="body2" color="white" sx={{ mb: 1 }}>
-                  {dashboardSummary?.viewings.past || 0}
+                  {pastViewings.length}
                   </Typography>
                   </Box>
                 </Box>
@@ -323,29 +341,37 @@ const DashboardHome: React.FC = () => {
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'end', justifyContent: 'center', mt: 2 }}>
                 <Box sx={{ textAlign: 'center', pr: 3 }}>
-                  <Box sx={{ height: `${(dashboardSummary?.viewings.upcoming || 0) * 30}px`, width: 50, bgcolor: '#FEDFA0', borderRadius: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                  <Box sx={{ 
+                    height: `${upcomingViewings.length * 30}px`, 
+                    width: 50, 
+                    background: 'linear-gradient(180deg, #E91E63 0%, #C2185B 100%)',
+                    borderRadius: 2, 
+                    display: 'flex', 
+                    alignItems: 'flex-end', 
+                    justifyContent: 'center' 
+                  }}>
                   <Typography variant="body2" color="white" sx={{ mb: 1 }}>
-                  {dashboardSummary?.viewings.upcoming || 0}
+                  {upcomingViewings.length}
                   </Typography>
                   </Box>
                 </Box>
                 </Box>
 
                 
-                <Box sx={{ display: 'flex', flexDirection: 'column', mt: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <Box sx={{ width: 16, height: 16, bgcolor: '#C4A86E', mr: 1 }} />
-                  <Typography variant="body2">Total Viewings</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <Box sx={{ width: 16, height: 16, bgcolor: '#E1C387', mr: 1 }} />
-                  <Typography variant="body2">Completed Viewings</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Box sx={{ width: 16, height: 16, bgcolor: '#FEDFA0', mr: 1 }} />
-                  <Typography variant="body2">Upcoming Viewings</Typography>
-                  </Box>
-                </Box>
+                                 <Box sx={{ display: 'flex', flexDirection: 'column', mt: 2 }}>
+                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                   <Box sx={{ width: 16, height: 16, bgcolor: '#9C27B0', mr: 1 }} />
+                   <Typography variant="body2">Total Viewings</Typography>
+                   </Box>
+                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                   <Box sx={{ width: 16, height: 16, bgcolor: '#4CAF50', mr: 1 }} />
+                   <Typography variant="body2">Completed Viewings</Typography>
+                   </Box>
+                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                   <Box sx={{ width: 16, height: 16, bgcolor: '#E91E63', mr: 1 }} />
+                   <Typography variant="body2">Upcoming Viewings</Typography>
+                   </Box>
+                 </Box>
                 
                 </Box> }
               
