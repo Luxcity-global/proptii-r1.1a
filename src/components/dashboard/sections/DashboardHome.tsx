@@ -752,93 +752,104 @@ const DashboardHome: React.FC = () => {
         </DashboardCard>
       </Grid>
 
-      {/* Files Section */}
-      <div className='Files Section' style={{ display: 'flex', flexDirection: 'column',  borderRadius: '8px', paddingLeft: '30,', paddingTop:'30px', paddingBottom:'30px', width: '100%', backgroundColor:'' }} >
-      <Grid item xs={12} height={'10px'} width={'100%'}  > 
-        
-          <CardContent bgcolor={'#EDF3FA'} borderRadius={4} >
-            <div style={{ display:'flex', flexDirection:'row', justifyContent:'start', alignItems:'start', backgroundColor: '#F5F5F5', padding: '12px', borderRadius: '6px', width: '100%',}}>
-            <Typography variant="h6" color='#374957' fontWeight="bold">Uploaded Files</Typography>
-            </div>
-            <Grid container spacing={2} sx={{ mt: 2 }} height={'100%'} width={'100%'}>
-            {(() => { console.log('🎨 Rendering files section with', files.length, 'files'); return null; })()}
-       {files.slice(0, 8).map((file) => (
-       <Grid item xs={6} sm={3} md={2} lg={1.5} key={file.id} width={'100%'}>
-       <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'start',
-          cursor: 'pointer', // Add pointer cursor to indicate clickability
-        }}
-        onClick={() => {
-          // Handle both data URLs and regular URLs
-          if (file.url.startsWith('data:')) {
-            // For data URLs, open in new window
-            const newWindow = window.open();
-            if (newWindow) {
-              newWindow.document.write(`
-                <html>
-                  <head><title>${file.name}</title></head>
-                  <body style="margin:0;padding:20px;">
-                    ${file.type.startsWith('image/') 
-                      ? `<img src="${file.url}" style="max-width:100%;height:auto;" alt="${file.name}">`
-                      : `<iframe src="${file.url}" style="width:100%;height:90vh;border:none;"></iframe>`
-                    }
-                  </body>
-                </html>
-              `);
-            }
-          } else {
-            // For regular URLs, open directly
-            window.open(file.url, '_blank');
-          }
-        }}
-        >
-        <Paper
-          elevation={0}
-          sx={{
-            width: 80,
-            height: 80,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            bgcolor: getFileColorByType(file.type),
-            borderRadius: 2,
-            mb: 1,
-          }}
-        >
-          {getFileIconByType(file.type)}
-        </Paper>
-        <Typography variant="caption" textAlign="center" noWrap sx={{ maxWidth: 100 }}>
-          {file.name}
-        </Typography>
-        <Typography variant="caption" color="textSecondary" noWrap sx={{ maxWidth: 100 }}>
-          {formatFileSize(file.size)}
-        </Typography>
-        </Box>
-        </Grid>
-       ))}
+             {/* Files Section */}
+       <Grid item xs={12} md={12}>
+         <Paper sx={{ 
+           bgcolor: '#FFFFFF', 
+           borderRadius: 4, 
+           p: 3,
+           height: 'auto',
+           minHeight: 200,
+           width: '100%'
+         }}>
+           <div style={{ 
+             display: 'flex', 
+             flexDirection: 'row', 
+             justifyContent: 'start', 
+             alignItems: 'start', 
+             backgroundColor: '#F5F5F5', 
+             padding: '12px', 
+             borderRadius: '6px', 
+             width: '100%',
+             marginBottom: '16px'
+           }}>
+             <Typography variant="h6" color='#374957' fontWeight="bold">Uploaded Files</Typography>
+           </div>
+           <Grid container spacing={2} sx={{ mt: 2 }}>
+             {(() => { console.log('🎨 Rendering files section with', files.length, 'files'); return null; })()}
+             {files.slice(0, 8).map((file) => (
+               <Grid item xs={6} sm={3} md={2} lg={1.5} key={file.id}>
+                 <Box
+                   sx={{
+                     display: 'flex',
+                     flexDirection: 'column',
+                     alignItems: 'start',
+                     cursor: 'pointer',
+                   }}
+                   onClick={() => {
+                     // Handle both data URLs and regular URLs
+                     if (file.url.startsWith('data:')) {
+                       // For data URLs, open in new window
+                       const newWindow = window.open();
+                       if (newWindow) {
+                         newWindow.document.write(`
+                           <html>
+                             <head><title>${file.name}</title></head>
+                             <body style="margin:0;padding:20px;">
+                               ${file.type.startsWith('image/') 
+                                 ? `<img src="${file.url}" style="max-width:100%;height:auto;" alt="${file.name}">`
+                                 : `<iframe src="${file.url}" style="width:100%;height:90vh;border:none;"></iframe>`
+                               }
+                             </body>
+                           </html>
+                         `);
+                       }
+                     } else {
+                       // For regular URLs, open directly
+                       window.open(file.url, '_blank');
+                     }
+                   }}
+                 >
+                   <Paper
+                     elevation={0}
+                     sx={{
+                       width: 80,
+                       height: 80,
+                       display: 'flex',
+                       justifyContent: 'center',
+                       alignItems: 'center',
+                       bgcolor: getFileColorByType(file.type),
+                       borderRadius: 2,
+                       mb: 1,
+                     }}
+                   >
+                     {getFileIconByType(file.type)}
+                   </Paper>
+                   <Typography variant="caption" textAlign="center" noWrap sx={{ maxWidth: 100 }}>
+                     {file.name}
+                   </Typography>
+                   <Typography variant="caption" color="textSecondary" noWrap sx={{ maxWidth: 100 }}>
+                     {formatFileSize(file.size)}
+                   </Typography>
+                 </Box>
+               </Grid>
+             ))}
 
-        {files.length === 0 && (
-        <Grid item xs={12}>
-        <Box sx={{ py: 2, textAlign: 'center' }}>
-        <Typography variant="body2" color="textSecondary">
-          No files uploaded yet. Upload files in the referencing form to see them here.
-        </Typography>
-        <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 1 }}>
-          Debug: Files array length is {files?.length || 0}
-        </Typography>
-       </Box>
-        </Grid>
-        )}
-        </Grid>
-             
-          </CardContent>
-      
-        
-      </Grid>
-      </div>
+             {files.length === 0 && (
+               <Grid item xs={12}>
+                 <Box sx={{ py: 2, textAlign: 'center' }}>
+                   <Typography variant="body2" color="textSecondary">
+                     No files uploaded yet. Upload files in the referencing form to see them here.
+                   </Typography>
+                   <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 1 }}>
+                     Debug: Files array length is {files?.length || 0}
+                   </Typography>
+                 </Box>
+               </Grid>
+             )}
+           </Grid>
+         </Paper>
+       </Grid>
     </Grid>
     
   );
