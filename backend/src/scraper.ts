@@ -1,6 +1,8 @@
 import puppeteer from 'puppeteer';
-import type { LaunchOptions } from 'puppeteer';
+import type { LaunchOptions, Browser } from 'puppeteer';
 import * as cheerio from 'cheerio';
+import * as os from 'os';
+import * as path from 'path';
 
 export interface Property {
   title: string;
@@ -78,7 +80,7 @@ function prioritizeEmails(emails: string[]): string[] {
     .map(item => item.email);
 }
 
-async function scrapeEmailsFromWebsite(url: string, browser: import("puppeteer").Browser): Promise<string[]> {
+async function scrapeEmailsFromWebsite(url: string, browser: Browser): Promise<string[]> {
   const page = await browser.newPage();
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -290,7 +292,7 @@ async function searchEmailWithBraveAPI(companyName: string, apiKey: string): Pro
   return prioritizeEmails(uniqueEmails);
 }
 
-async function findEmailForAgent(agentName: string, website: string | undefined, browser: import("puppeteer").Browser, apiKey: string): Promise<{ email: string | null, website?: string }> {
+async function findEmailForAgent(agentName: string, website: string | undefined, browser: Browser, apiKey: string): Promise<{ email: string | null, website?: string }> {
   // Extract company name from agent name (usually the part after "Marketed by" or similar)
   // Format: "Marketed by Company Name - Location Phone Email"
   let companyMatch = agentName.match(/Marketed by\s+([^-]+?)(?:\s*-\s*|$)/i);
@@ -372,16 +374,16 @@ export async function scrapeInternet(query: string, apiKey: string): Promise<Pro
   console.log(`Starting internet search for: "${query}"`);
   
   try {
-    // Search for property listings on alternative platforms (excluding major portals)
+    // Optimized search for speed - focus on most productive sources
     const searchQueries = [
-      `${query} site:facebook.com/marketplace`,
-      `${query} site:facebook.com UK property`,
-      `${query} UK property listings -site:rightmove.co.uk -site:zoopla.co.uk -site:onthemarket.com -site:openrent.com`,
-      `${query} UK rental property -rightmove -zoopla -onthemarket`,
-      `${query} UK house for sale facebook marketplace`,
-      `${query} UK property gumtree`,
-      `${query} UK property classified ads`,
-      `${query} UK property local listings`
+      // Facebook marketplace variants (prioritized - most likely to have quality results)
+      `${query} site:facebook.com/marketplace UK rent`,
+      `${query} site:facebook.com/marketplace/rentals`,
+      // High-quality property sites only
+      `${query} site:thehouseshop.com property`,
+      `${query} site:propertyheads.com property`,
+      // Generic but targeted
+      `${query} UK property listings -site:rightmove.co.uk -site:zoopla.co.uk -site:onthemarket.com -site:openrent.com -site:primelocation.com -site:gumtree.com`
     ];
     
     const allResults: Property[] = [];
@@ -411,12 +413,36 @@ export async function scrapeInternet(query: string, apiKey: string): Promise<Pro
             const description = result.description || '';
             
             // Skip major property portals and focus on alternative platforms
-            const skipDomains = ['onthemarket.com', 'rightmove.co.uk', 'zoopla.co.uk', 'primelocation.com', 
-                               'spareroom.co.uk', 'openrent.com', 'purplebricks.co.uk', 'movingguide.co.uk',
-                               'google.com', 'bing.com', 'wikipedia.org', 'linkedin.com', 'twitter.com', 'instagram.com'];
+            const skipDomains = [
+              'onthemarket.com',
+              'rightmove.co.uk',
+              'zoopla.co.uk',
+              'primelocation.com',
+              'spareroom.co.uk',
+              'openrent.com',
+              'openrent.co.uk',
+              'purplebricks.co.uk',
+              'boomin.com',
+              'yopa.co.uk',
+              'strike.co.uk',
+              'rentmyhome.co.uk',
+              'nestoria.co.uk',
+              'gumtree.com', // exclude Gumtree as requested
+              'oneroof.co.nz', // safety
+              // generic non-listing domains
+              'google.com', 'bing.com', 'wikipedia.org', 'linkedin.com', 'twitter.com', 'instagram.com', 'youtube.com'
+            ];
             
-            // Prioritize Facebook and alternative platforms
-            const priorityDomains = ['facebook.com', 'gumtree.com', 'preloved.co.uk', 'freeads.co.uk', 'adzuna.co.uk'];
+            // Prioritize Facebook and alternative platforms (excluding Gumtree)
+            const priorityDomains = [
+              'facebook.com',
+              'preloved.co.uk',
+              'freeads.co.uk',
+              'adzuna.co.uk',
+              'thehouseshop.com',
+              'propertyheads.com',
+              'rentola.co.uk'
+            ];
             
             if (skipDomains.some(domain => url.includes(domain))) {
               continue;
@@ -462,8 +488,8 @@ export async function scrapeInternet(query: string, apiKey: string): Promise<Pro
           }
         }
         
-        // Add delay between API calls
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Reduced delay between API calls for speed
+        await new Promise(resolve => setTimeout(resolve, 500)); // Reduced from 1000 to 500
         
       } catch (error: any) {
         console.error(`Error in internet search query "${searchQuery}":`, error.message);
@@ -474,31 +500,58 @@ export async function scrapeInternet(query: string, apiKey: string): Promise<Pro
       }
     }
     
-    // Remove duplicates and limit URLs to scrape
+    // Remove duplicates and limit URLs to scrape for speed
     const uniqueUrls = Array.from(new Map(
       allResults.map(property => [property.agent.website, property])
-    ).values()).slice(0, 15); // Limit to 15 URLs to avoid timeouts
+    ).values()).slice(0, 12); // Reduced from 25 to 12 for faster processing
     
     console.log(`Found ${uniqueUrls.length} property URLs to scrape. Starting detailed scraping...`);
     
     // Now actually scrape each URL for detailed information
     const scrapedProperties: Property[] = [];
-    let browser;
+    let browser: Browser | undefined;
     
     try {
       const launchOptions: LaunchOptions = {
         headless: true,
+        timeout: 60000, // Increased timeout
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
           '--disable-accelerated-2d-canvas',
           '--disable-gpu',
-          '--window-size=1920x1080'
+          '--disable-gpu-sandbox',
+          '--disable-software-rasterizer',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+          '--disable-features=TranslateUI',
+          '--disable-ipc-flooding-protection',
+          '--disable-background-networking',
+          '--disable-client-side-phishing-detection',
+          '--disable-sync',
+          '--disable-default-apps',
+          '--window-size=1920x1080',
+          '--user-data-dir=' + path.join(os.tmpdir(), 'puppeteer_dev_chrome_profile-' + Math.random().toString(36).substr(2, 9))
         ]
       };
 
-      browser = await puppeteer.launch(launchOptions);
+      // Try to launch browser with retry logic
+      let browserLaunchRetries = 3;
+      while (browserLaunchRetries > 0) {
+        try {
+          browser = await puppeteer.launch(launchOptions);
+          break;
+        } catch (error) {
+          console.error(`Browser launch failed, retries left: ${browserLaunchRetries - 1}`, error);
+          browserLaunchRetries--;
+          if (browserLaunchRetries === 0) {
+            throw new Error(`Failed to launch browser after 3 attempts: ${error}`);
+          }
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+        }
+      }
       
       for (let i = 0; i < uniqueUrls.length; i++) {
         const propertyInfo = uniqueUrls[i];
@@ -507,18 +560,18 @@ export async function scrapeInternet(query: string, apiKey: string): Promise<Pro
         console.log(`Scraping property ${i + 1}/${uniqueUrls.length}: ${url}`);
         
         try {
-          const page = await browser.newPage();
+          const page = await browser!.newPage();
           await page.setViewport({ width: 1920, height: 1080 });
           await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
           
-          // Navigate to the property page
+          // Navigate to the property page with faster settings
           await page.goto(url, { 
             waitUntil: 'domcontentloaded', 
-            timeout: 15000 
+            timeout: 8000 // Reduced from 15000 to 8000
           });
           
-          // Wait a bit for content to load
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Reduced wait time for content to load
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced from 2000 to 1000
           
           // Get page content and extract property information
           const content = await page.content();
@@ -533,8 +586,8 @@ export async function scrapeInternet(query: string, apiKey: string): Promise<Pro
           
           await page.close();
           
-          // Add delay between requests to be respectful
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Reduced delay between requests for speed
+          await new Promise(resolve => setTimeout(resolve, 500)); // Reduced from 2000 to 500
           
         } catch (error) {
           console.error(`Error scraping ${url}:`, error);
@@ -542,12 +595,95 @@ export async function scrapeInternet(query: string, apiKey: string): Promise<Pro
           scrapedProperties.push(propertyInfo);
         }
       }
+
+      // Enrich emails for small agencies and filter results
+      const filtered: Property[] = [];
+      const emailCache: Record<string, { email: string | null; website?: string }> = {};
+      const bigBrandDomains = [
+        'onthemarket.com',
+        'rightmove.co.uk',
+        'zoopla.co.uk',
+        'primelocation.com',
+        'spareroom.co.uk',
+        'openrent.com',
+        'openrent.co.uk',
+        'purplebricks.co.uk',
+        'boomin.com',
+        'yopa.co.uk',
+        'strike.co.uk',
+        'rentmyhome.co.uk',
+        'nestoria.co.uk'
+      ];
+
+      for (const prop of scrapedProperties) {
+        const website = prop.agent.website || '';
+        let host = '';
+        try { host = new URL(website).hostname.toLowerCase(); } catch {}
+
+        if (bigBrandDomains.some(d => host.includes(d))) {
+          continue; // never show big brands
+        }
+
+        if (host.includes('facebook.com')) {
+          filtered.push(prop); // keep Facebook regardless of email
+          continue;
+        }
+
+        if (host.includes('rentola.co.uk')) {
+          // Rentola properties already have the correct email, no need to search
+          prop.agent.email = 'info@rentola.co.uk';
+          filtered.push(prop);
+          continue;
+        }
+
+        // For small estate companies, require a contact email on their site
+        const existingEmail = prop.agent.email || '';
+        const hasInlineEmail = !!existingEmail.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+
+        if (hasInlineEmail) {
+          filtered.push(prop);
+          continue;
+        }
+
+        // Try to find email using company name/website
+        const cacheKey = `${prop.agent.name}|${prop.agent.website || ''}`;
+        if (!emailCache[cacheKey]) {
+                      try {
+              if (browser) {
+                const result = await findEmailForAgent(prop.agent.name, prop.agent.website, browser, apiKey);
+                emailCache[cacheKey] = result;
+              } else {
+                emailCache[cacheKey] = { email: null };
+              }
+            } catch {
+              emailCache[cacheKey] = { email: null };
+            }
+        }
+
+        const found = emailCache[cacheKey];
+        if (found && found.email) {
+          prop.agent.email = found.email;
+          if (found.website) prop.agent.website = found.website;
+          filtered.push(prop);
+        }
+      }
+
+      // Replace scrapedProperties with the filtered list
+      scrapedProperties.length = 0;
+      scrapedProperties.push(...filtered);
     } catch (error) {
       console.error('Error launching browser for internet scraping:', error);
       return uniqueUrls; // Return basic info if browser fails
     } finally {
       if (browser) {
-        await browser.close();
+        try {
+          console.log('Closing browser...');
+          await browser.close();
+          
+                  // Note: Puppeteer should clean up its own processes automatically
+        } catch (closeError) {
+          console.error('Error closing browser:', closeError);
+        }
       }
     }
     
@@ -756,9 +892,36 @@ function extractPropertyFromPage($: cheerio.Root, url: string, agentName: string
       agentEmail = emailMatch[0];
     }
     
+    // Extract price from title if not found elsewhere
+    let extractedPrice = null;
+    if (!price || price === 'Price on request') {
+      // Try multiple price patterns that might appear in the title
+      const pricePatterns = [
+        /(\d+)\s*£\s*\/\s*month/i,
+        /(\d+)\s*£\s*pcm/i,
+        /(\d+)\s*£\s*per\s*month/i,
+        /£\s*(\d+)\s*\/\s*month/i,
+        /£\s*(\d+)\s*pcm/i,
+        /£\s*(\d+)\s*per\s*month/i,
+        /(\d+)\s*pound\s*per\s*month/i,
+        /(\d+)\s*pound\s*\/\s*month/i
+      ];
+      
+      for (const pattern of pricePatterns) {
+        const titlePriceMatch = title.match(pattern);
+        if (titlePriceMatch) {
+          const priceValue = titlePriceMatch[1];
+          extractedPrice = `£${priceValue} / month`;
+          // Remove the price from the title using the original match
+          title = title.replace(titlePriceMatch[0], '').trim();
+          break;
+        }
+      }
+    }
+
     // Clean up extracted data
     title = title.substring(0, 200); // Limit title length
-    price = price || 'Price on request';
+    price = extractedPrice || price || 'Price on request';
     location = location || extractLocationFromURL(url) || 'Location not specified';
     propertyType = propertyType || 'Property';
     
@@ -805,7 +968,7 @@ function extractLocationFromURL(url: string): string | null {
 
 export async function scrape(url: string, apiKey: string): Promise<Property[]> {
   const properties: Property[] = [];
-  let browser;
+  let browser: Browser | undefined;
   const agentEmailCache: Record<string, { email: string | null, website?: string | null }> = {};
 
   try {
@@ -815,31 +978,58 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
     console.log('Cleaned URL:', cleanUrl);
     
     console.log('Launching browser...');
-    // Launch browser with more robust error handling
+    // Launch browser with more robust error handling and Windows-specific fixes
     const launchOptions: LaunchOptions = {
       headless: true,
+      timeout: 60000, // Increased timeout
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--disable-gpu',
-        '--window-size=1920x1080'
+        '--disable-gpu-sandbox',
+        '--disable-software-rasterizer',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-features=TranslateUI',
+        '--disable-ipc-flooding-protection',
+        '--disable-background-networking',
+        '--disable-client-side-phishing-detection',
+        '--disable-sync',
+        '--disable-default-apps',
+        '--window-size=1920x1080',
+        '--user-data-dir=' + path.join(os.tmpdir(), 'puppeteer_dev_chrome_profile-' + Math.random().toString(36).substr(2, 9))
       ]
     };
 
-    browser = await puppeteer.launch(launchOptions);
+    // Try to launch browser with retry logic
+    let browserLaunchRetries = 3;
+    while (browserLaunchRetries > 0) {
+      try {
+        browser = await puppeteer.launch(launchOptions);
+        break;
+      } catch (error) {
+        console.error(`Browser launch failed, retries left: ${browserLaunchRetries - 1}`, error);
+        browserLaunchRetries--;
+        if (browserLaunchRetries === 0) {
+          throw new Error(`Failed to launch browser after 3 attempts: ${error}`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+      }
+    }
 
     console.log('Creating new page...');
-    const page = await browser.newPage();
+    const page = await browser!.newPage();
 
     // Set viewport and user agent
     await page.setViewport({ width: 1920, height: 1080 });
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
 
     // Set default timeout for all operations
-    page.setDefaultTimeout(60000);
-    page.setDefaultNavigationTimeout(60000);
+    page.setDefaultTimeout(30000); // Reduced from 60000 to 30000
+    page.setDefaultNavigationTimeout(30000); // Reduced from 60000 to 30000
 
     console.log('Navigating to URL...');
     // Navigate to URL with retry logic
@@ -1102,8 +1292,12 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
     // Lookup emails for each unique agent
     for (const [key, { name, website }] of sortedAgents) {
       console.log(`Processing agent: ${name}`);
-      const result = await findEmailForAgent(name, website, browser, apiKey);
-      agentEmailCache[key] = { email: result.email, website: result.website };
+      if (browser) {
+        const result = await findEmailForAgent(name, website, browser, apiKey);
+        agentEmailCache[key] = { email: result.email, website: result.website };
+      } else {
+        agentEmailCache[key] = { email: null, website: null };
+      }
     }
     // Fill in emails for each property and filter out those without emails
     const propertiesWithEmails: Property[] = [];
@@ -1132,6 +1326,8 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
       try {
         console.log('Closing browser...');
         await browser.close();
+        
+        // Note: Puppeteer should clean up its own processes automatically
       } catch (closeError) {
         console.error('Error closing browser:', closeError);
       }
