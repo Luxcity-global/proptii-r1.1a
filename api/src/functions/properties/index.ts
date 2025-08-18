@@ -1,89 +1,135 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { BaseController } from '../../shared/base/BaseController';
-import { PropertyService } from '../../shared/services/PropertyService';
-import { AppError } from '../../shared/middleware/error-handling';
-import { withAuth } from '../../shared/middleware/auth';
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { PropertyService } from "../../shared/services/PropertyService";
 
-class PropertyController extends BaseController {
+export class PropertiesController {
     private propertyService: PropertyService;
 
-    constructor(context: InvocationContext) {
-        super(context);
+    constructor() {
         this.propertyService = new PropertyService();
     }
 
-    async handle(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    async createProperty(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
         try {
-            switch (request.method) {
-                case 'GET':
-                    return this.handleGet(request);
-                case 'POST':
-                    return this.handlePost(request);
-                case 'PUT':
-                    return this.handlePut(request);
-                case 'DELETE':
-                    return this.handleDelete(request);
-                default:
-                    throw new AppError(405, 'Method not allowed', 'METHOD_NOT_ALLOWED');
-            }
+            const body = await request.json();
+            const propertyData = body as any;
+            
+            const property = await this.propertyService.createProperty(propertyData);
+            
+            return {
+                status: 201,
+                body: JSON.stringify(property)
+            };
         } catch (error) {
-            return this.error(error as Error);
+            context.error('Error creating property:', error);
+            return {
+                status: 500,
+                body: JSON.stringify({ error: 'Failed to create property' })
+            };
         }
     }
 
-    private async handleGet(request: HttpRequest): Promise<HttpResponseInit> {
-        const propertyId = request.params.id;
-        const searchQuery = request.query.get('q');
-
-        if (propertyId) {
-            const property = await this.propertyService.getById(propertyId);
-            return this.success(property);
+    async updateProperty(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+        try {
+            const propertyId = request.params.propertyId;
+            const body = await request.json();
+            const propertyData = body as any;
+            
+            const property = await this.propertyService.updateProperty(propertyId, propertyData);
+            
+            return {
+                status: 200,
+                body: JSON.stringify(property)
+            };
+        } catch (error) {
+            context.error('Error updating property:', error);
+            return {
+                status: 500,
+                body: JSON.stringify({ error: 'Failed to update property' })
+            };
         }
-
-        if (searchQuery) {
-            const properties = await this.propertyService.search(searchQuery);
-            return this.success(properties);
-        }
-
-        const properties = await this.propertyService.getAll();
-        return this.success(properties);
     }
 
-    private async handlePost(request: HttpRequest): Promise<HttpResponseInit> {
-        const propertyData = await request.json();
-        const property = await this.propertyService.create(propertyData);
-        return this.success(property, 201);
+    async getProperty(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+        try {
+            const propertyId = request.params.propertyId;
+            const property = await this.propertyService.getPropertyById(propertyId);
+            
+            return {
+                status: 200,
+                body: JSON.stringify(property)
+            };
+        } catch (error) {
+            context.error('Error getting property:', error);
+            return {
+                status: 404,
+                body: JSON.stringify({ error: 'Property not found' })
+            };
+        }
     }
 
-    private async handlePut(request: HttpRequest): Promise<HttpResponseInit> {
-        const propertyId = request.params.id;
-        if (!propertyId) {
-            throw new AppError(400, 'Property ID is required', 'INVALID_REQUEST');
+    async getAllProperties(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+        try {
+            const properties = await this.propertyService.getAll();
+            
+            return {
+                status: 200,
+                body: JSON.stringify(properties)
+            };
+        } catch (error) {
+            context.error('Error getting properties:', error);
+            return {
+                status: 500,
+                body: JSON.stringify({ error: 'Failed to get properties' })
+            };
         }
-
-        const propertyData = await request.json();
-        const property = await this.propertyService.update(propertyId, propertyData);
-        return this.success(property);
     }
 
-    private async handleDelete(request: HttpRequest): Promise<HttpResponseInit> {
-        const propertyId = request.params.id;
-        if (!propertyId) {
-            throw new AppError(400, 'Property ID is required', 'INVALID_REQUEST');
+    async deleteProperty(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+        try {
+            const propertyId = request.params.propertyId;
+            await this.propertyService.deleteProperty(propertyId);
+            
+            return {
+                status: 204
+            };
+        } catch (error) {
+            context.error('Error deleting property:', error);
+            return {
+                status: 500,
+                body: JSON.stringify({ error: 'Failed to delete property' })
+            };
         }
-
-        await this.propertyService.delete(propertyId);
-        return this.success({ message: 'Property deleted successfully' });
     }
 }
 
-// Register the HTTP trigger
+const controller = new PropertiesController();
+
 app.http('properties', {
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST'],
     authLevel: 'anonymous',
-    route: 'properties/{id?}',
-    handler: withAuth(async (request: HttpRequest, context: InvocationContext) => {
-        const controller = new PropertyController(context);
-        return controller.handle(request, context);
-    })
+    handler: async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+        if (request.method === 'GET') {
+            return controller.getAllProperties(request, context);
+        } else if (request.method === 'POST') {
+            return controller.createProperty(request, context);
+        }
+        
+        return { status: 405, body: 'Method not allowed' };
+    }
+});
+
+app.http('properties/{propertyId}', {
+    methods: ['GET', 'PUT', 'DELETE'],
+    authLevel: 'anonymous',
+    handler: async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+        if (request.method === 'GET') {
+            return controller.getProperty(request, context);
+        } else if (request.method === 'PUT') {
+            return controller.updateProperty(request, context);
+        } else if (request.method === 'DELETE') {
+            return controller.deleteProperty(request, context);
+        }
+        
+        return { status: 405, body: 'Method not allowed' };
+    }
 }); 

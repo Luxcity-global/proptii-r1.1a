@@ -7,7 +7,7 @@ const userSchema = z.object({
     email: z.string().email(),
     firstName: z.string(),
     lastName: z.string(),
-    role: z.enum(['user', 'admin']).default('user'),
+    role: z.enum(['admin', 'user']).default('user'),
     createdAt: z.string().optional(),
     updatedAt: z.string().optional()
 });
@@ -19,7 +19,7 @@ export class UserService extends BaseService {
         super('Users');
     }
 
-    async create(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
+    async createUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
         const validatedData = userSchema.parse({
             ...userData,
             createdAt: new Date().toISOString(),
@@ -29,7 +29,7 @@ export class UserService extends BaseService {
         return super.create(validatedData);
     }
 
-    async update(id: string, userData: Partial<User>): Promise<User> {
+    async updateUser(id: string, userData: Partial<User>): Promise<User> {
         const validatedData = userSchema.partial().parse({
             ...userData,
             updatedAt: new Date().toISOString()
@@ -42,11 +42,18 @@ export class UserService extends BaseService {
         return this.query<User>('SELECT * FROM c');
     }
 
-    async getById(id: string): Promise<User> {
+    async getUserById(id: string): Promise<User> {
         return super.getById<User>(id, id);
     }
 
-    async delete(id: string): Promise<void> {
+    async deleteUser(id: string): Promise<void> {
         return super.delete(id, id);
+    }
+
+    async findByEmail(email: string): Promise<User | null> {
+        const users = await this.query<User>('SELECT * FROM c WHERE c.email = @email', [
+            { name: '@email', value: email }
+        ]);
+        return users[0] || null;
     }
 } 

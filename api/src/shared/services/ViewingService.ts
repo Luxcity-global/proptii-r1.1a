@@ -20,7 +20,7 @@ export class ViewingService extends BaseService {
         super('Viewings');
     }
 
-    async create(viewingData: Omit<Viewing, 'id' | 'createdAt' | 'updatedAt'>): Promise<Viewing> {
+    async createViewing(viewingData: Omit<Viewing, 'id' | 'createdAt' | 'updatedAt'>): Promise<Viewing> {
         const validatedData = viewingSchema.parse({
             ...viewingData,
             createdAt: new Date().toISOString(),
@@ -30,7 +30,7 @@ export class ViewingService extends BaseService {
         return super.create(validatedData);
     }
 
-    async update(id: string, viewingData: Partial<Viewing>): Promise<Viewing> {
+    async updateViewing(id: string, viewingData: Partial<Viewing>): Promise<Viewing> {
         const validatedData = viewingSchema.partial().parse({
             ...viewingData,
             updatedAt: new Date().toISOString()
@@ -43,21 +43,23 @@ export class ViewingService extends BaseService {
         return this.query<Viewing>('SELECT * FROM c');
     }
 
-    async getById(id: string): Promise<Viewing> {
+    async getViewingById(id: string): Promise<Viewing> {
         return super.getById<Viewing>(id, id);
     }
 
-    async delete(id: string): Promise<void> {
+    async deleteViewing(id: string): Promise<void> {
         return super.delete(id, id);
     }
 
     async getByPropertyId(propertyId: string): Promise<Viewing[]> {
-        const query = 'SELECT * FROM c WHERE c.propertyId = @propertyId';
-        return this.query<Viewing>(query, [{ name: '@propertyId', value: propertyId }]);
+        return this.query<Viewing>('SELECT * FROM c WHERE c.propertyId = @propertyId', [
+            { name: '@propertyId', value: propertyId }
+        ]);
     }
 
     async getByUserId(userId: string): Promise<Viewing[]> {
-        const query = 'SELECT * FROM c WHERE c.userId = @userId';
-        return this.query<Viewing>(query, [{ name: '@userId', value: userId }]);
+        return this.query<Viewing>('SELECT * FROM c WHERE c.userId = @userId', [
+            { name: '@userId', value: userId }
+        ]);
     }
 } 
