@@ -67,8 +67,8 @@ export class SecurityMiddleware {
         const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
         
         const connectSrc = isDevelopment 
-            ? "'self' https://proptii.b2clogin.com https://*.azure.com http://localhost:* https://proptii-r1-1a.onrender.com https://proptii-r1-1a-1.onrender.com"
-            : `'self' https://proptii.b2clogin.com https://*.azure.com ${baseUrl} https://proptii-r1-1a-1.onrender.com`;
+            ? "'self' https://proptii.b2clogin.com https://*.azure.com http://localhost:* https://proptii-r1-1a.onrender.com https://proptii-r1-1a-1.onrender.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net"
+            : `'self' https://proptii.b2clogin.com https://*.azure.com ${baseUrl} https://proptii-r1-1a-1.onrender.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net`;
 
         return [
             "default-src 'self'",
@@ -77,7 +77,7 @@ export class SecurityMiddleware {
             "font-src 'self' https://fonts.gstatic.com data:",
             "img-src 'self' data: https: blob:",
             `connect-src ${connectSrc}`,
-            "frame-src 'self' https://proptii.b2clogin.com",
+            "frame-src 'self' https://proptii.b2clogin.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net",
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",

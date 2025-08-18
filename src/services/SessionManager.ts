@@ -68,7 +68,7 @@ export class SessionManager {
     private readonly maxStoredActivities = 100;
     private readonly backupKey = 'app_session_backup';
     private readonly maxBackups = 5;
-    private readonly encryptionKey: string;
+    private readonly encryptionKey: Uint8Array;
     private sessionBackups: Map<string, SessionBackup> = new Map();
     private sessionConflicts: Map<string, SessionConflict[]> = new Map();
     private currentVersion = 1;
@@ -99,14 +99,11 @@ export class SessionManager {
             if (keyBytes.length !== 32) {
                 throw new Error('Session encryption key must be 32 bytes (256 bits) long');
             }
-            // Convert bytes to string for use as encryption key
-            this.encryptionKey = String.fromCharCode(...keyBytes);
+            // Store the key as Uint8Array for proper use with crypto.subtle
+            this.encryptionKey = keyBytes;
         } else {
             // Generate a fixed 256-bit key (32 bytes) for development
-            this.encryptionKey = Array.from(new Uint8Array(32))
-                .map(() => Math.floor(Math.random() * 256))
-                .map(b => String.fromCharCode(b))
-                .join('');
+            this.encryptionKey = crypto.getRandomValues(new Uint8Array(32));
         }
 
         this.initializeSession();
@@ -360,7 +357,7 @@ export class SessionManager {
 
             const key = await crypto.subtle.importKey(
                 'raw',
-                encoder.encode(this.encryptionKey),
+                this.encryptionKey,
                 { name: 'AES-GCM' },
                 false,
                 ['encrypt']
@@ -401,7 +398,7 @@ export class SessionManager {
 
             const key = await crypto.subtle.importKey(
                 'raw',
-                new TextEncoder().encode(this.encryptionKey),
+                this.encryptionKey,
                 { name: 'AES-GCM' },
                 false,
                 ['decrypt']

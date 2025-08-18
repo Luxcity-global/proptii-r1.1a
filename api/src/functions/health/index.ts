@@ -1,24 +1,37 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { withErrorHandler } from '@/shared/middleware/error-handling';
-import { createLogger } from '@/shared/utils/logging';
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 
 export const healthCheckHandler = async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
-    const logger = createLogger(context);
-    logger.info('Health check request received');
-
-    return {
-        jsonBody: {
-            status: 'healthy',
-            timestamp: new Date().toISOString(),
-            environment: process.env.NODE_ENV
-        }
-    };
+    try {
+        return {
+            status: 200,
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                status: 'healthy',
+                timestamp: new Date().toISOString(),
+                version: '1.0.0',
+                environment: process.env.NODE_ENV || 'development'
+            })
+        };
+    } catch (error) {
+        context.error('Health check failed:', error);
+        return {
+            status: 500,
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                status: 'unhealthy',
+                error: 'Health check failed',
+                timestamp: new Date().toISOString()
+            })
+        };
+    }
 };
 
-export const healthCheck = withErrorHandler(healthCheckHandler);
-
-app.http('healthCheck', {
+app.http('health', {
     methods: ['GET'],
     authLevel: 'anonymous',
-    handler: healthCheck
+    handler: healthCheckHandler
 }); 

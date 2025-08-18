@@ -13,6 +13,7 @@ import './functions/health';
 import './functions/users';
 import './functions/properties';
 import './functions/viewings';
+import './functions/docusign';
 
 // Export the app
 export default app; 

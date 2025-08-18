@@ -634,7 +634,7 @@ const findCustomizedTemplate = () => {
                 {dropdownOpen === template.id && (
                   <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-300 rounded-md shadow-lg">
                     <button
-                      //onClick={() => handleCustomize(template.id)}
+                      onClick={() => handleCustomize(template.id)}
                       className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100"
                     >
                       Customize

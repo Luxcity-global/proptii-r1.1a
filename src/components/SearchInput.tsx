@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Camera, Mic, WifiOff, Search, X } from 'lucide-react';
+import { Camera, Mic, WifiOff, Search, X, Plus } from 'lucide-react';
 import { useSearch } from '../hooks/useSearch';
 import { useDebounce } from '../hooks/useDebounce';
 import { ErrorMessage } from './ErrorMessage';
@@ -50,6 +50,8 @@ export const SearchInput: React.FC<SearchInputProps> = ({
   const debouncedQuery = useDebounce(query, 300);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const localStorageService = LocalStorageService.getInstance();
+  const [showMobileIcons, setShowMobileIcons] = useState(false);
+  const mobileIconsRef = useRef<HTMLDivElement>(null);
 
   // Check if device is mobile
   useEffect(() => {
@@ -127,7 +129,8 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       onChange(suggestion);
     }
     saveSearch(suggestion);
-    handleSearch(suggestion);
+    // handleSearch expects no arguments, so just call it
+    handleSearch();
     setIsFocused(false);
   }, [handleSearch, onChange, saveSearch, clearError, setQuery]);
 
@@ -139,7 +142,8 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     }
     clearError();
     saveSearch(query);
-    handleSearch(query);
+    // handleSearch expects no arguments, so just call it
+    handleSearch();
   }, [query, handleSearch, saveSearch, clearError]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -208,6 +212,21 @@ export const SearchInput: React.FC<SearchInputProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Click outside for mobile icons popover
+  useEffect(() => {
+    if (!showMobileIcons) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        mobileIconsRef.current &&
+        !mobileIconsRef.current.contains(event.target as Node)
+      ) {
+        setShowMobileIcons(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMobileIcons]);
 
   const renderNoResults = () => {
     if (!hasResults && query.trim() && !isLoading) {
@@ -294,7 +313,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
         <form onSubmit={handleSubmit} className="relative w-full">
           <div className="bg-white rounded-3xl p-3 shadow-xl">
             {/* Input Section */}
-            <div className="relative mb-2">
+            <div className="relative mb-1"> {/* Reduced from mb-2 to mb-1 to decrease space */}
               <textarea
                 ref={inputRef}
                 className={`w-full px-4 py-2 bg-transparent text-gray-900 text-lg rounded-2xl border-none transition-all duration-150 resize-none ${isFocused ? 'bg-[#F6F6F6]' : 'bg-transparent'
@@ -326,7 +345,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
             {/* Icons Section */}
             <div className="flex items-center justify-between">
               {/* Left side icons */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 pl-2 relative"> {/* Reduced from pl-4 to pl-2 to shift icons left */}
                 {!isMobile && (
                   <>
                     <button
@@ -334,15 +353,53 @@ export const SearchInput: React.FC<SearchInputProps> = ({
                       className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100"
                       aria-label="Search by image"
                     >
-                      <Camera className="w-5 h-5" />
+                      <Camera className="w-6 h-6" />
                     </button>
                     <button
                       type="button"
                       className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100"
                       aria-label="Search by voice"
                     >
-                      <Mic className="w-5 h-5" />
+                      <Mic className="w-6 h-6" />
                     </button>
+                  </>
+                )}
+                {isMobile && (
+                  <>
+                    <button
+                      type="button"
+                      className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100"
+                      aria-label="Show search options"
+                      onClick={() => setShowMobileIcons((v) => !v)}
+                    >
+                      <Plus className="w-6 h-6" />
+                    </button>
+                    {showMobileIcons && (
+                      <div
+                        ref={mobileIconsRef}
+                        className="absolute bottom-full left-0 mb-2 w-48 bg-white rounded-xl shadow-lg p-3 flex flex-col z-50 animate-fade-in"
+                        style={{ minWidth: '180px' }}
+                      >
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            className="flex flex-col items-center p-2 text-gray-700 hover:text-primary transition-colors rounded-lg hover:bg-gray-100"
+                            aria-label="Search by image"
+                          >
+                            <Camera className="w-6 h-6 mb-1" />
+                            <span className="text-xs">Image</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="flex flex-col items-center p-2 text-gray-700 hover:text-primary transition-colors rounded-lg hover:bg-gray-100"
+                            aria-label="Search by voice"
+                          >
+                            <Mic className="w-6 h-6 mb-1" />
+                            <span className="text-xs">Voice</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
                 {isOffline && (
@@ -366,7 +423,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
                   <img
                     src="/images/ai-search-plane-icon-new-wht-1.png"
                     alt="Search"
-                    className="w-7 h-7"
+                    className="w-6 h-6"
                   />
                 )}
               </button>
@@ -396,7 +453,7 @@ export const SearchInput: React.FC<SearchInputProps> = ({
       {isFocused && (searchSuggestions.length > 0 || getSearchHistory().slice(0, 3).length > 0) && (
         <div
           ref={suggestionsRef}
-          className="absolute w-full mt-2 bg-white rounded-xl shadow-lg overflow-hidden z-50 max-h-[300px] overflow-y-auto"
+          className="absolute w-full mt-2 bg-white rounded-xl shadow-lg overflow-hidden z-50 max-h-[300px] overflow-y-auto custom-scrollbar"
         >
           <ul className="py-1" id="search-suggestions-list" role="listbox">
             {searchSuggestions.map((suggestion, index) => (
