@@ -87,7 +87,7 @@ const ContractsPage = () => {
           />
         </div>
 
-        {/* Coming Soon Overlay */}
+        {/* Coming Soon Overlay 
         <div className="absolute inset-0 z-20 bg-black bg-opacity-70 flex flex-col items-center justify-center px-4">
           <h3 className="text-3xl md:text-4xl lg:text-6xl text-white font-bold mb-4 animate-pulse text-center">
             Coming Soon
@@ -97,7 +97,7 @@ const ContractsPage = () => {
               We're working hard to bring you this feature
             </p>
           </div>
-        </div> 
+        </div> */}
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 md:pl-14">
           <div className="flex flex-col md:flex-row items-center justify-between space-y-8 md:space-y-0 md:space-x-8">

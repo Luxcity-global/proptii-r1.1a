@@ -51,4 +51,21 @@ body {
 .page-transition-exit-active {
   opacity: 0;
   transition: opacity 300ms;
+}
+
+/* Custom thin scrollbar for AI search suggestions dropdown */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #e65d24 #f6f6f6;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e65d24;
+  border-radius: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f6f6f6;
+  margin: 2px 0;
 } 

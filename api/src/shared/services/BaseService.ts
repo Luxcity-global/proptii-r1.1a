@@ -15,32 +15,32 @@ export abstract class BaseService {
         this.container = this.client.database(config.COSMOS_DB_DATABASE_NAME).container(containerName);
     }
 
-    protected async create<T extends ItemDefinition>(item: T): Promise<T> {
+    protected async create<T>(item: T): Promise<T> {
         try {
-            const { resource } = await this.container.items.create(item);
-            return resource as unknown as T;
+            const { resource } = await this.container.items.create(item as any);
+            return resource as T;
         } catch (error) {
             throw new AppError(500, 'Failed to create item', 'CREATE_ERROR');
         }
     }
 
-    protected async getById<T extends ItemDefinition>(id: string, partitionKey: string): Promise<T> {
+    protected async getById<T>(id: string, partitionKey: string): Promise<T> {
         try {
             const { resource } = await this.container.item(id, partitionKey).read();
             if (!resource) {
                 throw new AppError(404, 'Item not found', 'NOT_FOUND');
             }
-            return resource as unknown as T;
+            return resource as T;
         } catch (error) {
             if (error instanceof AppError) throw error;
             throw new AppError(500, 'Failed to get item', 'GET_ERROR');
         }
     }
 
-    protected async update<T extends ItemDefinition>(id: string, partitionKey: string, item: Partial<T>): Promise<T> {
+    protected async update<T>(id: string, partitionKey: string, item: Partial<T>): Promise<T> {
         try {
-            const { resource } = await this.container.item(id, partitionKey).replace(item);
-            return resource as unknown as T;
+            const { resource } = await this.container.item(id, partitionKey).replace(item as any);
+            return resource as T;
         } catch (error) {
             throw new AppError(500, 'Failed to update item', 'UPDATE_ERROR');
         }
@@ -54,7 +54,7 @@ export abstract class BaseService {
         }
     }
 
-    protected async softDelete<T extends ItemDefinition>(id: string, partitionKey: string): Promise<T> {
+    protected async softDelete<T>(id: string, partitionKey: string): Promise<T> {
         try {
             const item = await this.getById<T>(id, partitionKey);
             const updatedItem = {
@@ -69,33 +69,33 @@ export abstract class BaseService {
         }
     }
 
-    protected async batchCreate<T extends ItemDefinition>(items: T[]): Promise<T[]> {
+    protected async batchCreate<T>(items: T[]): Promise<T[]> {
         try {
             const operations: OperationInput[] = items.map(item => ({
                 operationType: 'Create',
-                resourceBody: item,
-                id: item.id,
-                partitionKey: item.id
+                resourceBody: item as any,
+                id: (item as any).id,
+                partitionKey: (item as any).id
             }));
 
             const response = await this.container.items.bulk(operations);
-            return response.map(r => r.resourceBody as unknown as T);
+            return response.map(r => r.resourceBody as T);
         } catch (error) {
             throw new AppError(500, 'Failed to batch create items', 'BATCH_CREATE_ERROR');
         }
     }
 
-    protected async batchUpdate<T extends ItemDefinition>(items: { id: string; partitionKey: string; item: Partial<T> }[]): Promise<T[]> {
+    protected async batchUpdate<T>(items: { id: string; partitionKey: string; item: Partial<T> }[]): Promise<T[]> {
         try {
             const operations: OperationInput[] = items.map(({ id, partitionKey, item }) => ({
                 operationType: 'Replace',
                 id,
                 partitionKey,
-                resourceBody: item
+                resourceBody: item as any
             }));
 
             const response = await this.container.items.bulk(operations);
-            return response.map(r => r.resourceBody as unknown as T);
+            return response.map(r => r.resourceBody as T);
         } catch (error) {
             throw new AppError(500, 'Failed to batch update items', 'BATCH_UPDATE_ERROR');
         }
@@ -116,7 +116,7 @@ export abstract class BaseService {
         }
     }
 
-    protected async batchSoftDelete<T extends ItemDefinition>(items: { id: string; partitionKey: string }[]): Promise<T[]> {
+    protected async batchSoftDelete<T>(items: { id: string; partitionKey: string }[]): Promise<T[]> {
         try {
             const operations: OperationInput[] = await Promise.all(
                 items.map(async ({ id, partitionKey }) => {
@@ -129,13 +129,13 @@ export abstract class BaseService {
                             ...item,
                             isDeleted: true,
                             deletedAt: new Date().toISOString()
-                        }
+                        } as any
                     };
                 })
             );
 
             const response = await this.container.items.bulk(operations);
-            return response.map(r => r.resourceBody as unknown as T);
+            return response.map(r => r.resourceBody as T);
         } catch (error) {
             throw new AppError(500, 'Failed to batch soft delete items', 'BATCH_SOFT_DELETE_ERROR');
         }

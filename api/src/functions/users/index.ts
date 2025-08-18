@@ -1,82 +1,135 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { BaseController } from '../../shared/base/BaseController';
-import { UserService } from '../../shared/services/UserService';
-import { AppError } from '../../shared/middleware/error-handling';
-import { withAuth } from '../../shared/middleware/auth';
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { UserService } from "../../shared/services/UserService";
 
-class UserController extends BaseController {
+export class UsersController {
     private userService: UserService;
 
-    constructor(context: InvocationContext) {
-        super(context);
+    constructor() {
         this.userService = new UserService();
     }
 
-    async handle(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    async createUser(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
         try {
-            switch (request.method) {
-                case 'GET':
-                    return this.handleGet(request);
-                case 'POST':
-                    return this.handlePost(request);
-                case 'PUT':
-                    return this.handlePut(request);
-                case 'DELETE':
-                    return this.handleDelete(request);
-                default:
-                    throw new AppError(405, 'Method not allowed', 'METHOD_NOT_ALLOWED');
-            }
+            const body = await request.json();
+            const userData = body as any;
+            
+            const user = await this.userService.createUser(userData);
+            
+            return {
+                status: 201,
+                body: JSON.stringify(user)
+            };
         } catch (error) {
-            return this.error(error as Error);
+            context.error('Error creating user:', error);
+            return {
+                status: 500,
+                body: JSON.stringify({ error: 'Failed to create user' })
+            };
         }
     }
 
-    private async handleGet(request: HttpRequest): Promise<HttpResponseInit> {
-        const userId = request.params.id;
-        if (userId) {
-            const user = await this.userService.getById(userId);
-            return this.success(user);
+    async updateUser(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+        try {
+            const userId = request.params.userId;
+            const body = await request.json();
+            const userData = body as any;
+            
+            const user = await this.userService.updateUser(userId, userData);
+            
+            return {
+                status: 200,
+                body: JSON.stringify(user)
+            };
+        } catch (error) {
+            context.error('Error updating user:', error);
+            return {
+                status: 500,
+                body: JSON.stringify({ error: 'Failed to update user' })
+            };
         }
-
-        const users = await this.userService.getAll();
-        return this.success(users);
     }
 
-    private async handlePost(request: HttpRequest): Promise<HttpResponseInit> {
-        const userData = await request.json();
-        const user = await this.userService.create(userData);
-        return this.success(user, 201);
+    async getUser(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+        try {
+            const userId = request.params.userId;
+            const user = await this.userService.getUserById(userId);
+            
+            return {
+                status: 200,
+                body: JSON.stringify(user)
+            };
+        } catch (error) {
+            context.error('Error getting user:', error);
+            return {
+                status: 404,
+                body: JSON.stringify({ error: 'User not found' })
+            };
+        }
     }
 
-    private async handlePut(request: HttpRequest): Promise<HttpResponseInit> {
-        const userId = request.params.id;
-        if (!userId) {
-            throw new AppError(400, 'User ID is required', 'INVALID_REQUEST');
+    async getAllUsers(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+        try {
+            const users = await this.userService.getAll();
+            
+            return {
+                status: 200,
+                body: JSON.stringify(users)
+            };
+        } catch (error) {
+            context.error('Error getting users:', error);
+            return {
+                status: 500,
+                body: JSON.stringify({ error: 'Failed to get users' })
+            };
         }
-
-        const userData = await request.json();
-        const user = await this.userService.update(userId, userData);
-        return this.success(user);
     }
 
-    private async handleDelete(request: HttpRequest): Promise<HttpResponseInit> {
-        const userId = request.params.id;
-        if (!userId) {
-            throw new AppError(400, 'User ID is required', 'INVALID_REQUEST');
+    async deleteUser(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+        try {
+            const userId = request.params.userId;
+            await this.userService.deleteUser(userId);
+            
+            return {
+                status: 204
+            };
+        } catch (error) {
+            context.error('Error deleting user:', error);
+            return {
+                status: 500,
+                body: JSON.stringify({ error: 'Failed to delete user' })
+            };
         }
-
-        await this.userService.delete(userId);
-        return this.success({ message: 'User deleted successfully' });
     }
 }
 
-// Register the HTTP trigger
+const controller = new UsersController();
+
 app.http('users', {
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST'],
     authLevel: 'anonymous',
-    route: 'users/{id?}',
-    handler: withAuth(async (request: HttpRequest, context: InvocationContext) => {
-        const controller = new UserController(context);
-        return controller.handle(request, context);
-    })
+    handler: async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+        if (request.method === 'GET') {
+            return controller.getAllUsers(request, context);
+        } else if (request.method === 'POST') {
+            return controller.createUser(request, context);
+        }
+        
+        return { status: 405, body: 'Method not allowed' };
+    }
+});
+
+app.http('users/{userId}', {
+    methods: ['GET', 'PUT', 'DELETE'],
+    authLevel: 'anonymous',
+    handler: async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+        if (request.method === 'GET') {
+            return controller.getUser(request, context);
+        } else if (request.method === 'PUT') {
+            return controller.updateUser(request, context);
+        } else if (request.method === 'DELETE') {
+            return controller.deleteUser(request, context);
+        }
+        
+        return { status: 405, body: 'Method not allowed' };
+    }
 }); 

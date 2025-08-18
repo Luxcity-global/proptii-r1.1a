@@ -1,95 +1,135 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { BaseController } from '../../shared/base/BaseController';
-import { ViewingService } from '../../shared/services/ViewingService';
-import { AppError } from '../../shared/middleware/error-handling';
-import { withAuth } from '../../shared/middleware/auth';
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { ViewingService } from "../../shared/services/ViewingService";
 
-class ViewingController extends BaseController {
+export class ViewingsController {
     private viewingService: ViewingService;
 
-    constructor(context: InvocationContext) {
-        super(context);
+    constructor() {
         this.viewingService = new ViewingService();
     }
 
-    async handle(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    async createViewing(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
         try {
-            switch (request.method) {
-                case 'GET':
-                    return this.handleGet(request);
-                case 'POST':
-                    return this.handlePost(request);
-                case 'PUT':
-                    return this.handlePut(request);
-                case 'DELETE':
-                    return this.handleDelete(request);
-                default:
-                    throw new AppError(405, 'Method not allowed', 'METHOD_NOT_ALLOWED');
-            }
+            const body = await request.json();
+            const viewingData = body as any;
+            
+            const viewing = await this.viewingService.createViewing(viewingData);
+            
+            return {
+                status: 201,
+                body: JSON.stringify(viewing)
+            };
         } catch (error) {
-            return this.error(error as Error);
+            context.error('Error creating viewing:', error);
+            return {
+                status: 500,
+                body: JSON.stringify({ error: 'Failed to create viewing' })
+            };
         }
     }
 
-    private async handleGet(request: HttpRequest): Promise<HttpResponseInit> {
-        const viewingId = request.params.id;
-        const propertyId = request.query.get('propertyId');
-        const userId = request.query.get('userId');
-
-        if (viewingId) {
-            const viewing = await this.viewingService.getById(viewingId);
-            return this.success(viewing);
+    async updateViewing(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+        try {
+            const viewingId = request.params.viewingId;
+            const body = await request.json();
+            const viewingData = body as any;
+            
+            const viewing = await this.viewingService.updateViewing(viewingId, viewingData);
+            
+            return {
+                status: 200,
+                body: JSON.stringify(viewing)
+            };
+        } catch (error) {
+            context.error('Error updating viewing:', error);
+            return {
+                status: 500,
+                body: JSON.stringify({ error: 'Failed to update viewing' })
+            };
         }
-
-        if (propertyId) {
-            const viewings = await this.viewingService.getByPropertyId(propertyId);
-            return this.success(viewings);
-        }
-
-        if (userId) {
-            const viewings = await this.viewingService.getByUserId(userId);
-            return this.success(viewings);
-        }
-
-        const viewings = await this.viewingService.getAll();
-        return this.success(viewings);
     }
 
-    private async handlePost(request: HttpRequest): Promise<HttpResponseInit> {
-        const viewingData = await request.json();
-        const viewing = await this.viewingService.create(viewingData);
-        return this.success(viewing, 201);
+    async getViewing(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+        try {
+            const viewingId = request.params.viewingId;
+            const viewing = await this.viewingService.getViewingById(viewingId);
+            
+            return {
+                status: 200,
+                body: JSON.stringify(viewing)
+            };
+        } catch (error) {
+            context.error('Error getting viewing:', error);
+            return {
+                status: 404,
+                body: JSON.stringify({ error: 'Viewing not found' })
+            };
+        }
     }
 
-    private async handlePut(request: HttpRequest): Promise<HttpResponseInit> {
-        const viewingId = request.params.id;
-        if (!viewingId) {
-            throw new AppError(400, 'Viewing ID is required', 'INVALID_REQUEST');
+    async getAllViewings(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+        try {
+            const viewings = await this.viewingService.getAll();
+            
+            return {
+                status: 200,
+                body: JSON.stringify(viewings)
+            };
+        } catch (error) {
+            context.error('Error getting viewings:', error);
+            return {
+                status: 500,
+                body: JSON.stringify({ error: 'Failed to get viewings' })
+            };
         }
-
-        const viewingData = await request.json();
-        const viewing = await this.viewingService.update(viewingId, viewingData);
-        return this.success(viewing);
     }
 
-    private async handleDelete(request: HttpRequest): Promise<HttpResponseInit> {
-        const viewingId = request.params.id;
-        if (!viewingId) {
-            throw new AppError(400, 'Viewing ID is required', 'INVALID_REQUEST');
+    async deleteViewing(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+        try {
+            const viewingId = request.params.viewingId;
+            await this.viewingService.deleteViewing(viewingId);
+            
+            return {
+                status: 204
+            };
+        } catch (error) {
+            context.error('Error deleting viewing:', error);
+            return {
+                status: 500,
+                body: JSON.stringify({ error: 'Failed to delete viewing' })
+            };
         }
-
-        await this.viewingService.delete(viewingId);
-        return this.success({ message: 'Viewing deleted successfully' });
     }
 }
 
-// Register the HTTP trigger
+const controller = new ViewingsController();
+
 app.http('viewings', {
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST'],
     authLevel: 'anonymous',
-    route: 'viewings/{id?}',
-    handler: withAuth(async (request: HttpRequest, context: InvocationContext) => {
-        const controller = new ViewingController(context);
-        return controller.handle(request, context);
-    })
+    handler: async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+        if (request.method === 'GET') {
+            return controller.getAllViewings(request, context);
+        } else if (request.method === 'POST') {
+            return controller.createViewing(request, context);
+        }
+        
+        return { status: 405, body: 'Method not allowed' };
+    }
+});
+
+app.http('viewings/{viewingId}', {
+    methods: ['GET', 'PUT', 'DELETE'],
+    authLevel: 'anonymous',
+    handler: async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+        if (request.method === 'GET') {
+            return controller.getViewing(request, context);
+        } else if (request.method === 'PUT') {
+            return controller.updateViewing(request, context);
+        } else if (request.method === 'DELETE') {
+            return controller.deleteViewing(request, context);
+        }
+        
+        return { status: 405, body: 'Method not allowed' };
+    }
 }); 

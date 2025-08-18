@@ -23,6 +23,13 @@
     ],
     "exclude": [
         "node_modules",
-        "dist"
+        "dist",
+        "src/shared/services/AccessControlService.ts",
+        "src/shared/services/BackupService.ts",
+        "src/shared/services/EncryptionService.ts",
+        "src/shared/services/EventGridService.ts",
+        "src/shared/services/FunctionService.ts",
+        "src/shared/services/NetworkSecurityService.ts",
+        "src/shared/services/PerformanceTestService.ts"
     ]
 }

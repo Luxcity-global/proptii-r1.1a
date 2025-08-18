@@ -30,7 +30,7 @@ export class PropertyService extends BaseService {
         super('Properties');
     }
 
-    async create(propertyData: Omit<Property, 'id' | 'createdAt' | 'updatedAt'>): Promise<Property> {
+    async createProperty(propertyData: Omit<Property, 'id' | 'createdAt' | 'updatedAt'>): Promise<Property> {
         const validatedData = propertySchema.parse({
             ...propertyData,
             createdAt: new Date().toISOString(),
@@ -40,7 +40,7 @@ export class PropertyService extends BaseService {
         return super.create(validatedData);
     }
 
-    async update(id: string, propertyData: Partial<Property>): Promise<Property> {
+    async updateProperty(id: string, propertyData: Partial<Property>): Promise<Property> {
         const validatedData = propertySchema.partial().parse({
             ...propertyData,
             updatedAt: new Date().toISOString()
@@ -53,11 +53,11 @@ export class PropertyService extends BaseService {
         return this.query<Property>('SELECT * FROM c');
     }
 
-    async getById(id: string): Promise<Property> {
+    async getPropertyById(id: string): Promise<Property> {
         return super.getById<Property>(id, id);
     }
 
-    async delete(id: string): Promise<void> {
+    async deleteProperty(id: string): Promise<void> {
         return super.delete(id, id);
     }
 
