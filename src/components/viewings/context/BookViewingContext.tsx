@@ -39,6 +39,7 @@ interface BookViewingState {
 // Action types
 type ActionType =
   | { type: 'UPDATE_PROPERTY'; payload: Partial<PropertyDetails> }
+  | { type: 'SET_SELECTED_PROPERTY'; payload: PropertyDetails }
   | { type: 'UPDATE_VIEWING_DETAILS'; payload: Partial<ViewingDetails> }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
@@ -88,6 +89,11 @@ function bookViewingReducer(state: BookViewingState, action: ActionType): BookVi
             ...(action.payload.agent || {})
           }
         }
+      };
+    case 'SET_SELECTED_PROPERTY':
+      return {
+        ...state,
+        selectedProperty: action.payload
       };
     case 'UPDATE_VIEWING_DETAILS':
       return {

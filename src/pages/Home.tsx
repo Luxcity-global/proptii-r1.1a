@@ -1,12 +1,9 @@
-//import React, { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import { SearchInput } from '../components/SearchInput';
-import { SearchResults } from '../components/SearchResults';
-import { useSearch } from '../hooks/useSearch';
 import ErrorBoundary from '../components/ErrorBoundary';
 
 import { useState, useEffect } from 'react';
@@ -14,58 +11,33 @@ import { useState, useEffect } from 'react';
 const Home = () => {
   const navigate = useNavigate();
 
-  const {
-    query,
-    setQuery,
-    isLoading,
-    error,
-    response,
-    handleSearch: executeSearch,
-  } = useSearch();
-
-  const [isBackendAvailable, setIsBackendAvailable] = useState(true);
-  const [hasResults, setHasResults] = useState(true);
   const [searchInputHeight, setSearchInputHeight] = useState(50);
 
-  useEffect(() => {
-    const checkBackend = async () => {
-      try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-        // Remove /api from the end if it exists
-        const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
-        const response = await fetch(`${baseUrl}/api/health`);
-        setIsBackendAvailable(response.ok);
-      } catch (error) {
-        console.error('Backend health check failed:', error);
-        setIsBackendAvailable(false);
-      }
-    };
+  // useEffect(() => {
+  //   const checkBackend = async () => {
+  //     try {
+  //       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+  //       // Remove /api from the end if it exists
+  //       const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
+  //       const response = await fetch(`${baseUrl}/api/health`);
+  //       setIsBackendAvailable(response.ok);
+  //     } catch (error) {
+  //       console.error('Backend health check failed:', error);
+  //       setIsBackendAvailable(false);
+  //     }
+  //   };
 
-    checkBackend();
-  }, []);
+  //   checkBackend();
+  // }, []);
 
   // Progress bar component (simplified since loadingProgress is not available)
-  const ProgressBar = () => (
-    <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden mt-4">
-      <div className="h-full bg-orange-500 transition-all duration-300 ease-out animate-pulse w-full" />
-    </div>
-  );
+  // const ProgressBar = () => (
+  //   <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden mt-4">
+  //     <div className="h-full bg-orange-500 transition-all duration-300 ease-out animate-pulse w-full" />
+  //   </div>
+  // );
 
-  const handleSearch = async (searchQuery: string) => {
-    if (!isBackendAvailable) {
-      alert('Search service is currently unavailable. Please try again later.');
-      return;
-    }
-    setQuery(searchQuery);
-    if (searchQuery.trim()) {
-      try {
-        const results = await executeSearch();
-        setHasResults(results ? results.length > 0 : false);
-      } catch (error) {
-        setHasResults(false);
-      }
-    }
-  };
+
 
   const handleSearchInputHeightChange = (height: number) => {
     setSearchInputHeight(height);
@@ -78,23 +50,9 @@ const Home = () => {
     return extraHeight * 0.5; // Adjust multiplier as needed
   };
 
-  // Search results fallback UI
-  const SearchResultsFallback = () => (
-    <div className="p-8 bg-white rounded-lg shadow-md">
-      <h3 className="text-xl font-semibold text-gray-800 mb-4">
-        Unable to display search results
-      </h3>
-      <p className="text-gray-600 mb-6">
-        We encountered an issue while displaying the search results. The data might be in an unexpected format.
-      </p>
-      <button
-        onClick={() => window.location.reload()}
-        className="px-6 py-2 bg-primary text-white rounded-full hover:bg-opacity-90 transition-all"
-      >
-        Try Again
-      </button>
-    </div>
-  );
+
+
+
 
   return (
     <div className="min-h-screen flex flex-col font-nunito">
@@ -102,7 +60,7 @@ const Home = () => {
 
       {/* Hero Section */}
       <section 
-        className={`${(query || response || isLoading || error) ? 'h-auto min-h-[85vh] py-8 pt-32 md:min-h-[95vh] md:py-12' : 'h-[85vh] pt-32'} relative flex items-center md:pt-0 z-10`}
+        className={`h-[95vh] pt-32 relative flex items-center md:pt-0 z-10`}
         style={{ paddingBottom: `${getDynamicPadding()}px` }}
       >
         {/* Background Image */}
@@ -147,36 +105,13 @@ const Home = () => {
           {/* Search Bar */}
           <div className="max-w-3xl mx-auto px-4 md:px-0">
             <SearchInput
-              onSearch={handleSearch}
-              value={query}
-              onChange={setQuery}
-              hasResults={hasResults}
               onHeightChange={handleSearchInputHeightChange}
             />
-            {isLoading && <ProgressBar />}
-            {!isBackendAvailable && (
-              <p className="text-yellow-500 mt-2 text-sm md:text-base">
-                Search service is currently unavailable. Please try again later.
-              </p>
-            )}
           </div>
         </div>
       </section>
 
-      {/* Display Search Results */}
-      {(query || response || isLoading || error) && (
-        <section className="pt-24 pb-12 bg-gray-50 relative z-5">
-          <div className="max-w-7xl mx-auto px-4">
-            <ErrorBoundary fallback={<SearchResultsFallback />}>
-              <SearchResults
-                searchResponse={response || []}
-                isLoading={isLoading}
-                error={error}
-              />
-            </ErrorBoundary>
-          </div>
-        </section>
-      )}
+
 
       {/**The new services section */}
       <section className="relative py-16 md:py-20 bg-[#f9f5f0] z-20">

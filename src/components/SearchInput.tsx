@@ -1,526 +1,310 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Camera, Mic, WifiOff, Search, X, Plus } from 'lucide-react';
-import { useSearch } from '../hooks/useSearch';
-import { useDebounce } from '../hooks/useDebounce';
-import { ErrorMessage } from './ErrorMessage';
-import { LoadingSpinner } from './LoadingSpinner';
-import { LocalStorageService } from '../services/LocalStorageService';
-import { Tooltip } from './Tooltip';
+import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface SearchInputProps {
-  onSearch: (query: string) => void;
-  placeholder?: string;
-  className?: string;
-  hasResults?: boolean;
+  onSearch?: (query: string) => void;
   value?: string;
   onChange?: (value: string) => void;
+  hasResults?: boolean;
   onHeightChange?: (height: number) => void;
 }
 
-export const SearchInput: React.FC<SearchInputProps> = ({
-  onSearch,
-  placeholder = 'AI-assisted property search...',
-  className = '',
+export const SearchInput = ({ 
+  onSearch, 
+  value = '', 
+  onChange, 
   hasResults = true,
-  value,
-  onChange,
-  onHeightChange
-}) => {
-  const {
-    query,
-    setQuery,
-    suggestions: searchSuggestions,
-    isLoading,
-    error,
-    handleSearch,
-    clearError,
-    getSuggestions,
-    retry,
-    saveSearch,
-    getSearchHistory
-  } = useSearch(onSearch);
-
+  onHeightChange 
+}: SearchInputProps) => {
+  const [query, setQuery] = useState(value);
+  const [loading, setLoading] = useState(false);
+  const [searchType, setSearchType] = useState<'onthemarket' | 'internet'>('onthemarket');
+  const [showPlatformDropdown, setShowPlatformDropdown] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const [isMobile, setIsMobile] = useState(false);
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
-  const [tooltipStep, setTooltipStep] = useState(1);
-  const [textareaHeight, setTextareaHeight] = useState(50); // Reduced initial height
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const debouncedQuery = useDebounce(query, 300);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
-  const localStorageService = LocalStorageService.getInstance();
-  const [showMobileIcons, setShowMobileIcons] = useState(false);
-  const mobileIconsRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const navigate = useNavigate();
 
-  // Check if device is mobile
+  // Close dropdown when clicking outside
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowPlatformDropdown(false);
+      }
     };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
-  // Handle value prop changes
+  // Update internal query when value prop changes
   useEffect(() => {
-    if (value !== undefined) {
-      setQuery(value);
-    }
-  }, [value, setQuery]);
+    setQuery(value);
+  }, [value]);
 
   // Auto-resize textarea
   useEffect(() => {
-    if (inputRef.current) {
-      const textarea = inputRef.current;
-      // Reset height to calculate new height
-      textarea.style.height = 'auto';
+    if (textareaRef.current) {
+      // Reset height to minimum first
+      textareaRef.current.style.height = '50px';
       
-      // Calculate new height
-      const scrollHeight = textarea.scrollHeight;
-      const lineHeight = 24; // Approximate line height in pixels
-      const maxLines = 5;
-      const maxHeight = lineHeight * maxLines;
+      // Calculate new height based on content
+      const scrollHeight = textareaRef.current.scrollHeight;
+      const newHeight = Math.min(Math.max(50, scrollHeight), 120);
       
-      let newHeight;
-      if (scrollHeight <= maxHeight) {
-        newHeight = Math.max(scrollHeight, 50); // Reduced minimum to 50px
-        textarea.style.overflowY = 'hidden';
-      } else {
-        newHeight = maxHeight;
-        textarea.style.overflowY = 'auto';
-      }
+      // Set the new height
+      textareaRef.current.style.height = `${newHeight}px`;
       
-      textarea.style.height = `${newHeight}px`;
-      setTextareaHeight(newHeight);
-      
-      // Notify parent of height change
       if (onHeightChange) {
         onHeightChange(newHeight);
       }
     }
   }, [query, onHeightChange]);
 
-  useEffect(() => {
-    if (debouncedQuery) {
-      getSuggestions(debouncedQuery).catch((err: unknown) => {
-        console.error('Failed to get suggestions:', err);
-        clearError();
-      });
-    }
-  }, [debouncedQuery, getSuggestions, clearError]);
+  const exampleQueries = [
+    '2 bedroom flats to rent in Leeds for 1200pcm',
+  ];
 
-  const handleRetry = useCallback(() => {
-    clearError();
-    retry();
-    if (debouncedQuery) {
-      getSuggestions(debouncedQuery).catch((err) => {
-        console.error('Failed to get suggestions on retry:', err);
-        clearError();
-      });
-    }
-  }, [debouncedQuery, getSuggestions, retry, clearError]);
-
-  const handleSuggestionClick = useCallback((suggestion: string) => {
-    setQuery(suggestion);
-    clearError();
-    if (onChange) {
-      onChange(suggestion);
-    }
-    saveSearch(suggestion);
-    // handleSearch expects no arguments, so just call it
-    handleSearch();
-    setIsFocused(false);
-  }, [handleSearch, onChange, saveSearch, clearError, setQuery]);
-
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSearch = async () => {
     if (!query.trim()) {
-      // Don't proceed with empty query, but don't set error message here
+      setError('Please enter a search query');
       return;
     }
-    clearError();
-    saveSearch(query);
-    // handleSearch expects no arguments, so just call it
-    handleSearch();
-  }, [query, handleSearch, saveSearch, clearError]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const allSuggestions = [...searchSuggestions, ...getSearchHistory().slice(0, 3)];
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setIsFocused(true);
-      setHighlightedIndex((prev) => (prev + 1) % allSuggestions.length);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setIsFocused(true);
-      setHighlightedIndex((prev) => (prev - 1 + allSuggestions.length) % allSuggestions.length);
-    } else if (e.key === 'Enter' && highlightedIndex >= 0) {
-      e.preventDefault();
-      const selected = allSuggestions[highlightedIndex];
-      if (selected) {
-        handleSuggestionClick(selected);
-      }
-    } else if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e as any); // Handle submit on Enter without Shift
-    } else if (e.key === 'Escape') {
-      setIsFocused(false);
-      setHighlightedIndex(-1);
-      clearError();
+    
+    setError('');
+    setLoading(true);
+    
+    try {
+      // Always navigate to search results page with the query and search type
+      navigate(`/search?q=${encodeURIComponent(query)}&type=${searchType}`);
+    } catch (err) {
+      setError('Search failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  }, [searchSuggestions, getSearchHistory, highlightedIndex, handleSuggestionClick, clearError, handleSubmit]);
-
-  useEffect(() => {
-    setHighlightedIndex(-1);
-  }, [searchSuggestions, isFocused]);
-
-  const handleClear = useCallback(() => {
-    setQuery('');
-    clearError();
-    if (onChange) {
-      onChange('');
-    }
-    inputRef.current?.focus();
-  }, [onChange, clearError, setQuery]);
-
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = e.target.value;
-    setQuery(newValue);
-    clearError();
-    if (onChange) {
-      onChange(newValue);
-    }
-  }, [onChange, clearError, setQuery]);
-
-  const handleInputFocus = useCallback(() => {
-    setIsFocused(true);
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        suggestionsRef.current &&
-        !suggestionsRef.current.contains(event.target as Node) &&
-        !inputRef.current?.contains(event.target as Node)
-      ) {
-        setIsFocused(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Click outside for mobile icons popover
-  useEffect(() => {
-    if (!showMobileIcons) return;
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        mobileIconsRef.current &&
-        !mobileIconsRef.current.contains(event.target as Node)
-      ) {
-        setShowMobileIcons(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showMobileIcons]);
-
-  const renderNoResults = () => {
-    if (!hasResults && query.trim() && !isLoading) {
-      return (
-        <div className="mt-4 p-4 bg-gray-50 rounded-lg text-center">
-          <Search className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-          <p className="text-gray-600 font-medium">No properties found</p>
-          <p className="text-gray-500 text-sm mt-1">
-            Try adjusting your search terms or browse our suggestions
-          </p>
-          {searchSuggestions.length > 0 && (
-            <div className="mt-3">
-              <p className="text-gray-500 text-sm mb-2">You might be interested in:</p>
-              <div className="flex flex-wrap gap-2 justify-center">
-                {searchSuggestions.slice(0, 3).map((suggestion, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSuggestionClick(suggestion)}
-                    className="px-3 py-1 bg-white border border-gray-200 rounded-full text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
-    return null;
   };
 
-  const clearRecentSearches = () => {
-    localStorageService.set('search_history', []);
-    setQuery('');
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSearch();
+    }
   };
 
-  // Tooltip content for step 1
-  const getTooltipContent = () => {
-    if (tooltipStep === 1) {
-      return (
-        <div className="space-y-3">
-          <p className="leading-relaxed text-sm font-medium text-left text-gray-900 m-0">
-            Enter your preferred location, property type (house or apartment), number of bedrooms and bathrooms using natural language.
-          </p>
-          <div className="flex justify-end">
-            <button
-              onClick={() => setTooltipStep(2)}
-              className="bg-black text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-800 transition-colors"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      );
-    } else {
-      return (
-        <div className="space-y-3">
-          <p className="leading-relaxed text-sm font-medium text-left text-gray-900 m-0">
-            Include your monthly rent budget and we'll fetch listings for you from Zoopla and OpenRent.
-          </p>
-          <div className="flex justify-end">
-            <button
-              onClick={() => setTooltipStep(1)}
-              className="bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-300 transition-colors"
-            >
-              Back
-            </button>
-          </div>
-        </div>
-      );
+  const handlePlatformSelect = (platform: 'onthemarket' | 'internet') => {
+    setSearchType(platform);
+    setShowPlatformDropdown(false);
+  };
+
+  const getPlatformName = (platform: string) => {
+    switch (platform) {
+      case 'onthemarket':
+        return 'On the Market';
+      case 'internet':
+        return 'Internet Search';
+      default:
+        return 'Select Platform';
+    }
+  };
+
+  const handleQueryChange = (newQuery: string) => {
+    setQuery(newQuery);
+    setError(''); // Clear error when user types
+    
+    if (onChange) {
+      onChange(newQuery);
     }
   };
 
   return (
-    <div className={`relative ${className}`}>
-      <Tooltip
-        content={getTooltipContent()}
-        position="top"
-        maxWidth="max-w-sm"
-        className="w-full block"
-        disabled={query.trim().length > 0}
-      >
-        <form onSubmit={handleSubmit} className="relative w-full">
-          <div className="bg-white rounded-3xl p-3 shadow-xl">
-            {/* Input Section */}
-            <div className="relative mb-1"> {/* Reduced from mb-2 to mb-1 to decrease space */}
-              <textarea
-                ref={inputRef}
-                className={`w-full px-4 py-2 bg-transparent text-gray-900 text-lg rounded-2xl border-none transition-all duration-150 resize-none ${isFocused ? 'bg-[#F6F6F6]' : 'bg-transparent'
-                  } ${error ? 'border-red-500' : 'border-gray-300'}`}
-                placeholder={placeholder}
-                value={query}
-                onChange={handleInputChange}
-                onFocus={handleInputFocus}
-                onBlur={() => setTimeout(() => setIsFocused(false), 300)}
-                onKeyDown={handleKeyDown}
-                aria-label="Search properties"
-                aria-invalid={!!error}
-                aria-describedby={error ? 'search-error' : undefined}
-                aria-autocomplete="list"
-                aria-controls="search-suggestions-list"
-                role="combobox"
-                autoComplete="off"
-                rows={1}
-                style={{ 
-                  outline: 'none', 
-                  boxShadow: 'none', 
-                  border: 'none',
-                  minHeight: '50px',
-                  lineHeight: '24px'
-                }}
-              />
-            </div>
+    <div className="max-w-3xl mx-auto px-4 md:px-0">
+      <div className="relative w-full">
+        <div className="bg-white rounded-3xl p-3 shadow-xl">
+          {/* Input Field */}
+          <div className="px-4 py-2">
+            <textarea
+              ref={textareaRef}
+              value={query}
+              onChange={(e) => handleQueryChange(e.target.value)}
+              onKeyDown={handleKeyPress}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              placeholder="AI-assisted property search..."
+              className={`w-full text-lg rounded-2xl border-0 focus:outline-none resize-none transition-all duration-150 ${
+                error ? 'border-red-500' : ''
+              }`}
+              style={{ 
+                color: '#111827', // text-gray-900
+                fontFamily: 'Inter, system-ui, sans-serif',
+                fontSize: '18px',
+                fontWeight: '400',
+                lineHeight: '24px',
+                minHeight: '50px',
+                maxHeight: '120px',
+                backgroundColor: isFocused ? '#F6F6F6' : '#FFFFFF',
+                padding: '8px 16px'
+              }}
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = '50px';
+                target.style.height = Math.min(Math.max(50, target.scrollHeight), 120) + 'px';
+                if (onHeightChange) {
+                  onHeightChange(Math.min(Math.max(50, target.scrollHeight), 120));
+                }
+              }}
+            />
+          </div>
 
-            {/* Icons Section */}
-            <div className="flex items-center justify-between">
-              {/* Left side icons */}
-              <div className="flex items-center gap-2 pl-2 relative"> {/* Reduced from pl-4 to pl-2 to shift icons left */}
-                {!isMobile && (
-                  <>
+          {/* Icons Row */}
+          <div className="px-4 pb-2 pt-1 flex items-center justify-between">
+            {/* Left Side Icons */}
+            <div className="flex items-center gap-3">
+              {/* Camera Icon */}
+              <button className="p-2 transition-colors rounded-lg hover:bg-gray-50" style={{ color: '#888' }}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+
+              {/* Microphone Icon */}
+              <button className="p-2 transition-colors rounded-lg hover:bg-gray-50" style={{ color: '#888' }}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+              </button>
+
+              {/* Platform Selector with Plus Icon */}
+              <div className="relative" ref={dropdownRef}>
+                <button 
+                  onClick={() => setShowPlatformDropdown(!showPlatformDropdown)}
+                  className="p-2 rounded-lg transition-all hover:bg-gray-50 flex items-center gap-2"
+                  style={{ color: '#888' }}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  <span className="text-sm" style={{ fontSize: '14px' }}>
+                    {getPlatformName(searchType)}
+                  </span>
+                </button>
+
+                {/* Platform Dropdown */}
+                {showPlatformDropdown && (
+                  <div 
+                    className="absolute bottom-full left-0 mb-2 bg-white rounded-xl shadow-lg border py-2 min-w-48 z-50"
+                    style={{ 
+                      borderColor: '#e5e7eb',
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                    }}
+                  >
+                    {/* On the Market Option */}
                     <button
-                      type="button"
-                      className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100"
-                      aria-label="Search by image"
+                      onClick={() => handlePlatformSelect('onthemarket')}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                      style={{ color: searchType === 'onthemarket' ? '#E65D24' : '#23272f' }}
                     >
-                      <Camera className="w-6 h-6" />
-                    </button>
-                    <button
-                      type="button"
-                      className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100"
-                      aria-label="Search by voice"
-                    >
-                      <Mic className="w-6 h-6" />
-                    </button>
-                  </>
-                )}
-                {isMobile && (
-                  <>
-                    <button
-                      type="button"
-                      className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-100"
-                      aria-label="Show search options"
-                      onClick={() => setShowMobileIcons((v) => !v)}
-                    >
-                      <Plus className="w-6 h-6" />
-                    </button>
-                    {showMobileIcons && (
-                      <div
-                        ref={mobileIconsRef}
-                        className="absolute bottom-full left-0 mb-2 w-48 bg-white rounded-xl shadow-lg p-3 flex flex-col z-50 animate-fade-in"
-                        style={{ minWidth: '180px' }}
-                      >
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            className="flex flex-col items-center p-2 text-gray-700 hover:text-primary transition-colors rounded-lg hover:bg-gray-100"
-                            aria-label="Search by image"
-                          >
-                            <Camera className="w-6 h-6 mb-1" />
-                            <span className="text-xs">Image</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="flex flex-col items-center p-2 text-gray-700 hover:text-primary transition-colors rounded-lg hover:bg-gray-100"
-                            aria-label="Search by voice"
-                          >
-                            <Mic className="w-6 h-6 mb-1" />
-                            <span className="text-xs">Voice</span>
-                          </button>
-                        </div>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      <div>
+                        <div className="font-medium" style={{ fontSize: '14px' }}>On the Market</div>
+                        <div className="text-xs" style={{ color: '#888' }}>Official property portal</div>
                       </div>
-                    )}
-                  </>
-                )}
-                {isOffline && (
-                  <div className="px-2 text-yellow-600 flex items-center">
-                    <WifiOff className="w-4 h-4 mr-1" />
-                    <span className="text-sm">Offline</span>
+                    </button>
+
+                    {/* Internet Search Option */}
+                    <button
+                      onClick={() => handlePlatformSelect('internet')}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                      style={{ color: searchType === 'internet' ? '#E65D24' : '#23272f' }}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9m0 9c-5 0-9-4-9-9s4-9 9-9" />
+                      </svg>
+                      <div>
+                        <div className="font-medium" style={{ fontSize: '14px' }}>Internet Search</div>
+                        <div className="text-xs" style={{ color: '#888' }}>Search across web</div>
+                      </div>
+                    </button>
                   </div>
                 )}
               </div>
-
-              {/* Right side - Search button */}
-              <button
-                className={`bg-primary text-white p-3 rounded-full transition-all shadow-md ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-opacity-90'
-                  }`}
-                type="submit"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <LoadingSpinner size="small" className="border-white" />
-                ) : (
-                  <img
-                    src="/images/ai-search-plane-icon-new-wht-1.png"
-                    alt="Search"
-                    className="w-6 h-6"
-                  />
-                )}
-              </button>
             </div>
-          </div>
-        </form>
-      </Tooltip>
 
-      {error && (
-        <div className="mt-2 flex items-center justify-between">
-          <ErrorMessage
-            id="search-error"
-            message={error}
-            className="text-sm text-red-500"
-          />
-          <button
-            onClick={handleRetry}
-            className="text-sm text-blue-500 hover:text-blue-600 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      {renderNoResults()}
-
-      {isFocused && (searchSuggestions.length > 0 || getSearchHistory().slice(0, 3).length > 0) && (
-        <div
-          ref={suggestionsRef}
-          className="absolute w-full mt-2 bg-white rounded-xl shadow-lg overflow-hidden z-50 max-h-[300px] overflow-y-auto custom-scrollbar"
-        >
-          <ul className="py-1" id="search-suggestions-list" role="listbox">
-            {searchSuggestions.map((suggestion, index) => (
-              <li
-                key={suggestion}
-                className={`px-4 py-2 cursor-pointer text-gray-700 ${highlightedIndex === index ? 'bg-gray-100' : ''}`}
-                onClick={() => handleSuggestionClick(suggestion)}
-                tabIndex={0}
-                role="option"
-                aria-selected={highlightedIndex === index}
-                onMouseEnter={() => setHighlightedIndex(index)}
-              >
-                {suggestion}
-              </li>
-            ))}
-            {getSearchHistory().slice(0, 3).map((item, idx) => {
-              const index = searchSuggestions.length + idx;
-              return (
-                <li
-                  key={item}
-                  className={`px-4 py-2 cursor-pointer text-gray-700 ${highlightedIndex === index ? 'bg-gray-100' : ''}`}
-                  onClick={() => handleSuggestionClick(item)}
-                  tabIndex={0}
-                  role="option"
-                  aria-selected={highlightedIndex === index}
-                  onMouseEnter={() => setHighlightedIndex(index)}
-                >
-                  {item}
-                  <span className="ml-2 text-xs text-gray-400">Recent</span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-
-      {isLoading && (
-        <div className="flex justify-center items-center mt-4">
-          <LoadingSpinner size="medium" />
-        </div>
-      )}
-
-      {getSearchHistory().slice(0, 3).length > 0 && (
-        <div className="mt-2 bg-white rounded-xl shadow p-3 relative">
-          <button
-            type="button"
-            className="absolute top-2 right-2 text-gray-400 hover:text-red-500 text-lg"
-            aria-label="Clear recent searches"
-            onClick={clearRecentSearches}
-          >
-            <X className="w-4 h-4" />
-          </button>
-          <div className="text-xs text-gray-500 mb-2">Recent Searches</div>
-          <div className="flex flex-wrap gap-2">
-            {getSearchHistory().slice(0, 3).map((item, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleSuggestionClick(item)}
-                className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-700 hover:bg-gray-200"
-                aria-label={`Repeat search: ${item}`}
-              >
-                {item}
-              </button>
-            ))}
+            {/* Right Side - Circular Search Button */}
+            <button
+              onClick={handleSearch}
+              disabled={loading || !query.trim()}
+              className="w-12 h-12 rounded-full text-white shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              style={{ 
+                backgroundColor: '#E65D24',
+              }}
+              onMouseEnter={(e) => {
+                const target = e.target as HTMLButtonElement;
+                if (!target.disabled) {
+                  target.style.backgroundColor = '#D54A1A';
+                }
+              }}
+              onMouseLeave={(e) => {
+                const target = e.target as HTMLButtonElement;
+                if (!target.disabled) {
+                  target.style.backgroundColor = '#E65D24';
+                }
+              }}
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <img 
+                  src="/images/ai-search-plane-icon-new-wht-1.png" 
+                  alt="Search" 
+                  className="w-6 h-6"
+                />
+              )}
+            </button>
           </div>
         </div>
-      )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="mt-2 text-red-500 text-sm">
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* Example Queries */}
+      <div className="mt-6">
+        <p className="mb-4 text-center" style={{ color: '#888', fontSize: '16px', fontWeight: '500' }}>Try asking:</p>
+        <div className="flex flex-wrap justify-center gap-4">
+          {exampleQueries.map((q, index) => (
+            <button
+              key={index}
+              onClick={() => handleQueryChange(q)}
+              className="px-6 py-3 rounded-xl transition-colors border shadow-sm"
+              style={{ 
+                backgroundColor: '#ffffff',
+                color: '#E65D24',
+                borderColor: '#E65D24' + '30',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}
+              onMouseEnter={(e) => {
+                (e.target as HTMLElement).style.backgroundColor = '#E65D24' + '10';
+              }}
+              onMouseLeave={(e) => {
+                (e.target as HTMLElement).style.backgroundColor = '#ffffff';
+              }}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }; 

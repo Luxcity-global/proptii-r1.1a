@@ -60,6 +60,9 @@ const StyledTextField = styled(TextField)(({ theme }) => ({
 
 const PropertySelector: React.FC = () => {
   const { state, dispatch } = useBookViewing();
+  
+  // Debug logging
+  console.log('PropertySelector state:', state.selectedProperty);
 
   const handlePropertyChange = (field: string, value: string) => {
     dispatch({
@@ -112,26 +115,6 @@ const PropertySelector: React.FC = () => {
               />
             </div>
           </Tooltip>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-          <TextField
-            label="City"
-            value={state.selectedProperty?.city || ''}
-            onChange={(e) => handlePropertyChange('city', e.target.value)}
-            sx={{ flex: 1 }}
-          />
-          <TextField
-            label="Town"
-            value={state.selectedProperty?.town || ''}
-            onChange={(e) => handlePropertyChange('town', e.target.value)}
-            sx={{ flex: 1 }}
-          />
-          <TextField
-            label="Postcode (Optional)"
-            value={state.selectedProperty?.postcode || ''}
-            onChange={(e) => handlePropertyChange('postcode', e.target.value)}
-            sx={{ flex: 1 }}
-          />
         </Box>
       </Box>
 

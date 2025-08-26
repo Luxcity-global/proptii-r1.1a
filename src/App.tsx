@@ -28,6 +28,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import FAQ from './pages/FAQ';
 import AgentContractLanding from './pages/AgentContractLanding';
+import SearchResults from './pages/SearchResults';
 
 export const App: React.FC = () => {
   return (
@@ -38,6 +39,7 @@ export const App: React.FC = () => {
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
+            <Route path="/search" element={<SearchResults />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />

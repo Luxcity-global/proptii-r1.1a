@@ -133,9 +133,9 @@ const BookViewing = () => {
       {/* Steps Section */}
       <section className="relative bg-cover bg-center bg-no-repeat py-16 md:py-24 px-4 md:px-8 min-h-[600px] flex items-center justify-center" style={{ backgroundImage: "url('/images/Referencing.png')" }}>
         {/* Container with spacing */}
-        <div className="relative container mx-auto flex flex-col md:flex-row items-center gap-8 md:gap-12 max-w-6xl">
+        <div className="relative container mx-auto flex flex-col md:flex-row items-start gap-8 md:gap-12 max-w-6xl">
           {/* Left Section - Text Content */}
-          <div className="w-full md:w-1/2 space-y-6 md:space-y-10 text-center md:text-left">
+          <div className="w-full md:w-1/2 space-y-6 md:space-y-10 text-center md:text-left md:absolute md:top-8 md:left-0 bg-white md:bg-white md:shadow-lg md:rounded-lg md:p-6 relative z-50">
             <h2 className="text-2xl md:text-3xl font-bold text-[#136C9E] leading-tight">
               Property viewings made easy.
             </h2>
@@ -150,7 +150,7 @@ const BookViewing = () => {
           </div>
 
           {/* Right Section - Swiper Carousel */}
-          <div className="w-full md:w-1/2 flex justify-center">
+          <div className="w-full md:w-1/2 md:ml-auto flex justify-center">
             <div className="w-full max-w-sm md:max-w-md">
               <Swiper
                 modules={[Pagination, Navigation]}

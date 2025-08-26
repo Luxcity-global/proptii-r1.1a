@@ -178,15 +178,19 @@ const steps = [
   },
 ];
 
-// Update the PropertyDetails interface to include id
+// Update the PropertyDetails interface to match the context
 interface PropertyDetails {
-  id: string;
+  id?: string;
   street: string;
+  town: string;
   city: string;
   postcode: string;
-  agent?: {
+  agent: {
+    id: string;
     name: string;
     email: string;
+    phone: string;
+    company: string;
   };
 }
 
@@ -194,17 +198,18 @@ interface BookViewingModalProps {
   open: boolean;
   onClose: () => void;
   onSubmissionComplete?: () => void;
+  prefilledPropertyData?: PropertyDetails | null;
 }
 
-const BookViewingModal: React.FC<BookViewingModalProps> = ({ open, onClose, onSubmissionComplete }) => {
+const BookViewingModal: React.FC<BookViewingModalProps> = ({ open, onClose, onSubmissionComplete, prefilledPropertyData }) => {
   return (
     <BookViewingProvider>
-      <BookViewingModalContent open={open} onClose={onClose} onSubmissionComplete={onSubmissionComplete} />
+      <BookViewingModalContent open={open} onClose={onClose} onSubmissionComplete={onSubmissionComplete} prefilledPropertyData={prefilledPropertyData} />
     </BookViewingProvider>
   );
 };
 
-const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClose, onSubmissionComplete }) => {
+const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClose, onSubmissionComplete, prefilledPropertyData }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { state, dispatch } = useBookViewing();
@@ -224,8 +229,6 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     const userDetails = viewing?.userDetails;
 
     return property?.street &&
-      property?.city &&
-      property?.postcode &&
       property?.agent?.name &&
       property?.agent?.email &&
       viewing?.date &&
@@ -241,8 +244,6 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     const property = state.selectedProperty;
     return !!(
       property?.street &&
-      property?.city &&
-      property?.postcode &&
       property?.agent?.name &&
       property?.agent?.email
     );
@@ -266,7 +267,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
 
     if (!isPropertyDetailsComplete()) {
       const property = state.selectedProperty;
-      if (!property?.street || !property?.city || !property?.postcode) {
+      if (!property?.street) {
         messages.push("Property address details");
       }
       if (!property?.agent?.name || !property?.agent?.email) {
@@ -297,8 +298,6 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     switch (section) {
       case 0: // Property Details
         return !!(property?.street ||
-          property?.city ||
-          property?.postcode ||
           property?.agent?.name ||
           property?.agent?.email);
       case 1: // Schedule Viewing
@@ -418,7 +417,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     switch (step) {
       case 0: // Property Details
         const property = state.selectedProperty;
-        if (!property?.street || !property?.city || !property?.postcode) {
+        if (!property?.street) {
           messages.push("Property address details");
         }
         if (!property?.agent?.name || !property?.agent?.email) {
@@ -538,6 +537,17 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
       setShowStepWarning(false);
     }
   }, [state.selectedProperty, state.viewingDetails]);
+
+  // Set prefilled property data when modal opens
+  useEffect(() => {
+    if (open && prefilledPropertyData && !state.selectedProperty?.street) {
+      console.log('Setting prefilled property data:', prefilledPropertyData);
+      dispatch({
+        type: 'SET_SELECTED_PROPERTY',
+        payload: prefilledPropertyData
+      });
+    }
+  }, [open, prefilledPropertyData, state.selectedProperty, dispatch]);
 
   return (
     <>
