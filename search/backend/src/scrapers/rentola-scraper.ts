@@ -17,7 +17,38 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
 
     browser = await chromium.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--disable-gpu-sandbox',
+        '--disable-software-rasterizer',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-features=TranslateUI',
+        '--disable-ipc-flooding-protection',
+        '--disable-background-networking',
+        '--disable-client-side-phishing-detection',
+        '--disable-sync',
+        '--disable-default-apps',
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-images',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+        '--window-size=1920x1080',
+        '--user-data-dir=/tmp/playwright_profile',
+        '--data-path=/tmp/playwright_data',
+        '--homedir=/tmp',
+        '--disk-cache-dir=/tmp/playwright_cache',
+        '--media-cache-dir=/tmp/playwright_media_cache',
+        '--aggressive-cache-discard',
+        '--memory-pressure-off',
+        '--max_old_space_size=4096'
+      ]
     });
 
     const context = await browser.newContext({

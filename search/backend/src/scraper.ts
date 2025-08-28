@@ -1152,10 +1152,11 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
     console.log('Cleaned URL:', cleanUrl);
     
     console.log('Launching browser...');
-    // Launch browser with more robust error handling and Windows-specific fixes
+    // Launch browser with containerized environment optimizations
     const launchOptions: LaunchOptions = {
       headless: true,
-      timeout: 60000, // Increased timeout
+      timeout: 60000,
+      executablePath: process.env.CHROME_BIN || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -1173,8 +1174,20 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
         '--disable-client-side-phishing-detection',
         '--disable-sync',
         '--disable-default-apps',
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-images',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
         '--window-size=1920x1080',
-        '--user-data-dir=' + path.join(os.tmpdir(), 'puppeteer_dev_chrome_profile-' + Math.random().toString(36).substr(2, 9))
+        '--user-data-dir=/tmp/puppeteer_profile',
+        '--data-path=/tmp/puppeteer_data',
+        '--homedir=/tmp',
+        '--disk-cache-dir=/tmp/puppeteer_cache',
+        '--media-cache-dir=/tmp/puppeteer_media_cache',
+        '--aggressive-cache-discard',
+        '--memory-pressure-off',
+        '--max_old_space_size=4096'
       ]
     };
 

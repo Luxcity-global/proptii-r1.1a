@@ -22,6 +22,43 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Fallback endpoint for when browser automation fails
+app.post('/scrape-fallback', async (req, res) => {
+  try {
+    const { query } = req.body;
+    
+    // Return mock data as fallback
+    const mockProperties = [
+      {
+        title: `Sample Property in ${query || 'Leeds'}`,
+        price: '£1,200 pcm',
+        location: query || 'Leeds',
+        bedrooms: 2,
+        bathrooms: 1,
+        description: 'This is a sample property listing. The search backend is currently experiencing issues with browser automation.',
+        images: ['https://via.placeholder.com/400x300?text=Property+Image'],
+        agent: {
+          name: 'Sample Agent',
+          email: 'agent@example.com',
+          phone: '0113 123 4567',
+          website: 'https://example.com'
+        },
+        source: 'Fallback',
+        url: 'https://example.com/property',
+        fallback: true
+      }
+    ];
+    
+    res.json(mockProperties);
+  } catch (error) {
+    console.error('Error in fallback endpoint:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'An unexpected error occurred'
+    });
+  }
+});
+
 app.post('/scrape', async (req, res) => {
   try {
 
@@ -114,6 +151,31 @@ app.post('/scrape', async (req, res) => {
     }
 
     // Handle other errors
+    if (errorMessage.includes('Could not find Chrome') || errorMessage.includes('Executable doesn\'t exist') || errorMessage.includes('Failed to launch browser')) {
+      console.log('Browser automation failed, using fallback endpoint');
+      // Extract location from URL for fallback
+      try {
+        const urlObj = new URL(url);
+        const pathParts = urlObj.pathname.split('/');
+        const location = pathParts[pathParts.length - 2] || 'Leeds';
+        const fallbackQuery = `property in ${location.replace(/-/g, ' ')}`;
+        
+        // Call the fallback endpoint
+        const fallbackResponse = await fetch(`${req.protocol}://${req.get('host')}/scrape-fallback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: fallbackQuery })
+        });
+        
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          return res.json(fallbackData);
+        }
+      } catch (fallbackError) {
+        console.error('Fallback endpoint also failed:', fallbackError);
+      }
+    }
+    
     res.status(500).json({
       error: 'Internal server error',
       message: errorMessage
@@ -148,6 +210,27 @@ app.post('/scrape-internet', async (req, res) => {
       res.json(allResults);
     } catch (error) {
       console.warn('Rentola search failed:', error);
+      
+      // Check if it's a browser automation error and use fallback
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      if (errorMessage.includes('Could not find Chrome') || errorMessage.includes('Executable doesn\'t exist') || errorMessage.includes('Failed to launch browser')) {
+        console.log('Browser automation failed, using fallback for internet search');
+        try {
+          const fallbackResponse = await fetch(`${req.protocol}://${req.get('host')}/scrape-fallback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
+          });
+          
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            return res.json(fallbackData);
+          }
+        } catch (fallbackError) {
+          console.error('Fallback endpoint also failed:', fallbackError);
+        }
+      }
+      
       res.json([]); // Return empty array if Rentola fails
     }
   } catch (error) {
