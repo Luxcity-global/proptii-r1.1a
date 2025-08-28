@@ -21,6 +21,8 @@ services:
         sync: false
       - key: VITE_GOOGLE_SHEETS_API_ENDPOINT
         value: https://proptii-r1-1a.onrender.com/api/sheets
+      - key: VITE_SEARCH_BACKEND_URL
+        value: https://proptii-search-backend.onrender.com
     headers:
       - path: /*
         name: X-Frame-Options
@@ -33,7 +35,7 @@ services:
         value: "1; mode=block"
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; connect-src 'self' https://proptii-r1-1a.onrender.com/api/* https://proptii-r1-1a-1.onrender.com/api/* https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com https://proptii-frontend.onrender.com https://*.cognitiveservices.azure.com https://*.onrender.com http://localhost:10000/api/*; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; frame-ancestors 'none';"
+        value: "default-src 'self'; connect-src 'self' https://proptii-r1-1a.onrender.com/api/* https://proptii-r1-1a-1.onrender.com/api/* https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com https://proptii-frontend.onrender.com https://*.cognitiveservices.azure.com https://*.onrender.com http://localhost:10000/api/* https://proptii-search-backend.onrender.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; frame-ancestors 'none';"
       - path: /*
         name: Cache-Control
         value: no-cache
@@ -83,3 +85,19 @@ services:
         sync: false
       - key: GOOGLE_SHEETS_CREDENTIALS_JSON
         sync: false
+
+  # Search Backend
+  - type: web
+    name: proptii-search-backend
+    env: node
+    plan: free
+    buildCommand: cd search/backend && npm install && npm run build
+    startCommand: cd search/backend && npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001

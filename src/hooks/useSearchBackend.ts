@@ -63,7 +63,7 @@ export const useSearchBackend = () => {
   const [results, setResults] = useState<Property[]>([]);
   const [searchType, setSearchType] = useState<'onthemarket' | 'internet'>('onthemarket');
 
-  const searchBackendUrl = 'http://localhost:3001'; // Search backend URL
+  const searchBackendUrl = import.meta.env.VITE_SEARCH_BACKEND_URL || 'http://localhost:3001'; // Search backend URL
 
   // Network connectivity check
   const checkNetworkConnectivity = async (): Promise<boolean> => {
