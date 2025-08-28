@@ -45,19 +45,56 @@ export const SearchInput = ({
     setQuery(value);
   }, [value]);
 
-  // Auto-resize textarea
+  // Set initial height to 50px
   useEffect(() => {
     if (textareaRef.current) {
-      // Reset height to minimum first
       textareaRef.current.style.height = '50px';
+      if (onHeightChange) {
+        onHeightChange(50);
+      }
+    }
+  }, []);
+
+  // Core Resizing Algorithm
+  useEffect(() => {
+    if (textareaRef.current) {
+      const textarea = textareaRef.current;
       
-      // Calculate new height based on content
-      const scrollHeight = textareaRef.current.scrollHeight;
-      const newHeight = Math.min(Math.max(50, scrollHeight), 120);
+      // If no content, keep at 50px
+      if (!query.trim()) {
+        textarea.style.height = '50px';
+        textarea.style.overflowY = 'hidden';
+        if (onHeightChange) {
+          onHeightChange(50);
+        }
+        return;
+      }
       
-      // Set the new height
-      textareaRef.current.style.height = `${newHeight}px`;
+      // Step 1: Reset height to 'auto' to get natural content height
+      textarea.style.height = 'auto';
       
+      // Step 2: Calculate dimensions
+      const scrollHeight = textarea.scrollHeight;  // Natural content height
+      const lineHeight = 24;                       // Line height in pixels
+      const maxLines = 4;                          // Maximum allowed lines (changed from 5 to 4)
+      const maxHeight = lineHeight * maxLines;     // 96px maximum height
+      
+      // Step 3: Determine new height
+      let newHeight;
+      if (scrollHeight <= maxHeight) {
+        // Content fits within max height
+        newHeight = Math.max(scrollHeight, 50);    // At least 50px, or content height
+        textarea.style.overflowY = 'hidden';       // Hide scrollbar
+      } else {
+        // Content exceeds max height
+        newHeight = maxHeight;                      // Cap at 96px
+        textarea.style.overflowY = 'auto';         // Show scrollbar
+      }
+      
+      // Step 4: Apply new height
+      textarea.style.height = `${newHeight}px`;
+      
+      // Step 5: Notify parent component
       if (onHeightChange) {
         onHeightChange(newHeight);
       }
@@ -120,11 +157,11 @@ export const SearchInput = ({
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 md:px-0">
+    <div className="max-w-3xl mx-auto px-2 md:px-0">
       <div className="relative w-full">
-        <div className="bg-white rounded-3xl p-3 shadow-xl">
+        <div className="bg-white rounded-3xl p-2 shadow-xl">
           {/* Input Field */}
-          <div className="px-4 py-2">
+          <div className="px-2 py-2">
             <textarea
               ref={textareaRef}
               value={query}
@@ -133,7 +170,7 @@ export const SearchInput = ({
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               placeholder="AI-assisted property search..."
-              className={`w-full text-lg rounded-2xl border-0 focus:outline-none resize-none transition-all duration-150 ${
+              className={`w-full text-lg rounded-2xl border-0 focus:outline-none focus:ring-0 resize-none transition-all duration-150 ${
                 error ? 'border-red-500' : ''
               }`}
               style={{ 
@@ -142,24 +179,51 @@ export const SearchInput = ({
                 fontSize: '18px',
                 fontWeight: '400',
                 lineHeight: '24px',
+                height: '50px', // Initial height
                 minHeight: '50px',
-                maxHeight: '120px',
-                backgroundColor: isFocused ? '#F6F6F6' : '#FFFFFF',
-                padding: '8px 16px'
+                maxHeight: '96px', // 4 lines * 24px line height
+                backgroundColor: isFocused ? '#FFFFFF' : '#FFFFFF',
+                padding: '8px 12px',
+                outline: 'none',
+                border: 'none'
               }}
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
-                target.style.height = '50px';
-                target.style.height = Math.min(Math.max(50, target.scrollHeight), 120) + 'px';
+                
+                // Step 1: Reset height to 'auto' to get natural content height
+                target.style.height = 'auto';
+                
+                // Step 2: Calculate dimensions
+                const scrollHeight = target.scrollHeight;  // Natural content height
+                const lineHeight = 24;                     // Line height in pixels
+                const maxLines = 4;                        // Maximum allowed lines
+                const maxHeight = lineHeight * maxLines;   // 96px maximum height
+                
+                // Step 3: Determine new height
+                let newHeight;
+                if (scrollHeight <= maxHeight) {
+                  // Content fits within max height
+                  newHeight = Math.max(scrollHeight, 50);  // At least 50px, or content height
+                  target.style.overflowY = 'hidden';       // Hide scrollbar
+                } else {
+                  // Content exceeds max height
+                  newHeight = maxHeight;                    // Cap at 96px
+                  target.style.overflowY = 'auto';         // Show scrollbar
+                }
+                
+                // Step 4: Apply new height
+                target.style.height = `${newHeight}px`;
+                
+                // Step 5: Notify parent component
                 if (onHeightChange) {
-                  onHeightChange(Math.min(Math.max(50, target.scrollHeight), 120));
+                  onHeightChange(newHeight);
                 }
               }}
             />
           </div>
 
           {/* Icons Row */}
-          <div className="px-4 pb-2 pt-1 flex items-center justify-between">
+          <div className="px-2 pb-2 pt-1 flex items-center justify-between">
             {/* Left Side Icons */}
             <div className="flex items-center gap-3">
               {/* Camera Icon */}
@@ -303,6 +367,13 @@ export const SearchInput = ({
               {q}
             </button>
           ))}
+        </div>
+        
+        {/* Helpful tip for connectivity issues */}
+        <div className="mt-4 text-center">
+          <p className="text-sm" style={{ color: '#666' }}>
+            💡 <strong>Tip:</strong> If searches fail, try switching to "Internet Search" mode for better reliability
+          </p>
         </div>
       </div>
     </div>

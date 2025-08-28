@@ -11,6 +11,22 @@ import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 import { Pagination, Navigation } from "swiper/modules";
 
+// PropertyDetails interface for prefilled data
+interface PropertyDetails {
+  id?: string;
+  street: string;
+  town: string;
+  city: string;
+  postcode: string;
+  agent: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    company: string;
+  };
+}
+
 // Custom styles for Swiper
 const swiperStyles = `
   .swiper-container .swiper-pagination-bullet {
@@ -48,6 +64,7 @@ const BookViewing = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [prefilledPropertyData, setPrefilledPropertyData] = useState<PropertyDetails | null>(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -70,6 +87,28 @@ const BookViewing = () => {
       document.head.removeChild(styleElement);
     };
   }, []);
+
+  // Check for prefilled property data from search results
+  useEffect(() => {
+    const prefilledData = sessionStorage.getItem('prefilledProperty');
+    if (prefilledData) {
+      try {
+        const parsedData = JSON.parse(prefilledData);
+        setPrefilledPropertyData(parsedData);
+        
+        // If user is authenticated, automatically open the modal
+        if (isAuthenticated) {
+          setIsModalOpen(true);
+        }
+        
+        // Clear the sessionStorage after retrieving the data
+        sessionStorage.removeItem('prefilledProperty');
+      } catch (error) {
+        console.error('Error parsing prefilled property data:', error);
+        sessionStorage.removeItem('prefilledProperty');
+      }
+    }
+  }, [isAuthenticated]);
 
   const handleGetStarted = () => {
     if (!isAuthenticated) {
@@ -232,6 +271,7 @@ const BookViewing = () => {
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmissionComplete={handleSubmissionComplete}
+        prefilledPropertyData={prefilledPropertyData}
       />
 
       <ReviewModal

@@ -20,7 +20,19 @@ const cleanPropertyPrice = (price: string): string => {
     return pcmMatch[0];
   }
   
-  // If no pcm found, return the cleaned price
+  // If no pcm found, try to add pound sign if missing
+  if (cleanedPrice.trim()) {
+    const trimmedPrice = cleanedPrice.trim();
+    // If it doesn't start with £, add it
+    if (!trimmedPrice.startsWith('£')) {
+      // Check if it's a number or contains numbers
+      if (/\d/.test(trimmedPrice)) {
+        return `£${trimmedPrice}`;
+      }
+    }
+    return trimmedPrice;
+  }
+  
   return cleanedPrice.trim();
 };
 

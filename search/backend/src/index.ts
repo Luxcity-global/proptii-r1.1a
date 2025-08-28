@@ -13,6 +13,15 @@ const port = 3001;
 app.use(cors());
 app.use(express.json());
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    service: 'property-search-backend'
+  });
+});
+
 app.post('/scrape', async (req, res) => {
   try {
 
@@ -43,8 +52,43 @@ app.post('/scrape', async (req, res) => {
       res.json(results);
     } else {
       console.log('Using OnTheMarket scraper for URL:', url);
-      const results = await scrape(url, apiKey);
-      res.json(results);
+      try {
+        const results = await scrape(url, apiKey);
+        res.json(results);
+      } catch (onTheMarketError) {
+        console.error('OnTheMarket scraping failed:', onTheMarketError);
+        
+        // Try to extract search parameters from the URL for fallback
+        try {
+          const urlObj = new URL(url);
+          const pathParts = urlObj.pathname.split('/');
+          const location = pathParts[pathParts.length - 2]; // Extract location from path
+          
+          if (location && location !== 'property') {
+            console.log('Attempting fallback to Rentola with location:', location);
+            
+            // Build a basic search query for Rentola
+            const searchQuery = `property in ${location.replace(/-/g, ' ')}`;
+            const rentolaUrl = buildRentolaUrl(searchQuery);
+            const rentolaResults = await scrapeRentola(rentolaUrl, apiKey);
+            
+            // Mark results as fallback
+            const fallbackResults = rentolaResults.map(prop => ({ 
+              ...prop, 
+              source: 'Rentola (Fallback)',
+              fallback: true 
+            }));
+            
+            console.log(`Fallback search completed: ${fallbackResults.length} properties found`);
+            res.json(fallbackResults);
+          } else {
+            throw onTheMarketError; // Re-throw if we can't extract location
+          }
+        } catch (fallbackError) {
+          console.error('Fallback search also failed:', fallbackError);
+          throw onTheMarketError; // Re-throw original error
+        }
+      }
     }
   } catch (error) {
     console.error('Error in /scrape endpoint:', error);
@@ -59,10 +103,20 @@ app.post('/scrape', async (req, res) => {
       });
     }
 
+    // Handle network errors more gracefully
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+    if (errorMessage.includes('ERR_NAME_NOT_RESOLVED') || errorMessage.includes('net::')) {
+      return res.status(503).json({
+        error: 'Network connectivity issue',
+        message: 'Unable to connect to property search services. Please check your internet connection and try again.',
+        details: errorMessage
+      });
+    }
+
     // Handle other errors
     res.status(500).json({
       error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'An unexpected error occurred'
+      message: errorMessage
     });
   }
 });

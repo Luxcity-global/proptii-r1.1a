@@ -18,7 +18,19 @@ const cleanPropertyPrice = (price: string): string => {
     return pcmMatch[0];
   }
   
-  // If no pcm found, return the cleaned price
+  // If no pcm found, try to add pound sign if missing
+  if (cleanedPrice.trim()) {
+    const trimmedPrice = cleanedPrice.trim();
+    // If it doesn't start with £, add it
+    if (!trimmedPrice.startsWith('£')) {
+      // Check if it's a number or contains numbers
+      if (/\d/.test(trimmedPrice)) {
+        return `£${trimmedPrice}`;
+      }
+    }
+    return trimmedPrice;
+  }
+  
   return cleanedPrice.trim();
 };
 
@@ -52,6 +64,20 @@ export const useSearchBackend = () => {
   const [searchType, setSearchType] = useState<'onthemarket' | 'internet'>('onthemarket');
 
   const searchBackendUrl = 'http://localhost:3001'; // Search backend URL
+
+  // Network connectivity check
+  const checkNetworkConnectivity = async (): Promise<boolean> => {
+    try {
+      const response = await fetch(`${searchBackendUrl}/health`, { 
+        method: 'GET',
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      });
+      return response.ok;
+    } catch (error) {
+      console.warn('Network connectivity check failed:', error);
+      return false;
+    }
+  };
 
   // Load cached results on mount
   useEffect(() => {
@@ -152,6 +178,47 @@ export const useSearchBackend = () => {
       });
 
       if (!response.ok) {
+        // If OnTheMarket fails, try internet search as fallback
+        if (type === 'onthemarket') {
+          console.log('OnTheMarket search failed, trying internet search as fallback...');
+          const fallbackResponse = await fetch(`${searchBackendUrl}/scrape-internet`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query: searchQuery }),
+          });
+          
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            let fallbackResults: Property[] = [];
+            if (Array.isArray(fallbackData)) {
+              fallbackResults = fallbackData;
+            } else if (fallbackData.properties) {
+              fallbackResults = fallbackData.properties;
+            }
+            
+            // Clean the pricing for all properties
+            const cleanedResults = fallbackResults.map(property => ({
+              ...property,
+              price: cleanPropertyPrice(property.price)
+            }));
+            
+            setResults(cleanedResults);
+            
+            // Cache the results in sessionStorage
+            const cacheData = {
+              results: cleanedResults,
+              query: searchQuery,
+              searchType: 'internet', // Update to reflect fallback
+              timestamp: Date.now()
+            };
+            sessionStorage.setItem('searchResults', JSON.stringify(cacheData));
+            
+            return fallbackResults;
+          }
+        }
+        
         throw new Error(`Search failed: ${response.statusText}`);
       }
 
@@ -185,7 +252,18 @@ export const useSearchBackend = () => {
       return finalResults;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Search failed';
-      setError(errorMessage);
+      
+      // Provide more user-friendly error messages
+      let userFriendlyError = errorMessage;
+      if (errorMessage.includes('ERR_NAME_NOT_RESOLVED') || errorMessage.includes('net::')) {
+        userFriendlyError = 'Network connection issue. Please check your internet connection and try again.';
+      } else if (errorMessage.includes('timeout')) {
+        userFriendlyError = 'Search timed out. Please try again.';
+      } else if (errorMessage.includes('Internal Server Error')) {
+        userFriendlyError = 'Search service temporarily unavailable. Please try again in a few moments.';
+      }
+      
+      setError(userFriendlyError);
       setResults([]);
       return [];
     } finally {

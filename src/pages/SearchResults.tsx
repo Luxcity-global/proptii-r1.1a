@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSearchBackend, type Property } from '../hooks/useSearchBackend';
-import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
 const cleanPropertyPrice = (price: string): string => {
@@ -22,7 +22,19 @@ const cleanPropertyPrice = (price: string): string => {
     return pcmMatch[0];
   }
   
-  // If no pcm found, return the cleaned price
+  // If no pcm found, try to add pound sign if missing
+  if (cleanedPrice.trim()) {
+    const trimmedPrice = cleanedPrice.trim();
+    // If it doesn't start with £, add it
+    if (!trimmedPrice.startsWith('£')) {
+      // Check if it's a number or contains numbers
+      if (/\d/.test(trimmedPrice)) {
+        return `£${trimmedPrice}`;
+      }
+    }
+    return trimmedPrice;
+  }
+  
   return cleanedPrice.trim();
 };
 
@@ -70,11 +82,11 @@ function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNav
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
       <div 
         ref={modalRef}
-        className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-auto"
+        className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
         style={{ maxWidth: '900px' }}
       >
-        {/* Modal Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        {/* Modal Header - Fixed at top */}
+        <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-xl">
           <h2 className="text-xl font-bold text-gray-900">Property Details</h2>
           <button
             onClick={onClose}
@@ -86,16 +98,18 @@ function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNav
           </button>
         </div>
 
-        {/* Image Gallery */}
-        {property.imageUrls && property.imageUrls.length > 0 && (
-          <div className="relative">
-            <div className="h-96 overflow-hidden">
-              <img
-                src={property.imageUrls[currentImageIndex]}
-                alt={`${property.title} - Image ${currentImageIndex + 1}`}
-                className="w-full h-full object-cover"
-              />
-            </div>
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-auto">
+          {/* Image Gallery */}
+          {property.imageUrls && property.imageUrls.length > 0 && (
+            <div className="relative">
+              <div className="h-96 overflow-hidden">
+                <img
+                  src={property.imageUrls[currentImageIndex]}
+                  alt={`${property.title} - Image ${currentImageIndex + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
             
             {/* Navigation Arrows */}
             {property.imageUrls.length > 1 && (
@@ -234,6 +248,7 @@ function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNav
             </div>
           </div>
         </div>
+        </div>
       </div>
     </div>
   );
@@ -325,12 +340,31 @@ const SearchResults = () => {
     navigate('/bookviewing');
   };
 
+  const goToHome = () => {
+    navigate('/');
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col font-nunito">
-        <div className="bg-blue-50">
-          <Navbar />
-        </div>
+        {/* Custom Header with navigation */}
+        <header className="bg-white shadow-lg border-b border-gray-200">
+          <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            {/* Left side: Back to Home */}
+            <button
+              onClick={goToHome}
+              className="flex items-center px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+            >
+              <img src="/images/Proptii-logo-icon.png" alt="Proptii Logo" className="h-6 w-6 mr-2" />
+              <span>Back to Home</span>
+            </button>
+
+            {/* Right side: Search Results title */}
+            <div className="flex items-center">
+              <h1 className="text-xl font-bold text-gray-900">Search Results</h1>
+            </div>
+          </div>
+        </header>
         <div className="flex-1 bg-gray-50 pt-20 flex items-center justify-center">
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-[#E65D24] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -345,9 +379,24 @@ const SearchResults = () => {
   if (error) {
     return (
       <div className="min-h-screen flex flex-col font-nunito">
-        <div className="bg-blue-50">
-          <Navbar />
-        </div>
+        {/* Custom Header with navigation */}
+        <header className="bg-white shadow-lg border-b border-gray-200">
+          <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            {/* Left side: Back to Home */}
+            <button
+              onClick={goToHome}
+              className="flex items-center px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+            >
+              <img src="/images/Proptii-logo-icon.png" alt="Proptii Logo" className="h-6 w-6 mr-2" />
+              <span>Back to Home</span>
+            </button>
+
+            {/* Right side: Search Results title */}
+            <div className="flex items-center">
+              <h1 className="text-xl font-bold text-gray-900">Search Results</h1>
+            </div>
+          </div>
+        </header>
         <div className="flex-1 bg-gray-50 pt-20 flex items-center justify-center">
           <div className="text-center max-w-md">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -357,6 +406,20 @@ const SearchResults = () => {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Search Error</h3>
             <p className="text-gray-600 mb-4">{error}</p>
+            
+            {/* Network connectivity check */}
+            {error.includes('Network connection') || error.includes('connect') && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 text-left">
+                <h4 className="font-medium text-blue-900 mb-2">Troubleshooting Tips:</h4>
+                <ul className="text-sm text-blue-800 space-y-1">
+                  <li>• Check your internet connection</li>
+                  <li>• Try refreshing the page</li>
+                  <li>• Switch to "Internet Search" mode</li>
+                  <li>• Try a different search query</li>
+                </ul>
+              </div>
+            )}
+            
             <div className="flex gap-3 justify-center">
               <button
                 onClick={retry}
@@ -380,47 +443,77 @@ const SearchResults = () => {
 
   return (
     <div className="min-h-screen flex flex-col font-nunito">
-      <div className="bg-blue-50">
-        <Navbar />
-      </div>
+      {/* Custom Header with navigation */}
+      <header className="bg-white shadow-lg border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+          {/* Left side: Back to Home */}
+          <button
+            onClick={goToHome}
+            className="flex items-center px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+          >
+            <img src="/images/Proptii-logo-icon.png" alt="Proptii Logo" className="h-6 w-6 mr-2" />
+            <span>Back to Home</span>
+          </button>
+
+          {/* Right side: Search Results title */}
+          <div className="flex items-center">
+            <h1 className="text-xl font-bold text-gray-900">Search Results</h1>
+          </div>
+        </div>
+      </header>
       
-      <div className="flex-1 bg-gray-50 pt-20">
+      <div className="flex-1 bg-gray-50 pt-8">
         <div className="max-w-7xl mx-auto px-4 py-8">
-          {/* Header */}
+          {/* Enhanced Header Section */}
           <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-3xl font-bold text-gray-900">
-                Search Results
-              </h1>
-              <div className="flex gap-3">
+            {/* Top Row: Buttons and Search Summary */}
+            <div className="flex items-center justify-between mb-6 bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+              {/* Left Side: Search Summary */}
+              <div className="flex-1">
+                <div className="flex items-center mb-3">
+                  <div className="w-2 h-8 bg-gradient-to-b from-[#136C9E] to-[#0F5A8A] rounded-full mr-4"></div>
+                  <h2 className="text-xl font-bold text-gray-900">Search Summary</h2>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <span className="text-gray-500 font-medium w-20">Query:</span>
+                    <span className="text-gray-900 font-semibold">{searchQuery}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-gray-500 font-medium w-20">Platform:</span>
+                    <span className="text-gray-900">{searchTypeParam === 'onthemarket' ? 'On the Market' : 'Internet Search'}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-gray-500 font-medium w-20">Results:</span>
+                    <span className="text-gray-900 font-semibold">{results.length} properties found</span>
+                    {sessionStorage.getItem('searchResults') && (
+                      <span className="ml-2 px-2 py-1 bg-[#136C9E]/10 text-[#136C9E] text-xs font-medium rounded-full">cached</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Right Side: Action Buttons */}
+              <div className="flex gap-3 ml-8">
                 <button
                   onClick={() => searchProperties(searchQuery, searchTypeParam as 'onthemarket' | 'internet')}
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
+                  className="flex items-center px-6 py-3 bg-gradient-to-r from-[#136C9E] to-[#0F5A8A] text-white rounded-lg hover:from-[#0F5A8A] hover:to-[#0D4A7A] transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                 >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
                   Refresh Results
                 </button>
                 <button
                   onClick={handleNewSearch}
-                  className="bg-[#E65D24] text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
+                  className="flex items-center px-6 py-3 bg-gradient-to-r from-[#E65D24] to-[#D54D14] text-white rounded-lg hover:from-[#D54D14] hover:to-[#C43D04] transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                 >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                   New Search
                 </button>
               </div>
-            </div>
-            
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <p className="text-gray-600">
-                <span className="font-medium">Query:</span> {searchQuery}
-              </p>
-              <p className="text-gray-600">
-                <span className="font-medium">Platform:</span> {searchTypeParam === 'onthemarket' ? 'On the Market' : 'Internet Search'}
-              </p>
-              <p className="text-gray-600">
-                <span className="font-medium">Results:</span> {results.length} properties found
-                {sessionStorage.getItem('searchResults') && (
-                  <span className="ml-2 text-blue-600 text-sm">(cached)</span>
-                )}
-              </p>
             </div>
           </div>
 
