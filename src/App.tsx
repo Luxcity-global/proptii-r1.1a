@@ -29,6 +29,8 @@ import TermsOfService from './pages/TermsOfService';
 import FAQ from './pages/FAQ';
 import AgentContractLanding from './pages/AgentContractLanding';
 import SearchResults from './pages/SearchResults';
+import EnvironmentDebug from './components/EnvironmentDebug';
+import SearchBackendTest from './components/SearchBackendTest';
 
 export const App: React.FC = () => {
   return (
@@ -36,6 +38,8 @@ export const App: React.FC = () => {
       <CssBaseline />
       <MSALProviderWrapper>
         <AuthProvider>
+          <EnvironmentDebug />
+          <SearchBackendTest />
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />

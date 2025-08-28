@@ -64,6 +64,15 @@ export const useSearchBackend = () => {
   const [searchType, setSearchType] = useState<'onthemarket' | 'internet'>('onthemarket');
 
   const searchBackendUrl = import.meta.env.VITE_SEARCH_BACKEND_URL || 'http://localhost:3001'; // Search backend URL
+  
+  // Debug logging
+  console.log('Search Backend URL:', searchBackendUrl);
+  console.log('Environment variables:', {
+    VITE_SEARCH_BACKEND_URL: import.meta.env.VITE_SEARCH_BACKEND_URL,
+    VITE_API_URL: import.meta.env.VITE_API_URL,
+    NODE_ENV: import.meta.env.NODE_ENV,
+    DEV: import.meta.env.DEV
+  });
 
   // Network connectivity check
   const checkNetworkConnectivity = async (): Promise<boolean> => {
