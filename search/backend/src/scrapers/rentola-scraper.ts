@@ -40,7 +40,6 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
         '--disable-web-security',
         '--disable-features=VizDisplayCompositor',
         '--window-size=1920x1080',
-        '--user-data-dir=/tmp/playwright_profile',
         '--data-path=/tmp/playwright_data',
         '--homedir=/tmp',
         '--disk-cache-dir=/tmp/playwright_cache',

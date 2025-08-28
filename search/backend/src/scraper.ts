@@ -1152,6 +1152,11 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
     console.log('Cleaned URL:', cleanUrl);
     
     console.log('Launching browser...');
+    console.log('Environment variables:');
+    console.log('CHROME_BIN:', process.env.CHROME_BIN);
+    console.log('PUPPETEER_CACHE_DIR:', process.env.PUPPETEER_CACHE_DIR);
+    console.log('Current working directory:', process.cwd());
+    
     // Launch browser with containerized environment optimizations
     const launchOptions: LaunchOptions = {
       headless: true,
@@ -1180,7 +1185,6 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
         '--disable-web-security',
         '--disable-features=VizDisplayCompositor',
         '--window-size=1920x1080',
-        '--user-data-dir=/tmp/puppeteer_profile',
         '--data-path=/tmp/puppeteer_data',
         '--homedir=/tmp',
         '--disk-cache-dir=/tmp/puppeteer_cache',

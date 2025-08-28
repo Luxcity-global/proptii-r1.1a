@@ -91,7 +91,7 @@ services:
     name: proptii-search-backend
     env: node
     plan: free
-    buildCommand: cd search/backend && npm install && npx puppeteer browsers install chrome && npx playwright install chromium && npm run build
+    buildCommand: cd search/backend && npm install && echo "Installing browsers..." && npx puppeteer browsers install chrome --path=/opt/render/.cache/puppeteer && npx playwright install chromium --with-deps && echo "Building TypeScript..." && npm run build
     startCommand: cd search/backend && npm start
     healthCheckPath: /health
     envVars:

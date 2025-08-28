@@ -662,20 +662,18 @@ function SearchResults() {
       const searchUrl = `https://www.onthemarket.com/${baseUrl}/property/${location}/`;
       const finalUrl = params.toString() ? `${searchUrl}?${params.toString()}` : searchUrl;
       
-      let endpoint = `${import.meta.env.VITE_SEARCH_BACKEND_URL || 'http://localhost:3001'}/scrape`;
+      let endpoint = `${import.meta.env.VITE_SEARCH_BACKEND_URL || 'http://localhost:3001'}/scrape-api`;
       let requestBody: any;
 
       if (searchType === 'internet') {
-        endpoint = `${import.meta.env.VITE_SEARCH_BACKEND_URL || 'http://localhost:3001'}/scrape-internet`;
+        endpoint = `${import.meta.env.VITE_SEARCH_BACKEND_URL || 'http://localhost:3001'}/scrape-api`;
         requestBody = { 
-          query: searchQuery,
-          apiKey: 'BSAbpHw4lHUQBBsmRTmY3pEK6WmT8Nz'
+          query: searchQuery
         };
       } else {
-        // Default to OnTheMarket
+        // Default to API-based search
         requestBody = { 
-          url: finalUrl,
-          apiKey: 'BSAbpHw4lHUQBBsmRTmY3pEK6WmT8Nz'
+          query: searchQuery
         };
       }
 

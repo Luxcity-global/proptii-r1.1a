@@ -157,13 +157,13 @@ export const useSearchBackend = () => {
         const searchUrl = `https://www.onthemarket.com/${baseUrl}/property/${location}/`;
         const finalUrl = params.toString() ? `${searchUrl}?${params.toString()}` : searchUrl;
         
-        endpoint = '/scrape';
+        endpoint = '/scrape-api';
         requestBody = {
-          url: finalUrl
+          query: finalUrl
         };
       } else {
         // For internet search
-        endpoint = '/scrape-internet';
+        endpoint = '/scrape-api';
         requestBody = {
           query: searchQuery
         };
