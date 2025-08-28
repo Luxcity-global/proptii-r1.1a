@@ -155,24 +155,43 @@ app.post('/scrape', async (req, res) => {
       console.log('Browser automation failed, using fallback endpoint');
       // Extract location from URL for fallback
       try {
-        const urlObj = new URL(url);
-        const pathParts = urlObj.pathname.split('/');
-        const location = pathParts[pathParts.length - 2] || 'Leeds';
-        const fallbackQuery = `property in ${location.replace(/-/g, ' ')}`;
-        
-        // Call the fallback endpoint
+        const { url } = req.body; // Get URL from request body
+        if (url) {
+          const urlObj = new URL(url);
+          const pathParts = urlObj.pathname.split('/');
+          const location = pathParts[pathParts.length - 2] || 'Leeds';
+          const fallbackQuery = `property in ${location.replace(/-/g, ' ')}`;
+          
+          // Call the fallback endpoint
+          const fallbackResponse = await fetch(`${req.protocol}://${req.get('host')}/scrape-fallback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: fallbackQuery })
+          });
+          
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            return res.json(fallbackData);
+          }
+        }
+      } catch (fallbackError) {
+        console.error('Fallback endpoint also failed:', fallbackError);
+      }
+      
+      // If URL extraction failed, use a generic fallback
+      try {
         const fallbackResponse = await fetch(`${req.protocol}://${req.get('host')}/scrape-fallback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: fallbackQuery })
+          body: JSON.stringify({ query: 'property in Leeds' })
         });
         
         if (fallbackResponse.ok) {
           const fallbackData = await fallbackResponse.json();
           return res.json(fallbackData);
         }
-      } catch (fallbackError) {
-        console.error('Fallback endpoint also failed:', fallbackError);
+      } catch (genericFallbackError) {
+        console.error('Generic fallback also failed:', genericFallbackError);
       }
     }
     
