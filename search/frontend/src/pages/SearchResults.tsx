@@ -199,13 +199,15 @@ function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDetailsModa
                 </div>
               </div>
 
-              {/* Description */}
-              <div className="mb-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-3">Property Description</h3>
-                <p className="text-gray-600 leading-relaxed">
-                  {property.description || 'Detailed property description not available. Contact the agent for more information about this property.'}
-                </p>
-              </div>
+              {/* Description - Only show if description exists */}
+              {property.description && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-3">Property Description</h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    {property.description}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Agent Info & Actions */}
@@ -418,11 +420,10 @@ function SmartSearchBar({ query, onQueryChange, onSearch, loading }: SmartSearch
 // Property Card Component
 interface PropertyCardProps {
   property: Property;
-  searchType: string;
   onViewDetails: (property: Property) => void;
 }
 
-function PropertyCard({ property, searchType, onViewDetails }: PropertyCardProps) {
+function PropertyCard({ property, onViewDetails }: PropertyCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -627,7 +628,6 @@ function SearchResults() {
     
     try {
       const isRental = searchQuery.toLowerCase().includes('rent') || searchQuery.toLowerCase().includes('pcm');
-      const baseUrl = isRental ? 'to-rent' : 'for-sale';
       const locationMatch = searchQuery.match(/in\s+([a-zA-Z\s,]+)/i);
       let location = locationMatch ? locationMatch[1].trim().toLowerCase() : '';
       location = location
@@ -659,14 +659,23 @@ function SearchResults() {
       }
       params.append('view', 'grid');
       
-      const searchUrl = `https://www.onthemarket.com/${baseUrl}/property/${location}/`;
-      const finalUrl = params.toString() ? `${searchUrl}?${params.toString()}` : searchUrl;
+
       
-      let endpoint = `${import.meta.env.VITE_SEARCH_BACKEND_URL || 'http://localhost:3001'}/scrape-api`;
+      // Ensure we always use HTTP protocol for the backend
+      const backendBaseUrl = import.meta.env.VITE_SEARCH_BACKEND_URL || 'http://localhost:3001';
+      const backendUrl = backendBaseUrl.startsWith('http://') ? backendBaseUrl : `http://${backendBaseUrl.replace(/^https?:\/\//, '')}`;
+      
+      let endpoint = `${backendUrl}/scrape-api`;
+      
+      // Debug logging
+      console.log('Environment variable VITE_SEARCH_BACKEND_URL:', import.meta.env.VITE_SEARCH_BACKEND_URL);
+      console.log('Backend Base URL:', backendBaseUrl);
+      console.log('Backend URL:', backendUrl);
+      console.log('Final endpoint:', endpoint);
       let requestBody: any;
 
       if (searchType === 'internet') {
-        endpoint = `${import.meta.env.VITE_SEARCH_BACKEND_URL || 'http://localhost:3001'}/scrape-api`;
+        endpoint = `${backendUrl}/scrape-api`;
         requestBody = { 
           query: searchQuery
         };
@@ -813,7 +822,6 @@ function SearchResults() {
                 <PropertyCard
                   key={index}
                   property={property}
-                  searchType={searchType}
                   onViewDetails={handleViewDetails}
                 />
               ))}
