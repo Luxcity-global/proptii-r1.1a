@@ -670,6 +670,8 @@ export async function scrapeInternet(query: string, apiKey: string): Promise<Pro
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
           '--disable-accelerated-2d-canvas',
+          "--no-first-run",
+          "--no-zygote",
           '--disable-gpu',
           '--disable-gpu-sandbox',
           '--disable-software-rasterizer',
