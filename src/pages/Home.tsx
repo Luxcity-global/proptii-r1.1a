@@ -69,7 +69,7 @@ const Home = () => {
             src="/images/01_Lady_Child_Family_BG.jpg"
             alt="Hero background"
             loading="eager"
-            fetchPriority="high"
+            fetchpriority="high"
             className="w-full h-full object-cover"
             sizes="100vw"
           />

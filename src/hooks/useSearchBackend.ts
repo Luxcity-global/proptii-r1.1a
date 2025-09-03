@@ -157,13 +157,14 @@ export const useSearchBackend = () => {
         const searchUrl = `https://www.onthemarket.com/${baseUrl}/property/${location}/`;
         const finalUrl = params.toString() ? `${searchUrl}?${params.toString()}` : searchUrl;
         
-        endpoint = '/scrape-api';
+        // Use the real scraping endpoint that uses Puppeteer
+        endpoint = '/scrape';
         requestBody = {
-          query: finalUrl
+          url: finalUrl
         };
       } else {
-        // For internet search
-        endpoint = '/scrape-api';
+        // For internet search, use the real scrapeInternet function
+        endpoint = '/scrape-internet-real';
         requestBody = {
           query: searchQuery
         };
@@ -181,7 +182,7 @@ export const useSearchBackend = () => {
         // If OnTheMarket fails, try internet search as fallback
         if (type === 'onthemarket') {
           console.log('OnTheMarket search failed, trying internet search as fallback...');
-          const fallbackResponse = await fetch(`${searchBackendUrl}/scrape-internet`, {
+          const fallbackResponse = await fetch(`${searchBackendUrl}/scrape-internet-real`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
