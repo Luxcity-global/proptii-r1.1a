@@ -550,7 +550,7 @@ const areaInsightHandler: RequestHandler = async (req, res) => {
   console.log(`📊 [AREA-INSIGHT] [${requestId}] Request body:`, req.body);
   
   try {
-    const { location, propertyType, bedrooms, useRealData } = req.body;
+    const { location, propertyType, bedrooms } = req.body;
     
     if (!location || !location.trim()) {
       console.log(`⚠️ [AREA-INSIGHT] [${requestId}] Empty location received`);
@@ -567,8 +567,7 @@ const areaInsightHandler: RequestHandler = async (req, res) => {
     const areaInsightRequest: AreaInsightRequest = {
       location: location.trim(),
       propertyType,
-      bedrooms,
-      useRealData: useRealData || false
+      bedrooms
     };
     
     const areaInsight = await areaInsightService.getAreaInsight(areaInsightRequest);

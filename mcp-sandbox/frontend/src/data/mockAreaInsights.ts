@@ -1,4 +1,4 @@
-import { AreaInsight } from '../types/areaInsight';
+import type { AreaInsight } from '../types/areaInsight';
 
 export const mockAreaInsights: Record<string, AreaInsight> = {
   'london': {

@@ -24,6 +24,7 @@ interface Property {
     name: string;
   };
   actions: Array<{ type: string; label: string }>;
+  source: string;
 }
 
 interface PropertyGridProps {

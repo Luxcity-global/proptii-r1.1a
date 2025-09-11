@@ -32,7 +32,7 @@ interface BackendProperty {
   };
 }
 
-interface SearchOptions {
+export interface SearchOptions {
   useRealData?: boolean;
   sources?: string[];
   filters?: Record<string, unknown>;

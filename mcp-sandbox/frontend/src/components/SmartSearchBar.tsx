@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Search, Sparkles, Filter, X } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Mic, MicOff, Search, Sparkles, X } from 'lucide-react';
 
 interface SearchSuggestion {
   text: string;
@@ -20,7 +20,7 @@ const SmartSearchBar: React.FC<SmartSearchBarProps> = ({
   onSearch,
   onVoiceSearch,
   isListening = false,
-  suggestions = [],
+
   recentSearches = [],
   isLoading = false,
 }) => {

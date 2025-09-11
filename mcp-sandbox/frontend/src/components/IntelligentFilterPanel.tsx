@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, TrendingUp, MapPin, PoundSterling, Bed, Home, Clock, Target } from 'lucide-react';
+import { Sparkles, TrendingUp, PoundSterling, Bed, Clock, Target } from 'lucide-react';
 
 interface FilterOption {
   id: string;

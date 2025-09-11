@@ -130,10 +130,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onCardClick }) =>
         </div>
         {/* Thumbnails */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%', justifyContent: 'space-between', flex: 1 }}>
-          {property.images.slice(1).map((img, idx, arr) => {
+          {property.images.slice(1).map((img) => {
             // Calculate thumbnail height to fill the gallery height with 12px gaps
-            const totalGap = 12 * (arr.length - 1);
-            const thumbHeight = (240 - totalGap) / arr.length;
+            const remainingImages = property.images.slice(1);
+            const totalGap = 12 * (remainingImages.length - 1);
+            const thumbHeight = (240 - totalGap) / remainingImages.length;
             return (
               <div key={img.label} style={{ position: 'relative', flex: 1, minHeight: 0 }}>
                 {img.src ? (

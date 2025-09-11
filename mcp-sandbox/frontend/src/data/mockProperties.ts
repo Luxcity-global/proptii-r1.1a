@@ -52,6 +52,7 @@ export const mockProperty = {
     { type: 'call', label: 'Call' },
     { type: 'email', label: 'Email' },
   ],
+  source: 'mock',
 };
 
 export const mockProperties = [

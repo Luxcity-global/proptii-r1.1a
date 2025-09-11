@@ -5,7 +5,7 @@ import {
   Activity, 
   Settings, 
   Play, 
-  Pause, 
+ 
   Trash2,
   CheckCircle,
   AlertCircle,

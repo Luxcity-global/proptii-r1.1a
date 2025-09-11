@@ -1,5 +1,5 @@
 import React from 'react';
-import { AreaInsight } from '../types/areaInsight';
+import type { AreaInsight } from '../types/areaInsight';
 import { MapPin, Info } from 'lucide-react';
 
 interface AreaInsightPanelProps {
@@ -17,7 +17,7 @@ const AreaInsightPanel: React.FC<AreaInsightPanelProps> = ({
     return (
       <div style={{
         background: '#f0f8ff',
-        borderLeft: '4px solid #1e40af',
+        borderLeft: '4px solid #136C9E',
         borderRadius: '8px',
         padding: '20px',
         marginBottom: '24px',
@@ -37,7 +37,7 @@ const AreaInsightPanel: React.FC<AreaInsightPanelProps> = ({
     return (
       <div style={{
         background: '#fef2f2',
-        borderLeft: '4px solid #dc2626',
+        borderLeft: '4px solid #136C9E',
         borderRadius: '8px',
         padding: '20px',
         marginBottom: '24px',
@@ -78,7 +78,7 @@ const AreaInsightPanel: React.FC<AreaInsightPanelProps> = ({
   return (
     <div style={{
       background: '#f0f8ff',
-      borderLeft: '4px solid #1e40af',
+      borderLeft: '4px solid #136C9E',
       borderRadius: '8px',
       padding: '20px',
       marginBottom: '24px'
@@ -90,16 +90,16 @@ const AreaInsightPanel: React.FC<AreaInsightPanelProps> = ({
         gap: '8px',
         marginBottom: '16px'
       }}>
-        <MapPin size={20} color="#1e40af" />
+        <MapPin size={20} color="#136C9E" />
         <h3 style={{
           fontSize: '18px',
           fontWeight: '600',
-          color: '#1e40af',
+          color: '#136C9E',
           margin: 0
         }}>
           Area Insight: {areaInsight.location}
         </h3>
-        <Info size={16} color="#1e40af" />
+        <Info size={16} color="#136C9E" />
       </div>
 
       {/* Average Rent Information */}

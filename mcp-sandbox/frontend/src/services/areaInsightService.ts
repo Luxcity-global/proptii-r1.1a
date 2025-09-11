@@ -1,7 +1,6 @@
 import type { AreaInsight } from '../types/areaInsight';
 
 export interface AreaInsightServiceOptions {
-  useRealData?: boolean;
   location: string;
   propertyType?: string;
   bedrooms?: number;
@@ -12,7 +11,7 @@ class AreaInsightService {
   private readonly CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
   /**
-   * Fetch area insights for a given location
+   * Fetch area insights for a given location using real property data only
    */
   async getAreaInsight(options: AreaInsightServiceOptions): Promise<AreaInsight | null> {
     const { location, propertyType, bedrooms } = options;

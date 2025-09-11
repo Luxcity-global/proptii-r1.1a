@@ -5,11 +5,9 @@ export interface AreaInsightRequest {
   location: string;
   propertyType?: string;
   bedrooms?: number;
-  useRealData?: boolean;
 }
 
 export interface AreaInsightServiceOptions {
-  useRealData?: boolean;
   location: string;
   propertyType?: string;
   bedrooms?: number;
@@ -25,10 +23,10 @@ class AreaInsightService {
   }
 
   /**
-   * Fetch area insights for a given location using real property data
+   * Fetch area insights for a given location using real property data only
    */
   async getAreaInsight(options: AreaInsightServiceOptions): Promise<AreaInsight | null> {
-    const { location, useRealData = false, propertyType, bedrooms } = options;
+    const { location, propertyType, bedrooms } = options;
     
     // Create a unique cache key that includes search context
     const cacheKey = `${location.toLowerCase().trim()}_${propertyType || 'any'}_${bedrooms || 'any'}`;
@@ -41,43 +39,7 @@ class AreaInsightService {
     }
 
     try {
-      if (useRealData) {
-        console.log('🔍 [AREA-INSIGHT] Fetching real data from property MCP');
-        const realData = await this.generateAreaInsightFromRealData(location, propertyType, bedrooms);
-        if (realData) {
-          this.setCache(cacheKey, realData);
-          return realData;
-        }
-        console.log('⚠️ [AREA-INSIGHT] Real data not available, falling back to dynamic generation');
-      }
-
-      // Generate dynamic area insight based on location
-      const dynamicData = await this.generateDynamicAreaInsight(location, propertyType, bedrooms);
-      
-      if (dynamicData) {
-        this.setCache(cacheKey, dynamicData);
-        return dynamicData;
-      }
-
-      return null;
-    } catch (error) {
-      console.error('❌ [AREA-INSIGHT] Error fetching area insight:', error);
-      // Fallback to dynamic generation on error
-      const dynamicData = await this.generateDynamicAreaInsight(location, propertyType, bedrooms);
-      if (dynamicData) {
-        this.setCache(cacheKey, dynamicData);
-        return dynamicData;
-      }
-      return null;
-    }
-  }
-
-  /**
-   * Generate area insights from real property data
-   */
-  private async generateAreaInsightFromRealData(location: string, propertyType?: string, bedrooms?: number): Promise<AreaInsight | null> {
-    try {
-      console.log('🏠 [AREA-INSIGHT] Fetching real property data for:', location);
+      console.log('🔍 [AREA-INSIGHT] Fetching real property data for:', location);
       
       // Get real property data from the MCP
       const properties = await this.propertyMCP.searchProperties(location, {
@@ -92,11 +54,48 @@ class AreaInsightService {
 
       console.log(`📊 [AREA-INSIGHT] Found ${properties.length} real properties for analysis`);
 
+      // Generate area insight from real property data
+      const areaInsight = await this.generateAreaInsightFromRealData(location, properties, propertyType, bedrooms);
+      
+      if (areaInsight) {
+        this.setCache(cacheKey, areaInsight);
+        return areaInsight;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('❌ [AREA-INSIGHT] Error fetching area insight:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Generate area insights from real property data only
+   */
+  private async generateAreaInsightFromRealData(
+    location: string, 
+    properties: Property[], 
+    propertyType?: string, 
+    bedrooms?: number
+  ): Promise<AreaInsight | null> {
+    try {
+      console.log('🏠 [AREA-INSIGHT] Analyzing real property data for:', location);
+
+      if (!properties || properties.length === 0) {
+        console.log('⚠️ [AREA-INSIGHT] No properties to analyze');
+        return null;
+      }
+
       // Calculate average rent from real properties
       const rentProperties = properties.filter(p => p.price.type === 'rent');
       const averageRent = rentProperties.length > 0 
         ? rentProperties.reduce((sum, p) => sum + p.price.amount, 0) / rentProperties.length
         : 0;
+
+      if (averageRent === 0) {
+        console.log('⚠️ [AREA-INSIGHT] No rental properties found for analysis');
+        return null;
+      }
 
       // Extract unique amenities from properties
       const allAmenities = properties.flatMap(p => p.amenities?.nearby || []);
@@ -139,265 +138,6 @@ class AreaInsightService {
     } catch (error) {
       console.error('❌ [AREA-INSIGHT] Error generating real area insight:', error);
       return null;
-    }
-  }
-
-  /**
-   * Generate dynamic area insight when real data is not available
-   */
-  private async generateDynamicAreaInsight(location: string, propertyType?: string, bedrooms?: number): Promise<AreaInsight | null> {
-    try {
-      console.log('🎯 [AREA-INSIGHT] Generating dynamic area insight for:', location);
-      
-      // Calculate dynamic rent based on location and property type
-      const baseRent = this.calculateDynamicRent(location, propertyType, bedrooms);
-      
-      // Generate dynamic amenities based on location
-      const amenities = this.generateDynamicAmenities(location);
-      
-      // Generate transport info based on location
-      const transport = this.generateDynamicTransport(location);
-      
-      // Generate market trends
-      const marketTrends = this.generateDynamicMarketTrends(location);
-      
-      // Generate neighborhood info
-      const neighborhoodInfo = this.generateDynamicNeighborhoodInfo(location);
-
-      const areaInsight: AreaInsight = {
-        location: location,
-        averageRent: {
-          amount: baseRent,
-          currency: 'GBP',
-          propertyType: propertyType || '1-BR',
-          period: 'monthly'
-        },
-        amenities: amenities,
-        transport: transport,
-        marketTrends: marketTrends,
-        neighborhoodInfo: neighborhoodInfo
-      };
-
-      console.log('✅ [AREA-INSIGHT] Generated dynamic area insight for:', location);
-      return areaInsight;
-    } catch (error) {
-      console.error('❌ [AREA-INSIGHT] Error generating dynamic area insight:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Calculate dynamic rent based on location and property characteristics
-   */
-  private calculateDynamicRent(location: string, propertyType?: string, bedrooms?: number): number {
-    const normalizedLocation = location.toLowerCase().trim();
-    
-    // Base rent by region (GBP per month)
-    const regionRentRanges: { [key: string]: { min: number; max: number } } = {
-      'london': { min: 1800, max: 4500 },
-      'manchester': { min: 800, max: 2000 },
-      'birmingham': { min: 700, max: 1800 },
-      'leeds': { min: 700, max: 1700 },
-      'liverpool': { min: 600, max: 1500 },
-      'sheffield': { min: 600, max: 1400 },
-      'edinburgh': { min: 900, max: 2200 },
-      'glasgow': { min: 700, max: 1800 },
-      'bristol': { min: 900, max: 2200 },
-      'cardiff': { min: 700, max: 1700 },
-      'newcastle': { min: 600, max: 1500 },
-      'nottingham': { min: 600, max: 1500 },
-      'leicester': { min: 600, max: 1500 },
-      'cambridge': { min: 1200, max: 2800 },
-      'oxford': { min: 1100, max: 2600 },
-      'brighton': { min: 900, max: 2200 },
-      'bath': { min: 800, max: 2000 },
-      'york': { min: 700, max: 1700 },
-      'canterbury': { min: 700, max: 1700 }
-    };
-
-    // Find matching region
-    let baseRent = 1000; // Default
-    for (const [region, range] of Object.entries(regionRentRanges)) {
-      if (normalizedLocation.includes(region)) {
-        baseRent = Math.floor((range.min + range.max) / 2);
-        break;
-      }
-    }
-
-    // Adjust for property type and bedrooms
-    if (propertyType === '2-BR' || bedrooms === 2) baseRent *= 1.3;
-    if (propertyType === '3-BR' || bedrooms === 3) baseRent *= 1.6;
-    if (propertyType === '4-BR' || bedrooms === 4) baseRent *= 2.0;
-
-    // Add some variation based on location string
-    const variation = (normalizedLocation.length % 20) / 100; // 0-20% variation
-    baseRent = Math.round(baseRent * (1 + variation));
-
-    return baseRent;
-  }
-
-  /**
-   * Generate dynamic amenities based on location
-   */
-  private generateDynamicAmenities(location: string): Array<{ category: string; items: string[] }> {
-    const normalizedLocation = location.toLowerCase().trim();
-    
-    const amenities = [
-      {
-        category: 'Dining & Entertainment',
-        items: ['Local restaurants', 'Pubs and bars', 'Cafes and coffee shops', 'Takeaway options']
-      },
-      {
-        category: 'Shopping',
-        items: ['Local shops', 'Supermarkets', 'Convenience stores', 'Shopping centers']
-      },
-      {
-        category: 'Transport',
-        items: ['Bus stops', 'Train stations', 'Cycle routes', 'Parking facilities']
-      },
-      {
-        category: 'Health & Fitness',
-        items: ['GP surgeries', 'Pharmacies', 'Gyms and fitness centers', 'Parks and green spaces']
-      }
-    ];
-
-    // Add location-specific amenities
-    if (normalizedLocation.includes('london')) {
-      amenities.push({
-        category: 'Culture & Arts',
-        items: ['Museums and galleries', 'Theaters and cinemas', 'Historical landmarks', 'Art exhibitions']
-      });
-    } else if (normalizedLocation.includes('manchester')) {
-      amenities.push({
-        category: 'Sports & Entertainment',
-        items: ['Sports venues', 'Music venues', 'Entertainment complexes', 'Cultural centers']
-      });
-    } else if (normalizedLocation.includes('birmingham')) {
-      amenities.push({
-        category: 'Shopping & Culture',
-        items: ['Shopping centers', 'Cultural venues', 'Entertainment options', 'Historical sites']
-      });
-    }
-
-    return amenities;
-  }
-
-  /**
-   * Generate dynamic transport information
-   */
-  private generateDynamicTransport(location: string): Array<{ type: string; details: string }> {
-    const normalizedLocation = location.toLowerCase().trim();
-    
-    const transport = [
-      {
-        type: 'Buses',
-        details: 'Regular bus services connecting to local areas and city center'
-      },
-      {
-        type: 'Rail',
-        details: 'Train connections to nearby cities and towns'
-      },
-      {
-        type: 'Cycling',
-        details: 'Cycle routes and bike-sharing schemes available'
-      }
-    ];
-
-    // Add location-specific transport
-    if (normalizedLocation.includes('london')) {
-      transport.unshift({
-        type: 'Underground',
-        details: 'Extensive Tube network with multiple lines serving the area'
-      });
-    } else if (normalizedLocation.includes('manchester')) {
-      transport.unshift({
-        type: 'Tram',
-        details: 'Metrolink tram system connecting to city center and suburbs'
-      });
-    } else if (normalizedLocation.includes('birmingham')) {
-      transport.unshift({
-        type: 'Tram',
-        details: 'Midland Metro tram system serving key areas'
-      });
-    }
-
-    return transport;
-  }
-
-  /**
-   * Generate dynamic market trends
-   */
-  private generateDynamicMarketTrends(location: string): { trend: "rising" | "stable" | "declining"; percentage: number; description: string } {
-    const normalizedLocation = location.toLowerCase().trim();
-    
-    // Generate trends based on location characteristics
-    if (normalizedLocation.includes('london')) {
-      return {
-        trend: 'rising',
-        percentage: 4.2,
-        description: 'Strong rental market with steady growth in property values'
-      };
-    } else if (normalizedLocation.includes('manchester') || normalizedLocation.includes('birmingham')) {
-      return {
-        trend: 'stable',
-        percentage: 2.8,
-        description: 'Stable rental market with moderate growth potential'
-      };
-    } else {
-      return {
-        trend: 'stable',
-        percentage: 2.1,
-        description: 'Balanced rental market with steady demand'
-      };
-    }
-  }
-
-  /**
-   * Generate dynamic neighborhood information
-   */
-  private generateDynamicNeighborhoodInfo(location: string): { description: string; highlights: string[] } {
-    const normalizedLocation = location.toLowerCase().trim();
-    
-    if (normalizedLocation.includes('london')) {
-      return {
-        description: 'London offers diverse neighborhoods with excellent transport links and amenities.',
-        highlights: [
-          'Excellent transport connectivity',
-          'Diverse cultural scene',
-          'Strong employment opportunities',
-          'World-class amenities and services'
-        ]
-      };
-    } else if (normalizedLocation.includes('manchester')) {
-      return {
-        description: 'Manchester combines industrial heritage with modern development and affordable living.',
-        highlights: [
-          'Growing tech and media sectors',
-          'Rich cultural heritage',
-          'Affordable cost of living',
-          'Excellent transport links'
-        ]
-      };
-    } else if (normalizedLocation.includes('birmingham')) {
-      return {
-        description: 'Birmingham offers excellent value for money with strong transport connections.',
-        highlights: [
-          'Major business and conference center',
-          'Excellent transport connectivity',
-          'Affordable housing market',
-          'Diverse cultural scene'
-        ]
-      };
-    } else {
-      return {
-        description: `${location} offers a great balance of amenities, transport links, and quality of life.`,
-        highlights: [
-          'Good transport connections',
-          'Local amenities and services',
-          'Community-focused environment',
-          'Balanced cost of living'
-        ]
-      };
     }
   }
 

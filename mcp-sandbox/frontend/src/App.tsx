@@ -8,10 +8,11 @@ import AIIntelligencePanel from './components/AIIntelligencePanel';
 import RealTimeScrapingPanel from './components/RealTimeScrapingPanel';
 import AreaInsightPanel from './components/AreaInsightPanel';
 import AreaMap from './components/AreaMap';
+import GoogleMapsTest from './components/GoogleMapsTest';
 import { mockProperties } from './data/mockProperties';
-import { searchProperties } from './services/api';
+import { searchProperties, type SearchOptions } from './services/api';
 import { areaInsightService } from './services/areaInsightService';
-import { AreaInsight } from './types/areaInsight';
+import type { AreaInsight } from './types/areaInsight';
 import { Brain, Sparkles } from 'lucide-react';
 
 interface MarketInsight {
@@ -46,6 +47,7 @@ interface Property {
     name: string;
   };
   actions: Array<{ type: string; label: string }>;
+  source: string;
 }
 
 interface Filters {
@@ -112,7 +114,7 @@ function App() {
   const [isListening, setIsListening] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showAIInsights, setShowAIInsights] = useState(false);
-  const [useRealData, setUseRealData] = useState(true);
+
   const [areaInsight, setAreaInsight] = useState<AreaInsight | null>(null);
   const [areaInsightLoading, setAreaInsightLoading] = useState(false);
   const [areaInsightError, setAreaInsightError] = useState<string | null>(null);
@@ -196,7 +198,7 @@ function App() {
   };
 
   const handleSearch = async (query: string, filters?: Filters) => {
-    console.log('🎯 [APP] Smart search initiated:', query, filters, 'useRealData:', useRealData);
+    console.log('🎯 [APP] Smart search initiated:', query, filters);
     
     if (!query.trim()) {
       console.log('⚠️ [APP] Empty query - resetting state');
@@ -223,14 +225,13 @@ function App() {
     try {
       console.log('📞 [APP] Calling searchProperties API...');
       const searchOptions = {
-        useRealData,
         filters: filters || {},
         sources: ['openrent'],
         page: 1,
         limit: 20
       };
       
-      const results = await searchProperties(query.trim(), searchOptions);
+      const results = await searchProperties(query.trim(), searchOptions as SearchOptions);
       const searchEndTime = Date.now();
       
       console.log('✅ [APP] Search completed successfully');
@@ -262,7 +263,7 @@ function App() {
           console.log('🏘️ [APP] Fetching area insights for:', query);
           const insight = await areaInsightService.getAreaInsight({
             location: query,
-            useRealData,
+    
             propertyType: filters?.propertyType,
             bedrooms: filters?.bedrooms
           });
@@ -419,58 +420,7 @@ function App() {
         alignItems: 'center',
       }}
     >
-      {/* Toggle Switch for Live/Mock Data */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 32,
-        marginBottom: 8,
-        gap: 12
-      }}>
-        <span style={{ fontSize: 14, color: '#888', fontWeight: 500 }}>Mock Data</span>
-        <label style={{ position: 'relative', display: 'inline-block', width: 48, height: 28 }}>
-          <input
-            type="checkbox"
-            checked={useRealData}
-            onChange={() => setUseRealData(v => !v)}
-            style={{ opacity: 0, width: 0, height: 0 }}
-            aria-label="Toggle real data"
-          />
-          <span
-            style={{
-              position: 'absolute',
-              cursor: 'pointer',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: useRealData ? 'linear-gradient(90deg, #E65D24 0%, #FF6B35 100%)' : '#e5e5e5',
-              borderRadius: 20,
-              transition: 'background 0.2s',
-              boxShadow: useRealData ? '0 2px 8px rgba(230,93,36,0.12)' : 'none',
-            }}
-          >
-            <span
-              style={{
-                position: 'absolute',
-                left: useRealData ? 24 : 4,
-                top: 4,
-                width: 20,
-                height: 20,
-                background: '#fff',
-                borderRadius: '50%',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-                transition: 'left 0.2s',
-                display: 'block',
-              }}
-            />
-          </span>
-        </label>
-        <span style={{ fontSize: 14, color: useRealData ? '#E65D24' : '#888', fontWeight: 500 }}>
-          Live Data
-        </span>
-      </div>
+
       {/* Centered initial state */}
       {!searchPerformed ? (
         <div style={{
@@ -625,11 +575,29 @@ function App() {
                   properties={filteredProperties.map(p => ({
                     id: p.id,
                     address: p.address,
-                    price: p.price
+                    price: p.price,
+                    priceUnit: p.priceUnit,
+                    beds: p.beds,
+                    baths: p.baths,
+                    area: p.area,
+                    areaUnit: p.areaUnit,
+                    status: p.status,
+                    availableNow: p.availableNow,
+                    images: p.images
                   }))}
+                  onPropertyClick={(property) => {
+                    const foundProperty = filteredProperties.find(p => p.id === property.id);
+                    if (foundProperty) {
+                      handlePropertyClick(foundProperty);
+                    }
+                  }}
+                  selectedPropertyId={selectedProperty?.id}
                 />
               </div>
             )}
+            
+            {/* Google Maps API Test Component */}
+            <GoogleMapsTest />
             
             {loading ? (
               <div style={{ color: '#888', fontSize: 20, margin: '48px 0', textAlign: 'center' }}>

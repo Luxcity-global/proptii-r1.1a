@@ -404,7 +404,7 @@ const PropertyDetailsModal: React.FC<PropertyDetailsModalProps> = ({ property, o
                     }}
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
-                      e.currentTarget.nextElementSibling!.style.display = 'flex';
+                      (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex';
                     }}
                   />
                   <div style={{
