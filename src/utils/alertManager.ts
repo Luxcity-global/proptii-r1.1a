@@ -29,7 +29,7 @@ class AlertManager {
     constructor() {
         this.appInsights = new ApplicationInsights({
             config: {
-                instrumentationKey: process.env.VITE_APP_INSIGHTS_INSTRUMENTATION_KEY,
+                instrumentationKey: import.meta.env.VITE_APP_INSIGHTS_INSTRUMENTATION_KEY,
                 enableAutoRouteTracking: true,
                 enableCorsCorrelation: true,
                 enableRequestTracking: true,
@@ -148,7 +148,7 @@ class AlertManager {
     }
 
     private async sendToSlack(alertData: any): Promise<void> {
-        const webhookUrl = process.env.VITE_SLACK_WEBHOOK_URL;
+        const webhookUrl = import.meta.env.VITE_SLACK_WEBHOOK_URL;
         if (!webhookUrl) return;
 
         try {
@@ -171,7 +171,7 @@ class AlertManager {
     }
 
     private async sendEmail(alertData: any): Promise<void> {
-        const emailEndpoint = process.env.VITE_ALERT_EMAIL_ENDPOINT;
+        const emailEndpoint = import.meta.env.VITE_ALERT_EMAIL_ENDPOINT;
         if (!emailEndpoint) return;
 
         try {

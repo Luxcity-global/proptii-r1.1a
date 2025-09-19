@@ -124,6 +124,12 @@ class EmailService {
         case 'user':
           html = this.generateUserEmailTemplate(parsedFormData);
           break;
+        case 'viewing-agent':
+          html = this.generateViewingAgentEmailTemplate(parsedFormData);
+          break;
+        case 'viewing-user':
+          html = this.generateViewingUserEmailTemplate(parsedFormData);
+          break;
         default:
           html = this.generateAgentEmailTemplate(parsedFormData);
       }
@@ -131,11 +137,12 @@ class EmailService {
       // Create zip file of attachments if needed (only for agent emails)
       const emailAttachments = [];
       if (emailType === 'agent' && attachments?.length > 0) {
-        const zipFile = await this.createAttachmentsZip(attachments, parsedFormData?.identity);
-        if (zipFile) {
+        // For agent emails, we expect a single zip file containing all documents
+        const zipAttachment = attachments[0];
+        if (zipAttachment) {
           emailAttachments.push({
-            filename: zipFile.filename,
-            content: zipFile.content,
+            filename: zipAttachment.filename,
+            content: zipAttachment.content,
             contentType: 'application/zip'
           });
         }
@@ -500,6 +507,146 @@ class EmailService {
         </div>
       </body>
       </html>`;
+  }
+
+  // Helper method to format time strings properly
+  formatTimeString(timeString) {
+    // If time is in HH:MM format, convert to 12-hour format
+    if (/^\d{2}:\d{2}$/.test(timeString)) {
+      const [hours, minutes] = timeString.split(':');
+      const hour = parseInt(hours, 10);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      return `${displayHour}:${minutes} ${ampm}`;
+    }
+
+    // If it's already a full datetime, parse it normally
+    try {
+      const date = new Date(timeString);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleTimeString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+      }
+    } catch (error) {
+      console.error('Error formatting time:', error);
+    }
+
+    return timeString; // Return as-is if can't parse
+  }
+
+  generateViewingAgentEmailTemplate(formData) {
+    const { property, viewing } = formData;
+    const viewingDate = new Date(viewing.date).toLocaleDateString('en-GB', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const viewingTime = this.formatTimeString(viewing.time);
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { color: #136C9E; font-size: 24px; margin-bottom: 20px; }
+          .details { background: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0; }
+          .footer { margin-top: 30px; font-size: 14px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">New Viewing Request</div>
+          
+          <p>Hello ${property.agent?.name},</p>
+          
+          <p>A new viewing request has been submitted for your property.</p>
+          
+          <div class="details">
+            <h3>Property Details:</h3>
+            <p>Address: ${property.street}, ${property.city}, ${property.postcode}</p>
+            
+            <h3>Viewing Details:</h3>
+            <p>Date: ${viewingDate}</p>
+            <p>Time: ${viewingTime}</p>
+            <p>Type: ${viewing.preference === 'virtual' ? 'Virtual Viewing' : 'In-Person Viewing'}</p>
+            
+            <h3>Viewer Details:</h3>
+            <p>Name: ${viewing.user?.name || 'Not provided'}</p>
+            <p>Email: ${viewing.user?.email || 'Not provided'}</p>
+          </div>
+          
+          <p>Please review this request and confirm the viewing time with the potential viewer.</p>
+          
+          <div class="footer">
+            <p>Best regards,<br>The Proptii Team</p>
+            <hr>
+            <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com">here</a>.</em>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  generateViewingUserEmailTemplate(formData) {
+    const { property, viewing } = formData;
+    const viewingDate = new Date(viewing.date).toLocaleDateString('en-GB', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const viewingTime = this.formatTimeString(viewing.time);
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { color: #136C9E; font-size: 24px; margin-bottom: 20px; }
+          .details { background: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0; }
+          .footer { margin-top: 30px; font-size: 14px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">Viewing Request Confirmation</div>
+          
+          <p>Thank you for submitting your viewing request through Proptii.</p>
+          
+          <div class="details">
+            <h3>Property Details:</h3>
+            <p>Address: ${property.street}, ${property.city}, ${property.postcode}</p>
+            
+            <h3>Requested Viewing Time:</h3>
+            <p>Date: ${viewingDate}</p>
+            <p>Time: ${viewingTime}</p>
+            <p>Type: ${viewing.preference === 'virtual' ? 'Virtual Viewing' : 'In-Person Viewing'}</p>
+            
+            <h3>Estate Agent Details:</h3>
+            <p>Name: ${property.agent?.name}</p>
+            <p>Email: ${property.agent?.email}</p>
+          </div>
+          
+          <p>The estate agent will review your request and contact you shortly to confirm the viewing.</p>
+          
+          <div class="footer">
+            <p>Best regards,<br>The Proptii Team</p>
+            <hr>
+            <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com">here</a>.</em>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
   }
 
   async sendMultipleEmails({ formData, attachments, submissionId }) {

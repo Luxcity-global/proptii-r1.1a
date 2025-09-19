@@ -10,6 +10,7 @@ import {
   Divider
 } from '@mui/material';
 import { useBookViewing } from '../context/BookViewingContext';
+import { Tooltip } from '../../Tooltip';
 
 // Constants
 const BLUE_COLOR = '#136C9E';
@@ -60,115 +61,125 @@ const StyledTextField = styled(TextField)(({ theme }) => ({
 const PropertySelector: React.FC = () => {
   const { state, dispatch } = useBookViewing();
 
-  const handlePropertyChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePropertyChange = (field: string, value: string) => {
     dispatch({
       type: 'UPDATE_PROPERTY',
       payload: {
         ...state.selectedProperty,
-        [field]: event.target.value,
-      },
+        [field]: value
+      }
     });
   };
 
-  const handleAgentChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAgentChange = (field: string, value: string) => {
     dispatch({
       type: 'UPDATE_PROPERTY',
       payload: {
         ...state.selectedProperty,
         agent: {
           ...state.selectedProperty?.agent,
-          [field]: event.target.value,
-        },
-      },
+          [field]: value
+        }
+      }
     });
   };
 
   return (
-    <Box sx={{ p: 2 }}>
-      <SectionTitle variant="h6">Property Details</SectionTitle>
-      <SectionDescription variant="body2">
+    <Box sx={{ width: '100%', maxWidth: 800, mx: 'auto', p: 3 }}>
+      <Typography variant="h6" sx={{ mb: 3, color: '#DC5F12' }}>Property Details</Typography>
+      <Typography variant="subtitle1" sx={{ mb: 4, color: '#666666' }}>
         Please enter the property details and estate agent information.
-      </SectionDescription>
+      </Typography>
 
-      <StyledPaper>
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <Typography variant="subtitle1" sx={{ color: DARK_GREY, mb: 2, fontWeight: 500 }}>
-              Property Address
-            </Typography>
-            <StyledTextField
-              fullWidth
-              label="First line of address"
-              value={state.selectedProperty?.street || ''}
-              onChange={handlePropertyChange('street')}
-            />
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={4}>
-                <StyledTextField
-                  fullWidth
-                  label="City"
-                  value={state.selectedProperty?.city || ''}
-                  onChange={handlePropertyChange('city')}
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <StyledTextField
-                  fullWidth
-                  label="Town"
-                  value={state.selectedProperty?.town || ''}
-                  onChange={handlePropertyChange('town')}
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <StyledTextField
-                  fullWidth
-                  label="Postcode (Optional)"
-                  value={state.selectedProperty?.postcode || ''}
-                  onChange={handlePropertyChange('postcode')}
-                />
-              </Grid>
-            </Grid>
-          </Grid>
+      {/* Property Address Section */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: '#666666' }}>
+          Property Address
+        </Typography>
+        <Box sx={{ position: 'relative', mb: 2 }}>
+          <Tooltip
+            content="Copy the property and agent details from the listing and enter them into the form. We'll take it from there and help you contact the agent."
+            position="top"
+            trigger="hover"
+            forcePosition={true}
+          >
+            <div>
+              <TextField
+                fullWidth
+                label="First line of address"
+                value={state.selectedProperty?.street || ''}
+                onChange={(e) => handlePropertyChange('street', e.target.value)}
+              />
+            </div>
+          </Tooltip>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+          <TextField
+            label="City"
+            value={state.selectedProperty?.city || ''}
+            onChange={(e) => handlePropertyChange('city', e.target.value)}
+            sx={{ flex: 1 }}
+          />
+          <TextField
+            label="Town"
+            value={state.selectedProperty?.town || ''}
+            onChange={(e) => handlePropertyChange('town', e.target.value)}
+            sx={{ flex: 1 }}
+          />
+          <TextField
+            label="Postcode (Optional)"
+            value={state.selectedProperty?.postcode || ''}
+            onChange={(e) => handlePropertyChange('postcode', e.target.value)}
+            sx={{ flex: 1 }}
+          />
+        </Box>
+      </Box>
 
-          <Grid item xs={12}>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle1" sx={{ color: DARK_GREY, mb: 2, fontWeight: 500 }}>
-              Estate Agent Details
-            </Typography>
-            <StyledTextField
-              fullWidth
-              label="Agent Name"
-              value={state.selectedProperty?.agent?.name || ''}
-              onChange={handleAgentChange('name')}
-            />
-            <StyledTextField
-              fullWidth
-              label="Company"
-              value={state.selectedProperty?.agent?.company || ''}
-              onChange={handleAgentChange('company')}
-            />
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <StyledTextField
-                  fullWidth
-                  label="Agent Email"
-                  type="email"
-                  value={state.selectedProperty?.agent?.email || ''}
-                  onChange={handleAgentChange('email')}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <StyledTextField
-                  fullWidth
-                  label="Agent Phone"
-                  value={state.selectedProperty?.agent?.phone || ''}
-                  onChange={handleAgentChange('phone')}
-                />
-              </Grid>
-            </Grid>
-          </Grid>
-        </Grid>
-      </StyledPaper>
+      {/* Estate Agent Details Section */}
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: '#666666' }}>
+          Estate Agent Details
+        </Typography>
+        <TextField
+          fullWidth
+          label="Agent Name"
+          value={state.selectedProperty?.agent?.name || ''}
+          onChange={(e) => handleAgentChange('name', e.target.value)}
+          sx={{ mb: 2 }}
+        />
+        <TextField
+          fullWidth
+          label="Company"
+          value={state.selectedProperty?.agent?.company || ''}
+          onChange={(e) => handleAgentChange('company', e.target.value)}
+          sx={{ mb: 2 }}
+        />
+        <Box sx={{ position: 'relative', mb: 2 }}>
+          <Tooltip
+            content="If the email isn't listed on the property page, try searching for the agency's contact details online and add the agent's email address here."
+            position="top"
+            trigger="hover"
+            forcePosition={true}
+          >
+            <div>
+              <TextField
+                fullWidth
+                label="Agent Email"
+                value={state.selectedProperty?.agent?.email || ''}
+                onChange={(e) => handleAgentChange('email', e.target.value)}
+                type="email"
+              />
+            </div>
+          </Tooltip>
+        </Box>
+        <TextField
+          fullWidth
+          label="Agent Phone"
+          value={state.selectedProperty?.agent?.phone || ''}
+          onChange={(e) => handleAgentChange('phone', e.target.value)}
+          sx={{ mb: 2 }}
+        />
+      </Box>
     </Box>
   );
 };

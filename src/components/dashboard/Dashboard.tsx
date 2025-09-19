@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, CssBaseline, useTheme, useMediaQuery } from '@mui/material';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import DashboardSidebar from './ui/DashboardSidebar';
 import DashboardHeader from './ui/DashboardHeader';
 import { HomeIcon } from 'lucide-react';
@@ -119,30 +119,30 @@ export const DASHBOARD_SECTIONS = [
  * This is the main container component that manages the dashboard layout
  */
 
-interface DashboardSidebarProps {
-  activeSection: string;
-  onSectionChange: (sectionId: string) => void;
-  isCollapsed: boolean; // Ensure this property is included in the props
-}
+
 
 const Dashboard: React.FC = () => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md')); // Detect mobile/tablet view
+  const location = useLocation();
   const [activeSection, setActiveSection] = useState('dashboard');
-  const [isCollapsed, setIsCollapsed] = useState(false); // State to control sidebar collapse
-
-  // Removed duplicate declaration of handleSectionChange
-
-  // Automatically collapse the sidebar on mobile/tablet view
-  useEffect(() => {
-    setIsCollapsed(isMobile);
-  }, [isMobile]);
 
   // Update activeSection based on the current route
   useEffect(() => {
-    const currentSection = DASHBOARD_SECTIONS.find((section) =>
-      section && location.pathname.startsWith(section.path)
+    const currentPath = location.pathname;
+    
+    // First, try to find an exact match
+    let currentSection = DASHBOARD_SECTIONS.find((section) =>
+      section && currentPath === section.path
     );
+    
+    // If no exact match, check if we're on the dashboard home (which should match /dashboard exactly)
+    if (!currentSection && currentPath === '/dashboard') {
+      const dashboardSection = DASHBOARD_SECTIONS.find((section) => section.id === 'dashboard');
+      if (dashboardSection) {
+        currentSection = dashboardSection;
+      }
+    }
+    
     if (currentSection) {
       setActiveSection(currentSection.id);
     }
@@ -169,10 +169,7 @@ const Dashboard: React.FC = () => {
         <DashboardSidebar
           activeSection={activeSection}
           onSectionChange={handleSectionChange}
-          isCollapsed={isCollapsed} // Pass collapse state to the sidebar
-          onToggleCollapse={function (): void {
-            throw new Error('Function not implemented.');
-          } }        />
+        />
 
         {/* Main content */}
         <Box
@@ -185,7 +182,7 @@ const Dashboard: React.FC = () => {
             flexDirection: 'column',
           }}
         >
-          <DashboardHeader userName="Tosin Lanipekun" />
+          <DashboardHeader />
 
           <Box sx={{ flexGrow: 1, mt: 2 }}>
             <Outlet />

@@ -21,6 +21,12 @@ const ResidentialUpload: React.FC<ResidentialUploadProps> = ({ updateFormData, f
   useEffect(() => {
     if (formData?.residential?.proofDocument?.dataUrl) {
       setPreview(formData.residential.proofDocument.dataUrl);
+      // Also set selectedFile to indicate we have a file loaded
+      setSelectedFile(formData.residential.proofDocument as any);
+    } else {
+      // Clear both states if no file in formData
+      setPreview(null);
+      setSelectedFile(null);
     }
   }, [formData]);
 

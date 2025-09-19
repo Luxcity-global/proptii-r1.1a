@@ -23,6 +23,8 @@ import ViewingScheduler from './components/ViewingScheduler';
 import ViewingComparison from './components/ViewingComparison';
 import { BookViewingProvider, useBookViewing } from './context/BookViewingContext';
 import { bookingService } from './services/bookingService';
+import { viewingEmailService } from './services/viewingEmailService';
+import { useAuth } from '../../contexts/AuthContext';
 
 import { Home, Event, DoneAll, Close, Warning } from '@mui/icons-material';
 import CheckIcon from '@mui/icons-material/Check';
@@ -59,12 +61,22 @@ const StyledDialog = styled(Dialog)(({ theme }) => ({
 
 const ContentSection = styled(Box)(({ theme }) => ({
   flex: 1,
-  padding: theme.spacing(3),
   display: 'flex',
   flexDirection: 'column',
   backgroundColor: BACKGROUND_BLUE,
-  overflow: 'auto',
+  position: 'relative',
+  overflow: 'hidden',
 }));
+
+const ScrollableContent = styled(Box)(({ theme }) => ({
+  flex: 1,
+  padding: theme.spacing(3),
+  overflow: 'auto',
+  display: 'flex',
+  flexDirection: 'column',
+}));
+
+
 
 const StepSidebar = styled(Box)(({ theme }) => ({
   width: '280px',
@@ -149,19 +161,19 @@ const SavedIndicator = styled(Box)(({ theme }) => ({
 
 // Steps definition with icons
 const steps = [
-  { 
-    label: 'Property Details', 
-    icon: <Home sx={{ color: 'inherit' }} />, 
+  {
+    label: 'Property Details',
+    icon: <Home sx={{ color: 'inherit' }} />,
     stepIcon: <Home sx={{ color: 'inherit' }} />
   },
-  { 
-    label: 'Schedule Viewing', 
-    icon: <Event sx={{ color: 'inherit' }} />, 
+  {
+    label: 'Schedule Viewing',
+    icon: <Event sx={{ color: 'inherit' }} />,
     stepIcon: <Event sx={{ color: 'inherit' }} />
   },
-  { 
-    label: 'Confirmation', 
-    icon: <DoneAll sx={{ color: 'inherit' }} />, 
+  {
+    label: 'Confirmation',
+    icon: <DoneAll sx={{ color: 'inherit' }} />,
     stepIcon: <DoneAll sx={{ color: 'inherit' }} />
   },
 ];
@@ -181,40 +193,100 @@ interface PropertyDetails {
 interface BookViewingModalProps {
   open: boolean;
   onClose: () => void;
+  onSubmissionComplete?: () => void;
 }
 
-const BookViewingModal: React.FC<BookViewingModalProps> = ({ open, onClose }) => {
+const BookViewingModal: React.FC<BookViewingModalProps> = ({ open, onClose, onSubmissionComplete }) => {
   return (
     <BookViewingProvider>
-      <BookViewingModalContent open={open} onClose={onClose} />
+      <BookViewingModalContent open={open} onClose={onClose} onSubmissionComplete={onSubmissionComplete} />
     </BookViewingProvider>
   );
 };
 
-const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClose }) => {
+const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClose, onSubmissionComplete }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { state, dispatch } = useBookViewing();
+  const { user } = useAuth();
   const [activeStep, setActiveStep] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
+  const [showStepWarning, setShowStepWarning] = useState(false);
 
   // Validation function for final submission
   const isAllDataComplete = () => {
     const property = state.selectedProperty;
     const viewing = state.viewingDetails;
-    
-    return property?.street && 
-           property?.city && 
-           property?.postcode && 
-           property?.agent?.name && 
-           property?.agent?.email &&
-           viewing?.date && 
-           viewing?.time && 
-           viewing?.preference;
+    const userDetails = viewing?.userDetails;
+
+    return property?.street &&
+      property?.city &&
+      property?.postcode &&
+      property?.agent?.name &&
+      property?.agent?.email &&
+      viewing?.date &&
+      viewing?.time &&
+      viewing?.preference &&
+      userDetails?.fullName &&
+      userDetails?.email &&
+      userDetails?.phoneNumber;
+  };
+
+  // Add these validation functions after the isAllDataComplete function
+  const isPropertyDetailsComplete = () => {
+    const property = state.selectedProperty;
+    return !!(
+      property?.street &&
+      property?.city &&
+      property?.postcode &&
+      property?.agent?.name &&
+      property?.agent?.email
+    );
+  };
+
+  const isSchedulingDetailsComplete = () => {
+    const viewing = state.viewingDetails;
+    const userDetails = viewing?.userDetails;
+    return !!(
+      viewing?.date &&
+      viewing?.time &&
+      viewing?.preference &&
+      userDetails?.fullName &&
+      userDetails?.email &&
+      userDetails?.phoneNumber
+    );
+  };
+
+  const getIncompleteFieldsMessage = () => {
+    const messages = [];
+
+    if (!isPropertyDetailsComplete()) {
+      const property = state.selectedProperty;
+      if (!property?.street || !property?.city || !property?.postcode) {
+        messages.push("Property address details");
+      }
+      if (!property?.agent?.name || !property?.agent?.email) {
+        messages.push("Agent contact information");
+      }
+    }
+
+    if (!isSchedulingDetailsComplete()) {
+      const viewing = state.viewingDetails;
+      const userDetails = viewing?.userDetails;
+
+      if (!viewing?.date || !viewing?.time || !viewing?.preference) {
+        messages.push("Viewing date and time preferences");
+      }
+      if (!userDetails?.fullName || !userDetails?.email || !userDetails?.phoneNumber) {
+        messages.push("Your contact details");
+      }
+    }
+
+    return messages;
   };
 
   // Check if a section has content
@@ -224,15 +296,15 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
 
     switch (section) {
       case 0: // Property Details
-        return !!(property?.street || 
-                 property?.city || 
-                 property?.postcode || 
-                 property?.agent?.name || 
-                 property?.agent?.email);
+        return !!(property?.street ||
+          property?.city ||
+          property?.postcode ||
+          property?.agent?.name ||
+          property?.agent?.email);
       case 1: // Schedule Viewing
-        return !!(viewing?.date || 
-                 viewing?.time || 
-                 viewing?.preference);
+        return !!(viewing?.date ||
+          viewing?.time ||
+          viewing?.preference);
       case 2: // Confirmation
         return false; // Confirmation doesn't need a completion indicator
       default:
@@ -241,6 +313,15 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
   };
 
   const handleNext = async () => {
+    // Check if current step has missing fields (only for steps 0 and 1)
+    if (activeStep < 2) {
+      const warningMessages = getStepWarningMessage(activeStep);
+      if (warningMessages.length > 0) {
+        setShowStepWarning(true);
+        return; // Don't proceed if fields are missing
+      }
+    }
+
     // If we're on the confirmation step, check if all data is complete
     if (activeStep === steps.length - 1 && !isAllDataComplete()) {
       return; // Don't proceed if data is incomplete
@@ -253,12 +334,29 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         // Submit the viewing request to the backend
         const property = state.selectedProperty;
         const viewing = state.viewingDetails;
-        
+
         if (!property || !viewing) {
           throw new Error('Missing property or viewing details');
         }
 
+        // Save to database
         await bookingService.scheduleViewing(property, viewing);
+
+        // Send emails
+        const emailResult = await viewingEmailService.sendViewingEmails({
+          property,
+          viewing,
+          user: {
+            name: viewing.userDetails?.fullName,
+            email: viewing.userDetails?.email
+          }
+        });
+
+        if (emailResult.error) {
+          console.error('Error sending emails:', emailResult.error);
+          // Continue with success flow even if emails fail
+          // You might want to show a warning to the user
+        }
 
         setSaveComplete(true);
         setShowSavedIndicator(true);
@@ -282,69 +380,171 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
       console.error('Error in handleNext:', error);
       setIsSaving(false);
       // Show error message to user
-      dispatch({ 
-        type: 'SET_ERROR', 
-        payload: error instanceof Error ? error.message : 'Failed to save viewing request' 
+      dispatch({
+        type: 'SET_ERROR',
+        payload: error instanceof Error ? error.message : 'Failed to save viewing request'
       });
     }
   };
 
   const handleBack = () => {
+    setShowStepWarning(false);
     setActiveStep((prevStep) => prevStep - 1);
+  };
+
+  const handleCloseWarning = () => {
+    setShowStepWarning(false);
   };
 
   const handleSuccessClose = () => {
     setShowSuccess(false);
     dispatch({ type: 'RESET_STATE' });
     setActiveStep(0);
+    
+    // Close the main modal first
     onClose();
-  };
-
-  const renderStepContent = () => {
-    switch (activeStep) {
-      case 0:
-        return <PropertySelector />;
-      case 1:
-        return <ViewingScheduler />;
-      case 2:
-        return (
-          <>
-            {!isAllDataComplete() && (
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 1, 
-                bgcolor: alpha('#DC5F12', 0.1), 
-                color: '#DC5F12',
-                p: 2,
-                borderRadius: 1,
-                mb: 2
-              }}>
-                <Warning />
-                <Typography>
-                  Please complete all required fields in the previous steps before submitting.
-                </Typography>
-              </Box>
-            )}
-            <ViewingComparison />
-          </>
-        );
-      default:
-        return null;
+    
+    // Then trigger the review modal in the parent component after a short delay
+    if (onSubmissionComplete) {
+      setTimeout(() => {
+        onSubmissionComplete();
+      }, 300);
     }
   };
 
-  // Reset saved indicator when changing steps
+  const getStepWarningMessage = (step: number) => {
+    const messages = [];
+
+    switch (step) {
+      case 0: // Property Details
+        const property = state.selectedProperty;
+        if (!property?.street || !property?.city || !property?.postcode) {
+          messages.push("Property address details");
+        }
+        if (!property?.agent?.name || !property?.agent?.email) {
+          messages.push("Agent contact information");
+        }
+        break;
+
+      case 1: // Schedule Viewing
+        const viewing = state.viewingDetails;
+        const userDetails = viewing?.userDetails;
+        if (!viewing?.date || !viewing?.time || !viewing?.preference) {
+          messages.push("Viewing date and time preferences");
+        }
+        if (!userDetails?.fullName || !userDetails?.email || !userDetails?.phoneNumber) {
+          messages.push("Your contact details");
+        }
+        break;
+
+      case 2: // Confirmation
+        return getIncompleteFieldsMessage();
+    }
+
+    return messages;
+  };
+
+  const WarningPopup = ({ messages, open, onClose }: { messages: string[]; open: boolean; onClose: () => void }) => {
+    return (
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="sm"
+        fullWidth
+        sx={{
+          '& .MuiDialog-paper': {
+            borderRadius: 2,
+            [theme.breakpoints.down('sm')]: {
+              margin: 2,
+              maxWidth: 'calc(100% - 32px)',
+            }
+          }
+        }}
+      >
+        <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: { xs: 1, sm: 1.5 },
+            color: '#DC5F12',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 } }}>
+              <Warning sx={{ fontSize: { xs: '1.5rem', sm: '2rem' } }} />
+              <Typography
+                variant="h6"
+                fontWeight="bold"
+                sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
+              >
+                Missing Information
+              </Typography>
+            </Box>
+            <Typography sx={{ fontSize: { xs: '0.9rem', sm: '1rem' }, mb: 1 }}>
+              Please complete the following information before continuing:
+            </Typography>
+            <ul style={{
+              marginLeft: 0,
+              paddingLeft: isMobile ? '16px' : '20px',
+              marginBottom: 0
+            }}>
+              {messages.map((message, index) => (
+                <li key={index} style={{ marginBottom: '4px' }}>
+                  <Typography sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
+                    {message}
+                  </Typography>
+                </li>
+              ))}
+            </ul>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: { xs: 2, sm: 3 }, pt: 0 }}>
+          <Button
+            onClick={onClose}
+            variant="contained"
+            sx={{
+              bgcolor: BLUE_COLOR,
+              '&:hover': {
+                bgcolor: BLUE_COLOR,
+                opacity: 0.9
+              },
+              fontSize: { xs: '0.9rem', sm: '1rem' }
+            }}
+          >
+            Got it
+          </Button>
+        </DialogActions>
+      </Dialog>
+    );
+  };
+
+  const renderStepContent = () => {
+    return (
+      <ScrollableContent>
+        {activeStep === 0 && <PropertySelector />}
+        {activeStep === 1 && <ViewingScheduler />}
+        {activeStep === 2 && <ViewingComparison />}
+      </ScrollableContent>
+    );
+  };
+
+  // Reset saved indicator and warnings when changing steps
   useEffect(() => {
     setShowSavedIndicator(false);
+    setShowStepWarning(false);
   }, [activeStep]);
+
+  // Reset warning when state changes (user fills fields)
+  useEffect(() => {
+    if (showStepWarning) {
+      setShowStepWarning(false);
+    }
+  }, [state.selectedProperty, state.viewingDetails]);
 
   return (
     <>
-      <StyledDialog 
-        open={open} 
-        onClose={onClose} 
-        maxWidth="lg" 
+      <StyledDialog
+        open={open}
+        onClose={onClose}
+        maxWidth="lg"
         fullWidth
         fullScreen={isMobile}
       >
@@ -361,21 +561,21 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           {!isMobile && (
             <StepSidebar>
               <SidebarContent>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    color: ORANGE_COLOR, 
-                    fontWeight: 'bold', 
+                <Typography
+                  variant="h6"
+                  sx={{
+                    color: ORANGE_COLOR,
+                    fontWeight: 'bold',
                     mb: 1,
                     fontSize: '1.3rem' // Increased font size
                   }}
                 >
                   Steps
                 </Typography>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
-                    color: DARK_GREY, 
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: DARK_GREY,
                     mb: 2,
                     fontSize: '1rem' // Increased font size
                   }}
@@ -385,7 +585,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
                 {steps.map((step, index) => {
                   const isActive = activeStep === index;
                   const hasContent = hasSectionContent(index);
-                  
+
                   return (
                     <StepButton
                       key={step.label}
@@ -404,10 +604,10 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
                 })}
               </SidebarContent>
               <SidebarFooter>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
-                    color: DARK_GREY, 
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: DARK_GREY,
                     mb: 1,
                     fontSize: '1rem' // Increased font size
                   }}
@@ -434,9 +634,9 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
               {renderStepContent()}
             </ContentSection>
 
-            <DialogActions sx={{ 
-              position: 'relative', 
-              borderTop: `1px solid ${alpha(BLUE_COLOR, 0.12)}`, 
+            <DialogActions sx={{
+              position: 'relative',
+              borderTop: `1px solid ${alpha(BLUE_COLOR, 0.12)}`,
               p: 2,
               mt: 'auto',
               backgroundColor: '#fff',
@@ -457,7 +657,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
                   </SavedIndicator>
                 )}
               </Box>
-              
+
               <Box sx={{ display: 'flex', gap: 1 }}>
                 {activeStep > 0 && (
                   <Button
@@ -487,8 +687,8 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         </DialogContent>
       </StyledDialog>
 
-      <Dialog 
-        open={showSuccess} 
+      <Dialog
+        open={showSuccess}
         onClose={handleSuccessClose}
         maxWidth="sm"
         fullWidth
@@ -507,10 +707,10 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button 
+          <Button
             onClick={handleSuccessClose}
             variant="contained"
-            sx={{ 
+            sx={{
               bgcolor: BLUE_COLOR,
               '&:hover': {
                 bgcolor: BLUE_COLOR,
@@ -522,6 +722,12 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           </Button>
         </DialogActions>
       </Dialog>
+
+      <WarningPopup
+        messages={showStepWarning && activeStep < 2 ? getStepWarningMessage(activeStep) : []}
+        open={showStepWarning}
+        onClose={handleCloseWarning}
+      />
     </>
   );
 };

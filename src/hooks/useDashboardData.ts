@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   dashboardService, 
+  createDashboardService,
   DashboardSummary, 
   SavedProperty, 
   PropertyViewing, 
@@ -17,6 +19,7 @@ interface DashboardData {
   viewings: PropertyViewing[];
   upcomingViewings: PropertyViewing[];
   pastViewings: PropertyViewing[];
+  cancelledViewings: PropertyViewing[];
   referencingApplications: ReferencingApplication[];
   contracts: Contract[];
   files: UserFile[];
@@ -28,6 +31,7 @@ interface DashboardData {
  * This centralizes data fetching across different dashboard sections
  */
 export const useDashboardData = (): DashboardData => {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null);
@@ -38,8 +42,13 @@ export const useDashboardData = (): DashboardData => {
   const [files, setFiles] = useState<UserFile[]>([]);
 
   const fetchDashboardData = async () => {
+    console.log('🚀 fetchDashboardData called with user?.id:', user?.id);
     setIsLoading(true);
     setError(null);
+    
+    // Create dashboard service with current user ID
+    const dashboardServiceInstance = createDashboardService(user?.id);
+    console.log('🔧 Created dashboard service instance for user:', user?.id);
     
     try {
       // Fetch all data in parallel for better performance
@@ -51,17 +60,20 @@ export const useDashboardData = (): DashboardData => {
         contractsResponse,
         filesResponse
       ] = await Promise.all([
-        dashboardService.getDashboardSummary(),
-        dashboardService.getSavedProperties(),
-        dashboardService.getViewings(),
-        dashboardService.getReferencingApplications(),
-        dashboardService.getContracts(),
-        dashboardService.getUserFiles()
+        dashboardServiceInstance.getDashboardSummary(),
+        dashboardServiceInstance.getSavedProperties(),
+        dashboardServiceInstance.getViewings(),
+        dashboardServiceInstance.getReferencingApplications(),
+        dashboardServiceInstance.getContracts(),
+        dashboardServiceInstance.getUserFiles()
       ]);
 
+      console.log('📋 Dashboard response:', dashboardResponse);
       if (dashboardResponse.success && dashboardResponse.data) {
+        console.log('✅ Setting dashboard summary:', dashboardResponse.data);
         setDashboardSummary(dashboardResponse.data);
       } else if (!dashboardResponse.success) {
+        console.error('❌ Dashboard response failed:', dashboardResponse.error);
         setError(dashboardResponse.error || 'Failed to fetch dashboard summary');
       }
 
@@ -102,14 +114,21 @@ export const useDashboardData = (): DashboardData => {
     }
   };
 
-  // Load data on initial mount
+  // Load data on initial mount and when user changes
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    console.log('🔄 useDashboardData useEffect triggered with user?.id:', user?.id);
+    if (user?.id) { // Only fetch data if user ID is available
+      console.log('📊 Fetching dashboard data for user:', user.id);
+      fetchDashboardData();
+    } else {
+      console.log('⏳ No user ID available, skipping dashboard data fetch');
+    }
+  }, [user?.id]); // Re-run when user.id changes
 
   // Filter viewings for convenience
   const upcomingViewings = viewings.filter(viewing => viewing.status === 'upcoming');
   const pastViewings = viewings.filter(viewing => viewing.status === 'completed');
+  const cancelledViewings = viewings.filter(viewing => viewing.status === 'cancelled');
 
   return {
     isLoading,
@@ -119,6 +138,7 @@ export const useDashboardData = (): DashboardData => {
     viewings,
     upcomingViewings,
     pastViewings,
+    cancelledViewings,
     referencingApplications,
     contracts,
     files,

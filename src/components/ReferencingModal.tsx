@@ -9,10 +9,13 @@ import FinancialUpload from "./Uploads/FinancialUpload";
 import GuarantorUpload from "./Uploads/GuarantorUpload";
 import referencingService from '../services/referencingService';
 import emailService from '../services/emailService';
+import { toast } from 'react-hot-toast';
+import { IndexedDBManager } from '../utils/indexedDBManager';
 
 interface ReferencingModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSubmissionComplete?: () => void;
 }
 
 // Form data types for different steps
@@ -147,17 +150,26 @@ const navigationItems: NavigationItem[] = [
   { label: "Residential", Icon: Home, step: 3 },
   { label: "Financial", Icon: Euro, step: 4 },
   { label: "Guarantor", Icon: Users, step: 5 },
-  { label: "Credit Check", Icon: CreditCard, step: 6 },
+  // { label: "Credit Check", Icon: CreditCard, step: 6 },
   { label: "Agent Details", Icon: User, step: 7 }
 ];
 
-// Add a helper function to convert File to StoredFile format
-const fileToStoredFile = (file: File) => {
+// Process file for storage with validation
+const processFileForStorage = async (file: File): Promise<StoredFile> => {
+  // Validate file size
+  if (!IndexedDBManager.validateFileSize(file)) {
+    throw new Error(`File ${file.name} is too large. Maximum size is 5MB.`);
+  }
+
+  // Convert file to base64
+  const dataUrl = await IndexedDBManager.fileToBase64(file);
+  
   return {
     name: file.name,
     type: file.type,
     size: file.size,
-    lastModified: file.lastModified
+    lastModified: file.lastModified,
+        dataUrl: dataUrl
   };
 };
 
@@ -188,6 +200,50 @@ const base64ToFile = (storedFile: StoredFile): File => {
     type: storedFile.type,
     lastModified: storedFile.lastModified
   });
+};
+
+// Convert stored form data back to regular form data with File objects
+const convertStoredFormData = (storedData: any): FormData => {
+  const convertFile = (storedFile: StoredFile | null): File | null => {
+    if (!storedFile || !storedFile.dataUrl) return null;
+    try {
+      return base64ToFile(storedFile);
+    } catch (error) {
+      console.error('Error converting stored file:', error);
+      return null;
+    }
+  };
+
+  return {
+    identity: {
+      ...storedData.identity,
+      identityProof: convertFile(storedData.identity?.identityProof)
+    },
+    employment: {
+      ...storedData.employment,
+      proofDocument: convertFile(storedData.employment?.proofDocument)
+    },
+    residential: {
+      ...storedData.residential,
+      proofDocument: convertFile(storedData.residential?.proofDocument)
+    },
+    financial: {
+      ...storedData.financial,
+      proofOfIncomeDocument: convertFile(storedData.financial?.proofOfIncomeDocument)
+    },
+    guarantor: {
+      ...storedData.guarantor,
+      identityDocument: convertFile(storedData.guarantor?.identityDocument)
+    },
+    creditCheck: storedData.creditCheck || {},
+    agentDetails: storedData.agentDetails || {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phoneNumber: '',
+      hasAgreedToCheck: false
+    }
+  };
 };
 
 interface StoredFormData {
@@ -249,7 +305,14 @@ interface StoredFormData {
   };
 }
 
-const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) => {
+interface UploadProps {
+  updateFormData: (step: keyof FormData | string, data: Partial<FormData[keyof FormData]>) => void;
+  formData: FormData;
+}
+
+
+
+const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, onSubmissionComplete }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -319,167 +382,416 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const [lastSavedSteps, setLastSavedSteps] = useState<{ [key: number]: Date | null }>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [fileCache, setFileCache] = useState<Map<string, StoredFile>>(new Map());
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [stepStatus, setStepStatus] = useState<{ [key: number]: 'empty' | 'partial' | 'complete' }>({
-    1: 'empty',
-    2: 'empty',
-    3: 'empty',
-    4: 'empty',
-    5: 'empty',
-    6: 'empty',
-    7: 'empty'
+    1: 'partial', // Orange by default
+    2: 'partial', // Orange by default
+    3: 'partial', // Orange by default
+    4: 'partial', // Orange by default
+    5: 'partial', // Orange by default (even for optional guarantor)
+    // 6: 'empty', // Credit check step commented out
+    7: 'partial' // Orange by default
   });
 
-  // Load status from localStorage on mount
+  // Load saved form data from localStorage on mount (only once when modal opens)
   useEffect(() => {
-    if (user?.id) {
-      const savedStatus = localStorage.getItem(`referencing_${user.id}_stepStatus`);
-      if (savedStatus) {
+    if (user?.id && isOpen) {
+      const loadSavedData = async () => {
         try {
-          setStepStatus(JSON.parse(savedStatus));
-        } catch (e) {
-          console.error('Failed to parse saved step status:', e);
+                // Load saved form data
+      const savedFormData = await IndexedDBManager.getItem(`${user.id}_formData`);
+          if (savedFormData) {
+            console.log('📥 Loading saved form data:', savedFormData);
+            
+            // Debug: Check if files exist in the saved data
+            if (savedFormData.identity?.identityProof) {
+              console.log('🔍 Identity file in saved data:', {
+                name: savedFormData.identity.identityProof.name,
+                hasDataUrl: !!savedFormData.identity.identityProof.dataUrl,
+                size: savedFormData.identity.identityProof.size
+              });
+            }
+            if (savedFormData.employment?.proofDocument) {
+              console.log('🔍 Employment file in saved data:', {
+                name: savedFormData.employment.proofDocument.name,
+                hasDataUrl: !!savedFormData.employment.proofDocument.dataUrl,
+                size: savedFormData.employment.proofDocument.size
+              });
+            }
+            
+            // Restore form data with files if they exist
+            const restoredFormData = {
+              identity: {
+                ...savedFormData.identity,
+                identityProof: savedFormData.identity?.identityProof?.dataUrl 
+                  ? (() => {
+                      try {
+                        console.log('🔍 Restoring identity file:', savedFormData.identity.identityProof.name);
+                        // Keep the original StoredFile object with dataUrl for UI compatibility
+                        return savedFormData.identity.identityProof;
+                      } catch (error) {
+                        console.error('❌ Error restoring identity file:', error);
+                        return null;
+                      }
+                    })()
+                  : null
+              },
+              employment: {
+                ...savedFormData.employment,
+                proofDocument: savedFormData.employment?.proofDocument?.dataUrl
+                  ? (() => {
+                      try {
+                        console.log('🔍 Restoring employment file:', savedFormData.employment.proofDocument.name);
+                        // Keep the original StoredFile object with dataUrl for UI compatibility
+                        return savedFormData.employment.proofDocument;
+                      } catch (error) {
+                        console.error('❌ Error restoring employment file:', error);
+                        return null;
+                      }
+                    })()
+                  : null
+              },
+              residential: {
+                ...savedFormData.residential,
+                proofDocument: savedFormData.residential?.proofDocument?.dataUrl
+                  ? (() => {
+                      try {
+                        console.log('🔍 Restoring residential file:', savedFormData.residential.proofDocument.name);
+                        // Keep the original StoredFile object with dataUrl for UI compatibility
+                        return savedFormData.residential.proofDocument;
+                      } catch (error) {
+                        console.error('❌ Error restoring residential file:', error);
+                        return null;
+                      }
+                    })()
+                  : null
+              },
+              financial: {
+                ...savedFormData.financial,
+                proofOfIncomeDocument: savedFormData.financial?.proofOfIncomeDocument?.dataUrl
+                  ? (() => {
+                      try {
+                        console.log('🔍 Restoring financial file:', savedFormData.financial.proofOfIncomeDocument.name);
+                        // Keep the original StoredFile object with dataUrl for UI compatibility
+                        return savedFormData.financial.proofOfIncomeDocument;
+                      } catch (error) {
+                        console.error('❌ Error restoring financial file:', error);
+                        return null;
+                      }
+                    })()
+                  : null
+              },
+              guarantor: {
+                ...savedFormData.guarantor,
+                identityDocument: savedFormData.guarantor?.identityDocument?.dataUrl
+                  ? (() => {
+                      try {
+                        console.log('🔍 Restoring guarantor file:', savedFormData.guarantor.identityDocument.name);
+                        // Keep the original StoredFile object with dataUrl for UI compatibility
+                        return savedFormData.guarantor.identityDocument;
+                      } catch (error) {
+                        console.error('❌ Error restoring guarantor file:', error);
+                        return null;
+                      }
+                    })()
+                  : null
+              },
+              creditCheck: savedFormData.creditCheck || {},
+              agentDetails: savedFormData.agentDetails || {
+                firstName: '',
+                lastName: '',
+                email: '',
+                phoneNumber: '',
+                hasAgreedToCheck: false
+              }
+            };
+            setFormData(restoredFormData);
+            console.log('✅ Form data restored successfully');
+          }
+
+          // Load saved current step
+          const savedCurrentStep = await IndexedDBManager.getItem(`${user.id}_currentStep`);
+          if (savedCurrentStep && typeof savedCurrentStep === 'number') {
+            console.log('📥 Loading saved current step:', savedCurrentStep);
+            setCurrentStep(savedCurrentStep);
+          }
+
+          // Load saved step status
+          const savedStepStatus = await IndexedDBManager.getItem(`${user.id}_stepStatus`);
+          if (savedStepStatus) {
+            console.log('📥 Loading saved step status:', savedStepStatus);
+            setStepStatus(savedStepStatus);
+          }
+        } catch (error) {
+          console.error('Error loading saved form data:', error);
         }
-      }
-    }
-  }, [user]);
+      };
 
-  // Save status to localStorage whenever it changes
+      loadSavedData();
+    }
+  }, [user?.id, isOpen]); // Only depend on user.id and isOpen, not formData
+
+  // Calculate step status based on current form data (runs after data changes)
   useEffect(() => {
-    if (user?.id) {
-      localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
-    }
-  }, [stepStatus, user]);
+    const newStatus = {
+      1: determineStepStatus('identity', formData.identity),
+      2: determineStepStatus('employment', formData.employment),
+      3: determineStepStatus('residential', formData.residential),
+      4: determineStepStatus('financial', formData.financial),
+      5: determineStepStatus('guarantor', formData.guarantor),
+      // 6: determineStepStatus('creditCheck', formData), // Credit check step commented out
+      7: determineStepStatus('agentDetails', formData.agentDetails)
+    };
 
-  const updateFormData = (step: keyof FormData, data: Partial<FormData[keyof FormData]>) => {
+    console.log('📊 Calculated Status:', newStatus);
+    console.log('👤 Agent Details Data:', formData.agentDetails);
+
+    // Only update step status if it's different from current
+    setStepStatus(prevStatus => {
+      const hasChanged = Object.keys(newStatus).some(key => {
+        const stepKey = parseInt(key);
+        return prevStatus[stepKey as keyof typeof prevStatus] !== newStatus[stepKey as keyof typeof newStatus];
+      });
+      
+      if (hasChanged) {
+        return newStatus;
+      }
+      return prevStatus;
+    });
+  }, [formData]);
+
+  // Process file upload with caching to avoid reprocessing
+  const processFileUpload = async (file: File): Promise<StoredFile> => {
+    // Create a cache key based on file properties
+    const cacheKey = `${file.name}_${file.size}_${file.lastModified}`;
+
+    // Check if file is already processed and cached
+    if (fileCache.has(cacheKey)) {
+      console.log(`Using cached file: ${file.name}`);
+      return fileCache.get(cacheKey)!;
+    }
+
+    // Process the file
+    const storedFile = await processFileForStorage(file);
+
+    // Cache the result for future use
+    setFileCache(prev => new Map(prev.set(cacheKey, storedFile)));
+
+    return storedFile;
+  };
+
+  // Optimized updateFormData with reduced localStorage operations
+  const updateFormData = async (step: keyof FormData | string, data: Partial<FormData[keyof FormData]>) => {
+    let processedData: any = { ...data };
+    let hasFilesToProcess = false;
+    let fileProcessingPromises: Promise<void>[] = [];
+
+    // Batch file processing operations
+    const processFiles = async () => {
+      // Check and process file uploads in parallel
+      if ('identityProof' in data && (data as any).identityProof instanceof File) {
+        hasFilesToProcess = true;
+        fileProcessingPromises.push(
+          processFileUpload((data as any).identityProof).then(result => {
+            (processedData as any).identityProof = result;
+          })
+        );
+      }
+
+      if ('proofDocument' in data && (data as any).proofDocument instanceof File) {
+        hasFilesToProcess = true;
+        fileProcessingPromises.push(
+          processFileUpload((data as any).proofDocument).then(result => {
+            (processedData as any).proofDocument = result;
+          })
+        );
+      }
+
+      if ('identityDocument' in data && (data as any).identityDocument instanceof File) {
+        hasFilesToProcess = true;
+        fileProcessingPromises.push(
+          processFileUpload((data as any).identityDocument).then(result => {
+            (processedData as any).identityDocument = result;
+          })
+        );
+      }
+
+      if ('proofOfIncomeDocument' in data && (data as any).proofOfIncomeDocument instanceof File) {
+        hasFilesToProcess = true;
+        fileProcessingPromises.push(
+          processFileUpload((data as any).proofOfIncomeDocument).then(result => {
+            (processedData as any).proofOfIncomeDocument = result;
+          })
+        );
+      }
+
+      if (fileProcessingPromises.length > 0) {
+        setIsProcessingFile(true);
+        toast.loading('Processing files...', { id: 'file-processing' });
+
+        try {
+          await Promise.all(fileProcessingPromises);
+          toast.dismiss('file-processing');
+          toast.success('Files processed successfully!');
+        } catch (error) {
+          console.error('Error processing files:', error);
+          toast.error('Failed to process files. Please try again.');
+          setIsProcessingFile(false);
+          toast.dismiss('file-processing');
+          return;
+        }
+
+        setIsProcessingFile(false);
+      }
+    };
+
+    await processFiles();
+
     setFormData(prev => {
       const updated = {
         ...prev,
         [step]: {
-          ...prev[step],
-          ...data
+          ...prev[step as keyof FormData],
+          ...processedData
         }
       };
-      // Save the entire form data to local storage
+
+      // Ultra-fast IndexedDB save for better performance and large data handling
       if (user?.id) {
-        localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(updated));
+        if (typeof window.requestIdleCallback !== 'undefined') {
+          requestIdleCallback(async () => {
+            await IndexedDBManager.setItem(`${user.id}_formData`, updated);
+          });
+        } else {
+          // Fallback for browsers without requestIdleCallback
+          setTimeout(async () => {
+            await IndexedDBManager.setItem(`${user.id}_formData`, updated);
+          }, 0);
+        }
       }
-      return updated;
-    });
 
-    const stepMap: { [key in keyof FormData]: number } = {
-      identity: 1,
-      employment: 2,
-      residential: 3,
-      financial: 4,
-      guarantor: 5,
-      creditCheck: 6,
-      agentDetails: 7
-    };
-
-    const stepIndex = stepMap[step];
-    const status = determineStepStatus(step, { ...formData[step], ...data });
-
-    setStepStatus(prev => {
-      const updated = {
-        ...prev,
-        [stepIndex]: status
+      // Update step status immediately after form data update
+      const stepMap: { [key: string]: number } = {
+        identity: 1,
+        employment: 2,
+        residential: 3,
+        financial: 4,
+        guarantor: 5,
+        // creditCheck: 6, // Credit check step commented out
+        agentDetails: 7
       };
-      // Save step status to localStorage
-      if (user?.id) {
-        localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(updated));
+
+      const stepIndex = stepMap[step];
+      if (stepIndex) {
+        const currentStepData = { ...updated[step as keyof FormData] };
+        const status = determineStepStatus(step as keyof FormData, currentStepData);
+
+        setStepStatus(prevStatus => {
+          const newStatus = {
+            ...prevStatus,
+            [stepIndex]: status
+          };
+          return newStatus;
+        });
       }
+
       return updated;
     });
   };
 
   const determineStepStatus = (step: keyof FormData, data: any): 'empty' | 'partial' | 'complete' => {
+    if (!data) return 'partial'; // Default to orange (partial) instead of empty
+
     switch (step) {
-      case 'identity':
-        const hasAllIdentityFields = data.firstName && data.lastName && data.email &&
-          data.phoneNumber && data.dateOfBirth && data.nationality;
-        const hasIdentityDocument = data.identityProof && (data.identityProof instanceof File || data.identityProof.name);
+      case 'identity': {
+        const hasAllRequiredFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.dateOfBirth && data.nationality && !data.dateOfBirthError;
+        const hasRequiredDocument = data.identityProof?.name && data.identityProof?.dataUrl;
 
-        if (hasAllIdentityFields && hasIdentityDocument) {
+        // Only return green when completely filled
+        if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
+        return 'partial'; // Always orange until complete
+      }
+
+      case 'employment': {
+        const nonApplicableStatus = ['Unemployed', 'Retired', 'Student'];
+        
+        // For non-applicable statuses, only status selection is required
+        if (nonApplicableStatus.includes(data.employmentStatus)) {
           return 'complete';
         }
-        if (hasAllIdentityFields || hasIdentityDocument || data.firstName || data.lastName ||
-          data.email || data.phoneNumber || data.dateOfBirth || data.nationality) {
-          return 'partial';
+
+        // For employed statuses, require all employment fields AND document
+        if (data.employmentStatus && !nonApplicableStatus.includes(data.employmentStatus)) {
+          const hasAllRequiredFields = data.employmentStatus && data.companyDetails && data.lengthOfEmployment && data.jobPosition && data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType;
+          const hasRequiredDocument = data.proofDocument?.name && data.proofDocument?.dataUrl;
+
+          if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
         }
-        return 'empty';
 
-      case 'employment':
-        const hasAllEmploymentFields = data.employmentStatus && data.companyDetails && data.jobPosition &&
-          data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType && data.lengthOfEmployment;
-        const hasEmploymentDocument = data.proofDocument && (data.proofDocument instanceof File || data.proofDocument.name);
+        return 'partial'; // Always orange until complete
+      }
 
-        if (hasAllEmploymentFields && hasEmploymentDocument)
-          return 'complete';
-        if (hasAllEmploymentFields || hasEmploymentDocument || data.employmentStatus || data.companyDetails ||
-          data.jobPosition || data.referenceFullName || data.referenceEmail || data.referencePhone ||
-          data.proofType || data.lengthOfEmployment)
-          return 'partial';
-        return 'empty';
+      case 'residential': {
+        let requiredFields = [
+          'currentAddress', 'durationAtCurrentAddress', 'reasonForLeaving', 'proofType', 'alreadyHavePropertyAddress'
+        ];
 
-      case 'residential':
-        const hasAllResidentialFields = data.currentAddress && data.durationAtCurrentAddress &&
-          data.previousAddress && data.durationAtPreviousAddress && data.reasonForLeaving && data.proofType;
-        const hasResidentialDocument = data.proofDocument && (data.proofDocument instanceof File || data.proofDocument.name);
-
-        if (hasAllResidentialFields && hasResidentialDocument)
-          return 'complete';
-        if (hasAllResidentialFields || hasResidentialDocument || data.currentAddress || data.durationAtCurrentAddress ||
-          data.previousAddress || data.alreadyHavePropertyAddress || data.propertyAddress || data.durationAtPreviousAddress || data.reasonForLeaving || data.proofType)
-          return 'partial';
-        return 'empty';
-
-      case 'financial':
-        const hasAllFinancialFields = data.proofOfIncomeType && data.monthlyIncome;
-        const hasFinancialDocument = data.proofOfIncomeDocument && (data.proofOfIncomeDocument instanceof File || data.proofOfIncomeDocument.name);
-
-        if (hasAllFinancialFields && hasFinancialDocument)
-          return 'complete';
-        if (hasAllFinancialFields || hasFinancialDocument || data.proofOfIncomeType || data.monthlyIncome)
-          return 'partial';
-        return 'empty';
-
-      case 'guarantor':
-        const hasAllGuarantorFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
-        const hasGuarantorDocument = data.identityDocument && (data.identityDocument instanceof File || data.identityDocument.name);
-
-        if (hasAllGuarantorFields && hasGuarantorDocument)
-          return 'complete';
-        if (hasAllGuarantorFields || hasGuarantorDocument || data.firstName || data.lastName || data.email ||
-          data.phoneNumber || data.address)
-          return 'partial';
-        return 'empty';
-
-      case 'creditCheck':
-        const identityData = formData.identity || {};
-        const hasCriticalIdentityInfo =
-          identityData.firstName &&
-          identityData.lastName &&
-          identityData.email &&
-          identityData.phoneNumber &&
-          identityData.dateOfBirth;
-
-        if (hasCriticalIdentityInfo) {
-          return 'complete';
-        } else if (identityData.firstName || identityData.lastName || identityData.email ||
-          identityData.phoneNumber || identityData.dateOfBirth) {
-          return 'partial';
+        if (data.alreadyHavePropertyAddress === 'Yes') {
+          requiredFields.push('propertyAddress');
         }
-        return 'empty';
 
-      case 'agentDetails':
-        if (data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck)
-          return 'complete';
-        if (data.firstName || data.lastName || data.email || data.phoneNumber)
-          return 'partial';
-        return 'empty';
+        const needsPreviousAddress = data.durationAtCurrentAddress && data.durationAtCurrentAddress !== '2-3 years';
+        if (needsPreviousAddress) {
+          requiredFields.push('previousAddress', 'durationAtPreviousAddress');
+        }
+
+        const hasAllRequiredFields = requiredFields.every(field => !!data[field]);
+        const hasRequiredDocument = data.proofDocument?.name && data.proofDocument?.dataUrl;
+
+        // Only return green when completely filled
+        if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
+        return 'partial'; // Always orange until complete
+      }
+
+      case 'financial': {
+        const hasAllRequiredFields = data.monthlyIncome && data.proofOfIncomeType;
+        const hasRequiredDocument = data.proofOfIncomeDocument?.name && data.proofOfIncomeDocument?.dataUrl;
+        const isOpenBankingConnected = data.useOpenBanking && data.isConnectedToOpenBanking;
+
+        // Only return green when completely filled
+        if (hasAllRequiredFields && (hasRequiredDocument || isOpenBankingConnected)) return 'complete';
+        return 'partial'; // Always orange until complete
+      }
+
+      case 'guarantor': {
+        // Guarantor section is completely optional
+        const hasAnyData = Object.values(data).some(value => !!value && value !== null && value !== '');
+        
+        // If some data is entered, all fields + document must be complete for green
+        if (hasAnyData) {
+          const hasAllRequiredFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
+          const hasRequiredDocument = data.identityDocument?.name && data.identityDocument?.dataUrl;
+
+          if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
+          return 'partial'; // Orange if partially filled
+        }
+        
+        // If no data entered, it's still orange by default (will be handled in the form completion check)
+        return 'partial';
+      }
+
+      case 'agentDetails': {
+        const hasAllRequiredFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.hasAgreedToCheck;
+
+        // Only return green when completely filled
+        if (hasAllRequiredFields) return 'complete';
+        return 'partial'; // Always orange until complete
+      }
 
       default:
-        return 'empty';
+        return 'partial'; // Default to orange instead of empty
     }
   };
 
@@ -490,14 +802,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       { icon: Home, text: 'Residential', step: 3, dataKey: 'residential' },
       { icon: PoundSterling, text: 'Financial', step: 4, dataKey: 'financial' },
       { icon: Users, text: 'Guarantor', step: 5, dataKey: 'guarantor' },
-      { icon: CreditCard, text: 'Credit Check', step: 6, dataKey: 'creditCheck' },
+      // { icon: CreditCard, text: 'Credit Check', step: 6, dataKey: 'creditCheck' },
       { icon: User, text: 'Agent Details', step: 7, dataKey: 'agentDetails' }
     ];
 
     return steps.map(({ icon: Icon, text, step, dataKey }) => {
       const status = stepStatus[step];
-      const shouldShowDot = status !== 'empty';
-      let dotColor = '';
+      let dotColor = 'bg-orange-500'; // Default to orange
       switch (status) {
         case 'partial':
           dotColor = 'bg-orange-500';
@@ -505,8 +816,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         case 'complete':
           dotColor = 'bg-green-500';
           break;
+        case 'empty':
+          dotColor = 'bg-orange-500'; // Show orange even for empty
+          break;
         default:
-          dotColor = 'bg-gray-300';
+          dotColor = 'bg-orange-500';
       }
 
       return (
@@ -520,12 +834,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         >
           <Icon size={18} className={currentStep === step ? 'text-orange-600' : 'text-gray-500'} />
           <span>{text}</span>
-          {shouldShowDot && (
-            <span
-              className={`ml-auto w-3 h-3 rounded-full ${dotColor}`}
-              title={`Status: ${status}`}
-            />
-          )}
+          {/* Always show dot for all statuses */}
+          <span
+            className={`ml-auto w-3 h-3 rounded-full ${dotColor}`}
+            title={`Status: ${status}`}
+          />
         </li>
       );
     });
@@ -545,39 +858,9 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   }, [user]);
 
-  // Update the useEffect for loading stored data
-  useEffect(() => {
-    if (user?.id) {
-      try {
-        // Load step status
-        const savedStatus = localStorage.getItem(`referencing_${user.id}_stepStatus`);
-        if (savedStatus) {
-          setStepStatus(JSON.parse(savedStatus));
-        }
 
-        // Load current step
-        const savedStep = localStorage.getItem(`referencing_${user.id}_currentStep`);
-        if (savedStep) {
-          setCurrentStep(parseInt(savedStep, 10));
-        }
 
-        // Load entire form data at once
-        const savedFormData = localStorage.getItem(`referencing_${user.id}_formData`);
-        if (savedFormData) {
-          const parsedData = JSON.parse(savedFormData);
-          setFormData(prev => ({
-            ...prev,
-            ...parsedData
-          }));
-        }
-
-      } catch (e) {
-        console.error('Failed to load saved data:', e);
-      }
-    }
-  }, [user]);
-
-  // Update saveCurrentStep to save all data
+  // Save current step and all data
   const saveCurrentStep = async () => {
     try {
       setIsSaving(true);
@@ -586,14 +869,51 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
         throw new Error('No user found. Please login again.');
       }
 
-      // Save current step
-      localStorage.setItem(`referencing_${user.id}_currentStep`, currentStep.toString());
+      // Save current step to IndexedDB
+      await IndexedDBManager.setItem(`${user.id}_currentStep`, currentStep);
+      await IndexedDBManager.setItem(`${user.id}_formData`, formData);
+      await IndexedDBManager.setItem(`${user.id}_stepStatus`, stepStatus);
 
-      // Save entire form data
-      localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(formData));
+      // Get current section data
+      const section = getCurrentSection();
+      if (!section) {
+        return; // Skip saving for credit check step
+      }
 
-      // Save step status
-      localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
+      const currentSectionData = {
+        ...formData[section],
+        userId: user.id
+      };
+
+      // Save to Cosmos DB based on current step
+      let saveResult;
+      switch (currentStep) {
+        case 1:
+          saveResult = await referencingService.saveIdentityData(currentSectionData);
+          break;
+        case 2:
+          saveResult = await referencingService.saveEmploymentData(currentSectionData);
+          break;
+        case 3:
+          saveResult = await referencingService.saveResidentialData(currentSectionData);
+          break;
+        case 4:
+          saveResult = await referencingService.saveFinancialData(currentSectionData);
+          break;
+        case 5:
+          saveResult = await referencingService.saveGuarantorData(currentSectionData);
+          break;
+        // case 6: // Credit check step commented out
+        case 7:
+          saveResult = await referencingService.saveAgentDetailsData(currentSectionData);
+          break;
+        default:
+          saveResult = { success: true }; // Credit check step doesn't need saving
+      }
+
+      if (!saveResult.success) {
+        throw new Error(saveResult.error || 'Failed to save data');
+      }
 
       // Update last saved timestamp
       setLastSavedSteps(prev => ({
@@ -602,27 +922,67 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       }));
 
       // Show success message
-      // alert('Data saved successfully!');
+      toast.success('Progress saved successfully');
+      
+      // Show save success indicator
+      setShowSaveSuccess(true);
+      
+      // Auto-hide save success after 3 seconds
+      setTimeout(() => {
+        setShowSaveSuccess(false);
+      }, 3000);
 
     } catch (error) {
       console.error('Error in save operation:', error);
-      // alert(error instanceof Error ? error.message : 'Failed to submit application');
+      toast.error(error instanceof Error ? error.message : 'Failed to save data');
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Add auto-save on form updates
-  useEffect(() => {
-    if (user?.id) {
-      // Save form data whenever it changes
-      localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(formData));
-      // Save step status
-      localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
-      // Save current step
-      localStorage.setItem(`referencing_${user.id}_currentStep`, currentStep.toString());
+  // Helper function to get current section name
+  const getCurrentSection = () => {
+    switch (currentStep) {
+      case 1:
+        return 'identity';
+      case 2:
+        return 'employment';
+      case 3:
+        return 'residential';
+      case 4:
+        return 'financial';
+      case 5:
+        return 'guarantor';
+      // case 6: // Credit check step commented out
+      case 7:
+        return 'agentDetails';
+      default:
+        return '';
     }
-  }, [formData, stepStatus, currentStep, user]);
+  };
+
+  // Add auto-save on form updates (debounced to prevent excessive saves)
+  useEffect(() => {
+    if (user?.id && isOpen) {
+      const timeoutId = setTimeout(async () => {
+        console.log('💾 Auto-saving form data...', { currentStep, stepStatus });
+        
+        // Save form data with files included
+        const formDataSuccess = await IndexedDBManager.setItem(`${user.id}_formData`, formData);
+        const stepStatusSuccess = await IndexedDBManager.setItem(`${user.id}_stepStatus`, stepStatus);
+        const currentStepSuccess = await IndexedDBManager.setItem(`${user.id}_currentStep`, currentStep);
+        
+        // Log warnings if storage fails
+        if (!formDataSuccess || !stepStatusSuccess || !currentStepSuccess) {
+          console.warn('Some form data could not be saved due to storage limitations');
+        } else {
+          console.log('✅ Form data saved successfully');
+        }
+      }, 500); // Debounce for 500ms
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [formData, stepStatus, currentStep, user?.id, isOpen]);
 
   const goToStep = (step: number) => {
     setCurrentStep(step);
@@ -632,161 +992,102 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const nextStep = async () => {
     if (currentStep < 7) {
       await saveCurrentStep();
-      setCurrentStep(prev => prev + 1);
+      // Skip step 6 (credit check) - jump from step 5 to step 7
+      if (currentStep === 5) {
+        setCurrentStep(7);
+      } else {
+        setCurrentStep(prev => prev + 1);
+      }
     }
   };
 
   const prevStep = () => {
     if (currentStep > 1) {
-      setCurrentStep(prev => prev - 1);
+      // Skip step 6 (credit check) - jump from step 7 to step 5
+      if (currentStep === 7) {
+        setCurrentStep(5);
+      } else {
+        setCurrentStep(prev => prev - 1);
+      }
     }
   };
 
   const checkFormCompleteness = () => {
-    // Check each section's status
-    const identityComplete = stepStatus[1] === 'complete';
-    const employmentComplete = stepStatus[2] === 'complete';
-    const residentialComplete = stepStatus[3] === 'complete';
-    const financialComplete = stepStatus[4] === 'complete';
-    const guarantorComplete = stepStatus[5] === 'complete';
-    const creditCheckComplete = stepStatus[6] === 'complete';
-    const agentDetailsComplete = stepStatus[7] === 'complete';
+    // Check if all required steps are complete (excluding optional guarantor step)
+    const requiredSteps = [1, 2, 3, 4, 7]; // Identity, Employment, Residential, Financial, Agent Details
+    const requiredStepsComplete = requiredSteps.every(stepNumber => stepStatus[stepNumber] === 'complete');
 
-    const allComplete =
-      identityComplete &&
-      employmentComplete &&
-      residentialComplete &&
-      financialComplete &&
-      guarantorComplete &&
-      creditCheckComplete &&
-      agentDetailsComplete;
-
-    setIsFormComplete(allComplete);
-    return allComplete;
+    // Guarantor step (5) is optional - it doesn't affect form completeness
+    setIsFormComplete(requiredStepsComplete);
+    return requiredStepsComplete;
   };
 
-  const submitApplication = async () => {
+  // Optimized submission process
+  const submitApplication = async (force: boolean = false) => {
     const isComplete = checkFormCompleteness();
-    if (!isComplete) {
+
+    if (!isComplete && !force) {
       setShowWarningModal(true);
       return;
     }
-    proceedWithSubmission();
-  };
 
-  const proceedWithSubmission = async () => {
+    // Hide the warning modal if it was open
+    if (showWarningModal) {
+      setShowWarningModal(false);
+    }
+
     try {
       setIsSubmitting(true);
-      await saveCurrentStep();
-      const userId = user?.id || '';
+
+      const userId = user?.id;
+
+      if (!userId) {
+        throw new Error('User ID is required for submission');
+      }
 
       // Get agent details from the form data
       const agentEmail = formData.agentDetails?.email;
-      const agentName = `${formData.agentDetails?.firstName || ''} ${formData.agentDetails?.lastName || ''}`.trim();
 
       if (!agentEmail) {
         throw new Error('Agent email is required. Please complete the Agent Details section.');
       }
 
-      // Prepare attachments array with proper naming for zip organization
-      const attachments: Attachment[] = [];
+      // ULTRA-FAST SUBMISSION: Skip all redundant operations
+      // Don't save current step - data is already auto-saved
+      // Don't show multiple progress updates - just submit directly
 
-      // Helper function to add file if it exists
-      const addFileToAttachments = (storedFile: StoredFile | null, prefix: string, section: string) => {
-        if (storedFile && storedFile.dataUrl) {
-          const file = base64ToFile(storedFile);
-          const fileExtension = storedFile.name.split('.').pop();
-          const sanitizedName = `${formData.identity?.firstName || 'unknown'}_${formData.identity?.lastName || 'unknown'}`;
-          const fileName = `${section}/${prefix}_${sanitizedName}.${fileExtension}`;
-          attachments.push({
-            filename: fileName,
-            content: file
-          });
-        }
-      };
+      // Submit immediately with timeout for faster response
+      const submitWithTimeout = Promise.race([
+        referencingService.submitApplication(userId, {
+          formData,
+          isNewReference: true
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Submission timeout - please try again')), 15000)
+        )
+      ]);
 
-      // Add all files with proper folder structure
-      if (formData.identity?.identityProof) {
-        addFileToAttachments(
-          formData.identity.identityProof as StoredFile,
-          'identity_proof',
-          '1_Identity_Documents'
-        );
+      const result = await submitWithTimeout as any;
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to submit application');
       }
 
-      if (formData.employment?.proofDocument) {
-        addFileToAttachments(
-          formData.employment.proofDocument as StoredFile,
-          'employment_proof',
-          '2_Employment_Documents'
-        );
-      }
-
-      if (formData.residential?.proofDocument) {
-        addFileToAttachments(
-          formData.residential.proofDocument as StoredFile,
-          'residential_proof',
-          '3_Residential_Documents'
-        );
-      }
-
-      if (formData.financial?.proofOfIncomeDocument) {
-        addFileToAttachments(
-          formData.financial.proofOfIncomeDocument as StoredFile,
-          'income_proof',
-          '4_Financial_Documents'
-        );
-      }
-
-      if (formData.guarantor?.identityDocument) {
-        addFileToAttachments(
-          formData.guarantor.identityDocument as StoredFile,
-          'guarantor_proof',
-          '5_Guarantor_Documents'
-        );
-      }
-
-      // Submit the application
-      const submissionResult = await referencingService.submitApplication(userId, {
-        formData,
-        emailContent: {
-          to: agentEmail,
-          subject: `New Tenant Application${formData.residential?.propertyAddress ? ` - ${formData.residential.propertyAddress}` : ''}`,
-          attachments,
-          formData // Pass the entire formData for email template generation
-        }
-      });
-
-      if (!submissionResult.success) {
-        throw new Error(submissionResult.message || 'Failed to submit application');
-      }
-
-      // Send emails to all recipients
-      const emailResults = await emailService.sendMultipleEmails(formData, attachments);
-
-      if (emailResults.error) {
-        console.error('Error sending some emails:', emailResults.error);
-      }
-
-      // Log email sending results
-      console.log('Email sending results:', {
-        agent: emailResults.agent,
-        referee: emailResults.referee,
-        guarantor: emailResults.guarantor
-      });
-
-      // Show success modal
+      // Fast cleanup - use async operations to avoid blocking UI
       setShowSuccessModal(true);
+      setShowWarningModal(false);
 
-      // Don't clear local storage immediately after submission
-      // Instead, mark the submission as complete
-      if (userId) {
-        localStorage.setItem(`referencing_${userId}_submitted`, 'true');
-      }
+      // Non-blocking IndexedDB operations
+      setTimeout(async () => {
+        await IndexedDBManager.setItem(`${userId}_submitted`, true);
+      }, 0);
+
+      // Show instant success feedback
+      toast.success('Application submitted successfully!', { duration: 2000 });
 
     } catch (error) {
       console.error('Error submitting application:', error);
-      // alert(error instanceof Error ? error.message : 'Failed to submit application');
+      toast.error(error instanceof Error ? error.message : 'Failed to submit application. Please try again later.');
     } finally {
       setIsSubmitting(false);
     }
@@ -796,7 +1097,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     if (!showWarningModal) return null;
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center">
         <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
           <div className="flex items-center mb-4">
             <div className="bg-yellow-100 p-2 rounded-full">
@@ -818,13 +1119,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               Cancel
             </button>
             <button
-              onClick={() => {
-                setShowWarningModal(false);
-                proceedWithSubmission();
-              }}
+              onClick={() => submitApplication(true)}
               className="px-4 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors"
+              disabled={isSubmitting}
             >
-              Submit Anyway
+              {isSubmitting ? 'Submitting...' : 'Submit Anyway'}
             </button>
           </div>
         </div>
@@ -835,12 +1134,33 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   const SuccessModal = () => {
     if (!showSuccessModal) return null;
 
+    const handleClose = () => {
+      setShowSuccessModal(false);
+      
+      // Close the main modal first
+      onClose();
+      
+      // Then trigger the review modal in the parent component
+      if (onSubmissionComplete) {
+        // Use setTimeout to ensure the modal is fully closed before showing review
+        setTimeout(() => {
+          onSubmissionComplete();
+        }, 100);
+      }
+    };
+
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center"
+        onClick={handleClose}
+      >
+        <div
+          className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="flex items-center mb-4">
             <div className="bg-green-100 p-2 rounded-full">
-              <CheckCircle className="text-green-500 w-6 h-6" />
+              <CheckCircle className="text-green-500 w-7 h-7" />
             </div>
             <h3 className="text-lg font-semibold ml-3">Application Submitted Successfully</h3>
           </div>
@@ -851,10 +1171,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
 
           <div className="flex justify-end">
             <button
-              onClick={() => {
-                setShowSuccessModal(false);
-                onClose();
-              }}
+              onClick={handleClose}
               className="px-4 py-2 bg-[#136C9E] text-white rounded-md hover:bg-opacity-90 transition-colors"
             >
               Close
@@ -870,40 +1187,44 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
   }, [stepStatus]);
 
   // Add an effect to update credit check status when identity form changes
-  useEffect(() => {
-    if (formData.identity) {
-      const creditCheckStatus = determineStepStatus('creditCheck', formData);
-      setStepStatus(prev => ({
-        ...prev,
-        6: creditCheckStatus
-      }));
-    }
-  }, [formData.identity]);
+  // useEffect(() => {
+  //   if (formData.identity) {
+  //     const creditCheckStatus = determineStepStatus('creditCheck', formData);
+  //     setStepStatus(prev => ({
+  //       ...prev,
+  //       6: creditCheckStatus
+  //     }));
+  //   }
+  // }, [formData.identity]);
 
-  // Update cleanup effect
+  // Update cleanup effect - only clear data when form is successfully submitted
   useEffect(() => {
     if (!isOpen && user?.id) {
-      const isSubmitted = localStorage.getItem(`referencing_${user.id}_submitted`) === 'true';
-      if (isSubmitted) {
-        // Clear storage only if the form was successfully submitted
-        const keysToRemove = [
-          `referencing_${user.id}_formData`,
-          `referencing_${user.id}_stepStatus`,
-          `referencing_${user.id}_currentStep`,
-          `referencing_${user.id}_submitted`
-        ];
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-      }
+      const checkSubmissionStatus = async () => {
+        const isSubmitted = await IndexedDBManager.getItem(`${user.id}_submitted`);
+        console.log('🔍 Cleanup effect - Modal closed, checking submission status:', isSubmitted);
+        
+        if (isSubmitted === true) {
+          console.log('🧹 Clearing form data after successful submission');
+          // Clear storage only if the form was successfully submitted
+          await IndexedDBManager.clearUserData(user.id);
+          await IndexedDBManager.removeItem(`${user.id}_submitted`);
+        } else {
+          console.log('💾 Keeping form data - form not submitted yet');
+        }
+      };
+      
+      checkSubmissionStatus();
     }
-  }, [isOpen, user]);
+  }, [isOpen, user?.id]); // Only depend on user.id, not the entire user object
 
   const renderFormContent = () => {
     switch (currentStep) {
       case 1:
         return (
           <div className="relative">
-            <h3 className="text-xl font-semibold mb-6">Fill in your personal details below</h3>
-            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 md:mb-6">Fill in your personal details below</h3>
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 grid grid-cols-1 md:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
               <div>
                 <label className="block text-gray-700 mb-2">First Name</label>
                 <input
@@ -1126,11 +1447,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 2:
         return (
           <div className="relative">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Fill in your employment details below</h2>
+            <div className="mb-3 sm:mb-4 md:mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your employment details below</h2>
             </div>
-            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
-              <div className="col-span-1">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Employment Status</label>
                 <select
                   value={formData.employment.employmentStatus}
@@ -1146,7 +1467,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   <option value="Student">Student</option>
                 </select>
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Company Details</label>
                 <input
                   type="text"
@@ -1156,7 +1477,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Company name"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Length of Employment (Years)</label>
                 <input
                   type="text"
@@ -1166,7 +1487,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="2"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Job Position</label>
                 <input
                   type="text"
@@ -1176,7 +1497,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Software Developer"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Referee - Full Name</label>
                 <input
                   type="text"
@@ -1186,7 +1507,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="John Smith"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Referee - Email Address</label>
                 <input
                   type="email"
@@ -1196,7 +1517,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="john.smith@example.com"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Proof of Employment</label>
                 <select
                   value={formData.employment.proofType}
@@ -1210,7 +1531,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   <option value="Tax Return">Tax Return</option>
                 </select>
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Referee - Phone Number</label>
                 <input
                   type="tel"
@@ -1227,12 +1548,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 3:
         return (
           <div className="relative">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Fill in your residential details below</h2>
+            <div className="mb-3 sm:mb-4 md:mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your residential details below</h2>
             </div>
 
-            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
-              <div className="col-span-2">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+              <div className="col-span-1 sm:col-span-2">
                 <label className="block text-gray-700 mb-2">Do you already have a property you're interested in renting?</label>
                 <select
                   value={formData.residential.alreadyHavePropertyAddress}
@@ -1258,8 +1579,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               </div>
             </div>
 
-            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
-              <div className="col-span-1">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Reason for leaving Previous Address</label>
                 <textarea
                   value={formData.residential.reasonForLeaving}
@@ -1269,7 +1590,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Please provide the reason for leaving"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Current Address</label>
                 <textarea
                   value={formData.residential.currentAddress}
@@ -1279,7 +1600,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Enter your current address"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2 whitespace-nowrap">Previous Address (If less than 3 yrs at current)</label>
                 <input
                   type="text"
@@ -1289,7 +1610,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Enter your previous address"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">How long have you lived at this Address?</label>
                 <select
                   value={formData.residential.durationAtCurrentAddress}
@@ -1302,7 +1623,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   <option value="2-3 years">2-3 years</option>
                 </select>
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Proof of Address</label>
                 <select
                   value={formData.residential.proofType}
@@ -1316,7 +1637,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   <option value="Tenancy Agreement">Tenancy Agreement</option>
                 </select>
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Select exact duration at this address</label>
                 <select
                   value={formData.residential.durationAtPreviousAddress}
@@ -1336,11 +1657,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 4:
         return (
           <div className="relative">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Fill in your financial details below</h2>
+            <div className="mb-3 sm:mb-4 md:mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your financial details below</h2>
             </div>
-            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
-              <div className="col-span-1">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Monthly Income (£)</label>
                 <input
                   type="number"
@@ -1350,7 +1671,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Enter your monthly income"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Proof of income</label>
                 <select
                   value={formData.financial.proofOfIncomeType}
@@ -1372,11 +1693,17 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
       case 5:
         return (
           <div className="relative">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Fill in your guarantor's personal details below</h2>
+            <div className="mb-3 sm:mb-4 md:mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your guarantor's personal details below</h2>
+              <p className="text-sm text-gray-600 mt-2">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
+                  Optional
+                </span>
+                This section is optional. Please skip if you don't need a guarantor.
+              </p>
             </div>
-            <div className="bg-white rounded-lg p-6 mb-6 grid grid-cols-2 gap-x-6 gap-y-4">
-              <div className="col-span-1">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Guarantor's First Name</label>
                 <input
                   type="text"
@@ -1386,7 +1713,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Enter first name"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Guarantor's Last Name</label>
                 <input
                   type="text"
@@ -1396,7 +1723,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Enter last name"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Guarantor's Email Address</label>
                 <input
                   type="email"
@@ -1406,7 +1733,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Enter email address"
                 />
               </div>
-              <div className="col-span-1">
+              <div className="col-span-1 sm:col-span-1">
                 <label className="block text-gray-700 mb-2">Guarantor's Phone Number</label>
                 <input
                   type="tel"
@@ -1416,7 +1743,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                   placeholder="Enter phone number"
                 />
               </div>
-              <div className="col-span-2">
+              <div className="col-span-1 sm:col-span-2">
                 <label className="block text-gray-700 mb-2">Guarantor's Address</label>
                 <textarea
                   value={formData.guarantor.address}
@@ -1430,20 +1757,20 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
             <GuarantorUpload updateFormData={updateFormData} formData={formData} />
           </div>
         );
-      case 6:
+      {/*case 6:
         return (
           <div className="relative">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Fill in your personal details below</h2>
+            <div className="mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your personal details below</h2>
             </div>
-            <div className="bg-white rounded-lg p-6 mb-6">
-              <p className="text-gray-700 mb-6">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-4 md:mb-6">
+              <p className="text-sm sm:text-base text-gray-700 mb-4 sm:mb-6">
                 A Credit check is required to complete your referencing.<br />
                 Your personal information has been filled in automatically.<br />
                 <strong>Check that all your details are correct.</strong>
               </p>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                <div className="col-span-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">First Name</label>
                   <input
                     type="text"
@@ -1452,7 +1779,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
                   />
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Last Name</label>
                   <input
                     type="text"
@@ -1461,7 +1788,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
                   />
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Email Address</label>
                   <input
                     type="email"
@@ -1470,7 +1797,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
                   />
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Phone Number</label>
                   <input
                     type="tel"
@@ -1479,7 +1806,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50"
                   />
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Date of birth</label>
                   <input
                     type="text"
@@ -1500,18 +1827,18 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
               <p className="text-white text-sm">Automated live credit checks</p>
             </div>
           </div>
-        );
+        );*/}
       case 7:
         return (
           <div className="relative">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">
+            <div className="mb-3 sm:mb-4 md:mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
                 Fill in the agent's details below
               </h2>
             </div>
-            <div className="bg-white rounded-lg p-6 mb-6">
-              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                <div className="col-span-1">
+            <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Agent's First Name</label>
                   <input
                     type="text"
@@ -1525,7 +1852,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
                   />
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Agent's Last Name</label>
                   <input
                     type="text"
@@ -1539,7 +1866,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
                   />
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Agent's Email Address</label>
                   <input
                     type="email"
@@ -1553,7 +1880,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                     className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white"
                   />
                 </div>
-                <div className="col-span-1">
+                <div className="col-span-1 sm:col-span-1">
                   <label className="block text-gray-700 mb-2">Agent's Phone Number</label>
                   <input
                     type="tel"
@@ -1569,7 +1896,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
                 </div>
               </div>
             </div>
-            <div className="mt-4 mb-4">
+            <div className="mt-3 mb-3 sm:mt-4 sm:mb-4">
               <label className="flex items-center">
                 <input
                   type="checkbox"
@@ -1594,15 +1921,23 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
     }
   };
 
+  // Handle modal close with cleanup
+  const handleClose = () => {
+    setIsProcessingFile(false);
+    setShowWarningModal(false);
+    setShowSuccessModal(false);
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       <div
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-        onClick={onClose}
+        onClick={handleClose}
       />
-      <div className="relative w-full max-w-5xl mx-auto my-8 bg-white rounded-lg shadow-xl flex overflow-hidden min-h-[600px]">
+      <div className="relative w-full max-w-sm sm:max-w-md md:max-w-4xl lg:max-w-5xl mx-auto my-2 sm:my-4 md:my-8 bg-white rounded-lg shadow-xl flex overflow-hidden h-[85vh] sm:h-[80vh] md:min-h-[600px] max-h-[90vh]">
         <div className="w-64 bg-gray-50 py-4 px-4 border-r border-gray-200 hidden md:block md:flex flex-col">
           <div className="mb-6 px-2">
             <h2 className="text-xl font-bold text-orange-600 mb-2">Referencing Steps</h2>
@@ -1616,102 +1951,200 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose }) 
             {renderSidebarNavigation()}
           </ul>
           <div className="mt-auto pt-6 px-2">
-            <div className="text-sm text-gray-600 mb-2">Step {currentStep} of 7</div>
+            <div className="text-sm text-gray-600 mb-2">Step {currentStep > 5 ? currentStep - 1 : currentStep} of 6</div>
             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
                 className="h-full bg-[#136C9E] transition-all duration-300"
-                style={{ width: `${(currentStep / 7) * 100}%` }}
+                style={{ width: `${((currentStep > 5 ? currentStep - 1 : currentStep) / 6) * 100}%` }}
               ></div>
             </div>
           </div>
         </div>
         <div className="flex-1 flex flex-col max-h-[90vh]">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center space-x-4">
-              <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-2">
-                <Menu size={24} />
+          <div className="flex items-center justify-between px-3 sm:px-6 py-2 sm:py-4 border-b border-gray-200">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-1 sm:p-2">
+                <Menu size={20} className="sm:w-6 sm:h-6" />
               </button>
-              <h2 className="text-md font-semibold">Referencing Form</h2>
+              <h2 className="text-sm sm:text-md font-semibold">Referencing Form</h2>
             </div>
             <button
-              onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors"
+              onClick={handleClose}
+              className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors"
               aria-label="Close modal"
             >
-              <X size={18} />
+              <X size={16} className="sm:w-[18px] sm:h-[18px]" />
             </button>
           </div>
           {isMenuOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
-              <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-xl p-6">
-                <button onClick={() => setIsMenuOpen(false)} className="mb-4">
-                  <X size={24} />
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-[70]">
+              <div className="fixed inset-y-0 left-0 w-64 sm:w-72 bg-white shadow-xl p-4 sm:p-6">
+                <button onClick={() => setIsMenuOpen(false)} className="mb-4 p-1">
+                  <X size={20} className="sm:w-6 sm:h-6" />
                 </button>
-                <ul className="space-y-4">
-                  {navigationItems.map(({ label, Icon, step }) => (
-                    <li
-                      key={step}
-                      onClick={() => {
-                        goToStep(step);
-                        setIsMenuOpen(false);
-                      }}
-                      className="flex items-center space-x-3 px-4 py-3 cursor-pointer hover:bg-gray-100"
-                    >
-                      <Icon
-                        size={18}
-                        className={currentStep === step ? "text-orange-600" : "text-gray-500"}
-                      />
-                      <span>{label}</span>
-                    </li>
-                  ))}
+                <div className="mb-4 sm:mb-6">
+                  <h2 className="text-base sm:text-lg font-bold text-orange-600 mb-2">Referencing Steps</h2>
+                  <p className="text-xs sm:text-sm text-gray-600">
+                    The referencing process verifies renter or buyer identity, financial status, and rental history.
+                  </p>
+                </div>
+                <ul className="space-y-1">
+                  {navigationItems.map(({ label, Icon, step }) => {
+                    const status = stepStatus[step];
+                    let dotColor = 'bg-orange-500'; // Default to orange
+                    switch (status) {
+                      case 'partial':
+                        dotColor = 'bg-orange-500';
+                        break;
+                      case 'complete':
+                        dotColor = 'bg-green-500';
+                        break;
+                      case 'empty':
+                        dotColor = 'bg-orange-500'; // Show orange even for empty
+                        break;
+                      default:
+                        dotColor = 'bg-orange-500';
+                    }
+
+                    return (
+                      <li
+                        key={step}
+                        onClick={() => {
+                          goToStep(step);
+                          setIsMenuOpen(false);
+                        }}
+                        className={`flex items-center space-x-3 px-4 py-3 cursor-pointer transition-all ${currentStep === step
+                          ? 'bg-blue-100 text-black font-semibold rounded-lg'
+                          : 'text-gray-600 hover:bg-gray-100'
+                          }`}
+                      >
+                        <Icon size={18} className={currentStep === step ? 'text-orange-600' : 'text-gray-500'} />
+                        <span>{label}</span>
+                        {/* Always show dot for all statuses */}
+                        <span
+                          className={`ml-auto w-3 h-3 rounded-full ${dotColor}`}
+                          title={`Status: ${status}`}
+                        />
+                      </li>
+                    );
+                  })}
                 </ul>
+                <div className="mt-auto pt-6">
+                  <div className="text-sm text-gray-600 mb-2">Step {currentStep > 5 ? currentStep - 1 : currentStep} of 6</div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#136C9E] transition-all duration-300"
+                      style={{ width: `${((currentStep > 5 ? currentStep - 1 : currentStep) / 6) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
-          <div className="flex-1 overflow-y-auto p-6 bg-[#f2f7fb]">
+          <div className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-6 bg-[#f2f7fb]">
             {renderFormContent()}
           </div>
-          <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
-            <div>
-              {lastSavedSteps[currentStep] && (
-                <div className="flex items-center text-sm text-gray-500 ml-2">
-                  <CheckCircle className="text-green-500 mr-1" fontSize="small" />
-                  <span>Saved</span>
+          <div className="px-3 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4 border-t border-gray-200 flex-shrink-0">
+            {/* Mobile Layout (default) - Triangle arrangement */}
+            <div className="flex justify-between items-start md:hidden">
+              <div>
+                {(lastSavedSteps[currentStep] || showSaveSuccess) && (
+                  <div className="flex items-center text-sm text-gray-500 ml-2">
+                    <CheckCircle className="text-green-500 mr-1" size={20} />
+                    <span>Saved</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Right angle triangle button layout for mobile */}
+              <div className="relative">
+                {/* Save button positioned at top right */}
+                <div className="flex justify-end mb-2">
+                  <button
+                    onClick={saveCurrentStep}
+                    className="px-3 sm:px-4 py-2 text-sm bg-gray-100 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-200 transition-colors"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </button>
                 </div>
-              )}
+
+                {/* Bottom row: Previous and Continue/Submit side by side */}
+                <div className="flex space-x-3">
+                  {currentStep > 1 && (
+                    <button
+                      onClick={prevStep}
+                      className="px-3 sm:px-4 py-2 text-sm border border-[#136C9E] text-[#136C9E] rounded-md hover:bg-[#136C9E] hover:text-white transition-colors"
+                    >
+                      Previous
+                    </button>
+                  )}
+                  {currentStep < 7 ? (
+                    <button
+                      onClick={nextStep}
+                      className="px-3 sm:px-4 py-2 text-sm bg-[#136C9E] text-white rounded-md hover:bg-[#0F5A82] transition-colors"
+                    >
+                      Continue
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => submitApplication()}
+                      className="px-3 sm:px-4 py-2 text-sm bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck}
+                    >
+                      {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="flex space-x-3">
-              {currentStep > 1 && (
+
+            {/* Desktop Layout - Horizontal arrangement */}
+            <div className="hidden md:flex md:justify-between md:items-center">
+              {/* Save success indicator on the left */}
+              <div>
+                {(lastSavedSteps[currentStep] || showSaveSuccess) && (
+                  <div className="flex items-center text-sm text-gray-500">
+                    <CheckCircle className="text-green-500 mr-1" size={20} />
+                    <span>Saved</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Buttons horizontally aligned on the right */}
+              <div className="flex items-center space-x-3">
+                {currentStep > 1 && (
+                  <button
+                    onClick={prevStep}
+                    className="px-4 md:px-6 py-2 text-base border border-[#136C9E] text-[#136C9E] rounded-md hover:bg-[#136C9E] hover:text-white transition-colors"
+                  >
+                    Previous
+                  </button>
+                )}
                 <button
-                  onClick={prevStep}
-                  className="px-6 py-2 border border-[#136C9E] text-[#136C9E] rounded-md hover:bg-[#136C9E] hover:text-white transition-colors"
+                  onClick={saveCurrentStep}
+                  className="px-4 md:px-6 py-2 text-base bg-gray-100 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-200 transition-colors"
+                  disabled={isSaving}
                 >
-                  Previous
+                  {isSaving ? 'Saving...' : 'Save'}
                 </button>
-              )}
-              <button
-                onClick={saveCurrentStep}
-                className="px-6 py-2 bg-gray-100 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-200 transition-colors"
-                disabled={isSaving}
-              >
-                {isSaving ? 'Saving...' : 'Save'}
-              </button>
-              {currentStep < 7 ? (
-                <button
-                  onClick={nextStep}
-                  className="px-6 py-2 bg-[#136C9E] text-white rounded-md hover:bg-[#0F5A82] transition-colors"
-                >
-                  Continue
-                </button>
-              ) : (
-                <button
-                  onClick={submitApplication}
-                  className="px-6 py-2 bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck}
-                >
-                  {isSubmitting ? 'Submitting...' : 'Submit Application'}
-                </button>
-              )}
+                {currentStep < 7 ? (
+                  <button
+                    onClick={nextStep}
+                    className="px-4 md:px-6 py-2 text-base bg-[#136C9E] text-white rounded-md hover:bg-[#0F5A82] transition-colors"
+                  >
+                    Continue
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => submitApplication()}
+                    className="px-4 md:px-6 py-2 text-base bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck}
+                  >
+                    {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

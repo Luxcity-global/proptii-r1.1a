@@ -21,6 +21,12 @@ const GuarantorUpload: React.FC<GuarantorUploadProps> = ({ updateFormData, formD
   useEffect(() => {
     if (formData?.guarantor?.identityDocument?.dataUrl) {
       setPreview(formData.guarantor.identityDocument.dataUrl);
+      // Also set selectedFile to indicate we have a file loaded
+      setSelectedFile(formData.guarantor.identityDocument as any);
+    } else {
+      // Clear both states if no file in formData
+      setPreview(null);
+      setSelectedFile(null);
     }
   }, [formData]);
 

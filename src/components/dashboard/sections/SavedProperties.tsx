@@ -21,9 +21,11 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import BathtubIcon from '@mui/icons-material/Bathtub';
 import KingBedIcon from '@mui/icons-material/KingBed';
 import HomeIcon from '@mui/icons-material/Home';
-import { useDashboardData } from '../../../hooks/useDashboardData';
+import { useSavedProperties } from '../../../context/SavedPropertiesContext';
 import { formatCurrency, formatDate } from '../../../utils/formatters';
-import { AlignJustify } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import ListingDetailsModal from '../../listings/ListingDetailsModal';
+import type { Property } from '../../listings/ListingDetailsModal';
 
 const PropertyImage = styled('img')({
   width: '100%',
@@ -37,23 +39,21 @@ const PropertyImage = styled('img')({
  * SavedProperties component to display properties saved by the user
  */
 const SavedProperties: React.FC = () => {  
-  const { isLoading, error, savedProperties } = useDashboardData();
+  const { savedProperties, removeSavedProperty } = useSavedProperties();
+  const navigate = useNavigate();
+  const [selectedProperty, setSelectedProperty] = React.useState(null);
+  const [modalOpen, setModalOpen] = React.useState(false);
 
-  if (isLoading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const handleViewDetails = (property: Property) => {
+    setSelectedProperty(property);
+    setModalOpen(true);
+  };
 
-  if (error) {
-    return (
-      <Alert severity="error" sx={{ mb: 3 }}>
-        {error}
-      </Alert>
-    );
-  }
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setSelectedProperty(null);
+  };
+
 
   return ( 
     <Box bgcolor={'#EDF3FA'} display={'flex'} flexDirection={'column'} justifyContent={'stretch' }      padding={3}>
@@ -63,6 +63,7 @@ const SavedProperties: React.FC = () => {
         </Typography>
         <Button 
             variant="contained" 
+            onClick={() => navigate('/listings')}
             sx={{ 
             backgroundColor: '#DC5F12', // Use custom color here
             borderRadius: 2,
@@ -90,6 +91,7 @@ const SavedProperties: React.FC = () => {
           <Button 
             variant="contained" 
             color="primary" 
+            onClick={() => navigate('/listings')}
             sx={{ mt: 2, borderRadius: 2, textTransform: 'none' }}
           >
             Browse Properties
@@ -97,8 +99,8 @@ const SavedProperties: React.FC = () => {
         </Paper>
       ) : (
         <Grid container spacing={3}>
-          {savedProperties.map((property) => (
-            <Grid item xs={12} sm={6} md={4} key={property.id}>
+          {savedProperties.map((savedProperty) => (
+            <Grid item xs={12} sm={6} md={4} key={savedProperty.id}>
               <Card sx={{ 
                 height: '100%',
                 width: '80%',
@@ -115,8 +117,8 @@ const SavedProperties: React.FC = () => {
               }}>
                 <Box sx={{ position: 'relative' }}>
                 <PropertyImage
-                    src="/images/detached-house.jpg"
-                    alt={property.address}
+                    src={savedProperty.property.images[0]?.src || "/images/detached-house.jpg"}
+                    alt={savedProperty.property.title}
                   />
                   
                   <Box sx={{ 
@@ -127,7 +129,12 @@ const SavedProperties: React.FC = () => {
                     borderRadius: '50%',
                     p: 0.5
                   }}>
-                    <IconButton size="small" color="error" aria-label="remove from saved">
+                    <IconButton 
+                      size="small" 
+                      color="error" 
+                      aria-label="remove from saved"
+                      onClick={() => removeSavedProperty(savedProperty.property.id)}
+                    >
                       <FavoriteIcon />
                     </IconButton>
                   </Box>
@@ -142,38 +149,38 @@ const SavedProperties: React.FC = () => {
                     px: 2
                   }}>
                     <Typography variant="h6" component="div">
-                      {formatCurrency(property.price)}
+                      {formatCurrency(savedProperty.property.price)}
                     </Typography>
                   </Box>
                 </Box>
                 
                 <CardContent sx={{ flexGrow: 1 }}>
                   <Typography variant="body1" fontWeight={500}>
-                    {property.address}
+                    {savedProperty.property.title}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', my: 1 }}>
                     <LocationOnIcon fontSize="small" sx={{ color: 'text.secondary', mr: 0.5 }} />
                     <Typography variant="body2" color="text.secondary">
-                      {property.city}, {property.postcode}
+                      {savedProperty.property.location.city}, {savedProperty.property.location.postcode}
                     </Typography>
                   </Box>
                   
                   <Box sx={{ display: 'flex', mt: 2, justifyContent: 'start', gap: 1 }}>
                     <Chip 
                       icon={<KingBedIcon style={{color: '#D68552'}} /> } 
-                      label={`${property.bedrooms} ${property.bedrooms === 1 ? 'Bed' : 'Beds'}`}
+                      label={`${savedProperty.property.bedrooms} ${savedProperty.property.bedrooms === 1 ? 'Bed' : 'Beds'}`}
                       size="small"
                       sx={{ mr: 1 }}
                     />
                     <Chip 
                       icon={<BathtubIcon style={{color: '#357E99'}} />} 
-                      label={`${property.bathrooms} ${property.bathrooms === 1 ? 'Bath' : 'Baths'}`}
+                      label={`${savedProperty.property.bathrooms} ${savedProperty.property.bathrooms === 1 ? 'Bath' : 'Baths'}`}
                       size="small"
                       sx={{ mr: 1 }}
                     />
                     <Chip 
                       icon={<HomeIcon style={{color: '#1E9674'}} />} 
-                      label={property.propertyType}
+                      label={savedProperty.property.type === 'rent' ? 'To Rent' : 'For Sale'}
                       size="small"
                     />
                   </Box>
@@ -183,11 +190,12 @@ const SavedProperties: React.FC = () => {
                 
                 <CardActions sx={{ justifyContent: 'space-between', px: 2, py: 1.5 }}>
                   <Typography variant="caption" color="text.secondary">
-                    Saved on {formatDate(property.savedAt)}
+                    Saved on {formatDate(savedProperty.savedAt)}
                   </Typography>
                   <Button 
                     size="small" 
                     variant="contained"
+                    onClick={() => handleViewDetails(savedProperty.property)}
                     sx={{ 
                       borderRadius: 4,
                       textTransform: 'none',
@@ -200,6 +208,12 @@ const SavedProperties: React.FC = () => {
               </Card>
             </Grid>
           ))}
+          {modalOpen && selectedProperty && (
+            <ListingDetailsModal 
+              property={selectedProperty} 
+              onClose={handleCloseModal} 
+            />
+          )}
         </Grid>
       )}
     </Box>

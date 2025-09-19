@@ -78,7 +78,18 @@ const ViewingComparison: React.FC = () => {
 
   const formatTime = (time: Date | string | undefined) => {
     if (!time) return 'Not selected';
+    
+    // If time is already in HH:MM format (from HTML time input), return it directly
+    if (typeof time === 'string' && /^\d{2}:\d{2}$/.test(time)) {
+      return time;
+    }
+    
+    // If it's a Date object or full datetime string, format it
     const d = new Date(time);
+    if (isNaN(d.getTime())) {
+      return 'Invalid time';
+    }
+    
     return d.toLocaleTimeString('en-GB', {
       hour: '2-digit',
       minute: '2-digit',

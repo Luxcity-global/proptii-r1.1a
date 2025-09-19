@@ -21,6 +21,12 @@ const FinancialUpload: React.FC<FinancialUploadProps> = ({ updateFormData, formD
   useEffect(() => {
     if (formData?.financial?.proofOfIncomeDocument?.dataUrl) {
       setPreview(formData.financial.proofOfIncomeDocument.dataUrl);
+      // Also set selectedFile to indicate we have a file loaded
+      setSelectedFile(formData.financial.proofOfIncomeDocument as any);
+    } else {
+      // Clear both states if no file in formData
+      setPreview(null);
+      setSelectedFile(null);
     }
   }, [formData]);
 

@@ -20,18 +20,23 @@ const Home = () => {
     isLoading,
     error,
     response,
-    loadingProgress,
     handleSearch: executeSearch,
   } = useSearch();
 
   const [isBackendAvailable, setIsBackendAvailable] = useState(true);
+  const [hasResults, setHasResults] = useState(true);
+  const [searchInputHeight, setSearchInputHeight] = useState(50);
 
   useEffect(() => {
     const checkBackend = async () => {
       try {
-        const response = await fetch('http://localhost:3000/health');
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+        // Remove /api from the end if it exists
+        const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
+        const response = await fetch(`${baseUrl}/api/health`);
         setIsBackendAvailable(response.ok);
       } catch (error) {
+        console.error('Backend health check failed:', error);
         setIsBackendAvailable(false);
       }
     };
@@ -39,25 +44,38 @@ const Home = () => {
     checkBackend();
   }, []);
 
-  // Progress bar component
+  // Progress bar component (simplified since loadingProgress is not available)
   const ProgressBar = () => (
     <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden mt-4">
-      <div 
-        className="h-full bg-orange-500 transition-all duration-300 ease-out"
-        style={{ width: `${loadingProgress}%` }}
-      />
+      <div className="h-full bg-orange-500 transition-all duration-300 ease-out animate-pulse w-full" />
     </div>
   );
 
-  const handleSearch = (searchQuery: string) => {
+  const handleSearch = async (searchQuery: string) => {
     if (!isBackendAvailable) {
       alert('Search service is currently unavailable. Please try again later.');
       return;
     }
     setQuery(searchQuery);
     if (searchQuery.trim()) {
-      executeSearch();
+      try {
+        const results = await executeSearch();
+        setHasResults(results ? results.length > 0 : false);
+      } catch (error) {
+        setHasResults(false);
+      }
     }
+  };
+
+  const handleSearchInputHeightChange = (height: number) => {
+    setSearchInputHeight(height);
+  };
+
+  // Calculate dynamic padding based on search input height
+  const getDynamicPadding = () => {
+    const baseHeight = 50;
+    const extraHeight = Math.max(0, searchInputHeight - baseHeight);
+    return extraHeight * 0.5; // Adjust multiplier as needed
   };
 
   // Search results fallback UI
@@ -81,30 +99,35 @@ const Home = () => {
   return (
     <div className="min-h-screen flex flex-col font-nunito">
       <Navbar />
-      
+
       {/* Hero Section */}
-      <section className="h-[80vh] relative flex items-center">
+      <section 
+        className={`${(query || response || isLoading || error) ? 'h-auto min-h-[85vh] py-8 pt-32 md:min-h-[95vh] md:py-12' : 'h-[85vh] pt-32'} relative flex items-center md:pt-0 z-10`}
+        style={{ paddingBottom: `${getDynamicPadding()}px` }}
+      >
         {/* Background Image */}
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 overflow-hidden">
           <img
             src="/images/01_Lady_Child_Family_BG.jpg"
-            alt="Mother and child smiling"
-            className="w-full h-full object-cover"
+            alt="Hero background"
             loading="eager"
+            fetchpriority="high"
+            className="w-full h-full object-cover"
+            sizes="100vw"
           />
           <div className="absolute inset-0 bg-black bg-opacity-40"></div>
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full">
+        <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full py-8 md:py-0">
           {/* User Type Selection */}
-          <div className="mb-12">
+          <div className="mt-16 md:mt-20 mb-8 md:mb-12">
             <div className="inline-flex rounded-full bg-white p-1 shadow-lg">
-              <button className="px-8 py-3 rounded-full bg-primary text-white font-semibold transition-all">
+              <button className="px-6 md:px-8 py-3 rounded-full bg-primary text-white font-semibold transition-all text-sm md:text-base">
                 Tenant
               </button>
               <Link
                 to="/Agent"
-                className="px-8 py-3 rounded-full text-gray-700 hover:bg-gray-50 font-semibold transition-all"
+                className="px-6 md:px-8 py-3 rounded-full text-gray-700 hover:bg-gray-50 font-semibold transition-all text-sm md:text-base"
               >
                 Agent
               </Link>
@@ -112,26 +135,27 @@ const Home = () => {
           </div>
 
           {/* Main Heading */}
-          <h3 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight">
+          <h3 className="text-2xl md:text-6xl font-bold mb-4 md:mb-6 font-archive leading-tight">
             Find Your Dream Home
           </h3>
-          
+
           {/* Subheading */}
-          <p className="text-xl md:text-2xl mb-12 max-w-2xl mx-auto font-light">
+          <p className="text-lg md:text-2xl mb-8 md:mb-12 max-w-2xl mx-auto font-light px-4">
             We make finding and securing your home easy, every step of the way.
           </p>
 
           {/* Search Bar */}
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-3xl mx-auto px-4 md:px-0">
             <SearchInput
               onSearch={handleSearch}
-              isLoading={isLoading}
               value={query}
               onChange={setQuery}
+              hasResults={hasResults}
+              onHeightChange={handleSearchInputHeightChange}
             />
             {isLoading && <ProgressBar />}
             {!isBackendAvailable && (
-              <p className="text-yellow-500 mt-2">
+              <p className="text-yellow-500 mt-2 text-sm md:text-base">
                 Search service is currently unavailable. Please try again later.
               </p>
             )}
@@ -141,11 +165,11 @@ const Home = () => {
 
       {/* Display Search Results */}
       {(query || response || isLoading || error) && (
-        <section className="py-12 bg-gray-50">
+        <section className="pt-24 pb-12 bg-gray-50 relative z-5">
           <div className="max-w-7xl mx-auto px-4">
             <ErrorBoundary fallback={<SearchResultsFallback />}>
               <SearchResults
-                searchResponse={response}
+                searchResponse={response || []}
                 isLoading={isLoading}
                 error={error}
               />
@@ -155,80 +179,85 @@ const Home = () => {
       )}
 
       {/**The new services section */}
-<section className="relative py-20 bg-[#f9f5f0]">
-  {/* Background Image (Blobs) */}
-  <img 
-    src="/images/middle-section.png" 
-    alt="Decorative background"
-    className="absolute top-0 left-0 w-full h-full object-cover opacity-50"
-  />
+      <section className="relative py-16 md:py-20 bg-[#f9f5f0] z-20">
+        {/* Background Image (Blobs) */}
+        <img
+          src="/images/middle-section.png"
+          alt="Background design"
+          loading="lazy"
+          className="absolute inset-0 w-full h-full object-cover"
+        />
 
-  <div className="max-w-7xl mx-auto px-4 relative z-10">
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-      {/* Book Viewing Card */}
-      <div className="bg-white rounded-3xl shadow-lg p-8 flex flex-col">
-        <div className="mb-8">
-          <img
-            src="/images/viewing-room.jpg"
-            alt="Modern living room"
-            className="w-full h-64 object-cover rounded-2xl"
-            style={{ objectPosition: 'center 30%' }}
-          />
-        </div>
-        <h3 className="text-[#E65D24] text-3xl font-bold mb-4">Book Viewing</h3>
-        <p className="text-gray-600 mb-8 flex-grow">
-          Save time and effort with our AI-powered booking service. Simply enter your desired property details and let our system handle the rest.
-        </p>
-        <button 
-        onClick={() => navigate('/bookviewing')}
-        className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
-          Learn More
-        </button>
-      </div>
+        <div className="max-w-7xl mx-auto px-4 relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+            {/* Book Viewing Card */}
+            <div className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
+              <div className="mb-5 md:mb-6">
+                <img
+                  src="/images/viewing-room.jpg"
+                  alt="Viewing room"
+                  loading="lazy"
+                  className="w-full h-full object-cover rounded-lg"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+              </div>
+              <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Book Viewing</h3>
+              <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
+                Save time and effort with our AI-powered booking service. Simply enter your desired property details and let our system handle the rest.
+              </p>
+              <button
+                onClick={() => navigate('/bookviewing')}
+                className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
+                Learn More
+              </button>
+            </div>
 
-      {/* Referencing Card */}
-      <div className="bg-white rounded-3xl shadow-lg p-8 flex flex-col">
-        <div className="mb-8">
-          <img
-            src="/images/referencing-person.jpg"
-            alt="Professional woman with tablet"
-            className="w-full h-64 object-cover rounded-2xl"
-            style={{ objectPosition: 'center 20%' }}
-          />
-        </div>
-        <h3 className="text-[#E65D24] text-3xl font-bold mb-4">Referencing</h3>
-        <p className="text-gray-600 mb-8 flex-grow">
-          Ensure peace of mind for both landlords and tenants. Our rigorous referencing process verifies renter or buyer identity, financial stability, and rental history.
-        </p>
-        <button 
-        onClick={() => navigate('/referencing')}
-        className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
-          Learn More
-        </button>
-      </div>
+            {/* Referencing Card */}
+            <div className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
+              <div className="mb-5 md:mb-6">
+                <img
+                  src="/images/referencing-person.jpg"
+                  alt="Referencing process"
+                  loading="lazy"
+                  className="w-full h-full object-cover rounded-lg"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+              </div>
+              <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Referencing</h3>
+              <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
+                Ensure peace of mind for both landlords and tenants. Our rigorous referencing process verifies renter or buyer identity, financial stability, and rental history.
+              </p>
+              <button
+                onClick={() => navigate('/referencing')}
+                className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
+                Learn More
+              </button>
+            </div>
 
-      {/* Contract Card */}
-      <div className="bg-white rounded-3xl shadow-lg p-8 flex flex-col">
-        <div className="mb-8">
-          <img
-            src="/images/modern-building.jpg"
-            alt="Modern glass building"
-            className="w-full h-64 object-cover rounded-2xl"
-          />
+            {/* Contract Card */}
+            <div className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
+              <div className="mb-5 md:mb-6">
+                <img
+                  src="/images/modern-building.jpg"
+                  alt="Modern building"
+                  loading="lazy"
+                  className="w-full h-full object-cover rounded-lg"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+              </div>
+              <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Contract</h3>
+              <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
+                Save time and reduce errors with our contract management solution. We offer a range of customizable lease agreement templates to suit your specific needs.
+              </p>
+              <button
+                onClick={() => navigate('/contracts')}
+                className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
+                Learn More
+              </button>
+            </div>
+          </div>
         </div>
-        <h3 className="text-[#E65D24] text-3xl font-bold mb-4">Contract</h3>
-        <p className="text-gray-600 mb-8 flex-grow">
-          Save time and reduce errors with our contract management solution. We offer a range of customizable lease agreement templates to suit your specific needs.
-        </p>
-        <button 
-        onClick={() => navigate('/contracts')}
-        className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-lg font-medium">
-          Learn More
-        </button>
-      </div>
-    </div>
-  </div>
-</section>
+      </section>
 
       {/**End of the new services section */}
 

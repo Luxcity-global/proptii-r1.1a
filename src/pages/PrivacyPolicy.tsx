@@ -1,18 +1,43 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Link } from 'react-router-dom';
 
+// Add preload link for the hero image
+const heroImageUrl = '/images/Privacy-Policy-Hero.png';
+const preloadHeroImage = () => {
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = 'image';
+  link.href = heroImageUrl;
+  document.head.appendChild(link);
+};
+
 const PrivacyPolicy = () => {
+  // Preload hero image when component mounts
+  useEffect(() => {
+    preloadHeroImage();
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
       {/* Hero Section */}
       <section
-        className="relative h-[80vh] bg-cover bg-center"
-        style={{ backgroundImage: 'url("/images/Privacy-Policy-Hero.png")' }}
+        className="relative h-[80vh] bg-cover bg-center overflow-hidden"
       >
-        <div className="absolute inset-0 bg-[#0A2342]/80"></div>
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          <img
+            src={heroImageUrl}
+            alt="Privacy Policy Hero"
+            className="w-full h-full object-cover"
+            loading="eager"
+            fetchpriority="high"
+            decoding="sync"
+            sizes="100vw"
+          />
+          <div className="absolute inset-0 bg-[#0A2342]/80"></div>
+        </div>
         <div className="relative z-10 container mx-auto px-4 h-screen flex flex-col justify-center items-center text-center">
           <h1 className="text-5xl md:text-7xl font-bold text-white font-archivo">
             Privacy Policy

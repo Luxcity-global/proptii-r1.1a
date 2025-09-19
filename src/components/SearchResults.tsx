@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ExternalLink, BedDouble, Bath, Building2, Home } from 'lucide-react';
+import { Tooltip } from './Tooltip';
 
 interface PropertySpecs {
   beds: number;
@@ -26,6 +27,15 @@ interface Property {
     description: string;
   };
   searchUrl?: string;
+  furnished?: boolean;
+  petFriendly?: boolean;
+  garden?: boolean;
+  parking?: boolean;
+  // Additional properties that might come from backend
+  bedrooms?: number;
+  baths?: number;
+  propertyType?: string;
+  description?: string;
 }
 
 interface SearchResultsProps {
@@ -46,6 +56,42 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   isLoading,
   error
 }) => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Map backend property objects to a consistent structure for rendering
+  const mappedResults = (searchResponse || []).map((property, idx) => {
+    // If property.specs exists, use it; otherwise, map flat fields
+    const specs = property.specs || {
+      beds: property.bedrooms ?? 'N/A',
+      baths: property.baths ?? 'N/A',
+      propertyType: property.propertyType ?? 'N/A',
+    };
+    return {
+      ...property,
+      specs,
+      id: property.id || `${property.title}-${idx}`,
+      exampleListing: property.exampleListing || {
+        title: property.title,
+        price: property.price,
+        description: property.description || '',
+      },
+      propertyTypes: property.propertyTypes || (property.propertyType ? [property.propertyType] : []),
+      searchLocation: property.searchLocation || property.location || '',
+      searchPrice: property.searchPrice || property.price || '',
+    };
+  });
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -69,82 +115,112 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   }
 
   return (
-    <div className="space-y-8">
-      <h2 className="text-2xl font-semibold mb-6">Search Results</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {searchResponse.map((property) => (
-          <div key={property.id} className="bg-white rounded-lg shadow-lg overflow-hidden">
-            {/* Fixed height header section */}
-            <div className="bg-[#f2f1eb] px-6 py-4 border-b h-[120px] flex items-center justify-between">
-              <img 
-                src={SITE_LOGOS[property.site]}
-                alt={`${property.site} logo`}
-                className={`object-contain ${
-                  property.site === 'zoopla' 
-                    ? 'h-[61.5px]' // Previous 41px + 50%
+    <div className="space-y-8" role="region" aria-label="Property search results">
+      <h2 className="text-2xl font-semibold mb-6" tabIndex={0}>Search Results</h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+        {mappedResults.map((property) => (
+          <Tooltip
+            key={property.id}
+            content="Browse the listings and save the URL of any property you're interested in."
+            position="top"
+            maxWidth="max-w-sm"
+            className="w-full block"
+            trigger={isMobile ? "auto-mobile" : "hover"}
+            autoShowDelay={0}
+            autoHideDelay={60000}
+          >
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 w-full flex flex-col" tabIndex={0} aria-label={`Property card: ${property.title}`}>
+              {/* Fixed height header section */}
+              <div className="bg-[#f2f1eb] px-6 py-4 border-b h-[120px] flex items-center justify-between">
+                <img
+                  src={SITE_LOGOS[property.site]}
+                  alt={`${property.site} logo`}
+                  className={`object-contain ${property.site === 'zoopla'
+                    ? 'h-[40px]' // Reduced from 61.5px by 6 points
                     : 'h-[100px]' // Previous 50px doubled
-                }`}
-              />
-            </div>
-
-            <div className="p-6">
-              {/* Location and Price Badges */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
-                  {property.searchLocation}
-                </span>
-                <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
-                  {property.searchPrice}
-                </span>
+                    }`}
+                />
               </div>
 
-              {/* Property Types */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                {property.propertyTypes.map((type, index) => (
-                  <span 
-                    key={index}
-                    className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
-                  >
-                    {type}
+              <div className="p-6 flex-1">
+                {/* Location and Price Badges */}
+                <div className="flex flex-wrap gap-2 mb-4 justify-center sm:justify-start">
+                  <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
+                    {property.searchLocation}
                   </span>
-                ))}
-              </div>
-
-              {/* Property Specs */}
-              <div className="flex items-center gap-4 mb-4 text-gray-600">
-                <div className="flex items-center gap-1">
-                  <BedDouble className="w-5 h-5" />
-                  <span>{property.specs.beds} beds</span>
+                  <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
+                    {property.searchPrice}
+                  </span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Bath className="w-5 h-5" />
-                  <span>{property.specs.baths} baths</span>
+
+                {/* Property Types */}
+                <div className="flex flex-wrap gap-2 mb-4 justify-center sm:justify-start">
+                  {property.propertyTypes.map((type, index) => (
+                    <span
+                      key={index}
+                      className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
+                    >
+                      {type}
+                    </span>
+                  ))}
                 </div>
-                <div className="flex items-center gap-1">
-                  <Building2 className="w-5 h-5" />
-                  <span>{property.specs.propertyType}</span>
+
+                {/* Feature Badges */}
+                <div className="flex flex-wrap gap-2 mb-4 justify-center sm:justify-start">
+                  {property.furnished && (
+                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Furnished</span>
+                  )}
+                  {property.petFriendly && (
+                    <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">Pet Friendly</span>
+                  )}
+                  {property.garden && (
+                    <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">Garden</span>
+                  )}
+                  {property.parking && (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">Parking</span>
+                  )}
+                  {/* Add more feature badges as needed */}
+                </div>
+
+                {/* Property Specs */}
+                <div className="flex flex-wrap items-center gap-4 mb-4 text-gray-600 justify-center sm:justify-start">
+                  <div className="flex items-center gap-1">
+                    <BedDouble className="w-5 h-5" />
+                    <span>{property.specs?.beds ?? 'N/A'} beds</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Bath className="w-5 h-5" />
+                    <span>{property.specs?.baths ?? 'N/A'} baths</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Building2 className="w-5 h-5" />
+                    <span>{property.specs?.propertyType ?? 'N/A'}</span>
+                  </div>
+                </div>
+
+                {/* Example Listing */}
+                <div className="mb-6 text-center sm:text-left">
+                  <h3 className="text-lg font-semibold mb-2">{property.exampleListing.title}</h3>
+                  <p className="text-gray-600 text-sm">{property.exampleListing.description}</p>
+                </div>
+
+                {/* External Link */}
+                <div className="flex justify-center sm:justify-start">
+                  <a
+                    href={property.searchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-opacity-90 transition-all"
+                    aria-label={`View listings for ${property.title} on ${property.site}`}
+                  >
+                    <Home className="w-4 h-4" />
+                    View Listings on {property.site.charAt(0).toUpperCase() + property.site.slice(1)}
+                  </a>
                 </div>
               </div>
-
-              {/* Example Listing */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-2">{property.exampleListing.title}</h3>
-                <p className="text-gray-600 text-sm">{property.exampleListing.description}</p>
-              </div>
-
-              {/* External Link */}
-              <a 
-                href={property.searchUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-opacity-90 transition-all"
-              >
-                <Home className="w-4 h-4" />
-                View Listings on {property.site.charAt(0).toUpperCase() + property.site.slice(1)}
-              </a>
             </div>
-          </div>
+          </Tooltip>
         ))}
       </div>
     </div>

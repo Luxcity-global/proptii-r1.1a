@@ -12,7 +12,7 @@ interface EmailContent {
   html?: string;
   attachments: EmailAttachment[];
   formData?: any;
-  emailType?: 'agent' | 'referee' | 'guarantor' | 'user';
+  emailType?: 'agent' | 'referee' | 'guarantor' | 'user' | 'viewing-agent' | 'viewing-user';
 }
 
 interface SendEmailResponse {
@@ -22,6 +22,7 @@ interface SendEmailResponse {
 }
 
 interface MultiEmailResponse {
+  success: boolean;
   agent?: boolean;
   referee?: boolean;
   guarantor?: boolean;
@@ -29,9 +30,25 @@ interface MultiEmailResponse {
   error?: string;
 }
 
+interface MultiEmailParams {
+  formData: {
+    identity?: { email?: string };
+    agentDetails?: { email?: string };
+    employment?: { referenceEmail?: string };
+    guarantor?: { email?: string };
+  };
+  submissionId: string;
+}
+
+interface MultiEmailResult {
+  success: boolean;
+  errors?: any[];
+  error?: string;
+}
+
 const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:3002'
-  : (import.meta.env.VITE_API_URL || 'http://localhost:3002');
+  ? 'http://localhost:10000/api'
+  : 'https://proptii-r1-1a.onrender.com/api';
 
 class EmailService {
   private readonly API_URL = API_BASE_URL;
@@ -200,7 +217,7 @@ class EmailService {
       console.log('Starting email submission process...', {
         to: emailContent.to,
         subject: emailContent.subject,
-        attachmentsCount: emailContent.attachments.length,
+        attachmentsCount: emailContent.attachments?.length || 0,
         emailType: emailContent.emailType || 'agent'
       });
 
@@ -213,37 +230,54 @@ class EmailService {
       formData.append('formData', JSON.stringify(emailContent.formData));
       formData.append('emailType', emailContent.emailType || 'agent');
 
-      // Only create zip file for agent emails
-      if (emailContent.emailType === 'agent' && emailContent.attachments.length > 0) {
+      // Only create zip file for referencing agent emails
+      if (emailContent.emailType === 'agent' && emailContent.attachments?.length > 0) {
         // Create zip file
         const zip = new JSZip();
 
-        // Create folders for different types of documents
-        const folders = {
-          '1_Identity_Documents': zip.folder('1_Identity_Documents'),
-          '2_Employment_Documents': zip.folder('2_Employment_Documents'),
-          '3_Residential_Documents': zip.folder('3_Residential_Documents'),
-          '4_Financial_Documents': zip.folder('4_Financial_Documents'),
-          '5_Guarantor_Documents': zip.folder('5_Guarantor_Documents')
-        };
-
-        // Add files to their respective folders
+        // Process each attachment
         for (const attachment of emailContent.attachments) {
-          const folderPath = attachment.filename.split('/')[0];
-          const fileName = attachment.filename.split('/')[1];
-          const folder = folders[folderPath as keyof typeof folders];
+          try {
+            // Get folder path and filename from the attachment's filename
+            const [folderPath, fileName] = attachment.filename.split('/');
 
-          if (folder) {
+            // Get or create the folder in the zip
+            const folder = zip.folder(folderPath);
+            if (!folder) {
+              console.error(`Failed to create/get folder: ${folderPath}`);
+              continue;
+            }
+
+            // Convert File to ArrayBuffer
             const fileArrayBuffer = await attachment.content.arrayBuffer();
+
+            // Add the file to the appropriate folder
+            console.log(`Adding file to zip: ${folderPath}/${fileName}`);
             folder.file(fileName, fileArrayBuffer);
+          } catch (error) {
+            console.error('Error processing attachment:', error);
+            console.error('Attachment details:', {
+              filename: attachment.filename,
+              contentType: attachment.content.type,
+              size: attachment.content.size
+            });
           }
         }
 
         // Generate zip file
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const zipBlob = await zip.generateAsync({
+          type: 'blob',
+          compression: "DEFLATE",
+          compressionOptions: {
+            level: 9
+          }
+        });
+
+        const applicantName = `${emailContent.formData.identity.firstName || 'Unknown'}_${emailContent.formData.identity.lastName || 'User'}`;
+        const timestamp = new Date().toISOString().split('T')[0];
         const zipFile = new File(
           [zipBlob],
-          `${emailContent.formData.identity.firstName}_${emailContent.formData.identity.lastName}_Documents.zip`,
+          `${applicantName}_Documents_${timestamp}.zip`,
           { type: 'application/zip' }
         );
 
@@ -252,7 +286,7 @@ class EmailService {
       }
 
       // Send to backend
-      const response = await axios.post(`${this.API_URL}/api/referencing/send-email`, formData, {
+      const response = await axios.post(`${this.API_URL}/referencing/send-email`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -287,66 +321,116 @@ class EmailService {
     }
   }
 
-  async sendMultipleEmails(formData: any, attachments: EmailAttachment[] = []): Promise<MultiEmailResponse> {
-    const results: MultiEmailResponse = {};
-    const identity = formData.identity || {};
-    const employment = formData.employment || {};
-    const guarantor = formData.guarantor || {};
-    const residential = formData.residential || {};
+  async sendMultipleEmails({ formData, submissionId }: MultiEmailParams): Promise<MultiEmailResult> {
+    try {
+      const emailPromises = [];
+
+      // 1. Send email to user
+      if (formData.identity?.email) {
+        emailPromises.push(this.sendEmail({
+          to: formData.identity.email,
+          subject: 'Your Referencing Application Has Been Submitted',
+          formData,
+          emailType: 'user',
+          attachments: []
+        }));
+      }
+
+      // 2. Send email to agent
+      if (formData.agentDetails?.email) {
+        emailPromises.push(this.sendEmail({
+          to: formData.agentDetails.email,
+          subject: 'New Referencing Application Received',
+          formData,
+          emailType: 'agent',
+          attachments: []
+        }));
+      }
+
+      // 3. Send email to referee
+      if (formData.employment?.referenceEmail) {
+        emailPromises.push(this.sendEmail({
+          to: formData.employment.referenceEmail,
+          subject: 'Reference Request for Rental Application',
+          formData,
+          emailType: 'referee',
+          attachments: []
+        }));
+      }
+
+      // 4. Send email to guarantor
+      if (formData.guarantor?.email) {
+        emailPromises.push(this.sendEmail({
+          to: formData.guarantor.email,
+          subject: 'Guarantor Request for Rental Application',
+          formData,
+          emailType: 'guarantor',
+          attachments: []
+        }));
+      }
+
+      // Send all emails in parallel
+      const results = await Promise.allSettled(emailPromises);
+
+      // Check results
+      const success = results.every(result => result.status === 'fulfilled');
+      const errors = results
+        .filter(result => result.status === 'rejected')
+        .map(result => (result as PromiseRejectedResult).reason);
+
+      return {
+        success,
+        errors: errors.length > 0 ? errors : undefined
+      };
+
+    } catch (error) {
+      console.error('Error sending multiple emails:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to send emails'
+      };
+    }
+  }
+
+  async sendViewingEmails(data: any): Promise<MultiEmailResponse> {
+    const results: MultiEmailResponse = {
+      success: false // Initialize with false
+    };
 
     try {
       // Send email to agent
-      const agentResult = await this.sendEmail({
-        to: formData.agentDetails.email,
-        subject: `New Tenant Application${residential.propertyAddress ? ` - ${residential.propertyAddress}` : ''}`,
-        formData,
-        attachments,
-        emailType: 'agent'
-      });
-      results.agent = agentResult.success;
-
-      // Send email to referee if provided
-      if (employment.referenceEmail) {
-        const refereeResult = await this.sendEmail({
-          to: employment.referenceEmail,
-          subject: `Reference Request for ${identity.firstName} ${identity.lastName}`,
-          formData,
+      if (data.property.agent?.email) {
+        const agentResult = await this.sendEmail({
+          to: data.property.agent.email,
+          subject: `New Viewing Request - ${data.property.street}`,
+          formData: data,
           attachments: [],
-          emailType: 'referee'
+          emailType: 'viewing-agent'
         });
-        results.referee = refereeResult.success;
+        results.agent = agentResult.success;
       }
 
-      // Send email to guarantor if provided
-      if (guarantor.email) {
-        const guarantorResult = await this.sendEmail({
-          to: guarantor.email,
-          subject: `You've Been Chosen as a Guarantor by ${identity.firstName} ${identity.lastName}`,
-          formData,
-          attachments: [],
-          emailType: 'guarantor'
-        });
-        results.guarantor = guarantorResult.success;
-      }
-
-      // Send summary email to user
-      if (identity.email) {
+      // Send confirmation email to user
+      if (data.user.email) {
         const userResult = await this.sendEmail({
-          to: identity.email,
-          subject: 'Summary of Referencing Details Submitted',
-          formData,
+          to: data.user.email,
+          subject: 'Your Viewing Request Confirmation',
+          formData: data,
           attachments: [],
-          emailType: 'user'
+          emailType: 'viewing-user'
         });
         results.user = userResult.success;
       }
 
+      // Set overall success if at least one email was sent
+      results.success = !!(results.agent || results.user);
+
       return results;
     } catch (error) {
-      console.error('Error sending multiple emails:', error);
+      console.error('Error sending viewing emails:', error);
       return {
-        ...results,
-        error: error instanceof Error ? error.message : 'Failed to send all emails'
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to send viewing emails'
       };
     }
   }

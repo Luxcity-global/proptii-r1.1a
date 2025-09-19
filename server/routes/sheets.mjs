@@ -4,7 +4,7 @@ const router = express.Router();
 
 // Configure Google Sheets
 const auth = new google.auth.GoogleAuth({
-    keyFile: process.env.GOOGLE_SHEETS_CREDENTIALS_PATH,
+    credentials: JSON.parse(process.env.GOOGLE_SHEETS_CREDENTIALS_JSON),
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
@@ -27,23 +27,58 @@ router.post('/submit', async (req, res) => {
         // Format timestamp for better readability in spreadsheet
         const formattedTimestamp = new Date(data.timestamp).toLocaleString();
 
-        // Prepare values to append
-        const values = [
-            [
-                formattedTimestamp,
-                data.subject,
-                data.heading,
-                data.body,
-                data.userEmail
-            ]
-        ];
+        // Prepare values to append based on data type
+        let values = [];
+        let range = '';
+
+        // Detect data type and format accordingly
+        if (data.rating !== undefined) {
+            // Review data format
+            console.log('Review data received:', {
+                timestamp: data.timestamp,
+                rating: data.rating,
+                feedback: data.feedback,
+                userType: data.userType,
+                userId: data.userId,
+                userEmail: data.userEmail,
+                source: data.source
+            });
+            
+            values = [
+                [
+                    formattedTimestamp,
+                    data.rating,
+                    data.feedback || 'No feedback provided',
+                    data.userType || 'Unknown',
+                    data.userId || 'Anonymous',
+                    data.userEmail || 'No email provided',
+                    data.source || 'Unknown'
+                ]
+            ];
+            range = 'Sheet1!A:G'; // 7 columns for review data (added userEmail)
+            console.log('Processing as review data with 7 columns:', values[0]);
+            console.log('Using range:', range);
+        } else {
+            // Help form data format (existing)
+            values = [
+                [
+                    formattedTimestamp,
+                    data.subject,
+                    data.heading,
+                    data.body,
+                    data.userEmail
+                ]
+            ];
+            range = 'Sheet1!A:E'; // 5 columns for help form data
+            console.log('Processing as help form data');
+        }
 
         console.log('Attempting to append values:', values);
 
         // Append values to the spreadsheet
         const response = await sheets.spreadsheets.values.append({
             spreadsheetId,
-            range: 'Sheet1!A:E', // Make sure this matches your sheet name
+            range, // Dynamic range based on data type
             valueInputOption: 'USER_ENTERED',
             insertDataOption: 'INSERT_ROWS',
             resource: {

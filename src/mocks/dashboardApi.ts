@@ -1,4 +1,5 @@
 import { ApiResponse } from '../services/api';
+import { ReferencingProgressService, getReferencingFiles } from '../services/referencingProgressService';
 
 // Import ReferencingModal constants for consistency
 const BLUE_COLOR = '#136C9E';
@@ -25,9 +26,8 @@ export interface DashboardSummary {
     residential: boolean,
     financial: boolean,
     guarantor: boolean,
+    creditCheck: boolean,
     agentDetails: boolean,
-    
-    
   };
   contracts: {
     pending: number;
@@ -109,12 +109,56 @@ export interface UserFile {
   type: string;
   size: number;
   uploadedAt: string;
-  category: 'identity' | 'employment' | 'residential' | 'financial' | 'contract' | 'other';
+  category: 'identity' | 'employment' | 'residential' | 'financial' | 'guarantor' | 'contract' | 'other';
   url: string;
 }
 
-// Mock data for dashboard
-const mockDashboardData: DashboardSummary = {
+// Function to get real referencing data from localStorage
+const getRealReferencingData = async (userId?: string): Promise<DashboardSummary['referencing']> => {
+  // Use provided user ID or fallback to default
+  const currentUserId = userId || 'default-user';
+  
+  console.log('🔍 getRealReferencingData called with userId:', currentUserId);
+  
+  try {
+    // Get form data from IndexedDB
+    const formData = await ReferencingProgressService.getFormDataFromStorage(currentUserId);
+    
+    console.log('📊 Form data retrieved from IndexedDB:', formData);
+    
+    if (formData) {
+      // Convert real form data to dashboard format
+      const dashboardData = ReferencingProgressService.convertToDashboardSummary(formData, currentUserId);
+      console.log('📈 Converted to dashboard format:', dashboardData);
+      return dashboardData;
+    } else {
+      console.log('⚠️ No form data found for user:', currentUserId);
+    }
+  } catch (error) {
+    console.error('❌ Error getting real referencing data:', error);
+  }
+  
+  // Fallback to default data if no form data exists
+  const fallbackData: DashboardSummary['referencing'] = {
+    status: 'not_started',
+    progress: 0,
+    completedSteps: 0,
+    totalSteps: 7,
+    identity: false,
+    employment: false,
+    residential: false,
+    financial: false,
+    guarantor: false,
+    creditCheck: false,
+    agentDetails: false
+  };
+  
+  console.log('🔄 Using fallback data:', fallbackData);
+  return fallbackData;
+};
+
+// Function to create dashboard data with real referencing data
+const createDashboardData = async (userId?: string): Promise<DashboardSummary> => ({
   savedSearches: {
     count: 3,
     recentSearches: [
@@ -133,29 +177,7 @@ const mockDashboardData: DashboardSummary = {
       time: '14:00'
     }
   },
-  referencing: {
-    status: 'not_started',
-    identity: true,
-    employment: true,
-    residential: true,
-    financial: true,
-    guarantor: true,
-    agentDetails: true,
-    get progress() {
-      return [
-        this.identity,
-        this.employment,
-        this.residential,
-        this.financial,
-        this.guarantor,
-        this.agentDetails
-      ].reduce((acc, curr) => acc + (curr ? 1 : 0), 0);
-    },
-    get completedSteps() {
-      return this.progress;
-    },
-    totalSteps: 6,
-  },
+  referencing: await getRealReferencingData(userId),
   contracts: {
     pending: 0,
     signed: 1,
@@ -232,7 +254,7 @@ const mockDashboardData: DashboardSummary = {
       }
     ]
   }
-};
+});
 
 // Mock saved properties
 const mockSavedProperties: SavedProperty[] = [
@@ -332,6 +354,30 @@ const mockViewings: PropertyViewing[] = [
     notes: 'Excellent property, considered making an offer',
     agentName: 'James Taylor',
     agentContact: 'james.t@luxcity.com'
+  },
+  {
+    id: '6',
+    propertyId: '6',
+    propertyAddress: '15 Oak Avenue, Manchester',
+    propertyImageUrl: '/images/property6.jpg',
+    date: '2023-11-15',
+    time: '15:00',
+    status: 'cancelled',
+    notes: 'Cancelled due to scheduling conflict',
+    agentName: 'Lisa Anderson',
+    agentContact: 'lisa.a@luxcity.com'
+  },
+  {
+    id: '7',
+    propertyId: '7',
+    propertyAddress: '89 Pine Street, Manchester',
+    propertyImageUrl: '/images/property7.jpg',
+    date: '2023-11-20',
+    time: '09:30',
+    status: 'cancelled',
+    notes: 'Property no longer available',
+    agentName: 'Robert Clark',
+    agentContact: 'robert.c@luxcity.com'
   }
 ];
 
@@ -377,31 +423,62 @@ const mockContracts: Contract[] = [
 ];
 
 // Mock files
-const mockFiles: UserFile[] = mockDashboardData.files.recentlyAdded.map(file => ({
-  id: file.id,
-  name: file.name,
-  type: file.type,
-  size: file.size,
-  uploadedAt: file.date,
-  category: file.name.toLowerCase().includes('passport') || file.name.toLowerCase().includes('photo') 
-    ? 'identity' 
-    : file.name.toLowerCase().includes('bank') 
-      ? 'financial'
-      : file.name.toLowerCase().includes('address') || file.name.toLowerCase().includes('utility')
-        ? 'residential'
-        : file.name.toLowerCase().includes('employment') // Ensure "Employment Contract" is categorized here
-          ? 'employment'
-          : 'other',
-  url: file.url
-}));
+const mockFiles: UserFile[] = [
+  { 
+    id: '1', 
+    name: 'Passport.jpg', 
+    type: 'image/jpeg', 
+    uploadedAt: '2023-12-01T14:30:00Z',
+    size: 1240000,
+    category: 'identity',
+    url: 'https://example.com/files/passport.jpg'
+  },
+  { 
+    id: '2', 
+    name: 'Bank Statement.pdf', 
+    type: 'application/pdf', 
+    uploadedAt: '2023-11-29T10:15:00Z',
+    size: 2450000,
+    category: 'financial',
+    url: 'https://example.com/files/bank_statement.pdf'
+  },
+  { 
+    id: '3', 
+    name: 'Rental Contract.pdf', 
+    type: 'application/pdf', 
+    uploadedAt: '2023-11-25T16:45:00Z',
+    size: 3200000,
+    category: 'contract',
+    url: 'https://example.com/files/rental_contract.pdf'
+  },
+  { 
+    id: '4', 
+    name: 'Proof of Address.pdf', 
+    type: 'application/pdf', 
+    uploadedAt: '2023-11-23T09:20:00Z',
+    size: 1800000,
+    category: 'residential',
+    url: 'https://example.com/files/proof_of_address.pdf'
+  },
+  { 
+    id: '5', 
+    name: 'Employment Contract.pdf', 
+    type: 'application/pdf', 
+    uploadedAt: '2023-11-18T11:30:00Z',
+    size: 2700000,
+    category: 'employment',
+    url: 'https://example.com/files/employment_contract.pdf'
+  }
+];
 
 // Mock API endpoints for dashboard
-export const mockGetDashboardSummary = async (): Promise<ApiResponse<DashboardSummary>> => {
+export const mockGetDashboardSummary = async (userId?: string): Promise<ApiResponse<DashboardSummary>> => {
   try {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 800));
     
-    return { success: true, data: mockDashboardData };
+    const dashboardData = await createDashboardData(userId);
+    return { success: true, data: dashboardData };
   } catch (error: any) {
     console.error('Mock API Error:', error);
     return {
@@ -471,12 +548,24 @@ export const mockGetContracts = async (): Promise<ApiResponse<Contract[]>> => {
   }
 };
 
-export const mockGetUserFiles = async (): Promise<ApiResponse<UserFile[]>> => {
+export const mockGetUserFiles = async (userId?: string): Promise<ApiResponse<UserFile[]>> => {
   try {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 750));
     
-    return { success: true, data: mockFiles };
+    console.log('📁 Getting user files for:', userId);
+    
+    // Get real files from referencing form data
+    const realFiles = await getReferencingFiles(userId);
+    
+    // If no real files found, fall back to mock files
+    if (realFiles.length === 0) {
+      console.log('📁 No real files found, using mock files');
+      return { success: true, data: mockFiles };
+    }
+    
+    console.log('📁 Returning real files:', realFiles.length);
+    return { success: true, data: realFiles };
   } catch (error: any) {
     console.error('Mock API Error:', error);
     return {
