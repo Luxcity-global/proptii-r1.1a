@@ -45,6 +45,45 @@ export interface NeighborhoodData {
   };
 }
 
+// New interfaces for map integration
+export interface AreaInsights {
+  areaName: string;
+  averageRent: {
+    oneBedroom: number;
+    twoBedroom: number;
+    threeBedroom: number;
+  };
+  localAmenities: string[];
+  transportLinks: string[];
+  walkabilityScore: number;
+  safetyScore: number;
+  schoolScore: number;
+}
+
+export interface PropertyWithCoordinates {
+  id: string;
+  title: string;
+  price: number;
+  priceUnit: string;
+  address: string;
+  beds: number;
+  baths: number;
+  area: number;
+  areaUnit: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+  distanceFromCenter: number; // Distance in km from search center
+}
+
+export interface GeocodingResult {
+  lat: number;
+  lng: number;
+  address: string;
+  formattedAddress: string;
+}
+
 export interface TransportInfo {
   tubeStations: {
     name: string;
@@ -414,5 +453,232 @@ export class NeighborhoodMCP {
     if (randomValue < 0.8) return 'moderate';
     if (randomValue < 0.95) return 'unsafe';
     return 'very_unsafe';
+  }
+
+  // New methods for map integration
+  async getAreaInsights(location: string): Promise<AreaInsights> {
+    console.log(`🗺️ Getting area insights for: ${location}`);
+    
+    try {
+      // Extract area name from location
+      const areaName = this.extractAreaName(location);
+      
+      // Generate area insights based on location
+      const insights: AreaInsights = {
+        areaName,
+        averageRent: {
+          oneBedroom: Math.round((Math.random() * 500 + 1200) / 50) * 50, // 1200-1700
+          twoBedroom: Math.round((Math.random() * 800 + 1800) / 50) * 50, // 1800-2600
+          threeBedroom: Math.round((Math.random() * 1000 + 2500) / 50) * 50 // 2500-3500
+        },
+        localAmenities: [
+          'World-class dining scene',
+          'Vibrant arts and culture',
+          'Excellent shopping districts',
+          'Beautiful parks and green spaces',
+          'Top-rated schools and universities',
+          'Modern transport links',
+          'Healthcare facilities',
+          'Entertainment venues'
+        ],
+        transportLinks: [
+          'Central Line',
+          'Northern Line',
+          'Multiple bus routes',
+          'National Rail connections',
+          'Cycle superhighways'
+        ],
+        walkabilityScore: Math.round(Math.random() * 30 + 70), // 70-100
+        safetyScore: Math.round(Math.random() * 25 + 75), // 75-100
+        schoolScore: Math.round(Math.random() * 20 + 80) // 80-100
+      };
+
+      return insights;
+    } catch (error) {
+      console.error('❌ Area insights error:', error);
+      throw error;
+    }
+  }
+
+  async getPropertyCoordinates(properties: any[], searchLocation: string, radiusKm: number = 5): Promise<PropertyWithCoordinates[]> {
+    console.log(`📍 Getting property coordinates for ${properties.length} properties within ${radiusKm}km of ${searchLocation}`);
+    
+    try {
+      // Get search location coordinates
+      const searchCoords = await this.geocodeLocation(searchLocation);
+      
+      // Filter properties within radius and add coordinates
+      const propertiesWithCoords = properties
+        .map(property => {
+          // Generate random coordinates within radius
+          const coords = this.generateCoordinatesWithinRadius(
+            searchCoords.lat,
+            searchCoords.lng,
+            radiusKm
+          );
+          
+          const distance = this.calculateDistance(
+            searchCoords.lat,
+            searchCoords.lng,
+            coords.lat,
+            coords.lng
+          );
+
+          return {
+            ...property,
+            coordinates: coords,
+            distanceFromCenter: distance
+          };
+        })
+        .filter(property => property.distanceFromCenter <= radiusKm);
+
+      console.log(`✅ Found ${propertiesWithCoords.length} properties within ${radiusKm}km radius`);
+      return propertiesWithCoords;
+    } catch (error) {
+      console.error('❌ Property coordinates error:', error);
+      throw error;
+    }
+  }
+
+  async getPropertiesWithinRadius(properties: any[], centerLat: number, centerLng: number, radiusKm: number): Promise<PropertyWithCoordinates[]> {
+    console.log(`🎯 Filtering ${properties.length} properties within ${radiusKm}km of (${centerLat}, ${centerLng})`);
+    
+    try {
+      const propertiesWithCoords = properties
+        .map(property => {
+          // Generate random coordinates within radius
+          const coords = this.generateCoordinatesWithinRadius(centerLat, centerLng, radiusKm);
+          
+          const distance = this.calculateDistance(centerLat, centerLng, coords.lat, coords.lng);
+
+          return {
+            ...property,
+            coordinates: coords,
+            distanceFromCenter: distance
+          };
+        })
+        .filter(property => property.distanceFromCenter <= radiusKm);
+
+      console.log(`✅ Found ${propertiesWithCoords.length} properties within radius`);
+      return propertiesWithCoords;
+    } catch (error) {
+      console.error('❌ Properties within radius error:', error);
+      throw error;
+    }
+  }
+
+  async geocodeLocation(location: string): Promise<GeocodingResult> {
+    console.log(`🌍 Geocoding location: ${location}`);
+    
+    try {
+      // Mock geocoding - in real implementation, use Google Geocoding API
+      const mockCoordinates = this.getMockCoordinatesForLocation(location);
+      
+      return {
+        lat: mockCoordinates.lat,
+        lng: mockCoordinates.lng,
+        address: location,
+        formattedAddress: `${location}, London, UK`
+      };
+    } catch (error) {
+      console.error('❌ Geocoding error:', error);
+      throw error;
+    }
+  }
+
+  private extractAreaName(location: string): string {
+    // Extract area name from location string
+    const query = location.toLowerCase().trim();
+    
+    // Comprehensive UK locations database
+    const locations = [
+      // London areas
+      'london', 'westminster', 'camden', 'islington', 'hackney', 'tower hamlets',
+      'southwark', 'lambeth', 'wandsworth', 'hammersmith', 'kensington', 'chelsea',
+      'fulham', 'richmond', 'kingston',
+      
+      // Major UK cities
+      'manchester', 'birmingham', 'liverpool', 'leeds', 'sheffield', 'bristol',
+      'newcastle', 'nottingham', 'leicester', 'coventry', 'cardiff', 'belfast',
+      'edinburgh', 'glasgow', 'aberdeen',
+      
+      // Popular areas
+      'brighton', 'oxford', 'cambridge', 'bath', 'york', 'canterbury', 'stratford',
+      
+      // Original areas
+      'bromley', 'orpington', 'swiss cottage'
+    ];
+    
+    // Try exact match first
+    for (const area of locations) {
+      if (query === area) {
+        return this.capitalizeWords(area);
+      }
+    }
+    
+    // Try partial matches
+    for (const area of locations) {
+      if (query.includes(area) || area.includes(query)) {
+        return this.capitalizeWords(area);
+      }
+    }
+    
+    // Default to the original location if no match found
+    return this.capitalizeWords(location);
+  }
+
+  private capitalizeWords(str: string): string {
+    return str.split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    ).join(' ');
+  }
+
+  private generateCoordinatesWithinRadius(centerLat: number, centerLng: number, radiusKm: number): { lat: number; lng: number } {
+    // Generate random coordinates within radius using polar coordinates
+    const angle = Math.random() * 2 * Math.PI;
+    const distance = Math.random() * radiusKm;
+    
+    // Convert to lat/lng (approximate)
+    const latOffset = (distance / 111) * Math.cos(angle); // 1 degree ≈ 111km
+    const lngOffset = (distance / (111 * Math.cos(centerLat * Math.PI / 180))) * Math.sin(angle);
+    
+    return {
+      lat: centerLat + latOffset,
+      lng: centerLng + lngOffset
+    };
+  }
+
+  private calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    // Haversine formula for distance calculation
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  private getMockCoordinatesForLocation(location: string): { lat: number; lng: number } {
+    const locationMap: Record<string, { lat: number; lng: number }> = {
+      'bromley': { lat: 51.4032, lng: 0.0152 },
+      'orpington': { lat: 51.3744, lng: 0.0979 },
+      'london': { lat: 51.5074, lng: -0.1278 },
+      'swiss cottage': { lat: 51.5431, lng: -0.1746 },
+      'camden': { lat: 51.5390, lng: -0.1426 },
+      'westminster': { lat: 51.4994, lng: -0.1245 },
+      'islington': { lat: 51.5362, lng: -0.1033 }
+    };
+
+    const lowerLocation = location.toLowerCase();
+    for (const [key, coords] of Object.entries(locationMap)) {
+      if (lowerLocation.includes(key)) {
+        return coords;
+      }
+    }
+
+    // Default to London center
+    return { lat: 51.5074, lng: -0.1278 };
   }
 } 

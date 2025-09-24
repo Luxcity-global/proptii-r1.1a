@@ -1,7 +1,36 @@
 const API_BASE_URL = import.meta.env.VITE_MCP_API_URL || 'http://localhost:3002/api/mcp';
 
+// TypeScript interfaces for backend property structure
+interface BackendProperty {
+  id: string;
+  status?: string;
+  title?: string;
+  price?: {
+    amount?: number;
+    type?: string;
+    period?: string;
+  };
+  location?: {
+    address?: string;
+  };
+  address?: string;
+  specifications?: {
+    bedrooms?: number;
+    bathrooms?: number;
+    totalArea?: number;
+  };
+  images?: Array<{
+    src?: string;
+    alt?: string;
+  }>;
+  agent?: {
+    company?: string;
+    name?: string;
+  };
+}
+
 // Transform backend property format to frontend PropertyCard format
-function transformProperty(backendProperty: any) {
+function transformProperty(backendProperty: BackendProperty) {
   console.log('🔄 [FRONTEND] Transforming property:', backendProperty.id);
   
   // Determine if this is a rental or sale property
@@ -25,7 +54,7 @@ function transformProperty(backendProperty: any) {
     area: backendProperty.specifications?.totalArea || 0,
     areaUnit: 'sq ft',
     images: backendProperty.images && backendProperty.images.length > 0 
-      ? backendProperty.images.map((img: any, index: number) => ({
+      ? backendProperty.images.map((img, index: number) => ({
           src: img.src || '',
           alt: img.alt || backendProperty.title,
           label: img.alt || `Property image ${index + 1}`
@@ -52,7 +81,7 @@ function transformProperty(backendProperty: any) {
 export async function searchProperties(query: string, options?: {
   useRealData?: boolean;
   sources?: string[];
-  filters?: any;
+  filters?: Record<string, unknown>;
   page?: number;
   limit?: number;
 }) {
@@ -133,14 +162,17 @@ export async function searchProperties(query: string, options?: {
     const endTime = Date.now();
     console.error('💥 [FRONTEND] Search request failed after:', endTime - startTime, 'ms');
     console.error('💥 [FRONTEND] Error details:', error);
-    console.error('💥 [FRONTEND] Error type:', error.constructor.name);
-    console.error('💥 [FRONTEND] Error message:', error.message);
     
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      console.error('🌐 [FRONTEND] Network error - backend may be unavailable');
+    if (error instanceof Error) {
+      console.error('💥 [FRONTEND] Error type:', error.constructor.name);
+      console.error('💥 [FRONTEND] Error message:', error.message);
+      
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.error('🌐 [FRONTEND] Network error - backend may be unavailable');
+      }
     }
     
-    throw error;
+    throw error instanceof Error ? error : new Error('Unknown error occurred');
   }
 }
 
@@ -149,7 +181,7 @@ export async function triggerScraping(options: {
   source: string;
   query: string;
   pages?: number;
-  filters?: any;
+  filters?: Record<string, unknown>;
 }) {
   console.log('🔄 [FRONTEND] Triggering real-time scraping...');
   console.log('⚙️ [FRONTEND] Scraping options:', options);
@@ -171,7 +203,7 @@ export async function triggerScraping(options: {
     return data;
   } catch (error) {
     console.error('💥 [FRONTEND] Scraping trigger failed:', error);
-    throw error;
+    throw error instanceof Error ? error : new Error('Unknown error occurred');
   }
 }
 
@@ -293,6 +325,111 @@ export async function getPropertyDetails(id: string) {
     return data;
   } catch (error) {
     console.error('💥 [FRONTEND] Property details error:', error);
+    throw error;
+  }
+}
+
+// Map Integration API functions
+
+// Get area insights for a location
+export async function getAreaInsights(location: string) {
+  console.log('🗺️ [FRONTEND] Fetching area insights for:', location);
+  
+  try {
+    const res = await fetch(`${API_BASE_URL}/area-insights/${encodeURIComponent(location)}`);
+    
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    console.log('✅ [FRONTEND] Area insights received:', data);
+    return data;
+  } catch (error) {
+    console.error('💥 [FRONTEND] Area insights error:', error);
+    throw error;
+  }
+}
+
+// Get property coordinates within radius
+export async function getPropertyCoordinates(properties: BackendProperty[], searchLocation: string, radiusKm: number = 5) {
+  console.log('📍 [FRONTEND] Fetching property coordinates for', properties.length, 'properties');
+  
+  try {
+    const res = await fetch(`${API_BASE_URL}/property-coordinates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        properties,
+        searchLocation,
+        radiusKm
+      })
+    });
+    
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    console.log('✅ [FRONTEND] Property coordinates received:', data);
+    return data;
+  } catch (error) {
+    console.error('💥 [FRONTEND] Property coordinates error:', error);
+    throw error;
+  }
+}
+
+// Get combined map data (area insights + property coordinates)
+export async function getMapData(properties: BackendProperty[], searchLocation: string, radiusKm: number = 5) {
+  console.log('🗺️ [FRONTEND] Fetching combined map data for:', searchLocation);
+  
+  try {
+    const res = await fetch(`${API_BASE_URL}/map-data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        properties,
+        searchLocation,
+        radiusKm
+      })
+    });
+    
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    console.log('✅ [FRONTEND] Map data received:', data);
+    return data;
+  } catch (error) {
+    console.error('💥 [FRONTEND] Map data error:', error);
+    throw error;
+  }
+}
+
+// Get properties within radius
+export async function getPropertiesWithinRadius(properties: BackendProperty[], lat: number, lng: number, radius: number) {
+  console.log('🎯 [FRONTEND] Fetching properties within radius:', { lat, lng, radius });
+  
+  try {
+    const params = new URLSearchParams({
+      lat: lat.toString(),
+      lng: lng.toString(),
+      radius: radius.toString(),
+      properties: JSON.stringify(properties)
+    });
+    
+    const res = await fetch(`${API_BASE_URL}/properties-within-radius?${params}`);
+    
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+    
+    const data = await res.json();
+    console.log('✅ [FRONTEND] Properties within radius received:', data);
+    return data;
+  } catch (error) {
+    console.error('💥 [FRONTEND] Properties within radius error:', error);
     throw error;
   }
 } 

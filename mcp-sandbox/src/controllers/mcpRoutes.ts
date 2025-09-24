@@ -468,6 +468,116 @@ router.get('/neighborhood/:postcode', neighborhoodHandler);
 router.get('/agent/:id', agentHandler);
 router.get('/market-analysis', marketAnalysisHandler);
 
+// New map integration endpoints
+router.get('/area-insights/:location', async (req, res) => {
+  try {
+    const { location } = req.params;
+    const insights = await neighborhoodMCP.getAreaInsights(location);
+    
+    res.json({
+      success: true,
+      data: insights,
+      timestamp: new Date().toISOString(),
+      location: location
+    });
+  } catch (error) {
+    console.error('❌ Area insights error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch area insights',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+router.post('/property-coordinates', async (req, res) => {
+  try {
+    const { properties, searchLocation, radiusKm = 5 } = req.body;
+    const coordinates = await neighborhoodMCP.getPropertyCoordinates(properties, searchLocation, radiusKm);
+    
+    res.json({
+      success: true,
+      data: coordinates,
+      timestamp: new Date().toISOString(),
+      searchLocation: searchLocation,
+      radiusKm: radiusKm
+    });
+  } catch (error) {
+    console.error('❌ Property coordinates error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch property coordinates',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+router.post('/map-data', async (req, res) => {
+  try {
+    const { properties, searchLocation, radiusKm = 5 } = req.body;
+    
+    // Get both area insights and property coordinates
+    const [insights, coordinates] = await Promise.all([
+      neighborhoodMCP.getAreaInsights(searchLocation),
+      neighborhoodMCP.getPropertyCoordinates(properties, searchLocation, radiusKm)
+    ]);
+    
+    res.json({
+      success: true,
+      data: {
+        areaInsights: insights,
+        propertyCoordinates: coordinates
+      },
+      timestamp: new Date().toISOString(),
+      searchLocation: searchLocation,
+      radiusKm: radiusKm
+    });
+  } catch (error) {
+    console.error('❌ Map data error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch map data',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+router.get('/properties-within-radius', async (req, res) => {
+  try {
+    const { lat, lng, radius = 5, properties } = req.query;
+    
+    if (!lat || !lng || !properties) {
+      res.status(400).json({
+        success: false,
+        error: 'Latitude, longitude, and properties are required'
+      });
+      return;
+    }
+    
+    const coordinates = await neighborhoodMCP.getPropertiesWithinRadius(
+      JSON.parse(properties as string),
+      parseFloat(lat as string),
+      parseFloat(lng as string),
+      parseFloat(radius as string)
+    );
+    
+    res.json({
+      success: true,
+      data: coordinates,
+      timestamp: new Date().toISOString(),
+      center: { lat: parseFloat(lat as string), lng: parseFloat(lng as string) },
+      radius: parseFloat(radius as string)
+    });
+  } catch (error) {
+    console.error('❌ Properties within radius error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch properties within radius',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // ===== PHASE 2.2: NEW ENHANCED ROUTES =====
 router.post('/enhanced-search', enhancedSearchHandler);
 router.post('/scraping', scrapingHandler);

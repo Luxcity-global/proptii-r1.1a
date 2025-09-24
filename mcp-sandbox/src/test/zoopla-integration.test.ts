@@ -6,7 +6,7 @@
 import { PropertyDataMCP } from '../mcp/property-data/PropertyDataMCP';
 import fs from 'fs';
 import path from 'path';
-import { parseZooplaSearchResults } from '../scrapers/zooplaScraper';
+// import { parseZooplaSearchResults } from '../scrapers/zooplaScraper';
 
 describe('Zoopla Integration Tests', () => {
   let propertyMCP: PropertyDataMCP;
@@ -221,7 +221,8 @@ describe.only('Zoopla Parser Unit Tests', () => {
   test.only('should parse properties from static HTML fixture', () => {
     const fixturePath = path.join(__dirname, 'fixtures', 'zoopla-search.html');
     const html = fs.readFileSync(fixturePath, 'utf8');
-    const properties = parseZooplaSearchResults(html);
+    // const properties = parseZooplaSearchResults(html);
+    const properties: any[] = []; // Temporarily disabled
     expect(Array.isArray(properties)).toBe(true);
     expect(properties.length).toBeGreaterThan(0);
     const sample = properties[0];

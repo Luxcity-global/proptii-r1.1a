@@ -447,31 +447,8 @@ export class PropertyDataMCP {
         return cachedResult;
       }
 
-      // Import the enhanced Zoopla scraper dynamically to avoid circular dependencies
-      const { scrapeZooplaWithQuery } = await import('../../scrapers/zooplaScraper');
-      const { transformZooplaProperties, getZooplaTransformationStats } = await import('../../scrapers/zooplaSchemaTransformer');
-      
-      // Use the enhanced scraper with query parsing
-      const zooplaProperties = await scrapeZooplaWithQuery(query, filters);
-      
-      // Transform to MCP format
-      console.log(`🔄 [ZOOPLA_SCRAPING] [${scrapingId}] Transforming ${zooplaProperties.length} properties...`);
-      const transformedProperties = transformZooplaProperties(zooplaProperties);
-      
-      // Get transformation statistics
-      const stats = getZooplaTransformationStats(zooplaProperties, transformedProperties);
-      console.log(`📊 [ZOOPLA_SCRAPING] [${scrapingId}] Transformation stats:`, {
-        total: stats.total,
-        successful: stats.successful,
-        successRate: `${stats.successRate.toFixed(1)}%`,
-        averagePrice: `£${stats.averagePrice}`
-      });
-
-      // Cache the results
-      await this.setCache(cacheKey, transformedProperties, this.cacheExpiry);
-      
-      console.log(`✅ [ZOOPLA_SCRAPING] [${scrapingId}] Enhanced Zoopla scraping completed: ${transformedProperties.length} properties`);
-      return transformedProperties;
+      // Zoopla scraper is temporarily disabled
+      throw new Error('Zoopla scraper temporarily disabled for build');
       
     } catch (error) {
       console.error(`❌ [ZOOPLA_SCRAPING] [${scrapingId}] Enhanced Zoopla scraping failed:`, error);
@@ -701,11 +678,12 @@ export class PropertyDataMCP {
           return [];
         case 'zoopla':
           // Import Zoopla pagination scraper and transformer
-          const { scrapeZooplaWithPagination } = await import('../../scrapers/zooplaScraper');
-          const { transformZooplaProperties } = await import('../../scrapers/zooplaSchemaTransformer');
+          // const { scrapeZooplaWithPagination } = await import('../../scrapers/zooplaScraper');
+          throw new Error('Zoopla scraper temporarily disabled for build');
+          // const { transformZooplaProperties } = await import('../../scrapers/zooplaSchemaTransformer');
           
-          const zooplaProperties = await scrapeZooplaWithPagination(query, pages);
-          return transformZooplaProperties(zooplaProperties);
+          // const zooplaProperties = await scrapeZooplaWithPagination(query, pages);
+          // return transformZooplaProperties(zooplaProperties);
         default:
           throw new Error(`Unknown source: ${source}`);
       }

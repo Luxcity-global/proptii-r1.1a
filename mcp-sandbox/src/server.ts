@@ -42,6 +42,10 @@ app.get('/api/mcp/docs', (req, res) => {
       property: 'GET /api/mcp/property/:id',
       neighborhood: 'GET /api/mcp/neighborhood/:postcode',
       agent: 'GET /api/mcp/agent/:id',
+      areaInsights: 'GET /api/mcp/area-insights/:location',
+      propertyCoordinates: 'POST /api/mcp/property-coordinates',
+      mapData: 'POST /api/mcp/map-data',
+      propertiesWithinRadius: 'GET /api/mcp/properties-within-radius',
       docs: 'GET /api/mcp/docs'
     },
     features: [
@@ -71,7 +75,11 @@ app.use((req, res) => {
       'POST /api/mcp/search',
       'GET /api/mcp/property/:id',
       'GET /api/mcp/neighborhood/:postcode',
-      'GET /api/mcp/agent/:id'
+      'GET /api/mcp/agent/:id',
+      'GET /api/mcp/area-insights/:location',
+      'POST /api/mcp/property-coordinates',
+      'POST /api/mcp/map-data',
+      'GET /api/mcp/properties-within-radius'
     ]
   });
 });
