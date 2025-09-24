@@ -1,8 +1,18 @@
 import { Loader } from '@googlemaps/js-api-loader';
 
+// Get API key from environment with proper validation
+const getApiKey = () => {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    console.warn('⚠️ [GOOGLE-MAPS-LOADER] VITE_GOOGLE_MAPS_API_KEY not found in environment, using fallback');
+    return 'AIzaSyChXxNp1xBJtJB9pC5WxWoZw3__7nT3djU';
+  }
+  return apiKey;
+};
+
 // Google Maps API configuration
 const GOOGLE_MAPS_CONFIG = {
-  apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyChXxNp1xBJtJB9pC5WxWoZw3__7nT3djU',
+  apiKey: getApiKey(),
   version: 'weekly',
   libraries: ['places', 'geometry'] as ['places', 'geometry'],
   language: 'en',

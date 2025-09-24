@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Search API</title>
+</head>
+<body>
+    <h1>Test Property Search</h1>
+    <button onclick="testSearch()">Test Search</button>
+    <div id="results"></div>
+
+    <script>
+        async function testSearch() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = 'Searching...';
+
+            try {
+                const response = await fetch('http://localhost:3002/api/mcp/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: 'London',
+                        filters: {},
+                        useRealData: false,
+                        sources: ['openrent'],
+                        page: 1,
+                        limit: 5
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log('Raw API Response:', data);
+
+                // Extract properties the same way the frontend does
+                const backendProperties = data.results || data.data?.properties || data.properties || [];
+                console.log('Extracted properties:', backendProperties);
+
+                resultsDiv.innerHTML = `
+                    <h2>Search Results</h2>
+                    <p>Found ${backendProperties.length} properties</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                console.error('Search error:', error);
+                resultsDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -123,7 +123,19 @@ class GeocodingService {
       return geocodingResult;
 
     } catch (error) {
-      console.error('❌ [GEOCODING] Error geocoding address:', cleanAddress, error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Handle specific geocoding errors more gracefully
+      if (errorMessage.includes('ZERO_RESULTS')) {
+        console.log('⚠️ [GEOCODING] No results found for address:', cleanAddress);
+      } else if (errorMessage.includes('OVER_QUERY_LIMIT')) {
+        console.warn('⚠️ [GEOCODING] Query limit exceeded, please try again later');
+      } else if (errorMessage.includes('REQUEST_DENIED')) {
+        console.error('❌ [GEOCODING] Request denied - check API key');
+      } else {
+        console.error('❌ [GEOCODING] Error geocoding address:', cleanAddress, errorMessage);
+      }
+      
       return null;
     }
   }
@@ -216,6 +228,25 @@ class GeocodingService {
   clearCache(): void {
     this.cache.clear();
     console.log('🗑️ [GEOCODING] Cache cleared');
+  }
+
+  /**
+   * Clean expired cache entries for memory management
+   */
+  cleanExpiredCache(): void {
+    const now = Date.now();
+    let cleanedCount = 0;
+    
+    for (const [key, cached] of this.cache.entries()) {
+      if (now - cached.timestamp > this.CACHE_DURATION) {
+        this.cache.delete(key);
+        cleanedCount++;
+      }
+    }
+    
+    if (cleanedCount > 0) {
+      console.log(`🧹 [GEOCODING] Cleaned ${cleanedCount} expired cache entries`);
+    }
   }
 
   /**

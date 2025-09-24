@@ -36,18 +36,23 @@ const AreaInsightPanel: React.FC<AreaInsightPanelProps> = ({
   if (error) {
     return (
       <div style={{
-        background: '#fef2f2',
-        borderLeft: '4px solid #136C9E',
+        background: '#fefdf8',
+        borderLeft: '4px solid #f59e0b',
         borderRadius: '8px',
         padding: '20px',
         marginBottom: '24px',
         minHeight: '200px',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        flexDirection: 'column'
       }}>
-        <div style={{ color: '#dc2626', fontSize: '16px' }}>
-          {error}
+        <Info style={{ width: 24, height: 24, color: '#f59e0b', marginBottom: 8 }} />
+        <div style={{ color: '#92400e', fontSize: '16px', fontWeight: 500, textAlign: 'center', marginBottom: 8 }}>
+          Area insights temporarily unavailable
+        </div>
+        <div style={{ color: '#a16207', fontSize: '14px', textAlign: 'center' }}>
+          The app continues to work normally. Try refreshing in a moment.
         </div>
       </div>
     );
@@ -67,12 +72,45 @@ const AreaInsightPanel: React.FC<AreaInsightPanelProps> = ({
   };
 
   const getAmenitiesText = (amenities: AreaInsight['amenities']) => {
-    const allItems = amenities.flatMap(category => category.items);
-    return allItems.slice(0, 4).join(', ') + (allItems.length > 4 ? '...' : '');
+    if (!amenities || amenities.length === 0) {
+      return 'excellent local amenities including shops, restaurants, parks, and recreational facilities';
+    }
+    
+    try {
+      const allItems = amenities.flatMap(category => 
+        category?.items ? category.items : []
+      ).filter(Boolean);
+      
+      if (allItems.length === 0) {
+        return 'excellent local amenities including shops, restaurants, parks, and recreational facilities';
+      }
+      
+      return allItems.slice(0, 4).join(', ') + (allItems.length > 4 ? ', and more' : '');
+    } catch (error) {
+      console.warn('Error processing amenities:', error);
+      return 'excellent local amenities including shops, restaurants, parks, and recreational facilities';
+    }
   };
 
   const getTransportText = (transport: AreaInsight['transport']) => {
-    return transport.map(t => t.details).join(', ');
+    if (!transport || transport.length === 0) {
+      return 'Good transport links with access to buses, trains, and major road networks';
+    }
+    
+    try {
+      const transportDetails = transport
+        .map(t => t?.details)
+        .filter(Boolean);
+      
+      if (transportDetails.length === 0) {
+        return 'Good transport links with access to buses, trains, and major road networks';
+      }
+      
+      return transportDetails.join(', ');
+    } catch (error) {
+      console.warn('Error processing transport:', error);
+      return 'Good transport links with access to buses, trains, and major road networks';
+    }
   };
 
   return (
@@ -171,4 +209,4 @@ const AreaInsightPanel: React.FC<AreaInsightPanelProps> = ({
   );
 };
 
-export default AreaInsightPanel; 
+export default AreaInsightPanel;

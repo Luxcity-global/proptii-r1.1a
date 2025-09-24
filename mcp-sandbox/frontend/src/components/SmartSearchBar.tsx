@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Search, Sparkles, X } from 'lucide-react';
 
 interface SearchSuggestion {
@@ -27,6 +27,7 @@ const SmartSearchBar: React.FC<SmartSearchBarProps> = ({
   const [query, setQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -132,6 +133,15 @@ const SmartSearchBar: React.FC<SmartSearchBarProps> = ({
     setQuery(value);
     setShowSuggestions(value.length > 0);
     setActiveSuggestionIndex(-1);
+    
+    // Debounce suggestions for better performance
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    debounceTimeoutRef.current = setTimeout(() => {
+      // Could trigger suggestion API calls here if implemented
+      console.log('🔍 [SMART_SEARCH] Debounced input:', value);
+    }, 300);
   };
 
   const handleVoiceSearch = () => {
@@ -147,6 +157,15 @@ const SmartSearchBar: React.FC<SmartSearchBarProps> = ({
     setActiveSuggestionIndex(-1);
     inputRef.current?.focus();
   };
+
+  // Cleanup debounce timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div style={{ position: 'relative', width: '100%', maxWidth: 800 }}>

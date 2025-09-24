@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { Upload, X } from 'lucide-react';
 
 interface ImageUploadProps {
@@ -9,6 +9,24 @@ interface ImageUploadProps {
 
 const ImageUpload: React.FC<ImageUploadProps> = ({ images, onChange, hidePreview = false }) => {
   const [isDragging, setIsDragging] = useState(false);
+
+  // Create and manage preview URLs properly
+  const previewUrls = useMemo(() => {
+    return images.map(file => URL.createObjectURL(file));
+  }, [images]);
+
+  // Cleanup effect to revoke URLs when images change or component unmounts
+  useEffect(() => {
+    return () => {
+      previewUrls.forEach(url => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch (error) {
+          console.warn('Failed to revoke object URL:', error);
+        }
+      });
+    };
+  }, [previewUrls]);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -103,7 +121,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ images, onChange, hidePreview
             <div key={index} className="relative group">
               <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 border">
                 <img
-                  src={URL.createObjectURL(file)}
+                  src={previewUrls[index]}
                   alt={`Upload preview ${index}`}
                   className="w-full h-full object-cover"
                 />

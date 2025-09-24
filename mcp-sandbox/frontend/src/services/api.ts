@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_MCP_API_URL || 'http://localhost:3002/api/mcp';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_BASE_URL + '/api/mcp' || 'http://localhost:3002/api/mcp';
 
 // TypeScript interfaces for better type safety
 interface BackendProperty {

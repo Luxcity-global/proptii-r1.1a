@@ -7,8 +7,9 @@ import IntelligentFilterPanel from './components/IntelligentFilterPanel';
 import AIIntelligencePanel from './components/AIIntelligencePanel';
 import RealTimeScrapingPanel from './components/RealTimeScrapingPanel';
 import AreaInsightPanel from './components/AreaInsightPanel';
-import AreaMap from './components/AreaMap';
-import GoogleMapsTest from './components/GoogleMapsTest';
+import SimpleMap from './components/SimpleMap';
+import MapErrorBoundary from './components/MapErrorBoundary';
+import DebugSearch from './components/DebugSearch';
 import { mockProperties } from './data/mockProperties';
 import { searchProperties, type SearchOptions } from './services/api';
 import { areaInsightService } from './services/areaInsightService';
@@ -225,6 +226,7 @@ function App() {
     try {
       console.log('📞 [APP] Calling searchProperties API...');
       const searchOptions = {
+        useRealData: true, // Force real data usage
         filters: filters || {},
         sources: ['openrent'],
         page: 1,
@@ -258,28 +260,33 @@ function App() {
           console.log('📊 [APP] Search metadata:', results.metadata);
         }
         
-        // Fetch area insights
-        try {
-          console.log('🏘️ [APP] Fetching area insights for:', query);
-          const insight = await areaInsightService.getAreaInsight({
-            location: query,
-    
-            propertyType: filters?.propertyType,
-            bedrooms: filters?.bedrooms
-          });
-          
-          if (insight) {
-            console.log('✅ [APP] Area insight received:', insight);
-            setAreaInsight(insight);
-          } else {
-            console.log('⚠️ [APP] No area insight available for:', query);
+        // Fetch area insights asynchronously (don't block main search)
+        setTimeout(async () => {
+          try {
+            console.log('🏘️ [APP] Fetching area insights for:', query);
+            const insight = await areaInsightService.getAreaInsight({
+              location: query,
+              propertyType: filters?.propertyType,
+              bedrooms: filters?.bedrooms
+            });
+            
+            if (insight) {
+              console.log('✅ [APP] Area insight received:', insight);
+              setAreaInsight(insight);
+              setAreaInsightError(null);
+            } else {
+              console.log('⚠️ [APP] No area insight available for:', query);
+              setAreaInsight(null);
+              setAreaInsightError('Area insights not available for this location');
+            }
+          } catch (insightError) {
+            console.error('❌ [APP] Area insight fetch failed:', insightError);
+            setAreaInsightError('Unable to load area information');
             setAreaInsight(null);
+          } finally {
+            setAreaInsightLoading(false);
           }
-        } catch (insightError) {
-          console.error('❌ [APP] Area insight fetch failed:', insightError);
-          setAreaInsightError('Unable to load area information');
-          setAreaInsight(null);
-        }
+        }, 100); // Small delay to let main search complete first
       }
       
     } catch (err: any) {
@@ -557,47 +564,37 @@ function App() {
               </div>
             </div>
             
-            {/* Area Insight and Map Section */}
-            {(areaInsight || areaInsightLoading || areaInsightError) && (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '24px',
-                marginBottom: '32px'
-              }}>
+            {/* Map Section - Always show when search is performed */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: (areaInsight || areaInsightLoading || areaInsightError) ? '1fr 1fr' : '1fr',
+              gap: '24px',
+              marginBottom: '32px'
+            }}>
+              {/* Area Insight Panel - Optional enhancement */}
+              {(areaInsight || areaInsightLoading || areaInsightError) && (
                 <AreaInsightPanel
                   areaInsight={areaInsight}
                   loading={areaInsightLoading}
                   error={areaInsightError}
                 />
-                <AreaMap
-                  location={areaInsight?.location || searchQuery}
+              )}
+              
+              {/* Map - Always show when search is performed */}
+              <MapErrorBoundary fallbackMessage="Unable to load the map. Please check your internet connection and try again.">
+                <SimpleMap
+                  location={searchQuery}
                   properties={filteredProperties.map(p => ({
                     id: p.id,
                     address: p.address,
                     price: p.price,
-                    priceUnit: p.priceUnit,
                     beds: p.beds,
-                    baths: p.baths,
-                    area: p.area,
-                    areaUnit: p.areaUnit,
-                    status: p.status,
-                    availableNow: p.availableNow,
-                    images: p.images
+                    baths: p.baths
                   }))}
-                  onPropertyClick={(property) => {
-                    const foundProperty = filteredProperties.find(p => p.id === property.id);
-                    if (foundProperty) {
-                      handlePropertyClick(foundProperty);
-                    }
-                  }}
-                  selectedPropertyId={selectedProperty?.id}
                 />
-              </div>
-            )}
+              </MapErrorBoundary>
+            </div>
             
-            {/* Google Maps API Test Component */}
-            <GoogleMapsTest />
             
             {loading ? (
               <div style={{ color: '#888', fontSize: 20, margin: '48px 0', textAlign: 'center' }}>
@@ -651,6 +648,15 @@ function App() {
 
       {/* Real-time Scraping Panel */}
       <RealTimeScrapingPanel />
+
+      {/* Debug Search Panel */}
+      <DebugSearch
+        searchPerformed={searchPerformed}
+        loading={loading}
+        error={error}
+        filteredProperties={filteredProperties}
+        searchQuery={searchQuery}
+      />
 
       {/* Floating AI Assistant Button */}
       {searchPerformed && (

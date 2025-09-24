@@ -77,7 +77,11 @@ const PropertySelector: React.FC = () => {
       payload: {
         ...state.selectedProperty,
         agent: {
-          ...state.selectedProperty?.agent,
+          id: state.selectedProperty?.agent?.id || '',
+          name: state.selectedProperty?.agent?.name || '',
+          email: state.selectedProperty?.agent?.email || '',
+          phone: state.selectedProperty?.agent?.phone || '',
+          company: state.selectedProperty?.agent?.company || '',
           [field]: value
         }
       }
@@ -184,4 +188,4 @@ const PropertySelector: React.FC = () => {
   );
 };
 
-export default PropertySelector; 
+export default PropertySelector;

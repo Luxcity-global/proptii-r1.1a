@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -59,6 +59,15 @@ const SubmissionForm: React.FC = () => {
   });
 
   const handleImagesChange = (newImages: File[]) => {
+    // Clean up previous preview URLs to prevent memory leaks
+    imagePreviews.forEach(url => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.warn('Failed to revoke object URL:', error);
+      }
+    });
+
     setImages(newImages);
     setValue('images', newImages);
     
@@ -70,6 +79,20 @@ const SubmissionForm: React.FC = () => {
     });
     setImagePreviews(newPreviews);
   };
+
+  // Cleanup effect to revoke URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      // Clean up all object URLs when component unmounts
+      imagePreviews.forEach(url => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch (error) {
+          console.warn('Failed to revoke object URL during cleanup:', error);
+        }
+      });
+    };
+  }, [imagePreviews]);
 
   const onSubmit = async (data: PropertyFormData) => {
     setIsSubmitting(true);

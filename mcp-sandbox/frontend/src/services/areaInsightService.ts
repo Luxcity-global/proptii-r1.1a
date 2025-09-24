@@ -12,6 +12,7 @@ class AreaInsightService {
 
   /**
    * Fetch area insights for a given location using real property data only
+   * With retry logic and graceful degradation
    */
   async getAreaInsight(options: AreaInsightServiceOptions): Promise<AreaInsight | null> {
     const { location, propertyType, bedrooms } = options;
@@ -26,36 +27,63 @@ class AreaInsightService {
       return cached;
     }
 
-    try {
-      console.log('🔍 [AREA-INSIGHT] Fetching area insight from backend API');
-      const realData = await this.fetchFromAPI(options);
-      if (realData) {
-        this.setCache(cacheKey, realData);
-        return realData;
+    // Retry logic for resilience
+    const maxRetries = 2;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔍 [AREA-INSIGHT] Fetching area insight from backend API (attempt ${attempt}/${maxRetries})`);
+        const realData = await this.fetchFromAPI(options);
+        if (realData) {
+          this.setCache(cacheKey, realData);
+          console.log('✅ [AREA-INSIGHT] Successfully fetched and cached area insight');
+          return realData;
+        }
+        console.log('⚠️ [AREA-INSIGHT] No area insight data available from API');
+        return null;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Unknown error');
+        console.warn(`⚠️ [AREA-INSIGHT] Attempt ${attempt} failed:`, lastError.message);
+        
+        // If this is the last attempt, don't retry
+        if (attempt === maxRetries) {
+          break;
+        }
+        
+        // Wait before retrying (exponential backoff)
+        const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s delays
+        console.log(`⏳ [AREA-INSIGHT] Waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-      console.log('⚠️ [AREA-INSIGHT] No area insight data available');
-      return null;
-    } catch (error) {
-      console.error('❌ [AREA-INSIGHT] Error fetching area insight:', error);
-      return null;
     }
+
+    console.error('❌ [AREA-INSIGHT] All attempts failed, area insights unavailable:', lastError?.message);
+    return null; // Graceful degradation - app continues without insights
   }
 
   /**
    * Fetch area insights from backend API
    */
   private async fetchFromAPI(options: AreaInsightServiceOptions): Promise<AreaInsight | null> {
-    const API_BASE_URL = import.meta.env.VITE_MCP_API_URL || 'http://localhost:3002/api/mcp';
+    const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_BASE_URL + '/api/mcp' || 'http://localhost:3002/api/mcp';
     
     try {
       console.log('🌐 [AREA-INSIGHT] Calling backend API:', `${API_BASE_URL}/area-insights`);
       console.log('📤 [AREA-INSIGHT] Request payload:', options);
       
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(`${API_BASE_URL}/area-insights`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(options),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       console.log('📊 [AREA-INSIGHT] Response status:', response.status);
 

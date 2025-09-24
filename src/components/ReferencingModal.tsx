@@ -350,11 +350,23 @@ const compressImage = (file: File, maxSizeKB: number = 150): Promise<File> => {
           resolve(file);
         }
       }, 'image/jpeg', quality);
+      
+      // Clean up the object URL after processing
+      try {
+        URL.revokeObjectURL(img.src);
+      } catch (error) {
+        console.warn('Failed to revoke object URL:', error);
+      }
     };
 
     img.onerror = () => {
       clearTimeout(timeout);
       console.warn('Image loading failed, using original file');
+      try {
+        URL.revokeObjectURL(img.src);
+      } catch (error) {
+        console.warn('Failed to revoke object URL:', error);
+      }
       resolve(file);
     };
 
