@@ -1,0 +1,35 @@
+# CrewAI Core Framework - Updated for Python 3.13 compatibility
+crewai>=0.186.0
+crewai-tools>=0.1.6
+
+# AI/ML Libraries
+openai>=1.12.0
+anthropic>=0.7.8
+langchain>=0.1.0
+langchain-openai>=0.0.6
+langchain-anthropic>=0.0.2
+
+# WebSocket and HTTP
+fastapi>=0.108.0
+uvicorn>=0.24.0
+websockets>=12.0
+httpx>=0.25.2
+
+# Database and Storage
+sqlalchemy>=2.0.25
+psycopg2-binary>=2.9.9
+redis>=5.0.1
+
+# Utilities
+pydantic>=2.5.2
+python-dotenv>=1.0.0
+pydantic-settings>=2.1.0
+loguru>=0.7.2
+
+# Development
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.12.1
+flake8==6.1.0
+
+

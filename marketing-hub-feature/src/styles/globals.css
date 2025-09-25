@@ -1,0 +1,263 @@
+
+:root {
+  --font-size: 16px;
+  
+  /* Proptii Brand Colors - LuxBlue Scale */
+  --lux-blue-50: #f0f4ff;
+  --lux-blue-100: #e0e9ff;
+  --lux-blue-200: #c7d6ff;
+  --lux-blue-300: #a4baff;
+  --lux-blue-400: #7e94ff;
+  --lux-blue-500: #5b6eff;
+  --lux-blue-600: #136C9E;
+  --lux-blue-700: #3730a3;
+  --lux-blue-800: #312e81;
+  --lux-blue-900: #1e1b4b;
+  
+  /* Proptii Brand Colors - LuxOrange Scale */
+  --lux-orange-50: #fff8f0;
+  --lux-orange-100: #ffedd5;
+  --lux-orange-200: #fed7aa;
+  --lux-orange-300: #fdba74;
+  --lux-orange-400: #fb923c;
+  --lux-orange-500: #f97316;
+  --lux-orange-600: #DC5F12;
+  --lux-orange-700: #c2410c;
+  --lux-orange-800: #9a3412;
+  --lux-orange-900: #7c2d12;
+  
+  /* Proptii Brand Colors - LuxGreen Scale */
+  --lux-green-50: #f0fdf4;
+  --lux-green-100: #dcfce7;
+  --lux-green-200: #bbf7d0;
+  --lux-green-300: #86efac;
+  --lux-green-400: #4ade80;
+  --lux-green-500: #22c55e;
+  --lux-green-600: #16a34a;
+  --lux-green-700: #15803d;
+  --lux-green-800: #166534;
+  --lux-green-900: #14532d;
+  
+  /* Proptii Brand Colors - LuxCream Scale */
+  --lux-cream-25: #ffffff;
+  --lux-cream-50: #fefefe;
+  --lux-cream-100: #fcfcfc;
+  --lux-cream-200: #f8f8f8;
+  --lux-cream-300: #f3f3f3;
+  --lux-cream-400: #ededed;
+  --lux-cream-500: #e5e5e5;
+  --lux-cream-600: #d1d1d1;
+  --lux-cream-700: #b8b8b8;
+  --lux-cream-800: #8a8a8a;
+  --lux-cream-900: #5c5c5c;
+
+  --background: var(--lux-cream-50);
+  --foreground: var(--lux-blue-900);
+  --card: #ffffff;
+  --card-foreground: var(--lux-blue-900);
+  --popover: #ffffff;
+  --popover-foreground: var(--lux-blue-900);
+  --primary: var(--lux-blue-600);
+  --primary-foreground: #ffffff;
+  --secondary: var(--lux-orange-100);
+  --secondary-foreground: var(--lux-orange-700);
+  --muted: var(--lux-cream-200);
+  --muted-foreground: var(--lux-cream-700);
+  --accent: var(--lux-cream-100);
+  --accent-foreground: var(--lux-blue-800);
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: var(--lux-cream-300);
+  --input: transparent;
+  --input-background: var(--lux-cream-100);
+  --switch-background: var(--lux-cream-400);
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: var(--lux-blue-400);
+  --chart-1: var(--lux-blue-500);
+  --chart-2: var(--lux-orange-500);
+  --chart-3: var(--lux-green-500);
+  --chart-4: var(--lux-blue-300);
+  --chart-5: var(--lux-orange-300);
+  --radius: 0.5rem;
+  --sidebar: var(--lux-cream-50);
+  --sidebar-foreground: var(--lux-blue-900);
+  --sidebar-primary: var(--lux-blue-600);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--lux-cream-100);
+  --sidebar-accent-foreground: var(--lux-blue-800);
+  --sidebar-border: var(--lux-cream-300);
+  --sidebar-ring: var(--lux-blue-400);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+@layer base {
+  * {
+    @apply outline-none;
+  }
+
+  body {
+    @apply bg-lux-cream-50 text-lux-blue-900;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+html {
+  font-size: var(--font-size);
+}
+
+/* Base typography */
+@layer base {
+  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
+    h1 {
+      font-size: 1.5rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h2 {
+      font-size: 1.25rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h3 {
+      font-size: 1.125rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h4 {
+      font-size: 1rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    p {
+      font-size: 1rem;
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+
+    label {
+      font-size: 1rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    button {
+      font-size: 1rem;
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    input {
+      font-size: 1rem;
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+  }
+}
+
+/* Accessibility utilities */
+@layer utilities {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .not-sr-only {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+
+  .focus\:not-sr-only:focus {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+
+  /* Focus styles for better accessibility */
+  .focus-visible\:ring-2:focus-visible {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--ring);
+  }
+
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    .border {
+      border-width: 2px;
+    }
+    
+    .ring-2 {
+      box-shadow: 0 0 0 3px var(--ring);
+    }
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

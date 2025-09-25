@@ -1,0 +1,116 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - link "Skip to main content" [ref=e5] [cursor=pointer]:
+      - /url: "#main-content"
+    - link "Skip to navigation" [ref=e6] [cursor=pointer]:
+      - /url: "#navigation"
+    - link "Skip to search" [ref=e7] [cursor=pointer]:
+      - /url: "#search"
+  - main "Main content" [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - img "Luxury modern apartment" [ref=e12]
+        - generic [ref=e14]:
+          - generic [ref=e15]:
+            - heading "Welcome to Proptii Marketing Hub" [level=1] [ref=e16]
+            - paragraph [ref=e17]: Generate compelling content, launch targeted campaigns, and attract quality tenants faster than ever with our AI-powered marketing platform
+          - generic [ref=e18]:
+            - button "Get Started" [ref=e19]:
+              - img
+              - text: Get Started
+              - img
+            - button "View Dashboard" [ref=e20]:
+              - img
+              - text: View Dashboard
+      - generic [ref=e22]:
+        - generic [ref=e23]:
+          - generic [ref=e24]:
+            - heading "What would you like to do today?" [level=2] [ref=e25]
+            - paragraph [ref=e26]: Choose from our powerful marketing tools
+          - generic [ref=e28]:
+            - generic [ref=e30] [cursor=pointer]:
+              - img [ref=e35] [cursor=pointer]
+              - generic [ref=e41] [cursor=pointer]:
+                - generic [ref=e42] [cursor=pointer]:
+                  - heading "Create Social Media Assets" [level=3] [ref=e43] [cursor=pointer]
+                  - paragraph [ref=e44] [cursor=pointer]: Design eye-catching posts, stories, and ads for Facebook, Instagram, and TikTok
+                - button "Create Assets" [ref=e46]
+            - generic [ref=e48] [cursor=pointer]:
+              - generic [ref=e50] [cursor=pointer]:
+                - img [ref=e52] [cursor=pointer]
+                - img [ref=e56] [cursor=pointer]
+              - generic [ref=e61] [cursor=pointer]:
+                - generic [ref=e62] [cursor=pointer]:
+                  - heading "Write Up Content" [level=3] [ref=e63] [cursor=pointer]
+                  - paragraph [ref=e64] [cursor=pointer]: Generate compelling property descriptions, blog posts, and marketing copy with AI assistance
+                - button "Start Writing" [ref=e66]
+            - generic [ref=e68] [cursor=pointer]:
+              - generic [ref=e70] [cursor=pointer]:
+                - img [ref=e72] [cursor=pointer]
+                - img [ref=e76] [cursor=pointer]
+              - generic [ref=e78] [cursor=pointer]:
+                - generic [ref=e79] [cursor=pointer]:
+                  - heading "View Dashboard" [level=3] [ref=e80] [cursor=pointer]
+                  - paragraph [ref=e81] [cursor=pointer]: Monitor campaign performance, track leads, and analyze ROI across all your properties
+                - button "Open Dashboard" [ref=e83]
+            - generic [ref=e85] [cursor=pointer]:
+              - generic [ref=e87] [cursor=pointer]:
+                - generic [ref=e89] [cursor=pointer]: AI
+                - img [ref=e91] [cursor=pointer]
+              - generic [ref=e96] [cursor=pointer]:
+                - generic [ref=e97] [cursor=pointer]:
+                  - heading "Create New Campaign" [level=3] [ref=e98] [cursor=pointer]
+                  - paragraph [ref=e99] [cursor=pointer]: Launch targeted marketing campaigns across multiple channels with AI optimization
+                - button "Launch Campaign" [ref=e101]
+        - generic [ref=e102]:
+          - generic [ref=e103]:
+            - heading "Quick Stats" [level=4] [ref=e105]:
+              - img [ref=e106]
+              - text: Quick Stats
+            - generic [ref=e109]:
+              - generic [ref=e110]:
+                - generic [ref=e111]: "24"
+                - generic [ref=e112]: Active Campaigns
+                - generic [ref=e113]: +12% vs last month
+              - generic [ref=e114]:
+                - generic [ref=e115]: "387"
+                - generic [ref=e116]: Leads Generated
+                - generic [ref=e117]: +28% vs last month
+              - generic [ref=e118]:
+                - generic [ref=e119]: £9.80
+                - generic [ref=e120]: Avg CPL
+                - generic [ref=e121]: "-15% vs last month"
+          - generic [ref=e122]:
+            - heading "Recent Activity" [level=4] [ref=e124]:
+              - img [ref=e125]
+              - text: Recent Activity
+            - generic [ref=e128]:
+              - generic [ref=e131]:
+                - paragraph [ref=e132]: Campaign launched
+                - paragraph [ref=e133]: Shoreditch property
+                - paragraph [ref=e134]: 2 hours ago
+              - generic [ref=e137]:
+                - paragraph [ref=e138]: Content generated
+                - paragraph [ref=e139]: 3 new social posts
+                - paragraph [ref=e140]: 4 hours ago
+              - generic [ref=e143]:
+                - paragraph [ref=e144]: Lead received
+                - paragraph [ref=e145]: Hackney apartment
+                - paragraph [ref=e146]: 6 hours ago
+        - generic [ref=e148]:
+          - generic [ref=e149]:
+            - img [ref=e150]
+            - heading "Need help getting started?" [level=3] [ref=e153]
+          - paragraph [ref=e154]: Check our comprehensive guides or get in touch with our support team.
+          - generic [ref=e155]:
+            - button "View Guides" [ref=e156]:
+              - img
+              - text: View Guides
+            - button "Contact Support" [ref=e157]:
+              - img
+              - text: Contact Support
+  - region "Notifications alt+T"
+```

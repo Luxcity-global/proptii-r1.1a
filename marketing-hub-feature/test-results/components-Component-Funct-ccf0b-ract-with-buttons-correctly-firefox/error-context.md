@@ -1,0 +1,201 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - link "Skip to main content" [ref=e5] [cursor=pointer]:
+      - /url: "#main-content"
+    - link "Skip to navigation" [ref=e6] [cursor=pointer]:
+      - /url: "#navigation"
+    - link "Skip to search" [ref=e7] [cursor=pointer]:
+      - /url: "#search"
+  - banner [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - heading "Proptii" [level=1] [ref=e11]
+        - generic [ref=e12]:
+          - img [ref=e13]
+          - textbox "Search properties, campaigns, assets..." [ref=e16]
+      - generic [ref=e17]:
+        - button "3" [ref=e18]:
+          - img
+          - generic [ref=e19]: "3"
+        - button [ref=e20]:
+          - img
+        - generic [ref=e22]: JS
+  - main "Main content" [ref=e23]:
+    - generic [ref=e25]:
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - img [ref=e30]
+          - heading "Proptii" [level=2] [ref=e33]
+        - navigation [ref=e34]:
+          - button "Dashboard" [ref=e35]:
+            - img
+            - text: Dashboard
+          - button "Social Media Assets" [ref=e36]:
+            - img
+            - text: Social Media Assets
+          - button "Write Content" [ref=e37]:
+            - img
+            - text: Write Content
+          - button "Create Campaign" [ref=e38]:
+            - img
+            - text: Create Campaign
+          - button "Property Marketing" [ref=e39]:
+            - img
+            - text: Property Marketing
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - heading "Dashboard" [level=1] [ref=e43]
+            - paragraph [ref=e44]: Monitor your marketing performance and campaigns
+          - generic [ref=e45]:
+            - button "Search" [ref=e46]:
+              - img
+              - text: Search
+            - button "Filter" [ref=e47]:
+              - img
+              - text: Filter
+            - button "Create Campaign" [ref=e48]:
+              - img
+              - text: Create Campaign
+        - generic [ref=e49]:
+          - generic [ref=e52]:
+            - generic [ref=e53]:
+              - paragraph [ref=e54]: Total Campaigns
+              - paragraph [ref=e55]: "24"
+              - generic [ref=e56]:
+                - img [ref=e57]
+                - paragraph [ref=e60]: +12% from last month
+            - img [ref=e62]
+          - generic [ref=e69]:
+            - generic [ref=e70]:
+              - paragraph [ref=e71]: Leads Generated
+              - paragraph [ref=e72]: "387"
+              - generic [ref=e73]:
+                - img [ref=e74]
+                - paragraph [ref=e77]: +28% from last month
+            - img [ref=e79]
+          - generic [ref=e86]:
+            - generic [ref=e87]:
+              - paragraph [ref=e88]: Avg CPL
+              - paragraph [ref=e89]: £9.80
+              - generic [ref=e90]:
+                - img [ref=e91]
+                - paragraph [ref=e94]: "-15% from last month"
+            - img [ref=e96]
+          - generic [ref=e101]:
+            - generic [ref=e102]:
+              - paragraph [ref=e103]: ROI
+              - paragraph [ref=e104]: 4.2x
+              - generic [ref=e105]:
+                - img [ref=e106]
+                - paragraph [ref=e109]: +0.8x from last month
+            - img [ref=e111]
+        - generic [ref=e115]:
+          - generic [ref=e116]:
+            - generic [ref=e117]:
+              - heading "Active Campaigns" [level=4] [ref=e118]
+              - button [ref=e119]:
+                - img
+            - generic [ref=e121]:
+              - generic [ref=e122]:
+                - generic [ref=e123]:
+                  - generic [ref=e124]:
+                    - heading "Shoreditch Premium Campaign" [level=3] [ref=e125]
+                    - generic [ref=e126]: Active
+                  - paragraph [ref=e127]: 2-bed flat in Shoreditch
+                  - generic [ref=e128]:
+                    - generic [ref=e129]:
+                      - img [ref=e130]
+                      - text: Started 3 days ago
+                    - generic [ref=e135]:
+                      - img [ref=e136]
+                      - text: £2,500 budget
+                - generic [ref=e140]:
+                  - paragraph [ref=e141]: £47.20
+                  - paragraph [ref=e142]: 8 leads
+                  - generic [ref=e143]:
+                    - button [ref=e144]:
+                      - img
+                    - button [ref=e145]:
+                      - img
+              - generic [ref=e146]:
+                - generic [ref=e147]:
+                  - generic [ref=e148]:
+                    - heading "Canary Wharf Luxury Suite" [level=3] [ref=e149]
+                    - generic [ref=e150]: Paused
+                  - paragraph [ref=e151]: 1-bed luxury suite, Canary Wharf
+                  - generic [ref=e152]:
+                    - generic [ref=e153]:
+                      - img [ref=e154]
+                      - text: Started 1 week ago
+                    - generic [ref=e159]:
+                      - img [ref=e160]
+                      - text: £1,800 budget
+                - generic [ref=e164]:
+                  - paragraph [ref=e165]: £32.50
+                  - paragraph [ref=e166]: 5 leads
+                  - generic [ref=e167]:
+                    - button [ref=e168]:
+                      - img
+                    - button [ref=e169]:
+                      - img
+              - generic [ref=e170]:
+                - generic [ref=e171]:
+                  - generic [ref=e172]:
+                    - heading "Hackney Modern Apartment" [level=3] [ref=e173]
+                    - generic [ref=e174]: Draft
+                  - paragraph [ref=e175]: 3-bed modern apartment, Hackney
+                  - generic [ref=e176]:
+                    - generic [ref=e177]:
+                      - img [ref=e178]
+                      - text: Created yesterday
+                    - generic [ref=e183]:
+                      - img [ref=e184]
+                      - text: £3,200 budget
+                - generic [ref=e188]:
+                  - paragraph [ref=e189]: "-"
+                  - paragraph [ref=e190]: 0 leads
+                  - generic [ref=e191]:
+                    - button [ref=e192]:
+                      - img
+                    - button [ref=e193]:
+                      - img
+          - generic [ref=e194]:
+            - generic [ref=e195]:
+              - heading "Recent Activity" [level=4] [ref=e197]:
+                - img [ref=e198]
+                - text: Recent Activity
+              - generic [ref=e200]:
+                - generic [ref=e203]:
+                  - paragraph [ref=e204]: Campaign launched
+                  - paragraph [ref=e205]: Shoreditch property
+                  - paragraph [ref=e206]: 2 hours ago
+                - generic [ref=e209]:
+                  - paragraph [ref=e210]: Content generated
+                  - paragraph [ref=e211]: 3 new social posts
+                  - paragraph [ref=e212]: 4 hours ago
+                - generic [ref=e215]:
+                  - paragraph [ref=e216]: Lead received
+                  - paragraph [ref=e217]: Hackney apartment
+                  - paragraph [ref=e218]: 6 hours ago
+                - generic [ref=e221]:
+                  - paragraph [ref=e222]: Campaign paused
+                  - paragraph [ref=e223]: Canary Wharf suite
+                  - paragraph [ref=e224]: 1 day ago
+            - generic [ref=e225]:
+              - heading "Quick Actions" [level=4] [ref=e227]
+              - generic [ref=e228]:
+                - button "Create New Campaign" [ref=e229]:
+                  - img
+                  - text: Create New Campaign
+                - button "Generate Social Content" [ref=e230]:
+                  - img
+                  - text: Generate Social Content
+                - button "Write Property Description" [ref=e231]:
+                  - img
+                  - text: Write Property Description
+  - region "Notifications alt+T"
+```

@@ -1,0 +1,75 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "users_1_lastName": {
+            "value": null
+        },
+        "vulnerabilityAssessments_Default_storageContainerPath": {
+            "value": null
+        },
+        "sites_Referencing_Backend_name": {
+            "value": null
+        },
+        "servers_proptii_sql_server_name": {
+            "value": null
+        },
+        "sites_proptii_referencing_api_name": {
+            "value": null
+        },
+        "vaults_proptii_prod_kv_01_name": {
+            "value": null
+        },
+        "serverfarms_ASP_proptiirg_94e4_name": {
+            "value": null
+        },
+        "serverfarms_ASP_proptiirg_af74_name": {
+            "value": null
+        },
+        "storageAccounts_proptiir11a_name": {
+            "value": null
+        },
+        "storageAccounts_proptiirgac99_name": {
+            "value": null
+        },
+        "components_proptii_prod_ai_01_name": {
+            "value": null
+        },
+        "components_Referencing_Backend_name": {
+            "value": null
+        },
+        "storageAccounts_proptiiprodst01_name": {
+            "value": null
+        },
+        "accounts_proptii_vision_name": {
+            "value": null
+        },
+        "storageAccounts_proptiistagingst01_name": {
+            "value": null
+        },
+        "components_proptii_referencing_api_name": {
+            "value": null
+        },
+        "virtualNetworks_proptii_prod_vnet_01_name": {
+            "value": null
+        },
+        "service_Referencing_Backend_apim_name": {
+            "value": null
+        },
+        "storageAccounts_proptiiextractorstorage_name": {
+            "value": null
+        },
+        "networkSecurityGroups_proptii_prod_nsg_01_name": {
+            "value": null
+        },
+        "workspaces_proptii_prod_law_01_name": {
+            "value": null
+        },
+        "workspaces_managed_proptii_prod_ai_01_ws_externalid": {
+            "value": null
+        },
+        "workspaces_DefaultWorkspace_93714023_0875_491f_bd2f_dbc0ce275c4c_SUK_externalid": {
+            "value": null
+        }
+    }
+}

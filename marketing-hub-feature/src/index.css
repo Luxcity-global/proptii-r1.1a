@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --color-lux-blue-50: #f0f4ff;
+  --color-lux-blue-100: #e0e9ff;
+  --color-lux-blue-200: #c7d6ff;
+  --color-lux-blue-300: #a4baff;
+  --color-lux-blue-400: #7e94ff;
+  --color-lux-blue-500: #5b6eff;
+  --color-lux-blue-600: #136C9E;
+  --color-lux-blue-700: #3730a3;
+  --color-lux-blue-800: #312e81;
+  --color-lux-blue-900: #1e1b4b;
+  
+  --color-lux-orange-50: #fff8f0;
+  --color-lux-orange-100: #ffedd5;
+  --color-lux-orange-200: #fed7aa;
+  --color-lux-orange-300: #fdba74;
+  --color-lux-orange-400: #fb923c;
+  --color-lux-orange-500: #f97316;
+  --color-lux-orange-600: #DC5F12;
+  --color-lux-orange-700: #c2410c;
+  --color-lux-orange-800: #9a3412;
+  --color-lux-orange-900: #7c2d12;
+  
+  --color-lux-green-50: #f0fdf4;
+  --color-lux-green-100: #dcfce7;
+  --color-lux-green-200: #bbf7d0;
+  --color-lux-green-300: #86efac;
+  --color-lux-green-400: #4ade80;
+  --color-lux-green-500: #22c55e;
+  --color-lux-green-600: #16a34a;
+  --color-lux-green-700: #15803d;
+  --color-lux-green-800: #166534;
+  --color-lux-green-900: #14532d;
+  
+  --color-lux-cream-25: #ffffff;
+  --color-lux-cream-50: #fefefe;
+  --color-lux-cream-100: #fcfcfc;
+  --color-lux-cream-200: #f8f8f8;
+  --color-lux-cream-300: #f3f3f3;
+  --color-lux-cream-400: #ededed;
+  --color-lux-cream-500: #e5e5e5;
+  --color-lux-cream-600: #d1d1d1;
+  --color-lux-cream-700: #b8b8b8;
+  --color-lux-cream-800: #8a8a8a;
+  --color-lux-cream-900: #5c5c5c;
+  
+  --color-background: #fefefe;
+  --color-foreground: #1e1b4b;
+  --color-card: #ffffff;
+  --color-card-foreground: #1e1b4b;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1e1b4b;
+  --color-primary: #136C9E;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #ffedd5;
+  --color-secondary-foreground: #c2410c;
+  --color-muted: #f8f8f8;
+  --color-muted-foreground: #b8b8b8;
+  --color-accent: #fcfcfc;
+  --color-accent-foreground: #312e81;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #f3f3f3;
+  --color-input: transparent;
+  --color-ring: #a4baff;
+  
+  --font-family-sans: 'Inter', system-ui, sans-serif;
+  --radius: 0.5rem;
+}

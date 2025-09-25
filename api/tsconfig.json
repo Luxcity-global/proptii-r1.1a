@@ -1,0 +1,35 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "target": "es2020",
+        "outDir": "dist",
+        "rootDir": "src",
+        "sourceMap": true,
+        "strict": true,
+        "moduleResolution": "node",
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "baseUrl": ".",
+        "paths": {
+            "@/*": [
+                "src/*"
+            ]
+        }
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist",
+        "src/shared/services/AccessControlService.ts",
+        "src/shared/services/BackupService.ts",
+        "src/shared/services/EncryptionService.ts",
+        "src/shared/services/EventGridService.ts",
+        "src/shared/services/FunctionService.ts",
+        "src/shared/services/NetworkSecurityService.ts",
+        "src/shared/services/PerformanceTestService.ts"
+    ]
+}

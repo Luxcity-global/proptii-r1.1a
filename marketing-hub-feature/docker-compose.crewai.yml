@@ -1,0 +1,193 @@
+version: "3.8"
+
+services:
+  # CrewAI Service
+  crewai-service:
+    build:
+      context: ./crewai-service
+      dockerfile: Dockerfile
+    container_name: crewai-property-marketing
+    ports:
+      - "8002:8002"
+    environment:
+      - CREWAI_VERBOSE=true
+      - CREWAI_MEMORY=true
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
+      - WEBSOCKET_HOST=0.0.0.0
+      - WEBSOCKET_PORT=8002
+      - LOG_LEVEL=INFO
+      - UK_PROPERTY_API_KEY=${UK_PROPERTY_API_KEY}
+      - EPC_API_KEY=${EPC_API_KEY}
+    volumes:
+      - ./crewai-service:/app
+      - /app/node_modules
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - marketing-hub-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis for job queue and caching
+  redis:
+    image: redis:7-alpine
+    container_name: marketing-hub-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - marketing-hub-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # PostgreSQL for data storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: marketing-hub-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=marketing_hub
+      - POSTGRES_USER=marketing_hub_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-marketing_hub_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - marketing-hub-network
+    restart: unless-stopped
+
+  # Existing Marketing Hub Frontend (for reference)
+  marketing-hub-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: marketing-hub-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8001/api/v1/v2
+      - VITE_CREWAI_WS_URL=ws://localhost:8002
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - crewai-service
+    networks:
+      - marketing-hub-network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  marketing-hub-network:
+    driver: bridge
+
+services:
+  # CrewAI Service
+  crewai-service:
+    build:
+      context: ./crewai-service
+      dockerfile: Dockerfile
+    container_name: crewai-property-marketing
+    ports:
+      - "8002:8002"
+    environment:
+      - CREWAI_VERBOSE=true
+      - CREWAI_MEMORY=true
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
+      - WEBSOCKET_HOST=0.0.0.0
+      - WEBSOCKET_PORT=8002
+      - LOG_LEVEL=INFO
+      - UK_PROPERTY_API_KEY=${UK_PROPERTY_API_KEY}
+      - EPC_API_KEY=${EPC_API_KEY}
+    volumes:
+      - ./crewai-service:/app
+      - /app/node_modules
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - marketing-hub-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis for job queue and caching
+  redis:
+    image: redis:7-alpine
+    container_name: marketing-hub-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - marketing-hub-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # PostgreSQL for data storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: marketing-hub-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=marketing_hub
+      - POSTGRES_USER=marketing_hub_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-marketing_hub_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - marketing-hub-network
+    restart: unless-stopped
+
+  # Existing Marketing Hub Frontend (for reference)
+  marketing-hub-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: marketing-hub-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8001/api/v1/v2
+      - VITE_CREWAI_WS_URL=ws://localhost:8002
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - crewai-service
+    networks:
+      - marketing-hub-network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  marketing-hub-network:
+    driver: bridge
+
+

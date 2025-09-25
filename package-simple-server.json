@@ -1,0 +1,16 @@
+{
+  "name": "simple-docusign-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Simple Express server for DocuSign API",
+  "main": "simple-docusign-server.js",
+  "scripts": {
+    "start": "node simple-docusign-server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^3.3.2"
+  }
+} 
