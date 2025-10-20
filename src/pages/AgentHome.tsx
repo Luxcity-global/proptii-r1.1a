@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import Navbar from '../components/Navbar';
+import AgentNavbar from '../components/AgentNavbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 
@@ -25,7 +25,7 @@ const AgentHome = () => {
 
   return (
     <div className="min-h-screen font-nunito">
-      <Navbar isAgent={true} />
+      <AgentNavbar isAgent={true} />
 
       {/* Hero Section */}
       <section className="h-[80vh] relative flex items-center">

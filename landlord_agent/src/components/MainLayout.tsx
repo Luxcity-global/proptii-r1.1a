@@ -41,19 +41,21 @@ function CustomSidebarHeader() {
       {/* Logo container with conditional padding */}
       <div className={`pt-2 pb-2 ${isCollapsed ? 'px-2' : 'pl-4 pr-2'}`}>
         <div className={`flex items-center h-8 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
-          {isCollapsed ? (
-            <img 
-              src={proptiiLogoSmall} 
-              alt="Proptii Logo" 
-              className="w-8 h-8 object-contain flex-shrink-0"
-            />
-          ) : (
-            <img 
-              src={proptiiLogoLarge} 
-              alt="Proptii Logo" 
-              className="h-8 object-contain"
-            />
-          )}
+          <a href="http://localhost:5173" className="flex items-center">
+            {isCollapsed ? (
+              <img 
+                src={proptiiLogoSmall} 
+                alt="Proptii Logo" 
+                className="w-8 h-8 object-contain flex-shrink-0 hover:opacity-80 transition-opacity"
+              />
+            ) : (
+              <img 
+                src={proptiiLogoLarge} 
+                alt="Proptii Logo" 
+                className="h-8 object-contain hover:opacity-80 transition-opacity"
+              />
+            )}
+          </a>
         </div>
       </div>
     </div>
@@ -166,14 +168,20 @@ function CustomSidebarTrigger() {
       
       {/* Proptii Home Button */}
       {isCollapsed ? (
-        <button className="w-full flex items-center justify-center h-8 px-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors">
+        <a 
+          href="http://localhost:5173"
+          className="w-full flex items-center justify-center h-8 px-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors"
+        >
           <Home className="h-4 w-4" />
-        </button>
+        </a>
       ) : (
-        <button className="w-full flex items-center justify-center h-8 px-2 rounded-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 transition-colors text-sm font-medium">
+        <a 
+          href="http://localhost:5173"
+          className="w-full flex items-center justify-center h-8 px-2 rounded-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 transition-colors text-sm font-medium"
+        >
           <Home className="h-4 w-4 mr-2" />
           Proptii Home
-        </button>
+        </a>
       )}
     </div>
   );
