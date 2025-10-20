@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
-import ReferencingModal from '../components/ReferencingModal';
+import ReferencingModal from '../components/ReferencingModal.OLD';
 import ReviewModal from '../components/ReviewModal';
 import DocumentChecklistModal from '../components/DocumentChecklistModal';
 import { Swiper, SwiperSlide } from 'swiper/react';

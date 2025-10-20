@@ -1,18 +1,11 @@
-<<<<<<< HEAD
-import React, { createContext, useReducer, useContext, ReactNode, useEffect, useCallback } from 'react';
-=======
 import React, { createContext, useReducer, useContext, ReactNode, useEffect, useCallback, useState } from 'react';
->>>>>>> upstream/feature/ai-search-listings-agents
 import { FormData, FormSection, ReferencingState as FormReferencingState, ReferencingAction as FormReferencingAction, ReferencingFormData } from '../../../types/referencing';
 import { saveToLocalStorage, loadFromLocalStorage, saveDraft } from '../../../utils/localStorage';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import * as referencingService from '../../../services/referencingService';
 import { isAzureConfigured } from '../../../config/azure';
 import { uploadToAzureStorage } from '../../../services/storageService';
-<<<<<<< HEAD
-=======
 import * as yup from 'yup';
->>>>>>> upstream/feature/ai-search-listings-agents
 
 // Define the state type
 interface ReferencingState {
@@ -57,12 +50,6 @@ interface ReferencingContextType {
   saveAsDraft: (name: string) => Promise<boolean>;
   setPropertyId: (id: string) => void;
   uploadDocument: (section: FormSection, field: string, file: File) => Promise<string | null>;
-<<<<<<< HEAD
-}
-
-// Create the context
-const ReferencingContext = createContext<ReferencingContextType | null>(null);
-=======
   formData: FormData;
   errors: {
     [K in keyof FormData]?: {
@@ -70,11 +57,11 @@ const ReferencingContext = createContext<ReferencingContextType | null>(null);
     };
   };
   validateSection: (section: keyof FormData) => Promise<boolean>;
+  currentStep: number;
 }
 
 // Create the context
 const ReferencingContext = createContext<ReferencingContextType | undefined>(undefined);
->>>>>>> upstream/feature/ai-search-listings-agents
 
 // Initial state
 const initialFormData: FormData = {
@@ -477,13 +464,8 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
         return true;
       } else {
         // Simulate API call
-<<<<<<< HEAD
         await new Promise(resolve => setTimeout(resolve, 2000));
         return true;
-=======
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return true;
->>>>>>> upstream/feature/ai-search-listings-agents
       }
     } catch (error) {
       console.error('Error submitting application:', error);
@@ -686,8 +668,6 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
     return formData;
   };
 
-<<<<<<< HEAD
-=======
   // Validation schemas
   const employmentSchema = yup.object().shape({
     employmentStatus: yup.string().required('Employment status is required'),
@@ -738,7 +718,6 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
     }
   }, [state.formData]);
 
->>>>>>> upstream/feature/ai-search-listings-agents
   return (
     <ReferencingContext.Provider
       value={{
@@ -752,14 +731,11 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
         setCurrentStep,
         saveAsDraft,
         setPropertyId,
-<<<<<<< HEAD
-        uploadDocument
-=======
         uploadDocument,
         formData: state.formData,
         errors: state.errors,
-        validateSection
->>>>>>> upstream/feature/ai-search-listings-agents
+        validateSection,
+        currentStep: state.currentStep
       }}
     >
       {children}
@@ -774,10 +750,6 @@ export const useReferencing = (): ReferencingContextType => {
     throw new Error('useReferencing must be used within a ReferencingProvider');
   }
   return context;
-<<<<<<< HEAD
 };
-=======
-}; 
->>>>>>> upstream/feature/ai-search-listings-agents
 
 export default ReferencingContext; 

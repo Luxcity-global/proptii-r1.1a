@@ -12,11 +12,11 @@ import ContractsPage from './pages/Contracts';
 import BookViewing from './pages/BookViewing';
 import Dashboard from './components/dashboard/Dashboard';
 import { DashboardHome } from './components/dashboard/index';
-import SavedProperties from './components/dashboard/sections/SavedProperties';
-import Viewings from './components/dashboard/sections/Viewings';
-import TenantContracts from './components/dashboard/sections/TenantContracts';
-import FileTable from './components/dashboard/sections/YourFiles';
-import TenantReferencing from './components/dashboard/sections/TenantReferencing';
+import SavedProperties from './components/dashboard/sections/SavedProperties-new';
+import Viewings from './components/dashboard/sections/Viewings-new';
+import TenantContracts from './components/dashboard/sections/TenantContracts-new';
+import FileTable from './components/dashboard/sections/YourFiles-new';
+import TenantReferencing from './components/dashboard/sections/TenantReferencing-new';
 import AgentHome from './pages/AgentHome';
 import Listings from './pages/Listings';
 import NewListingPage from './pages/listings/new';
@@ -27,8 +27,8 @@ import AboutUs from './pages/AboutUs';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import FAQ from './pages/FAQ';
-import AgentContractLanding from './pages/AgentContractLanding';
-import SearchResults from './pages/SearchResults';
+// import AgentContractLanding from './pages/AgentContractLanding';
+// import SearchResults from './pages/SearchResults';
 
 export const App: React.FC = () => {
   return (
@@ -39,7 +39,7 @@ export const App: React.FC = () => {
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
-            <Route path="/search" element={<SearchResults />} />
+            {/* <Route path="/search" element={<SearchResults />} /> */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
@@ -77,7 +77,7 @@ export const App: React.FC = () => {
             </Route>
 
             {/* New agent contract route */}
-            <Route path="/agent-contracts" element={<AgentContractLanding />} />
+            {/* <Route path="/agent-contracts" element={<AgentContractLanding />} /> */}
 
             {/* Catch-all route for 404 */}
             <Route path="*" element={<NotFoundPage />} />

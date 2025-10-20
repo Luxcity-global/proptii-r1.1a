@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Box, CssBaseline, useTheme, useMediaQuery } from '@mui/material';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import DashboardSidebar from './ui/DashboardSidebar';
 import DashboardHeader from './ui/DashboardHeader';
-import { HomeIcon } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Define color constants (matching ReferencingModal)
 export const BLUE_COLOR = '#136C9E';
@@ -46,7 +45,7 @@ export const DASHBOARD_SECTIONS = [
         />
       </g>
     </svg>
-  )},,
+  )},
   { id: 'viewings', label: 'Viewings', path: '/dashboard/viewings', icon: (isSelected: boolean) => (
     <svg
       width="20"
@@ -63,7 +62,7 @@ export const DASHBOARD_SECTIONS = [
         />
       </g>
     </svg>
-  )},,
+  )},
   { id: 'tenant-contracts', label: 'Contracts', path: '/dashboard/tenant-contracts', icon: (isSelected: boolean) => (
     <svg
       width="20"
@@ -122,27 +121,31 @@ export const DASHBOARD_SECTIONS = [
 interface DashboardSidebarProps {
   activeSection: string;
   onSectionChange: (sectionId: string) => void;
-  isCollapsed: boolean; // Ensure this property is included in the props
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
 const Dashboard: React.FC = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md')); // Detect mobile/tablet view
+  const location = useLocation();
   const [activeSection, setActiveSection] = useState('dashboard');
-  const [isCollapsed, setIsCollapsed] = useState(false); // State to control sidebar collapse
-
-  // Removed duplicate declaration of handleSectionChange
-
-  // Automatically collapse the sidebar on mobile/tablet view
-  useEffect(() => {
-    setIsCollapsed(isMobile);
-  }, [isMobile]);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { user, isLoading } = useAuth();
 
   // Update activeSection based on the current route
   useEffect(() => {
-    const currentSection = DASHBOARD_SECTIONS.find((section) =>
-      section && location.pathname.startsWith(section.path)
-    );
+    // Sort sections by path length (longest first) to ensure more specific routes match first
+    const sortedSections = [...DASHBOARD_SECTIONS].sort((a, b) => {
+      if (!a || !b) return 0;
+      return b.path.length - a.path.length;
+    });
+    
+    const currentSection = sortedSections.find((section) => {
+      if (!section) return false;
+      
+      // Check if pathname starts with the section path
+      return location.pathname.startsWith(section.path);
+    });
+    
     if (currentSection) {
       setActiveSection(currentSection.id);
     }
@@ -152,47 +155,46 @@ const Dashboard: React.FC = () => {
     setActiveSection(sectionId);
   };
 
+  const handleToggleCollapse = () => {
+    setIsCollapsed(!isCollapsed);
+  };
+
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        overflow: 'hidden',
-        bgcolor: theme.palette.background.default,
+    <div 
+      className="flex h-screen overflow-hidden"
+      style={{ 
+        backgroundColor: '#F7F7F7',
+        fontFamily: 'Archivo, sans-serif'
       }}
     >
-      <CssBaseline />
-
-      <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
         {/* Sidebar */}
         <DashboardSidebar
           activeSection={activeSection}
           onSectionChange={handleSectionChange}
-          isCollapsed={isCollapsed} // Pass collapse state to the sidebar
-          onToggleCollapse={function (): void {
-            throw new Error('Function not implemented.');
-          } }        />
+        isCollapsed={isCollapsed}
+        onToggleCollapse={handleToggleCollapse}
+      />
 
         {/* Main content */}
-        <Box
-          component="main"
-          sx={{
-            flexGrow: 1,
-            p: 3,
-            overflow: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <DashboardHeader userName="Tosin Lanipekun" />
+      <main 
+        className="flex-1 overflow-auto"
+        style={{ marginLeft: isCollapsed ? '56px' : '220px' }}
+      >
+        <div className="mt-8 max-w-7xl mx-auto px-3">
+          <DashboardHeader 
+            userName={
+              isLoading 
+                ? "Loading..." 
+                : user?.name || user?.givenName || "User"
+            } 
+          />
+        </div>
 
-          <Box sx={{ flexGrow: 1, mt: 2 }}>
+        <div className="max-w-7xl mx-auto px-3 pb-8">
             <Outlet />
-          </Box>
-        </Box>
-      </Box>
-    </Box>
+        </div>
+      </main>
+    </div>
   );
 };
 
