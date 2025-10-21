@@ -37,7 +37,7 @@ function CustomSidebarHeader() {
   const isCollapsed = state === 'collapsed';
 
   return (
-    <div className="border-b border-sidebar-border">
+    <div className="border-b" style={{ borderColor: '#f2f2f2' }}>
       {/* Logo container with conditional padding */}
       <div className={`pt-2 pb-2 ${isCollapsed ? 'px-2' : 'pl-4 pr-2'}`}>
         <div className={`flex items-center h-8 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
@@ -76,7 +76,7 @@ function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
   const isCollapsed = state === 'collapsed';
 
   return (
-    <div className="pt-2 pb-2 pl-4 pr-2">
+    <div className="pt-12 pb-2 pl-4 pr-2">
       <div className="space-y-3">
         {navigationItems.map((item) => {
           const isActive = currentScreen === item.id;
@@ -87,10 +87,15 @@ function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
               className={`
                 w-full flex items-center h-10 px-3 rounded-md text-sm font-medium transition-colors
                 ${isCollapsed ? 'justify-center' : 'justify-start'}
+                focus:outline-none focus:ring-0
+                ${isActive ? 'border-[#f2f2f2]' : ''}
               `}
               style={{ 
                 color: isActive ? '#136C9E' : '#374957',
-                backgroundColor: isActive ? '#E6F3FF' : 'transparent'
+                backgroundColor: isActive ? '#E6F3FF' : 'transparent',
+                border: isActive ? '2px solid #f2f2f2 !important' : '2px solid transparent !important',
+                outline: 'none !important',
+                boxShadow: isActive ? '0 0 0 1px #f2f2f2 !important' : 'none !important'
               }}
               onMouseEnter={(e) => {
                 if (!isActive) {
@@ -123,7 +128,7 @@ function CustomUserProfile({ userProfile }: { userProfile: UserProfile | null })
   if (!userProfile) return null;
 
   return (
-    <div className="border-t border-sidebar-border pt-2 pb-2 pl-4 pr-2">
+    <div className="border-t pt-2 pb-2 pl-4 pr-2" style={{ borderColor: '#f2f2f2' }}>
       <div className="flex items-center h-8 px-2">
         <Avatar className="h-4 w-4 flex-shrink-0">
           {userProfile.logo && <AvatarImage src={userProfile.logo} alt={userProfile.name} />}
@@ -153,7 +158,7 @@ function CustomSidebarTrigger() {
   const isCollapsed = state === 'collapsed';
 
   return (
-    <div className="border-t border-sidebar-border pt-2 pb-2 pl-4 pr-2 space-y-2">
+    <div className="border-t pt-2 pb-2 pl-4 pr-2 space-y-2" style={{ borderColor: '#f2f2f2' }}>
       {/* Collapse/Expand Trigger */}
       <button
         onClick={toggleSidebar}
@@ -210,9 +215,15 @@ function CustomSidebar({
     <div className="group peer hidden md:block" data-collapsible="icon" style={{ color: '#374957' }}>
       {/* Sidebar Container */}
       <div 
-        className="fixed inset-y-0 left-0 z-10 h-screen transition-all duration-300 ease-out bg-white border-r border-sidebar-border"
+        className="sidebar-fixed fixed inset-y-0 left-0 z-50 h-screen bg-white"
         style={{
-          width: isCollapsed ? 'var(--sidebar-width-collapsed)' : 'var(--sidebar-width)'
+          width: isCollapsed ? 'var(--sidebar-width-collapsed)' : 'var(--sidebar-width)',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          bottom: 0,
+          transform: 'none',
+          borderRight: '1px solid #f2f2f2'
         }}
       >
         <div className="flex flex-col h-full">

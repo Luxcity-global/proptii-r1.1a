@@ -206,7 +206,8 @@ export function PropertiesPage({
             borderColor: '#DC5F12', 
             minWidth: '180px',
             background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+            color: 'white'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
@@ -519,7 +520,7 @@ export function PropertiesPage({
             const arrears = tenant ? getArrearsForTenant(tenant.id) : null;
             
             return (
-              <Card key={property.id} className="overflow-hidden">
+              <Card key={property.id} className="overflow-hidden" style={{ borderColor: '#f2f2f2', borderWidth: '1px', backgroundColor: 'white' }}>
                 <CardHeader className="p-0">
                   {coverPhoto ? (
                     <div className="aspect-video bg-muted">

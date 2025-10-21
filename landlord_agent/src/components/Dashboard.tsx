@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { useSharedAuth } from "../hooks/useSharedAuth";
+import { crossAppAuthBridge } from "../services/CrossAppAuthBridge";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -86,6 +89,66 @@ export function Dashboard({
   vacancyAlerts = [],
   arrearsAlerts = [],
 }: DashboardProps) {
+  const { user } = useAuth();
+  const { user: sharedUser } = useSharedAuth();
+  const [crossAppUser, setCrossAppUser] = useState<{ name: string; email: string } | null>(null);
+
+  // Get cross-app authentication data
+  useEffect(() => {
+    const getCrossAppUser = () => {
+      // Try multiple sources for user data
+      const user = crossAppAuthBridge.getCurrentUserFromAnywhere();
+      
+      // Check various storage locations for user data
+      const localStorageUser = localStorage.getItem('user');
+      const sessionStorageUser = sessionStorage.getItem('user');
+      const msalUser = localStorage.getItem('msal.account.keys');
+      const authUser = localStorage.getItem('auth_user');
+      
+      let parsedUser = null;
+      
+      // Try to parse any stored user data
+      const userSources = [localStorageUser, sessionStorageUser, authUser];
+      for (const source of userSources) {
+        if (source) {
+          try {
+            parsedUser = JSON.parse(source);
+            if (parsedUser && parsedUser.name) {
+              break; // Found a valid user
+            }
+          } catch (e) {
+            console.error('Error parsing stored user:', e);
+          }
+        }
+      }
+      
+      // If no user found, create a mock user for testing
+      if (!parsedUser && !user) {
+        parsedUser = {
+          name: "John Doe",
+          email: "john.doe@example.com"
+        };
+        console.log('Using mock user for testing:', parsedUser);
+      }
+      
+      setCrossAppUser(user || parsedUser);
+    };
+
+    // Get initial data
+    getCrossAppUser();
+
+    // Listen for cross-app auth changes
+    const handleCrossAppAuthChange = () => {
+      getCrossAppUser();
+    };
+
+    window.addEventListener('cross-app-auth-changed', handleCrossAppAuthChange);
+    
+    return () => {
+      window.removeEventListener('cross-app-auth-changed', handleCrossAppAuthChange);
+    };
+  }, [user, sharedUser, userProfile]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [complianceFilter, setComplianceFilter] =
@@ -438,18 +501,18 @@ export function Dashboard({
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7' }}>
       {/* Clean Header */}
-      <div className="sticky top-8 z-50 mt-8 max-w-7xl mx-auto bg-white shadow-lg rounded-xl">
+      <div className="mt-8 max-w-7xl mx-auto bg-white shadow-lg rounded-xl">
         <div className="px-8 py-6">
           <div className="flex items-center justify-between min-w-0">
             <div className="flex items-center space-x-6 flex-1 min-w-0">
               {/* Avatar Circle */}
               <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium text-lg flex-shrink-0">
-                {(userProfile?.name || "Tosin Lanipekun").charAt(0).toUpperCase()}
+                {(userProfile?.name || user?.name || sharedUser?.name || crossAppUser?.name || "T").charAt(0).toUpperCase()}
               </div>
               
               <div className="min-w-0">
                 <h1 className="text-xl font-semibold mb-1 truncate" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
-                  Welcome <span style={{ color: '#136C9E' }}>{userProfile?.name || "Tosin Lanipekun"}</span> <span className="inline-flex items-center ml-2"><span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span><span className="text-sm font-normal text-green-600">Verified</span></span>
+                  Welcome <span style={{ color: '#136C9E' }}>{userProfile?.name || user?.name || sharedUser?.name || crossAppUser?.name || "User"}</span> <span className="inline-flex items-center ml-2"><span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span><span className="text-sm font-normal text-green-600">Verified</span></span>
               </h1>
                 <p className="text-sm text-gray-500 truncate">
                 Here's what's happening with your property portfolio
@@ -475,7 +538,10 @@ export function Dashboard({
                 className="px-4 py-3 cursor-pointer transition-all duration-300 min-h-[3.5rem] flex items-center justify-center flex-shrink-0"
                   onClick={onViewInsights}
                 style={{
-                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                  borderColor: '#f2f2f2',
+                  borderWidth: '1px',
+                  backgroundColor: 'white'
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.boxShadow = '0 8px 20px rgba(255, 248, 220, 0.6), 0 4px 10px rgba(0, 0, 0, 0.1)';
@@ -507,7 +573,8 @@ export function Dashboard({
                   backgroundColor: '#DC5F12', 
                   borderColor: '#DC5F12', 
                   minWidth: '180px',
-                  background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)'
+                  background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
+                  color: 'white'
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
@@ -538,7 +605,7 @@ export function Dashboard({
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="p-6">
+          <Card className="p-6" style={{ borderColor: '#f2f2f2', borderWidth: '1px', backgroundColor: 'white' }}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-muted-foreground mb-1 text-sm">
@@ -554,7 +621,7 @@ export function Dashboard({
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-6" style={{ borderColor: '#f2f2f2', borderWidth: '1px', backgroundColor: 'white' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-6 flex-1">
                 <div className="text-center">
@@ -583,7 +650,7 @@ export function Dashboard({
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-6" style={{ borderColor: '#f2f2f2', borderWidth: '1px', backgroundColor: 'white' }}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-muted-foreground mb-1 text-sm">
@@ -599,7 +666,7 @@ export function Dashboard({
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-6" style={{ borderColor: '#f2f2f2', borderWidth: '1px', backgroundColor: 'white' }}>
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-muted-foreground mb-1 text-sm">
@@ -1090,7 +1157,8 @@ export function Dashboard({
                 borderColor: '#DC5F12', 
                 minWidth: '180px',
                 background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                color: 'white'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
@@ -1113,6 +1181,7 @@ export function Dashboard({
               <Card
                 key={property.id}
                 className="overflow-hidden hover:shadow-lg transition-shadow"
+                style={{ borderColor: '#f2f2f2', borderWidth: '1px', backgroundColor: 'white' }}
               >
                 {/* Property Image */}
                 <div className="aspect-video relative overflow-hidden">

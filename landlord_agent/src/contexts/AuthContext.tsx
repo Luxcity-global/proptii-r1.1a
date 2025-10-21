@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { loginRequest, graphConfig } from '../config/azureConfig';
+import { sharedAuthService } from '../services/SharedAuthService';
 import { UserProfile } from '../App';
 
 interface AuthContextType {
@@ -84,8 +85,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setIsLoading(false);
         }
       } else {
-        setUser(null);
-        setIsLoading(false);
+        // Try to get user from shared auth service as fallback
+        try {
+          const sharedUser = await sharedAuthService.getCurrentUser();
+          if (sharedUser) {
+            setUser({
+              name: sharedUser.name,
+              email: sharedUser.email,
+              phone: '',
+              companyName: '',
+            });
+          } else {
+            setUser(null);
+          }
+        } catch (err) {
+          setUser(null);
+        } finally {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -97,7 +114,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError(null);
     
     try {
-      await instance.loginPopup(loginRequest);
+      // Try shared auth service first
+      const sharedUser = await sharedAuthService.login();
+      if (sharedUser) {
+        setUser({
+          name: sharedUser.name,
+          email: sharedUser.email,
+          phone: '',
+          companyName: '',
+        });
+      } else {
+        // Fallback to MSAL instance
+        await instance.loginPopup(loginRequest);
+      }
     } catch (error: any) {
       setError(error.message || 'Login failed');
       console.error('Login error:', error);
@@ -106,10 +135,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    instance.logoutPopup({
-      postLogoutRedirectUri: window.location.origin,
-    });
+  const logout = async () => {
+    try {
+      // Try shared auth service first
+      await sharedAuthService.logout();
+    } catch (error) {
+      // Fallback to MSAL instance
+      instance.logoutPopup({
+        postLogoutRedirectUri: window.location.origin,
+      });
+    }
   };
 
   const value: AuthContextType = {
