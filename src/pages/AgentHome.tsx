@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import AgentNavbar from '../components/AgentNavbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
+import RoleSelectionModal from '../components/RoleSelectionModal';
 
 // Add preload link for the hero image
 const heroImageUrl = '/images/hero-agent-happy-couple.jpg';
@@ -17,11 +18,23 @@ const preloadHeroImage = () => {
 
 const AgentHome = () => {
   const navigate = useNavigate();
+  const [showRoleModal, setShowRoleModal] = useState(true);
+  const [selectedRole, setSelectedRole] = useState<'landlord' | 'agent' | null>(null);
 
   // Preload hero image when component mounts
   useEffect(() => {
     preloadHeroImage();
   }, []);
+
+  const handleAgentToggle = () => {
+    setShowRoleModal(true);
+  };
+
+  const handleRoleSelection = (role: 'landlord' | 'agent') => {
+    setShowRoleModal(false);
+    setSelectedRole(role);
+    console.log('Selected role:', role);
+  };
 
   return (
     <div className="min-h-screen font-archivo">
@@ -36,7 +49,7 @@ const AgentHome = () => {
             alt="Happy couple with agent"
             className="w-full h-full object-cover"
             loading="eager"
-            fetchPriority="high"
+            fetchpriority="high"
             decoding="sync"
             sizes="100vw"
           />
@@ -53,7 +66,11 @@ const AgentHome = () => {
               >
                 Tenant
               </Link>
-              <button className="px-8 py-3 rounded-full bg-[#FFEFD4] text-black font-semibold transition-all">
+              <button 
+                type="button"
+                onClick={() => { console.log('Agent toggle clicked'); handleAgentToggle(); }}
+                className="px-8 py-3 rounded-full bg-[#FFEFD4] text-black font-semibold transition-all"
+              >
                 Agent
               </button>
             </div>
@@ -69,13 +86,25 @@ const AgentHome = () => {
             Streamline your property listings and reach more potential tenants.
           </p>
 
-          {/* View Your Dashboard Button */}
-          <a
-            href="http://localhost:3000#dashboard"
-            className="inline-block px-8 py-4 bg-[#FFEFD4] text-black rounded-full text-lg font-semibold hover:bg-opacity-90 transition-all"
-          >
-            View Your Dashboard
-          </a>
+                 {/* View Your Dashboard Button */}
+                 <div className="flex flex-col items-center gap-3">
+                   <a
+                     href={`http://localhost:3000?role=${selectedRole}#dashboard`}
+                     className="inline-block px-8 py-4 bg-[#FFEFD4] text-black rounded-full text-lg font-semibold hover:bg-opacity-90 transition-all"
+                   >
+                     View Your Dashboard
+                   </a>
+                   {selectedRole && (
+                     <div className="flex items-center gap-2 px-3 py-1 bg-[#136C9E] text-white rounded-full text-sm">
+                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                       </svg>
+                       <span className="font-medium">
+                         {selectedRole === 'landlord' ? 'Landlord' : 'Property Agent'} Dashboard
+                       </span>
+                     </div>
+                   )}
+                 </div>
         </div>
       </section>
 
@@ -183,6 +212,13 @@ const AgentHome = () => {
 
       {/* Footer */}
       <Footer />
+
+      {/* Role Selection Modal */}
+      <RoleSelectionModal
+        isOpen={showRoleModal}
+        onClose={() => setShowRoleModal(false)}
+        onSelectRole={handleRoleSelection}
+      />
     </div>
   );
 };

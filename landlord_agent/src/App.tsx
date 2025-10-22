@@ -285,6 +285,17 @@ function AppContent() {
   React.useEffect(() => {
     const checkHashAndNavigate = () => {
       const hash = window.location.hash;
+      const urlParams = new URLSearchParams(window.location.search);
+      const roleFromUrl = urlParams.get('role');
+      
+      // Update role if provided in URL
+      if (roleFromUrl && (roleFromUrl === 'landlord' || roleFromUrl === 'agent')) {
+        setUserRole(roleFromUrl);
+        // Clean up URL after reading role
+        const newUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+      
       if (hash === '#dashboard') {
         setCurrentScreen('main-app');
         setNavigationScreen('dashboard');
@@ -303,6 +314,7 @@ function AppContent() {
       window.removeEventListener('hashchange', checkHashAndNavigate);
     };
   }, []);
+
   
   // Property setup state
   const [propertySetupData, setPropertySetupData] = useState<PropertySetupData>({
@@ -1169,6 +1181,11 @@ function AppContent() {
         return <WelcomeScreen onGetStarted={() => navigateToScreen('role-selection')} />;
       
       case 'role-selection':
+        // If role is already set from external source, skip role selection
+        if (userRole && (userRole === 'landlord' || userRole === 'agent')) {
+          navigateToScreen('profile-setup');
+          return null;
+        }
         return (
           <RoleSelection
             selectedRole={userRole}

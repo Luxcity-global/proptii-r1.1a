@@ -406,26 +406,26 @@ export function PropertiesPage({
       <div className="bg-white rounded-xl p-6 mb-6" style={{ border: '1px solid #E5E7EB' }}>
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Select All Checkbox */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={selectAllProperties}
-              className="p-2"
-            >
-              {isAllSelected ? (
-                <CheckSquare className="h-4 w-4" />
-              ) : isPartiallySelected ? (
-                <CheckSquare className="h-4 w-4 opacity-50" />
-              ) : (
-                <Square className="h-4 w-4" />
-              )}
-            </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={selectAllProperties}
+            className="p-2"
+          >
+            {isAllSelected ? (
+              <CheckSquare className="h-4 w-4" />
+            ) : isPartiallySelected ? (
+              <CheckSquare className="h-4 w-4 opacity-50" />
+            ) : (
+              <Square className="h-4 w-4" />
+            )}
+          </Button>
             <span className="text-sm" style={{ color: '#374957' }}>
-              {isAllSelected ? 'Deselect All' : 'Select All'}
-            </span>
-          </div>
-
+            {isAllSelected ? 'Deselect All' : 'Select All'}
+          </span>
+        </div>
+        
           {/* Search Input */}
           <div className="flex-1">
             <div className="relative">
@@ -436,8 +436,8 @@ export function PropertiesPage({
                 type="text"
                 placeholder="Search properties by address or type..."
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-[#f3f3f3] placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
@@ -491,8 +491,8 @@ export function PropertiesPage({
                 </div>
               )}
             </div>
-          </div>
-
+        </div>
+        
           {/* Type Filter */}
           <div className="lg:w-48">
             <div className="relative">
@@ -518,13 +518,13 @@ export function PropertiesPage({
                     >
                       All Types
                     </button>
-                    {getPropertyTypes().map((type) => (
+              {getPropertyTypes().map((type) => (
                       <button
                         key={type}
                         className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
                         onClick={() => { setTypeFilter(type); setTypeDropdownOpen(false); }}
                       >
-                        {type}
+                  {type}
                       </button>
                     ))}
                   </div>
@@ -538,10 +538,10 @@ export function PropertiesPage({
             <button
               type="button"
               className="block w-full px-4 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-left text-sm text-[#374957] hover:border-[#DC5F12] hover:text-[#DC5F12] transition-all flex items-center justify-center"
-              onClick={() => setShowImportDialog(true)}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Import
+            onClick={() => setShowImportDialog(true)}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Import
             </button>
           </div>
         </div>
