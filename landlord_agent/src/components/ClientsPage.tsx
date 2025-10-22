@@ -343,10 +343,10 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6" style={{ backgroundColor: '#f2f2f2', fontFamily: 'Archivo, sans-serif' }}>
       <div className="flex justify-between items-start">
         <div className="text-left">
-          <h1 style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>Your Tenants</h1>
+          <h1 style={{ color: '#374957', fontFamily: 'Archivo, sans-serif', fontSize: '2rem', fontWeight: '700' }}>Your Tenants</h1>
           <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
             Manage your tenants and landlords
           </p>
@@ -355,16 +355,16 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="p-6">
+        <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted-foreground mb-1">
+              <p className="mb-1" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                 Total Tenants
               </p>
-              <p className="text-2xl font-semibold">
+              <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif' }}>
                 {summary.totalTenants}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                 {summary.currentCount} current, {summary.overdueCount} overdue
               </p>
             </div>
@@ -374,16 +374,16 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted-foreground mb-1">
+              <p className="mb-1" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                 Rent Arrears
               </p>
-              <p className="text-2xl font-semibold text-red-600">
+              <p className="text-2xl font-semibold text-red-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
                 £{summary.totalOverdueAmount.toLocaleString()}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                 {summary.overdueCount} tenant{summary.overdueCount !== 1 ? 's' : ''} behind
               </p>
             </div>
@@ -393,16 +393,16 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted-foreground mb-1">
+              <p className="mb-1" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                 Leases Expiring
               </p>
-              <p className="text-2xl font-semibold text-orange-600">
+              <p className="text-2xl font-semibold text-orange-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
                 {summary.leasesExpiringSoon}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                 Next 3 months
               </p>
             </div>
@@ -412,19 +412,19 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted-foreground mb-1">
+              <p className="mb-1" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                 Avg Risk Score
               </p>
               <p className={`text-2xl font-semibold ${
                 summary.avgRiskScore >= 70 ? 'text-red-600' : 
                 summary.avgRiskScore >= 40 ? 'text-orange-600' : 'text-green-600'
-              }`}>
+              }`} style={{ fontFamily: 'Archivo, sans-serif' }}>
                 {summary.avgRiskScore}%
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                 Default risk level
               </p>
             </div>
@@ -440,6 +440,98 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
           </div>
         </Card>
       </div>
+
+      {/* Filter Bar for Landlord Role with Add Tenant Button */}
+      {userRole === 'landlord' && (
+        <div className="bg-white rounded-xl p-6 mb-6" style={{ border: '1px solid #E5E7EB' }}>
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Select All Checkbox */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={selectAllTenants}
+                className="p-2"
+              >
+                {selectedTenants.length === filteredTenants.length && filteredTenants.length > 0 ? (
+                  <CheckSquare className="h-4 w-4" />
+                ) : (
+                  <Square className="h-4 w-4" />
+                )}
+              </Button>
+              <span className="text-sm" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
+                {selectedTenants.length === filteredTenants.length && filteredTenants.length > 0 ? 'Deselect All' : 'Select All'}
+              </span>
+            </div>
+
+            {/* Search Input */}
+            <div className="flex-1">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search tenants..."
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-[#f3f3f3] placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-sm"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Status Filter */}
+            <div className="lg:w-48">
+              <div className="relative">
+                <button
+                  type="button"
+                  className="block w-full px-4 py-2 pr-8 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-left text-sm"
+                  style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}
+                  onClick={() => setTenantFilter(tenantFilter === 'all' ? 'active' : tenantFilter === 'active' ? 'pending' : tenantFilter === 'pending' ? 'ended' : 'all')}
+                >
+                  {tenantFilter === 'all' ? 'All Status' :
+                   tenantFilter === 'active' ? 'Active' :
+                   tenantFilter === 'pending' ? 'Pending' : 'Ended'}
+                </button>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Add Tenant Button */}
+            <div className="flex items-center">
+              <Button 
+                onClick={onAddTenant}
+                className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto text-white" 
+                style={{ 
+                  backgroundColor: '#DC5F12', 
+                  borderColor: '#DC5F12', 
+                  minWidth: '180px',
+                  background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
+                  color: 'white !important'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
+                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                  e.currentTarget.style.transform = 'translateY(0px)';
+                }}
+              >
+                <Plus className="w-4 h-4" strokeWidth={2.5} style={{ color: 'white' }} />
+                <span style={{ color: 'white' }}>Add Tenant</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {userRole !== 'landlord' ? (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -463,67 +555,92 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
           </TabsList>
 
           <TabsContent value="tenants" className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search tenants..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+          {/* Filter Bar for Agent Role */}
+          <div className="bg-white rounded-xl p-6 mb-6" style={{ border: '1px solid #E5E7EB' }}>
+            <div className="flex flex-col lg:flex-row gap-4">
+              {/* Select All Checkbox */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={selectAllTenants}
+                  className="p-2"
+                >
+                  {selectedTenants.length === filteredTenants.length && filteredTenants.length > 0 ? (
+                    <CheckSquare className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                </Button>
+                <span className="text-sm" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
+                  {selectedTenants.length === filteredTenants.length && filteredTenants.length > 0 ? 'Deselect All' : 'Select All'}
+                </span>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={selectAllTenants}
-                className="flex items-center space-x-2"
-              >
-                {selectedTenants.length === filteredTenants.length ? (
-                  <CheckSquare className="h-4 w-4" />
-                ) : (
-                  <Square className="h-4 w-4" />
-                )}
-                <span>Select All</span>
-              </Button>
-              <Select value={tenantFilter} onValueChange={setTenantFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="ended">Ended</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button 
-                onClick={onAddTenant}
-                className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto" 
-                style={{ 
-                  backgroundColor: '#DC5F12', 
-                  borderColor: '#DC5F12', 
-                  minWidth: '180px',
-                  background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-                  e.currentTarget.style.transform = 'translateY(0px)';
-                }}
-              >
-                <Plus className="w-4 h-4" strokeWidth={2.5} />
-                <span>Add Tenant</span>
-              </Button>
+
+              {/* Search Input */}
+              <div className="flex-1">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search tenants..."
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-[#f3f3f3] placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-sm"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Status Filter */}
+              <div className="lg:w-48">
+                <div className="relative">
+                  <button
+                    type="button"
+                    className="block w-full px-4 py-2 pr-8 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-left text-sm"
+                    style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}
+                    onClick={() => setTenantFilter(tenantFilter === 'all' ? 'active' : tenantFilter === 'active' ? 'pending' : tenantFilter === 'pending' ? 'ended' : 'all')}
+                  >
+                    {tenantFilter === 'all' ? 'All Status' :
+                     tenantFilter === 'active' ? 'Active' :
+                     tenantFilter === 'pending' ? 'Pending' : 'Ended'}
+                  </button>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Add Tenant Button */}
+              <div className="flex items-center">
+                <Button 
+                  onClick={onAddTenant}
+                  className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto text-white" 
+                  style={{ 
+                    backgroundColor: '#DC5F12', 
+                    borderColor: '#DC5F12', 
+                    minWidth: '180px',
+                    background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
+                    color: 'white !important'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
+                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(0px)';
+                  }}
+                >
+                  <Plus className="w-4 h-4" strokeWidth={2.5} style={{ color: 'white' }} />
+                  <span style={{ color: 'white' }}>Add Tenant</span>
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -584,9 +701,10 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
               return (
                 <Card 
                   key={tenant.id} 
-                  className={`hover:shadow-md transition-shadow ${
+                  className={`transition-shadow ${
                     arrears ? 'border-red-200 bg-red-50/50' : ''
                   } ${selectedTenants.includes(tenant.id) ? 'ring-2 ring-blue-500' : ''}`}
+                  style={arrears ? { backgroundColor: 'rgba(254, 242, 242, 0.5)', border: '1px solid #fecaca' } : { backgroundColor: 'white', border: '1px solid #D1D5DB' }}
                 >
                   <CardContent className="p-6 cursor-pointer" onClick={() => onViewTenant(tenant)}>
                     <div className="flex items-start justify-between">
@@ -610,7 +728,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                         </Avatar>
                         <div className="flex-1 space-y-2">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-medium" style={{ color: '#374957' }}>{tenant.name}</h3>
+                            <h3 className="font-medium" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>{tenant.name}</h3>
                             <Badge className={getStatusColor(tenant.status)}>
                               {tenant.status}
                             </Badge>
@@ -626,7 +744,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                           </div>
                           
                           {/* Property Information */}
-                          <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <div className="flex items-center justify-between text-sm" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                             <div className="flex items-center">
                               <MapPin className="h-4 w-4 mr-2" />
                               {tenant.propertyAddress}
@@ -653,40 +771,40 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center text-red-800">
                                   <PoundSterling className="h-4 w-4 mr-2" />
-                                  <span className="font-medium">
+                                  <span className="font-medium" style={{ fontFamily: 'Archivo, sans-serif' }}>
                                     £{arrears.overdueAmount.toLocaleString()} overdue
                                   </span>
                                 </div>
-                                <span className="text-sm text-red-600">
+                                <span className="text-sm text-red-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
                                   {arrears.daysPastDue} days past due
                                 </span>
                               </div>
-                              <div className="mt-1 text-sm text-red-700">
+                              <div className="mt-1 text-sm text-red-700" style={{ fontFamily: 'Archivo, sans-serif' }}>
                                 Default Risk Score: {arrears.defaultRiskScore}%
                               </div>
                             </div>
                           )}
                           
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                            <div className="flex items-center">
+                            <div className="flex items-center" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                               <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
                               {tenant.email}
                             </div>
-                            <div className="flex items-center">
+                            <div className="flex items-center" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                               <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
                               {tenant.phone}
                             </div>
-                            <div className="flex items-center">
+                            <div className="flex items-center" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                               <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
                               {formatCurrency(tenant.rentAmount)}/month
                             </div>
                           </div>
-                          <div className="flex items-center text-sm text-muted-foreground">
+                          <div className="flex items-center text-sm" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                             <Calendar className="h-4 w-4 mr-2" />
                             Lease: {formatDate(tenant.leaseStart)} - {formatDate(tenant.leaseEnd)}
                           </div>
                           {tenant.emergencyContact && (
-                            <div className="text-sm text-muted-foreground">
+                            <div className="text-sm" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                               Emergency: {tenant.emergencyContact.name} ({tenant.emergencyContact.relationship}) - {tenant.emergencyContact.phone}
                             </div>
                           )}
@@ -918,57 +1036,6 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
       ) : (
         // For landlord users, show tenant list directly without tabs
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search tenants..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={selectAllTenants}
-                className="flex items-center space-x-2"
-              >
-                {selectedTenants.length === filteredTenants.length ? (
-                  <CheckSquare className="h-4 w-4" />
-                ) : (
-                  <Square className="h-4 w-4" />
-                )}
-                <span>{selectedTenants.length === filteredTenants.length ? 'Deselect All' : 'Select All'}</span>
-              </Button>
-              <Button 
-                onClick={onAddTenant} 
-                className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto" 
-                style={{ 
-                  backgroundColor: '#DC5F12', 
-                  borderColor: '#DC5F12', 
-                  minWidth: '180px',
-                  background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-                  e.currentTarget.style.transform = 'translateY(0px)';
-                }}
-              >
-                <Plus className="w-4 h-4" strokeWidth={2.5} />
-                <span>Add Tenant</span>
-              </Button>
-            </div>
-          </div>
 
           {/* Bulk Actions Bar */}
           {showBulkActions && selectedTenants.length > 0 && (
@@ -1027,9 +1094,10 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
               return (
                 <Card 
                   key={tenant.id} 
-                  className={`hover:shadow-md transition-shadow ${
+                  className={`transition-shadow ${
                     arrears ? 'border-red-200 bg-red-50/50' : ''
                   } ${selectedTenants.includes(tenant.id) ? 'ring-2 ring-blue-500' : ''}`}
+                  style={arrears ? { backgroundColor: 'rgba(254, 242, 242, 0.5)', border: '1px solid #fecaca' } : { backgroundColor: 'white', border: '1px solid #D1D5DB' }}
                 >
                   <CardContent className="p-6 cursor-pointer" onClick={() => onViewTenant(tenant)}>
                     <div className="flex items-start justify-between">

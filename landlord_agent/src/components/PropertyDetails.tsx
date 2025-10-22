@@ -165,9 +165,9 @@ export function PropertyDetails({
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen" style={{ backgroundColor: '#f2f2f2', fontFamily: 'Archivo, sans-serif' }}>
       {/* Header */}
-      <div className="border-b bg-card/50">
+      <div className="border-b bg-white">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -175,12 +175,12 @@ export function PropertyDetails({
                 <ArrowLeft className="w-4 h-4" />
               </Button>
               <div>
-                <h1 className="mb-1">{property.address}</h1>
+                <h1 className="mb-1" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{property.address}</h1>
                 <div className="flex items-center space-x-3">
                   <Badge className={`${getStatusColor(property.status)} text-white border-0`}>
                     {getStatusText(property.status)}
                   </Badge>
-                  <span className="text-muted-foreground">
+                  <span style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                     {property.type} • {property.bedrooms} bed{property.bedrooms !== 1 ? 's' : ''}
                   </span>
                 </div>
@@ -216,7 +216,7 @@ export function PropertyDetails({
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Property Photos */}
-            <Card className="overflow-hidden">
+            <Card className="overflow-hidden bg-white" style={{ border: '1px solid #D1D5DB' }}>
               {property.photos.length > 0 ? (
                 <div>
                   <div className="aspect-[16/10] relative overflow-hidden">
@@ -282,25 +282,25 @@ export function PropertyDetails({
               </TabsList>
 
               <TabsContent value="details">
-                <Card className="p-6">
+                <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <div>
-                        <h3 className="mb-2">Basic Information</h3>
+                        <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Basic Information</h3>
                         <div className="space-y-2">
-                          <div className="flex items-center text-muted-foreground">
+                          <div className="flex items-center" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                             <MapPin className="w-4 h-4 mr-2" />
                             {property.address}
                           </div>
-                          <div className="flex items-center text-muted-foreground">
+                          <div className="flex items-center" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                             <BedDouble className="w-4 h-4 mr-2" />
                             {property.bedrooms} bedroom{property.bedrooms !== 1 ? 's' : ''}
                           </div>
-                          <div className="flex items-center text-muted-foreground">
+                          <div className="flex items-center" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                             <PoundSterling className="w-4 h-4 mr-2" />
                             £{property.rent.toLocaleString()} per month
                           </div>
-                          <div className="flex items-center text-muted-foreground">
+                          <div className="flex items-center" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                             <Calendar className="w-4 h-4 mr-2" />
                             Added {formattedDates.createdAt}
                           </div>
@@ -311,7 +311,7 @@ export function PropertyDetails({
                     <div className="space-y-4">
                       {property.amenities.length > 0 && (
                         <div>
-                          <h3 className="mb-2">Amenities</h3>
+                          <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Amenities</h3>
                           <div className="flex flex-wrap gap-2">
                             {property.amenities.map((amenity) => (
                               <Badge key={amenity} variant="secondary">
@@ -324,8 +324,8 @@ export function PropertyDetails({
 
                       {property.notes && (
                         <div>
-                          <h3 className="mb-2">Notes</h3>
-                          <p className="text-muted-foreground">{property.notes}</p>
+                          <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Notes</h3>
+                          <p style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>{property.notes}</p>
                         </div>
                       )}
                     </div>
@@ -334,9 +334,9 @@ export function PropertyDetails({
               </TabsContent>
 
               <TabsContent value="documents">
-                <Card className="p-6">
+                <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
                   <div className="flex items-center justify-between mb-4">
-                    <h3>Property Documents</h3>
+                    <h3 style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Property Documents</h3>
                     <Button onClick={onManageDocuments}>
                       <FileText className="w-4 h-4 mr-2" />
                       Manage Documents
@@ -346,7 +346,7 @@ export function PropertyDetails({
                   {property.documents.length === 0 ? (
                     <div className="text-center py-8">
                       <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground mb-4">No documents uploaded</p>
+                      <p className="mb-4" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>No documents uploaded</p>
                       <Button variant="outline" onClick={onManageDocuments}>
                         Upload Documents
                       </Button>
@@ -456,8 +456,8 @@ export function PropertyDetails({
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Quick Actions */}
-            <Card className="p-6">
-              <h3 className="mb-4">Quick Actions</h3>
+            <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
+              <h3 className="mb-4" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Quick Actions</h3>
               <div className="space-y-3">
                 <Button 
                   variant="outline" 
@@ -496,8 +496,8 @@ export function PropertyDetails({
 
             {/* Current Tenant */}
             {property.status === 'occupied' && property.tenant && (
-              <Card className="p-6">
-                <h3 className="mb-4">Current Tenant</h3>
+              <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
+                <h3 className="mb-4" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Current Tenant</h3>
                 <div className="space-y-4">
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-12 w-12">
@@ -507,7 +507,7 @@ export function PropertyDetails({
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{property.tenant.name || 'Unknown Tenant'}</p>
+                      <p className="font-medium truncate" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{property.tenant.name || 'Unknown Tenant'}</p>
                       <div className="flex items-center space-x-1">
                         <Badge 
                           variant={property.tenant.paymentStatus === 'current' ? 'secondary' : 'destructive'}
@@ -522,25 +522,25 @@ export function PropertyDetails({
                   
                   <div className="space-y-2">
                     {property.tenant.email && (
-                      <div className="flex items-center text-sm text-muted-foreground">
+                      <div className="flex items-center text-sm" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                         <Mail className="w-4 h-4 mr-2" />
                         <span className="truncate">{property.tenant.email}</span>
                       </div>
                     )}
                     {property.tenant.phone && (
-                      <div className="flex items-center text-sm text-muted-foreground">
+                      <div className="flex items-center text-sm" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                         <Phone className="w-4 h-4 mr-2" />
                         {property.tenant.phone}
                       </div>
                     )}
                     {property.tenant.rentAmount && (
-                      <div className="flex items-center text-sm text-muted-foreground">
+                      <div className="flex items-center text-sm" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                         <PoundSterling className="w-4 h-4 mr-2" />
                         £{property.tenant.rentAmount.toLocaleString()} / month
                       </div>
                     )}
                     {formattedDates.leaseEnd && (
-                      <div className="flex items-center text-sm text-muted-foreground">
+                      <div className="flex items-center text-sm" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                         <Calendar className="w-4 h-4 mr-2" />
                         Lease until {formattedDates.leaseEnd}
                       </div>
@@ -578,14 +578,14 @@ export function PropertyDetails({
             )}
 
             {property.status === 'vacant' && (
-              <Card className="p-6">
-                <h3 className="mb-4">Property Status</h3>
+              <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
+                <h3 className="mb-4" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Property Status</h3>
                 <div className="text-center py-6">
                   <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
                     <User className="w-6 h-6 text-muted-foreground" />
                   </div>
-                  <p className="text-muted-foreground mb-2">Property is vacant</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="mb-2" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>Property is vacant</p>
+                  <p className="text-sm" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                     Ready for new tenant
                   </p>
                 </div>
@@ -593,14 +593,14 @@ export function PropertyDetails({
             )}
 
             {property.status === 'under-renovation' && (
-              <Card className="p-6">
-                <h3 className="mb-4">Property Status</h3>
+              <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
+                <h3 className="mb-4" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Property Status</h3>
                 <div className="text-center py-6">
                   <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <Clock className="w-6 h-6 text-orange-600" />
                   </div>
-                  <p className="text-muted-foreground mb-2">Under renovation</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="mb-2" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>Under renovation</p>
+                  <p className="text-sm" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                     Not available for tenants
                   </p>
                 </div>
@@ -608,20 +608,20 @@ export function PropertyDetails({
             )}
 
             {/* Compliance Status */}
-            <Card className="p-6">
-              <h3 className="mb-4">Compliance Status</h3>
+            <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
+              <h3 className="mb-4" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Compliance Status</h3>
               <div className="space-y-3">
                 {property.documents.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">
+                  <p className="text-sm" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                     No documents uploaded. Upload compliance documents to track their status.
                   </p>
                 ) : (
                   property.documents.map((document) => (
                     <div key={document.id} className="flex items-center justify-between">
-                      <span className="text-sm">{getDocumentTypeLabel(document.type)}</span>
+                      <span className="text-sm" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{getDocumentTypeLabel(document.type)}</span>
                       <div className="flex items-center space-x-2">
                         {getDocumentStatusIcon(document.status)}
-                        <span className="text-xs text-muted-foreground capitalize">
+                        <span className="text-xs capitalize" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
                           {document.status.replace('-', ' ')}
                         </span>
                       </div>
@@ -632,32 +632,32 @@ export function PropertyDetails({
             </Card>
 
             {/* Property Stats */}
-            <Card className="p-6">
-              <h3 className="mb-4">Property Summary</h3>
+            <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
+              <h3 className="mb-4" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Property Summary</h3>
               <div className="space-y-4">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Type</span>
-                  <span>{property.type}</span>
+                  <span style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>Type</span>
+                  <span style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>{property.type}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Bedrooms</span>
-                  <span>{property.bedrooms}</span>
+                  <span style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>Bedrooms</span>
+                  <span style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>{property.bedrooms}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Monthly rent</span>
-                  <span>£{property.rent.toLocaleString()}</span>
+                  <span style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>Monthly rent</span>
+                  <span style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>£{property.rent.toLocaleString()}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Photos</span>
-                  <span>{property.photos.length}</span>
+                  <span style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>Photos</span>
+                  <span style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>{property.photos.length}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Documents</span>
-                  <span>{property.documents.length}</span>
+                  <span style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>Documents</span>
+                  <span style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>{property.documents.length}</span>
                 </div>
               </div>
             </Card>

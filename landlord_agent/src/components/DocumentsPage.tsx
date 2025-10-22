@@ -30,6 +30,8 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
 
   // Flatten all documents with property information
   const allDocuments = useMemo<DocumentWithProperty[]>(() => {
@@ -184,23 +186,23 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6" style={{ fontFamily: 'Archivo, sans-serif' }}>
       <div>
-        <h1 style={{ color: '#374957' }}>Documents</h1>
-        <p className="text-muted-foreground">
+        <h1 style={{ color: '#374957', fontFamily: 'Archivo, sans-serif', fontSize: '2rem', fontWeight: '700', marginBottom: '0.5rem' }}>Documents</h1>
+        <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.125rem', fontWeight: '400' }}>
           Manage and track compliance across all your properties
         </p>
       </div>
 
       {/* Document Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="p-6">
+        <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted-foreground mb-1">
+              <p className="text-sm font-medium" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.875rem', fontWeight: '500', color: '#374957' }}>
                 Total Documents
               </p>
-              <p className="text-2xl font-semibold">
+              <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.5rem', fontWeight: '600' }}>
                 {documentStats.total}
               </p>
             </div>
@@ -210,13 +212,13 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted-foreground mb-1">
+              <p className="text-sm font-medium" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.875rem', fontWeight: '500', color: '#374957' }}>
                 Valid Documents
               </p>
-              <p className="text-2xl font-semibold text-green-600">
+              <p className="text-2xl font-semibold text-green-600" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.5rem', fontWeight: '600' }}>
                 {documentStats.valid}
               </p>
             </div>
@@ -226,13 +228,13 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted-foreground mb-1">
+              <p className="text-sm font-medium" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.875rem', fontWeight: '500', color: '#374957' }}>
                 Expiring Soon
               </p>
-              <p className="text-2xl font-semibold text-orange-600">
+              <p className="text-2xl font-semibold text-orange-600" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.5rem', fontWeight: '600' }}>
                 {documentStats.expiringSoon}
               </p>
             </div>
@@ -242,13 +244,13 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted-foreground mb-1">
+              <p className="text-sm font-medium" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.875rem', fontWeight: '500', color: '#374957' }}>
                 Expired
               </p>
-              <p className="text-2xl font-semibold text-red-600">
+              <p className="text-2xl font-semibold text-red-600" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.5rem', fontWeight: '600' }}>
                 {documentStats.expired}
               </p>
             </div>
@@ -263,7 +265,7 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
       {documentStats.expired > 0 && (
         <Alert className="border-red-200 bg-red-50">
           <AlertTriangle className="h-4 w-4 text-red-600" />
-          <AlertDescription className="text-red-800">
+          <AlertDescription className="text-red-800" style={{ fontFamily: 'Archivo, sans-serif' }}>
             <span className="font-medium">{documentStats.expired} documents have expired</span> and require immediate attention.
           </AlertDescription>
         </Alert>
@@ -272,77 +274,154 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
       {documentStats.expiringSoon > 0 && (
         <Alert className="border-orange-200 bg-orange-50">
           <Clock className="h-4 w-4 text-orange-600" />
-          <AlertDescription className="text-orange-800">
+          <AlertDescription className="text-orange-800" style={{ fontFamily: 'Archivo, sans-serif' }}>
             <span className="font-medium">{documentStats.expiringSoon} documents are expiring soon</span> and should be renewed.
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Filters and Search */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search documents..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={selectAllDocuments}
-            className="flex items-center space-x-2"
-          >
-            {selectedDocuments.length === filteredDocuments.length ? (
-              <CheckSquare className="h-4 w-4" />
-            ) : (
-              <Square className="h-4 w-4" />
-            )}
-            <span>Select All</span>
-          </Button>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="valid">Valid</SelectItem>
-              <SelectItem value="expiring-soon">Expiring Soon</SelectItem>
-              <SelectItem value="expired">Expired</SelectItem>
-            </SelectContent>
-          </Select>
+      {/* Custom Filter Bar */}
+      <div className="bg-white rounded-xl p-6 mb-6" style={{ border: '1px solid #E5E7EB' }}>
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Select All Checkbox */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={selectAllDocuments}
+              className="p-2"
+            >
+              {selectedDocuments.length === filteredDocuments.length && filteredDocuments.length > 0 ? (
+                <CheckSquare className="h-4 w-4" />
+              ) : (
+                <Square className="h-4 w-4" />
+              )}
+            </Button>
+            <span className="text-sm" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
+              {selectedDocuments.length === filteredDocuments.length && filteredDocuments.length > 0 ? 'Deselect All' : 'Select All'}
+            </span>
+          </div>
 
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Document Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {getDocumentTypes().map((type) => (
-                <SelectItem key={type} value={type}>
-                  {formatDocumentType(type)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Search Input */}
+          <div className="flex-1">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search documents..."
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-[#f3f3f3] placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Status Filter */}
+          <div className="lg:w-48">
+            <div className="relative">
+              <button
+                type="button"
+                className="block w-full px-4 py-2 pr-8 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-left text-sm text-[#374957]"
+                onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+              >
+                {statusFilter === 'all' ? 'All Status' :
+                 statusFilter === 'valid' ? 'Valid' :
+                 statusFilter === 'expiring-soon' ? 'Expiring Soon' : 'Expired'}
+              </button>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+
+              {statusDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
+                  <div className="py-1">
+                    <button
+                      className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                      onClick={() => { setStatusFilter('all'); setStatusDropdownOpen(false); }}
+                    >
+                      All Status
+                    </button>
+                    <button
+                      className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                      onClick={() => { setStatusFilter('valid'); setStatusDropdownOpen(false); }}
+                    >
+                      Valid
+                    </button>
+                    <button
+                      className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                      onClick={() => { setStatusFilter('expiring-soon'); setStatusDropdownOpen(false); }}
+                    >
+                      Expiring Soon
+                    </button>
+                    <button
+                      className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                      onClick={() => { setStatusFilter('expired'); setStatusDropdownOpen(false); }}
+                    >
+                      Expired
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Type Filter */}
+          <div className="lg:w-48">
+            <div className="relative">
+              <button
+                type="button"
+                className="block w-full px-4 py-2 pr-8 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-left text-sm text-[#374957]"
+                onClick={() => setTypeDropdownOpen(!typeDropdownOpen)}
+              >
+                {typeFilter === 'all' ? 'All Types' : formatDocumentType(typeFilter as PropertyDocument['type'])}
+              </button>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+
+              {typeDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
+                  <div className="py-1">
+                    <button
+                      className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                      onClick={() => { setTypeFilter('all'); setTypeDropdownOpen(false); }}
+                    >
+                      All Types
+                    </button>
+                    {getDocumentTypes().map((type) => (
+                      <button
+                        key={type}
+                        className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                        onClick={() => { setTypeFilter(type); setTypeDropdownOpen(false); }}
+                      >
+                        {formatDocumentType(type as PropertyDocument['type'])}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Documents Table */}
-      <Card>
+      <Card className="bg-white" style={{ border: '1px solid #D1D5DB' }}>
         <CardHeader>
-          <CardTitle>All Documents</CardTitle>
+          <CardTitle style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>All Documents</CardTitle>
         </CardHeader>
         <CardContent>
           {filteredDocuments.length === 0 ? (
             <div className="text-center py-8">
               <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="font-semibold mb-2" style={{ color: '#374957' }}>No documents found</h3>
-              <p className="text-muted-foreground">
+              <h3 className="font-semibold mb-2" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>No documents found</h3>
+              <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
                 {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
                   ? 'Try adjusting your filters'
                   : 'Add documents to your properties to see them here'
@@ -403,7 +482,7 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
               <div className="overflow-x-auto">
                 <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow style={{ borderBottom: '1px solid #f3f3f3' }}>
                     <TableHead className="w-12">
                       <input
                         type="checkbox"
@@ -412,13 +491,13 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
                         className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                       />
                     </TableHead>
-                    <TableHead>Document</TableHead>
-                    <TableHead>Property</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Issue Date</TableHead>
-                    <TableHead>Expiry Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Document</TableHead>
+                    <TableHead style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Property</TableHead>
+                    <TableHead style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Type</TableHead>
+                    <TableHead style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Issue Date</TableHead>
+                    <TableHead style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Expiry Date</TableHead>
+                    <TableHead style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Status</TableHead>
+                    <TableHead style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -427,7 +506,7 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
                     const daysUntilExpiry = getDaysUntilExpiry(document.expiryDate);
                     
                     return (
-                      <TableRow key={`${document.propertyId}-${document.id}`} className={selectedDocuments.includes(document.id) ? 'bg-blue-50' : ''}>
+                      <TableRow key={`${document.propertyId}-${document.id}`} className={selectedDocuments.includes(document.id) ? 'bg-blue-50' : ''} style={{ borderBottom: '1px solid #f3f3f3' }}>
                         <TableCell>
                           <input
                             type="checkbox"

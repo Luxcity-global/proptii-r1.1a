@@ -49,7 +49,7 @@ const AgentHome = () => {
             alt="Happy couple with agent"
             className="w-full h-full object-cover"
             loading="eager"
-            fetchpriority="high"
+                  fetchPriority="high"
             decoding="sync"
             sizes="100vw"
           />
@@ -95,12 +95,12 @@ const AgentHome = () => {
                      View Your Dashboard
                    </a>
                    {selectedRole && (
-                     <div className="flex items-center gap-2 px-3 py-1 bg-[#136C9E] text-white rounded-full text-sm">
+                     <div className="flex items-center gap-2 px-3 py-1 bg-white text-[#136C9E] rounded-full text-sm">
                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                        </svg>
                        <span className="font-medium">
-                         {selectedRole === 'landlord' ? 'Landlord' : 'Property Agent'} Dashboard
+                         {selectedRole === 'landlord' ? 'Landlord' : 'Property Agent'}
                        </span>
                      </div>
                    )}

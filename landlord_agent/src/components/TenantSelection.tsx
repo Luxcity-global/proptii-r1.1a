@@ -67,7 +67,7 @@ export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting
   ];
 
   return (
-    <div className="min-h-screen flex flex-col px-4" style={{ backgroundColor: '#F7F7F7', fontFamily: 'Archivo, sans-serif' }}>
+    <div className="min-h-screen flex flex-col px-4" style={{ backgroundColor: '#f2f2f2', fontFamily: 'Archivo, sans-serif' }}>
       <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between mb-8 px-4 pt-8">
@@ -107,11 +107,10 @@ export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting
               return (
                 <Card
                   key={option.id}
-                  className={`relative cursor-pointer transition-all duration-300 ${
-                    option.recommended ? 'ring-1 shadow-lg' : 'hover:shadow-md'
-                  }`}
+                  className="relative cursor-pointer transition-all duration-300 bg-white"
                   style={{
-                    ...(option.recommended ? { borderColor: '#136C9E', borderWidth: '1px' } : {}),
+                    border: option.id === 'manual' ? '1px solid #136C9E' : 'none',
+                    boxShadow: 'none'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-8px)';
@@ -149,7 +148,6 @@ export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting
                       <p className="text-sm font-medium text-gray-700 mb-2">Features:</p>
                       {option.features.map((feature, index) => (
                         <div key={index} className="flex items-center justify-center text-sm text-gray-600">
-                          <div className="w-1.5 h-1.5 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: '#DC5F12' }} />
                           <span>{feature}</span>
                         </div>
                       ))}
@@ -159,7 +157,38 @@ export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting
                       variant={option.buttonVariant}
                       className="w-full"
                       size="lg"
-                      style={{ fontFamily: 'Archivo, sans-serif' }}
+                      style={{ 
+                        fontFamily: 'Archivo, sans-serif',
+                        ...(option.id === 'manual' ? {
+                          backgroundColor: '#DC5F12',
+                          borderColor: '#DC5F12',
+                          color: 'white'
+                        } : {
+                          backgroundColor: 'white',
+                          borderColor: '#136C9E',
+                          color: '#136C9E'
+                        })
+                      }}
+                      onMouseEnter={(e) => {
+                        if (option.id === 'manual') {
+                          e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
+                          e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        } else {
+                          e.currentTarget.style.borderColor = '#DC5F12';
+                          e.currentTarget.style.color = '#DC5F12';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (option.id === 'manual') {
+                          e.currentTarget.style.background = '#DC5F12';
+                          e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                          e.currentTarget.style.transform = 'translateY(0px)';
+                        } else {
+                          e.currentTarget.style.borderColor = '#136C9E';
+                          e.currentTarget.style.color = '#136C9E';
+                        }
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         option.onClick();
@@ -174,14 +203,14 @@ export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting
           </div>
 
           {/* Additional Info */}
-          <div className="max-w-4xl mx-auto" style={{ marginTop: '60px' }}>
+          <div className="max-w-5xl mx-auto" style={{ marginTop: '60px' }}>
             <Card className="bg-blue-50 border-blue-200">
               <CardContent className="p-6">
                 <div className="flex items-start space-x-3">
-                  <Home className="w-5 h-5 text-blue-600 mt-1 flex-shrink-0" />
+                  <Home className="w-5 h-5 mt-1 flex-shrink-0" style={{ color: '#136C9E' }} />
                   <div>
-                    <h3 className="font-medium text-blue-900 mb-2">Property Assignment</h3>
-                    <p className="text-blue-800 text-sm">
+                    <h3 className="font-medium mb-2" style={{ color: '#374957' }}>Property Assignment</h3>
+                    <p className="text-sm" style={{ color: '#374957' }}>
                       All tenants will need to verify they are occupying the assigned property before 
                       being fully added to your tenant list. This ensures accurate property management.
                     </p>

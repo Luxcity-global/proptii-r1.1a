@@ -146,9 +146,9 @@ export function PortfolioInsights({ properties, userProfile, onBack, marketInsig
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen" style={{ fontFamily: 'Archivo, sans-serif', backgroundColor: '#f2f2f2' }}>
       {/* Header */}
-      <div className="border-b bg-card/50">
+      <div className="border-b bg-white">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -156,8 +156,8 @@ export function PortfolioInsights({ properties, userProfile, onBack, marketInsig
                 <ArrowLeft className="w-4 h-4" />
               </Button>
               <div>
-                <h1 className="mb-1">Portfolio Insights</h1>
-                <p className="text-muted-foreground">
+                <h1 className="mb-1" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957', fontSize: '1.5rem', fontWeight: '600' }}>Portfolio Insights</h1>
+                <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
                   AI-powered analysis of your property portfolio
                 </p>
               </div>
@@ -198,76 +198,76 @@ export function PortfolioInsights({ properties, userProfile, onBack, marketInsig
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="p-6">
+          <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                 <Home className="w-6 h-6 text-blue-600" />
               </div>
-              <Badge variant="secondary">Portfolio</Badge>
+              <Badge variant="secondary" style={{ fontFamily: 'Archivo, sans-serif' }}>Portfolio</Badge>
             </div>
             <div>
-              <p className="text-2xl font-semibold">{formatCurrency(mockMarketData.portfolioValue)}</p>
-              <p className="text-muted-foreground">Total Value</p>
+              <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{formatCurrency(mockMarketData.portfolioValue)}</p>
+              <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Total Value</p>
               <div className="flex items-center mt-2">
                 <TrendingUp className="w-4 h-4 text-green-600 mr-1" />
-                <span className="text-sm text-green-600">
+                <span className="text-sm text-green-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
                   +{((mockMarketData.portfolioValue / mockMarketData.marketAverageValue - 1) * 100).toFixed(1)}% vs market
                 </span>
               </div>
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <BarChart3 className="w-6 h-6 text-green-600" />
               </div>
-              <Badge variant="secondary">Yield</Badge>
+              <Badge variant="secondary" style={{ fontFamily: 'Archivo, sans-serif' }}>Yield</Badge>
             </div>
             <div>
-              <p className="text-2xl font-semibold">{mockMarketData.portfolioYield}%</p>
-              <p className="text-muted-foreground">Average Yield</p>
+              <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{mockMarketData.portfolioYield}%</p>
+              <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Average Yield</p>
               <div className="flex items-center mt-2">
                 <TrendingUp className="w-4 h-4 text-green-600 mr-1" />
-                <span className="text-sm text-green-600">
+                <span className="text-sm text-green-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
                   +{(mockMarketData.portfolioYield - mockMarketData.marketAverageYield).toFixed(1)}% vs market
                 </span>
               </div>
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <PoundSterling className="w-6 h-6 text-purple-600" />
               </div>
-              <Badge variant="secondary">Monthly</Badge>
+              <Badge variant="secondary" style={{ fontFamily: 'Archivo, sans-serif' }}>Monthly</Badge>
             </div>
             <div>
-              <p className="text-2xl font-semibold">{formatCurrency(mockMarketData.totalRent)}</p>
-              <p className="text-muted-foreground">Total Rent</p>
+              <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{formatCurrency(mockMarketData.totalRent)}</p>
+              <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Total Rent</p>
               <div className="flex items-center mt-2">
                 <TrendingUp className="w-4 h-4 text-green-600 mr-1" />
-                <span className="text-sm text-green-600">
+                <span className="text-sm text-green-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
                   +12% vs last year
                 </span>
               </div>
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
                 <Users className="w-6 h-6 text-orange-600" />
               </div>
-              <Badge variant="secondary">Occupancy</Badge>
+              <Badge variant="secondary" style={{ fontFamily: 'Archivo, sans-serif' }}>Occupancy</Badge>
             </div>
             <div>
-              <p className="text-2xl font-semibold">{mockMarketData.occupancyRate}%</p>
-              <p className="text-muted-foreground">Occupancy Rate</p>
+              <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{mockMarketData.occupancyRate}%</p>
+              <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Occupancy Rate</p>
               <div className="flex items-center mt-2">
                 <TrendingUp className="w-4 h-4 text-green-600 mr-1" />
-                <span className="text-sm text-green-600">
+                <span className="text-sm text-green-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
                   +{mockMarketData.occupancyRate - mockMarketData.marketOccupancyRate}% vs market
                 </span>
               </div>
@@ -277,17 +277,17 @@ export function PortfolioInsights({ properties, userProfile, onBack, marketInsig
 
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="performance">Performance</TabsTrigger>
-            <TabsTrigger value="recommendations">AI Insights</TabsTrigger>
-            <TabsTrigger value="scenarios">What-If</TabsTrigger>
+            <TabsTrigger value="overview" style={{ fontFamily: 'Archivo, sans-serif' }}>Overview</TabsTrigger>
+            <TabsTrigger value="performance" style={{ fontFamily: 'Archivo, sans-serif' }}>Performance</TabsTrigger>
+            <TabsTrigger value="recommendations" style={{ fontFamily: 'Archivo, sans-serif' }}>AI Insights</TabsTrigger>
+            <TabsTrigger value="scenarios" style={{ fontFamily: 'Archivo, sans-serif' }}>What-If</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid lg:grid-cols-2 gap-6">
               {/* Portfolio Value Trend */}
-              <Card className="p-6">
-                <h3 className="mb-4">Portfolio Value Trend</h3>
+              <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
+                <h3 className="mb-4" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Portfolio Value Trend</h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={mockPriceHistory}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -313,8 +313,8 @@ export function PortfolioInsights({ properties, userProfile, onBack, marketInsig
               </Card>
 
               {/* Property Distribution */}
-              <Card className="p-6">
-                <h3 className="mb-4">Property Distribution</h3>
+              <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
+                <h3 className="mb-4" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Property Distribution</h3>
                 <div className="space-y-4">
                   <ResponsiveContainer width="100%" height={200}>
                     <PieChart>
@@ -351,8 +351,8 @@ export function PortfolioInsights({ properties, userProfile, onBack, marketInsig
             </div>
 
             {/* Top Growth Areas */}
-            <Card className="p-6">
-              <h3 className="mb-4">Top Growth Areas in Your Portfolio</h3>
+            <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
+              <h3 className="mb-4" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Top Growth Areas in Your Portfolio</h3>
               <div className="space-y-4">
                 {mockGrowthAreas.map((area, index) => (
                   <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
