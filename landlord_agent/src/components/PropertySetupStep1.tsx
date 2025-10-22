@@ -212,7 +212,7 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
 
           {/* Right Section - Property Slideshow */}
           <div className="flex-1" style={{ marginRight: '-48px' }}>
-            <div className="w-full h-[1100px] rounded-xl overflow-hidden shadow-lg relative">
+            <div className="w-full h-[600px] rounded-xl overflow-hidden shadow-lg relative">
               {/* Property Image */}
               <img 
                 src={slides[currentSlide].image} 

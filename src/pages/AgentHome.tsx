@@ -24,7 +24,7 @@ const AgentHome = () => {
   }, []);
 
   return (
-    <div className="min-h-screen font-nunito">
+    <div className="min-h-screen font-archivo">
       <AgentNavbar isAgent={true} />
 
       {/* Hero Section */}
@@ -60,7 +60,7 @@ const AgentHome = () => {
           </div>
 
           {/* Main Heading */}
-          <h1 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight">
+          <h1 className="text-3xl md:text-6xl font-bold mb-6 font-archivo leading-tight">
             List Your Properties
           </h1>
 
@@ -69,17 +69,18 @@ const AgentHome = () => {
             Streamline your property listings and reach more potential tenants.
           </p>
 
-          {/* Start New Listing Button */}
-          <Link
-            to="/listings/new"
+          {/* View Your Dashboard Button */}
+          <a
+            href="http://localhost:3000#dashboard"
             className="inline-block px-8 py-4 bg-[#FFEFD4] text-black rounded-full text-lg font-semibold hover:bg-opacity-90 transition-all"
           >
-            Start New Listing
-          </Link>
+            View Your Dashboard
+          </a>
         </div>
       </section>
 
-      {/**The new services section */}
+
+      {/* What would you like to do next section */}
       <section className="relative py-16 md:py-20 bg-[#f9f5f0]">
         {/* Background Image (Blobs) */}
         <img
@@ -89,79 +90,93 @@ const AgentHome = () => {
           loading="lazy"
           sizes="100vw"
         />
-
         <div className="max-w-7xl mx-auto px-4 relative z-10">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-[#374957] mb-4">
+              What would you like to do next?
+            </h2>
+            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+              Choose how you'd like to continue setting up your property management system. You can always access these options later from your dashboard.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-            {/* Book Viewing Card */}
-            <div className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
-              <div className="mb-5 md:mb-6">
-                <img
-                  src="/images/viewing-room.jpg"
-                  alt="Modern living room"
-                  className="w-full h-full object-cover rounded-lg"
-                  loading="lazy"
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                />
+            {/* Go to Dashboard Card */}
+            <div className="bg-gray-50 rounded-2xl p-8 md:p-10 flex flex-col h-full min-h-[320px] border-2 border-[#8FCDFF] hover:shadow-lg transition-shadow duration-300">
+              <div className="flex justify-center mb-8">
+                <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg className="w-10 h-10 text-[#3B82F6]" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+                  </svg>
+                </div>
               </div>
-              <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Book Viewing</h3>
-              <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
-                Save time and effort with our AI-powered booking service. Simply enter your desired property details and let our system handle the rest.
+              <h3 className="text-xl font-bold text-[#374957] mb-4 text-center">Go to Dashboard</h3>
+              <p className="text-gray-600 mb-8 flex-grow text-center">
+                Explore your property management dashboard
               </p>
-              <button
-                onClick={() => navigate('/bookviewing')}
-                className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
-                Learn More
-              </button>
+              <a href="http://localhost:3000#dashboard" className="border-2 border-[#136C9E] text-[#136C9E] bg-transparent px-6 py-4 rounded-lg hover:border-[#DC5F12] hover:text-[#DC5F12] transition-all font-medium flex items-center justify-center">
+                View Dashboard
+                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </a>
             </div>
 
-            {/* Referencing Card */}
-            <div className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
-              <div className="mb-5 md:mb-6">
-                <img
-                  src="/images/referencing-person.jpg"
-                  alt="Professional woman with tablet"
-                  className="w-full h-full object-cover rounded-lg"
-                  loading="lazy"
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                />
+            {/* Add a Property Card (Recommended) */}
+            <div className="bg-gray-50 rounded-2xl p-8 md:p-10 flex flex-col h-full relative border-2 border-[#136C9E] min-h-[320px] hover:shadow-lg transition-shadow duration-300">
+              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                <span className="bg-[#136C9E] text-white px-4 py-1 rounded-full text-sm font-medium">
+                  Recommended
+                </span>
               </div>
-              <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Referencing</h3>
-              <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
-                Ensure peace of mind for both landlords and tenants. Our rigorous referencing process verifies renter or buyer identity, financial stability, and rental history.
+              <div className="flex justify-center mb-8">
+                <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center">
+                  <svg className="w-10 h-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </div>
+              </div>
+              <h3 className="text-xl font-bold text-[#374957] mb-4 text-center">Add a Property</h3>
+              <p className="text-gray-600 mb-8 flex-grow text-center">
+                Get started by adding a property to your portfolio
               </p>
-              <button
-                onClick={() => navigate('/referencing')}
-                className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
-                Learn More
-              </button>
+              <a href="http://localhost:3000#add-property" className="bg-[#DC5F12] text-white px-6 py-4 rounded-lg hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#C95200] hover:shadow-[0_12px_35px_rgba(220,95,18,0.5)] transition-all font-medium flex items-center justify-center">
+                Add Property
+                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </a>
             </div>
 
-            {/* Contract Card */}
-            <div className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
-              <div className="mb-5 md:mb-6">
-                <img
-                  src="/images/modern-building.jpg"
-                  alt="Modern glass building"
-                  className="w-full h-full object-cover rounded-lg"
-                  loading="lazy"
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                />
+            {/* Setup Company Profile Card */}
+            <div className="bg-gray-50 rounded-2xl p-8 md:p-10 flex flex-col h-full min-h-[320px] border-2 border-[#8FCDFF] hover:shadow-lg transition-shadow duration-300">
+              <div className="flex justify-center mb-8">
+                <div className="w-20 h-20 bg-teal-100 rounded-full flex items-center justify-center">
+                  <svg className="w-10 h-10 text-[#06B6D4]" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-6a1 1 0 00-1-1H9a1 1 0 00-1 1v6a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
+                  </svg>
+                </div>
               </div>
-              <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Contract</h3>
-              <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
-                Save time and reduce errors with our contract management solution. We offer a range of customizable lease agreement templates to suit your specific needs.
+              <h3 className="text-xl font-bold text-[#374957] mb-4 text-center">Setup Company Profile</h3>
+              <p className="text-gray-600 mb-8 flex-grow text-center">
+                Add company details, logo, and professional settings
               </p>
-              <button
-                onClick={() => navigate('/contracts')}
-                className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
-                Learn More
+              <button className="border-2 border-[#136C9E] text-[#136C9E] bg-transparent px-6 py-4 rounded-lg hover:border-[#DC5F12] hover:text-[#DC5F12] transition-all font-medium flex items-center justify-center">
+                Setup Company
+                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </button>
             </div>
           </div>
+
+          <div className="text-center mt-8">
+            <p className="text-gray-600">
+              Don't worry - you can access all of these features anytime from your dashboard
+            </p>
+          </div>
         </div>
       </section>
-
-      {/**End of the new services section */}
 
       {/* FAQ Section */}
       <FAQSection />

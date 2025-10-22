@@ -166,7 +166,7 @@ const AgentNavbar: React.FC<AgentNavbarProps> = ({ isAgent = true }) => {
                 {isDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-50">
                     <a
-                      href="http://localhost:3000"
+                      href="http://localhost:3000#dashboard"
                       onClick={() => setIsDropdownOpen(false)}
                       className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 w-full text-left"
                     >
@@ -240,7 +240,7 @@ const AgentNavbar: React.FC<AgentNavbarProps> = ({ isAgent = true }) => {
                 {isDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-50">
                     <a
-                      href="http://localhost:3000"
+                      href="http://localhost:3000#dashboard"
                       onClick={() => setIsDropdownOpen(false)}
                       className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 w-full text-left"
                     >

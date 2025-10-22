@@ -281,6 +281,29 @@ function AppContent() {
   const [arrearsAlerts, setArrearsAlerts] = useState<ArrearsAlert[]>([]);
   const [isTransitioning, setIsTransitioning] = useState(false);
   
+  // Check for URL hash parameters to navigate to specific screens
+  React.useEffect(() => {
+    const checkHashAndNavigate = () => {
+      const hash = window.location.hash;
+      if (hash === '#dashboard') {
+        setCurrentScreen('main-app');
+        setNavigationScreen('dashboard');
+      } else if (hash === '#add-property') {
+        setCurrentScreen('property-setup-step1');
+      }
+    };
+    
+    // Check on mount
+    checkHashAndNavigate();
+    
+    // Listen for hash changes
+    window.addEventListener('hashchange', checkHashAndNavigate);
+    
+    return () => {
+      window.removeEventListener('hashchange', checkHashAndNavigate);
+    };
+  }, []);
+  
   // Property setup state
   const [propertySetupData, setPropertySetupData] = useState<PropertySetupData>({
     propertyType: null,
