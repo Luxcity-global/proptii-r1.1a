@@ -102,7 +102,7 @@ const AgentHome = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             {/* Go to Dashboard Card */}
-            <div className="bg-gray-50 rounded-2xl p-8 md:p-10 flex flex-col h-full min-h-[320px] border-2 border-[#8FCDFF] hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-gray-50 rounded-2xl p-8 md:p-10 flex flex-col h-full min-h-[320px] border-2 border-[#D1D5DB] hover:shadow-lg transition-shadow duration-300">
               <div className="flex justify-center mb-8">
                 <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
                   <svg className="w-10 h-10 text-[#3B82F6]" fill="currentColor" viewBox="0 0 20 20">
@@ -149,7 +149,7 @@ const AgentHome = () => {
             </div>
 
             {/* Setup Company Profile Card */}
-            <div className="bg-gray-50 rounded-2xl p-8 md:p-10 flex flex-col h-full min-h-[320px] border-2 border-[#8FCDFF] hover:shadow-lg transition-shadow duration-300">
+            <div className="bg-gray-50 rounded-2xl p-8 md:p-10 flex flex-col h-full min-h-[320px] border-2 border-[#D1D5DB] hover:shadow-lg transition-shadow duration-300">
               <div className="flex justify-center mb-8">
                 <div className="w-20 h-20 bg-teal-100 rounded-full flex items-center justify-center">
                   <svg className="w-10 h-10 text-[#06B6D4]" fill="currentColor" viewBox="0 0 20 20">

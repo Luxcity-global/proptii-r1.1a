@@ -48,6 +48,8 @@ export function PropertiesPage({
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
 
   const filteredProperties = properties.filter((property) => {
     const matchesSearch = property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -190,11 +192,11 @@ export function PropertiesPage({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6" style={{ fontFamily: 'Archivo, sans-serif' }}>
       <div className="flex items-center justify-between">
         <div>
-          <h1 style={{ color: '#374957' }}>Properties</h1>
-          <p className="text-muted-foreground">
+          <h1 style={{ color: '#374957', fontFamily: 'Archivo, sans-serif', fontSize: '2rem', fontWeight: '700', marginBottom: '0.5rem' }}>Properties</h1>
+          <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.125rem', fontWeight: '400' }}>
             Manage all your properties in one place
           </p>
         </div>
@@ -226,15 +228,15 @@ export function PropertiesPage({
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="p-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+        <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-6 flex-1">
               <div className="text-center">
-                <p className="text-muted-foreground mb-1 text-sm">
+                <p className="mb-1" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.875rem', fontWeight: '500', color: '#374957' }}>
                   Occupied
                 </p>
-                <p className="text-2xl font-semibold text-green-600">
+                <p className="text-2xl font-semibold text-green-600" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.5rem', fontWeight: '600' }}>
                   {properties.filter(p => p.status === 'occupied').length}
                 </p>
               </div>
@@ -242,10 +244,10 @@ export function PropertiesPage({
               <div className="w-px h-12 bg-gray-200"></div>
               
               <div className="text-center">
-                <p className="text-muted-foreground mb-1 text-sm">
+                <p className="mb-1" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.875rem', fontWeight: '500', color: '#374957' }}>
                   Vacant
                 </p>
-                <p className="text-2xl font-semibold text-orange-600">
+                <p className="text-2xl font-semibold text-orange-600" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.5rem', fontWeight: '600' }}>
                   {properties.filter(p => p.status === 'vacant').length}
                 </p>
               </div>
@@ -256,16 +258,16 @@ export function PropertiesPage({
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted-foreground mb-1">
+              <p className="mb-1" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.875rem', fontWeight: '500', color: '#374957' }}>
                 Average Rent
               </p>
-              <p className="text-2xl font-semibold">
+              <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.5rem', fontWeight: '600' }}>
                 £{properties.length > 0 ? Math.round(properties.reduce((sum, p) => sum + p.rent, 0) / properties.length).toLocaleString() : '0'}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.75rem', fontWeight: '400', color: '#374957' }}>
                 Per month
               </p>
             </div>
@@ -275,16 +277,16 @@ export function PropertiesPage({
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted-foreground mb-1">
+              <p className="mb-1" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.875rem', fontWeight: '500', color: '#374957' }}>
                 Under Renovation
               </p>
-              <p className="text-2xl font-semibold text-yellow-600">
+              <p className="text-2xl font-semibold text-yellow-600" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.5rem', fontWeight: '600' }}>
                 {properties.filter(p => p.status === 'under-renovation').length}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.75rem', fontWeight: '400', color: '#374957' }}>
                 Properties
               </p>
             </div>
@@ -294,18 +296,18 @@ export function PropertiesPage({
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted-foreground mb-1">
+              <p className="mb-1" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.875rem', fontWeight: '500', color: '#374957' }}>
                 Compliance Issues
               </p>
-              <p className="text-2xl font-semibold text-red-600">
+              <p className="text-2xl font-semibold text-red-600" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.5rem', fontWeight: '600' }}>
                 {properties.reduce((count, p) => 
                   count + p.documents.filter(d => d.status === 'expiring-soon' || d.status === 'expired').length, 0
                 )}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.75rem', fontWeight: '400', color: '#374957' }}>
                 Documents need attention
               </p>
             </div>
@@ -400,74 +402,148 @@ export function PropertiesPage({
         </div>
       )}
 
-      {/* Filters and Search */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={selectAllProperties}
-            className="p-2"
-          >
-            {isAllSelected ? (
-              <CheckSquare className="h-4 w-4" />
-            ) : isPartiallySelected ? (
-              <CheckSquare className="h-4 w-4 opacity-50" />
-            ) : (
-              <Square className="h-4 w-4" />
-            )}
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            {isAllSelected ? 'Deselect All' : 'Select All'}
-          </span>
-        </div>
-        
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search properties..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        
-        <div className="flex gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="vacant">Vacant</SelectItem>
-              <SelectItem value="occupied">Occupied</SelectItem>
-              <SelectItem value="under-renovation">Under Renovation</SelectItem>
-            </SelectContent>
-          </Select>
+      {/* Custom Filter Bar */}
+      <div className="bg-white rounded-xl p-6 mb-6" style={{ border: '1px solid #E5E7EB' }}>
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Select All Checkbox */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={selectAllProperties}
+              className="p-2"
+            >
+              {isAllSelected ? (
+                <CheckSquare className="h-4 w-4" />
+              ) : isPartiallySelected ? (
+                <CheckSquare className="h-4 w-4 opacity-50" />
+              ) : (
+                <Square className="h-4 w-4" />
+              )}
+            </Button>
+            <span className="text-sm" style={{ color: '#374957' }}>
+              {isAllSelected ? 'Deselect All' : 'Select All'}
+            </span>
+          </div>
 
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {getPropertyTypes().map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Search Input */}
+          <div className="flex-1">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search properties by address or type..."
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-[#f3f3f3] placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowImportDialog(true)}
-            className="px-3"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Import
-          </Button>
+          {/* Status Filter */}
+          <div className="lg:w-48">
+            <div className="relative">
+              <button
+                type="button"
+                className="block w-full px-4 py-2 pr-8 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-left text-sm text-[#374957]"
+                onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+              >
+                {statusFilter === 'all' ? 'All Status' : 
+                 statusFilter === 'occupied' ? 'Occupied' :
+                 statusFilter === 'vacant' ? 'Vacant' : 'Under Renovation'}
+              </button>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+              
+              {statusDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
+                  <div className="py-1">
+                    <button
+                      className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                      onClick={() => { setStatusFilter('all'); setStatusDropdownOpen(false); }}
+                    >
+                      All Status
+                    </button>
+                    <button
+                      className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                      onClick={() => { setStatusFilter('occupied'); setStatusDropdownOpen(false); }}
+                    >
+                      Occupied
+                    </button>
+                    <button
+                      className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                      onClick={() => { setStatusFilter('vacant'); setStatusDropdownOpen(false); }}
+                    >
+                      Vacant
+                    </button>
+                    <button
+                      className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                      onClick={() => { setStatusFilter('under-renovation'); setStatusDropdownOpen(false); }}
+                    >
+                      Under Renovation
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Type Filter */}
+          <div className="lg:w-48">
+            <div className="relative">
+              <button
+                type="button"
+                className="block w-full px-4 py-2 pr-8 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-left text-sm text-[#374957]"
+                onClick={() => setTypeDropdownOpen(!typeDropdownOpen)}
+              >
+                {typeFilter === 'all' ? 'All Types' : typeFilter}
+              </button>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+              
+              {typeDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
+                  <div className="py-1">
+                    <button
+                      className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                      onClick={() => { setTypeFilter('all'); setTypeDropdownOpen(false); }}
+                    >
+                      All Types
+                    </button>
+                    {getPropertyTypes().map((type) => (
+                      <button
+                        key={type}
+                        className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                        onClick={() => { setTypeFilter(type); setTypeDropdownOpen(false); }}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Import Button */}
+          <div className="lg:w-auto">
+            <button
+              type="button"
+              className="block w-full px-4 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-left text-sm text-[#374957] hover:border-[#DC5F12] hover:text-[#DC5F12] transition-all flex items-center justify-center"
+              onClick={() => setShowImportDialog(true)}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Import
+            </button>
+          </div>
         </div>
       </div>
 
@@ -554,7 +630,7 @@ export function PropertiesPage({
                       </Button>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold truncate" style={{ color: '#374957' }}>{property.address}</h3>
-                        <p className="text-sm text-muted-foreground">{property.type}</p>
+                        <p className="text-sm" style={{ color: '#374957' }}>{property.type}</p>
                       </div>
                     </div>
                     
@@ -607,7 +683,7 @@ export function PropertiesPage({
                   </div>
                   
                   <div className="space-y-2 mb-4">
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-4 text-sm" style={{ color: '#374957' }}>
                       <div className="flex items-center gap-1">
                         <BedSingle className="h-4 w-4" />
                         <span>{property.bedrooms} bed</span>
@@ -642,7 +718,7 @@ export function PropertiesPage({
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
                             <User className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">{tenant.name}</span>
+                            <span className="text-sm font-medium" style={{ color: '#374957' }}>{tenant.name}</span>
                           </div>
                           <Button
                             variant="ghost"
@@ -653,7 +729,7 @@ export function PropertiesPage({
                             View
                           </Button>
                         </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
+                        <div className="mt-1 text-xs" style={{ color: '#374957' }}>
                           Lease ends: {tenant.leaseEnd.toLocaleDateString('en-GB')}
                         </div>
                         {arrears && (
@@ -670,7 +746,7 @@ export function PropertiesPage({
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="flex-1"
+                      className="flex-1 border-[#D1D5DB] text-[#374957] hover:border-[#DC5F12] hover:text-[#DC5F12] transition-all"
                       onClick={() => onViewProperty(property)}
                     >
                       <Eye className="mr-2 h-4 w-4" />
@@ -679,7 +755,7 @@ export function PropertiesPage({
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="flex-1"
+                      className="flex-1 border-[#D1D5DB] text-[#374957] hover:border-[#DC5F12] hover:text-[#DC5F12] transition-all"
                       onClick={() => onEditProperty(property)}
                     >
                       <Edit className="mr-2 h-4 w-4" />

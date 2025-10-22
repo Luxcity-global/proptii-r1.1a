@@ -153,6 +153,8 @@ export function Dashboard({
   const [statusFilter, setStatusFilter] = useState("all");
   const [complianceFilter, setComplianceFilter] =
     useState("all");
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [propertiesDropdownOpen, setPropertiesDropdownOpen] = useState(false);
   const [dismissedInsights, setDismissedInsights] = useState<
     string[]
   >([]);
@@ -499,7 +501,7 @@ export function Dashboard({
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7' }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7', fontFamily: 'Archivo, sans-serif' }}>
       {/* Clean Header */}
       <div className="mt-8 max-w-7xl mx-auto bg-white shadow-lg rounded-xl">
         <div className="px-8 py-6">
@@ -1075,67 +1077,121 @@ export function Dashboard({
 
       <div className="max-w-7xl mx-auto px-3 pb-6">
         {/* Filters */}
-        <Card className="p-6 mb-6">
+        {/* Custom Filter Bar */}
+        <div className="bg-white rounded-xl p-6 mb-6" style={{ border: '1px solid #E5E7EB' }}>
           <div className="flex flex-col lg:flex-row gap-4">
+            {/* Search Input */}
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-gray-400" />
+                </div>
+                <input
+                  type="text"
                   placeholder="Search properties by address or type..."
-                  className="pl-10"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-[#f3f3f3] placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-sm"
                   value={searchTerm}
-                  onChange={(e) =>
-                    setSearchTerm(e.target.value)
-                  }
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
             </div>
 
-            <div className="flex gap-3">
-              <Select
-                value={statusFilter}
-                onValueChange={setStatusFilter}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    All Status
-                  </SelectItem>
-                  <SelectItem value="occupied">
-                    Occupied
-                  </SelectItem>
-                  <SelectItem value="vacant">Vacant</SelectItem>
-                  <SelectItem value="under-renovation">
-                    Under Renovation
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Status Filter */}
+            <div className="lg:w-48">
+              <div className="relative">
+                <button
+                  type="button"
+                  className="block w-full px-4 py-2 pr-8 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-left text-sm text-[#374957]"
+                  onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+                >
+                  {statusFilter === 'all' ? 'All Status' : 
+                   statusFilter === 'occupied' ? 'Occupied' :
+                   statusFilter === 'vacant' ? 'Vacant' : 'Under Renovation'}
+                </button>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                
+                {statusDropdownOpen && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
+                    <div className="py-1">
+                      <button
+                        className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                        onClick={() => { setStatusFilter('all'); setStatusDropdownOpen(false); }}
+                      >
+                        All Status
+                      </button>
+                      <button
+                        className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                        onClick={() => { setStatusFilter('occupied'); setStatusDropdownOpen(false); }}
+                      >
+                        Occupied
+                      </button>
+                      <button
+                        className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                        onClick={() => { setStatusFilter('vacant'); setStatusDropdownOpen(false); }}
+                      >
+                        Vacant
+                      </button>
+                      <button
+                        className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                        onClick={() => { setStatusFilter('under-renovation'); setStatusDropdownOpen(false); }}
+                      >
+                        Under Renovation
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
-              <Select
-                value={complianceFilter}
-                onValueChange={setComplianceFilter}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Compliance" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    All Properties
-                  </SelectItem>
-                  <SelectItem value="expiring">
-                    Expiring Soon
-                  </SelectItem>
-                  <SelectItem value="expired">
-                    Expired
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Properties Filter */}
+            <div className="lg:w-48">
+              <div className="relative">
+                <button
+                  type="button"
+                  className="block w-full px-4 py-2 pr-8 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-left text-sm text-[#374957]"
+                  onClick={() => setPropertiesDropdownOpen(!propertiesDropdownOpen)}
+                >
+                  {complianceFilter === 'all' ? 'All Properties' : 
+                   complianceFilter === 'expiring' ? 'Expiring Soon' : 'Expired'}
+                </button>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                
+                {propertiesDropdownOpen && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
+                    <div className="py-1">
+                      <button
+                        className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                        onClick={() => { setComplianceFilter('all'); setPropertiesDropdownOpen(false); }}
+                      >
+                        All Properties
+                      </button>
+                      <button
+                        className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                        onClick={() => { setComplianceFilter('expiring'); setPropertiesDropdownOpen(false); }}
+                      >
+                        Expiring Soon
+                      </button>
+                      <button
+                        className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
+                        onClick={() => { setComplianceFilter('expired'); setPropertiesDropdownOpen(false); }}
+                      >
+                        Expired
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Properties Grid */}
         {displayProperties.length === 0 ? (
@@ -1317,7 +1373,7 @@ export function Dashboard({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1"
+                      className="flex-1 border-[#D1D5DB] text-[#374957] hover:border-[#DC5F12] hover:text-[#DC5F12] transition-all"
                       onClick={() => onViewProperty(property)}
                     >
                       <Eye className="w-4 h-4 mr-2" />
@@ -1326,6 +1382,7 @@ export function Dashboard({
                     <Button
                       variant="outline"
                       size="sm"
+                      className="border-[#D1D5DB] text-[#374957] hover:border-[#DC5F12] hover:text-[#DC5F12] transition-all"
                       onClick={() =>
                         onManageDocuments(property)
                       }
@@ -1335,6 +1392,7 @@ export function Dashboard({
                     <Button
                       variant="outline"
                       size="sm"
+                      className="border-[#D1D5DB] text-[#374957] hover:border-[#DC5F12] hover:text-[#DC5F12] transition-all"
                       onClick={() => onManagePhotos(property)}
                     >
                       <Image className="w-4 h-4" />
