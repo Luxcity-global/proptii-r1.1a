@@ -38,7 +38,7 @@ const AgentHome = () => {
 
   return (
     <div className="min-h-screen font-archivo">
-      <AgentNavbar isAgent={true} />
+      <AgentNavbar isAgent={true} selectedRole={selectedRole} />
 
       {/* Hero Section */}
       <section className="h-[80vh] relative flex items-center">

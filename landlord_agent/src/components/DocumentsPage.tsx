@@ -285,18 +285,18 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Select All Checkbox */}
           <div className="flex items-center gap-2">
-            <Button
+          <Button
               variant="ghost"
-              size="sm"
-              onClick={selectAllDocuments}
+            size="sm"
+            onClick={selectAllDocuments}
               className="p-2"
-            >
+          >
               {selectedDocuments.length === filteredDocuments.length && filteredDocuments.length > 0 ? (
-                <CheckSquare className="h-4 w-4" />
-              ) : (
-                <Square className="h-4 w-4" />
-              )}
-            </Button>
+              <CheckSquare className="h-4 w-4" />
+            ) : (
+              <Square className="h-4 w-4" />
+            )}
+          </Button>
             <span className="text-sm" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
               {selectedDocuments.length === filteredDocuments.length && filteredDocuments.length > 0 ? 'Deselect All' : 'Select All'}
             </span>
@@ -394,7 +394,7 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
                     >
                       All Types
                     </button>
-                    {getDocumentTypes().map((type) => (
+              {getDocumentTypes().map((type) => (
                       <button
                         key={type}
                         className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"

@@ -69,12 +69,6 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({ isOpen, onClose
               </button>
             )}
             <div className="flex-1"></div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
           </div>
         </div>
 
@@ -95,13 +89,13 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({ isOpen, onClose
 
             {/* Slideshow */}
             <div className="relative max-w-4xl mx-auto mb-8">
-              <div className="flex items-center justify-center space-x-1">
+              <div className="flex items-center justify-center">
                 {/* Left slide (fading out) */}
-                <div className="flex-shrink-0 w-1/4 opacity-50 transform scale-90 transition-all duration-500">
+                <div className="flex-shrink-0 w-1/4 opacity-75 transform scale-90 transition-all duration-500 -mr-8">
                   <img
                     src={slides[(currentSlide - 1 + slides.length) % slides.length]}
                     alt={`Feature ${((currentSlide - 1 + slides.length) % slides.length) + 1}`}
-                    className="w-full h-auto object-contain max-h-60 rounded-lg"
+                    className="w-full h-auto object-contain max-h-72 rounded-lg"
                   />
                 </div>
                 
@@ -115,11 +109,11 @@ const RoleSelectionModal: React.FC<RoleSelectionModalProps> = ({ isOpen, onClose
                 </div>
                 
                 {/* Right slide (fading in) */}
-                <div className="flex-shrink-0 w-1/4 opacity-50 transform scale-90 transition-all duration-500">
+                <div className="flex-shrink-0 w-1/4 opacity-75 transform scale-90 transition-all duration-500 -ml-8">
                   <img
                     src={slides[(currentSlide + 1) % slides.length]}
                     alt={`Feature ${((currentSlide + 1) % slides.length) + 1}`}
-                    className="w-full h-auto object-contain max-h-60 rounded-lg"
+                    className="w-full h-auto object-contain max-h-72 rounded-lg"
                   />
                 </div>
               </div>
