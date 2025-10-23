@@ -20,6 +20,7 @@ import TenantReferencing from './components/dashboard/sections/TenantReferencing
 import AgentHome from './pages/AgentHome';
 import Listings from './pages/Listings';
 import NewListingPage from './pages/listings/new';
+import LandlordDemo from './pages/LandlordDemo';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { UnauthorizedPage } from './pages/Unauthorized';
@@ -51,6 +52,7 @@ export const App: React.FC = () => {
             {/* Protected Routes */}
             <Route path="/agent" element={<AgentHome />} />
             <Route path="/Agent" element={<AgentHome />} />
+            <Route path="/landlord-demo" element={<LandlordDemo />} />
 
             <Route path="/referencing" element={<Referencing />} />
 

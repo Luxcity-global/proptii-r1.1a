@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .authenticated {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .not-authenticated {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info-box {
+            background-color: #e2e3e5;
+            border: 1px solid #d6d8db;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🔐 Authentication State Test</h1>
+        <p>This page shows the current authentication state stored in localStorage.</p>
+        
+        <div id="auth-status" class="status not-authenticated">
+            <strong>Status:</strong> <span id="status-text">Not Authenticated</span>
+        </div>
+        
+        <div id="user-info" class="info-box" style="display: none;">
+            <h3>👤 User Information</h3>
+            <p><strong>Name:</strong> <span id="user-name">-</span></p>
+            <p><strong>Email:</strong> <span id="user-email">-</span></p>
+            <p><strong>ID:</strong> <span id="user-id">-</span></p>
+            <p><strong>Roles:</strong> <span id="user-roles">-</span></p>
+        </div>
+        
+        <div class="info-box">
+            <h3>📊 Raw Authentication Data</h3>
+            <pre id="raw-data">Loading...</pre>
+        </div>
+        
+        <div>
+            <button onclick="refreshData()">🔄 Refresh Data</button>
+            <button onclick="clearAuth()">🗑️ Clear Auth</button>
+            <button onclick="testLandlordApp()">🏢 Test Landlord App</button>
+        </div>
+    </div>
+
+    <script>
+        function refreshData() {
+            const authData = localStorage.getItem('proptii_auth_state');
+            const statusDiv = document.getElementById('auth-status');
+            const statusText = document.getElementById('status-text');
+            const userInfoDiv = document.getElementById('user-info');
+            const userName = document.getElementById('user-name');
+            const userEmail = document.getElementById('user-email');
+            const userId = document.getElementById('user-id');
+            const userRoles = document.getElementById('user-roles');
+            const rawData = document.getElementById('raw-data');
+
+            if (authData) {
+                try {
+                    const parsed = JSON.parse(authData);
+                    rawData.textContent = JSON.stringify(parsed, null, 2);
+                    
+                    if (parsed.isAuthenticated && parsed.user) {
+                        statusDiv.className = 'status authenticated';
+                        statusText.textContent = 'Authenticated';
+                        userInfoDiv.style.display = 'block';
+                        
+                        userName.textContent = parsed.user.name || parsed.user.email || 'Unknown';
+                        userEmail.textContent = parsed.user.email || 'Unknown';
+                        userId.textContent = parsed.user.id || 'Unknown';
+                        userRoles.textContent = parsed.user.roles ? parsed.user.roles.join(', ') : 'None';
+                    } else {
+                        statusDiv.className = 'status not-authenticated';
+                        statusText.textContent = 'Not Authenticated';
+                        userInfoDiv.style.display = 'none';
+                    }
+                } catch (error) {
+                    statusDiv.className = 'status not-authenticated';
+                    statusText.textContent = 'Error parsing auth data';
+                    userInfoDiv.style.display = 'none';
+                    rawData.textContent = 'Error: ' + error.message;
+                }
+            } else {
+                statusDiv.className = 'status not-authenticated';
+                statusText.textContent = 'No authentication data found';
+                userInfoDiv.style.display = 'none';
+                rawData.textContent = 'No data in localStorage';
+            }
+        }
+
+        function clearAuth() {
+            localStorage.removeItem('proptii_auth_state');
+            refreshData();
+        }
+
+        function testLandlordApp() {
+            window.open('/landlord/index.html', '_blank');
+        }
+
+        // Refresh data on page load
+        document.addEventListener('DOMContentLoaded', refreshData);
+        
+        // Auto-refresh every 2 seconds
+        setInterval(refreshData, 2000);
+    </script>
+</body>
+</html>

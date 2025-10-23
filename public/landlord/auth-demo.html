@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Demo - Landlord App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .demo-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .authenticated {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .not-authenticated {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info-box {
+            background-color: #e2e3e5;
+            border: 1px solid #d6d8db;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1>🔐 Authentication Demo - Landlord App</h1>
+        <p>This page demonstrates how the landlord app receives authentication data from the tenant app.</p>
+        
+        <div id="auth-status" class="status not-authenticated">
+            <strong>Status:</strong> <span id="status-text">Not Authenticated</span>
+        </div>
+        
+        <div id="user-info" class="info-box" style="display: none;">
+            <h3>👤 User Information</h3>
+            <p><strong>Name:</strong> <span id="user-name">-</span></p>
+            <p><strong>Email:</strong> <span id="user-email">-</span></p>
+            <p><strong>Given Name:</strong> <span id="user-given-name">-</span></p>
+            <p><strong>Family Name:</strong> <span id="user-family-name">-</span></p>
+        </div>
+        
+        <div class="info-box">
+            <h3>🛠️ Available Functions</h3>
+            <p>These functions are available globally in the landlord app:</p>
+            <ul>
+                <li><code>window.getUserName()</code> - Get user's display name</li>
+                <li><code>window.getUserInfo()</code> - Get full user information</li>
+                <li><code>window.isUserAuthenticated()</code> - Check authentication status</li>
+                <li><code>window.debugAuth()</code> - Debug authentication state</li>
+            </ul>
+        </div>
+        
+        <div>
+            <button onclick="updateDisplay()">🔄 Refresh Display</button>
+            <button onclick="window.debugAuth()">🐛 Debug Auth</button>
+            <button onclick="testFunctions()">🧪 Test Functions</button>
+        </div>
+        
+        <div id="test-results" class="info-box" style="display: none;">
+            <h3>🧪 Function Test Results</h3>
+            <div id="test-output"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global authentication state
+        window.authState = {
+            isAuthenticated: false,
+            user: null,
+            isLoading: true
+        };
+
+        // Authentication bridge - receive auth state from parent tenant app
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'AUTH_STATE') {
+                window.authState = event.data.payload;
+                console.log('Landlord app received auth state:', window.authState);
+                updateDisplay();
+            }
+        });
+        
+        // Request authentication state from parent tenant app
+        function requestAuthState() {
+            if (window.parent !== window) {
+                console.log('Requesting auth state from parent tenant app...');
+                window.parent.postMessage({ type: 'REQUEST_AUTH_STATE' }, '*');
+            } else {
+                // If not in iframe, check localStorage for auth state
+                const storedAuthState = localStorage.getItem('proptii_auth_state');
+                if (storedAuthState) {
+                    try {
+                        window.authState = JSON.parse(storedAuthState);
+                        console.log('Loaded auth state from localStorage:', window.authState);
+                        updateDisplay();
+                    } catch (error) {
+                        console.error('Error parsing stored auth state:', error);
+                    }
+                }
+            }
+        }
+
+        // Global utility functions for the React app to access user data
+        window.getUserInfo = function() {
+            return window.userInfo || {
+                name: document.body.getAttribute('data-user-name') || 'Guest User',
+                email: document.body.getAttribute('data-user-email') || '',
+                givenName: '',
+                familyName: '',
+                isAuthenticated: document.body.getAttribute('data-user-authenticated') === 'true'
+            };
+        };
+
+        window.getUserName = function() {
+            const userInfo = window.getUserInfo();
+            return userInfo.name || userInfo.email || 'Guest User';
+        };
+
+        window.isUserAuthenticated = function() {
+            return window.authState?.isAuthenticated || false;
+        };
+
+        // Debug function to check authentication state
+        window.debugAuth = function() {
+            console.log('=== Authentication Debug Info ===');
+            console.log('Auth State:', window.authState);
+            console.log('User Info:', window.userInfo);
+            console.log('Body Data Attributes:');
+            console.log('  - data-user-name:', document.body.getAttribute('data-user-name'));
+            console.log('  - data-user-email:', document.body.getAttribute('data-user-email'));
+            console.log('  - data-user-authenticated:', document.body.getAttribute('data-user-authenticated'));
+            console.log('Global Functions:');
+            console.log('  - getUserName():', window.getUserName());
+            console.log('  - isUserAuthenticated():', window.isUserAuthenticated());
+            console.log('===============================');
+        };
+
+        function updateDisplay() {
+            const statusDiv = document.getElementById('auth-status');
+            const statusText = document.getElementById('status-text');
+            const userInfoDiv = document.getElementById('user-info');
+            const userName = document.getElementById('user-name');
+            const userEmail = document.getElementById('user-email');
+            const userGivenName = document.getElementById('user-given-name');
+            const userFamilyName = document.getElementById('user-family-name');
+
+            if (window.authState.isAuthenticated && window.authState.user) {
+                statusDiv.className = 'status authenticated';
+                statusText.textContent = 'Authenticated';
+                userInfoDiv.style.display = 'block';
+                
+                userName.textContent = window.authState.user.name || window.authState.user.email || 'Unknown';
+                userEmail.textContent = window.authState.user.email || 'Unknown';
+                userGivenName.textContent = window.authState.user.givenName || 'Unknown';
+                userFamilyName.textContent = window.authState.user.familyName || 'Unknown';
+            } else {
+                statusDiv.className = 'status not-authenticated';
+                statusText.textContent = 'Not Authenticated';
+                userInfoDiv.style.display = 'none';
+            }
+        }
+
+        function testFunctions() {
+            const testResults = document.getElementById('test-results');
+            const testOutput = document.getElementById('test-output');
+            
+            testResults.style.display = 'block';
+            testOutput.innerHTML = `
+                <p><strong>getUserName():</strong> ${window.getUserName()}</p>
+                <p><strong>isUserAuthenticated():</strong> ${window.isUserAuthenticated()}</p>
+                <p><strong>getUserInfo():</strong> ${JSON.stringify(window.getUserInfo(), null, 2)}</p>
+            `;
+        }
+
+        // Request auth state when page loads
+        document.addEventListener('DOMContentLoaded', requestAuthState);
+        
+        // Also request immediately
+        requestAuthState();
+
+        // Auto-update display every 2 seconds
+        setInterval(updateDisplay, 2000);
+    </script>
+</body>
+</html>
