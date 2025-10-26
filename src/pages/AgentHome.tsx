@@ -98,7 +98,7 @@ const AgentHome = () => {
               What would you like to do next?
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Choose how you'd like to continue setting up your property management system. You can always access these options later from your dashboard.
+              Choose how you'd like to continue setting up your property management system. You can always access these options later from your&nbsp;dashboard.
             </p>
           </div>
 
@@ -108,14 +108,14 @@ const AgentHome = () => {
             <div className="bg-white rounded-2xl shadow-lg border border-[#D1D5DB] p-8 md:p-10 text-center hover:shadow-xl transition-shadow min-h-[280px] flex flex-col justify-between">
               <div>
                 <div className="mb-8">
-                  <div className="w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center mx-auto">
-                    <svg className="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="w-16 h-16 bg-[#EBF4FF] rounded-full flex items-center justify-center mx-auto">
+                    <svg className="w-8 h-8 text-[#3B82F6]" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
                     </svg>
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-[#374957] mb-4">Go to Dashboard</h3>
-                <p className="text-gray-600 mb-8">Explore your property management dashboard</p>
+                <p className="text-gray-600 mb-8">Explore your property management&nbsp;dashboard</p>
               </div>
               <button
                 onClick={() => navigate('/landlord')}
@@ -146,11 +146,11 @@ const AgentHome = () => {
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-[#374957] mb-4">Add a Property</h3>
-                <p className="text-gray-600 mb-8">Get started by adding a property to your portfolio</p>
+                <p className="text-gray-600 mb-8">Get started by adding a property to your&nbsp;portfolio</p>
               </div>
               <button
                 onClick={() => navigate('/listings/new')}
-                className="bg-[#DC5F12] hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#f97316] hover:py-4 text-white px-8 py-3 rounded-full font-medium flex items-center justify-center mx-auto group transition-all duration-300"
+                className="bg-[#DC5F12] hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#f97316] hover:py-4 hover:shadow-2xl hover:shadow-[#DC5F12]/70 text-white px-8 py-3 rounded-full font-medium flex items-center justify-center mx-auto group transition-all duration-300"
               >
                 Add Property
                 <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -163,14 +163,14 @@ const AgentHome = () => {
             <div className="bg-white rounded-2xl shadow-lg border border-[#D1D5DB] p-8 md:p-10 text-center hover:shadow-xl transition-shadow min-h-[280px] flex flex-col justify-between">
               <div>
                 <div className="mb-8">
-                  <div className="w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center mx-auto">
-                    <svg className="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="w-16 h-16 bg-[#E6FFFA] rounded-full flex items-center justify-center mx-auto">
+                    <svg className="w-8 h-8 text-[#06B6D4]" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-6a1 1 0 00-1-1H9a1 1 0 00-1 1v6a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
                     </svg>
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-[#374957] mb-4">Setup Company Profile</h3>
-                <p className="text-gray-600 mb-8">Add company details, logo, and professional settings</p>
+                <p className="text-gray-600 mb-8">Add company details, logo, and professional&nbsp;settings</p>
               </div>
               <button
                 onClick={() => navigate('/profile/company')}
@@ -187,7 +187,7 @@ const AgentHome = () => {
           {/* Bottom Note */}
           <div className="text-center">
             <p className="text-gray-500 text-sm">
-              Don't worry - you can access all of these features anytime from your dashboard
+              Don't worry - you can access all of these features anytime from your&nbsp;dashboard
             </p>
           </div>
         </div>
