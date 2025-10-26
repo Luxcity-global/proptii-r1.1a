@@ -460,11 +460,11 @@ export function Dashboard({
               <div className="flex flex-col space-y-2 flex-shrink-0">
                 <div className="flex items-center space-x-2 px-3 py-2 rounded-lg" style={{ backgroundColor: '#F7F7F7' }}>
                   <Phone className="w-4 h-4" style={{ color: '#374957' }} />
-                  <span className="text-sm" style={{ color: '#374957' }}>+44 7911 123456</span>
+                  <span className="text-sm" style={{ color: '#374957' }}>{userProfile?.phone || '+44 7911 123456'}</span>
                 </div>
                 <div className="flex items-center space-x-2 px-3 py-2 rounded-lg" style={{ backgroundColor: '#F7F7F7' }}>
                   <Mail className="w-4 h-4" style={{ color: '#374957' }} />
-                  <span className="text-sm" style={{ color: '#374957' }}>TosinLanipekun@Luxcity.omnicrosoft</span>
+                  <span className="text-sm" style={{ color: '#374957' }}>{userProfile?.email || 'TosinLanipekun@Luxcity.omnimicrosoft'}</span>
                 </div>
               </div>
             </div>

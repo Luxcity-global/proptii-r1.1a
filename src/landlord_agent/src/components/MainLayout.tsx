@@ -35,6 +35,11 @@ function CustomSidebarHeader() {
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
 
+  const handleLogoClick = () => {
+    // Navigate back to the tenant app's home page
+    window.location.href = '/';
+  };
+
   return (
     <div className="border-b border-sidebar-border">
       {/* Logo container with conditional padding */}
@@ -44,13 +49,17 @@ function CustomSidebarHeader() {
             <img 
               src={proptiiLogoSmall} 
               alt="Proptii Logo" 
-              className="w-8 h-8 object-contain flex-shrink-0"
+              className="w-8 h-8 object-contain flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={handleLogoClick}
+              title="Go to Tenant App"
             />
           ) : (
             <img 
               src={proptiiLogoLarge} 
               alt="Proptii Logo" 
-              className="h-8 object-contain"
+              className="h-8 object-contain cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={handleLogoClick}
+              title="Go to Tenant App"
             />
           )}
         </div>
@@ -144,6 +153,11 @@ function CustomSidebarTrigger() {
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === 'collapsed';
 
+  const handleProptiiHomeClick = () => {
+    // Navigate back to the tenant app's home page
+    window.location.href = '/';
+  };
+
   return (
     <div className="border-t border-sidebar-border pt-2 pb-2 pl-4 pr-2 space-y-2">
       {/* Collapse/Expand Trigger */}
@@ -160,11 +174,19 @@ function CustomSidebarTrigger() {
       
       {/* Proptii Home Button */}
       {isCollapsed ? (
-        <button className="w-full flex items-center justify-center h-8 px-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors">
+        <button 
+          onClick={handleProptiiHomeClick}
+          className="w-full flex items-center justify-center h-8 px-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors"
+          title="Go to Tenant App"
+        >
           <Home className="h-4 w-4" />
         </button>
       ) : (
-        <button className="w-full flex items-center justify-center h-8 px-2 rounded-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 transition-colors text-sm font-medium">
+        <button 
+          onClick={handleProptiiHomeClick}
+          className="w-full flex items-center justify-center h-8 px-2 rounded-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 transition-colors text-sm font-medium"
+          title="Go to Tenant App"
+        >
           <Home className="h-4 w-4 mr-2" />
           Proptii Home
         </button>
