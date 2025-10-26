@@ -1,9 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
+import { RoleSelectionPopup } from '../components/RoleSelectionPopup';
+
+type UserRole = 'landlord' | 'agent';
 
 // Add preload link for the hero image
 const heroImageUrl = '/images/hero-agent-happy-couple.jpg';
@@ -17,11 +20,28 @@ const preloadHeroImage = () => {
 
 const AgentHome = () => {
   const navigate = useNavigate();
+  const [showRolePopup, setShowRolePopup] = useState(true);
+  const [selectedRole, setSelectedRole] = useState<UserRole>('landlord');
 
   // Preload hero image when component mounts
   useEffect(() => {
     preloadHeroImage();
   }, []);
+
+  const handleRoleSelected = (role: UserRole) => {
+    setSelectedRole(role);
+    setShowRolePopup(false);
+  };
+
+  const handleStartNewListing = () => {
+    if (selectedRole === 'landlord') {
+      // Navigate to the landlord app served from public directory
+      window.location.href = '/landlord/index.html';
+    } else {
+      // Navigate to the agent dashboard (which is the current AgentHome page)
+      navigate('/agent');
+    }
+  };
 
   return (
     <div className="min-h-screen font-archivo">
@@ -69,13 +89,13 @@ const AgentHome = () => {
             Streamline your property listings and reach more potential tenants.
           </p>
 
-          {/* Start New Listing Button */}
-          <Link
-            to="/listings/new"
+          {/* Go to Dashboard Button */}
+          <button
+            onClick={handleStartNewListing}
             className="inline-block px-8 py-4 bg-[#FFEFD4] text-black rounded-full text-lg font-semibold hover:bg-opacity-90 transition-all"
           >
-            Start New Listing
-          </Link>
+            Go to Dashboard
+          </button>
         </div>
       </section>
 
@@ -198,6 +218,12 @@ const AgentHome = () => {
 
       {/* Footer */}
       <Footer />
+
+      {/* Role Selection Popup */}
+      <RoleSelectionPopup 
+        isOpen={showRolePopup} 
+        onRoleSelected={handleRoleSelected} 
+      />
     </div>
   );
 };
