@@ -1,11 +1,12 @@
+
   <!DOCTYPE html>
   <html lang="en">
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>End-to-End Landlord App</title>
-    <script type="module" crossorigin src="/landlord/assets/index-Crif0OWj.js"></script>
-    <link rel="stylesheet" crossorigin href="/landlord/assets/index-D_BS9qqN.css">
+    <title>Proptii Landlord App</title>
+    <script type="module" crossorigin src="/landlord/assets/index-C49fbscy.js"></script>
+    <link rel="stylesheet" crossorigin href="/landlord/assets/index-BM8mDDdp.css">
     
     <!-- Authentication Bridge Script -->
     <script>
@@ -212,58 +213,6 @@
         setTimeout(overrideMockUser, 500);
       });
 
-      // More aggressive approach - intercept and override user data
-      function interceptUserData() {
-        // Override any user-related functions or objects
-        const originalConsoleLog = console.log;
-        console.log = function(...args) {
-          // Check if this is the mock user log
-          if (args[0] && args[0].includes && args[0].includes('Using mock user for testing')) {
-            const authState = window.authState;
-            if (authState?.isAuthenticated && authState.user) {
-              console.log('🚫 Blocking mock user, using real authentication data instead');
-              console.log('✅ Real user:', authState.user.name, authState.user.email);
-              return; // Don't log the mock user message
-            }
-          }
-          originalConsoleLog.apply(console, args);
-        };
-
-        // Try to find and override the user object in the React app
-        const checkForUserObject = () => {
-          // Look for common user object patterns
-          const possibleUserObjects = [
-            window.user,
-            window.currentUser,
-            window.authenticatedUser,
-            window.authState?.user
-          ];
-
-          possibleUserObjects.forEach((userObj, index) => {
-            if (userObj && userObj.name === 'John Doe') {
-              console.log(`🔄 Found mock user at index ${index}, overriding...`);
-              const authState = window.authState;
-              if (authState?.isAuthenticated && authState.user) {
-                Object.assign(userObj, {
-                  name: authState.user.name,
-                  email: authState.user.email,
-                  id: authState.user.id,
-                  givenName: authState.user.givenName,
-                  familyName: authState.user.familyName
-                });
-                console.log('✅ User object overridden:', userObj);
-              }
-            }
-          });
-        };
-
-        // Check periodically for user objects to override
-        setInterval(checkForUserObject, 2000);
-      }
-
-      // Start intercepting after a delay
-      setTimeout(interceptUserData, 3000);
-
       // DOM injection approach - directly update any "John Doe" text
       function injectRealUserName() {
         const authState = window.authState;
@@ -311,3 +260,4 @@
       <div id="root"></div>
     </body>
   </html>
+  

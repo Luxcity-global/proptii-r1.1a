@@ -83,7 +83,7 @@ export function PropertyCard({
   };
 
   return (
-    <Card className={`overflow-hidden hover:shadow-lg transition-shadow ${className}`} style={{ borderColor: '#f2f2f2', borderWidth: '1px', backgroundColor: 'white' }}>
+    <Card className={`overflow-hidden hover:shadow-lg transition-shadow ${className}`}>
       {/* Property Image */}
       <div className="aspect-video relative overflow-hidden">
         {property.photos.length > 0 ? (

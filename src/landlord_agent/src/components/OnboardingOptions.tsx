@@ -32,7 +32,7 @@ export function OnboardingOptions({
       buttonText: 'View Dashboard',
       buttonVariant: 'outline' as const,
       recommended: false,
-      iconColor: '#60A5FA', // Light blue
+      iconColor: '#3B82F6', // Blue
       iconBgColor: '#EBF4FF' // Light blue background
     },
     {
@@ -44,7 +44,7 @@ export function OnboardingOptions({
       buttonText: 'Add Property',
       buttonVariant: 'default' as const,
       recommended: true,
-      iconColor: '#A78BFA', // Light purple
+      iconColor: '#8B5CF6', // Purple
       iconBgColor: '#F3E8FF' // Light purple background
     },
     {
@@ -59,7 +59,7 @@ export function OnboardingOptions({
       buttonVariant: 'outline' as const,
       recommended: false,
       completed: userHasCompanyInfo,
-      iconColor: '#2DD4BF', // Teal
+      iconColor: '#06B6D4', // Teal
       iconBgColor: '#E6FFFA' // Light teal background
     }
   ];
@@ -68,8 +68,8 @@ export function OnboardingOptions({
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-4xl">
         <div className="text-center mb-8">
-          <h1 className="mb-4 text-3xl font-bold text-gray-900" style={{ fontFamily: 'Archivo, sans-serif' }}>What would you like to do next?</h1>
-          <p className="text-gray-600 text-lg max-w-2xl mx-auto" style={{ fontFamily: 'Archivo, sans-serif' }}>
+          <h1 className="mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>What would you like to do next?</h1>
+          <p className="text-muted-foreground max-w-2xl mx-auto" style={{ fontFamily: 'Archivo, sans-serif' }}>
             Choose how you'd like to continue setting up your property management system. 
             You can always access these options later from your dashboard.
           </p>
@@ -81,10 +81,10 @@ export function OnboardingOptions({
             return (
               <Card 
                 key={option.id} 
-                className={`relative transition-all duration-200 hover:shadow-lg bg-white ${
-                  option.recommended ? 'ring-1 ring-[#136C9E] shadow-lg' : 'border-[#f2f2f2]'
+                className={`relative transition-all duration-200 hover:shadow-lg ${
+                  option.recommended ? 'ring-1 shadow-md' : ''
                 }`}
-                style={option.recommended ? { borderColor: '#136C9E', ringColor: '#136C9E', borderWidth: '0.5px' } : { borderColor: '#f2f2f2', borderWidth: '2px' }}
+                style={option.recommended ? { borderColor: '#136C9E', ringColor: '#136C9E' } : {}}
               >
                 {option.recommended && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
@@ -125,15 +125,12 @@ export function OnboardingOptions({
                   <Button 
                     onClick={option.action}
                     variant={option.buttonVariant}
-                    className={`w-full ${option.recommended ? 'bg-[#DC5F12] hover:bg-[#DC5F12]/90 text-white border-0' : 'bg-white text-gray-700 border-[#f2f2f2] hover:bg-gray-50'}`}
+                    className="w-full"
                     size="lg"
-                    style={{ 
-                      fontFamily: 'Archivo, sans-serif',
-                      ...(option.recommended ? { backgroundColor: '#DC5F12', color: 'white' } : { backgroundColor: 'white', color: '#374151', borderColor: '#f2f2f2', borderWidth: '2px' })
-                    }}
+                    style={{ fontFamily: 'Archivo, sans-serif' }}
                   >
                     {option.buttonText}
-                    <ArrowRight className={`ml-2 h-4 w-4 ${option.recommended ? 'text-white' : 'text-gray-700'}`} />
+                    <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </CardContent>
               </Card>

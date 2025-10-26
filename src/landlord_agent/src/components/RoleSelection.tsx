@@ -82,10 +82,10 @@ export function RoleSelection({ selectedRole, onRoleSelect, onContinue }: RoleSe
               key={role.id}
               className={`p-6 cursor-pointer transition-all duration-200 hover:shadow-lg bg-white ${
                 selectedRole === role.id
-                  ? 'ring-1 ring-[#136C9E] shadow-lg'
-                  : 'border-[#f2f2f2] hover:border-primary/50'
+                  ? 'ring-1 shadow-lg'
+                  : 'border-border hover:border-primary/50'
               }`}
-              style={selectedRole === role.id ? { borderColor: '#136C9E', borderWidth: '2px' } : { borderColor: '#f2f2f2', borderWidth: '1px' }}
+              style={selectedRole === role.id ? { borderColor: '#136C9E', borderWidth: '2px' } : {}}
               onClick={() => onRoleSelect(role.id)}
             >
               <div className="flex items-start justify-between mb-4">
@@ -120,7 +120,7 @@ export function RoleSelection({ selectedRole, onRoleSelect, onContinue }: RoleSe
                 <ul className="space-y-1">
                   {role.features.map((feature, index) => (
                     <li key={index} className="text-sm text-muted-foreground flex items-center space-x-2">
-                      <span className="font-bold text-lg" style={{ color: '#DC5F12' }}>•</span>
+                      <div className="w-1 h-1 bg-primary rounded-full flex-shrink-0" />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -133,13 +133,12 @@ export function RoleSelection({ selectedRole, onRoleSelect, onContinue }: RoleSe
         <div className="flex justify-center">
           <Button 
             onClick={onContinue}
-            className="flex items-center space-x-2 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto text-white" 
+            className="flex items-center space-x-2 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto" 
             style={{ 
               backgroundColor: '#DC5F12', 
               borderColor: '#DC5F12', 
               minWidth: '250px',
-              background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
-              color: 'white'
+              background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';

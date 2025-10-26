@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Authentication Test</title>
+    <title>Landlord App Authentication Test</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -12,7 +12,7 @@
             padding: 20px;
             background-color: #f5f5f5;
         }
-        .test-container {
+        .container {
             background: white;
             padding: 30px;
             border-radius: 10px;
@@ -20,26 +20,13 @@
         }
         .status {
             padding: 15px;
-            border-radius: 5px;
             margin: 10px 0;
-        }
-        .authenticated {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-        }
-        .not-authenticated {
-            background-color: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
-        }
-        .info-box {
-            background-color: #e2e3e5;
-            border: 1px solid #d6d8db;
-            padding: 15px;
             border-radius: 5px;
-            margin: 10px 0;
+            font-weight: bold;
         }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
         button {
             background-color: #007bff;
             color: white;
@@ -49,106 +36,99 @@
             cursor: pointer;
             margin: 5px;
         }
-        button:hover {
-            background-color: #0056b3;
-        }
-        pre {
+        button:hover { background-color: #0056b3; }
+        .debug-info {
             background-color: #f8f9fa;
-            border: 1px solid #e9ecef;
-            padding: 10px;
+            border: 1px solid #dee2e6;
+            padding: 15px;
             border-radius: 5px;
-            overflow-x: auto;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
         }
     </style>
 </head>
 <body>
-    <div class="test-container">
-        <h1>🔐 Authentication State Test</h1>
-        <p>This page shows the current authentication state stored in localStorage.</p>
+    <div class="container">
+        <h1>🔐 Landlord App Authentication Test</h1>
         
-        <div id="auth-status" class="status not-authenticated">
-            <strong>Status:</strong> <span id="status-text">Not Authenticated</span>
+        <div id="status" class="status info">
+            Checking authentication status...
         </div>
-        
-        <div id="user-info" class="info-box" style="display: none;">
-            <h3>👤 User Information</h3>
-            <p><strong>Name:</strong> <span id="user-name">-</span></p>
-            <p><strong>Email:</strong> <span id="user-email">-</span></p>
-            <p><strong>ID:</strong> <span id="user-id">-</span></p>
-            <p><strong>Roles:</strong> <span id="user-roles">-</span></p>
-        </div>
-        
-        <div class="info-box">
-            <h3>📊 Raw Authentication Data</h3>
-            <pre id="raw-data">Loading...</pre>
-        </div>
-        
+
         <div>
-            <button onclick="refreshData()">🔄 Refresh Data</button>
-            <button onclick="clearAuth()">🗑️ Clear Auth</button>
-            <button onclick="testLandlordApp()">🏢 Test Landlord App</button>
+            <button onclick="testAuthState()">Test Auth State</button>
+            <button onclick="openLandlordApp()">Open Landlord App</button>
+            <button onclick="openMainApp()">Open Main App</button>
         </div>
+
+        <div id="debug-info" class="debug-info">
+            Debug information will appear here...
+        </div>
+
+        <h3>Instructions:</h3>
+        <ol>
+            <li>First, go to the <strong>Main App</strong> and sign in with Azure AD B2C</li>
+            <li>Then come back here and click <strong>"Test Auth State"</strong></li>
+            <li>Finally, click <strong>"Open Landlord App"</strong> to see the landlord app with your real user data</li>
+        </ol>
+
+        <h3>Expected Results:</h3>
+        <ul>
+            <li>✅ Authentication state should be shared between apps</li>
+            <li>✅ Your real name should appear in the landlord app (not "John Doe")</li>
+            <li>✅ Single sign-on experience across both applications</li>
+        </ul>
     </div>
 
     <script>
-        function refreshData() {
-            const authData = localStorage.getItem('proptii_auth_state');
-            const statusDiv = document.getElementById('auth-status');
-            const statusText = document.getElementById('status-text');
-            const userInfoDiv = document.getElementById('user-info');
-            const userName = document.getElementById('user-name');
-            const userEmail = document.getElementById('user-email');
-            const userId = document.getElementById('user-id');
-            const userRoles = document.getElementById('user-roles');
-            const rawData = document.getElementById('raw-data');
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
 
-            if (authData) {
+        function updateDebugInfo(info) {
+            const debugDiv = document.getElementById('debug-info');
+            debugDiv.textContent = JSON.stringify(info, null, 2);
+        }
+
+        function testAuthState() {
+            const authState = localStorage.getItem('proptii_auth_state');
+            
+            if (authState) {
                 try {
-                    const parsed = JSON.parse(authData);
-                    rawData.textContent = JSON.stringify(parsed, null, 2);
-                    
-                    if (parsed.isAuthenticated && parsed.user) {
-                        statusDiv.className = 'status authenticated';
-                        statusText.textContent = 'Authenticated';
-                        userInfoDiv.style.display = 'block';
-                        
-                        userName.textContent = parsed.user.name || parsed.user.email || 'Unknown';
-                        userEmail.textContent = parsed.user.email || 'Unknown';
-                        userId.textContent = parsed.user.id || 'Unknown';
-                        userRoles.textContent = parsed.user.roles ? parsed.user.roles.join(', ') : 'None';
-                    } else {
-                        statusDiv.className = 'status not-authenticated';
-                        statusText.textContent = 'Not Authenticated';
-                        userInfoDiv.style.display = 'none';
-                    }
+                    const parsed = JSON.parse(authState);
+                    updateStatus('✅ Authentication state found!', 'success');
+                    updateDebugInfo(parsed);
                 } catch (error) {
-                    statusDiv.className = 'status not-authenticated';
-                    statusText.textContent = 'Error parsing auth data';
-                    userInfoDiv.style.display = 'none';
-                    rawData.textContent = 'Error: ' + error.message;
+                    updateStatus('❌ Error parsing auth state: ' + error.message, 'error');
                 }
             } else {
-                statusDiv.className = 'status not-authenticated';
-                statusText.textContent = 'No authentication data found';
-                userInfoDiv.style.display = 'none';
-                rawData.textContent = 'No data in localStorage';
+                updateStatus('❌ No authentication state found. Please sign in to the main app first.', 'error');
+                updateDebugInfo({ error: 'No auth state in localStorage' });
             }
         }
 
-        function clearAuth() {
-            localStorage.removeItem('proptii_auth_state');
-            refreshData();
-        }
-
-        function testLandlordApp() {
+        function openLandlordApp() {
             window.open('/landlord/index.html', '_blank');
         }
 
-        // Refresh data on page load
-        document.addEventListener('DOMContentLoaded', refreshData);
-        
-        // Auto-refresh every 2 seconds
-        setInterval(refreshData, 2000);
+        function openMainApp() {
+            window.open('/', '_blank');
+        }
+
+        // Auto-check auth state on page load
+        window.addEventListener('load', () => {
+            setTimeout(testAuthState, 1000);
+        });
+
+        // Listen for auth state changes
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'proptii_auth_state') {
+                testAuthState();
+            }
+        });
     </script>
 </body>
 </html>

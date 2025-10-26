@@ -275,9 +275,9 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
   };
 
   return (
-    <div className="min-h-screen" style={{ fontFamily: 'Archivo, sans-serif', backgroundColor: '#f2f2f2' }}>
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b bg-white">
+      <div className="border-b bg-card/50">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -292,12 +292,12 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h1 className="mb-1" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957', fontSize: '1.5rem', fontWeight: '600' }}>{mockTenant.name}</h1>
+                  <h1 className="mb-1">{mockTenant.name}</h1>
                   <div className="flex items-center space-x-3 flex-wrap gap-2">
-                    <Badge className={getStatusColor(mockTenant.status)} style={{ fontFamily: 'Archivo, sans-serif' }}>
+                    <Badge className={getStatusColor(mockTenant.status)}>
                       {mockTenant.status}
                     </Badge>
-                    <Badge className={getReferencingStatusColor(mockTenant.referencingStatus)} style={{ fontFamily: 'Archivo, sans-serif' }}>
+                    <Badge className={getReferencingStatusColor(mockTenant.referencingStatus)}>
                       Referencing: {getReferencingStatusLabel(mockTenant.referencingStatus)}
                     </Badge>
                   </div>
@@ -343,19 +343,19 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview" style={{ fontFamily: 'Archivo, sans-serif' }}>Overview</TabsTrigger>
-            <TabsTrigger value="payments" style={{ fontFamily: 'Archivo, sans-serif' }}>Payments</TabsTrigger>
-            <TabsTrigger value="maintenance" style={{ fontFamily: 'Archivo, sans-serif' }}>Maintenance</TabsTrigger>
-            <TabsTrigger value="documents" style={{ fontFamily: 'Archivo, sans-serif' }}>Documents</TabsTrigger>
-            <TabsTrigger value="references" style={{ fontFamily: 'Archivo, sans-serif' }}>References</TabsTrigger>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+            <TabsTrigger value="documents">Documents</TabsTrigger>
+            <TabsTrigger value="references">References</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2">
               {/* Contact Information */}
-              <Card className="bg-white" style={{ border: '1px solid #D1D5DB' }}>
+              <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                  <CardTitle className="flex items-center">
                     <User className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
                     Contact Information
                   </CardTitle>
@@ -363,24 +363,24 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                 <CardContent className="space-y-4">
                   <div className="flex items-center">
                     <Mail className="w-4 h-4 mr-3 text-muted-foreground" />
-                    <span style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{mockTenant.email}</span>
+                    <span>{mockTenant.email}</span>
                   </div>
                   <div className="flex items-center">
                     <Phone className="w-4 h-4 mr-3 text-muted-foreground" />
-                    <span style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{mockTenant.phone}</span>
+                    <span>{mockTenant.phone}</span>
                   </div>
                   <div className="flex items-center">
                     <MapPin className="w-4 h-4 mr-3 text-muted-foreground" />
-                    <span style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{mockTenant.propertyAddress}</span>
+                    <span>{mockTenant.propertyAddress}</span>
                   </div>
                   {mockTenant.emergencyContact && (
                     <>
                       <Separator />
                       <div>
-                        <p className="font-medium mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Emergency Contact</p>
+                        <p className="font-medium mb-2">Emergency Contact</p>
                         <div className="space-y-1 text-sm text-muted-foreground">
-                          <p style={{ fontFamily: 'Archivo, sans-serif' }}>{mockTenant.emergencyContact.name} ({mockTenant.emergencyContact.relationship})</p>
-                          <p style={{ fontFamily: 'Archivo, sans-serif' }}>{mockTenant.emergencyContact.phone}</p>
+                          <p>{mockTenant.emergencyContact.name} ({mockTenant.emergencyContact.relationship})</p>
+                          <p>{mockTenant.emergencyContact.phone}</p>
                         </div>
                       </div>
                     </>
@@ -389,9 +389,9 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
               </Card>
 
               {/* Tenancy Details */}
-              <Card className="bg-white" style={{ border: '1px solid #D1D5DB' }}>
+              <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                  <CardTitle className="flex items-center">
                     <Home className="w-5 h-5 mr-2 text-muted-foreground" />
                     Tenancy Details
                   </CardTitle>
@@ -399,59 +399,59 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Monthly Rent</p>
-                      <p style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{formatCurrency(mockTenant.monthlyRent || mockTenant.rentAmount)}</p>
+                      <p className="text-sm text-muted-foreground">Monthly Rent</p>
+                      <p>{formatCurrency(mockTenant.monthlyRent || mockTenant.rentAmount)}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Deposit</p>
-                      <p style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{formatCurrency(mockTenant.depositAmount || mockTenant.rentAmount * 1.5)}</p>
+                      <p className="text-sm text-muted-foreground">Deposit</p>
+                      <p>{formatCurrency(mockTenant.depositAmount || mockTenant.rentAmount * 1.5)}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Lease Start</p>
-                      <p style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{formatDate(mockTenant.leaseStart)}</p>
+                      <p className="text-sm text-muted-foreground">Lease Start</p>
+                      <p>{formatDate(mockTenant.leaseStart)}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Lease End</p>
-                      <p style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{formatDate(mockTenant.leaseEnd)}</p>
+                      <p className="text-sm text-muted-foreground">Lease End</p>
+                      <p>{formatDate(mockTenant.leaseEnd)}</p>
                     </div>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Tenancy Type</p>
-                    <p className="capitalize" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{mockTenant.tenancyType?.replace('-', ' ')}</p>
+                    <p className="text-sm text-muted-foreground">Tenancy Type</p>
+                    <p className="capitalize">{mockTenant.tenancyType?.replace('-', ' ')}</p>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Employment Information */}
-              <Card className="bg-white" style={{ border: '1px solid #D1D5DB' }}>
+              <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                  <CardTitle className="flex items-center">
                     <CreditCard className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
                     Employment & Income
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <p className="text-sm text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Employer</p>
-                    <p style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{mockTenant.employer}</p>
+                    <p className="text-sm text-muted-foreground">Employer</p>
+                    <p>{mockTenant.employer}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Annual Salary</p>
-                    <p style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{formatCurrency(mockTenant.annualSalary || 0)}</p>
+                    <p className="text-sm text-muted-foreground">Annual Salary</p>
+                    <p>{formatCurrency(mockTenant.annualSalary || 0)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Previous Address</p>
-                    <p className="text-sm" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{mockTenant.previousAddress}</p>
+                    <p className="text-sm text-muted-foreground">Previous Address</p>
+                    <p className="text-sm">{mockTenant.previousAddress}</p>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Payment Status */}
-              <Card className="bg-white" style={{ border: '1px solid #D1D5DB' }}>
+              <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                  <CardTitle className="flex items-center">
                     <PoundSterling className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
                     Payment Status
                   </CardTitle>
@@ -516,12 +516,12 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
               </Card>
 
               {/* Notes */}
-              <Card className="bg-white" style={{ border: '1px solid #D1D5DB' }}>
+              <Card>
                 <CardHeader>
-                  <CardTitle style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Notes</CardTitle>
+                  <CardTitle>Notes</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  <p className="text-sm text-muted-foreground">
                     {mockTenant.notes || 'No additional notes'}
                   </p>
                 </CardContent>

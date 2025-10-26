@@ -39,8 +39,6 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
     issueDate: '',
     expiryDate: ''
   });
-  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
-  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
 
   if (!property) {
     return (
@@ -154,9 +152,9 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
   };
 
   return (
-    <div className="min-h-screen" style={{ fontFamily: 'Archivo, sans-serif', backgroundColor: '#f2f2f2' }}>
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b bg-white">
+      <div className="border-b bg-card/50">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -164,8 +162,8 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
                 <ArrowLeft className="w-4 h-4" />
               </Button>
               <div>
-                <h1 className="mb-1" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957', fontSize: '1.5rem', fontWeight: '600' }}>Document Management</h1>
-                <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>{property.address}</p>
+                <h1 className="mb-1">Document Management</h1>
+                <p className="text-muted-foreground">{property.address}</p>
               </div>
             </div>
 
@@ -268,21 +266,21 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
+          <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.875rem', fontWeight: '500', color: '#374957' }}>Total Documents</p>
-                <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.5rem', fontWeight: '600' }}>{property.documents.length}</p>
+                <p className="text-muted-foreground mb-1">Total Documents</p>
+                <p className="text-2xl font-semibold">{property.documents.length}</p>
               </div>
               <FileText className="w-8 h-8 text-muted-foreground" />
             </div>
           </Card>
 
-          <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
+          <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.875rem', fontWeight: '500', color: '#374957' }}>Valid</p>
-                <p className="text-2xl font-semibold text-green-600" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.5rem', fontWeight: '600' }}>
+                <p className="text-muted-foreground mb-1">Valid</p>
+                <p className="text-2xl font-semibold text-green-600">
                   {property.documents.filter(d => getDocumentStatus(d) === 'valid').length}
                 </p>
               </div>
@@ -290,11 +288,11 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
             </div>
           </Card>
 
-          <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
+          <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.875rem', fontWeight: '500', color: '#374957' }}>Expiring Soon</p>
-                <p className="text-2xl font-semibold text-orange-600" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.5rem', fontWeight: '600' }}>
+                <p className="text-muted-foreground mb-1">Expiring Soon</p>
+                <p className="text-2xl font-semibold text-orange-600">
                   {property.documents.filter(d => getDocumentStatus(d) === 'expiring-soon').length}
                 </p>
               </div>
@@ -302,11 +300,11 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
             </div>
           </Card>
 
-          <Card className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
+          <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '0.875rem', fontWeight: '500', color: '#374957' }}>Expired</p>
-                <p className="text-2xl font-semibold text-red-600" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '1.5rem', fontWeight: '600' }}>
+                <p className="text-muted-foreground mb-1">Expired</p>
+                <p className="text-2xl font-semibold text-red-600">
                   {property.documents.filter(d => getDocumentStatus(d) === 'expired').length}
                 </p>
               </div>
@@ -315,129 +313,63 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
           </Card>
         </div>
 
-        {/* Custom Filter Bar */}
-        <div className="bg-white rounded-xl p-6 mb-6" style={{ border: '1px solid #E5E7EB' }}>
+        {/* Filters */}
+        <Card className="p-6 mb-6">
           <div className="flex flex-col lg:flex-row gap-4">
-            {/* Search Input */}
             <div className="flex-1">
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-gray-400" />
-                </div>
-                <input
-                  type="text"
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
                   placeholder="Search documents..."
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-[#f3f3f3] placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-sm"
+                  className="pl-10"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
             </div>
 
-            {/* Type Filter */}
-            <div className="lg:w-48">
-              <div className="relative">
-                <button
-                  type="button"
-                  className="block w-full px-4 py-2 pr-8 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-left text-sm text-[#374957]"
-                  onClick={() => setTypeDropdownOpen(!typeDropdownOpen)}
-                >
-                  {typeFilter === 'all' ? 'All Types' : getTypeLabel(typeFilter)}
-                </button>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
+            <div className="flex gap-3">
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {documentTypes.map(type => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-                {typeDropdownOpen && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
-                    <div className="py-1">
-                      <button
-                        className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
-                        onClick={() => { setTypeFilter('all'); setTypeDropdownOpen(false); }}
-                      >
-                        All Types
-                      </button>
-                      {documentTypes.map((type) => (
-                        <button
-                          key={type.value}
-                          className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
-                          onClick={() => { setTypeFilter(type.value); setTypeDropdownOpen(false); }}
-                        >
-                          {type.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Status Filter */}
-            <div className="lg:w-48">
-              <div className="relative">
-                <button
-                  type="button"
-                  className="block w-full px-4 py-2 pr-8 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-[#8FCDFF] focus:border-[#8FCDFF] text-left text-sm text-[#374957]"
-                  onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-                >
-                  {statusFilter === 'all' ? 'All Status' :
-                   statusFilter === 'valid' ? 'Valid' :
-                   statusFilter === 'expiring-soon' ? 'Expiring Soon' : 'Expired'}
-                </button>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-
-                {statusDropdownOpen && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
-                    <div className="py-1">
-                      <button
-                        className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
-                        onClick={() => { setStatusFilter('all'); setStatusDropdownOpen(false); }}
-                      >
-                        All Status
-                      </button>
-                      <button
-                        className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
-                        onClick={() => { setStatusFilter('valid'); setStatusDropdownOpen(false); }}
-                      >
-                        Valid
-                      </button>
-                      <button
-                        className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
-                        onClick={() => { setStatusFilter('expiring-soon'); setStatusDropdownOpen(false); }}
-                      >
-                        Expiring Soon
-                      </button>
-                      <button
-                        className="block w-full px-4 py-2 text-left text-sm text-[#374957] hover:bg-gray-100 focus:outline-none focus:bg-gray-100"
-                        onClick={() => { setStatusFilter('expired'); setStatusDropdownOpen(false); }}
-                      >
-                        Expired
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="valid">Valid</SelectItem>
+                  <SelectItem value="expiring-soon">Expiring Soon</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Documents List */}
         {filteredDocuments.length === 0 ? (
-          <Card className="p-12 text-center bg-white" style={{ border: '1px solid #D1D5DB' }}>
+          <Card className="p-12 text-center">
             <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+            <h3 className="mb-2">
               {property.documents.length === 0 
                 ? 'No documents uploaded' 
                 : 'No documents match your filters'
               }
             </h3>
-            <p className="text-muted-foreground mb-6" style={{ fontFamily: 'Archivo, sans-serif' }}>
+            <p className="text-muted-foreground mb-6">
               {property.documents.length === 0
                 ? 'Upload compliance documents to track their status and never miss renewals'
                 : 'Try adjusting your search or filters'
@@ -453,13 +385,13 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
             {filteredDocuments.map((document) => {
               const status = getDocumentStatus(document);
               return (
-                <Card key={document.id} className="p-6 bg-white" style={{ border: '1px solid #D1D5DB' }}>
+                <Card key={document.id} className="p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       {getStatusIcon(status)}
                       <div>
-                        <h3 className="mb-1" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>{document.name}</h3>
-                        <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                        <h3 className="mb-1">{document.name}</h3>
+                        <p className="text-muted-foreground">
                           {getTypeLabel(document.type)}
                         </p>
                       </div>
@@ -467,11 +399,11 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
 
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
-                        <p className="text-sm mb-1" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                        <p className="text-sm mb-1">
                           Issued: {formatDate(document.issueDate)}
                         </p>
                         {document.expiryDate && (
-                          <p className="text-sm text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                          <p className="text-sm text-muted-foreground">
                             Expires: {formatDate(document.expiryDate)}
                           </p>
                         )}
@@ -480,10 +412,10 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
                       {getStatusBadge(status)}
 
                       <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm" className="border-[#D1D5DB] text-[#374957] hover:border-[#DC5F12] hover:text-[#DC5F12] transition-all">
+                        <Button variant="outline" size="sm">
                           <Download className="w-4 h-4" />
                         </Button>
-                        <Button variant="outline" size="sm" className="border-[#D1D5DB] text-[#374957] hover:border-[#DC5F12] hover:text-[#DC5F12] transition-all">
+                        <Button variant="outline" size="sm">
                           <X className="w-4 h-4" />
                         </Button>
                       </div>
@@ -496,33 +428,33 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
         )}
 
         {/* Compliance Tips */}
-        <Card className="p-6 mt-8 bg-white" style={{ border: '1px solid #D1D5DB' }}>
-          <h3 className="mb-4 flex items-center" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+        <Card className="p-6 mt-8 bg-muted/50">
+          <h3 className="mb-4 flex items-center">
             <AlertTriangle className="w-5 h-5 text-orange-600 mr-2" />
             Compliance Reminders
           </h3>
           <div className="grid md:grid-cols-2 gap-4 text-sm">
             <div>
-              <h4 className="font-medium mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Gas Safety Certificate</h4>
-              <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
+              <h4 className="font-medium mb-2">Gas Safety Certificate</h4>
+              <p className="text-muted-foreground">
                 Required annually for all rental properties with gas appliances
               </p>
             </div>
             <div>
-              <h4 className="font-medium mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>EPC Certificate</h4>
-              <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
+              <h4 className="font-medium mb-2">EPC Certificate</h4>
+              <p className="text-muted-foreground">
                 Valid for 10 years, minimum rating of E required for rentals
               </p>
             </div>
             <div>
-              <h4 className="font-medium mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Insurance Policy</h4>
-              <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
+              <h4 className="font-medium mb-2">Insurance Policy</h4>
+              <p className="text-muted-foreground">
                 Landlord insurance should cover property damage and liability
               </p>
             </div>
             <div>
-              <h4 className="font-medium mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Tenancy Agreement</h4>
-              <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
+              <h4 className="font-medium mb-2">Tenancy Agreement</h4>
+              <p className="text-muted-foreground">
                 Keep signed agreements for all current and past tenancies
               </p>
             </div>

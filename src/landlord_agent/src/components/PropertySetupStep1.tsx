@@ -72,22 +72,6 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
 
   return (
     <div className="min-h-screen py-4 px-2" style={{ backgroundColor: '#F7F7F7', fontFamily: 'Archivo, sans-serif' }}>
-      <style>
-        {`
-          .section-button {
-            outline: none !important;
-            border: 1px solid #D1D5DB !important;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-          }
-          .section-button:focus,
-          .section-button:focus-visible,
-          .section-button:active,
-          .section-button:hover {
-            outline: none !important;
-            border: 1px solid #D1D5DB !important;
-          }
-        `}
-      </style>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8 py-4">
@@ -126,7 +110,10 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
             <div className="space-y-4">
               <Button 
                 variant="outline" 
-                className="section-button w-full justify-start text-left h-20 px-4 transition-all duration-300"
+                className="w-full justify-start text-left h-20 px-4 border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-all duration-300"
+                style={{
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                }}
                 onClick={onSection1}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.boxShadow = '0 12px 30px rgba(255, 248, 220, 0.8), 0 8px 20px rgba(0, 0, 0, 0.15)';
@@ -148,7 +135,10 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
               
               <Button 
                 variant="outline" 
-                className="section-button w-full justify-start text-left h-20 px-4 transition-all duration-300"
+                className="w-full justify-start text-left h-20 px-4 border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-all duration-300"
+                style={{
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                }}
                 onClick={onSection2}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.boxShadow = '0 12px 30px rgba(255, 248, 220, 0.8), 0 8px 20px rgba(0, 0, 0, 0.15)';
@@ -170,7 +160,10 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
               
               <Button 
                 variant="outline" 
-                className="section-button w-full justify-start text-left h-20 px-4 transition-all duration-300"
+                className="w-full justify-start text-left h-20 px-4 border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-all duration-300"
+                style={{
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                }}
                 onClick={onSection3}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.boxShadow = '0 12px 30px rgba(255, 248, 220, 0.8), 0 8px 20px rgba(0, 0, 0, 0.15)';
@@ -192,7 +185,10 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
               
               <Button 
                 variant="outline" 
-                className="section-button w-full justify-start text-left h-20 px-4 transition-all duration-300"
+                className="w-full justify-start text-left h-20 px-4 border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-all duration-300"
+                style={{
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                }}
                 onClick={onSection4}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.boxShadow = '0 12px 30px rgba(255, 248, 220, 0.8), 0 8px 20px rgba(0, 0, 0, 0.15)';
@@ -216,7 +212,7 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
 
           {/* Right Section - Property Slideshow */}
           <div className="flex-1" style={{ marginRight: '-48px' }}>
-            <div className="w-full h-[600px] rounded-xl overflow-hidden shadow-lg relative">
+            <div className="w-full h-[1100px] rounded-xl overflow-hidden shadow-lg relative">
               {/* Property Image */}
               <img 
                 src={slides[currentSlide].image} 

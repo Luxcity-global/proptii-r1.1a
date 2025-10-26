@@ -16,7 +16,6 @@ import {
 } from './ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { UserProfile } from '../App';
-import { LogoutButton } from './auth/LogoutButton';
 
 // Import logos
 const proptiiLogoLarge = '/src/assets/proptii_logo_large.png';
@@ -37,25 +36,23 @@ function CustomSidebarHeader() {
   const isCollapsed = state === 'collapsed';
 
   return (
-    <div className="border-b" style={{ borderColor: '#f2f2f2' }}>
+    <div className="border-b border-sidebar-border">
       {/* Logo container with conditional padding */}
       <div className={`pt-2 pb-2 ${isCollapsed ? 'px-2' : 'pl-4 pr-2'}`}>
         <div className={`flex items-center h-8 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
-          <a href="http://localhost:5173" className="flex items-center">
-            {isCollapsed ? (
-              <img 
-                src={proptiiLogoSmall} 
-                alt="Proptii Logo" 
-                className="w-8 h-8 object-contain flex-shrink-0 hover:opacity-80 transition-opacity"
-              />
-            ) : (
-              <img 
-                src={proptiiLogoLarge} 
-                alt="Proptii Logo" 
-                className="h-8 object-contain hover:opacity-80 transition-opacity"
-              />
-            )}
-          </a>
+          {isCollapsed ? (
+            <img 
+              src={proptiiLogoSmall} 
+              alt="Proptii Logo" 
+              className="w-8 h-8 object-contain flex-shrink-0"
+            />
+          ) : (
+            <img 
+              src={proptiiLogoLarge} 
+              alt="Proptii Logo" 
+              className="h-8 object-contain"
+            />
+          )}
         </div>
       </div>
     </div>
@@ -76,7 +73,7 @@ function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
   const isCollapsed = state === 'collapsed';
 
   return (
-    <div className="pt-12 pb-2 pl-4 pr-2">
+    <div className="pt-2 pb-2 pl-4 pr-2">
       <div className="space-y-3">
         {navigationItems.map((item) => {
           const isActive = currentScreen === item.id;
@@ -87,15 +84,10 @@ function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
               className={`
                 w-full flex items-center h-10 px-3 rounded-md text-sm font-medium transition-colors
                 ${isCollapsed ? 'justify-center' : 'justify-start'}
-                focus:outline-none focus:ring-0
-                ${isActive ? 'border-[#f2f2f2]' : ''}
               `}
               style={{ 
                 color: isActive ? '#136C9E' : '#374957',
-                backgroundColor: isActive ? '#E6F3FF' : 'transparent',
-                border: isActive ? '2px solid #f2f2f2 !important' : '2px solid transparent !important',
-                outline: 'none !important',
-                boxShadow: isActive ? '0 0 0 1px #f2f2f2 !important' : 'none !important'
+                backgroundColor: isActive ? '#E6F3FF' : 'transparent'
               }}
               onMouseEnter={(e) => {
                 if (!isActive) {
@@ -128,7 +120,7 @@ function CustomUserProfile({ userProfile }: { userProfile: UserProfile | null })
   if (!userProfile) return null;
 
   return (
-    <div className="border-t pt-2 pb-2 pl-4 pr-2" style={{ borderColor: '#f2f2f2' }}>
+    <div className="border-t border-sidebar-border pt-2 pb-2 pl-4 pr-2">
       <div className="flex items-center h-8 px-2">
         <Avatar className="h-4 w-4 flex-shrink-0">
           {userProfile.logo && <AvatarImage src={userProfile.logo} alt={userProfile.name} />}
@@ -142,11 +134,6 @@ function CustomUserProfile({ userProfile }: { userProfile: UserProfile | null })
             <div className="truncate text-xs opacity-70" style={{ color: '#374957' }}>{userProfile.email}</div>
           </div>
         )}
-        {!isCollapsed && (
-          <div className="ml-2">
-            <LogoutButton />
-          </div>
-        )}
       </div>
     </div>
   );
@@ -158,7 +145,7 @@ function CustomSidebarTrigger() {
   const isCollapsed = state === 'collapsed';
 
   return (
-    <div className="border-t pt-2 pb-2 pl-4 pr-2 space-y-2" style={{ borderColor: '#f2f2f2' }}>
+    <div className="border-t border-sidebar-border pt-2 pb-2 pl-4 pr-2 space-y-2">
       {/* Collapse/Expand Trigger */}
       <button
         onClick={toggleSidebar}
@@ -173,20 +160,14 @@ function CustomSidebarTrigger() {
       
       {/* Proptii Home Button */}
       {isCollapsed ? (
-        <a 
-          href="http://localhost:5173"
-          className="w-full flex items-center justify-center h-8 px-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors"
-        >
+        <button className="w-full flex items-center justify-center h-8 px-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors">
           <Home className="h-4 w-4" />
-        </a>
+        </button>
       ) : (
-        <a 
-          href="http://localhost:5173"
-          className="w-full flex items-center justify-center h-8 px-2 rounded-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 transition-colors text-sm font-medium"
-        >
+        <button className="w-full flex items-center justify-center h-8 px-2 rounded-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 transition-colors text-sm font-medium">
           <Home className="h-4 w-4 mr-2" />
           Proptii Home
-        </a>
+        </button>
       )}
     </div>
   );
@@ -215,15 +196,9 @@ function CustomSidebar({
     <div className="group peer hidden md:block" data-collapsible="icon" style={{ color: '#374957' }}>
       {/* Sidebar Container */}
       <div 
-        className="sidebar-fixed fixed inset-y-0 left-0 z-50 h-screen bg-white"
+        className="fixed inset-y-0 left-0 z-10 h-screen transition-all duration-300 ease-out bg-white border-r border-sidebar-border"
         style={{
-          width: isCollapsed ? 'var(--sidebar-width-collapsed)' : 'var(--sidebar-width)',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          bottom: 0,
-          transform: 'none',
-          borderRight: '1px solid #f2f2f2'
+          width: isCollapsed ? 'var(--sidebar-width-collapsed)' : 'var(--sidebar-width)'
         }}
       >
         <div className="flex flex-col h-full">

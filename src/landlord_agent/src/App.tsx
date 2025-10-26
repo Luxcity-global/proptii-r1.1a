@@ -32,9 +32,6 @@ import { AddTenant } from './components/AddTenant';
 import { InviteTenant } from './components/InviteTenant';
 import { SelectExistingTenant } from './components/SelectExistingTenant';
 import { AddLandlord } from './components/AddLandlord';
-import { AuthProviders } from './providers/AuthProviders';
-import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { useAuth } from './contexts/AuthContext';
 
 export type UserRole = 'landlord' | 'agent';
 
@@ -262,8 +259,7 @@ interface PropertySetupData {
   additionalNotes: string;
 }
 
-function AppContent() {
-  const { user: azureUser } = useAuth();
+export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
   const [navigationScreen, setNavigationScreen] = useState<NavigationScreen>('dashboard');
   const [userRole, setUserRole] = useState<UserRole>('landlord');
@@ -280,41 +276,6 @@ function AppContent() {
   const [vacancyAlerts, setVacancyAlerts] = useState<VacancyRiskAlert[]>([]);
   const [arrearsAlerts, setArrearsAlerts] = useState<ArrearsAlert[]>([]);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  
-  // Check for URL hash parameters to navigate to specific screens
-  React.useEffect(() => {
-    const checkHashAndNavigate = () => {
-      const hash = window.location.hash;
-      const urlParams = new URLSearchParams(window.location.search);
-      const roleFromUrl = urlParams.get('role');
-      
-      // Update role if provided in URL
-      if (roleFromUrl && (roleFromUrl === 'landlord' || roleFromUrl === 'agent')) {
-        setUserRole(roleFromUrl);
-        // Clean up URL after reading role
-        const newUrl = window.location.pathname + window.location.hash;
-        window.history.replaceState({}, document.title, newUrl);
-      }
-      
-      if (hash === '#dashboard') {
-        setCurrentScreen('main-app');
-        setNavigationScreen('dashboard');
-      } else if (hash === '#add-property') {
-        setCurrentScreen('property-setup-step1');
-      }
-    };
-    
-    // Check on mount
-    checkHashAndNavigate();
-    
-    // Listen for hash changes
-    window.addEventListener('hashchange', checkHashAndNavigate);
-    
-    return () => {
-      window.removeEventListener('hashchange', checkHashAndNavigate);
-    };
-  }, []);
-
   
   // Property setup state
   const [propertySetupData, setPropertySetupData] = useState<PropertySetupData>({
@@ -343,6 +304,38 @@ function AppContent() {
       propertyDetails: { ...prev.propertyDetails, ...updates }
     }));
   };
+
+  // Listen for authentication changes from the bridge script
+  React.useEffect(() => {
+    const handleAuthStateChange = () => {
+      // Check if authentication bridge functions are available
+      if (typeof window.getUserInfo === 'function') {
+        const userInfo = window.getUserInfo();
+        if (userInfo && userInfo.isAuthenticated) {
+          setUserProfile({
+            name: userInfo.name,
+            email: userInfo.email,
+            phone: '+44 7911 123456', // Default phone, could be enhanced later
+            companyName: 'Proptii',
+            logo: undefined
+          });
+          console.log('✅ Updated userProfile with authentication data:', userInfo);
+        }
+      }
+    };
+
+    // Listen for authentication state changes
+    window.addEventListener('authStateChanged', handleAuthStateChange);
+    window.addEventListener('userAuthenticated', handleAuthStateChange);
+
+    // Also check immediately
+    handleAuthStateChange();
+
+    return () => {
+      window.removeEventListener('authStateChanged', handleAuthStateChange);
+      window.removeEventListener('userAuthenticated', handleAuthStateChange);
+    };
+  }, []);
 
   // Convert property setup data to Property object
   const createPropertyFromSetupData = (): Property => {
@@ -381,17 +374,6 @@ function AppContent() {
       createdAt: new Date()
     };
   };
-
-  // Sync Azure user with local user profile
-  React.useEffect(() => {
-    if (azureUser && !userProfile) {
-      setUserProfile(azureUser);
-      // Skip welcome screen if user is authenticated
-      if (currentScreen === 'welcome') {
-        setCurrentScreen('role-selection');
-      }
-    }
-  }, [azureUser, userProfile, currentScreen]);
 
   // Initialize with mock data for better demonstration
   React.useEffect(() => {
@@ -1181,11 +1163,6 @@ function AppContent() {
         return <WelcomeScreen onGetStarted={() => navigateToScreen('role-selection')} />;
       
       case 'role-selection':
-        // If role is already set from external source, skip role selection
-        if (userRole && (userRole === 'landlord' || userRole === 'agent')) {
-          navigateToScreen('profile-setup');
-          return null;
-        }
         return (
           <RoleSelection
             selectedRole={userRole}
@@ -1627,15 +1604,5 @@ function AppContent() {
         {renderScreen()}
       </div>
     </div>
-  );
-}
-
-export default function App() {
-  return (
-    <AuthProviders>
-      <ProtectedRoute>
-        <AppContent />
-      </ProtectedRoute>
-    </AuthProviders>
   );
 }
