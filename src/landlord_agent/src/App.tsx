@@ -337,6 +337,18 @@ export default function App() {
     };
   }, []);
 
+  // Check URL parameters for role selection
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roleParam = urlParams.get('role');
+    if (roleParam === 'agent') {
+      setUserRole('agent');
+      // Skip onboarding and go directly to main app for agents
+      setIsOnboarding(false);
+      setCurrentScreen('main-app');
+    }
+  }, []);
+
   // Convert property setup data to Property object
   const createPropertyFromSetupData = (): Property => {
     const { propertyType, propertyDetails, amenities, images, additionalNotes } = propertySetupData;

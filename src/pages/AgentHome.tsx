@@ -30,7 +30,16 @@ const AgentHome = () => {
 
   const handleRoleSelected = (role: UserRole) => {
     setSelectedRole(role);
+    // Don't close popup immediately - let user see the role was selected
+    // Popup will close when they click "Continue" button
+  };
+
+  const handleRoleContinue = (role: UserRole) => {
+    setSelectedRole(role);
     setShowRolePopup(false);
+    
+    // Just close the popup and let the user decide what to do next
+    // The "Go to Dashboard" button will handle the navigation
   };
 
   const handleStartNewListing = () => {
@@ -38,8 +47,9 @@ const AgentHome = () => {
       // Navigate to the landlord app served from public directory
       window.location.href = '/landlord/index.html';
     } else {
-      // Navigate to the agent dashboard (which is the current AgentHome page)
-      navigate('/agent');
+      // For agents, navigate to the landlord app but with agent role
+      // We need to pass the agent role to the landlord app
+      window.location.href = '/landlord/index.html?role=agent';
     }
   };
 
@@ -94,7 +104,7 @@ const AgentHome = () => {
             onClick={handleStartNewListing}
             className="inline-block px-8 py-4 bg-[#FFEFD4] text-black rounded-full text-lg font-semibold hover:bg-opacity-90 transition-all"
           >
-            Go to Dashboard
+            {selectedRole === 'landlord' ? 'Go to Landlord Dashboard' : 'Go to Agent Dashboard'}
           </button>
         </div>
       </section>
@@ -123,7 +133,7 @@ const AgentHome = () => {
           </div>
 
           {/* Action Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-8 action-cards-section">
             {/* Go to Dashboard Card */}
             <div className="bg-white rounded-2xl shadow-lg border border-[#D1D5DB] p-8 md:p-10 text-center hover:shadow-xl transition-shadow min-h-[280px] flex flex-col justify-between">
               <div>
@@ -222,7 +232,8 @@ const AgentHome = () => {
       {/* Role Selection Popup */}
       <RoleSelectionPopup 
         isOpen={showRolePopup} 
-        onRoleSelected={handleRoleSelected} 
+        onRoleSelected={handleRoleSelected}
+        onContinue={handleRoleContinue}
       />
     </div>
   );
