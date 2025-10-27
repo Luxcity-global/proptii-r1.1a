@@ -324,10 +324,26 @@ export function ContractsPage({ onBack }: ContractsPageProps) {
           </div>
           <Button 
             onClick={() => setIsSendModalOpen(true)}
-            className="flex items-center space-x-2"
-            style={{ backgroundColor: '#DC5F12', fontFamily: 'Archivo, sans-serif' }}
+            className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto"
+            style={{ 
+              backgroundColor: '#DC5F12', 
+              borderColor: '#DC5F12', 
+              minWidth: '180px',
+              background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
+              fontFamily: 'Archivo, sans-serif'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
+              e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
+              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+              e.currentTarget.style.transform = 'translateY(0px)';
+            }}
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-4 h-4" strokeWidth={2.5} />
             <span>Send Contract</span>
           </Button>
         </div>
@@ -349,7 +365,7 @@ export function ContractsPage({ onBack }: ContractsPageProps) {
           <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Expiring Soon</p>
+                <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Contracts expiring soon</p>
                 <p className="text-2xl font-semibold text-orange-600" style={{ fontFamily: 'Archivo, sans-serif' }}>{expiringSoon}</p>
               </div>
               <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -377,7 +393,7 @@ export function ContractsPage({ onBack }: ContractsPageProps) {
             <h2 className="text-lg font-semibold mb-4" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
               Alerts
             </h2>
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {alerts.map((alert) => (
                 <Card key={alert.id} className={`p-4 ${
                   alert.type === 'expiring' 

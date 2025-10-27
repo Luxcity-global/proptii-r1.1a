@@ -74,6 +74,7 @@ function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
     id: NavigationScreen;
     icon: React.ComponentType<{ className?: string }>;
     label: string;
+    hasNotification?: boolean;
   }>;
   currentScreen: NavigationScreen;
   onNavigate: (screen: NavigationScreen) => void;
@@ -95,6 +96,7 @@ function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
                 ${isCollapsed ? 'justify-center' : 'justify-start'}
               `}
               style={{ 
+                alignItems: 'center',
                 color: isActive ? '#136C9E' : '#374957',
                 backgroundColor: isActive ? '#E6F3FF' : 'transparent'
               }}
@@ -109,7 +111,12 @@ function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
                 }
               }}
             >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
+              <div className="relative flex-shrink-0">
+                <item.icon className="w-5 h-5" />
+                {item.hasNotification && (
+                  <div className="absolute top-0 left-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white z-10 transform -translate-x-1 -translate-y-1"></div>
+                )}
+              </div>
               {!isCollapsed && (
                 <span className="ml-2 truncate">{item.label}</span>
               )}
@@ -272,11 +279,12 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
       icon: FileText,
       label: 'Documents',
     },
-    {
-      id: 'contracts' as NavigationScreen,
-      icon: FileSignature,
-      label: 'Contracts',
-    },
+          {
+            id: 'contracts' as NavigationScreen,
+            icon: FileSignature,
+            label: 'Contracts',
+            hasNotification: true, // This would be dynamic based on unsigned contracts
+          },
     {
       id: 'clients' as NavigationScreen,
       icon: Users,
