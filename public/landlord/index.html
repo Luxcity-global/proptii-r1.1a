@@ -17,6 +17,119 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Archivo:wght@400;600&display=swap"
     rel="stylesheet">
+  <!-- Authentication Bridge Script -->
+  <script>
+    // Global authentication state
+    window.authState = {
+      isAuthenticated: false,
+      user: null,
+      isLoading: true
+    };
+
+    // Authentication bridge - receive auth state from parent tenant app
+    window.addEventListener('message', function(event) {
+      if (event.data.type === 'AUTH_STATE') {
+        window.authState = event.data.payload;
+        console.log('Landlord app received auth state:', window.authState);
+      }
+    });
+    
+    // Request authentication state from parent tenant app
+    function requestAuthState() {
+      if (window.parent !== window) {
+        console.log('Requesting auth state from parent tenant app...');
+        window.parent.postMessage({ type: 'REQUEST_AUTH_STATE' }, '*');
+      } else {
+        // If not in iframe, check localStorage for auth state
+        const storedAuthState = localStorage.getItem('proptii_auth_state');
+        if (storedAuthState) {
+          try {
+            window.authState = JSON.parse(storedAuthState);
+            console.log('Loaded auth state from localStorage:', window.authState);
+          } catch (error) {
+            console.error('Error parsing stored auth state:', error);
+          }
+        }
+      }
+    }
+
+    // Global utility functions for the React app to access user data
+    window.getUserInfo = function() {
+      // First try to get from authState
+      if (window.authState && window.authState.isAuthenticated && window.authState.user) {
+        return {
+          name: window.authState.user.name,
+          email: window.authState.user.email,
+          givenName: window.authState.user.givenName,
+          familyName: window.authState.user.familyName,
+          isAuthenticated: true
+        };
+      }
+      
+      // Fallback to MSAL data
+      try {
+        const accountKeys = localStorage.getItem('msal.account.keys');
+        if (accountKeys) {
+          const keys = JSON.parse(accountKeys);
+          if (keys && keys.length > 0) {
+            const accountKey = keys[0];
+            const accountData = localStorage.getItem(accountKey);
+            if (accountData) {
+              const account = JSON.parse(accountData);
+              if (account && account.name && account.username) {
+                return {
+                  name: account.name,
+                  email: account.username,
+                  givenName: account.name?.split(' ')[0],
+                  familyName: account.name?.split(' ').slice(1).join(' '),
+                  isAuthenticated: true
+                };
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error getting MSAL data:', error);
+      }
+      
+      // Final fallback
+      return {
+        name: document.body.getAttribute('data-user-name') || 'Guest User',
+        email: document.body.getAttribute('data-user-email') || '',
+        givenName: '',
+        familyName: '',
+        isAuthenticated: false
+      };
+    };
+
+    window.getUserName = function() {
+      const userInfo = window.getUserInfo();
+      return userInfo.name || userInfo.email || 'Guest User';
+    };
+
+    window.isUserAuthenticated = function() {
+      return window.authState?.isAuthenticated || false;
+    };
+
+    // Debug function to check authentication state
+    window.debugAuth = function() {
+      console.log('=== Authentication Debug Info ===');
+      console.log('Auth State:', window.authState);
+      console.log('User Info:', window.getUserInfo());
+      console.log('Body Data Attributes:');
+      console.log('  - data-user-name:', document.body.getAttribute('data-user-name'));
+      console.log('  - data-user-email:', document.body.getAttribute('data-user-email'));
+      console.log('  - data-user-authenticated:', document.body.getAttribute('data-user-authenticated'));
+      console.log('Global Functions:');
+      console.log('  - getUserName():', window.getUserName());
+      console.log('  - isUserAuthenticated():', window.isUserAuthenticated());
+      console.log('===============================');
+    };
+
+    // Initialize authentication on page load
+    requestAuthState();
+  </script>
+
   <script type="module" crossorigin src="/assets/index-Dw5xEbhg.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-BM8mDDdp.css">
 </head>
