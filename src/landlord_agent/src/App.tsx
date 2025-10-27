@@ -32,6 +32,7 @@ import { AddTenant } from './components/AddTenant';
 import { InviteTenant } from './components/InviteTenant';
 import { SelectExistingTenant } from './components/SelectExistingTenant';
 import { AddLandlord } from './components/AddLandlord';
+import { ContractsPage } from './components/ContractsPage';
 
 export type UserRole = 'landlord' | 'agent';
 
@@ -1058,6 +1059,13 @@ export default function App() {
               // In real app, this would export document data
               console.log('Export documents as:', format);
             }}
+          />
+        );
+
+      case 'contracts':
+        return (
+          <ContractsPage
+            onBack={() => setNavigationScreen('dashboard')}
           />
         );
 

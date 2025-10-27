@@ -18,32 +18,36 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
   
   const slides = [
     {
-      image: '/assets/add_prp_slide/chalcot-square-london-uk-march-people-enjoy-sun-gardens-surrounded-colorful-italianate-terraced-houses-greater-area-214905146.png',
+      image: '/add_prp_slide/chalcot-square-london-uk-march-people-enjoy-sun-gardens-surrounded-colorful-italianate-terraced-houses-greater-area-214905146.png',
       tip: 'Start with property type - it determines your rental strategy and target market'
     },
     {
-      image: '/assets/add_prp_slide/pexels-heyho-6077368.png',
+      image: '/add_prp_slide/fyGslLi6kqhgzXxdxn7fQYSSReDgNPDwHpPeYYsP_1200.png',
       tip: 'Consider location carefully - it affects rental income and tenant quality'
     },
     {
-      image: '/assets/add_prp_slide/pexels-lebele-11935244.png',
+      image: '/add_prp_slide/i.png',
       tip: 'Document everything - photos, floor plans, and condition reports are essential'
     },
     {
-      image: '/assets/add_prp_slide/pexels-naimbic-2030037.png',
+      image: '/add_prp_slide/viewSourceImage-39-1-scaled.png',
       tip: 'Set competitive rent - research local market rates for similar properties'
     },
     {
-      image: '/assets/add_prp_slide/iStock-1974859701-1-scaled.png',
+      image: '/add_prp_slide/pexels-heyho-6077368.png',
       tip: 'Maintain good tenant relationships - communication is key to successful property management'
     },
     {
-      image: '/assets/add_prp_slide/fyGslLi6kqhgzXxdxn7fQYSSReDgNPDwHpPeYYsP_1200.png',
+      image: '/add_prp_slide/iStock-1974859701-1-scaled.png',
       tip: 'Regular maintenance prevents costly repairs and keeps tenants happy'
     },
     {
-      image: '/assets/add_prp_slide/viewSourceImage-39-1-scaled.png',
+      image: '/add_prp_slide/pexels-lebele-11935244.png',
       tip: 'Keep detailed records - proper documentation protects you legally and financially'
+    },
+    {
+      image: '/add_prp_slide/pexels-naimbic-2030037.png',
+      tip: 'Plan for the future - consider long-term property value and market trends'
     }
   ];
 
@@ -222,7 +226,7 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
                 }`}
                 onError={(e) => {
                   // Fallback to a different image if the current one fails
-                  (e.currentTarget as HTMLImageElement).src = '/assets/add_prp_slide/chalcot-square-london-uk-march-people-enjoy-sun-gardens-surrounded-colorful-italianate-terraced-houses-greater-area-214905146.png';
+                  (e.currentTarget as HTMLImageElement).src = '/add_prp_slide/chalcot-square-london-uk-march-people-enjoy-sun-gardens-surrounded-colorful-italianate-terraced-houses-greater-area-214905146.png';
                 }}
               />
               

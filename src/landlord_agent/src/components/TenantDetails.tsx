@@ -5,6 +5,7 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Separator } from './ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { DocumentUploadModal } from './DocumentUploadModal';
 import { 
   ArrowLeft, 
   Edit3, 
@@ -77,6 +78,7 @@ interface TenantDetailsProps {
 
 export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   if (!tenant) {
     return (
@@ -193,6 +195,29 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
         status: 'valid'
       }
     ]
+  };
+
+  const handleDocumentUpload = (documentData: {
+    name: string;
+    type: string;
+    file: File;
+    expiryDate?: string;
+  }) => {
+    // Create new document object
+    const newDocument: TenantDocument = {
+      id: Date.now().toString(),
+      name: documentData.name,
+      type: documentData.type as TenantDocument['type'],
+      dateUploaded: new Date(),
+      expiryDate: documentData.expiryDate ? new Date(documentData.expiryDate) : undefined,
+      status: 'valid'
+    };
+
+    // Add to mockTenant documents (in real app, this would be an API call)
+    mockTenant.documents = [...(mockTenant.documents || []), newDocument];
+    
+    console.log('Document uploaded:', newDocument);
+    // In a real app, you would call an API to save the document
   };
 
   const getStatusColor = (status: string) => {
@@ -600,10 +625,37 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
           <TabsContent value="documents" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <FileText className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
-                  Documents
-                </CardTitle>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <CardTitle className="flex items-center">
+                    <FileText className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
+                    Documents
+                  </CardTitle>
+                  <Button
+                    onClick={() => setIsUploadModalOpen(true)}
+                    style={{
+                      backgroundColor: '#DC5F12',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      padding: '0.5rem 1rem',
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#FF6B1A';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#DC5F12';
+                    }}
+                  >
+                    <FileText size={16} />
+                    Upload Document
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -665,6 +717,13 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Document Upload Modal */}
+      <DocumentUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUpload={handleDocumentUpload}
+      />
     </div>
   );
 }
