@@ -260,7 +260,7 @@ interface PropertySetupData {
 }
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
+  const [currentScreen, setCurrentScreen] = useState<Screen>('main-app');
   const [navigationScreen, setNavigationScreen] = useState<NavigationScreen>('dashboard');
   const [userRole, setUserRole] = useState<UserRole>('landlord');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -271,7 +271,7 @@ export default function App() {
   const [selectedLandlord, setSelectedLandlord] = useState<any | null>(null);
   const [selectedVacancyAlert, setSelectedVacancyAlert] = useState<VacancyRiskAlert | null>(null);
   const [selectedArrearsAlert, setSelectedArrearsAlert] = useState<ArrearsAlert | null>(null);
-  const [isOnboarding, setIsOnboarding] = useState(true);
+  const [isOnboarding, setIsOnboarding] = useState(false);
   const [marketInsights, setMarketInsights] = useState<MarketInsight[]>([]);
   const [vacancyAlerts, setVacancyAlerts] = useState<VacancyRiskAlert[]>([]);
   const [arrearsAlerts, setArrearsAlerts] = useState<ArrearsAlert[]>([]);
@@ -337,15 +337,13 @@ export default function App() {
     };
   }, []);
 
-  // Check URL parameters for role selection
+  // Check localStorage for role selection (from AgentHome)
   React.useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const roleParam = urlParams.get('role');
-    if (roleParam === 'agent') {
+    const storedRole = localStorage.getItem('userRole');
+    if (storedRole === 'agent') {
       setUserRole('agent');
-      // Skip onboarding and go directly to main app for agents
-      setIsOnboarding(false);
-      setCurrentScreen('main-app');
+      // Clear the stored role after using it
+      localStorage.removeItem('userRole');
     }
   }, []);
 
@@ -1170,6 +1168,7 @@ export default function App() {
   };
 
   const renderScreen = () => {
+    console.log('🔍 Current screen:', currentScreen, 'Type:', typeof currentScreen);
     switch (currentScreen) {
       case 'welcome':
         return <WelcomeScreen onGetStarted={() => navigateToScreen('role-selection')} />;
@@ -1600,6 +1599,7 @@ export default function App() {
         );
       
       default:
+        console.log('🚨 Falling through to default case! Current screen:', currentScreen);
         return <WelcomeScreen onGetStarted={() => navigateToScreen('role-selection')} />;
     }
   };

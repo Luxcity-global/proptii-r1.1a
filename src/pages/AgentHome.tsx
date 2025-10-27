@@ -47,9 +47,10 @@ const AgentHome = () => {
       // Navigate to the landlord app served from public directory
       window.location.href = '/landlord/index.html';
     } else {
-      // For agents, navigate to the landlord app but with agent role
-      // We need to pass the agent role to the landlord app
-      window.location.href = '/landlord/index.html?role=agent';
+      // For agents, navigate to the landlord app with agent role
+      // Use a different approach - navigate to landlord app and pass role via localStorage
+      localStorage.setItem('userRole', 'agent');
+      window.location.href = '/landlord/index.html';
     }
   };
 
