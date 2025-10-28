@@ -392,7 +392,7 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
 
           {/* Property Details Section Header */}
           <div className="text-left mb-8 px-4 py-6" style={{ 
-            backgroundImage: 'url("/assets/add_prp_slide/property_details%20background.png")',
+            backgroundImage: 'url("./add_prp_slide/property_details background.png")',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',

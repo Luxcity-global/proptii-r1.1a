@@ -84,7 +84,7 @@ export function PropertyTypeSelection({ selectedType: propSelectedType, onTypeSe
 
           {/* Property Type Section Header */}
           <div className="text-left mb-8 px-4 py-6" style={{ 
-            backgroundImage: 'url("/assets/add_prp_slide/property_type background.png")',
+            backgroundImage: 'url("./add_prp_slide/property_type background.png")',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',

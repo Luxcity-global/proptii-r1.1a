@@ -103,7 +103,7 @@ export function AmenitiesSelection({ selectedAmenities: propSelectedAmenities, o
 
           {/* Amenities Section Header */}
           <div className="text-left mb-8 px-4 py-6" style={{ 
-            backgroundImage: 'url("/assets/add_prp_slide/property_amenities%20background.png")',
+            backgroundImage: 'url("./add_prp_slide/property_amenities background.png")',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
