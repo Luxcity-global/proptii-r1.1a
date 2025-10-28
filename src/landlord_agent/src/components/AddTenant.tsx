@@ -1575,7 +1575,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
       className="min-h-screen w-full flex flex-col relative"
       style={{ 
         backgroundImage: 'url(/assets/add_prp_slide/addtenbg.png)',
-        backgroundSize: '100% 100%',
+        backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
         width: '100%'
@@ -1585,7 +1585,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
       aria-describedby="form-description"
     >
       {/* Mini Floating Navigation - Left Side */}
-      <div className="fixed top-1/2 -translate-y-1/2 z-20" style={{ left: '40px' }}>
+      <div className="fixed z-20" style={{ left: '40px', top: '50%', transform: 'translateY(-50%)' }}>
         <div className={`bg-white rounded-lg shadow-lg border border-gray-200 transition-all duration-500 ease-in-out ${
           isNavCollapsed ? 'p-4' : 'p-3'
         }`}
