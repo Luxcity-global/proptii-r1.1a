@@ -130,7 +130,7 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <img 
-              src="/src/assets/proptii_logo_large.png" 
+              src="./images/proptii-logo.png" 
               alt="Proptii Logo" 
               className="h-8 w-auto"
             />

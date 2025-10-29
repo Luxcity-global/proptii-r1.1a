@@ -18,8 +18,8 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { UserProfile } from '../App';
 
 // Import logos
-const proptiiLogoLarge = '/src/assets/proptii_logo_large.png';
-const proptiiLogoSmall = '/src/assets/proptii_logo_small.png';
+const proptiiLogoLarge = './images/proptii-logo.png';
+const proptiiLogoSmall = './images/Proptii-logo-icon.png';
 
 export type NavigationScreen = 'dashboard' | 'properties' | 'documents' | 'clients' | 'insights' | 'inbox' | 'contracts';
 

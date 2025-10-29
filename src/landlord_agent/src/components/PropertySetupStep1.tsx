@@ -81,7 +81,7 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
         <div className="flex items-center justify-between mb-8 py-4">
           <div className="flex items-center space-x-4">
             <img 
-              src="/src/assets/proptii_logo_large.png" 
+              src="./images/proptii-logo.png" 
               alt="Proptii Logo" 
               className="h-8 w-auto cursor-pointer hover:opacity-80 transition-opacity"
               onClick={onHome}

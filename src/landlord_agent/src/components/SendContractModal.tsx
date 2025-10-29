@@ -169,7 +169,7 @@ export function SendContractModal({ isOpen, onClose, onSend }: SendContractModal
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[70vh] overflow-y-auto mx-auto mt-16">
+      <DialogContent className="max-w-2xl max-h-[70vh] overflow-y-auto mx-auto mt-20">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2" style={{ fontFamily: 'Archivo, sans-serif' }}>
             <FileText className="w-5 h-5" style={{ color: '#DC5F12' }} />
