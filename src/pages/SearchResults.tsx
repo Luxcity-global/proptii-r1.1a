@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSearchBackend, type Property } from '../hooks/useSearchBackend';
+import { useSavedProperties } from '../contexts/SavedPropertiesContext';
 import Footer from '../components/Footer';
 
 
@@ -264,6 +265,9 @@ const SearchResults = () => {
   const [isNavigatingToBooking, setIsNavigatingToBooking] = useState(false);
 
   const { results, isLoading, error, retry, searchProperties, clearCache } = useSearchBackend();
+  const { isPropertySaved, toggleSaveProperty } = useSavedProperties();
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   // Perform search when component mounts or search params change
   useEffect(() => {
@@ -565,9 +569,36 @@ const SearchResults = () => {
                       {cleanPropertyPrice(property.price)}
                     </div>
                     
+                    {/* Heart Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const propertyId = `${property.title}-${property.location}-${property.price}`;
+                        const wasSaved = isPropertySaved(propertyId);
+                        toggleSaveProperty(property);
+                        setToastMessage(wasSaved ? 'Property removed from saved' : 'Property saved!');
+                        setShowToast(true);
+                        setTimeout(() => setShowToast(false), 3000);
+                      }}
+                      className="absolute top-4 right-4 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
+                    >
+                      <svg 
+                        className={`w-5 h-5 transition-colors ${
+                          isPropertySaved(`${property.title}-${property.location}-${property.price}`) 
+                            ? 'text-red-500 fill-red-500' 
+                            : 'text-gray-600 hover:text-red-500'
+                        }`}
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                    </button>
+                    
                     {/* Source Badge */}
                     {property.source && (
-                      <div className="absolute top-4 right-4 bg-black/70 text-white px-2 py-1 rounded text-xs">
+                      <div className="absolute bottom-4 left-4 bg-black/70 text-white px-2 py-1 rounded text-xs">
                         {property.source}
                       </div>
                     )}
@@ -624,6 +655,22 @@ const SearchResults = () => {
         onMessageClick={handleMessageClick}
         isNavigatingToBooking={isNavigatingToBooking}
       />
+
+      {/* Toast Notification */}
+      {showToast && (
+        <div className="fixed top-4 right-4 z-50 bg-white border border-gray-200 rounded-lg shadow-lg px-6 py-4 flex items-center gap-3 animate-in slide-in-from-right">
+          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+          <span className="text-gray-900 font-medium">{toastMessage}</span>
+          <button
+            onClick={() => setShowToast(false)}
+            className="ml-2 text-gray-400 hover:text-gray-600"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       <Footer />
     </div>

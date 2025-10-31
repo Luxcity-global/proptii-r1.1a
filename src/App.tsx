@@ -3,6 +3,8 @@ import { Routes, Route } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
 import { MSALProviderWrapper } from './contexts/AuthContext';
 import { AuthProvider } from './context/AuthContext';
+import { SavedPropertiesProvider } from './contexts/SavedPropertiesContext';
+import { SignedContractsProvider } from './contexts/SignedContractsContext';
 import Home from './pages/Home';
 import { LoginPage } from './pages/Login';
 import { RegisterPage } from './pages/Register';
@@ -28,7 +30,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import FAQ from './pages/FAQ';
 // import AgentContractLanding from './pages/AgentContractLanding';
-// import SearchResults from './pages/SearchResults';
+import SearchResults from './pages/SearchResults';
 
 export const App: React.FC = () => {
   return (
@@ -36,10 +38,12 @@ export const App: React.FC = () => {
       <CssBaseline />
       <MSALProviderWrapper>
         <AuthProvider>
-          <Routes>
+          <SavedPropertiesProvider>
+            <SignedContractsProvider>
+              <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
-            {/* <Route path="/search" element={<SearchResults />} /> */}
+            <Route path="/search" element={<SearchResults />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
@@ -81,7 +85,9 @@ export const App: React.FC = () => {
 
             {/* Catch-all route for 404 */}
             <Route path="*" element={<NotFoundPage />} />
-          </Routes>
+              </Routes>
+            </SignedContractsProvider>
+          </SavedPropertiesProvider>
         </AuthProvider>
       </MSALProviderWrapper>
     </ErrorBoundary>

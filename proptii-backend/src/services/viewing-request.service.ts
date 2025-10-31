@@ -4,17 +4,30 @@ import { CreateViewingRequestDto, UpdateViewingRequestDto } from '../dtos/viewin
 
 @Injectable()
 export class ViewingRequestService {
-  private container: Container;
+  private container: Container | null = null;
 
   constructor(
-    @Inject('COSMOS_CLIENT') private readonly cosmosClient: CosmosClient
+    @Inject('COSMOS_CLIENT') private readonly cosmosClient: CosmosClient | null
   ) {
-    const database = this.cosmosClient.database(process.env.COSMOS_DB_DATABASE_NAME);
-    this.container = database.container('Viewings');
+    if (this.cosmosClient) {
+      try {
+        const database = this.cosmosClient.database(process.env.COSMOS_DB_DATABASE_NAME || 'proptii-db');
+        this.container = database.container('Viewings');
+      } catch (error) {
+        console.warn('Failed to initialize Cosmos DB container for Viewings:', error);
+        this.container = null;
+      }
+    } else {
+      console.warn('Cosmos DB client not available for ViewingRequestService. Some features will be limited.');
+    }
   }
 
   async create(createViewingRequestDto: CreateViewingRequestDto): Promise<any> {
     try {
+      if (!this.container) {
+        throw new BadRequestException('Viewing request service is not available. Cosmos DB is not configured.');
+      }
+
       // Check for conflicting viewings
       const { resources: conflictingViewings } = await this.container.items
         .query({
@@ -49,6 +62,10 @@ export class ViewingRequestService {
   }
 
   async findAll(): Promise<any[]> {
+    if (!this.container) {
+      console.warn('Cosmos DB not available. Returning empty array for viewing requests.');
+      return [];
+    }
     const { resources } = await this.container.items
       .query({
         query: 'SELECT * FROM c WHERE c.type = "viewing-request"'
@@ -59,6 +76,9 @@ export class ViewingRequestService {
 
   async findOne(id: string): Promise<any> {
     try {
+      if (!this.container) {
+        throw new NotFoundException(`Viewing request service is not available. Cosmos DB is not configured.`);
+      }
       const { resource } = await this.container.item(id).read();
       if (!resource) {
         throw new NotFoundException(`Viewing request with ID ${id} not found`);
@@ -70,6 +90,10 @@ export class ViewingRequestService {
   }
 
   async findByProperty(propertyId: string): Promise<any[]> {
+    if (!this.container) {
+      console.warn('Cosmos DB not available. Returning empty array for property viewings.');
+      return [];
+    }
     const { resources } = await this.container.items
       .query({
         query: 'SELECT * FROM c WHERE c.type = "viewing-request" AND c.property.id = @propertyId',
@@ -80,6 +104,10 @@ export class ViewingRequestService {
   }
 
   async findByAgent(agentId: string): Promise<any[]> {
+    if (!this.container) {
+      console.warn('Cosmos DB not available. Returning empty array for agent viewings.');
+      return [];
+    }
     const { resources } = await this.container.items
       .query({
         query: 'SELECT * FROM c WHERE c.type = "viewing-request" AND c.agent.id = @agentId',
@@ -91,6 +119,9 @@ export class ViewingRequestService {
 
   async update(id: string, updateViewingRequestDto: UpdateViewingRequestDto): Promise<any> {
     try {
+      if (!this.container) {
+        throw new BadRequestException('Viewing request service is not available. Cosmos DB is not configured.');
+      }
       const { resource: existingViewing } = await this.container.item(id).read();
       if (!existingViewing) {
         throw new NotFoundException(`Viewing request with ID ${id} not found`);
@@ -105,7 +136,7 @@ export class ViewingRequestService {
       const { resource } = await this.container.item(id).replace(updatedViewing);
       return resource;
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
       throw new Error('Failed to update viewing request: ' + error.message);
@@ -114,6 +145,9 @@ export class ViewingRequestService {
 
   async remove(id: string): Promise<void> {
     try {
+      if (!this.container) {
+        throw new NotFoundException(`Viewing request service is not available. Cosmos DB is not configured.`);
+      }
       await this.container.item(id).delete();
     } catch (error) {
       throw new NotFoundException(`Viewing request with ID ${id} not found`);

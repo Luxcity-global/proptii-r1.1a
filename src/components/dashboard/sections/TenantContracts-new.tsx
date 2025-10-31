@@ -1,154 +1,249 @@
-import React, { useState } from 'react';
-import { FileText, Download, Eye, Calendar, CheckCircle, Clock, AlertTriangle, User, Mail, Phone } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { FileText, Download, Eye, Calendar, CheckCircle, Clock, AlertTriangle, User, Mail, Phone, Trash2 } from 'lucide-react';
+import { useSignedContracts } from '../../../contexts/SignedContractsContext';
+import ContractModal from '../../contract/ContractModal';
+import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
+import { useAuth } from '../../../contexts/AuthContext';
 
-/**
- * Tenant Contracts section - redesigned to match the provided design
- */
 const TenantContracts: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('requested');
+  const { signedContracts, isLoading, clearAllContracts, addSignedContract, removeSignedContract } = useSignedContracts();
+  const { user } = useAuth();
+  const [isContractModalOpen, setIsContractModalOpen] = useState(false);
+  const [firestoreContracts, setFirestoreContracts] = useState<any[]>([]);
+  const [isLoadingFirestore, setIsLoadingFirestore] = useState(false);
 
-  // Mock data for summary cards
+  // Use Firestore contracts as the primary source, fallback to context contracts
+  // Normalize contract data to ensure consistent structure
+  let displaySignedContracts = (firestoreContracts.length > 0 ? firestoreContracts : signedContracts).map((c: any) => {
+    // Normalize the contract structure to ensure all fields are properly mapped
+    const normalizedContract = {
+      id: c.id,
+      documentName: c.documentName || c.name || null, // Contract file name
+      propertyName: c.propertyName || null,
+      propertyAddress: c.propertyAddress || null,
+      agentName: c.agentName || c.agent || null, // Agent name, NOT document name
+      agentEmail: c.agentEmail || null,
+      tenantEmail: c.tenantEmail || null,
+      email: c.email || c.tenantEmail || c.agentEmail || null,
+      signedDate: c.signedDate || null,
+      documentUrl: c.documentUrl || null,
+      documentBase64: c.documentBase64 || null,
+      status: c.status || null,
+      emailSent: c.emailSent || false
+    };
+    
+    // If no usable documentUrl but we have a base64 data URL, build a blob URL on the fly
+    if ((!normalizedContract.documentUrl || normalizedContract.documentUrl.startsWith('/')) && normalizedContract.documentBase64 && typeof normalizedContract.documentBase64 === 'string' && normalizedContract.documentBase64.startsWith('data:application/pdf;base64,')) {
+      try {
+        // Convert data URL to Blob URL
+        const res = fetch(normalizedContract.documentBase64);
+        // Note: fetch on data URL returns a resolved promise; convert to blob lazily
+        // We'll attach a lazy getter to avoid blocking render
+        (res as any).then?.(async (r: Response) => {
+          const blob = await r.blob();
+          const url = URL.createObjectURL(blob);
+          normalizedContract.documentUrl = url;
+        });
+      } catch (e) {
+        console.warn('Failed to convert base64 to blob url for contract', normalizedContract.id, e);
+      }
+    }
+    return normalizedContract;
+  });
+
+  // Load signed contracts from Firestore
+  useEffect(() => {
+    const loadFirestoreContracts = async () => {
+      console.log('🔄 Loading signed contracts from Firestore...');
+      setIsLoadingFirestore(true);
+      
+      try {
+        // Use authenticated user ID or fallback for development
+        const userId = user?.id || 'dev-user-123';
+        
+        const result = await signedContractsFirestoreService.getUserSignedContracts(userId);
+        
+        if (result.success && result.contracts) {
+          console.log('✅ Loaded', result.contracts.length, 'signed contracts from Firestore');
+          
+          // Transform Firestore contracts to match the expected format
+          const transformedContracts = result.contracts.map(contract => ({
+            id: contract.id,
+            propertyName: contract.propertyName,
+            propertyAddress: contract.propertyAddress,
+            agentName: contract.agentName,
+            email: contract.tenantEmail || contract.agentEmail,
+            phone: '+1 (555) 123-4567', // Default phone
+            signedDate: contract.signedDate,
+            documentUrl: contract.documentUrl,
+            documentBase64: (contract as any).documentBase64,
+            documentName: contract.documentName,
+            status: contract.status,
+            emailSent: contract.emailSent
+          }));
+          
+          setFirestoreContracts(transformedContracts);
+        } else {
+          console.log('❌ Failed to load contracts from Firestore:', result.error);
+          setFirestoreContracts([]);
+        }
+      } catch (error) {
+        console.error('❌ Error loading contracts from Firestore:', error);
+        setFirestoreContracts([]);
+      } finally {
+        setIsLoadingFirestore(false);
+      }
+    };
+
+    loadFirestoreContracts();
+  }, [user?.id]); // Reload when user changes
+
+  // Contract statistics
   const contractStats = {
-    total: 3,
-    signed: 5,
-    requested: 2,
-    expiring: 8
+    total: displaySignedContracts.length, // Use display contracts for stats
+    signed: displaySignedContracts.length, // Use display contracts for stats
+    requested: 0, // No requested contracts
+    expiring: 0 // No expiring contracts (since we removed mock data)
   };
 
-  // Mock data for contracts
-  const requestedContracts = [
-    {
-      id: 1,
-      property: '123 Regent Street, London W1B 4EA',
-      agent: 'John Doe',
-      email: 'johndoe@gmail.com',
-      phone: '08130990478',
-      issueDate: '15 Jan 2024',
-      dueInDays: 5
-    },
-    {
-      id: 2,
-      property: '456 Oxford Street, London W1C 1AP',
-      agent: 'Jane Smith',
-      email: 'janesmith@gmail.com',
-      phone: '08130990478',
-      issueDate: '17 Jan 2024',
-      dueInDays: 3
-    },
-    {
-      id: 3,
-      property: '789 Bond Street, London W1S 1DH',
-      agent: 'Mike Johnson',
-      email: 'mikejohnson@gmail.com',
-      phone: '08130990478',
-      issueDate: '20 Jan 2024',
-      dueInDays: 1
-    }
-  ];
+  // Default to signed tab since requested is disabled
+  const [activeTab, setActiveTab] = useState('signed');
 
-  const signedContracts = [
-    {
-      id: 1,
-      property: '22 Kensington Gardens, London W2 4RU',
-      agent: 'James Bond',
-      email: 'Bond@gmail.com',
-      phone: '08130990478',
-      signedDate: '5 Jan 2024'
-    },
-    {
-      id: 2,
-      property: '15 Camden High Street, London NW1 7JE',
-      agent: 'Jane Smoke',
-      email: 'Jsmoke@gmail.com',
-      phone: '08130990478',
-      signedDate: '3 Apr 2024'
-    },
-    {
-      id: 3,
-      property: '8 Notting Hill Gate, London W11 3JE',
-      agent: 'An Agent',
-      email: 'Amail@gmail.com',
-      phone: '12345678923',
-      signedDate: '2 Jan 2024'
-    }
-  ];
+  // Always show signed contracts
+  const currentContracts = displaySignedContracts;
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', { 
-      day: 'numeric', 
-      month: 'short', 
-      year: 'numeric' 
-    });
-  };
-
-  const currentContracts = activeTab === 'requested' ? requestedContracts : signedContracts;
-  
-  // Helper function to get date based on contract type
+  // Get contract date based on tab
   const getContractDate = (contract: any) => {
-    return activeTab === 'requested' ? contract.issueDate : contract.signedDate;
+    return contract.signedDate; // Always return signedDate
   };
-  
-  // Helper function to get due days for requested contracts
-  const getDueDays = (contract: any) => {
-    return activeTab === 'requested' ? contract.dueInDays : null;
+
+  // Handle contract viewing
+  const handleViewContract = (contract: any) => {
+    console.log('🔍 View button clicked for contract:', contract.id);
+    console.log('🔍 Contract details:', contract);
+    if ('documentUrl' in contract && contract.documentUrl) {
+      if (contract.documentUrl.startsWith('blob:')) {
+        console.log('🔍 Opening blob document URL:', contract.documentUrl);
+        window.open(contract.documentUrl, '_blank');
+      } else if (contract.documentUrl.startsWith('/')) {
+        console.log('🔍 Mock contract document URL:', contract.documentUrl);
+        alert(`This is a demo contract. In a real application, this would open: ${contract.documentUrl}\n\nTo test the actual view functionality, please sign a real contract document.`);
+      } else {
+        console.log('🔍 Opening document URL:', contract.documentUrl);
+        window.open(contract.documentUrl, '_blank');
+      }
+    } else {
+      console.log('❌ No document URL available for contract:', contract.id);
+      alert('Document not available for viewing. This contract was created without a signed PDF document.');
+    }
   };
+
+  // Handle contract downloading
+  const handleDownloadContract = (contract: any) => {
+    console.log('🔍 Download button clicked for contract:', contract.id);
+    console.log('🔍 Contract details:', contract);
+    if ('documentUrl' in contract && contract.documentUrl) {
+      if (contract.documentUrl.startsWith('blob:')) {
+        console.log('🔍 Downloading blob document URL:', contract.documentUrl);
+        const link = document.createElement('a');
+        link.href = contract.documentUrl;
+        link.download = `${('documentName' in contract && contract.documentName) ? contract.documentName : 'signed-contract'}.pdf`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        console.log('✅ Download initiated for contract:', contract.id);
+      } else if (contract.documentUrl.startsWith('/')) {
+        console.log('🔍 Mock contract document URL:', contract.documentUrl);
+        alert(`This is a demo contract. In a real application, this would download: ${contract.documentUrl}\n\nTo test the actual download functionality, please sign a real contract document.`);
+      } else {
+        console.log('🔍 Downloading document URL:', contract.documentUrl);
+        const link = document.createElement('a');
+        link.href = contract.documentUrl;
+        link.download = `${('documentName' in contract && contract.documentName) ? contract.documentName : 'signed-contract'}.pdf`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        console.log('✅ Download initiated for contract:', contract.id);
+      }
+    } else {
+      console.log('❌ No document URL available for contract:', contract.id);
+      alert('Document not available for download. This contract was created without a signed PDF document.');
+    }
+  };
+
+  // Handle contract deletion
+  const handleDeleteContract = async (contractId: string) => {
+    try {
+      console.log('🔍 Delete button clicked for contract:', contractId);
+      if (window.confirm('Are you sure you want to delete this contract? This action cannot be undone.')) {
+        // Delete from Firestore
+        const firestoreResult = await signedContractsFirestoreService.deleteSignedContract(contractId);
+        
+        if (firestoreResult.success) {
+          console.log('✅ Contract deleted from Firestore successfully:', contractId);
+          
+          // Also remove from local state
+          setFirestoreContracts(prev => prev.filter(contract => contract.id !== contractId));
+          
+          // Also remove from context if it exists there
+          await removeSignedContract(contractId);
+          
+          console.log('✅ Contract deleted successfully:', contractId);
+        } else {
+          console.error('❌ Failed to delete contract from Firestore:', firestoreResult.error);
+          alert('Failed to delete contract from database. Please try again.');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error deleting contract:', error);
+      alert('Failed to delete contract. Please try again.');
+    }
+  };
+
+  if (isLoading || isLoadingFirestore) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <span className="ml-2 text-gray-600">
+          {isLoadingFirestore ? 'Loading contracts from database...' : 'Loading...'}
+        </span>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6" style={{ fontFamily: 'Archivo, sans-serif' }}>
-      {/* Spacing above header */}
-      <div className="mt-10"></div>
-      
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between pt-6">
         <div>
-        <h1 className="text-2xl font-semibold" style={{ color: '#374957' }}>
-            Contracts
-        </h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Manage and track compliance across your contracts
-          </p>
+          <h2 className="text-2xl font-bold text-gray-900">Contracts</h2>
+          <p className="text-gray-600">Manage your property contracts and agreements</p>
         </div>
-        <button 
-          className="px-12 py-3 text-white rounded-full text-sm font-medium transition-all duration-300 hover:-translate-y-0.5"
-          style={{
-            background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
-            border: '1px solid #DC5F12',
-            minHeight: '3.5rem',
-            minWidth: '180px',
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-            e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
-            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-          }}
+        <button
+          onClick={() => setIsContractModalOpen(true)}
+          className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
         >
           Go To Contract Page
         </button>
       </div>
 
-      {/* Spacing */}
-      <div className="mb-6"></div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Total Contracts */}
         <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Total Contracts</h3>
             <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-blue-600" />
+              <FileText className="w-5 h-5 text-blue-600" />
             </div>
           </div>
           <div className="mb-3">
-              <p className="text-2xl font-bold" style={{ color: '#374957' }}>
+            <p className="text-2xl font-bold" style={{ color: '#374957' }}>
               {contractStats.total}
-              </p>
-            </div>
+            </p>
+          </div>
           <div>
             <p className="text-sm" style={{ color: '#717182' }}>All contracts</p>
           </div>
@@ -157,7 +252,7 @@ const TenantContracts: React.FC = () => {
         {/* Signed Contracts */}
         <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Signed Contracts</h3>
+            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Signed</h3>
             <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
               <CheckCircle className="w-5 h-5 text-green-600" />
             </div>
@@ -168,14 +263,15 @@ const TenantContracts: React.FC = () => {
             </p>
           </div>
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>As of 10/09/2025</p>
+            <p className="text-sm" style={{ color: '#717182' }}>Completed</p>
           </div>
         </div>
 
-        {/* Requested Contracts */}
+        {/* Requested Contracts - disabled */}
+        {false && (
         <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Requested Contracts</h3>
+            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Requested</h3>
             <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
               <Clock className="w-5 h-5 text-yellow-600" />
             </div>
@@ -185,10 +281,11 @@ const TenantContracts: React.FC = () => {
               {contractStats.requested}
             </p>
           </div>
-            <div>
+          <div>
             <p className="text-sm" style={{ color: '#717182' }}>Awaiting signature</p>
           </div>
         </div>
+        )}
 
         {/* Expiring Soon */}
         <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
@@ -199,163 +296,134 @@ const TenantContracts: React.FC = () => {
             </div>
           </div>
           <div className="mb-3">
-              <p className="text-2xl font-bold" style={{ color: '#374957' }}>
+            <p className="text-2xl font-bold" style={{ color: '#374957' }}>
               {contractStats.expiring}
-              </p>
-            </div>
+            </p>
+          </div>
           <div>
             <p className="text-sm" style={{ color: '#717182' }}>Within 30 days</p>
-            </div>
           </div>
         </div>
-
-      {/* Alert Message */}
-      <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-            <AlertTriangle className="w-5 h-5 text-orange-600" />
-          </div>
-          <p className="text-sm font-medium text-orange-800">
-            3 contracts are awaiting your signature and should be reviewed.
-              </p>
-            </div>
       </div>
 
-      {/* Tabs Section */}
+      {/* Alert Message - disabled for requested feature */}
+      {false && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-orange-600" />
+            </div>
+            <p className="text-sm font-medium text-orange-800">
+              3 contracts are awaiting your signature and should be reviewed.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Contract Modal */}
+      <ContractModal 
+        isOpen={isContractModalOpen}
+        onClose={() => setIsContractModalOpen(false)}
+      />
+
+      {/* Tabs Section - requested tab disabled */}
       <div>
         <div className="mb-6">
           <div className="bg-white rounded-full border border-gray-100 p-1 inline-flex">
             <button
-              onClick={() => setActiveTab('requested')}
-              className={`px-4 py-2 text-sm font-medium transition-colors rounded-l-full ${
-                activeTab === 'requested'
-                  ? 'text-white'
-                  : 'text-gray-600'
-              }`}
-              style={{
-                backgroundColor: activeTab === 'requested' ? '#DC5F12' : 'transparent'
-              }}
+              className={`px-4 py-2 text-sm font-medium transition-colors rounded-full text-white`}
+              style={{ backgroundColor: '#DC5F12' }}
+              disabled
             >
-              Requested Contracts ({requestedContracts.length})
+              Signed Contracts ({displaySignedContracts.length}) {signedContracts.length > 0 ? '📄' : '📝'}
             </button>
-            <button
-              onClick={() => setActiveTab('signed')}
-              className={`px-4 py-2 text-sm font-medium transition-colors rounded-r-full ${
-                activeTab === 'signed'
-                  ? 'text-white'
-                  : 'text-gray-600'
-              }`}
-              style={{
-                backgroundColor: activeTab === 'signed' ? '#DC5F12' : 'transparent'
-              }}
-            >
-              Signed Contracts ({signedContracts.length})
-            </button>
-            </div>
           </div>
-        
+        </div>
+
         {/* Contracts Table */}
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           {/* Table Header */}
           <div className="px-6 py-4 border-b border-gray-200" style={{ backgroundColor: '#E7F2FF' }}>
-            <div className="grid grid-cols-6 gap-4 text-sm font-medium text-gray-600">
-              <div>Property</div>
+            <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-600">
+              <div>Name</div>
               <div>Agent</div>
               <div>Email</div>
-              <div>Phone</div>
-              <div>{activeTab === 'requested' ? 'Issue Date' : 'Signed Date'}</div>
+              <div>Signed Date</div>
               <div>Actions</div>
-        </div>
-      </div>
+            </div>
+          </div>
 
           {/* Table Body */}
-        <div className="divide-y divide-gray-100">
-            {currentContracts.map((contract) => (
-              <div key={contract.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                <div className="grid grid-cols-6 gap-4 items-center">
-                  {/* Property */}
-                  <div className="flex items-center gap-3">
-                    {activeTab === 'signed' ? (
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                    ) : (
-                      <FileText className="w-5 h-5 text-gray-600" />
-                    )}
-                    <span className="text-sm font-medium text-gray-900">
-                      {contract.property}
-                    </span>
+          <div className="divide-y divide-gray-100">
+            {currentContracts.map((contract, index) => (
+              <div key={contract.id || index} className="grid grid-cols-5 gap-4 items-start px-6 py-4 hover:bg-gray-50 transition-colors">
+                {/* Name (Contract File Name) */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-5 h-5 text-gray-600" />
                   </div>
-                  
-                  {/* Agent */}
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-700">{contract.agent}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 break-words overflow-wrap-anywhere">
+                      {contract.documentName || contract.propertyName || 'Contract Document'}
+                    </p>
                   </div>
-                  
-                  {/* Email */}
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-700">{contract.email}</span>
-                    </div>
-                  
-                  {/* Phone */}
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm text-gray-700">{contract.phone}</span>
-                    </div>
-                  
-                  {/* Date */}
-                    <div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-700">
-                        {getContractDate(contract)}
-                      </span>
-                    </div>
-                    {getDueDays(contract) && (
-                      <div className="mt-1">
-                        <span className="text-xs text-red-600 font-medium">
-                          Due in {getDueDays(contract)} days
-                        </span>
-                    </div>
-                    )}
-                    {activeTab === 'signed' && (
-                      <div className="mt-1">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Signed
-                        </span>
-                  </div>
-                    )}
                 </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    {activeTab === 'requested' ? (
-                      <button className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-colors" style={{ backgroundColor: '#136C9E' }}>
-                        <Eye className="w-4 h-4 mr-1" />
-                        View Contract
-                      </button>
-                    ) : (
-                      <>
-                        <button className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                          <Eye className="w-4 h-4 mr-1" />
-                          View
-                        </button>
-                        <button className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                          <Download className="w-4 h-4 mr-1" />
-                          Download
-                        </button>
-                      </>
-                    )}
-                  </div>
+                {/* Agent */}
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {contract.agentName || 'Agent Name'}
+                  </p>
+                </div>
+
+                {/* Email */}
+                <div className="flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm text-gray-700">{contract.email || contract.tenantEmail || contract.agentEmail || 'No email'}</span>
+                </div>
+
+                {/* Signed Date */}
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm text-gray-700">
+                    {getContractDate(contract) ? new Date(getContractDate(contract)).toLocaleDateString() : 'N/A'}
+                  </span>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => handleViewContract(contract)}
+                    className="inline-flex items-center p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                    aria-label="View"
+                    title="View"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => handleDownloadContract(contract)}
+                    className="inline-flex items-center p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                    aria-label="Download"
+                    title="Download"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => contract.id && handleDeleteContract(String(contract.id))}
+                    className="inline-flex items-center p-2 border border-red-300 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                    aria-label="Delete"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
       </div>
     </div>
   );
 };
 
 export default TenantContracts;
-

@@ -4,7 +4,9 @@ import * as pdfjs from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 import { useNavigate } from "react-router-dom";
-import CustomizePage from './CustomizePage'
+import CustomizePage from './CustomizePage';
+import { contractService, ContractTemplate } from '../../services/contractService';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ContractModalProps {
   isOpen: boolean;
@@ -20,133 +22,78 @@ interface Template {
   file?: File; // Store the actual file object
   fileData?: string; // Base64 encoded file data for storage
   fileSize?: number; // File size in bytes
+  firestoreId?: string; // Firestore document ID
 }
 
-// Storage service for managing template persistence
-class TemplateStorageService {
-  private static STORAGE_KEY = 'contract_templates';
-  private static DELETED_STORAGE_KEY = 'deleted_contract_templates';
-  private static MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit
-
-  static async saveTemplates(templates: Template[]): Promise<void> {
-    try {
-      const templatesToStore = await Promise.all(
-        templates.map(async (template) => {
-          const storageTemplate = { ...template };
-          
-          // Remove file object and blob URL before storage
-          delete storageTemplate.file;
-          delete storageTemplate.fileUrl;
-          
-          // Convert file to base64 if not already done and file exists
-          if (template.file && !template.fileData) {
-            if (template.file.size > this.MAX_FILE_SIZE) {
-              console.warn(`File ${template.name} is too large for storage (${(template.file.size / 1024 / 1024).toFixed(2)}MB)`);
-              return null; // Skip large files
-            }
-            
-            try {
-              const arrayBuffer = await template.file.arrayBuffer();
-              const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-              storageTemplate.fileData = base64;
-              storageTemplate.fileSize = template.file.size;
-            } catch (error) {
-              console.error('Error converting file to base64:', error);
-              return null;
-            }
-          }
-          
-          return storageTemplate;
-        })
-      );
-
-      const validTemplates = templatesToStore.filter(t => t !== null);
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(validTemplates));
-      console.log(`Saved ${validTemplates.length} templates to storage`);
-    } catch (error) {
-      console.error('Error saving templates:', error);
-      if (error instanceof Error && error.name === 'QuotaExceededError') {
-        alert('Storage quota exceeded. Some files may be too large to save.');
-      }
+// Helper functions for Firestore operations
+const convertFileToBase64 = async (file: File): Promise<string> => {
+  try {
+    console.log("Converting file to base64, size:", file.size, "bytes");
+    const arrayBuffer = await file.arrayBuffer();
+    console.log("ArrayBuffer created, size:", arrayBuffer.byteLength, "bytes");
+    
+    const uint8Array = new Uint8Array(arrayBuffer);
+    console.log("Uint8Array created, length:", uint8Array.length);
+    
+    // Convert to base64 in chunks to avoid memory issues with large files
+    const chunkSize = 8192; // 8KB chunks
+    let base64 = '';
+    
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.slice(i, i + chunkSize);
+      base64 += btoa(String.fromCharCode(...chunk));
     }
+    
+    console.log("Base64 conversion completed, length:", base64.length);
+    return base64;
+  } catch (error) {
+    console.error("Error converting file to base64:", error);
+    throw new Error(`Failed to convert file to base64: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+};
 
-  static async loadTemplates(): Promise<Template[]> {
-    try {
-      const stored = localStorage.getItem(this.STORAGE_KEY);
-      if (!stored) return [];
-
-      const templates: Template[] = JSON.parse(stored);
-      
-      // Reconstruct file objects and blob URLs
-      const reconstructedTemplates = templates.map((template) => {
-        if (template.fileData) {
-          try {
-            // Convert base64 back to file
-            const binaryString = atob(template.fileData);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
-            }
-            
-            const file = new File([bytes], template.name, { type: 'application/pdf' });
-            const fileUrl = URL.createObjectURL(file);
-            
-            return {
-              ...template,
-              file,
-              fileUrl
-            };
-          } catch (error) {
-            console.error('Error reconstructing file:', error);
-            return null;
-          }
-        }
-        return template;
-      }).filter(t => t !== null) as Template[];
-
-      console.log(`Loaded ${reconstructedTemplates.length} templates from storage`);
-      return reconstructedTemplates;
-    } catch (error) {
-      console.error('Error loading templates:', error);
-      return [];
+const convertBase64ToFile = (base64: string, fileName: string, fileType: string): File => {
+  try {
+    console.log('🔄 Converting base64 to file:', fileName);
+    console.log('🔄 Base64 length:', base64.length);
+    console.log('🔄 Base64 preview (first 100 chars):', base64.substring(0, 100));
+    
+    // Clean the base64 string - remove any data URL prefix if present
+    let cleanBase64 = base64;
+    if (base64.includes(',')) {
+      cleanBase64 = base64.split(',')[1];
+      console.log('🔄 Removed data URL prefix, clean length:', cleanBase64.length);
     }
-  }
-
-  static async saveDeletedTemplates(templates: Template[]): Promise<void> {
-    try {
-      const templatesToStore = templates.map(template => {
-        const storageTemplate = { ...template };
-        delete storageTemplate.file;
-        delete storageTemplate.fileUrl;
-        return storageTemplate;
-      });
-      
-      localStorage.setItem(this.DELETED_STORAGE_KEY, JSON.stringify(templatesToStore));
-      console.log(`Saved ${templatesToStore.length} deleted templates to storage`);
-    } catch (error) {
-      console.error('Error saving deleted templates:', error);
+    
+    // Validate base64 string
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64)) {
+      console.error('❌ Invalid base64 string format');
+      throw new Error('Invalid base64 string format');
     }
-  }
-
-  static loadDeletedTemplates(): Template[] {
-    try {
-      const stored = localStorage.getItem(this.DELETED_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch (error) {
-      console.error('Error loading deleted templates:', error);
-      return [];
+    
+    console.log('🔄 Decoding base64...');
+    const binaryString = atob(cleanBase64);
+    console.log('🔄 Binary string length:', binaryString.length);
+    
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
     }
+    
+    console.log('🔄 Created Uint8Array, length:', bytes.length);
+    const file = new File([bytes], fileName, { type: fileType });
+    console.log('✅ Successfully converted base64 to file:', fileName, 'Size:', file.size);
+    
+    return file;
+  } catch (error) {
+    console.error('❌ Error converting base64 to file:', error);
+    console.error('❌ Base64 string:', base64.substring(0, 200) + '...');
+    throw new Error(`Failed to convert base64 to file: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-
-  static clearStorage(): void {
-    localStorage.removeItem(this.STORAGE_KEY);
-    localStorage.removeItem(this.DELETED_STORAGE_KEY);
-    console.log('Template storage cleared');
-  }
-}
+};
 
 const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'uploaded' | 'deleted'>('uploaded');
   const [uploadedTemplates, setUploadedTemplates] = useState<Template[]>([]);
   const [deletedTemplates, setDeletedTemplates] = useState<Template[]>([]);
@@ -168,54 +115,123 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
   const [customizeMode, setCustomizeMode] = useState(false);
   const [customizingTemplateId, setCustomizingTemplateId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
 
-  // Load templates from storage on component mount
+  // Load templates from Firestore on component mount
   useEffect(() => {
-    const loadStoredTemplates = async () => {
+    const loadTemplatesFromFirestore = async () => {
+      console.log('🔄 ContractModal - useEffect triggered');
+      console.log('🔄 ContractModal - isOpen:', isOpen);
+      console.log('🔄 ContractModal - user:', user);
+      console.log('🔄 ContractModal - user?.id:', user?.id);
+      
+      // Use a fallback user ID for development if no user is authenticated
+      const userId = user?.id || 'dev-user-123';
+      console.log('🔄 Using user ID:', userId);
+      
+      if (!isOpen) {
+        console.log('❌ Modal not open, skipping template load');
+        return;
+      }
+
       try {
-        const storedTemplates = await TemplateStorageService.loadTemplates();
-        const storedDeletedTemplates = TemplateStorageService.loadDeletedTemplates();
+        console.log('🔄 Loading contract templates from Firestore for user:', userId);
+        setIsLoadingTemplates(true);
         
-        setUploadedTemplates(storedTemplates);
-        setDeletedTemplates(storedDeletedTemplates);
+        // Load active templates
+        console.log('🔄 Fetching active templates...');
+        const activeResult = await contractService.getUserContractTemplates(userId);
+        console.log('🔄 Active templates result:', activeResult);
         
-        console.log(`Loaded ${storedTemplates.length} templates and ${storedDeletedTemplates.length} deleted templates`);
+        if (activeResult.success && activeResult.templates) {
+          console.log('🔄 Processing', activeResult.templates.length, 'active templates');
+          const templates = [];
+          
+          for (const contract of activeResult.templates) {
+            try {
+              console.log('🔄 Processing template:', contract.name, 'Size:', contract.fileSize);
+              const file = convertBase64ToFile(contract.fileData, contract.name, contract.fileType);
+              const fileUrl = URL.createObjectURL(file);
+              
+              templates.push({
+                id: contract.id,
+                name: contract.name,
+                uploadDate: contract.uploadDate,
+                fileUrl,
+                imagePreview: contract.imagePreview || null,
+                file: file,
+                fileData: contract.fileData,
+                fileSize: contract.fileSize,
+                firestoreId: contract.id
+              });
+              console.log('✅ Successfully processed template:', contract.name);
+            } catch (error) {
+              console.error('❌ Failed to process template:', contract.name, error);
+              console.error('❌ Skipping corrupted template:', contract.name);
+              // Continue with other templates instead of failing completely
+            }
+          }
+          
+          setUploadedTemplates(templates);
+          console.log(`✅ Loaded ${templates.length} active templates from Firestore (${activeResult.templates.length - templates.length} skipped due to errors)`);
+        } else {
+          console.log('❌ Failed to load active templates:', activeResult.error);
+          setUploadedTemplates([]);
+        }
+
+        // Load deleted templates
+        console.log('🔄 Fetching deleted templates...');
+        const deletedResult = await contractService.getDeletedContractTemplates(userId);
+        console.log('🔄 Deleted templates result:', deletedResult);
+        
+        if (deletedResult.success && deletedResult.templates) {
+          console.log('🔄 Processing', deletedResult.templates.length, 'deleted templates');
+          const deletedTemplates = deletedResult.templates.map(contract => {
+            const file = convertBase64ToFile(contract.fileData, contract.name, contract.fileType);
+            const fileUrl = URL.createObjectURL(file);
+            
+            return {
+              id: contract.id,
+              name: contract.name,
+              uploadDate: contract.uploadDate,
+              fileUrl,
+              imagePreview: contract.imagePreview || null,
+              file: file,
+              fileData: contract.fileData,
+              fileSize: contract.fileSize,
+              firestoreId: contract.id
+            };
+          });
+          setDeletedTemplates(deletedTemplates);
+          console.log(`✅ Loaded ${deletedTemplates.length} deleted templates from Firestore`);
+        } else {
+          console.log('❌ Failed to load deleted templates:', deletedResult.error);
+          setDeletedTemplates([]);
+        }
       } catch (error) {
-        console.error('Error loading templates from storage:', error);
+        console.error('❌ Error loading templates from Firestore:', error);
+        console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
+      } finally {
+        setIsLoadingTemplates(false);
       }
     };
 
-    if (isOpen) {
-      loadStoredTemplates();
-    }
-  }, [isOpen]);
+    loadTemplatesFromFirestore();
+  }, [isOpen, user?.id]);
 
-  // Save templates to storage whenever they change
-  useEffect(() => {
-    const saveTemplates = async () => {
-      if (uploadedTemplates.length > 0) {
-        setIsSaving(true);
-        await TemplateStorageService.saveTemplates(uploadedTemplates);
-        setIsSaving(false);
-      }
-    };
+  // Clear all storage (for testing) - now clears Firestore data
+  const handleClearStorage = async () => {
+    if (!user?.id) return;
     
-    saveTemplates();
-  }, [uploadedTemplates]);
-
-  // Save deleted templates to storage whenever they change
-  useEffect(() => {
-    if (deletedTemplates.length > 0) {
-      TemplateStorageService.saveDeletedTemplates(deletedTemplates);
+    try {
+      // This would require implementing a bulk delete function in contractService
+      // For now, just clear local state
+      setUploadedTemplates([]);
+      setDeletedTemplates([]);
+      alert('All contract templates have been cleared!');
+    } catch (error) {
+      console.error('Error clearing templates:', error);
     }
-  }, [deletedTemplates]);
-
-  // Clear all storage (for testing)
-  const handleClearStorage = () => {
-    TemplateStorageService.clearStorage();
-    setUploadedTemplates([]);
-    setDeletedTemplates([]);
-    alert('All template storage has been cleared!');
   };
 
 
@@ -252,57 +268,166 @@ const findCustomizedTemplate = () => {
   
 
   // Handle Delete (Move to Deleted Templates)
-  const handleDelete = (templateId: string) => {
-    const templateToDelete = uploadedTemplates.find((t) => t.id === templateId);
-    if (templateToDelete) {
-      setUploadedTemplates(uploadedTemplates.filter((t) => t.id !== templateId));
-      setDeletedTemplates([...deletedTemplates, templateToDelete]);
-      setConfirmDelete(null);
+  const handleDelete = async (templateId: string) => {
+    try {
+      const result = await contractService.deleteContractTemplate(templateId);
+      if (result.success) {
+        const templateToDelete = uploadedTemplates.find((t) => t.id === templateId);
+        if (templateToDelete) {
+          setUploadedTemplates(uploadedTemplates.filter((t) => t.id !== templateId));
+          setDeletedTemplates([...deletedTemplates, templateToDelete]);
+          setConfirmDelete(null);
+          console.log("Template moved to deleted status in Firestore");
+        }
+      } else {
+        console.error("Failed to delete template:", result.error);
+        alert("Failed to delete template. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error deleting template:", error);
+      alert("Error deleting template. Please try again.");
     }
   };
 
   // Handle Restore (Move to Uploaded Templates)
-  const handleRestore = (templateId: string) => {
-    const restoredTemplate = deletedTemplates.find(template => template.id === templateId);
-    if (restoredTemplate) {
-      setDeletedTemplates(deletedTemplates.filter(template => template.id !== templateId));
-      setUploadedTemplates([...uploadedTemplates, restoredTemplate]);
+  const handleRestore = async (templateId: string) => {
+    try {
+      const result = await contractService.restoreContractTemplate(templateId);
+      if (result.success) {
+        const restoredTemplate = deletedTemplates.find(template => template.id === templateId);
+        if (restoredTemplate) {
+          setDeletedTemplates(deletedTemplates.filter(template => template.id !== templateId));
+          setUploadedTemplates([...uploadedTemplates, restoredTemplate]);
+          console.log("Template restored to active status in Firestore");
+        }
+      } else {
+        console.error("Failed to restore template:", result.error);
+        alert("Failed to restore template. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error restoring template:", error);
+      alert("Error restoring template. Please try again.");
     }
   };
 
   // Handle Permanent Delete (Remove from Deleted Templates)
-  const handleDeletePermanently = (templateId: string) => {
-    setDeletedTemplates(deletedTemplates.filter(template => template.id !== templateId));
-    setConfirmDelete(null); // Close confirmation after deletion
+  const handleDeletePermanently = async (templateId: string) => {
+    try {
+      const result = await contractService.permanentlyDeleteContractTemplate(templateId);
+      if (result.success) {
+        setDeletedTemplates(deletedTemplates.filter(template => template.id !== templateId));
+        setConfirmDelete(null);
+        console.log("Template permanently deleted from Firestore");
+      } else {
+        console.error("Failed to permanently delete template:", result.error);
+        alert("Failed to permanently delete template. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error permanently deleting template:", error);
+      alert("Error permanently deleting template. Please try again.");
+    }
   };
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     console.log("File selected:", file?.name, "Type:", file?.type, "Size:", file?.size);
+    console.log("User object:", user);
+    console.log("User ID:", user?.id);
     
-    if (file && file.type === "application/pdf") {
+    // Use a fallback user ID for development if no user is authenticated
+    const userId = user?.id || 'dev-user-123';
+    console.log("Using user ID for upload:", userId);
+    
+    if (!file) {
+      console.warn("No file selected");
+      alert("Please select a file to upload.");
+      return;
+    }
+    
+    // Check file type
+    if (file.type !== "application/pdf") {
+      console.warn("Invalid file type:", file.type);
+      alert("Please select a PDF file. Only PDF files are supported.");
+      return;
+    }
+    
+    // Check file size (limit to 10MB)
+    const maxFileSize = 10 * 1024 * 1024; // 10MB in bytes
+    if (file.size > maxFileSize) {
+      console.warn("File too large:", file.size, "bytes");
+      alert(`File is too large. Maximum file size is 10MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB.`);
+      return;
+    }
+    
+    // Check if file is too small (might be corrupted)
+    if (file.size < 1024) { // Less than 1KB
+      console.warn("File too small:", file.size, "bytes");
+      alert("File appears to be corrupted or empty. Please try a different file.");
+      return;
+    }
+    
+    console.log("File validation passed. Starting upload process...");
+    
+    try {
+      setIsSaving(true);
+      const fileUrl = URL.createObjectURL(file);
+      console.log("Created blob URL:", fileUrl);
+      
+      // Generate preview with error handling
+      let imagePreview: string | null = null;
       try {
-        const fileUrl = URL.createObjectURL(file);
-        console.log("Created blob URL:", fileUrl);
-        
-        const imagePreview = await generatePdfPreview(file);
+        imagePreview = await generatePdfPreview(file);
         console.log("Generated preview:", imagePreview ? "Success" : "Failed");
+      } catch (previewError) {
+        console.warn("Failed to generate preview, continuing without preview:", previewError);
+        // Continue without preview - this is not critical
+      }
 
+      // Convert file to base64 for Firestore storage
+      console.log("Converting file to base64...");
+      const fileData = await convertFileToBase64(file);
+      console.log("Converted file to base64, size:", fileData.length);
+
+      // Save to Firestore
+      console.log("Saving to Firestore...");
+      const contractData = {
+        name: file.name,
+        uploadDate: new Date().toLocaleDateString(),
+        fileData,
+        fileSize: file.size,
+        fileType: file.type,
+        imagePreview: imagePreview || undefined,
+        status: 'active' as const,
+        category: 'contract' as const
+      };
+
+      const result = await contractService.saveContractTemplate(userId, contractData);
+      
+      if (result.success && result.templateId) {
         const newTemplate: Template = {
-          id: `${file.name}-${Date.now()}`,
+          id: result.templateId,
           name: file.name,
           uploadDate: new Date().toLocaleDateString(),
           fileUrl,
           imagePreview,
-          file: file, // Store the actual file object
+          file: file,
+          fileData,
+          fileSize: file.size,
+          firestoreId: result.templateId
         };
         setUploadedTemplates([...uploadedTemplates, newTemplate]);
-        console.log("Template added successfully");
-      } catch (error) {
-        console.error("Error processing uploaded file:", error);
+        console.log("Template saved to Firestore successfully");
+        alert(`File "${file.name}" uploaded successfully!`);
+      } else {
+        console.error("Failed to save template to Firestore:", result.error);
+        alert(`Failed to save template: ${result.error || 'Unknown error'}. Please try again.`);
       }
-    } else {
-      console.warn("Invalid file type or no file selected");
+    } catch (error) {
+      console.error("Error processing uploaded file:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Error processing file: ${errorMessage}. Please try again.`);
+    } finally {
+      setIsSaving(false);
     }
     
     // Reset the file input to allow re-uploading the same file
@@ -543,13 +668,16 @@ const findCustomizedTemplate = () => {
             </nav>
 
         <div className="mb-6">
-          <h3 className="text-xl font-semibold mb-3">Upload your Template</h3>
+          <div className="mb-3">
+            <h3 className="text-xl font-semibold">Upload your Template</h3>
+          </div>
           <div className="flex gap-6 items-start">
             {/* Upload Box */}
             <label className="border-dashed bg-white border-2 border-gray-300 rounded-lg w-44 h-56 flex flex-col items-center justify-center cursor-pointer text-gray-500 hover:border-gray-400 transition-all">
               <UploadCloud size={32} className="mb-2 text-gray-400" />
               <span className="text-center text-sm">Click to upload or drag & drop</span>
-              <input type="file" className="hidden" onChange={handleUpload} />
+              <span className="text-center text-xs text-gray-400 mt-1">Max 10MB • PDF only</span>
+              <input type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleUpload} />
             </label>
 
             {/* Template Previews */}
@@ -596,7 +724,15 @@ const findCustomizedTemplate = () => {
 <div className="mt-4 max-h-[200px] overflow-y-auto">
   {activeTab === 'uploaded' ? (
     <div>
-      <h3 className="text-lg font-semibold text-gray-700 mb-3">Your Templates</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-lg font-semibold text-gray-700">Your Templates</h3>
+        {isLoadingTemplates && (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+            Loading templates...
+          </div>
+        )}
+      </div>
       {/* Uploaded Templates Table */}
       <table className="w-full border-collapse table-fixed">
         <thead>

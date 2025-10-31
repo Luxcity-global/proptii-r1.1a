@@ -7,17 +7,20 @@ import { ViewingRequestModule } from './modules/viewing-request.module';
 import { ReferencingModule } from './modules/referencing.module';
 import { SearchModule } from './search/search.module';
 import { SheetsModule } from './sheets/sheets.module';
+import { ContractModule } from './modules/contract.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: '.env',
     }),
     DatabaseModule,
     ViewingRequestModule,
     ReferencingModule,
     SearchModule,
     SheetsModule,
+    ContractModule,
   ],
   controllers: [AppController],
   providers: [AppService],

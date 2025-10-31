@@ -1,14 +1,19 @@
 import React from 'react';
 import { Phone, Mail, Sparkles } from 'lucide-react';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface DashboardHeaderProps {
   userName: string;
+  userEmail?: string;
+  userPhone?: string;
 }
 
 /**
  * Dashboard header component with user information and welcome message
  */
-const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName }) => {
+const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName, userEmail, userPhone }) => {
+  const { user } = useAuth();
+  
   return (
     <div 
       className="bg-white shadow-lg rounded-xl px-8 py-6"
@@ -51,7 +56,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName }) => {
           >
             <Phone className="w-4 h-4" style={{ color: '#374957' }} />
             <span className="text-sm" style={{ color: '#374957' }}>
-              +44 7911 123456
+              {userPhone || user?.phone || '+44 7911 123456'}
             </span>
           </div>
           
@@ -61,7 +66,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName }) => {
           >
             <Mail className="w-4 h-4" style={{ color: '#374957' }} />
             <span className="text-sm" style={{ color: '#374957' }}>
-              TosinLanipekun@Luxcity.omnicrosoft
+              {userEmail || 'user@example.com'}
             </span>
           </div>
         </div>

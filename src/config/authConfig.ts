@@ -22,7 +22,7 @@ export const msalConfig: Configuration = {
     storeAuthStateInCookie: true,
   },
   system: {
-    allowRedirectInIframe: true,
+    allowRedirectInIframe: false, // Disable iframe to avoid CSP issues
     windowHashTimeout: 60000, // Increase timeout for popup operations to 60 seconds
     iframeHashTimeout: 10000,
     loadFrameTimeout: 10000,
@@ -61,7 +61,13 @@ export const loginRequest = {
     "profile",
     "email",
     "offline_access"
-  ]
+  ],
+  // Request phone number claim
+  claims: JSON.stringify({
+    id_token: {
+      extension_PhoneNumber: null // Request phone number claim
+    }
+  })
   // Removed popup window attributes to avoid triggering popup blockers
 };
 

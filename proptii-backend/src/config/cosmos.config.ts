@@ -33,13 +33,27 @@ export const cosmosConfig: CosmosConfig = {
   }
 };
 
-export const cosmosClient = new CosmosClient({
-  endpoint: cosmosConfig.endpoint,
-  key: cosmosConfig.key,
-  consistencyLevel: "Session"
-});
+// Only create CosmosClient if we have valid configuration
+let cosmosClient: CosmosClient | null = null;
+
+if (cosmosConfig.endpoint && cosmosConfig.key) {
+  cosmosClient = new CosmosClient({
+    endpoint: cosmosConfig.endpoint,
+    key: cosmosConfig.key,
+    consistencyLevel: "Session"
+  });
+} else {
+  console.warn('Cosmos DB configuration is incomplete. Some features may not work.');
+}
+
+export { cosmosClient };
 
 export async function initializeCosmosDB() {
+  if (!cosmosClient) {
+    logger.warn('Cosmos DB client not initialized. Skipping database initialization.');
+    return;
+  }
+
   try {
     // Initialize database
     const { database } = await cosmosClient.databases.createIfNotExists({

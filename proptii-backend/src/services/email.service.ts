@@ -78,6 +78,12 @@ export class EmailService {
           case 'viewing-user':
             html = this.generateViewingUserEmailTemplate(parsedFormData);
             break;
+          case 'viewing-reschedule':
+            html = this.generateViewingRescheduleEmailTemplate(parsedFormData);
+            break;
+          case 'viewing-cancel':
+            html = this.generateViewingCancelEmailTemplate(parsedFormData);
+            break;
           default:
             html = this.generateAgentEmailTemplate(parsedFormData);
         }
@@ -706,6 +712,148 @@ export class EmailService {
           <div style="margin-top: 32px;">
             Thanks for using Proptii<br>
             — The Proptii Team
+          </div>
+          <hr />
+          <div class="footer-desc">
+            <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com" class="footer-link">here</a>.</em>
+          </div>
+          <div class="footer-logo">
+            <img src="https://ci3.googleusercontent.com/meips/ADKq_NY8hEqCfpvIsclrL2Y7Bh5rbsplzRLKZCSdpIpnfd0yj3UbdHYRghh_jcqBeTVksaYGkXybNBH7dR78-7qrgfVu81YmwI4tHtHb3B7ILEq32SZW1Rf1WYXK=s0-d-e1-ft#https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png" alt="Proptii Logo" />
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private generateViewingRescheduleEmailTemplate(formData: any): string {
+    const { property, viewing, user } = formData;
+    const viewingDate = this.formatDateString(viewing.date);
+    const viewingTime = this.formatTimeString(viewing.time);
+    const rescheduleMessage = viewing.rescheduleMessage || '';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #136C9E; color: white; padding: 20px; border-radius: 5px 5px 0 0; }
+          .content { background-color: #f9f9f9; padding: 20px; border-radius: 0 0 5px 5px; }
+          .message-box { background-color: white; padding: 15px; border-left: 4px solid #136C9E; margin: 15px 0; }
+          .info-item { margin: 10px 0; }
+          .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; }
+          .footer-logo { display: flex; align-items: center; margin-top: 16px; }
+          .footer-logo img { height: 40px; margin-right: 10px; }
+          .footer-desc { font-style: italic; color: #555; margin-top: 10px; }
+          .footer-link { color: #136C9E; text-decoration: underline; }
+          hr { border: none; border-top: 1px solid #bbb; margin: 24px 0 16px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h2>Viewing Reschedule Request</h2>
+          </div>
+          <div class="content">
+            <p>Dear ${property.agent?.name || 'Agent'},</p>
+            <p><strong>${user.name || 'The tenant'}</strong> has requested to reschedule their property viewing.</p>
+            
+            <div class="info-item">
+              <strong>Property:</strong> ${property.street}, ${property.town || ''}, ${property.city || ''}, ${property.postcode || ''}
+            </div>
+            <div class="info-item">
+              <strong>Original Viewing Date:</strong> ${viewingDate}
+            </div>
+            <div class="info-item">
+              <strong>Original Viewing Time:</strong> ${viewingTime}
+            </div>
+            
+            ${rescheduleMessage ? `
+            <div class="message-box">
+              <strong>Message from ${user.name || 'the tenant'}:</strong>
+              <p>${rescheduleMessage}</p>
+            </div>
+            ` : ''}
+            
+            <p>Please contact the tenant at <strong>${user.email || 'their email address'}</strong> to arrange a new viewing time.</p>
+            
+            <div class="footer">
+              <p>This is an automated notification from Proptii.</p>
+              <p>Please respond directly to the tenant's email to confirm the rescheduled viewing.</p>
+            </div>
+          </div>
+          <hr />
+          <div class="footer-desc">
+            <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com" class="footer-link">here</a>.</em>
+          </div>
+          <div class="footer-logo">
+            <img src="https://ci3.googleusercontent.com/meips/ADKq_NY8hEqCfpvIsclrL2Y7Bh5rbsplzRLKZCSdpIpnfd0yj3UbdHYRghh_jcqBeTVksaYGkXybNBH7dR78-7qrgfVu81YmwI4tHtHb3B7ILEq32SZW1Rf1WYXK=s0-d-e1-ft#https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png" alt="Proptii Logo" />
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private generateViewingCancelEmailTemplate(formData: any): string {
+    const { property, viewing, user } = formData;
+    const viewingDate = this.formatDateString(viewing.date);
+    const viewingTime = this.formatTimeString(viewing.time);
+    const cancelMessage = viewing.cancelMessage || '';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #dc2626; color: white; padding: 20px; border-radius: 5px 5px 0 0; }
+          .content { background-color: #f9f9f9; padding: 20px; border-radius: 0 0 5px 5px; }
+          .message-box { background-color: white; padding: 15px; border-left: 4px solid #dc2626; margin: 15px 0; }
+          .info-item { margin: 10px 0; }
+          .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; }
+          .footer-logo { display: flex; align-items: center; margin-top: 16px; }
+          .footer-logo img { height: 40px; margin-right: 10px; }
+          .footer-desc { font-style: italic; color: #555; margin-top: 10px; }
+          .footer-link { color: #136C9E; text-decoration: underline; }
+          hr { border: none; border-top: 1px solid #bbb; margin: 24px 0 16px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h2>Viewing Cancellation Notice</h2>
+          </div>
+          <div class="content">
+            <p>Dear ${property.agent?.name || 'Agent'},</p>
+            <p><strong>${user.name || 'The tenant'}</strong> has cancelled their property viewing.</p>
+            
+            <div class="info-item">
+              <strong>Property:</strong> ${property.street}, ${property.town || ''}, ${property.city || ''}, ${property.postcode || ''}
+            </div>
+            <div class="info-item">
+              <strong>Viewing Date:</strong> ${viewingDate}
+            </div>
+            <div class="info-item">
+              <strong>Viewing Time:</strong> ${viewingTime}
+            </div>
+            
+            ${cancelMessage ? `
+            <div class="message-box">
+              <strong>Message from ${user.name || 'the tenant'}:</strong>
+              <p>${cancelMessage}</p>
+            </div>
+            ` : ''}
+            
+            <p>Please contact the tenant at <strong>${user.email || 'their email address'}</strong> if you need any further information.</p>
+            
+            <div class="footer">
+              <p>This is an automated notification from Proptii.</p>
+              <p>The viewing has been marked as cancelled in the system.</p>
+            </div>
           </div>
           <hr />
           <div class="footer-desc">

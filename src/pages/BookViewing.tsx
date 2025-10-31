@@ -6,6 +6,7 @@ import FAQSection from '../components/FAQSection';
 import BookViewingModal from '../components/viewings/BookViewingModal';
 import ReviewModal from '../components/ReviewModal';
 import { Swiper, SwiperSlide } from 'swiper/react';
+import { bookViewingRequestService } from '../services/bookViewingRequestService';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
@@ -95,6 +96,50 @@ const BookViewing = () => {
       try {
         const parsedData = JSON.parse(prefilledData);
         setPrefilledPropertyData(parsedData);
+        // Persist request to Firestore so Viewings page can source from it
+        if (user?.id) {
+          const writeDraftFallback = () => {
+            try {
+              const draftViewing = {
+                id: `draft_${Date.now()}`,
+                userId: user?.id || 'anonymous',
+                propertyId: parsedData.id || 'unknown-property',
+                property: {
+                  street: parsedData.street,
+                  town: parsedData.town,
+                  city: parsedData.city,
+                  postcode: parsedData.postcode,
+                  agent: parsedData.agent
+                },
+                viewingDetails: { date: '', time: '', preference: 'In-Person Viewing', userDetails: { fullName: '', email: '', phoneNumber: '' } },
+                status: 'pending'
+              } as any;
+              sessionStorage.setItem('draft_viewing', JSON.stringify(draftViewing));
+            } catch (e) {
+              console.warn('Failed to create draft viewing placeholder:', e);
+            }
+          };
+
+          bookViewingRequestService
+            .saveRequest(user.id, parsedData.id || `property_${Date.now()}`, {
+              street: parsedData.street,
+              town: parsedData.town,
+              city: parsedData.city,
+              postcode: parsedData.postcode,
+              agent: parsedData.agent
+            })
+            .then((r) => {
+              if (r.success) {
+                sessionStorage.setItem('book_viewing_request_id', r.requestId || '');
+              } else {
+                writeDraftFallback();
+              }
+            })
+            .catch((e) => {
+              console.warn('Failed to save book viewing request:', e);
+              writeDraftFallback();
+            });
+        }
         
         // If user is authenticated, automatically open the modal
         if (isAuthenticated) {

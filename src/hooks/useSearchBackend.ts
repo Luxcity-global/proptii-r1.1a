@@ -42,11 +42,15 @@ export interface Property {
   propertyType: string;
   imageUrls: string[];
   agent: {
+    id?: string;
     name: string;
     email: string;
+    phone?: string;
+    company?: string;
     website?: string;
   };
   source?: string;
+  description?: string;
 }
 
 export interface SearchResponse {

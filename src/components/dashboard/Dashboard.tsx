@@ -186,7 +186,9 @@ const Dashboard: React.FC = () => {
               isLoading 
                 ? "Loading..." 
                 : user?.name || user?.givenName || "User"
-            } 
+            }
+            userEmail={user?.email}
+            userPhone={user?.phone}
           />
         </div>
 

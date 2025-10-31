@@ -12,7 +12,7 @@ interface EmailContent {
   html?: string;
   attachments: EmailAttachment[];
   formData?: any;
-  emailType?: 'agent' | 'referee' | 'guarantor' | 'user' | 'viewing-agent' | 'viewing-user';
+  emailType?: 'agent' | 'referee' | 'guarantor' | 'user' | 'viewing-agent' | 'viewing-user' | 'viewing-reschedule' | 'viewing-cancel';
 }
 
 interface SendEmailResponse {
@@ -46,9 +46,17 @@ interface MultiEmailResult {
   error?: string;
 }
 
-const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:10000/api'
-  : 'https://proptii-r1-1a.onrender.com/api';
+// Use VITE_API_URL if available, otherwise fallback to defaults
+const API_BASE_URL = (() => {
+  const envApiUrl = import.meta.env.VITE_API_URL || '';
+  if (envApiUrl) {
+    const baseUrl = envApiUrl.replace(/\/$/, ''); // Remove trailing slash
+    return baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
+  }
+  return window.location.hostname === 'localhost'
+    ? 'http://localhost:3000/api'
+    : 'https://proptii-r1-1a.onrender.com/api';
+})();
 
 class EmailService {
   private readonly API_URL = API_BASE_URL;
@@ -285,8 +293,9 @@ class EmailService {
         formData.append('attachments', zipFile);
       }
 
-      // Send to backend
-      const response = await axios.post(`${this.API_URL}/referencing/send-email`, formData, {
+      // Send to backend (primary API URL)
+      const primaryUrl = `${this.API_URL}/referencing/send-email`;
+      let response = await axios.post(primaryUrl, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -306,18 +315,47 @@ class EmailService {
         messageId: response.data.messageId
       };
     } catch (error) {
-      console.error('Error sending email:', error);
-      if (axios.isAxiosError(error)) {
-        console.error('Axios error details:', {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message
+      // If the primary endpoint fails (e.g., local backend not running), try fallback hosted API
+      const fallbackBase = 'https://proptii-r1-1a.onrender.com/api';
+      try {
+        if (axios.isAxiosError(error)) {
+          console.error('Axios error details:', {
+            status: error.response?.status,
+            data: error.response?.data,
+            message: error.message
+          });
+        }
+
+        const fallbackUrl = `${fallbackBase}/referencing/send-email`;
+        console.warn(`Primary API failed. Retrying with fallback: ${fallbackUrl}`);
+
+        const formData = new FormData();
+        formData.append('to', emailContent.to);
+        formData.append('subject', emailContent.subject);
+        formData.append('formData', JSON.stringify(emailContent.formData));
+        formData.append('emailType', emailContent.emailType || 'agent');
+
+        const response = await axios.post(fallbackUrl, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 60000,
+          maxContentLength: 100 * 1024 * 1024,
+          maxBodyLength: 100 * 1024 * 1024
         });
+
+        if (!response.data.success) {
+          throw new Error(response.data.error || 'Failed to send email (fallback)');
+        }
+
+        return { success: true, messageId: response.data.messageId };
+      } catch (fallbackError) {
+        console.error('Error sending email (fallback):', fallbackError);
+        return {
+          success: false,
+          error: axios.isAxiosError(fallbackError)
+            ? fallbackError.message
+            : (fallbackError instanceof Error ? fallbackError.message : 'Unknown error occurred')
+        };
       }
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
-      };
     }
   }
 

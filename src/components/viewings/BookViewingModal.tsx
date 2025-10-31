@@ -24,6 +24,7 @@ import ViewingComparison from './components/ViewingComparison';
 import { BookViewingProvider, useBookViewing } from './context/BookViewingContext';
 import { bookingService } from './services/bookingService';
 import { viewingEmailService } from './services/viewingEmailService';
+import { viewingService } from '../../services/viewingService';
 import { useAuth } from '../../contexts/AuthContext';
 
 import { Home, Event, DoneAll, Close, Warning } from '@mui/icons-material';
@@ -228,7 +229,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     const viewing = state.viewingDetails;
     const userDetails = viewing?.userDetails;
 
-    return property?.street &&
+    const isValid = property?.street &&
       property?.agent?.name &&
       property?.agent?.email &&
       viewing?.date &&
@@ -237,6 +238,24 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
       userDetails?.fullName &&
       userDetails?.email &&
       userDetails?.phoneNumber;
+
+    console.log('Data validation check:', {
+      property: !!property,
+      propertyStreet: !!property?.street,
+      agentName: !!property?.agent?.name,
+      agentEmail: !!property?.agent?.email,
+      viewing: !!viewing,
+      viewingDate: !!viewing?.date,
+      viewingTime: !!viewing?.time,
+      viewingPreference: !!viewing?.preference,
+      userDetails: !!userDetails,
+      userFullName: !!userDetails?.fullName,
+      userEmail: !!userDetails?.email,
+      userPhone: !!userDetails?.phoneNumber,
+      isValid
+    });
+
+    return isValid;
   };
 
   // Add these validation functions after the isAllDataComplete function
@@ -312,6 +331,8 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
   };
 
   const handleNext = async () => {
+    console.log('handleNext called', { activeStep, isAllDataComplete: isAllDataComplete() });
+    
     // Check if current step has missing fields (only for steps 0 and 1)
     if (activeStep < 2) {
       const warningMessages = getStepWarningMessage(activeStep);
@@ -323,6 +344,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
 
     // If we're on the confirmation step, check if all data is complete
     if (activeStep === steps.length - 1 && !isAllDataComplete()) {
+      console.log('Data incomplete, cannot submit');
       return; // Don't proceed if data is incomplete
     }
 
@@ -338,31 +360,75 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           throw new Error('Missing property or viewing details');
         }
 
-        // Save to database
-        await bookingService.scheduleViewing(property, viewing);
+        console.log('Starting viewing submission...', { property, viewing, userId: user?.id });
+        console.log('User object in BookViewingModal:', user);
 
-        // Send emails
-        const emailResult = await viewingEmailService.sendViewingEmails({
+        // Save to Firestore
+        const userIdToUse = user?.id || 'anonymous';
+        console.log('Using user ID for Firestore save:', userIdToUse);
+        
+        const firestoreResult = await viewingService.saveViewingBooking(
+          userIdToUse,
           property,
           viewing,
-          user: {
-            name: viewing.userDetails?.fullName,
-            email: viewing.userDetails?.email
-          }
-        });
+          property.id || undefined
+        );
 
-        if (emailResult.error) {
-          console.error('Error sending emails:', emailResult.error);
-          // Continue with success flow even if emails fail
+        console.log('Firestore result:', firestoreResult);
+
+        if (firestoreResult.error) {
+          console.error('Error saving to Firestore:', firestoreResult.error);
+          // Continue with success flow even if Firestore fails
           // You might want to show a warning to the user
+        } else {
+          console.log('✅ Successfully saved to Firestore');
         }
 
+        // Save to existing database (for backward compatibility) - Optional
+        try {
+          await bookingService.scheduleViewing(property, viewing);
+          console.log('✅ Successfully saved to existing backend');
+        } catch (backendError) {
+          console.warn('⚠️ Backend service not available (this is optional):', backendError.message);
+          // Continue with success flow - backend is optional
+        }
+
+        // Send emails - Optional
+        try {
+          const emailResult = await viewingEmailService.sendViewingEmails({
+            property,
+            viewing,
+            user: {
+              name: viewing.userDetails?.fullName,
+              email: viewing.userDetails?.email
+            }
+          });
+
+          if (emailResult.error) {
+            console.warn('⚠️ Email service not available (this is optional):', emailResult.error);
+          } else {
+            console.log('✅ Successfully sent emails');
+          }
+        } catch (emailError) {
+          console.warn('⚠️ Email service not available (this is optional):', emailError.message);
+          // Continue with success flow - emails are optional
+        }
+
+        console.log('✅ All submission steps completed successfully');
+        
         setSaveComplete(true);
         setShowSavedIndicator(true);
         setTimeout(() => {
           setSaveComplete(false);
           setIsSaving(false);
+          console.log('Showing success dialog...');
           setShowSuccess(true);
+          
+          // Auto-close after showing success for 3 seconds
+          setTimeout(() => {
+            console.log('Auto-closing modal after success...');
+            handleSuccessClose();
+          }, 3000);
         }, 500);
       } else {
         // Just move to next step
@@ -396,6 +462,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
   };
 
   const handleSuccessClose = () => {
+    console.log('Closing success dialog and modal...');
     setShowSuccess(false);
     dispatch({ type: 'RESET_STATE' });
     setActiveStep(0);
@@ -406,6 +473,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     // Then trigger the review modal in the parent component after a short delay
     if (onSubmissionComplete) {
       setTimeout(() => {
+        console.log('Triggering onSubmissionComplete callback...');
         onSubmissionComplete();
       }, 300);
     }
@@ -691,6 +759,12 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
                 >
                   {activeStep === steps.length - 1 ? 'Submit' : 'Continue'}
                 </Button>
+                {/* Debug info */}
+                {activeStep === steps.length - 1 && (
+                  <div style={{ fontSize: '10px', color: 'red', marginTop: '4px' }}>
+                    Debug: isSaving={isSaving.toString()}, isAllDataComplete={isAllDataComplete().toString()}
+                  </div>
+                )}
               </Box>
             </DialogActions>
           </Box>

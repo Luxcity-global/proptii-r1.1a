@@ -1,77 +1,385 @@
-import React from 'react';
-import { Building2, MapPin, PoundSterling, Eye, Heart, Search, FileText, Calendar, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Building2, MapPin, PoundSterling, Eye, Heart, Search, FileText, Calendar, AlertTriangle, Trash2, AlertCircle } from 'lucide-react';
+import { useSavedProperties } from '../../../contexts/SavedPropertiesContext';
+import BookViewingModal from '../../viewings/BookViewingModal';
+import { useAuth } from '../../../contexts/AuthContext';
+import { viewingService, ViewingStats } from '../../../services/viewingService';
+import { firestoreService } from '../../../services/firestoreService';
+import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
 
 /**
  * Saved Properties section - redesigned to follow style guide
  */
 const SavedProperties: React.FC = () => {
-  // Mock data for summary cards
-  const dashboardSummary = {
-    savedSearches: { count: 3 },
-    viewings: { total: 8 },
-    referencing: { completedSteps: 6, totalSteps: 6 },
-    contracts: { pending: 0, total: 1, requested: 0 }
+  const { savedProperties, unsaveProperty } = useSavedProperties();
+  const { user } = useAuth();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(6);
+  const [detailsModal, setDetailsModal] = useState<{ open: boolean; property: any | null }>({ open: false, property: null });
+  const [isBookViewingOpen, setIsBookViewingOpen] = useState(false);
+  const [prefilledPropertyData, setPrefilledPropertyData] = useState<any | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [viewingStats, setViewingStats] = useState<ViewingStats>({
+    upcoming: 0,
+    completed: 0,
+    rescheduled: 0,
+    total: 0
+  });
+  const [completedSections, setCompletedSections] = useState<Set<string>>(new Set());
+  const [signedContractsCount, setSignedContractsCount] = useState(0);
+
+  // Inline copy of the Search Results Property Details modal for visual parity
+  const SavedPropertyDetailsModal = ({ property, isOpen, onClose }: { property: any | null; isOpen: boolean; onClose: () => void }) => {
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const modalRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      if (isOpen) {
+        const handleEscape = (e: KeyboardEvent) => {
+          if (e.key === 'Escape') onClose();
+        };
+        const handleArrows = (e: KeyboardEvent) => {
+          if (!property?.imageUrls?.length) return;
+          if (e.key === 'ArrowLeft') {
+            setCurrentImageIndex(prev => prev > 0 ? prev - 1 : property.imageUrls.length - 1);
+          } else if (e.key === 'ArrowRight') {
+            setCurrentImageIndex(prev => (prev + 1) % property.imageUrls.length);
+          }
+        };
+        document.addEventListener('keydown', handleEscape);
+        document.addEventListener('keydown', handleArrows);
+        document.body.style.overflow = 'hidden';
+        return () => {
+          document.removeEventListener('keydown', handleEscape);
+          document.removeEventListener('keydown', handleArrows);
+          document.body.style.overflow = 'unset';
+        };
+      }
+    }, [isOpen, onClose, property]);
+
+    if (!isOpen || !property) return null;
+
+    const cleanPrice = (raw: string) => {
+      if (!raw) return raw;
+      let cleaned = raw.replace(/Tenancy info£?/gi, '');
+      cleaned = cleaned.replace(/\s*\(£[\d,]+\s*pw\)/gi, '');
+      const pcm = cleaned.match(/£[\d,]+ pcm/i);
+      if (pcm) return pcm[0];
+      const t = cleaned.trim();
+      if (t && !t.startsWith('£') && /\d/.test(t)) return `£${t}`;
+      return t;
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div ref={modalRef} className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-auto" style={{ maxWidth: '900px' }}>
+          <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900">Property Details</h2>
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+
+          {property.imageUrls && property.imageUrls.length > 0 && (
+            <div className="relative">
+              <div className="h-96 overflow-hidden">
+                <img src={property.imageUrls[currentImageIndex]} alt={`${property.title} - Image ${currentImageIndex + 1}`} className="w-full h-full object-cover" />
+              </div>
+              {property.imageUrls.length > 1 && (
+                <>
+                  <button onClick={() => setCurrentImageIndex(prev => prev > 0 ? prev - 1 : property.imageUrls.length - 1)} className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                  </button>
+                  <button onClick={() => setCurrentImageIndex(prev => (prev + 1) % property.imageUrls.length)} className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  </button>
+                </>
+              )}
+              {property.imageUrls.length > 1 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 bg-black/50 rounded-lg p-2">
+                  {property.imageUrls.slice(0, 8).map((img: string, index: number) => (
+                    <button key={index} onClick={() => setCurrentImageIndex(index)} className={`w-12 h-12 rounded overflow-hidden border-2 transition-all ${index === currentImageIndex ? 'border-white' : 'border-transparent'}`}>
+                      <img src={img} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="p-6">
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">{property.title}</h3>
+            <p className="text-3xl font-bold text-[#E65D24] mb-4">{cleanPrice(property.price)}</p>
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                <span className="text-gray-600">{property.location}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" /></svg>
+                <span className="text-gray-600">{property.bedrooms} bedrooms</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                <span className="text-gray-600">{property.propertyType}</span>
+              </div>
+              {property.source && (
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9m0 9c-5 0-9-4-9-9s4-9 9-9" /></svg>
+                  <span className="text-gray-600">Source: {property.source}</span>
+                </div>
+              )}
+            </div>
+            {/* Availability status */}
+            <div className="mb-6">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">Available</span>
+            </div>
+
+            {/* Description */}
+            <div className="border-t border-gray-200 pt-6 mb-6">
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Description</h4>
+              <p className="text-gray-700 leading-relaxed">
+                {property.description || 'No description provided for this property.'}
+              </p>
+            </div>
+
+            {/* Listed By / Agent */}
+            {property.agent && (
+              <div className="border-t border-gray-200 pt-6">
+                <h4 className="text-lg font-semibold text-gray-900 mb-3">Listed By</h4>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="font-medium text-gray-900">{property.agent.name || 'Estate Agent'}</p>
+                  {property.agent.company && (
+                    <p className="text-gray-600 text-sm mt-1">{property.agent.company}</p>
+                  )}
+                  {property.agent.email && (
+                    <p className="text-gray-600 text-sm mt-1">{property.agent.email}</p>
+                  )}
+                  {property.agent.phone && (
+                    <p className="text-gray-600 text-sm mt-1">Phone: {property.agent.phone}</p>
+                  )}
+                  <div className="mt-2">
+                    {property.agent.website && (
+                      <a href={property.agent.website} target="_blank" rel="noopener noreferrer" className="text-[#E65D24] hover:underline">View Agency Website</a>
+                    )}
+                  </div>
+                  <div className="mt-4 flex items-center gap-3">
+                    <button className="px-4 py-2 bg-[#E65D24] text-white rounded-lg">Chat</button>
+                    <button className="px-4 py-2 bg-green-600 text-white rounded-lg">Call</button>
+                    <button className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg">Message</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  // Load viewing stats, referencing completion, and contracts count
+  useEffect(() => {
+    if (user?.id) {
+      loadViewingStats();
+      loadSignedContractsCount();
+      loadReferencingStatus();
+    }
+  }, [user?.id]);
+
+  const loadViewingStats = async () => {
+    try {
+      if (!user?.id) return;
+      const result = await viewingService.getViewingStats(user.id);
+      if (result.success && result.stats) {
+        setViewingStats(result.stats);
+      }
+    } catch (error) {
+      console.error('Error loading viewing stats:', error);
+    }
   };
 
-  // Mock data for saved searches
-  const savedSearches = [
-    {
-      id: 1,
-      address: '123 Regent Street, London W1B 4EA',
-      propertyType: '2 Bedroom Apartment',
-      bedrooms: 2,
-      price: 2400,
-      features: ['Central Heating', 'Double Glazing', 'Balcony'],
-      image: '/images/detached-house.jpg'
-    },
-    {
-      id: 2,
-      address: '45 Victoria Park Road, London E9 7JN',
-      propertyType: '3 Bedroom House',
-      bedrooms: 3,
-      price: 2100,
-      features: ['Garden', 'Parking', 'Central Heating'],
-      image: '/images/detached-house.jpg'
-    },
-    {
-      id: 3,
-      address: '78 Oak Gardens, London SW4 9AL',
-      propertyType: '1 Bedroom Flat',
-      bedrooms: 1,
-      price: 2800,
-      features: ['Concierge', 'Gym Access', 'Balcony'],
-      image: '/images/detached-house.jpg'
-    },
-    {
-      id: 4,
-      address: '92 Baker Street, London NW1 6XE',
-      propertyType: '2 Bedroom Apartment',
-      bedrooms: 2,
-      price: 2200,
-      features: ['Central Heating', 'Double Glazing', 'Parking'],
-      image: '/images/detached-house.jpg'
-    },
-    {
-      id: 5,
-      address: '156 King\'s Road, London SW3 4TP',
-      propertyType: '3 Bedroom House',
-      bedrooms: 3,
-      price: 3500,
-      features: ['Garden', 'Parking', 'Balcony'],
-      image: '/images/detached-house.jpg'
-    },
-    {
-      id: 6,
-      address: '203 High Street, London W1C 1AP',
-      propertyType: '1 Bedroom Flat',
-      bedrooms: 1,
-      price: 1900,
-      features: ['Central Heating', 'Concierge', 'Gym Access'],
-      image: '/images/detached-house.jpg'
+  const loadSignedContractsCount = async () => {
+    try {
+      if (!user?.id) return;
+      const result = await signedContractsFirestoreService.getUserSignedContracts(user.id);
+      if (result.success && result.contracts) {
+        setSignedContractsCount(result.contracts.length);
+      }
+    } catch (error) {
+      console.error('Error loading signed contracts count:', error);
     }
-  ];
+  };
+
+  const loadReferencingStatus = async () => {
+    try {
+      if (!user?.id) return;
+      
+      const selectedPropertyId = 'demo-property-123';
+      let storedData = null;
+      
+      // Try to load from Firestore first
+      try {
+        const firestoreResult = await firestoreService.getReferencingForm(user.id, selectedPropertyId);
+        if (firestoreResult.success && firestoreResult.data) {
+          storedData = JSON.stringify(firestoreResult.data.formData);
+        }
+      } catch (error) {
+        console.warn('Failed to load from Firestore:', error);
+      }
+      
+      // Fallback to localStorage if Firestore fails
+      if (!storedData) {
+        const userKey = `referencing_${user.id}_formData`;
+        storedData = localStorage.getItem(userKey);
+      }
+      
+      if (!storedData) {
+        const storageKey = `property_${selectedPropertyId}_draft`;
+        const fullKey = `proptii_${storageKey}`;
+        storedData = localStorage.getItem(fullKey);
+      }
+      
+      if (storedData) {
+        const formData = JSON.parse(storedData);
+        const completed = new Set<string>();
+        
+        // Identity: firstName, lastName, and email must be filled
+        const identityComplete = formData.identity?.firstName && formData.identity?.lastName && formData.identity?.email;
+        if (identityComplete) {
+          completed.add('identity');
+        }
+        
+        // Employment: employmentStatus must be filled
+        if (formData.employment?.employmentStatus) {
+          completed.add('employment');
+        }
+        
+        // Residential: currentAddress must be filled
+        if (formData.residential?.currentAddress) {
+          completed.add('residential');
+        }
+        
+        // Financial: check for actual meaningful data
+        const financialComplete = formData.financial?.proofOfIncomeType && 
+                                 formData.financial.proofOfIncomeType.trim() !== '';
+        if (financialComplete) {
+          completed.add('financial');
+        }
+        
+        // Guarantor: check for actual meaningful data
+        const guarantorComplete = formData.guarantor?.firstName && 
+                                 formData.guarantor?.lastName && 
+                                 formData.guarantor?.email &&
+                                 formData.guarantor.firstName.trim() !== '' &&
+                                 formData.guarantor.lastName.trim() !== '' &&
+                                 formData.guarantor.email.trim() !== '';
+        if (guarantorComplete) {
+          completed.add('guarantor');
+        }
+        
+        // Agent Details: hasAgreedToCheck must be true
+        if (formData.agentDetails?.hasAgreedToCheck) {
+          completed.add('agentDetails');
+        }
+        
+        setCompletedSections(completed);
+      }
+    } catch (error) {
+      console.error('Error loading referencing status:', error);
+    }
+  };
+  
+  // Force re-render when savedProperties changes
+  useEffect(() => {
+    // This ensures the component updates when savedProperties changes
+  }, [savedProperties]);
 
   const formatCurrency = (amount: number) => `£${amount.toLocaleString()}`;
+
+  const filteredProperties = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return savedProperties;
+    return savedProperties.filter((p: any) => {
+      const haystack = [
+        p.title,
+        p.location,
+        p.propertyType,
+        String(p.bedrooms),
+        String(p.price)
+      ]
+        .filter(Boolean)
+        .join(' ') 
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [savedProperties, searchQuery]);
+
+  const displayedProperties = useMemo(() => {
+    return filteredProperties.slice(0, visibleCount);
+  }, [filteredProperties, visibleCount]);
+
+  useEffect(() => {
+    // reset pagination on new search or saved list changes
+    setVisibleCount(6);
+  }, [searchQuery, savedProperties]);
+
+  const openDetails = (p: any) => {
+    // Transform to match SearchResults PropertyDetailsModal expectations
+    const modalProperty = {
+      title: p.title,
+      price: typeof p.price === 'string' ? p.price : `£${p.price} pcm`,
+      location: p.location,
+      bedrooms: Number(p.bedrooms) || 0,
+      propertyType: p.propertyType,
+      source: p.source,
+      description: p.description,
+      imageUrls: (p.imageUrls && p.imageUrls.length ? p.imageUrls : ['/images/detached-house.jpg']),
+      agent: p.agent ? {
+        name: p.agent.name || p.agentName || 'Estate Agent',
+        email: p.agent.email || p.agentEmail || '',
+        website: p.agent.website || p.agentWebsite
+      } : undefined
+    };
+    setDetailsModal({ open: true, property: modalProperty });
+  };
+
+  const handleBookViewing = (property: any) => {
+    // Extract location parts from the property location string
+    const locationParts = property.location?.split(',').map((s: string) => s.trim()) || [];
+    
+    // Extract agent information from saved property structure
+    const agent = property.agent || {};
+    
+    // Prepare property data for BookViewingModal in the same format as SearchResults
+    const propertyData = {
+      id: property.id || property.propertyId || `property-${Date.now()}`,
+      street: locationParts[0] || property.location || '',
+      town: locationParts[1] || '',
+      city: locationParts[0] || property.location?.split(',')[0]?.trim() || '',
+      postcode: locationParts[locationParts.length - 1] || '',
+      agent: {
+        id: agent.id || agent.name || property.source || `agent-${Date.now()}`,
+        name: agent.name || property.source || 'Estate Agent',
+        email: agent.email || '',
+        phone: agent.phone || '',
+        company: agent.company || property.source || 'Estate Agency'
+      }
+    };
+    
+    setPrefilledPropertyData(propertyData);
+    setIsBookViewingOpen(true);
+  };
+
+  const handleDeleteProperty = (propertyId: string) => {
+    setDeleteConfirm(propertyId);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirm) {
+      unsaveProperty(deleteConfirm);
+      setDeleteConfirm(null);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-8" style={{ fontFamily: 'Archivo, sans-serif' }}>
@@ -86,26 +394,27 @@ const SavedProperties: React.FC = () => {
               Manage all your properties in one place.
             </p>
           </div>
-        <button 
-            className="px-12 py-3 text-white rounded-full text-sm font-medium transition-all duration-300 hover:-translate-y-0.5"
-            style={{
-              background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
-              border: '1px solid #DC5F12',
-              minHeight: '3.5rem',
-              minWidth: '180px',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-              e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
-              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-            }}
-          >
-            Browse Properties
-        </button>
+            <button 
+              onClick={() => window.location.href = '/'}
+              className="px-12 py-3 text-white rounded-full text-sm font-medium transition-all duration-300 hover:-translate-y-0.5"
+              style={{
+                background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
+                border: '1px solid #DC5F12',
+                minHeight: '3.5rem',
+                minWidth: '180px',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
+                e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
+                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+              }}
+            >
+              Browse Properties
+            </button>
         </div>
       </div>
 
@@ -121,11 +430,13 @@ const SavedProperties: React.FC = () => {
           </div>
           <div className="mb-3">
             <p className="text-2xl font-bold" style={{ color: '#374957' }}>
-              {dashboardSummary?.savedSearches.count || 3}
+              {savedProperties.length}
             </p>
           </div>
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>Active searches</p>
+            <p className="text-sm" style={{ color: '#717182' }}>
+              {savedProperties.length === 1 ? 'Saved property' : 'Saved properties'}
+            </p>
           </div>
         </div>
 
@@ -139,7 +450,7 @@ const SavedProperties: React.FC = () => {
           </div>
           <div className="mb-3">
             <p className="text-2xl font-bold" style={{ color: '#374957' }}>
-              {dashboardSummary?.viewings.total || 8}
+              {viewingStats.total || 0}
             </p>
           </div>
           <div>
@@ -157,7 +468,7 @@ const SavedProperties: React.FC = () => {
           </div>
           <div className="mb-3">
             <p className="text-2xl font-bold" style={{ color: '#374957' }}>
-              {dashboardSummary?.referencing.completedSteps || 6}/{dashboardSummary?.referencing.totalSteps || 6}
+              {completedSections.size}/6
             </p>
           </div>
           <div>
@@ -175,11 +486,11 @@ const SavedProperties: React.FC = () => {
           </div>
           <div className="mb-3">
             <p className="text-2xl font-bold" style={{ color: '#374957' }}>
-              {dashboardSummary?.contracts.total || 1}
+              {signedContractsCount || 0}
             </p>
           </div>
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>As of 09/10/2025</p>
+            <p className="text-sm" style={{ color: '#717182' }}>Signed Contracts</p>
           </div>
         </div>
       </div>
@@ -195,6 +506,8 @@ const SavedProperties: React.FC = () => {
             style={{ 
               fontFamily: 'Archivo, sans-serif'
             }}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={(e) => {
               e.target.style.borderColor = '#136C9E';
               e.target.style.boxShadow = '0 0 0 2px rgba(19, 108, 158, 0.2)';
@@ -209,20 +522,43 @@ const SavedProperties: React.FC = () => {
 
       {/* Properties Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {savedSearches.map((search) => (
-          <div key={search.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+        {filteredProperties.length === 0 ? (
+          <div className="col-span-full text-center py-12">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Heart className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              {searchQuery ? 'No matching properties' : 'No Saved Properties'}
+            </h3>
+            <p className="text-gray-600 mb-4">
+              {searchQuery ? 'Try a different search term.' : 'Start saving properties you like from your search results.'}
+            </p>
+            <button 
+              className="px-6 py-3 text-white rounded-lg font-medium transition-colors"
+              style={{ backgroundColor: '#E65D24' }}
+              onClick={() => window.location.href = '/'}
+            >
+              Browse Properties
+            </button>
+          </div>
+        ) : (
+          displayedProperties.map((property) => (
+            <div key={property.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
             {/* Property Image */}
             <div className="relative aspect-video overflow-hidden">
               <img 
-                src={search.image} 
-                alt={search.address} 
+                  src={property.imageUrls?.[0] || '/images/detached-house.jpg'} 
+                  alt={property.title} 
                 className="w-full h-full object-cover" 
               />
               {/* Heart Icon */}
               <div className="absolute top-3 right-3">
-                <div className="bg-white bg-opacity-80 rounded-full p-1">
+                  <button
+                    onClick={() => unsaveProperty(property.id)}
+                    className="bg-white bg-opacity-80 rounded-full p-1 hover:bg-opacity-100 transition-all"
+                  >
                   <Heart className="w-4 h-4 text-red-500 fill-red-500" />
-              </div>
+                  </button>
               </div>
             </div>
             
@@ -230,65 +566,130 @@ const SavedProperties: React.FC = () => {
             <div className="p-4">
               {/* Address */}
               <h3 className="text-base font-bold text-gray-800 mb-1 truncate">
-                {search.address}
+                  {property.title}
               </h3>
               
               {/* Property Type */}
               <p className="text-xs text-gray-600 mb-3 flex items-center">
                 <MapPin className="w-3 h-3 mr-1" />
-                London · {search.propertyType}
+                  {property.location} · {property.propertyType}
               </p>
               
               {/* Price */}
               <div className="flex items-center text-lg font-bold text-gray-900 mb-3">
-                {formatCurrency(search.price)}
+                  {property.price}
                 <span className="text-sm text-gray-500 ml-1">/month</span>
               </div>
               
               {/* Features */}
               <div className="flex flex-wrap gap-1 mb-4">
-                {search.features.slice(0, 3).map((feature, index) => (
-                  <span 
-                    key={index}
-                    className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-orange-100 text-orange-600 hover:bg-orange-200 cursor-pointer transition-colors"
-                  >
-                    {feature}
+                  <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-orange-100 text-orange-600">
+                    {property.bedrooms} Bedrooms
                   </span>
-                ))}
-                {search.features.length > 3 && (
-                  <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-orange-100 text-orange-600 hover:bg-orange-200 cursor-pointer transition-colors">
-                    +{search.features.length - 3} more
+                  <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-orange-100 text-orange-600">
+                    {property.propertyType}
+                  </span>
+                  {property.source && (
+                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-600">
+                      {property.source}
                   </span>
                 )}
               </div>
               
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
-                <button className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <button className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors" onClick={() => openDetails(property)}>
                   <Eye className="w-4 h-4 mr-2" />
                   View
                 </button>
-                <button className="p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
-                  <FileText className="w-4 h-4" />
-                </button>
-                <button className="p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+                <button 
+                  className="p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors" 
+                  onClick={() => handleBookViewing(property)}
+                  title="Book Viewing"
+                >
                   <Calendar className="w-4 h-4" />
+                </button>
+                <button 
+                  className="p-2 border border-gray-300 rounded-lg text-red-600 hover:bg-red-50 transition-colors" 
+                  onClick={() => handleDeleteProperty(property.id)}
+                  title="Remove from saved searches"
+                >
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>
           </div>
-        ))}
+          ))
+        )}
       </div>
 
       {/* Load More */}
-      <div className="text-center pt-6">
-        <button 
-          className="px-6 py-3 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-          style={{ color: '#374957' }}
-        >
-          Load More Properties
-        </button>
-      </div>
+      {displayedProperties.length < filteredProperties.length && (
+        <div className="text-center pt-6">
+          <button 
+            className="px-6 py-3 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            style={{ color: '#374957' }}
+            onClick={() => setVisibleCount((c) => c + 6)}
+          >
+            Load More Properties
+          </button>
+        </div>
+      )}
+      {detailsModal.open && detailsModal.property && (
+        <SavedPropertyDetailsModal
+          property={detailsModal.property}
+          isOpen={detailsModal.open}
+          onClose={() => setDetailsModal({ open: false, property: null })}
+        />
+      )}
+      <BookViewingModal
+        open={isBookViewingOpen}
+        onClose={() => {
+          setIsBookViewingOpen(false);
+          setPrefilledPropertyData(null);
+        }}
+        onSubmissionComplete={() => {
+          setIsBookViewingOpen(false);
+          setPrefilledPropertyData(null);
+        }}
+        prefilledPropertyData={prefilledPropertyData}
+      />
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Remove Property</h3>
+                  <p className="text-sm text-gray-500">This action cannot be undone</p>
+                </div>
+              </div>
+              <p className="text-gray-700 mb-6">
+                Are you sure you want to remove this property from your saved searches? This action cannot be undone.
+              </p>
+              <div className="flex items-center justify-end space-x-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

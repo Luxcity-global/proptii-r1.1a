@@ -3,7 +3,8 @@ import { Menu, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as pdfjs from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
-import DocuSignEditor from './DocuSignEditor';
+import DocumentSigningViewer from './DocumentSigningViewer';
+import SendContract from './SendContract';
 
 interface CustomizePageProps {
   templateId: string;
@@ -30,10 +31,14 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [manualRotation, setManualRotation] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // Document editing states
   const [editedPages, setEditedPages] = useState<any[]>([]);
+  
+  // Store signed PDF bytes for sending
+  const [signedPdfBytes, setSignedPdfBytes] = useState<Uint8Array | null>(null);
 
   // Toggle sidebar visibility
   const toggleSidebar = () => {
@@ -124,34 +129,31 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
         return;
       }
 
-      const viewport = page.getViewport({ scale: 1.5 });
+      // Use rotation of 0 to render pages as they are stored in the PDF
+      // The page.rotate property indicates the page's inherent orientation
+      const pageRotation = page.rotate || 0;
+      console.log(`Page ${pageNumber} rotation property:`, pageRotation);
+      console.log(`Manual rotation:`, manualRotation);
       
-      // Create a new canvas to avoid render conflicts
-      const newCanvas = document.createElement('canvas');
-      const newContext = newCanvas.getContext("2d");
+      // Always render with rotation 0 - PDFs should display as stored
+      const viewport = page.getViewport({ scale: 1.5, rotation: 0 });
       
-      if (!newContext) {
-        console.error("Could not get new canvas context");
-        return;
-      }
-
-      // Set dimensions on the new canvas
-      newCanvas.width = viewport.width;
-      newCanvas.height = viewport.height;
+      // Set canvas dimensions
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      
+      // Clear and fill with white background
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
 
       const renderContext = {
-        canvasContext: newContext,
+        canvasContext: context,
         viewport,
       };
 
-      // Render to the new canvas
+      // Render directly to the main canvas
       await page.render(renderContext).promise;
-      
-      // Clear the original canvas and copy the new content
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      context.drawImage(newCanvas, 0, 0);
       
       console.log(`Page ${pageNumber} rendered successfully`);
     } catch (error) {
@@ -177,7 +179,12 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
   // Effect to render page when currentPage changes
   useEffect(() => {
     if (pdfDocument && canvasRef.current) {
+      // Add a small delay to ensure proper rendering
+      const timer = setTimeout(() => {
       renderPage(currentPage);
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
   }, [currentPage, pdfDocument]);
 
@@ -195,9 +202,13 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
     {/*<div className="flex transition-all duration-300 max-w-3xl">*/}
-    <div className={`flex transition-all duration-300 ${isSidebarOpen ? 'max-w-5xl' : 'max-w-3xl'}`}>
+    <div className={`flex transition-all duration-300 ${
+      isSidebarOpen 
+        ? (activeTab === 'edit' ? 'max-w-7xl' : 'max-w-5xl') 
+        : (activeTab === 'edit' ? 'max-w-6xl' : 'max-w-3xl')
+    } ${activeTab === 'edit' ? 'max-h-[95vh]' : 'max-h-[90vh]'}`}>
       {/* Sidebar (Outside the modal, placed beside it) */}
       {isSidebarOpen && (
         <div className="max-h-[700px] w-80 bg-white shadow-lg p-6 flex flex-col">
@@ -225,8 +236,12 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
       )}
 
       {/* Main Content Area */}
-      <div className={`bg-[#FFFFFF] rounded-md shadow-lg w-full max-w-3xl p-6 relative pt-20 ${
-        activeTab === 'edit' ? 'max-h-[750px]' : 'max-h-[850px]'
+      <div className={`bg-[#FFFFFF] rounded-md shadow-lg w-full ${
+        activeTab === 'edit' ? 'max-w-6xl' : 
+        activeTab === 'send' ? 'max-w-5xl' : 'max-w-3xl'
+      } p-6 relative pt-20 ${
+        activeTab === 'edit' ? 'max-h-[95vh] overflow-auto' : 
+        activeTab === 'send' ? 'max-h-[90vh] overflow-auto' : 'max-h-[85vh] overflow-auto'
       }`}>
             
         {/* Keep the same navbar style for consistency */}
@@ -312,8 +327,9 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
               </div>
 
               {/* Navigation Controls */}
+              <div className="flex justify-center items-center space-x-4 mt-4 pt-2 border-t">
               {totalPages > 1 && (
-                <div className="flex justify-center items-center space-x-4 mt-4 pt-2 border-t">
+                  <>
                   <button
                     onClick={goToPrevPage}
                     disabled={currentPage === 1}
@@ -343,46 +359,84 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
                     <span>Next</span>
                     <ChevronRight size={16} />
                   </button>
+                  </>
+                )}
+                
+                {/* Removed manual Refresh button; rendering is now stable */}
+                
+                {/* Rotation Buttons */}
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => {
+                      setManualRotation(manualRotation - 90);
+                      console.log('Rotating left, new rotation:', manualRotation - 90);
+                    }}
+                    className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                  >
+                    ↶
+                  </button>
+                  <span className="text-xs text-gray-600">{manualRotation}°</span>
+                  <button
+                    onClick={() => {
+                      setManualRotation(manualRotation + 90);
+                      console.log('Rotating right, new rotation:', manualRotation + 90);
+                    }}
+                    className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                  >
+                    ↷
+                  </button>
+                </div>
               </div>
-            )}
           </div>
         </div>
         )}
 
         {activeTab === 'edit' && (
-          <div className="mt-4 flex-1 overflow-hidden" style={{ height: 'calc(100vh - 300px)' }}>
-            <DocuSignEditor
+          <div className="mt-4 flex-1 overflow-hidden" style={{ height: 'calc(100vh - 100px)', maxHeight: '90vh' }}>
+            <DocumentSigningViewer
               template={template}
-              onSave={handleDocumentSave}
-              onExport={handleDocumentExport}
+              recipient={{
+                email: 'user@example.com',
+                name: 'Document Signer'
+              }}
+              onSigned={(signedPdfBytes) => {
+                console.log('Document signed successfully, PDF bytes:', signedPdfBytes.length);
+                // Store signed PDF bytes for sending
+                setSignedPdfBytes(signedPdfBytes);
+              }}
+              onSave={(signedPdfBytes) => {
+                console.log('Saving signed document, PDF bytes:', signedPdfBytes.length);
+                handleDocumentSave('signed_document');
+              }}
+              onExport={(format) => {
+                console.log(`Exporting document as ${format}`);
+                handleDocumentExport(format);
+              }}
             />
           </div>
         )}
 
         {activeTab === 'send' && (
-          <div className="mt-4 p-8 text-center">
-            <div className="max-w-md mx-auto">
-              <div className="text-gray-400 mb-4">
-                <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-700 mb-2">Send Document</h3>
-              <p className="text-gray-600 mb-6">
-                This feature will allow you to send the document via email or generate a shareable link.
-              </p>
-              <div className="space-y-3">
-                <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                  Send via Email
-                </button>
-                <button className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                  Generate Share Link
-                </button>
-                <button className="w-full px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">
-                  Download & Send
-                </button>
-              </div>
-            </div>
+          <div className="mt-4 overflow-y-auto max-h-[calc(100vh-200px)]">
+            <SendContract
+              contractData={{
+                title: template.name,
+                content: 'Contract content will be extracted here',
+                extractedFields: {
+                  landlord: 'Landlord Name',
+                  tenant: 'Tenant Name',
+                  propertyAddress: 'Property Address',
+                  startDate: 'Start Date'
+                }
+              }}
+              signedPdfBytes={signedPdfBytes}
+              onSend={(recipients, signature) => {
+                console.log('Sending contract to:', recipients);
+                console.log('With signature:', signature?.name);
+                // Handle the actual sending logic here
+              }}
+              onClose={onBack}
+            />
           </div>
         )}
       </div>

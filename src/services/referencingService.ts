@@ -1,8 +1,9 @@
 import axios from 'axios';
 
-// Get the API URL from environment variables
-//const API_BASE_URL = process.env.VITE_API_URL || 'https://proptii-r1-1a.onrender.com/api';
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://proptii-r1-1a.onrender.com/api';
+// Get the API URL from environment variables and ensure it has /api suffix
+const envApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const baseUrl = envApiUrl.replace(/\/$/, ''); // Remove trailing slash
+const API_BASE_URL = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
 
 console.log('Using API URL:', API_BASE_URL);
 

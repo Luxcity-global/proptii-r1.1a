@@ -57,6 +57,7 @@ interface User {
   givenName?: string;
   familyName?: string;
   name?: string;
+  phone?: string;
   roles: string[];
 }
 
@@ -67,6 +68,7 @@ interface AuthContextType {
   login: () => Promise<void>;
   logout: () => Promise<void>;
   editProfile: () => Promise<void>;
+  refreshUserData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -89,6 +91,120 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+// Helper function to extract phone number from token claims
+const extractPhoneNumber = (claims: any): string | undefined => {
+  if (!claims) {
+    console.log('❌ No claims provided to extractPhoneNumber');
+    return undefined;
+  }
+  
+  console.log('🔍 All available claims:', Object.keys(claims));
+  console.log('🔍 All claim values:', claims);
+  
+  const possibleKeys = [
+    'extension_PhoneNumber', // Most common Azure AD B2C custom attribute name
+    'Phone Number',
+    'phoneNumber',
+    'phone_number',
+    'mobilePhone',
+    'mobile_phone',
+    'Mobile Phone',
+    'extension_phoneNumber',
+    'telephone',
+    'telephoneNumber',
+    'signInNames.phoneNumber' // Alternative location
+  ];
+  
+  for (const key of possibleKeys) {
+    if (claims[key]) {
+      console.log(`✅ Found phone number with key "${key}":`, claims[key]);
+      return claims[key] as string;
+    }
+  }
+  
+  console.log('❌ No phone number found in any of the expected keys');
+  return undefined;
+};
+
+// Helper function to refresh user data from Azure AD B2C
+const refreshUserData = async (instance: any, accounts: any[], loginRequest: any, setUser: any, extractPhoneNumber: any) => {
+  try {
+    console.log('🔄 Refreshing user data from Azure AD B2C...');
+    
+    if (!accounts || accounts.length === 0) {
+      console.log('No accounts found for refresh');
+      return;
+    }
+
+    // Try to get fresh token without iframe
+    try {
+      const freshResult = await instance.acquireTokenSilent({
+        ...loginRequest,
+        account: accounts[0],
+        forceRefresh: true // Force refresh to get latest claims
+      });
+      
+      if (freshResult && freshResult.account) {
+        const phoneNumber = extractPhoneNumber(freshResult.account.idTokenClaims);
+        
+        setUser({
+          id: freshResult.account.localAccountId || freshResult.account.homeAccountId || '',
+          name: freshResult.account.name || '',
+          email: freshResult.account.username || '',
+          phone: phoneNumber
+        });
+
+        console.log('✅ User data refreshed successfully with phone:', phoneNumber);
+        
+        // Dispatch auth state change event
+        window.dispatchEvent(new CustomEvent('auth-state-changed', {
+          detail: {
+            success: true,
+            userId: freshResult.account.localAccountId || freshResult.account.homeAccountId
+          }
+        }));
+      }
+    } catch (silentError) {
+      console.log('Silent token acquisition failed, trying popup approach:', silentError);
+      
+      // Fallback to popup if silent fails
+      try {
+        const popupResult = await instance.acquireTokenPopup({
+          ...loginRequest,
+          account: accounts[0]
+        });
+        
+        if (popupResult && popupResult.account) {
+          const phoneNumber = extractPhoneNumber(popupResult.account.idTokenClaims);
+          
+          setUser({
+            id: popupResult.account.localAccountId || popupResult.account.homeAccountId || '',
+            name: popupResult.account.name || '',
+            email: popupResult.account.username || '',
+            phone: phoneNumber
+          });
+
+          console.log('✅ User data refreshed via popup with phone:', phoneNumber);
+          
+          // Dispatch auth state change event
+          window.dispatchEvent(new CustomEvent('auth-state-changed', {
+            detail: {
+              success: true,
+              userId: popupResult.account.localAccountId || popupResult.account.homeAccountId
+            }
+          }));
+        }
+      } catch (popupError) {
+        console.error('❌ Both silent and popup token acquisition failed:', popupError);
+        throw popupError;
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error refreshing user data:', error);
+    throw error;
+  }
+};
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const { instance, accounts, inProgress } = useMsal();
   const [user, setUser] = useState<User | null>(null);
@@ -106,14 +222,70 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (accounts.length > 0) {
           const currentAccount = accounts[0];
           setIsAuthenticated(true);
+          
+          // Debug: Log all available claims
+          console.log('🔍 All available token claims:', currentAccount.idTokenClaims);
+          console.log('🔍 All claim keys:', Object.keys(currentAccount.idTokenClaims || {}));
+          console.log('🔍 All account properties:', Object.keys(currentAccount));
+          console.log('🔍 Full token claims object:', JSON.stringify(currentAccount.idTokenClaims, null, 2));
+          
+          // Try to find phone number in ALL possible locations
+          const claims = currentAccount.idTokenClaims || {};
+          let phoneNumber = undefined;
+          
+          console.log('🔍 Searching for phone number in claims...');
+          console.log('🔍 All available claim keys:', Object.keys(claims));
+          
+          // Try exact match for each possible key
+          // Azure AD B2C custom attributes are typically named like: extension_PhoneNumber
+          const possibleKeys = [
+            'extension_PhoneNumber', // Most common Azure AD B2C custom attribute name
+            'Phone Number',
+            'phoneNumber',
+            'phone_number',
+            'mobilePhone',
+            'mobile_phone',
+            'Mobile Phone',
+            'extension_phoneNumber',
+            'telephone',
+            'telephoneNumber',
+            'signInNames.phoneNumber' // Alternative location
+          ];
+          
+          for (const key of possibleKeys) {
+            if (claims[key as keyof typeof claims]) {
+              phoneNumber = claims[key as keyof typeof claims] as string;
+              console.log(`✅ Found phone number with key "${key}":`, phoneNumber);
+              break;
+            } else {
+              console.log(`❌ Key "${key}" not found in claims`);
+            }
+          }
+          
+          // If no phone number found, log all claims for debugging
+          if (!phoneNumber) {
+            console.log('❌ No phone number found in any expected keys');
+            console.log('🔍 All claims values:', claims);
+          }
+          
+          // Also check direct account properties
+          if (!phoneNumber) {
+            phoneNumber = (currentAccount as any).phoneNumber || (currentAccount as any).phone;
+          }
+          
+          console.log('📞 Final phone number:', phoneNumber);
+          
           setUser({
             id: currentAccount.localAccountId || currentAccount.homeAccountId,
             givenName: currentAccount.name?.split(' ')[0],
             familyName: currentAccount.name?.split(' ').slice(1).join(' '),
             email: currentAccount.username,
             name: currentAccount.name,
+            phone: phoneNumber,
             roles: ['tenant'] // Default role for new users
           });
+          
+          console.log('👤 User object set with phone:', phoneNumber);
 
           // Try silent token acquisition
           await instance.acquireTokenSilent({
@@ -122,7 +294,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           });
 
           // Record session activity
-          sessionManager.recordActivity('interaction', 'Session initialized');
+          sessionManager.updateActivity('interaction', 'Session initialized');
         }
       } catch (error) {
         if (error instanceof InteractionRequiredAuthError) {
@@ -186,17 +358,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }));
 
         setIsAuthenticated(true);
+        
+        // Debug: Log all available claims
+        console.log('🔍 Login - All available token claims:', result.account?.idTokenClaims);
+        console.log('🔍 Login - All account properties:', Object.keys(result.account || {}));
+        
+        // Try multiple possible phone number claim names
+        const phoneNumber = 
+          result.account?.idTokenClaims?.['Phone Number'] ||
+          result.account?.idTokenClaims?.['phoneNumber'] ||
+          result.account?.idTokenClaims?.extension_PhoneNumber ||
+          result.account?.idTokenClaims?.phone_number ||
+          result.account?.idTokenClaims?.mobilePhone ||
+          result.account?.idTokenClaims?.phoneNumber ||
+          (result.account as any)?.phoneNumber ||
+          (result.account as any)?.phone;
+        
+        console.log('📞 Login - Phone number found:', phoneNumber);
+        
         setUser({
           id: result.account?.localAccountId || result.account?.homeAccountId || '',
           email: result.account?.username || '',
           name: result.account?.name,
           givenName: result.account?.name?.split(' ')[0],
           familyName: result.account?.name?.split(' ').slice(1).join(' '),
+          phone: phoneNumber,
           roles: ['tenant'] // Default role for new users
         });
+        
+        console.log('👤 Login - User object set:', { id: result.account?.localAccountId, email: result.account?.username, phone: phoneNumber });
 
         // Record login activity
-        sessionManager.recordActivity('interaction', 'User login');
+        sessionManager.updateActivity('interaction', 'User login');
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -220,7 +413,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       // Record logout activity before clearing session
-      sessionManager.recordActivity('interaction', 'User logout');
+      sessionManager.updateActivity('interaction', 'User logout');
 
       await instance.logoutPopup({
         postLogoutRedirectUri: window.location.origin
@@ -245,17 +438,141 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const editProfile = async (): Promise<void> => {
     try {
       setIsLoading(true);
+      console.log('🔄 Starting profile edit...');
+      console.log('🔄 MSAL instance:', instance);
+      console.log('🔄 Current accounts:', accounts);
+      
       // Record profile edit activity
-      sessionManager.recordActivity('interaction', 'Profile edit');
+      sessionManager.updateActivity('interaction', 'Profile edit');
 
-      await instance.loginPopup({
-        ...loginRequest,
-        authority: `${instance.config.auth?.authority}/profile-edit`
-      });
-    } catch (error) {
-      console.error('Profile edit error:', error);
+      // Try MSAL's built-in profile editing first
+      try {
+        console.log('🔄 Attempting MSAL profile edit with profile editing authority...');
+        
+        const result = await instance.loginPopup({
+          scopes: loginRequest.scopes,
+          authority: `https://proptii.b2clogin.com/proptii.onmicrosoft.com/b2c_1_profileediting`,
+          prompt: 'login',
+          extraQueryParameters: {
+            'ui_locales': 'en'
+          }
+        });
+        
+        console.log('✅ MSAL profile edit completed:', result);
+        
+        // Update user data immediately
+        if (result && result.account) {
+          const phoneNumber = extractPhoneNumber(result.account.idTokenClaims);
+          
+          setUser({
+            id: result.account.localAccountId || result.account.homeAccountId || '',
+            name: result.account.name || '',
+            email: result.account.username || '',
+            phone: phoneNumber
+          });
+
+          console.log('✅ Profile updated successfully with phone:', phoneNumber);
+          
+          // Dispatch auth state change event
+          window.dispatchEvent(new CustomEvent('auth-state-changed', {
+            detail: {
+              success: true,
+              userId: result.account.localAccountId || result.account.homeAccountId
+            }
+          }));
+        }
+        
+        return; // Success, exit early
+        
+      } catch (msalError) {
+        console.log('MSAL profile edit failed, trying fallback approach:', msalError);
+        
+        // Fallback: Open Azure AD B2C profile editing page in new window
+        const profileEditUrl = `https://proptii.b2clogin.com/proptii.onmicrosoft.com/oauth2/v2.0/authorize?p=b2c_1_profileediting&client_id=532e1fa0-18a6-4356-bd78-1f62bd6d5e2f&nonce=defaultNonce&redirect_uri=${encodeURIComponent(window.location.origin)}&scope=openid&response_type=id_token&prompt=login`;
+        
+        console.log('🔄 Opening profile edit URL in new window:', profileEditUrl);
+        
+        const profileWindow = window.open(profileEditUrl, '_blank', 'width=600,height=700,scrollbars=yes,resizable=yes');
+        
+        if (!profileWindow) {
+          throw new Error('Popup blocked. Please allow popups for this site.');
+        }
+
+        // Monitor the popup window
+        const checkClosed = setInterval(() => {
+          if (profileWindow.closed) {
+            clearInterval(checkClosed);
+            console.log('Profile edit window closed');
+            
+            // Refresh user data after profile edit
+            setTimeout(async () => {
+              try {
+                console.log('🔄 Refreshing user data after profile edit...');
+                
+                // Force refresh the user data by re-acquiring tokens
+                await refreshUserData(instance, accounts, loginRequest, setUser, extractPhoneNumber);
+                
+              } catch (refreshError) {
+                console.error('❌ Error refreshing user data:', refreshError);
+              }
+            }, 1000);
+          }
+        }, 1000);
+
+        // Also add a focus event listener to refresh when user returns to the main window
+        const handleWindowFocus = async () => {
+          console.log('🔄 Window focused - checking for profile updates...');
+          try {
+            await refreshUserData(instance, accounts, loginRequest, setUser, extractPhoneNumber);
+          } catch (error) {
+            console.error('❌ Error refreshing user data on focus:', error);
+          }
+        };
+
+        window.addEventListener('focus', handleWindowFocus);
+        
+        // Clean up the event listener when the profile window closes
+        const originalCheckClosed = checkClosed;
+        const checkClosedWithCleanup = setInterval(() => {
+          if (profileWindow.closed) {
+            clearInterval(checkClosedWithCleanup);
+            window.removeEventListener('focus', handleWindowFocus);
+            console.log('Profile edit window closed');
+            
+            // Refresh user data after profile edit
+            setTimeout(async () => {
+              try {
+                console.log('🔄 Refreshing user data after profile edit...');
+                await refreshUserData(instance, accounts, loginRequest, setUser, extractPhoneNumber);
+              } catch (refreshError) {
+                console.error('❌ Error refreshing user data:', refreshError);
+              }
+            }, 1000);
+          }
+        }, 1000);
+      }
+
+    } catch (error: any) {
+      console.error('❌ Profile edit error:', error);
+      
+      // Handle specific error cases
+      if (error.message.includes('Popup blocked')) {
+        alert('Popup was blocked. Please allow popups for this site and try again.');
+      } else {
+        alert('Failed to edit profile. Please try again.');
+      }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Create a refresh function that can be called manually
+  const manualRefreshUserData = async () => {
+    try {
+      console.log('🔄 Manual refresh triggered...');
+      await refreshUserData(instance, accounts, loginRequest, setUser, extractPhoneNumber);
+    } catch (error) {
+      console.error('❌ Manual refresh failed:', error);
     }
   };
 
@@ -267,7 +584,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isLoading,
         login,
         logout,
-        editProfile
+        editProfile,
+        refreshUserData: manualRefreshUserData
       }}
     >
       {children}

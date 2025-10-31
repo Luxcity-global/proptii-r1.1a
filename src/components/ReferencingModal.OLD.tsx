@@ -9,12 +9,14 @@ import FinancialUpload from "./Uploads/FinancialUpload";
 import GuarantorUpload from "./Uploads/GuarantorUpload";
 import referencingService from '../services/referencingService';
 import emailService from '../services/emailService';
+import { firestoreService } from '../services/firestoreService';
 import { toast } from 'react-hot-toast';
 
 interface ReferencingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmissionComplete?: () => void;
+  initialStep?: number;
 }
 
 // Form data types for different steps
@@ -363,9 +365,9 @@ const compressImage = (file: File, maxSizeKB: number = 150): Promise<File> => {
   });
 };
 
-const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, onSubmissionComplete }) => {
+const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, onSubmissionComplete, initialStep = 1 }) => {
   const { user } = useAuth();
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(initialStep);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [isFormComplete, setIsFormComplete] = useState(false);
@@ -767,19 +769,75 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
     }
   }, [user]);
 
-  // Load stored data on mount
+  // Load stored data on mount - prioritize Firestore, fallback to localStorage
   useEffect(() => {
-    if (user?.id) {
-      try {
-        // Don't load step status from localStorage - let it be calculated from formData
+    const loadFormData = async () => {
+      if (!user?.id) return;
 
-        // Load current step
+      try {
+        const propertyId = 'demo-property-123'; // Using demo property ID as in DashboardHome
+        
+        // First try to load from Firestore by specific property
+        try {
+          console.log('🔍 Attempting to load referencing form from Firestore:', { userId: user.id, propertyId });
+          let firestoreResult = await firestoreService.getReferencingForm(user.id, propertyId);
+          console.log('📋 Firestore result (specific property):', { success: firestoreResult.success, hasData: !!firestoreResult.data, error: firestoreResult.error });
+          
+          // If not found with specific propertyId, try to get all forms for user and use the latest one
+          if (firestoreResult.success && !firestoreResult.data) {
+            console.log('ℹ️ No data found for specific property, trying to get all forms for user...');
+            const allFormsResult = await firestoreService.getUserReferencingForms(user.id);
+            if (allFormsResult.success && allFormsResult.data && allFormsResult.data.length > 0) {
+              // Use the most recently updated form
+              const sortedForms = allFormsResult.data.sort((a, b) => {
+                const aTime = a.updatedAt?.toMillis?.() || a.updatedAt?._seconds || 0;
+                const bTime = b.updatedAt?.toMillis?.() || b.updatedAt?._seconds || 0;
+                return bTime - aTime;
+              });
+              firestoreResult = { success: true, data: sortedForms[0] };
+              console.log('✅ Found form data from user forms (using latest):', sortedForms[0]);
+            }
+          }
+          
+          if (firestoreResult.success && firestoreResult.data) {
+            console.log('✅ Loading form data from Firestore:', firestoreResult.data);
+            
+            // Set form data from Firestore
+            setFormData(prev => ({
+              ...prev,
+              ...firestoreResult.data!.formData
+            }));
+            
+            // Set current step from Firestore (only if no initialStep provided)
+            if (firestoreResult.data.currentStep && !initialStep) {
+              setCurrentStep(firestoreResult.data.currentStep);
+            }
+            
+            // Set step status from Firestore
+            if (firestoreResult.data.stepStatus) {
+              setStepStatus(firestoreResult.data.stepStatus);
+            }
+            
+            return; // Exit early if Firestore data loaded successfully
+          } else if (firestoreResult.success && !firestoreResult.data) {
+            console.log('ℹ️ No data found in Firestore for this user');
+          } else if (firestoreResult.error) {
+            console.warn('⚠️ Firestore returned error:', firestoreResult.error);
+          }
+        } catch (error) {
+          console.warn('❌ Failed to load from Firestore:', error);
+        }
+        
+        // Fallback to localStorage if Firestore fails
+        console.log('🔄 Falling back to localStorage...');
+        
+        // Load current step from localStorage
         const savedStep = localStorage.getItem(`referencing_${user.id}_currentStep`);
         if (savedStep) {
           setCurrentStep(parseInt(savedStep, 10));
         }
 
-        // Load entire form data at once
+        // Load entire form data from localStorage
         const savedFormData = localStorage.getItem(`referencing_${user.id}_formData`);
         if (savedFormData) {
           const parsedData = JSON.parse(savedFormData);
@@ -792,8 +850,87 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       } catch (e) {
         console.error('Failed to load saved data:', e);
       }
-    }
+    };
+
+    loadFormData();
   }, [user]);
+
+  // Also load data when modal opens
+  useEffect(() => {
+    if (isOpen && user?.id) {
+      const loadDataOnOpen = async () => {
+        try {
+          const propertyId = 'demo-property-123';
+          console.log('🔍 Loading data on modal open:', { userId: user.id, propertyId });
+          
+          let firestoreResult = await firestoreService.getReferencingForm(user.id, propertyId);
+          console.log('📋 Firestore result on open (specific property):', { success: firestoreResult.success, hasData: !!firestoreResult.data });
+          
+          // If not found with specific propertyId, try to get all forms for user and use the latest one
+          if (firestoreResult.success && !firestoreResult.data) {
+            console.log('ℹ️ No data found for specific property on open, trying to get all forms for user...');
+            const allFormsResult = await firestoreService.getUserReferencingForms(user.id);
+            if (allFormsResult.success && allFormsResult.data && allFormsResult.data.length > 0) {
+              // Use the most recently updated form
+              const sortedForms = allFormsResult.data.sort((a, b) => {
+                const aTime = a.updatedAt?.toMillis?.() || a.updatedAt?._seconds || 0;
+                const bTime = b.updatedAt?.toMillis?.() || b.updatedAt?._seconds || 0;
+                return bTime - aTime;
+              });
+              firestoreResult = { success: true, data: sortedForms[0] };
+              console.log('✅ Found form data from user forms on open (using latest):', sortedForms[0]);
+            }
+          }
+          
+          if (firestoreResult.success && firestoreResult.data) {
+            console.log('✅ Loading form data on modal open:', firestoreResult.data);
+            
+            // Set form data from Firestore
+            setFormData(prev => ({
+              ...prev,
+              ...firestoreResult.data!.formData
+            }));
+            
+            // Set current step - prioritize initialStep prop over saved step
+            if (initialStep) {
+              setCurrentStep(initialStep);
+            } else if (firestoreResult.data.currentStep) {
+              setCurrentStep(firestoreResult.data.currentStep);
+            }
+            
+            // Set step status from Firestore
+            if (firestoreResult.data.stepStatus) {
+              setStepStatus(firestoreResult.data.stepStatus);
+            }
+          } else {
+            console.log('ℹ️ No Firestore data found on modal open, falling back to localStorage');
+            // Fallback to localStorage
+            const savedFormData = localStorage.getItem(`referencing_${user.id}_formData`);
+            if (savedFormData) {
+              const parsedData = JSON.parse(savedFormData);
+              setFormData(prev => ({
+                ...prev,
+                ...parsedData
+              }));
+            }
+          }
+        } catch (error) {
+          console.warn('❌ Failed to load from Firestore on modal open:', error);
+          // Fallback to localStorage
+          const savedFormData = localStorage.getItem(`referencing_${user.id}_formData`);
+          if (savedFormData) {
+            const parsedData = JSON.parse(savedFormData);
+            setFormData(prev => ({
+              ...prev,
+              ...parsedData
+            }));
+          }
+        }
+      };
+      
+      loadDataOnOpen();
+    }
+  }, [isOpen, user, initialStep]);
 
   // Save current step and all data
   const saveCurrentStep = async () => {
@@ -804,50 +941,62 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
         throw new Error('No user found. Please login again.');
       }
 
-      // Save current step to local storage
+      // Save current step to local storage (for backward compatibility)
       localStorage.setItem(`referencing_${user.id}_currentStep`, currentStep.toString());
       localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(formData));
       localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
 
-      // Get current section data
-      const section = getCurrentSection();
-      if (!section) {
-        return; // Skip saving for credit check step
-      }
-
-      const currentSectionData = {
-        ...formData[section],
-        userId: user.id
-      };
-
-      // Save to Cosmos DB based on current step
-      let saveResult;
-      switch (currentStep) {
-        case 1:
-          saveResult = await referencingService.saveIdentityData(currentSectionData);
-          break;
-        case 2:
-          saveResult = await referencingService.saveEmploymentData(currentSectionData);
-          break;
-        case 3:
-          saveResult = await referencingService.saveResidentialData(currentSectionData);
-          break;
-        case 4:
-          saveResult = await referencingService.saveFinancialData(currentSectionData);
-          break;
-        case 5:
-          saveResult = await referencingService.saveGuarantorData(currentSectionData);
-          break;
-        // case 6: // Credit check step commented out
-        case 7:
-          saveResult = await referencingService.saveAgentDetailsData(currentSectionData);
-          break;
-        default:
-          saveResult = { success: true }; // Credit check step doesn't need saving
-      }
+      // Save to Firestore
+      const propertyId = 'demo-property-123'; // Using demo property ID as in DashboardHome
+      const saveResult = await firestoreService.saveReferencingForm(
+        user.id,
+        propertyId,
+        formData,
+        currentStep,
+        stepStatus
+      );
 
       if (!saveResult.success) {
-        throw new Error(saveResult.error || 'Failed to save data');
+        console.warn('Firestore save failed:', saveResult.error);
+        // Don't throw error - continue with Cosmos DB save
+        toast.error('Firestore save failed, but data will be saved locally');
+      }
+
+      // Also save to Cosmos DB for backward compatibility
+      const section = getCurrentSection();
+      if (section) {
+        const currentSectionData = {
+          ...formData[section],
+          userId: user.id
+        };
+
+        let cosmosSaveResult;
+        switch (currentStep) {
+          case 1:
+            cosmosSaveResult = await referencingService.saveIdentityData(currentSectionData);
+            break;
+          case 2:
+            cosmosSaveResult = await referencingService.saveEmploymentData(currentSectionData);
+            break;
+          case 3:
+            cosmosSaveResult = await referencingService.saveResidentialData(currentSectionData);
+            break;
+          case 4:
+            cosmosSaveResult = await referencingService.saveFinancialData(currentSectionData);
+            break;
+          case 5:
+            cosmosSaveResult = await referencingService.saveGuarantorData(currentSectionData);
+            break;
+          case 7:
+            cosmosSaveResult = await referencingService.saveAgentDetailsData(currentSectionData);
+            break;
+          default:
+            cosmosSaveResult = { success: true };
+        }
+
+        if (!cosmosSaveResult.success) {
+          console.warn('Failed to save to Cosmos DB:', cosmosSaveResult.error);
+        }
       }
 
       // Update last saved timestamp
@@ -857,7 +1006,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       }));
 
       // Show success message
-      toast.success('Progress saved successfully');
+      if (saveResult.success) {
+        toast.success('Progress saved successfully to Firestore');
+      } else {
+        toast.success('Progress saved successfully (local storage)');
+      }
       
       // Show save success indicator
       setShowSaveSuccess(true);
@@ -980,6 +1133,20 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       // Don't save current step - data is already auto-saved
       // Don't show multiple progress updates - just submit directly
 
+      // Save final form data to Firestore before submission
+      const propertyId = 'demo-property-123'; // Using demo property ID as in DashboardHome
+      const firestoreSaveResult = await firestoreService.saveReferencingForm(
+        userId,
+        propertyId,
+        formData,
+        currentStep,
+        stepStatus
+      );
+
+      if (!firestoreSaveResult.success) {
+        console.warn('Failed to save to Firestore before submission:', firestoreSaveResult.error);
+      }
+
       // Submit immediately with timeout for faster response
       const submitWithTimeout = Promise.race([
         referencingService.submitApplication(userId, {
@@ -992,6 +1159,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       ]);
 
       const result = await submitWithTimeout as any;
+
+      // Mark as submitted in Firestore
+      if (result.success) {
+        const submitResult = await firestoreService.submitReferencingForm(userId, propertyId);
+        if (!submitResult.success) {
+          console.warn('Failed to mark as submitted in Firestore:', submitResult.error);
+        }
+      }
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to submit application');

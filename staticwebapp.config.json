@@ -102,7 +102,7 @@
         ".woff2": "font/woff2"
     },
     "globalHeaders": {
-        "Content-Security-Policy": "default-src 'self' https: 'unsafe-eval' 'unsafe-inline' blob: data:; connect-src 'self' https://proptii.b2clogin.com https://*.azure.com http://localhost:* https://proptii-r1-1a.onrender.com https://proptii-r1-1a-1.onrender.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net; object-src 'none'",
+        "Content-Security-Policy": "default-src 'self' https: 'unsafe-eval' 'unsafe-inline' blob: data:; connect-src 'self' https://proptii.b2clogin.com https://*.azure.com http://localhost:* https://proptii-r1-1a.onrender.com https://proptii-r1-1a-1.onrender.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.google.com wss://*.googleapis.com wss://*.firebaseio.com wss://*.firebaseapp.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; object-src 'none'",
         "X-Content-Type-Options": "nosniff",
         "X-Frame-Options": "DENY",
         "X-XSS-Protection": "1; mode=block",

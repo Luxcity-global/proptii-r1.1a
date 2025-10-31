@@ -91,10 +91,18 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false }) => {
     logout();
   };
 
-  const handleEditProfile = () => {
+  const handleEditProfile = async () => {
+    console.log('🔄 Edit Profile button clicked');
     setIsDropdownOpen(false);
     setIsMobileMenuOpen(false);
-    editProfile();
+    
+    try {
+      console.log('🔄 Calling editProfile function...');
+      await editProfile();
+      console.log('✅ Edit profile function completed');
+    } catch (error) {
+      console.error('❌ Error in handleEditProfile:', error);
+    }
   };
 
   const closeMobileMenu = () => {
@@ -180,10 +188,11 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false }) => {
                     </Link>
                     <button
                       onClick={handleEditProfile}
-                      className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 w-full text-left"
+                      disabled={isLoading}
+                      className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 w-full text-left disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Settings className="w-4 h-4 mr-2" />
-                      Edit Profile
+                      {isLoading ? 'Loading...' : 'Edit Profile'}
                     </button>
                     <button
                       onClick={handleLogout}
@@ -254,10 +263,11 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false }) => {
                     </Link>
                     <button
                       onClick={handleEditProfile}
-                      className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 w-full text-left"
+                      disabled={isLoading}
+                      className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 w-full text-left disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Settings className="w-4 h-4 mr-2" />
-                      Edit Profile
+                      {isLoading ? 'Loading...' : 'Edit Profile'}
                     </button>
                     <button
                       onClick={handleLogout}

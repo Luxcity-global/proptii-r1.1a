@@ -5,6 +5,10 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { HttpExceptionFilter } from './filters/http-exception.filter';
 import { initializeCosmosDB } from './config/cosmos.config';
 import * as express from 'express';
+import * as dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -19,11 +23,10 @@ async function bootstrap() {
   try {
     logger.log('Initializing Cosmos DB...');
     await initializeCosmosDB();
-    logger.log('Cosmos DB initialized successfully');
+    logger.log('Cosmos DB initialization completed');
   } catch (error) {
     logger.error('Failed to initialize Cosmos DB:', error);
-    logger.error('Please check your Cosmos DB configuration in .env file');
-    process.exit(1);
+    logger.warn('Continuing without Cosmos DB - some features may not work');
   }
 
   const app = await NestFactory.create(AppModule, {

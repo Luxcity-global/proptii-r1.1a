@@ -67,8 +67,8 @@ export class SecurityMiddleware {
         const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
         
         const connectSrc = isDevelopment 
-            ? "'self' https://proptii.b2clogin.com https://*.azure.com http://localhost:* https://proptii-r1-1a.onrender.com https://proptii-r1-1a-1.onrender.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net"
-            : `'self' https://proptii.b2clogin.com https://*.azure.com ${baseUrl} https://proptii-r1-1a-1.onrender.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net`;
+            ? "'self' https://proptii.b2clogin.com https://*.azure.com http://localhost:* https://proptii-r1-1a.onrender.com https://proptii-r1-1a-1.onrender.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.google.com wss://*.googleapis.com wss://*.firebaseio.com wss://*.firebaseapp.com"
+            : `'self' https://proptii.b2clogin.com https://*.azure.com ${baseUrl} https://proptii-r1-1a-1.onrender.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.google.com wss://*.googleapis.com wss://*.firebaseio.com wss://*.firebaseapp.com`;
 
         return [
             "default-src 'self'",

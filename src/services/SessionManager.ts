@@ -239,6 +239,12 @@ export class SessionManager {
         if (!newValue || !this.sessionState) return;
 
         try {
+            // Check if newValue is valid JSON
+            if (!newValue || typeof newValue !== 'string' || newValue.trim() === '') {
+                console.warn('Invalid session state value:', newValue);
+                return;
+            }
+            
             const newState = JSON.parse(newValue) as SessionState;
             if (newState.sessionId === this.sessionState.sessionId) {
                 // Update local state with changes from other tabs
@@ -251,6 +257,7 @@ export class SessionManager {
             }
         } catch (error) {
             console.error('Error parsing session state:', error);
+            console.error('Invalid JSON value:', newValue);
         }
     }
 

@@ -1,104 +1,250 @@
-import React, { useState } from 'react';
-import { FileText, Download, Eye, Upload, Search, Filter, User, Briefcase, Home, DollarSign, File, Calendar, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { FileText, Download, Eye, Upload, Search, Filter, User, Briefcase, Home, DollarSign, File, Calendar, ChevronDown, Trash2, AlertCircle, Loader } from 'lucide-react';
+import { fileService, FileItem } from '../../../services/fileService';
+import { useAuth } from '../../../contexts/AuthContext';
+import { firestoreService, ReferencingFormData } from '../../../services/firestoreService';
+import { contractService, ContractTemplate } from '../../../services/contractService';
+import FileUploadModal from './FileUploadModal';
+import FilePreviewModal from './FilePreviewModal';
 
 /**
- * Your Files section - matches the exact design from the image
+ * Your Files section - fully functional file management
  */
 const YourFiles: React.FC = () => {
+  const { user } = useAuth();
   const [selectedFilter, setSelectedFilter] = useState('All Files');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [referencingFiles, setReferencingFiles] = useState<FileItem[]>([]);
+  const [contractFiles, setContractFiles] = useState<FileItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
-  const files = [
-    {
-      id: 1,
-      name: 'Passport_Scan.pdf',
-      category: 'Identity',
-      type: 'application/pdf',
-      size: 2.4,
-      uploadDate: '11/23/2023'
-    },
-    {
-      id: 2,
-      name: 'Drivers_License.pdf',
-      category: 'Identity',
-      type: 'application/pdf',
-      size: 1.8,
-      uploadDate: '11/15/2023'
-    },
-    {
-      id: 3,
-      name: 'Employment_Contract.pdf',
-      category: 'Employment',
-      type: 'application/pdf',
-      size: 3.2,
-      uploadDate: '11/20/2023'
-    },
-    {
-      id: 4,
-      name: 'Payslip_November.pdf',
-      category: 'Employment',
-      type: 'application/pdf',
-      size: 1.5,
-      uploadDate: '11/18/2023'
-    },
-    {
-      id: 5,
-      name: 'Proof_of_Address.pdf',
-      category: 'Residential',
-      type: 'application/pdf',
-      size: 1787.81,
-      uploadDate: '11/10/2023'
-    },
-    {
-      id: 6,
-      name: 'Utility_Bill.pdf',
-      category: 'Residential',
-      type: 'application/pdf',
-      size: 1318.36,
-      uploadDate: '11/25/2023'
-    },
-    {
-      id: 7,
-      name: 'Bank_Statement.pdf',
-      category: 'Financial',
-      type: 'application/pdf',
-      size: 2.1,
-      uploadDate: '01/05/2024'
-    },
-    {
-      id: 8,
-      name: 'Tax_Return_2023.pdf',
-      category: 'Financial',
-      type: 'application/pdf',
-      size: 4.5,
-      uploadDate: '01/05/2024'
-    },
-    {
-      id: 9,
-      name: 'Guarantor_ID.pdf',
-      category: 'Guarantor',
-      type: 'application/pdf',
-      size: 2.3,
-      uploadDate: '01/05/2024'
-    },
-    {
-      id: 10,
-      name: 'Guarantor_Proof_Income.pdf',
-      category: 'Guarantor',
-      type: 'application/pdf',
-      size: 3.1,
-      uploadDate: '01/05/2024'
-    },
-    {
-      id: 11,
-      name: 'Tenancy_Agreement Signed.pdf',
-      category: 'Contracts',
-      type: 'application/pdf',
-      size: 5.2,
-      uploadDate: '01/05/2024'
+  // Load files on component mount
+  useEffect(() => {
+    loadFiles();
+  }, [user?.id]);
+
+  // Set up real-time subscription for contract files
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log('Setting up real-time subscription for contract files');
+    const unsubscribe = contractService.subscribeToUserContractTemplates(
+      user.id,
+      (templates) => {
+        console.log('Real-time contract files update:', templates);
+        const contractFilesList: FileItem[] = templates.map((contract, index) => ({
+          id: `contract_${contract.id}_${index}`,
+          name: contract.name,
+          category: 'Contracts',
+          type: contract.fileType,
+          size: contract.fileSize,
+          uploadDate: contract.uploadDate,
+          url: `data:${contract.fileType};base64,${contract.fileData}`,
+          firestoreId: contract.id
+        }));
+        setContractFiles(contractFilesList);
+        console.log(`✅ Real-time update: ${contractFilesList.length} contract files`);
+      },
+      (error) => {
+        console.error('❌ Error in contract files subscription:', error);
+      }
+    );
+
+    return () => {
+      console.log('Cleaning up contract files subscription');
+      unsubscribe();
+    };
+  }, [user?.id]);
+
+  const loadFiles = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Set current user in fileService
+      fileService.setCurrentUser(user?.id || null);
+      
+      // Load regular files from fileService (now includes user-specific files from Firestore)
+      const loadedFiles = await fileService.getFiles();
+      setFiles(loadedFiles);
+      
+      // Load referencing files from Firestore
+      if (user?.id) {
+        await loadReferencingFiles();
+        await loadContractFiles();
+      }
+    } catch (err) {
+      setError('Failed to load files');
+      console.error('Error loading files:', err);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const loadReferencingFiles = async () => {
+    try {
+      if (!user?.id) return;
+      
+      const propertyId = 'demo-property-123'; // Using same demo property ID
+      const result = await firestoreService.getReferencingForm(user.id, propertyId);
+      
+      if (result.success && result.data) {
+        const referencingFilesList: FileItem[] = [];
+        const formData = result.data.formData;
+        
+        // Extract files from each section
+        const sections = [
+          { section: 'identity', field: 'identityProof', category: 'Identity' },
+          { section: 'employment', field: 'proofDocument', category: 'Employment' },
+          { section: 'residential', field: 'proofDocument', category: 'Residential' },
+          { section: 'financial', field: 'proofOfIncomeDocument', category: 'Financial' },
+          { section: 'guarantor', field: 'identityDocument', category: 'Guarantor' }
+        ];
+        
+        sections.forEach(({ section, field, category }) => {
+          const sectionData = formData[section as keyof ReferencingFormData];
+          if (sectionData && (sectionData as any)[field]) {
+            const document = (sectionData as any)[field];
+            if (document && document.name && document.dataUrl) {
+              referencingFilesList.push({
+                id: Date.now() + Math.random(), // Generate unique ID
+                name: document.name,
+                category,
+                type: document.type || 'application/pdf',
+                size: document.size || 0,
+                uploadDate: new Date(document.lastModified || Date.now()).toLocaleDateString(),
+                url: document.dataUrl // Use the actual dataUrl from Firestore
+              });
+            }
+          }
+        });
+        
+        setReferencingFiles(referencingFilesList);
+      }
+    } catch (error) {
+      console.error('Error loading referencing files:', error);
+    }
+  };
+
+  const loadContractFiles = async () => {
+    try {
+      if (!user?.id) {
+        console.log('No user ID available for loading contract files');
+        return;
+      }
+      
+      console.log('Loading contract files from Firestore for user:', user.id);
+      const result = await contractService.getUserContractTemplates(user.id);
+      
+      console.log('Contract service result:', result);
+      
+      if (result.success && result.templates) {
+        console.log('Found contract templates:', result.templates);
+        const contractFilesList: FileItem[] = result.templates.map((contract, index) => ({
+          id: `contract_${contract.id}_${index}`, // Use contract ID for consistent identification
+          name: contract.name,
+          category: 'Contracts',
+          type: contract.fileType,
+          size: contract.fileSize,
+          uploadDate: contract.uploadDate,
+          url: `data:${contract.fileType};base64,${contract.fileData}`, // Create data URL from base64
+          firestoreId: contract.id // Store Firestore ID for operations
+        }));
+        
+        console.log('Mapped contract files:', contractFilesList);
+        setContractFiles(contractFilesList);
+        console.log(`✅ Loaded ${contractFilesList.length} contract files from Firestore`);
+      } else {
+        console.log('No contract templates found or error:', result.error);
+        setContractFiles([]);
+      }
+    } catch (error) {
+      console.error('❌ Error loading contract files:', error);
+      setContractFiles([]);
+    }
+  };
+
+  const handleUpload = async (uploadFiles: File[], category: string) => {
+    try {
+      setUploading(true);
+      setError(null);
+      
+      const results = await fileService.uploadFiles(uploadFiles, category);
+      
+      // Check if all uploads were successful
+      const failedUploads = results.filter(r => !r.success);
+      if (failedUploads.length > 0) {
+        setError(`Failed to upload ${failedUploads.length} file(s)`);
+      }
+      
+      // Reload files to show new uploads
+      await loadFiles();
+    } catch (err) {
+      setError('Upload failed');
+      console.error('Upload error:', err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDownload = async (file: FileItem) => {
+    try {
+      await fileService.downloadFile(file);
+    } catch (err) {
+      setError('Download failed');
+      console.error('Download error:', err);
+    }
+  };
+
+  const handleDelete = async (fileId: number, firestoreId?: string) => {
+    try {
+      // Check if it's a contract file
+      const contractFile = contractFiles.find(f => f.id === fileId);
+      if (contractFile && contractFile.firestoreId) {
+        // Delete from Firestore
+        const result = await contractService.deleteContractTemplate(contractFile.firestoreId);
+        if (result.success) {
+          setContractFiles(prev => prev.filter(f => f.id !== fileId));
+          setDeleteConfirm(null);
+          console.log('Contract file deleted from Firestore');
+        } else {
+          setError(result.error || 'Delete failed');
+        }
+      } else {
+        // Handle regular files
+        const result = await fileService.deleteFile(fileId, firestoreId);
+        if (result.success) {
+          // Remove from local state immediately
+          setFiles(prev => prev.filter(f => f.id !== fileId));
+          setDeleteConfirm(null);
+          
+          // For legacy files (no firestoreId), we don't need to reload
+          // For Firestore files, reload to ensure consistency
+          if (firestoreId) {
+            await loadFiles();
+          }
+        } else {
+          setError(result.error || 'Delete failed');
+        }
+      }
+    } catch (err) {
+      setError('Delete failed');
+      console.error('Delete error:', err);
+    }
+  };
+
+  const handleView = (file: FileItem) => {
+    setSelectedFile(file);
+    setIsPreviewModalOpen(true);
+  };
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -140,8 +286,31 @@ const YourFiles: React.FC = () => {
 
   const categories = ['All Files', 'Identity', 'Employment', 'Residential', 'Financial', 'Guarantor', 'Contracts'];
 
+  // Get file type icon based on file extension
+  const getFileTypeIcon = (fileName: string, fileType: string) => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    
+    if (fileType === 'application/pdf' || extension === 'pdf') {
+      return <FileText className="w-4 h-4 text-red-600" />;
+    } else if (fileType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif'].includes(extension || '')) {
+      return <FileText className="w-4 h-4 text-blue-600" />;
+    } else if (['doc', 'docx'].includes(extension || '')) {
+      return <FileText className="w-4 h-4 text-blue-500" />;
+    } else {
+      return <File className="w-4 h-4 text-gray-600" />;
+    }
+  };
+
+  // Format file size for display
+  const formatFileSize = (bytes: number): string => {
+    return fileService.formatFileSize(bytes);
+  };
+
+  // Combine regular files, referencing files, and contract files
+  const allFiles = [...files, ...referencingFiles, ...contractFiles];
+
   // Filter files based on selected category and search query
-  const filteredFiles = files.filter(file => {
+  const filteredFiles = allFiles.filter(file => {
     const matchesCategory = selectedFilter === 'All Files' || file.category === selectedFilter;
     const matchesSearch = searchQuery === '' || 
       file.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -149,6 +318,9 @@ const YourFiles: React.FC = () => {
       file.type.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  // Get file statistics
+  const stats = fileService.getFileStats(filteredFiles);
 
   return (
     <div className="space-y-6 pb-8" style={{ fontFamily: 'Archivo, sans-serif' }}>
@@ -163,7 +335,9 @@ const YourFiles: React.FC = () => {
           </p>
         </div>
         <button 
-          className="px-12 py-3 text-white rounded-full text-sm font-medium transition-all duration-300 hover:-translate-y-0.5"
+          onClick={() => setIsUploadModalOpen(true)}
+          disabled={uploading}
+          className="px-12 py-3 text-white rounded-full text-sm font-medium transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
             border: '1px solid #DC5F12',
@@ -172,15 +346,26 @@ const YourFiles: React.FC = () => {
             boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
           }}
           onMouseEnter={(e) => {
+            if (!uploading) {
             e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
             e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+            }
           }}
           onMouseLeave={(e) => {
+            if (!uploading) {
             e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
             e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+            }
           }}
         >
-          Upload File
+          {uploading ? (
+            <div className="flex items-center space-x-2">
+              <Loader className="w-4 h-4 animate-spin" />
+              <span>Uploading...</span>
+            </div>
+          ) : (
+            'Upload File'
+          )}
         </button>
       </div>
 
@@ -195,7 +380,9 @@ const YourFiles: React.FC = () => {
             </div>
           </div>
           <div className="mb-3">
-            <p className="text-2xl font-bold" style={{ color: '#374957' }}>{filteredFiles.length}</p>
+            <p className="text-2xl font-bold" style={{ color: '#374957' }}>
+              {loading ? <Loader className="w-6 h-6 animate-spin" /> : referencingFiles.length + contractFiles.length}
+            </p>
           </div>
           <div>
             <p className="text-sm" style={{ color: '#717182' }}>All updated files</p>
@@ -212,7 +399,7 @@ const YourFiles: React.FC = () => {
           </div>
           <div className="mb-3">
             <p className="text-2xl font-bold" style={{ color: '#374957' }}>
-              {filteredFiles.filter(f => f.category !== 'Contracts').length}
+              {loading ? <Loader className="w-6 h-6 animate-spin" /> : referencingFiles.length}
             </p>
           </div>
           <div>
@@ -230,7 +417,7 @@ const YourFiles: React.FC = () => {
           </div>
           <div className="mb-3">
             <p className="text-2xl font-bold" style={{ color: '#374957' }}>
-              {filteredFiles.filter(f => f.category === 'Contracts').length}
+              {loading ? <Loader className="w-6 h-6 animate-spin" /> : contractFiles.length}
             </p>
           </div>
           <div>
@@ -248,11 +435,11 @@ const YourFiles: React.FC = () => {
           </div>
           <div className="mb-3">
             <p className="text-2xl font-bold" style={{ color: '#374957' }}>
-              {(filteredFiles.reduce((total, file) => total + file.size, 0) / 1000).toFixed(1)}
+              {loading ? <Loader className="w-6 h-6 animate-spin" /> : formatFileSize(stats.totalSize)}
             </p>
           </div>
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>MB of 100 MB</p>
+            <p className="text-sm" style={{ color: '#717182' }}>of 100 MB</p>
           </div>
         </div>
       </div>
@@ -316,13 +503,30 @@ const YourFiles: React.FC = () => {
 
         {/* Table Body */}
         <div className="divide-y divide-gray-100">
-          {filteredFiles.map((file, index) => (
+          {loading ? (
+            <div className="px-6 py-8 text-center">
+              <Loader className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
+              <p className="text-gray-600">Loading files...</p>
+            </div>
+          ) : filteredFiles.length === 0 ? (
+            <div className="px-6 py-8 text-center">
+              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">No files found</p>
+              <p className="text-sm text-gray-500 mt-1">
+                {searchQuery || selectedFilter !== 'All Files' 
+                  ? 'Try adjusting your search or filter' 
+                  : 'Upload your first file to get started'
+                }
+              </p>
+            </div>
+          ) : (
+            filteredFiles.map((file, index) => (
             <div key={file.id} className={`px-6 py-4 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
               <div className="grid grid-cols-6 gap-4 items-center">
                 {/* File Name */}
                 <div className="flex items-center gap-3">
-                  <FileText className="w-4 h-4 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-900">
+                    {getFileTypeIcon(file.name, file.type)}
+                    <span className="text-sm font-medium text-gray-900 truncate">
                     {file.name}
                   </span>
                 </div>
@@ -337,12 +541,12 @@ const YourFiles: React.FC = () => {
                 
                 {/* Type */}
                 <div className="text-sm text-gray-700">
-                  {file.type}
+                    {file.type.split('/')[1]?.toUpperCase() || 'FILE'}
                 </div>
                 
                 {/* Size */}
                 <div className="text-sm text-gray-700">
-                  {file.size}
+                    {formatFileSize(file.size)}
                 </div>
                 
                 {/* Uploaded At */}
@@ -353,18 +557,110 @@ const YourFiles: React.FC = () => {
                 
                 {/* Actions */}
                 <div className="flex items-center gap-2">
-                  <button className="p-1 hover:bg-gray-100 rounded transition-colors">
+                    <button 
+                      onClick={() => handleView(file)}
+                      className="p-1 hover:bg-gray-100 rounded transition-colors"
+                      title="View file"
+                    >
                     <Eye className="w-4 h-4 text-gray-600" />
                   </button>
-                  <button className="p-1 hover:bg-gray-100 rounded transition-colors">
+                    <button 
+                      onClick={() => handleDownload(file)}
+                      className="p-1 hover:bg-gray-100 rounded transition-colors"
+                      title="Download file"
+                    >
                     <Download className="w-4 h-4 text-gray-600" />
+                    </button>
+                    <button 
+                      onClick={() => setDeleteConfirm(file.id)}
+                      className="p-1 hover:bg-red-100 rounded transition-colors"
+                      title="Delete file"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-600" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start space-x-2">
+            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-medium text-red-800">Error</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+              <button
+                onClick={() => setError(null)}
+                className="text-sm text-red-600 hover:text-red-800 mt-2"
+              >
+                Dismiss
                   </button>
                 </div>
               </div>
             </div>
-          ))}
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Delete File</h3>
+                  <p className="text-sm text-gray-500">This action cannot be undone</p>
+                </div>
+              </div>
+              <p className="text-gray-700 mb-6">
+                Are you sure you want to delete this file? This action cannot be undone.
+              </p>
+              <div className="flex items-center justify-end space-x-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    const file = allFiles.find(f => f.id === deleteConfirm);
+                    handleDelete(deleteConfirm, file?.firestoreId);
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
         </div>
       </div>
+        </div>
+      )}
+
+      {/* File Upload Modal */}
+      <FileUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUpload={handleUpload}
+      />
+
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        isOpen={isPreviewModalOpen}
+        onClose={() => {
+          setIsPreviewModalOpen(false);
+          setSelectedFile(null);
+        }}
+        file={selectedFile}
+        onDownload={handleDownload}
+      />
     </div>
   );
 };
