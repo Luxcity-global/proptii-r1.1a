@@ -175,15 +175,31 @@ export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting
 
           {/* Additional Info */}
           <div className="max-w-4xl mx-auto" style={{ marginTop: '60px' }}>
-            <Card className="bg-blue-50 border-blue-200">
+            <Card
+              className="relative border rounded-xl overflow-hidden"
+              style={{
+                borderColor: '#BFDBFE',
+                background: 'linear-gradient(180deg, rgba(239,246,255,0.9) 0%, rgba(219,234,254,0.9) 100%)'
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLDivElement).style.boxShadow = '0 10px 25px rgba(191,219,254,0.6), 0 6px 12px rgba(0,0,0,0.08)';
+                (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLDivElement).style.boxShadow = '';
+                (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
+              }}
+            >
               <CardContent className="p-6">
                 <div className="flex items-start space-x-3">
-                  <Home className="w-5 h-5 text-blue-600 mt-1 flex-shrink-0" />
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#DBEAFE' }}>
+                    <Home className="w-5 h-5" style={{ color: '#2563EB' }} />
+                  </div>
                   <div>
-                    <h3 className="font-medium text-blue-900 mb-2">Property Assignment</h3>
-                    <p className="text-blue-800 text-sm">
-                      All tenants will need to verify they are occupying the assigned property before 
-                      being fully added to your tenant list. This ensures accurate property management.
+                    <h3 className="font-semibold mb-1" style={{ color: '#1E3A8A' }}>Property Assignment</h3>
+                    <p className="text-sm" style={{ color: '#1D4ED8' }}>
+                      All tenants will need to verify they are occupying the assigned property before being fully added
+                      to your tenant list. This ensures accurate property management.
                     </p>
                   </div>
                 </div>

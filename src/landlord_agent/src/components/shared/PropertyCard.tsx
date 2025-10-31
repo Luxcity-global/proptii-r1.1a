@@ -126,7 +126,7 @@ export function PropertyCard({
           {/* Address */}
           <div className="flex items-center gap-2">
             <MapPin className="w-4 h-4 text-muted-foreground" />
-            <h3 className="font-semibold text-lg line-clamp-1" style={{ color: '#374957' }}>
+            <h3 className="font-semibold text-lg whitespace-normal break-words" style={{ color: '#374957', wordBreak: 'break-word' }}>
               {property.address}
             </h3>
           </div>

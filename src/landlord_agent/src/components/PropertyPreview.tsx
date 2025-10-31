@@ -30,6 +30,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 interface PropertyPreviewProps {
   property: Property | null;
+  isEditing?: boolean;
   onBack: () => void;
   onEdit: (property: Property) => void;
   onManageDocuments: () => void;
@@ -42,6 +43,7 @@ interface PropertyPreviewProps {
 
 export function PropertyPreview({
   property,
+  isEditing,
   onBack,
   onEdit,
   onManageDocuments,
@@ -312,7 +314,7 @@ export function PropertyPreview({
                     e.currentTarget.style.transform = 'translateY(0px)';
                   }}
                 >
-                  Publish Property
+                  {isEditing ? 'Save changes' : 'Publish Property'}
                 </Button>
               </div>
 

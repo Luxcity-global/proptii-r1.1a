@@ -272,6 +272,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
   const [state, dispatch] = useReducer(formReducer, initialFormState);
   const [isGuidelinesExpanded, setIsGuidelinesExpanded] = useState(false);
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   // Currency formatting functions
   const formatCurrency = (value: string) => {
@@ -291,6 +292,21 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
 
   const parseCurrency = (value: string) => {
     return value.replace(/[^\d.]/g, '');
+  };
+
+  // Date helpers to avoid timezone pitfalls with date-only strings
+  const toDateOnly = (value: string) => {
+    if (!value) return null;
+    const [y, m, d] = value.split('-').map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d, 12, 0, 0); // noon local to avoid TZ edge cases
+  };
+  const isTodayOrFuture = (value: string) => {
+    const dt = toDateOnly(value);
+    if (!dt) return false;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    return dt.getTime() >= today.getTime();
   };
 
   // Load progress on component mount
@@ -410,7 +426,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
         if (!value) {
           isValid = false;
           errorMessage = 'Date is required';
-        } else if (new Date(value) < new Date()) {
+        } else if (!isTodayOrFuture(value)) {
           isValid = false;
           errorMessage = 'Date cannot be in the past';
         }
@@ -628,7 +644,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
         return !isNaN(parseFloat(state.formData.rentAmount)) && parseFloat(state.formData.rentAmount) > 0;
       case 'leaseStart':
       case 'leaseEnd':
-        return !!state.formData[stepId as keyof TenantFormData] && new Date(state.formData[stepId as keyof TenantFormData] as string) >= new Date();
+        return !!state.formData[stepId as keyof TenantFormData] && isTodayOrFuture(state.formData[stepId as keyof TenantFormData] as string);
       case 'emergencyName':
         return !!state.formData.emergencyContactName;
       case 'emergencyPhone':
@@ -679,6 +695,12 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
       }
 
       // Create tenant object
+      // Normalize enums for backend compatibility
+      const normalizedReferencing =
+        state.formData.referencingStatus === 'completed' ? 'complete' : state.formData.referencingStatus;
+      const normalizedPayment =
+        (state.formData.paymentStatus as any) === 'partial' ? 'payment-plan' : state.formData.paymentStatus;
+
       const tenant: Omit<Tenant, 'id'> = {
         name: state.formData.name,
         email: state.formData.email,
@@ -686,11 +708,11 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
         propertyId: state.formData.propertyId,
         propertyAddress: state.formData.propertyAddress,
         rentAmount: parseFloat(state.formData.rentAmount) || 0,
-        leaseStart: state.formData.leaseStart,
-        leaseEnd: state.formData.leaseEnd,
+        leaseStart: toDateOnly(state.formData.leaseStart) || new Date(),
+        leaseEnd: toDateOnly(state.formData.leaseEnd) || new Date(),
         status: state.formData.status,
-        referencingStatus: state.formData.referencingStatus,
-        paymentStatus: state.formData.paymentStatus,
+        referencingStatus: normalizedReferencing as any,
+        paymentStatus: normalizedPayment as any,
         emergencyContact: {
           name: state.formData.emergencyContactName,
           phone: state.formData.emergencyContactPhone,
@@ -715,6 +737,13 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
           dispatch({ type: 'SET_RETRYING', isRetrying: true });
           await new Promise(resolve => setTimeout(resolve, 1000 * attempts)); // Exponential backoff
         }
+      }
+
+      // Mark saved and move to success step
+      setIsSaved(true);
+      const successIndex = FORM_STEPS.findIndex(s => s.id === 'success');
+      if (successIndex >= 0) {
+        dispatch({ type: 'SET_CURRENT_STEP', step: successIndex });
       }
 
     } catch (error) {
@@ -1864,7 +1893,12 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
               </button>
             ) : (
               <button
-                onClick={onBack}
+                onClick={async () => {
+                  if (!isSaved) {
+                    await handleSubmit();
+                  }
+                  onBack();
+                }}
                 className="bg-gradient-to-r from-[#DC5F12] to-[#DC5F12]/80 hover:from-[#DC5F12]/90 hover:to-[#DC5F12]/70 text-white px-8 py-3 rounded-full transition-all duration-300 hover:scale-105 hover: min-w-[140px] font-medium"
                 style={{
                   background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',

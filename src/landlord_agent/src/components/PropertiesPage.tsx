@@ -517,6 +517,7 @@ export function PropertiesPage({
             const coverPhoto = property.photos.find(photo => photo.isCover);
             const tenant = getTenantForProperty(property.id);
             const arrears = tenant ? getArrearsForTenant(tenant.id) : null;
+            const derivedStatus = tenant ? 'occupied' : property.status;
             
             return (
               <Card key={property.id} className="overflow-hidden">
@@ -609,16 +610,26 @@ export function PropertiesPage({
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <BedSingle className="h-4 w-4" />
-                        <span>{property.bedrooms} bed</span>
+                        <span>{property.bedrooms} bed{property.bedrooms !== 1 ? 's' : ''}</span>
                       </div>
+                      {typeof (property as any).bathrooms === 'number' && (
+                        <div className="flex items-center gap-1">
+                          <span>{(property as any).bathrooms} bath{(property as any).bathrooms !== 1 ? 's' : ''}</span>
+                        </div>
+                      )}
+                      {typeof (property as any).squareFootage === 'number' && (
+                        <div className="flex items-center gap-1">
+                          <span>{(property as any).squareFootage} sq ft</span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-1">
                         <span>£{property.rent.toLocaleString()}/mo</span>
                       </div>
                     </div>
                     
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge className={getStatusColor(property.status)}>
-                        {formatStatus(property.status)}
+                      <Badge className={getStatusColor(derivedStatus as any)}>
+                        {formatStatus(derivedStatus as any)}
                       </Badge>
                       
                       <Badge className={getComplianceColor(compliance.status)}>

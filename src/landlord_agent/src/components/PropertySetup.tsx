@@ -12,7 +12,7 @@ import { Property } from '../App';
 
 interface PropertySetupProps {
   property?: Property | null;
-  onPropertyComplete: (property: Omit<Property, 'id' | 'createdAt'>) => void;
+  onPropertyComplete: (property: Omit<Property, 'id' | 'createdAt'>) => Promise<void>;
   onSkip: () => void;
   onBack: () => void;
 }
@@ -29,6 +29,7 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isDraft, setIsDraft] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const propertyTypes = [
     'Flat/Apartment',
@@ -90,21 +91,29 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      const property = {
-        address: formData.address,
-        type: formData.type,
-        bedrooms: formData.bedrooms,
-        rent: Number(formData.rent),
-        status: formData.status,
-        amenities: formData.amenities,
-        notes: formData.notes,
-        photos: property?.photos || [],
-        documents: property?.documents || []
-      };
-      onPropertyComplete(property);
+      setIsSubmitting(true);
+      try {
+        const propertyData = {
+          address: formData.address,
+          type: formData.type,
+          bedrooms: formData.bedrooms,
+          rent: Number(formData.rent),
+          status: formData.status,
+          amenities: formData.amenities,
+          notes: formData.notes,
+          photos: property?.photos || [],
+          documents: property?.documents || []
+        };
+        await onPropertyComplete(propertyData);
+      } catch (error) {
+        console.error('Error submitting property:', error);
+        setErrors({ submit: 'Failed to save property. Please try again.' });
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -319,6 +328,16 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
               />
             </div>
 
+            {/* Submit Error */}
+            {errors.submit && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center space-x-2 text-red-600">
+                  <AlertCircle className="w-5 h-5" />
+                  <span>{errors.submit}</span>
+                </div>
+              </div>
+            )}
+
             {/* Form Actions */}
             <div className="flex justify-between items-center pt-6 border-t">
               <div className="flex items-center space-x-4">
@@ -344,6 +363,7 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
               <Button 
                 type="submit" 
                 size="lg"
+                disabled={isSubmitting}
                 className="transition-all duration-300"
                 style={{ 
                   backgroundColor: '#DC5F12', 
@@ -353,9 +373,11 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
                   color: 'white'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  if (!isSubmitting) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
+                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
@@ -363,7 +385,14 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
                   e.currentTarget.style.transform = 'translateY(0px)';
                 }}
               >
-                {property ? 'Save Changes' : 'Add Property'}
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                    Saving...
+                  </>
+                ) : (
+                  property ? 'Save Changes' : 'Add Property'
+                )}
               </Button>
             </div>
           </form>

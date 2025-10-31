@@ -1037,6 +1037,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                         <input
                           type="checkbox"
                           checked={selectedTenants.includes(tenant.id)}
+                          onClick={(e) => e.stopPropagation()}
                           onChange={(e) => {
                             e.stopPropagation();
                             toggleTenantSelection(tenant.id);

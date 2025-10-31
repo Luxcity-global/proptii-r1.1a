@@ -1,0 +1,258 @@
+import { 
+  collection, 
+  doc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  getDoc, 
+  getDocs,
+  query,
+  where,
+  orderBy,
+  Timestamp,
+  QueryConstraint,
+  DocumentData
+} from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { Property, PropertyPhoto, PropertyDocument } from '../App';
+
+class PropertyService {
+  private propertiesCollection = collection(db, 'properties');
+
+  /**
+   * Create a new property
+   */
+  async createProperty(
+    propertyData: Omit<Property, 'id' | 'createdAt' | 'tenant'>
+  ): Promise<string> {
+    try {
+      console.log('Creating property with photos:', propertyData.photos?.length || 0, 'photos');
+      // Ensure we never persist a client-side placeholder id/createdAt fields
+      const { id: _ignoredId, createdAt: _ignoredCreatedAt, ...clean } = (propertyData as any) || {};
+
+      // Clean photos array - remove undefined values (Firestore doesn't accept undefined)
+      const cleanedPhotos = (propertyData.photos || []).map(photo => {
+        const cleanPhoto: any = {
+          id: photo.id,
+          url: photo.url,
+          filename: photo.filename,
+          isCover: photo.isCover
+        };
+        // Only include room if it's defined
+        if (photo.room) {
+          cleanPhoto.room = photo.room;
+        }
+        return cleanPhoto;
+      });
+
+      const propertyDoc = {
+        ...clean,
+        photos: cleanedPhotos,
+        documents: propertyData.documents || [], // Include documents if provided
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      };
+
+      console.log('Property document to save:', {
+        address: propertyDoc.address,
+        photosCount: propertyDoc.photos?.length || 0,
+        photos: propertyDoc.photos
+      });
+
+      const docRef = await addDoc(this.propertiesCollection, propertyDoc);
+      console.log('Property created successfully with ID:', docRef.id);
+      
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating property:', error);
+      console.error('Error details:', {
+        message: (error as any)?.message,
+        code: (error as any)?.code,
+        stack: (error as any)?.stack
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get all properties with optional filters
+   */
+  async getProperties(
+    filters?: {
+      status?: Property['status'];
+      type?: string;
+      userId?: string;
+    }
+  ): Promise<Property[]> {
+    try {
+      const constraints: QueryConstraint[] = [];
+
+      if (filters?.status) {
+        constraints.push(where('status', '==', filters.status));
+      }
+      if (filters?.type) {
+        constraints.push(where('type', '==', filters.type));
+      }
+      if (filters?.userId) {
+        constraints.push(where('userId', '==', filters.userId));
+      }
+
+      // Try to query with orderBy, fallback to in-memory sorting if index missing
+      if (constraints.length > 0) {
+        try {
+          constraints.push(orderBy('createdAt', 'desc'));
+          const q = query(this.propertiesCollection, ...constraints);
+          const querySnapshot = await getDocs(q);
+          return this.mapPropertyDocs(querySnapshot.docs);
+        } catch (indexError: any) {
+          if (indexError.code === 'failed-precondition' && indexError.message?.includes('index')) {
+            console.warn('Firestore index missing. Fetching without orderBy and sorting in memory.');
+            const q = query(this.propertiesCollection, ...constraints.slice(0, -1)); // Remove orderBy
+            const querySnapshot = await getDocs(q);
+            const properties = this.mapPropertyDocs(querySnapshot.docs);
+            return properties.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+          }
+          throw indexError;
+        }
+      } else {
+        // No filters, fetch all and sort in memory
+        const querySnapshot = await getDocs(this.propertiesCollection);
+        const properties = this.mapPropertyDocs(querySnapshot.docs);
+        return properties.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      }
+    } catch (error) {
+      console.error('Error getting properties:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a single property by ID
+   */
+  async getProperty(propertyId: string): Promise<Property | null> {
+    try {
+      const docRef = doc(this.propertiesCollection, propertyId);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        return this.mapPropertyDoc(docSnap);
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting property:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update an existing property
+   */
+  async updateProperty(
+    propertyId: string,
+    updates: Partial<Omit<Property, 'id' | 'createdAt' | 'tenant'>>
+  ): Promise<void> {
+    try {
+      const docRef = doc(this.propertiesCollection, propertyId);
+      // Also remove any legacy 'id' field if present on the document
+      const { deleteField } = await import('firebase/firestore');
+      await updateDoc(docRef, {
+        id: (deleteField as any)(),
+        ...updates,
+        updatedAt: Timestamp.now(),
+      } as any);
+      console.log('Property updated successfully:', propertyId);
+    } catch (error) {
+      console.error('Error updating property:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a property
+   */
+  async deleteProperty(propertyId: string): Promise<void> {
+    try {
+      const docRef = doc(this.propertiesCollection, propertyId);
+      await deleteDoc(docRef);
+      console.log('Property deleted successfully:', propertyId);
+    } catch (error) {
+      console.error('Error deleting property:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Map Firestore document to Property object
+   */
+  private mapPropertyDoc(doc: any): Property {
+    const data = doc.data();
+    console.log('Mapping property document:', doc.id, 'Raw photos data:', data.photos);
+    const mappedProperty = {
+      id: doc.id,
+      address: data.address || '',
+      type: data.type || '',
+      bedrooms: data.bedrooms || 1,
+      bathrooms: data.bathrooms,
+      squareFootage: data.squareFootage,
+      rent: data.rent || 0,
+      status: data.status || 'vacant',
+      amenities: data.amenities || [],
+      notes: data.notes || '',
+      photos: this.mapPhotos(data.photos || []),
+      documents: this.mapDocuments(data.documents || []),
+      createdAt: data.createdAt?.toDate() || new Date(),
+      tenantId: data.tenantId,
+    };
+    console.log('Mapped property photos:', mappedProperty.photos.length);
+    return mappedProperty;
+  }
+
+  /**
+   * Map multiple Firestore documents to Property array
+   */
+  private mapPropertyDocs(docs: any[]): Property[] {
+    return docs.map(doc => this.mapPropertyDoc(doc));
+  }
+
+  /**
+   * Map photos array from Firestore
+   */
+  private mapPhotos(photos: any[]): PropertyPhoto[] {
+    if (!photos || !Array.isArray(photos)) {
+      console.warn('mapPhotos: photos is not an array:', photos);
+      return [];
+    }
+    console.log('Mapping photos from Firestore:', photos.length, 'photos');
+    const mapped = photos.map((photo, index) => {
+      const mappedPhoto = {
+        id: photo.id || `photo-${index}`,
+        url: photo.url || '',
+        filename: photo.filename || `property-photo-${index + 1}.jpg`,
+        room: photo.room,
+        isCover: photo.isCover || false,
+      };
+      console.log(`Photo ${index}:`, mappedPhoto);
+      return mappedPhoto;
+    });
+    return mapped;
+  }
+
+  /**
+   * Map documents array from Firestore
+   */
+  private mapDocuments(documents: any[]): PropertyDocument[] {
+    return documents.map(doc => ({
+      id: doc.id || '',
+      name: doc.name || '',
+      type: doc.type || 'other',
+      url: doc.url || '',
+      issueDate: doc.issueDate?.toDate() || new Date(),
+      expiryDate: doc.expiryDate?.toDate(),
+      status: doc.status || 'valid',
+    }));
+  }
+}
+
+export const propertyService = new PropertyService();
+

@@ -182,6 +182,8 @@ export function PropertyDetails({
                   </Badge>
                   <span className="text-muted-foreground">
                     {property.type} • {property.bedrooms} bed{property.bedrooms !== 1 ? 's' : ''}
+                    {typeof (property as any).bathrooms === 'number' && ` • ${(property as any).bathrooms} bath${(property as any).bathrooms !== 1 ? 's' : ''}`}
+                    {typeof (property as any).squareFootage === 'number' && ` • ${(property as any).squareFootage} sq ft`}
                   </span>
                 </div>
               </div>
@@ -296,6 +298,18 @@ export function PropertyDetails({
                             <BedDouble className="w-4 h-4 mr-2" />
                             {property.bedrooms} bedroom{property.bedrooms !== 1 ? 's' : ''}
                           </div>
+                          {typeof (property as any).bathrooms === 'number' && (
+                            <div className="flex items-center text-muted-foreground">
+                              <BedDouble className="w-4 h-4 mr-2" />
+                              {(property as any).bathrooms} bathroom{(property as any).bathrooms !== 1 ? 's' : ''}
+                            </div>
+                          )}
+                          {typeof (property as any).squareFootage === 'number' && (
+                            <div className="flex items-center text-muted-foreground">
+                              <BedDouble className="w-4 h-4 mr-2" />
+                              {(property as any).squareFootage} sq ft
+                            </div>
+                          )}
                           <div className="flex items-center text-muted-foreground">
                             <PoundSterling className="w-4 h-4 mr-2" />
                             £{property.rent.toLocaleString()} per month
@@ -645,6 +659,24 @@ export function PropertyDetails({
                   <span>{property.bedrooms}</span>
                 </div>
                 <Separator />
+                {typeof (property as any).bathrooms === 'number' && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Bathrooms</span>
+                      <span>{(property as any).bathrooms}</span>
+                    </div>
+                    <Separator />
+                  </>
+                )}
+                {typeof (property as any).squareFootage === 'number' && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Square footage</span>
+                      <span>{(property as any).squareFootage} sq ft</span>
+                    </div>
+                    <Separator />
+                  </>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Monthly rent</span>
                   <span>£{property.rent.toLocaleString()}</span>

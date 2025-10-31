@@ -5,6 +5,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
+import admin from 'firebase-admin';
 
 // Get directory name in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -13,14 +15,54 @@ const __dirname = path.dirname(__filename);
 // Load environment variables from root directory
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
+// Initialize Firebase Admin SDK
+let firebaseInitialized = false;
+try {
+    // Try to load service account from local file first
+    const serviceAccountPath = path.join(__dirname, 'service-account.json');
+    let serviceAccount = null;
+    
+    try {
+        serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+        console.log('📁 Loaded service account from local file');
+    } catch (fileError) {
+        // Try environment variable as fallback
+        if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+            serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+            console.log('📝 Loaded service account from environment variable');
+        }
+    }
+    
+    if (serviceAccount) {
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'proptii-16946.firebasestorage.app'
+        });
+        firebaseInitialized = true;
+        console.log('✅ Firebase Admin initialized with service account');
+    } else {
+        console.warn('⚠️  Firebase Admin not initialized - property image uploads will use temporary storage');
+        console.warn('   Add service-account.json file or FIREBASE_SERVICE_ACCOUNT_KEY env var');
+    }
+} catch (error) {
+    console.warn('⚠️  Firebase Admin initialization failed:', error.message);
+    console.warn('   Property images will be temporarily stored on the server');
+}
+
 const app = express();
 
 // Enable CORS for all routes with proper configuration for file uploads
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:3000'], // Add your frontend URLs
-    methods: ['GET', 'POST', 'OPTIONS'],
+    origin: [
+        'http://localhost:5173', 
+        'http://localhost:3000',
+        'http://localhost:5176',  // Landlord app port
+        'http://localhost:5176/landlord/index.html'
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'multipart/form-data', 'Origin', 'Accept'],
+    // Only header names are allowed here (not MIME types)
+    allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept'],
     exposedHeaders: ['Content-Type', 'Content-Length']
 }));
 
@@ -135,6 +177,107 @@ app.post('/api/email/send', upload.array('attachments', 10), async (req, res) =>
                 }
             } : undefined
         });
+    }
+});
+
+// Property image upload endpoint
+app.post('/api/property/upload-images', upload.array('images', 10), async (req, res) => {
+    try {
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'No images provided'
+            });
+        }
+
+        console.log(`Received ${req.files.length} images for upload`);
+
+        const uploadResults = [];
+        const bucket = firebaseInitialized ? admin.storage().bucket() : null;
+
+        for (let i = 0; i < req.files.length; i++) {
+            const file = req.files[i];
+            const timestamp = Date.now();
+            const fileName = `properties/${timestamp}_${i}_${file.originalname}`;
+
+            try {
+                let fileUrl;
+                
+                if (bucket) {
+                    // Upload to Firebase Storage via Admin SDK (no CORS issues)
+                    const fileRef = bucket.file(fileName);
+                    await fileRef.save(file.buffer, {
+                        metadata: {
+                            contentType: file.mimetype,
+                            cacheControl: 'public, max-age=31536000'
+                        }
+                    });
+                    
+                    // Make file publicly accessible
+                    await fileRef.makePublic();
+                    
+                    // Get public URL
+                    fileUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+                    
+                    console.log(`✅ Uploaded image ${i + 1}/${req.files.length} to Firebase: ${fileUrl}`);
+                } else {
+                    // Fallback: Return temporary URL (stored in memory)
+                    // In production, you'd want to save these to disk or use another storage service
+                    fileUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+                    console.warn(`⚠️  Using temporary storage for image ${i + 1} (Firebase not configured)`);
+                }
+
+                uploadResults.push({
+                    id: `photo-${timestamp}-${i}`,
+                    url: fileUrl,
+                    filename: file.originalname,
+                    isCover: i === 0,
+                    room: i === 0 ? 'Exterior' : undefined
+                });
+            } catch (error) {
+                console.error(`❌ Error uploading image ${i + 1}:`, error);
+                // Continue with other images even if one fails
+                uploadResults.push({
+                    id: `photo-${timestamp}-${i}`,
+                    url: null,
+                    filename: file.originalname,
+                    error: error.message
+                });
+            }
+        }
+
+        const successCount = uploadResults.filter(r => r.url).length;
+        console.log(`Upload complete: ${successCount}/${req.files.length} images uploaded successfully`);
+
+        res.json({
+            success: successCount > 0,
+            photos: uploadResults,
+            uploaded: successCount,
+            total: req.files.length
+        });
+    } catch (error) {
+        console.error('Error in property image upload:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Delete property (Firestore Admin)
+app.delete('/api/property/:id', async (req, res) => {
+    try {
+        if (!firebaseInitialized) {
+            return res.status(500).json({ success: false, error: 'Firebase Admin not initialized' });
+        }
+        const { id } = req.params;
+        const db = admin.firestore();
+        await db.collection('properties').doc(id).delete();
+        console.log('✅ Deleted property via admin:', id);
+        res.json({ success: true, id });
+    } catch (error) {
+        console.error('Error deleting property via admin:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

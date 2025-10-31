@@ -1,0 +1,9 @@
+[
+  {
+    "origin": ["http://localhost:5173", "http://localhost:5176", "http://localhost:3000"],
+    "method": ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"],
+    "responseHeader": ["Content-Type", "Content-Length", "Authorization", "x-goog-upload-url", "x-goog-upload-command", "x-goog-upload-header", "x-goog-upload-status"],
+    "maxAgeSeconds": 3600
+  }
+]
+

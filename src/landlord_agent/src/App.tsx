@@ -32,7 +32,12 @@ import { AddTenant } from './components/AddTenant';
 import { InviteTenant } from './components/InviteTenant';
 import { SelectExistingTenant } from './components/SelectExistingTenant';
 import { AddLandlord } from './components/AddLandlord';
+import { AddLandlordWizard } from './components/AddLandlordWizard';
 import { ContractsPage } from './components/ContractsPage';
+import { propertyService } from './services/propertyService';
+import { tenantService } from './services/tenantService';
+import { storage } from './config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export type UserRole = 'landlord' | 'agent';
 
@@ -63,6 +68,8 @@ export interface Property {
   address: string;
   type: string;
   bedrooms: number;
+  bathrooms?: number;
+  squareFootage?: number;
   rent: number;
   status: 'vacant' | 'occupied' | 'under-renovation';
   amenities: string[];
@@ -256,7 +263,8 @@ interface PropertySetupData {
     uploadedDocuments: File[];
   };
   amenities: string[];
-  images: string[];
+  images: string[]; // Blob URLs for preview
+  imageFiles: File[]; // Actual File objects for upload
   additionalNotes: string;
 }
 
@@ -277,6 +285,8 @@ export default function App() {
   const [vacancyAlerts, setVacancyAlerts] = useState<VacancyRiskAlert[]>([]);
   const [arrearsAlerts, setArrearsAlerts] = useState<ArrearsAlert[]>([]);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editingPropertyId, setEditingPropertyId] = useState<string | null>(null);
   
   // Property setup state
   const [propertySetupData, setPropertySetupData] = useState<PropertySetupData>({
@@ -290,7 +300,8 @@ export default function App() {
       uploadedDocuments: []
     },
     amenities: [],
-    images: [],
+    images: [], // Blob URLs for preview
+    imageFiles: [], // File objects for upload
     additionalNotes: ''
   });
 
@@ -338,6 +349,53 @@ export default function App() {
     };
   }, []);
 
+  // Listen for AUTH_STATE messages from the embedding tenant app (bridge)
+  React.useEffect(() => {
+    const handleAuthMessage = (event: MessageEvent) => {
+      const data: any = (event as any).data;
+      if (data && data.type === 'AUTH_STATE' && data.payload) {
+        const { isAuthenticated, user } = data.payload;
+        if (isAuthenticated && user) {
+          setUserProfile({
+            name: user.name || user.givenName || '',
+            email: user.email || '',
+            phone: user.phone || '+44 7911 123456',
+            companyName: 'Proptii',
+            logo: undefined
+          });
+          console.log('✅ Received AUTH_STATE from parent, updated userProfile:', user);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleAuthMessage);
+
+    // Fallback: read cached auth state if present
+    try {
+      const cached = localStorage.getItem('proptii_auth_state');
+      if (cached) {
+        const authState = JSON.parse(cached);
+        if (authState?.isAuthenticated && authState?.user) {
+          const user = authState.user;
+          setUserProfile({
+            name: user.name || user.givenName || '',
+            email: user.email || '',
+            phone: user.phone || '+44 7911 123456',
+            companyName: 'Proptii',
+            logo: undefined
+          });
+          console.log('✅ Loaded auth state from localStorage and updated userProfile:', user);
+        }
+      }
+    } catch (err) {
+      // ignore parse errors
+    }
+
+    return () => {
+      window.removeEventListener('message', handleAuthMessage);
+    };
+  }, []);
+
   // Check localStorage for role selection (from AgentHome)
   React.useEffect(() => {
     const storedRole = localStorage.getItem('userRole');
@@ -347,6 +405,110 @@ export default function App() {
       localStorage.removeItem('userRole');
     }
   }, []);
+
+  // Helper: Compress image to reduce size for Firestore
+  const compressImage = (file: File, maxSizeKB: number = 150): Promise<File> => {
+    return new Promise((resolve) => {
+      if (file.size <= maxSizeKB * 1024) {
+        resolve(file);
+        return;
+      }
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      const timeout = setTimeout(() => resolve(file), 3000);
+
+      img.onload = () => {
+        clearTimeout(timeout);
+        let { width, height } = img;
+        const maxDimension = 600;
+
+        if (width > height) {
+          if (width > maxDimension) {
+            height = (height * maxDimension) / width;
+            width = maxDimension;
+          }
+        } else {
+          if (height > maxDimension) {
+            width = (width * maxDimension) / height;
+            height = maxDimension;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            console.log(`Compressed: ${(compressedFile.size / 1024).toFixed(1)}KB (was ${(file.size / 1024).toFixed(1)}KB)`);
+            resolve(compressedFile);
+          } else {
+            resolve(file);
+          }
+        }, 'image/jpeg', 0.4);
+      };
+
+      img.onerror = () => {
+        clearTimeout(timeout);
+        resolve(file);
+      };
+
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  // Convert images to base64 and return PropertyPhoto objects
+  const uploadPropertyImages = async (imageFiles: File[]): Promise<PropertyPhoto[]> => {
+    if (imageFiles.length === 0) {
+      return [];
+    }
+    
+    console.log(`Processing ${imageFiles.length} images...`);
+    
+    const convertFileToBase64 = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    };
+    
+    const photoPromises = imageFiles.map(async (file, index) => {
+      try {
+        const timestamp = Date.now();
+        // Compress large images before converting to base64
+        let processedFile = file;
+        if (file.type.startsWith('image/') && file.size > 500 * 1024) {
+          processedFile = await compressImage(file, 150);
+        }
+        const base64Url = await convertFileToBase64(processedFile);
+        
+        console.log(`✅ Processed image ${index + 1}/${imageFiles.length} to base64`);
+        
+        return {
+          id: `photo-${timestamp}-${index}`,
+          url: base64Url,
+          filename: file.name,
+          isCover: index === 0,
+          room: index === 0 ? 'Exterior' : undefined
+        };
+      } catch (error) {
+        console.error(`❌ Error converting image ${index + 1}:`, error);
+        throw error;
+      }
+    });
+    
+    const uploadedPhotos = await Promise.all(photoPromises);
+    console.log(`✅ All ${uploadedPhotos.length} images processed successfully`);
+    return uploadedPhotos;
+  };
 
   // Convert property setup data to Property object
   const createPropertyFromSetupData = (): Property => {
@@ -376,6 +538,8 @@ export default function App() {
       address: propertyDetails.address,
       type: propertyType || 'Property',
       bedrooms: parseInt(propertyDetails.bedrooms) || 1,
+      bathrooms: parseInt(propertyDetails.bathrooms) || undefined,
+      squareFootage: parseInt(propertyDetails.squareFootage) || undefined,
       rent: parseInt(propertyDetails.monthlyRent) || 0,
       status: 'vacant',
       amenities: amenities,
@@ -388,7 +552,7 @@ export default function App() {
 
   // Initialize with mock data for better demonstration
   React.useEffect(() => {
-    // Mock tenants first
+    // Mock tenants are defined only to link mock properties below. We do NOT inject them into UI state.
     const mockTenants: Tenant[] = [
       {
         id: 't1',
@@ -476,7 +640,17 @@ export default function App() {
         }
       }
     ];
-    setTenants(mockTenants);
+    // Load tenants from Firestore; show empty state on no data/error
+    (async () => {
+      try {
+        const fetched = await tenantService.getTenants();
+        console.log('Tenants loaded from Firestore:', fetched.length);
+        setTenants(fetched);
+      } catch (e) {
+        console.warn('Failed to load tenants from Firestore, showing empty list');
+        setTenants([]);
+      }
+    })();
 
     // Mock properties with tenant relationships
     const mockProperties: Property[] = [
@@ -784,27 +958,97 @@ export default function App() {
     setNavigationScreen('dashboard');
   };
 
-  const addProperty = (property: Omit<Property, 'id' | 'createdAt'>) => {
-    const newProperty: Property = {
-      ...property,
-      id: Date.now().toString(),
-      createdAt: new Date(),
+  // Load properties from Firebase on mount
+  React.useEffect(() => {
+    const loadProperties = async () => {
+      try {
+        const fetchedProperties = await propertyService.getProperties();
+        console.log('Properties loaded from Firebase:', fetchedProperties.length);
+        // Log photos for each property
+        fetchedProperties.forEach((prop, idx) => {
+          console.log(`Property ${idx + 1} (${prop.address}):`, {
+            id: prop.id,
+            photosCount: prop.photos?.length || 0,
+            photos: prop.photos
+          });
+        });
+        setProperties(fetchedProperties);
+      } catch (error) {
+        console.error('Error loading properties:', error);
+        // Keep existing mock data if Firebase fails
+      }
     };
-    setProperties(prev => [...prev, newProperty]);
-    return newProperty.id;
+    loadProperties();
+  }, []);
+
+  const addProperty = async (property: Omit<Property, 'id' | 'createdAt'>) => {
+    try {
+      // Strip any accidental id/createdAt fields before saving
+      const { id: _ignoredId, createdAt: _ignoredCreatedAt, ...safeProperty } = property as any;
+      // Save to Firebase
+      const propertyId = await propertyService.createProperty(safeProperty);
+      
+      // Fetch the created property to get full data with timestamps
+      const newProperty = await propertyService.getProperty(propertyId);
+      
+      if (newProperty) {
+        console.log('Retrieved property after creation:', {
+          id: newProperty.id,
+          address: newProperty.address,
+          photosCount: newProperty.photos?.length || 0,
+          photos: newProperty.photos
+        });
+        setProperties(prev => [...prev, newProperty]);
+        console.log('Property added to Firebase:', propertyId);
+        return propertyId;
+      } else {
+        throw new Error('Failed to retrieve created property');
+      }
+    } catch (error) {
+      console.error('Error adding property to Firebase:', error);
+      // Fallback to local state if Firebase fails
+      const newProperty: Property = {
+        ...(safeProperty as any),
+        id: Date.now().toString(),
+        createdAt: new Date(),
+      };
+      setProperties(prev => [...prev, newProperty]);
+      return newProperty.id;
+    }
   };
 
-  const updateProperty = (propertyId: string, updates: Partial<Property>) => {
-    setProperties(prev => 
-      prev.map(p => p.id === propertyId ? { ...p, ...updates } : p)
-    );
-    if (selectedProperty && selectedProperty.id === propertyId) {
-      setSelectedProperty(prev => prev ? { ...prev, ...updates } : null);
+  const updateProperty = async (propertyId: string, updates: Partial<Property>) => {
+    try {
+      // Update in Firebase (exclude id, createdAt, tenant from updates)
+      const { id, createdAt, tenant, photos, documents, ...firebaseUpdates } = updates as any;
+      await propertyService.updateProperty(propertyId, firebaseUpdates);
+      
+      // Update local state
+      setProperties(prev => 
+        prev.map(p => p.id === propertyId ? { ...p, ...updates } : p)
+      );
+      if (selectedProperty && selectedProperty.id === propertyId) {
+        setSelectedProperty(prev => prev ? { ...prev, ...updates } : null);
+      }
+      console.log('Property updated in Firebase:', propertyId);
+    } catch (error) {
+      console.error('Error updating property in Firebase:', error);
+      // Fallback to local state update if Firebase fails
+      setProperties(prev => 
+        prev.map(p => p.id === propertyId ? { ...p, ...updates } : p)
+      );
+      if (selectedProperty && selectedProperty.id === propertyId) {
+        setSelectedProperty(prev => prev ? { ...prev, ...updates } : null);
+      }
     }
   };
 
   const selectProperty = (property: Property) => {
-    setSelectedProperty(property);
+    const tenantForProperty = tenants.find(t => t.propertyId === property.id || t.id === (property as any).tenantId);
+    const enriched: Property = tenantForProperty 
+      ? { ...property, tenant: tenantForProperty, status: 'occupied' as any }
+      : property;
+    setSelectedProperty(enriched);
   };
 
   const selectTenant = (tenant: Tenant) => {
@@ -837,12 +1081,23 @@ export default function App() {
     });
   };
 
-  const addTenant = (tenant: Omit<Tenant, 'id'>) => {
-    const newTenant: Tenant = {
-      ...tenant,
-      id: `tenant-${Date.now()}`
-    };
-    setTenants(prev => [...prev, newTenant]);
+  const addTenant = async (tenant: Omit<Tenant, 'id'>) => {
+    try {
+      console.log('[App] addTenant called with:', tenant);
+      const id = await tenantService.createTenant(tenant);
+      console.log('[App] tenant created with id:', id);
+      const saved = await tenantService.getTenant(id);
+      if (saved) {
+        console.log('[App] fetched saved tenant:', saved);
+        setTenants(prev => [...prev, saved]);
+        return;
+      }
+    } catch (e) {
+      console.warn('[App] addTenant failed, falling back:', e);
+      // ignore and fallback
+    }
+    const fallback: Tenant = { ...tenant, id: `tenant-${Date.now()}` };
+    setTenants(prev => [...prev, fallback]);
   };
 
   const addLandlord = (landlordData: any) => {
@@ -852,8 +1107,18 @@ export default function App() {
     // In a real app, you'd have: setLandlords(prev => [...prev, newLandlord]);
   };
 
-  const deleteProperty = (property: Property) => {
-    setProperties(prev => prev.filter(p => p.id !== property.id));
+  const deleteProperty = async (property: Property) => {
+    try {
+      await propertyService.deleteProperty(property.id);
+      setProperties(prev => prev.filter(p => p.id !== property.id));
+      if (selectedProperty?.id === property.id) {
+        setSelectedProperty(null);
+      }
+      console.log('Deleted property via Firestore client and updated state:', property.id);
+    } catch (error) {
+      console.error('Failed to delete property:', error);
+      alert(`Failed to delete property: ${(error as any)?.message || 'Unknown error'}`);
+    }
   };
 
   const archiveProperty = (property: Property) => {
@@ -965,6 +1230,7 @@ export default function App() {
         return (
           <Dashboard
             properties={properties}
+            tenants={tenants}
             userProfile={userProfile}
             onAddProperty={() => navigateToScreen('property-setup-step1')}
             onViewProperty={(property) => {
@@ -1012,7 +1278,25 @@ export default function App() {
               navigateToScreen('property-details');
             }}
             onEditProperty={(property) => {
+              // Prefill edit state when editing from the Properties list
               selectProperty(property);
+              setIsEditing(true);
+              setEditingPropertyId(property.id);
+              setPropertySetupData({
+                propertyType: property.type || null,
+                propertyDetails: {
+                  address: property.address || '',
+                  monthlyRent: String(property.rent ?? ''),
+                  bedrooms: String(property.bedrooms ?? ''),
+                  bathrooms: String((property as any).bathrooms ?? ''),
+                  squareFootage: String((property as any).squareFootage ?? ''),
+                  uploadedDocuments: []
+                },
+                amenities: property.amenities || [],
+                images: (property.photos || []).map(p => p.url),
+                imageFiles: [],
+                additionalNotes: property.notes || ''
+              });
               navigateToScreen('property-setup-step1');
             }}
             onManageDocuments={(property) => {
@@ -1090,7 +1374,12 @@ export default function App() {
               selectLandlord(landlord);
               navigateToScreen('landlord-details');
             }}
-            onDeleteTenant={(tenantId) => {
+            onDeleteTenant={async (tenantId) => {
+              try {
+                await tenantService.deleteTenant(tenantId);
+              } catch (e) {
+                // proceed to update UI regardless; rules are open in dev
+              }
               setTenants(prev => prev.filter(t => t.id !== tenantId));
             }}
             onArchiveTenant={(tenantId) => {
@@ -1292,10 +1581,10 @@ export default function App() {
       
       case 'images-notes-selection':
         return (
-          <ImagesAndNotesSelection
+            <ImagesAndNotesSelection
             uploadedImages={propertySetupData.images}
             additionalNotes={propertySetupData.additionalNotes}
-            onImagesChange={(images) => updatePropertySetupData({ images })}
+            onImagesChange={(images, imageFiles) => updatePropertySetupData({ images, imageFiles })}
             onNotesChange={(notes) => updatePropertySetupData({ additionalNotes: notes })}
             onNext={() => navigateToScreen('property-preview')}
             onBack={() => navigateToScreen('amenities-selection')}
@@ -1308,15 +1597,16 @@ export default function App() {
         return (
           <PropertySetup
             property={selectedProperty}
-            onPropertyComplete={(property) => {
+            onPropertyComplete={async (property) => {
               if (selectedProperty) {
                 // Editing existing property
-                updateProperty(selectedProperty.id, property);
+                await updateProperty(selectedProperty.id, property);
                 navigateToScreen('property-details');
               } else {
                 // Adding new property
-                const propertyId = addProperty(property);
+                const propertyId = await addProperty(property);
                 const newProperty = properties.find(p => p.id === propertyId) || 
+                  await propertyService.getProperty(propertyId) ||
                   { ...property, id: propertyId, createdAt: new Date() } as Property;
                 setSelectedProperty(newProperty);
                 if (isOnboarding) {
@@ -1371,7 +1661,25 @@ export default function App() {
             property={selectedProperty}
             onBack={() => navigateToScreen('main-app')}
             onEdit={(property) => {
+              // Enter editing mode and prefill setup data from the selected property
               setSelectedProperty(property);
+              setIsEditing(true);
+              setEditingPropertyId(property.id);
+              setPropertySetupData({
+                propertyType: property.type || null,
+                propertyDetails: {
+                  address: property.address || '',
+                  monthlyRent: String(property.rent ?? ''),
+                  bedrooms: String(property.bedrooms ?? ''),
+                  bathrooms: String((property as any).bathrooms ?? ''),
+                  squareFootage: String((property as any).squareFootage ?? ''),
+                  uploadedDocuments: []
+                },
+                amenities: property.amenities || [],
+                images: (property.photos || []).map(p => p.url),
+                imageFiles: [],
+                additionalNotes: property.notes || ''
+              });
               navigateToScreen('property-setup-step1');
             }}
             onManageDocuments={() => navigateToScreen('document-management')}
@@ -1516,20 +1824,86 @@ export default function App() {
         return (
           <PropertyPreview
             property={createPropertyFromSetupData()}
+            isEditing={isEditing}
             onBack={() => navigateToScreen('images-notes-selection')}
             onEdit={() => navigateToScreen('property-type-selection')}
             onManageDocuments={() => {}}
             onManagePhotos={() => {}}
             onViewInsights={() => {}}
             updateProperty={() => {}}
-            onPublishProperty={() => {
-              // Convert setup data to property and add to properties list
-              const newProperty = createPropertyFromSetupData();
-              const propertyId = addProperty(newProperty);
-              const createdProperty = properties.find(p => p.id === propertyId) || 
-                { ...newProperty, id: propertyId, createdAt: new Date() } as Property;
-              setSelectedProperty(createdProperty);
-              navigateToScreen('property-details');
+            onPublishProperty={async () => {
+              try {
+                console.log(isEditing ? '💾 Saving property changes...' : '📤 Publishing property...');
+                console.log('Property setup data:', {
+                  imageFilesCount: propertySetupData.imageFiles.length,
+                  imagesCount: propertySetupData.images.length
+                });
+                
+                // 1. Upload images to Firebase Storage
+                let uploadedPhotos: PropertyPhoto[] = [];
+                if (propertySetupData.imageFiles.length > 0) {
+                  console.log('Uploading images to Firebase Storage...');
+                  uploadedPhotos = await uploadPropertyImages(propertySetupData.imageFiles);
+                  console.log('Uploaded photos:', uploadedPhotos);
+                } else {
+                  console.warn('No image files to upload');
+                }
+                
+                // 2. Convert setup data to property
+                const newProperty = createPropertyFromSetupData();
+                
+                // 3. Replace preview URLs with uploaded Firebase Storage URLs
+                if (uploadedPhotos.length > 0) {
+                  console.log('Replacing preview URLs with Firebase Storage URLs');
+                  newProperty.photos = uploadedPhotos;
+                } else {
+                  console.warn('No photos to add to property');
+                  newProperty.photos = [];
+                }
+                
+                if (isEditing && editingPropertyId) {
+                  // Update existing property
+                  await updateProperty(editingPropertyId, {
+                    address: newProperty.address,
+                    type: newProperty.type,
+                    bedrooms: newProperty.bedrooms,
+                  bathrooms: newProperty.bathrooms,
+                  squareFootage: newProperty.squareFootage,
+                    rent: newProperty.rent,
+                    amenities: newProperty.amenities,
+                    notes: newProperty.notes,
+                  });
+                  // Optionally handle photos update here later
+                  const updated = await propertyService.getProperty(editingPropertyId);
+                  if (updated) {
+                    setSelectedProperty(updated);
+                  }
+                  setIsEditing(false);
+                  setEditingPropertyId(null);
+                  navigateToScreen('property-details');
+                } else {
+                  console.log('Creating property with photos:', newProperty.photos.length);
+                  console.log('Property photos data:', JSON.stringify(newProperty.photos, null, 2));
+                  
+                  // 4. Create property in Firebase
+                  const propertyId = await addProperty(newProperty);
+                  console.log('Property created with ID:', propertyId);
+                  
+                  // 5. Fetch created property to get full data
+                  const createdProperty = await propertyService.getProperty(propertyId);
+                  
+                  if (createdProperty) {
+                    selectProperty(createdProperty);
+                    navigateToScreen('property-details');
+                  } else {
+                    console.error('Failed to retrieve created property');
+                    alert('Property created but failed to load. Please refresh the page.');
+                  }
+                }
+              } catch (error) {
+                console.error('Error publishing property:', error);
+                alert(`Failed to publish property: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              }
             }}
           />
         );
@@ -1586,20 +1960,19 @@ export default function App() {
         );
       
       case 'add-landlord':
-        // Only agents can add landlords
         if (userRole !== 'agent') {
           navigateToScreen('main-app');
           setNavigationScreen('clients');
           return null;
         }
+        // Use the new wizard
         return (
-          <AddLandlord
-            onSave={(landlord) => {
-              addLandlord(landlord);
+          <AddLandlordWizard
+            onBack={() => {
               navigateToScreen('main-app');
               setNavigationScreen('clients');
             }}
-            onBack={() => {
+            onSaved={() => {
               navigateToScreen('main-app');
               setNavigationScreen('clients');
             }}

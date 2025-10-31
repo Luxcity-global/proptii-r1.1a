@@ -7,7 +7,7 @@ import { ProgressTracker } from './ProgressTracker';
 interface ImagesAndNotesSelectionProps {
   uploadedImages?: string[];
   additionalNotes?: string;
-  onImagesChange?: (images: string[]) => void;
+  onImagesChange?: (images: string[], imageFiles: File[]) => void;
   onNotesChange?: (notes: string) => void;
   onNext: () => void;
   onBack: () => void;
@@ -17,6 +17,7 @@ interface ImagesAndNotesSelectionProps {
 
 export function ImagesAndNotesSelection({ uploadedImages: propUploadedImages, additionalNotes: propAdditionalNotes, onImagesChange, onNotesChange, onNext, onBack, onHome, onPropertySetup }: ImagesAndNotesSelectionProps) {
   const [uploadedImages, setUploadedImages] = useState<string[]>(propUploadedImages || []);
+  const [imageFiles, setImageFiles] = useState<File[]>([]); // Store File objects
   const [additionalNotes, setAdditionalNotes] = useState(propAdditionalNotes || '');
   
   // Update local state when props change
@@ -45,13 +46,16 @@ export function ImagesAndNotesSelection({ uploadedImages: propUploadedImages, ad
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
-      const newImages = Array.from(files).map(file => URL.createObjectURL(file as Blob));
+      const fileArray = Array.from(files);
+      const newImages = fileArray.map(file => URL.createObjectURL(file as Blob));
       const updatedImages = [...uploadedImages, ...newImages];
+      const updatedFiles = [...imageFiles, ...fileArray];
       setUploadedImages(updatedImages);
+      setImageFiles(updatedFiles);
       
-      // Notify parent component
+      // Notify parent component with both blob URLs and File objects
       if (onImagesChange) {
-        onImagesChange(updatedImages);
+        onImagesChange(updatedImages, updatedFiles);
       }
       
       // Analyze new images for supportive nudges
@@ -61,11 +65,13 @@ export function ImagesAndNotesSelection({ uploadedImages: propUploadedImages, ad
 
   const removeImage = (index: number) => {
     const updatedImages = uploadedImages.filter((_, i) => i !== index);
+    const updatedFiles = imageFiles.filter((_, i) => i !== index);
     setUploadedImages(updatedImages);
+    setImageFiles(updatedFiles);
     
     // Notify parent component
     if (onImagesChange) {
-      onImagesChange(updatedImages);
+      onImagesChange(updatedImages, updatedFiles);
     }
   };
 
@@ -78,11 +84,13 @@ export function ImagesAndNotesSelection({ uploadedImages: propUploadedImages, ad
     const files = Array.from(event.dataTransfer.files);
     const newImages = files.map(file => URL.createObjectURL(file as Blob));
     const updatedImages = [...uploadedImages, ...newImages];
+    const updatedFiles = [...imageFiles, ...files];
     setUploadedImages(updatedImages);
+    setImageFiles(updatedFiles);
     
     // Notify parent component
     if (onImagesChange) {
-      onImagesChange(updatedImages);
+      onImagesChange(updatedImages, updatedFiles);
     }
     
     // Analyze new images for supportive nudges

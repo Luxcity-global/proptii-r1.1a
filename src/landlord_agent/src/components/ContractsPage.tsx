@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -9,14 +9,15 @@ import {
   AlertTriangle, 
   Clock, 
   CheckCircle, 
-  Send, 
-  Plus,
   Eye,
   Download,
   MoreHorizontal,
   Calendar,
   User,
-  Building2
+  Building2,
+  Loader2,
+  FileText,
+  Send
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -25,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { SendContractModal } from './SendContractModal';
+import { contractService } from '../services/contractService';
 
 export interface Contract {
   id: string;
@@ -49,70 +51,44 @@ interface ContractsPageProps {
 export function ContractsPage({ onBack }: ContractsPageProps) {
   const [activeTab, setActiveTab] = useState<'sent' | 'unsigned' | 'signed'>('sent');
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock contract data
-  const mockContracts: Contract[] = [
-    {
-      id: '1',
-      title: 'Tenancy Agreement - Regent Street',
-      propertyAddress: '123 Regent Street, London W1B 4EA',
-      tenantName: 'Sarah Johnson',
-      tenantEmail: 'sarah.johnson@email.com',
-      status: 'sent',
-      sentDate: new Date('2024-12-01'),
-      expiryDate: new Date('2024-12-15'),
-      contractType: 'tenancy-agreement',
-      fileUrl: '#',
-      fileName: 'tenancy_agreement_regent_street.pdf',
-      additionalInfo: 'Standard 12-month tenancy agreement'
-    },
-    {
-      id: '2',
-      title: 'Deposit Protection Certificate',
-      propertyAddress: '45 Victoria Park Road, London E9 7JN',
-      tenantName: 'Michael Chen',
-      tenantEmail: 'michael.chen@email.com',
-      status: 'unsigned',
-      sentDate: new Date('2024-11-28'),
-      signedDate: new Date('2024-12-02'),
-      contractType: 'deposit-certificate',
-      fileUrl: '#',
-      fileName: 'deposit_certificate_victoria_park.pdf',
-      additionalInfo: 'Deposit amount: £2,100'
-    },
-    {
-      id: '3',
-      title: 'Right to Rent Check',
-      propertyAddress: '78 Oak Gardens, London SW4 9AL',
-      tenantName: 'Emma Watson',
-      tenantEmail: 'emma.watson@email.com',
-      status: 'signed',
-      sentDate: new Date('2024-11-20'),
-      signedDate: new Date('2024-11-25'),
-      contractType: 'right-to-rent',
-      fileUrl: '#',
-      fileName: 'right_to_rent_oak_gardens.pdf',
-      additionalInfo: 'Passport verification completed'
-    },
-    {
-      id: '4',
-      title: 'Tenancy Agreement - Maple Court',
-      propertyAddress: '92 Maple Court, London N1 5QT',
-      tenantName: 'David Rodriguez',
-      tenantEmail: 'david.rodriguez@email.com',
-      status: 'sent',
-      sentDate: new Date('2024-12-05'),
-      expiryDate: new Date('2024-12-20'),
-      contractType: 'tenancy-agreement',
-      fileUrl: '#',
-      fileName: 'tenancy_agreement_maple_court.pdf',
-      additionalInfo: '6-month break clause included'
+  // Load contracts when tab changes
+  useEffect(() => {
+    loadContracts();
+  }, [activeTab]);
+
+  const loadContracts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const statusMap: Record<string, Contract['status']> = {
+        'sent': 'sent',
+        'unsigned': 'unsigned',
+        'signed': 'signed'
+      };
+      
+      const fetchedContracts = await contractService.getContracts({
+        status: statusMap[activeTab]
+      });
+      
+      setContracts(fetchedContracts);
+    } catch (err) {
+      console.error('Error loading contracts:', err);
+      setError('Failed to load contracts. Please try again.');
+      // Fallback to empty array on error
+      setContracts([]);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  const sentContracts = mockContracts.filter(c => c.status === 'sent');
-  const unsignedContracts = mockContracts.filter(c => c.status === 'unsigned');
-  const signedContracts = mockContracts.filter(c => c.status === 'signed');
+  const sentContracts = contracts.filter(c => c.status === 'sent');
+  const unsignedContracts = contracts.filter(c => c.status === 'unsigned');
+  const signedContracts = contracts.filter(c => c.status === 'signed');
 
   // Calculate overview metrics
   const totalSent = sentContracts.length;
@@ -180,21 +156,71 @@ export function ContractsPage({ onBack }: ContractsPageProps) {
     }
   };
 
-  const handleMarkAsSigned = (contractId: string) => {
-    // In a real app, this would update the contract status
-    console.log('Marking contract as signed:', contractId);
-    // For demo purposes, we could update the mock data here
+  const handleMarkAsSigned = async (contractId: string) => {
+    try {
+      await contractService.markAsSigned(contractId, 'tenant');
+      await loadContracts(); // Reload to get updated data
+    } catch (err) {
+      console.error('Error marking contract as signed:', err);
+      setError('Failed to update contract status. Please try again.');
+    }
   };
 
-  const handleSendContract = (contractData: {
+  const handleSendContract = async (contractData: {
     file: File;
     recipientName: string;
     recipientEmail: string;
-    additionalInfo?: string;
+    additionalEmail?: string;
   }) => {
-    // In a real app, this would send the contract
-    console.log('Sending contract:', contractData);
-    setIsSendModalOpen(false);
+    try {
+      setError(null);
+      
+      console.log('Sending contract to:', contractData.recipientEmail);
+      
+      // Create contract document and send email
+      const contractId = await contractService.createContract({
+        title: contractData.file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+        propertyAddress: '', // TODO: Get from context or props
+        tenantName: contractData.recipientName,
+        tenantEmail: contractData.recipientEmail, // This email will receive the contract
+        contractType: 'tenancy-agreement', // Default type
+        additionalInfo: contractData.additionalEmail ? contractData.additionalEmail : undefined, // Additional notes
+        status: 'sent',
+        sentDate: new Date(),
+        expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+      }, contractData.file, true); // true = send email
+
+      // Reload contracts to show the new one
+      await loadContracts();
+      setIsSendModalOpen(false);
+      
+      console.log('Contract sent successfully to', contractData.recipientEmail, 'ID:', contractId);
+      
+      // Show success message (you can replace this with a toast notification if available)
+      alert(`Contract sent successfully to ${contractData.recipientName} (${contractData.recipientEmail})!\n\nNote: Please check your backend server logs to verify the email was actually sent.`);
+    } catch (err: any) {
+      console.error('Error sending contract:', err);
+      const errorMessage = err?.message || 'Failed to send contract. Please try again.';
+      setError(errorMessage);
+      
+      // Show error message
+      alert(`Error sending contract: ${errorMessage}`);
+    }
+  };
+
+  const handleViewContract = (contract: Contract) => {
+    if (contract.fileUrl && contract.fileUrl !== '#') {
+      window.open(contract.fileUrl, '_blank');
+    }
+  };
+
+  const handleDownloadContract = (contract: Contract) => {
+    if (contract.fileUrl && contract.fileUrl !== '#') {
+      const link = document.createElement('a');
+      link.href = contract.fileUrl;
+      link.download = contract.fileName;
+      link.click();
+    }
   };
 
   const ContractTable = ({ contracts }: { contracts: Contract[] }) => (
@@ -285,11 +311,11 @@ export function ContractsPage({ onBack }: ContractsPageProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleViewContract(contract)}>
                       <Eye className="w-4 h-4 mr-2" />
                       View Contract
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDownloadContract(contract)}>
                       <Download className="w-4 h-4 mr-2" />
                       Download
                     </DropdownMenuItem>
@@ -324,7 +350,7 @@ export function ContractsPage({ onBack }: ContractsPageProps) {
           </div>
           <Button 
             onClick={() => setIsSendModalOpen(true)}
-            className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto"
+            className="flex items-center space-x-2 px-6 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0"
             style={{ 
               backgroundColor: '#DC5F12', 
               borderColor: '#DC5F12', 
@@ -357,7 +383,7 @@ export function ContractsPage({ onBack }: ContractsPageProps) {
                 <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif' }}>{totalSent}</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Send className="w-6 h-6 text-blue-600" />
+                <FileText className="w-6 h-6 text-blue-600" />
               </div>
             </div>
           </Card>
@@ -432,20 +458,34 @@ export function ContractsPage({ onBack }: ContractsPageProps) {
           </TabsList>
 
           <TabsContent value="sent" className="space-y-4">
-            {sentContracts.length === 0 ? (
+            {loading ? (
               <Card className="p-12 text-center">
-                <Send className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>No sent contracts</h3>
+                <Loader2 className="w-16 h-16 text-muted-foreground mx-auto mb-4 animate-spin" />
+                <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  Loading contracts...
+                </p>
+              </Card>
+            ) : error ? (
+              <Card className="p-12 text-center">
+                <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Error</h3>
                 <p className="text-muted-foreground mb-6" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                  Send your first contract to get started
+                  {error}
                 </p>
                 <Button 
-                  onClick={() => setIsSendModalOpen(true)}
+                  onClick={loadContracts}
                   style={{ backgroundColor: '#DC5F12', fontFamily: 'Archivo, sans-serif' }}
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Send Contract
+                  Try Again
                 </Button>
+              </Card>
+            ) : sentContracts.length === 0 ? (
+              <Card className="p-12 text-center">
+                <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>No sent contracts</h3>
+                <p className="text-muted-foreground mb-6" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  Your sent contracts will appear here
+                </p>
               </Card>
             ) : (
               <ContractTable contracts={sentContracts} />
@@ -453,7 +493,14 @@ export function ContractsPage({ onBack }: ContractsPageProps) {
           </TabsContent>
 
           <TabsContent value="unsigned" className="space-y-4">
-            {unsignedContracts.length === 0 ? (
+            {loading ? (
+              <Card className="p-12 text-center">
+                <Loader2 className="w-16 h-16 text-muted-foreground mx-auto mb-4 animate-spin" />
+                <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  Loading contracts...
+                </p>
+              </Card>
+            ) : unsignedContracts.length === 0 ? (
               <Card className="p-12 text-center">
                 <Clock className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                 <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>No unsigned contracts</h3>
@@ -467,7 +514,14 @@ export function ContractsPage({ onBack }: ContractsPageProps) {
           </TabsContent>
 
           <TabsContent value="signed" className="space-y-4">
-            {signedContracts.length === 0 ? (
+            {loading ? (
+              <Card className="p-12 text-center">
+                <Loader2 className="w-16 h-16 text-muted-foreground mx-auto mb-4 animate-spin" />
+                <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  Loading contracts...
+                </p>
+              </Card>
+            ) : signedContracts.length === 0 ? (
               <Card className="p-12 text-center">
                 <CheckCircle className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                 <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>No signed contracts</h3>

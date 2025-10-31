@@ -35,7 +35,7 @@ import {
   Phone,
   Mail,
 } from "lucide-react";
-import { Property, UserProfile, MarketInsight } from "../App";
+import { Property, UserProfile, MarketInsight, Tenant } from "../App";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +59,7 @@ import {
 
 interface DashboardProps {
   properties: Property[];
+  tenants?: Tenant[];
   userProfile: UserProfile | null;
   onAddProperty: () => void;
   onViewProperty: (property: Property) => void;
@@ -74,6 +75,7 @@ interface DashboardProps {
 
 export function Dashboard({
   properties,
+  tenants = [],
   userProfile,
   onAddProperty,
   onViewProperty,
@@ -209,12 +211,13 @@ export function Dashboard({
   );
 
   const totalProperties = mockProperties.length;
-  const occupiedProperties = mockProperties.filter(
-    (p) => p.status === "occupied",
-  ).length;
-  const vacantProperties = mockProperties.filter(
-    (p) => p.status === "vacant",
-  ).length;
+  // Derive occupancy from tenants if available; else use stored status
+  const tenantOccupiedIds = new Set((tenants || []).map(t => t.propertyId));
+  const occupiedProperties = (tenants && tenants.length > 0)
+    ? mockProperties.filter(p => tenantOccupiedIds.has(p.id)).length
+    : mockProperties.filter(p => p.status === 'occupied').length;
+  const renovatingCount = mockProperties.filter(p => p.status === 'under-renovation').length;
+  const vacantProperties = Math.max(totalProperties - occupiedProperties - renovatingCount, 0);
   const expiringDocuments = mockProperties.reduce(
     (count, p) =>
       count +
@@ -226,9 +229,9 @@ export function Dashboard({
     0,
   );
 
-  const totalRent = mockProperties
-    .filter((p) => p.status === "occupied")
-    .reduce((sum, p) => sum + p.rent, 0);
+  const totalRent = (tenants && tenants.length > 0)
+    ? mockProperties.filter(p => tenantOccupiedIds.has(p.id)).reduce((sum, p) => sum + p.rent, 0)
+    : mockProperties.filter((p) => p.status === 'occupied').reduce((sum, p) => sum + p.rent, 0);
 
   // Chart data processing
   const getOccupancyData = () => {
@@ -246,8 +249,10 @@ export function Dashboard({
   };
 
   const getRentData = () => {
-    const rentData = mockProperties
-      .filter(p => p.status === 'occupied')
+    const occupiedList = (tenants && tenants.length > 0)
+      ? mockProperties.filter(p => tenantOccupiedIds.has(p.id))
+      : mockProperties.filter(p => p.status === 'occupied');
+    const rentData = occupiedList
       .map(p => ({
         name: p.address.split(',')[0].slice(0, 20) + (p.address.split(',')[0].length > 20 ? '...' : ''),
         rent: p.rent,
@@ -263,21 +268,38 @@ export function Dashboard({
     if (mockProperties.length === 0) {
       return [{ name: 'No Properties', value: 1, color: '#e5e7eb' }];
     }
-    
+
+    const normalizeType = (raw: string) => {
+      const t = (raw || '').toLowerCase();
+      if (t.includes('apartment') || t.includes('flat')) return 'Apartment';
+      if (t.includes('house')) return 'House';
+      if (t.includes('studio')) return 'Studio';
+      if (t.includes('shared')) return 'Shared';
+      if (t.includes('commercial')) return 'Commercial';
+      if (t.includes('bungalow')) return 'Bungalow';
+      return 'Other';
+    };
+
     const typeCount = mockProperties.reduce((acc, p) => {
-      const type = p.type.includes('House') ? 'House' : 
-                   p.type.includes('Apartment') || p.type.includes('Flat') ? 'Apartment' :
-                   p.type.includes('Studio') ? 'Studio' : 'Other';
-      acc[type] = (acc[type] || 0) + 1;
+      const key = normalizeType(p.type);
+      acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
+
+    const colorMap: Record<string, string> = {
+      Apartment: '#8b5cf6',
+      House: '#3b82f6',
+      Studio: '#06b6d4',
+      Shared: '#10b981',
+      Commercial: '#f97316',
+      Bungalow: '#84cc16',
+      Other: '#f59e0b',
+    };
 
     return Object.entries(typeCount).map(([name, value]) => ({
       name,
       value,
-      color: name === 'House' ? '#3b82f6' : 
-             name === 'Apartment' ? '#8b5cf6' :
-             name === 'Studio' ? '#06b6d4' : '#f59e0b'
+      color: colorMap[name] || colorMap.Other,
     }));
   };
 
@@ -1109,7 +1131,10 @@ export function Dashboard({
           </Card>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {displayProperties.map((property) => (
+            {displayProperties.map((property) => {
+              const hasTenant = tenants?.some(t => t.propertyId === property.id);
+              const displayStatus = hasTenant ? 'occupied' : property.status;
+              return (
               <Card
                 key={property.id}
                 className="overflow-hidden hover:shadow-lg transition-shadow"
@@ -1134,9 +1159,9 @@ export function Dashboard({
                   {/* Status Badge */}
                   <div className="absolute top-3 left-3">
                     <Badge
-                      className={`${getStatusColor(property.status)} text-white border-0`}
+                      className={`${getStatusColor(displayStatus)} text-white border-0`}
                     >
-                      {getStatusText(property.status)}
+                      {getStatusText(displayStatus)}
                     </Badge>
                   </div>
 
@@ -1156,15 +1181,15 @@ export function Dashboard({
                 </div>
 
                 {/* Property Details */}
-                <div className="p-6">
+                <div className="p-6 flex flex-col">
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h3 className="truncate mb-1" style={{ color: '#374957' }}>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="mb-1 whitespace-normal break-words" style={{ color: '#374957' }}>
                         {property.address}
                       </h3>
-                      <p className="text-muted-foreground flex items-center">
+                      <p className="text-muted-foreground flex items-center flex-wrap">
                         <MapPin className="w-3 h-3 mr-1" />
-                        {property.type} • {property.bedrooms}{" "}
+                        {property.type ? property.type.charAt(0).toUpperCase() + property.type.slice(1) : ''} • {property.bedrooms}{" "}
                         bed{property.bedrooms !== 1 ? "s" : ""}
                       </p>
                     </div>
@@ -1220,7 +1245,7 @@ export function Dashboard({
 
                   {/* Amenities */}
                   {property.amenities.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-4">
+                    <div className="flex flex-wrap gap-1 mt-1 mb-1">
                       {property.amenities
                         .slice(0, 3)
                         .map((amenity) => (
@@ -1229,7 +1254,7 @@ export function Dashboard({
                             variant="secondary"
                             className="text-xs"
                           >
-                            {amenity}
+                            {amenity ? amenity.charAt(0).toUpperCase() + amenity.slice(1) : ''}
                           </Badge>
                         ))}
                       {property.amenities.length > 3 && (
@@ -1244,7 +1269,7 @@ export function Dashboard({
                   )}
 
                   {/* Actions */}
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mt-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -1273,7 +1298,7 @@ export function Dashboard({
                   </div>
                 </div>
               </Card>
-            ))}
+            );})}
           </div>
         )}
       </div>
