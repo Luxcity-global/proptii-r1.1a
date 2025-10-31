@@ -168,6 +168,16 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
     }
   };
 
+  // Convert File to base64 data URL (similar to property image upload)
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleSendContract = async (contractData: {
     file?: File;
     recipientName: string;
@@ -179,34 +189,45 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
       
       console.log('Sending email to:', contractData.recipientEmail);
       
+      const API_BASE_URL = window.location.hostname === 'localhost'
+        ? 'http://localhost:10000/api'
+        : 'https://proptii-r1-1a.onrender.com/api';
+      
       if (contractData.file) {
-        // Create contract document and send email
-        const contractId = await contractService.createContract({
-          title: contractData.file.name.replace(/\.[^/.]+$/, ''), // Remove extension
-          propertyAddress: '', // TODO: Get from context or props
-          tenantName: contractData.recipientName,
-          tenantEmail: contractData.recipientEmail, // This email will receive the contract
-          contractType: 'tenancy-agreement', // Default type
-          additionalInfo: contractData.additionalEmail ? contractData.additionalEmail : undefined, // Additional notes
-          status: 'sent',
-          sentDate: new Date(),
-          expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
-        }, contractData.file, true, false); // true = send email, false = don't try to attach PDF (to avoid CORS issues)
-
-        // Reload contracts to show the new one
-        await loadContracts();
-        setIsSendModalOpen(false);
+        // Convert file to base64 and send email with attachment
+        console.log('Converting file to base64:', contractData.file.name);
+        const base64Data = await fileToBase64(contractData.file);
         
-        console.log('Contract sent successfully to', contractData.recipientEmail, 'ID:', contractId);
+        // Extract base64 content (remove data:application/pdf;base64, prefix)
+        const base64Content = base64Data.split(',')[1];
+        const mimeType = base64Data.split(',')[0].split(':')[1].split(';')[0];
         
-        // Show success message (you can replace this with a toast notification if available)
-        alert(`Contract sent successfully to ${contractData.recipientName} (${contractData.recipientEmail})!\n\nNote: Please check your backend server logs to verify the email was actually sent.`);
+        console.log('File converted to base64, size:', base64Content.length, 'bytes');
+        
+        const formData = new FormData();
+        formData.append('to', contractData.recipientEmail);
+        formData.append('subject', `Contract for Review: ${contractData.file.name}`);
+        formData.append('html', `
+          <h2>Hello ${contractData.recipientName}!</h2>
+          <p>Please find attached your contract for review.</p>
+          ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
+          <p>Best regards,<br>Proptii Team</p>
+        `);
+        
+        // Send base64 data separately so backend can decode it
+        formData.append('attachmentBase64', base64Content);
+        formData.append('attachmentFilename', contractData.file.name);
+        formData.append('attachmentMimeType', mimeType);
+        
+        const response = await axios.post(`${API_BASE_URL}/email/send-base64`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 30000
+        });
+        
+        console.log('Contract email sent successfully with attachment');
+        alert(`Contract sent successfully to ${contractData.recipientName} (${contractData.recipientEmail})!\n\nAttachment: ${contractData.file.name}`);
       } else {
         // Send a simple test email without contract
-        const API_BASE_URL = window.location.hostname === 'localhost'
-          ? 'http://localhost:10000/api'
-          : 'https://proptii-r1-1a.onrender.com/api';
-        
         const formData = new FormData();
         formData.append('to', contractData.recipientEmail);
         formData.append('subject', 'Test Email from Proptii');
@@ -222,11 +243,11 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
           timeout: 30000
         });
         
-        setIsSendModalOpen(false);
-        
         console.log('Test email sent successfully');
         alert(`Test email sent successfully to ${contractData.recipientName} (${contractData.recipientEmail})!`);
       }
+      
+      setIsSendModalOpen(false);
     } catch (err: any) {
       console.error('Error sending email:', err);
       const errorMessage = err?.message || 'Failed to send email. Please try again.';

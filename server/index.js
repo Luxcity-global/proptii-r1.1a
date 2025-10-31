@@ -180,6 +180,95 @@ app.post('/api/email/send', upload.array('attachments', 10), async (req, res) =>
     }
 });
 
+// Email sending route with base64 attachment (avoids CORS issues)
+app.post('/api/email/send-base64', upload.none(), async (req, res) => {
+    try {
+        console.log('Received email request with base64 attachment:', {
+            to: req.body.to,
+            subject: req.body.subject,
+            hasAttachment: !!req.body.attachmentBase64
+        });
+
+        const { to, subject, html, attachmentBase64, attachmentFilename, attachmentMimeType } = req.body;
+
+        if (!to || !subject || !html) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required email fields',
+                details: {
+                    to: !!to,
+                    subject: !!subject,
+                    html: !!html,
+                    receivedFields: Object.keys(req.body)
+                }
+            });
+        }
+
+        // Decode base64 attachment if provided
+        const attachments = [];
+        if (attachmentBase64 && attachmentFilename && attachmentMimeType) {
+            try {
+                const attachmentBuffer = Buffer.from(attachmentBase64, 'base64');
+                attachments.push({
+                    filename: attachmentFilename,
+                    content: attachmentBuffer,
+                    contentType: attachmentMimeType
+                });
+                console.log('Decoded base64 attachment:', {
+                    filename: attachmentFilename,
+                    size: attachmentBuffer.length,
+                    mimeType: attachmentMimeType
+                });
+            } catch (decodeError) {
+                console.error('Error decoding base64 attachment:', decodeError);
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid base64 attachment data'
+                });
+            }
+        }
+
+        const mailOptions = {
+            from: process.env.SMTP_FROM_EMAIL,
+            to,
+            subject,
+            html,
+            attachments
+        };
+
+        console.log('Attempting to send email with options:', {
+            from: mailOptions.from,
+            to: mailOptions.to,
+            subject: mailOptions.subject,
+            attachmentsCount: mailOptions.attachments.length
+        });
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log('Email sent successfully:', info);
+
+        res.json({
+            success: true,
+            messageId: info.messageId
+        });
+    } catch (error) {
+        console.error('Error sending email:', error);
+        console.error('Error stack:', error.stack);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            details: process.env.NODE_ENV === 'development' ? {
+                stack: error.stack,
+                smtp: {
+                    host: process.env.SMTP_HOST,
+                    port: process.env.SMTP_PORT,
+                    user: process.env.SMTP_USER ? '***@' + process.env.SMTP_USER.split('@')[1] : undefined,
+                    fromEmail: process.env.SMTP_FROM_EMAIL
+                }
+            } : undefined
+        });
+    }
+});
+
 // Property image upload endpoint
 app.post('/api/property/upload-images', upload.array('images', 10), async (req, res) => {
     try {
