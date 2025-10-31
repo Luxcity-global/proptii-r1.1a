@@ -225,6 +225,30 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
         });
         
         console.log('Contract email sent successfully with attachment');
+        
+        // Save contract to Firestore for tracking
+        try {
+          const contractId = await contractService.createContractWithBase64({
+            title: contractData.file.name.replace(/\.[^/.]+$/, ''),
+            propertyAddress: '',
+            tenantName: contractData.recipientName,
+            tenantEmail: contractData.recipientEmail,
+            contractType: 'tenancy-agreement',
+            additionalInfo: contractData.additionalEmail,
+            status: 'sent',
+            sentDate: new Date(),
+            expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+          }, contractData.file.name, base64Data);
+          
+          console.log('Contract saved to Firestore:', contractId);
+          
+          // Reload contracts to show the new one
+          await loadContracts();
+        } catch (firestoreError) {
+          console.error('Error saving contract to Firestore:', firestoreError);
+          // Don't fail the whole operation if Firestore save fails
+        }
+        
         alert(`Contract sent successfully to ${contractData.recipientName} (${contractData.recipientEmail})!\n\nAttachment: ${contractData.file.name}`);
       } else {
         // Send a simple test email without contract

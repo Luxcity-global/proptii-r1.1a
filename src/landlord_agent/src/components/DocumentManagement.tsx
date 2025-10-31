@@ -21,6 +21,8 @@ import {
   Plus
 } from 'lucide-react';
 import { Property, PropertyDocument } from '../App';
+import { propertyService } from '../services/propertyService';
+import axios from 'axios';
 
 interface DocumentManagementProps {
   property: Property | null;
@@ -39,6 +41,8 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
     issueDate: '',
     expiryDate: ''
   });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   if (!property) {
     return (
@@ -97,37 +101,84 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
     }
   };
 
-  const handleUpload = (e: React.FormEvent) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setErrors(prev => ({ ...prev, file: '' }));
+    }
+  };
+
+  const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!uploadForm.name || !uploadForm.type || !uploadForm.issueDate) {
       return;
     }
 
-    const newDocument: Omit<PropertyDocument, 'id'> = {
-      name: uploadForm.name,
-      type: uploadForm.type as PropertyDocument['type'],
-      url: '#', // In a real app, this would be the uploaded file URL
-      issueDate: new Date(uploadForm.issueDate),
-      expiryDate: uploadForm.expiryDate ? new Date(uploadForm.expiryDate) : undefined,
-      status: 'valid'
-    };
-
-    // Update status based on expiry date
-    if (newDocument.expiryDate) {
-      const tempDoc = { ...newDocument, id: 'temp' } as PropertyDocument;
-      newDocument.status = getDocumentStatus(tempDoc);
+    if (!selectedFile) {
+      alert('Please select a file to upload');
+      return;
     }
 
-    onDocumentAdd(property.id, newDocument);
-    
-    setUploadForm({
-      name: '',
-      type: '',
-      issueDate: '',
-      expiryDate: ''
-    });
-    setIsUploadOpen(false);
+    setIsUploading(true);
+
+    try {
+      // Upload file to backend (which handles Firebase Storage upload without CORS issues)
+      const API_BASE_URL = window.location.hostname === 'localhost'
+        ? 'http://localhost:10000/api'
+        : 'https://proptii-r1-1a.onrender.com/api';
+
+      console.log('Uploading document to backend:', selectedFile.name);
+      
+      const formData = new FormData();
+      formData.append('document', selectedFile);
+
+      const uploadResponse = await axios.post(`${API_BASE_URL}/property/upload-document`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 30000
+      });
+
+      console.log('Document uploaded successfully:', uploadResponse.data);
+
+      const newDocument: Omit<PropertyDocument, 'id'> = {
+        name: uploadForm.name,
+        type: uploadForm.type as PropertyDocument['type'],
+        url: uploadResponse.data.document.url, // Store Firebase Storage URL
+        issueDate: new Date(uploadForm.issueDate),
+        expiryDate: uploadForm.expiryDate ? new Date(uploadForm.expiryDate) : undefined,
+        status: 'valid'
+      };
+
+      // Update status based on expiry date
+      if (newDocument.expiryDate) {
+        const tempDoc = { ...newDocument, id: 'temp' } as PropertyDocument;
+        newDocument.status = getDocumentStatus(tempDoc);
+      }
+
+      // Save to Firestore
+      await propertyService.addDocumentToProperty(property.id, newDocument);
+      
+      // Call the callback for UI updates
+      onDocumentAdd(property.id, newDocument);
+      
+      // Reset form
+      setUploadForm({
+        name: '',
+        type: '',
+        issueDate: '',
+        expiryDate: ''
+      });
+      setSelectedFile(null);
+      setIsUploadOpen(false);
+      
+      alert('Document uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      alert('Failed to upload document. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const filteredDocuments = property.documents.filter(doc => {
@@ -169,9 +220,28 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
 
             <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
               <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Upload Document
+                <Button 
+                  className="flex items-center space-x-2 px-6 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0"
+                  style={{ 
+                    backgroundColor: '#DC5F12', 
+                    borderColor: '#DC5F12', 
+                    minWidth: '180px',
+                    background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
+                    fontFamily: 'Archivo, sans-serif'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
+                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(0px)';
+                  }}
+                >
+                  <Upload className="w-4 h-4" strokeWidth={2.5} />
+                  <span>Upload Document</span>
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -233,17 +303,51 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
                     </div>
                   </div>
 
-                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-                    <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Drag and drop your file here, or click to browse
-                    </p>
-                    <Button type="button" variant="outline" size="sm">
-                      Browse Files
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      PDF, JPG, PNG up to 10MB
-                    </p>
+                  <div className="space-y-2">
+                    <Label>Document File *</Label>
+                    {!selectedFile ? (
+                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                        <input
+                          type="file"
+                          id="file-upload"
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                          onChange={handleFileSelect}
+                        />
+                        <label htmlFor="file-upload" className="cursor-pointer block">
+                          <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Drag and drop your file here, or click to browse
+                          </p>
+                          <Button type="button" variant="outline" size="sm">
+                            Browse Files
+                          </Button>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            PDF, JPG, PNG up to 2MB
+                          </p>
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <FileText className="w-8 h-8 text-orange-600" />
+                          <div>
+                            <p className="text-sm font-medium">{selectedFile.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedFile(null)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-end space-x-2 pt-4">
@@ -254,7 +358,9 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
                     >
                       Cancel
                     </Button>
-                    <Button type="submit">Upload Document</Button>
+                    <Button type="submit" disabled={isUploading}>
+                      {isUploading ? 'Uploading...' : 'Upload Document'}
+                    </Button>
                   </div>
                 </form>
               </DialogContent>

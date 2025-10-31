@@ -353,6 +353,78 @@ app.post('/api/property/upload-images', upload.array('images', 10), async (req, 
     }
 });
 
+// Property document upload endpoint (via backend to avoid CORS)
+app.post('/api/property/upload-document', upload.single('document'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No document provided'
+            });
+        }
+
+        console.log('Received document for upload:', req.file.originalname);
+
+        const uploadResult = {};
+        const bucket = firebaseInitialized ? admin.storage().bucket() : null;
+
+        try {
+            let fileUrl;
+            
+            if (bucket) {
+                // Upload to Firebase Storage via Admin SDK (no CORS issues)
+                const timestamp = Date.now();
+                const fileName = `property-documents/${timestamp}_${req.file.originalname}`;
+                const fileRef = bucket.file(fileName);
+                
+                await fileRef.save(req.file.buffer, {
+                    metadata: {
+                        contentType: req.file.mimetype,
+                        cacheControl: 'public, max-age=31536000'
+                    }
+                });
+                
+                // Make file publicly accessible
+                await fileRef.makePublic();
+                
+                // Get public URL
+                fileUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+                
+                console.log('✅ Uploaded document to Firebase:', fileUrl);
+                
+                uploadResult.url = fileUrl;
+                uploadResult.filename = req.file.originalname;
+                uploadResult.success = true;
+            } else {
+                // Fallback: Return base64 data URL
+                fileUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+                console.warn('⚠️  Using temporary storage (Firebase not configured)');
+                
+                uploadResult.url = fileUrl;
+                uploadResult.filename = req.file.originalname;
+                uploadResult.success = true;
+            }
+
+            res.json({
+                success: true,
+                document: uploadResult
+            });
+        } catch (error) {
+            console.error('❌ Error uploading document:', error);
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    } catch (error) {
+        console.error('Error in property document upload:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // Delete property (Firestore Admin)
 app.delete('/api/property/:id', async (req, res) => {
     try {

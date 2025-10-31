@@ -91,6 +91,52 @@ class ContractService {
   }
 
   /**
+   * Create a contract without uploading to Firebase Storage (for base64 emails)
+   */
+  async createContractWithBase64(
+    contractData: Omit<Contract, 'id' | 'fileUrl' | 'fileName'>,
+    fileName: string,
+    base64Data: string
+  ): Promise<string> {
+    try {
+      // Store the base64 data URL directly
+      const fileUrl = base64Data;
+
+      // Create contract document in Firestore
+      const contractDoc: any = {
+        title: contractData.title,
+        propertyAddress: contractData.propertyAddress,
+        tenantName: contractData.tenantName,
+        tenantEmail: contractData.tenantEmail,
+        contractType: contractData.contractType,
+        fileUrl,
+        fileName: fileName,
+        createdAt: Timestamp.now(),
+        sentDate: Timestamp.now(),
+        notificationSent: true,
+        reminderCount: 0,
+        status: 'sent' as const
+      };
+      
+      // Only include optional fields if they exist
+      if (contractData.expiryDate) {
+        contractDoc.expiryDate = Timestamp.fromDate(contractData.expiryDate);
+      }
+      if (contractData.additionalInfo) {
+        contractDoc.additionalInfo = contractData.additionalInfo;
+      }
+
+      const docRef = await addDoc(this.contractsCollection, contractDoc);
+      console.log('Contract saved to Firestore with base64 URL:', docRef.id);
+      
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating contract with base64:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get all contracts with optional filters
    */
   async getContracts(

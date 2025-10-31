@@ -169,6 +169,107 @@ class PropertyService {
   }
 
   /**
+   * Add a document to an existing property
+   */
+  async addDocumentToProperty(
+    propertyId: string,
+    document: Omit<PropertyDocument, 'id'>
+  ): Promise<void> {
+    try {
+      console.log('Adding document to property:', propertyId, document);
+      const property = await this.getProperty(propertyId);
+      if (!property) {
+        throw new Error('Property not found');
+      }
+
+      const newDocument: any = {
+        id: `doc-${Date.now()}`,
+        name: document.name,
+        type: document.type,
+        url: document.url,
+        issueDate: Timestamp.fromDate(document.issueDate),
+        status: document.status
+      };
+
+      if (document.expiryDate) {
+        newDocument.expiryDate = Timestamp.fromDate(document.expiryDate);
+      }
+
+      // Filter out documents with blob URLs (they can't be saved to Firestore)
+      const validExistingDocs = (property.documents || []).filter((doc) => {
+        const hasValidUrl = doc.url && !doc.url.startsWith('blob:');
+        if (!hasValidUrl) {
+          console.log(`Filtering out document with invalid URL: ${doc.name}`, doc.url);
+        }
+        return hasValidUrl;
+      });
+      
+      // Clean remaining documents to remove any undefined fields
+      const cleanExistingDocs = validExistingDocs.map((doc, index) => {
+        console.log(`Cleaning existing doc ${index}:`, doc);
+        const cleanDoc: any = {
+          id: doc.id,
+          name: doc.name,
+          type: doc.type,
+          url: doc.url,
+          issueDate: Timestamp.fromDate(doc.issueDate),
+          status: doc.status
+        };
+        if (doc.expiryDate) {
+          cleanDoc.expiryDate = Timestamp.fromDate(doc.expiryDate);
+        }
+        console.log(`Cleaned doc ${index}:`, cleanDoc);
+        return cleanDoc;
+      });
+      
+      const updatedDocuments = [...cleanExistingDocs, newDocument];
+      console.log(`Filtered out ${(property.documents || []).length - validExistingDocs.length} invalid documents`);
+      
+      // Estimate size of documents array
+      const jsonSize = JSON.stringify(updatedDocuments).length;
+      console.log(`Estimated size of documents array: ${(jsonSize / 1024).toFixed(2)} KB`);
+      
+      if (jsonSize > 500 * 1024) { // 500KB warning
+        console.warn('Documents array is large and may exceed Firestore limits when combined with photos');
+      }
+      
+      const docRef = doc(this.propertiesCollection, propertyId);
+      
+      // Try to validate each document before updating
+      for (let i = 0; i < updatedDocuments.length; i++) {
+        const docToValidate = updatedDocuments[i];
+        console.log(`Validating doc ${i}:`, {
+          id: docToValidate.id,
+          name: docToValidate.name,
+          type: docToValidate.type,
+          url: docToValidate.url?.substring(0, 50),
+          hasIssueDate: !!docToValidate.issueDate,
+          hasExpiryDate: !!docToValidate.expiryDate,
+          status: docToValidate.status
+        });
+        
+        // Check for undefined or invalid values
+        const keys = Object.keys(docToValidate);
+        for (const key of keys) {
+          if (docToValidate[key] === undefined) {
+            console.error(`Doc ${i} has undefined field:`, key);
+          }
+        }
+      }
+      
+      await updateDoc(docRef, {
+        documents: updatedDocuments,
+        updatedAt: Timestamp.now()
+      });
+      
+      console.log('Document added to property successfully:', propertyId);
+    } catch (error: any) {
+      console.error('Error adding document to property:', error.message, error);
+      throw error;
+    }
+  }
+
+  /**
    * Delete a property
    */
   async deleteProperty(propertyId: string): Promise<void> {
