@@ -19,17 +19,20 @@ import {
   MoreHorizontal,
   BarChart3,
   User,
+  UserPlus,
   Mail,
   Phone,
   Eye
 } from 'lucide-react';
-import { Property } from '../App';
+import { Property, Tenant } from '../App';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Separator } from './ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 interface PropertyDetailsProps {
   property: Property | null;
+  tenants?: Tenant[];
   onBack: () => void;
   onEdit: (property: Property) => void;
   onManageDocuments: () => void;
@@ -37,19 +40,29 @@ interface PropertyDetailsProps {
   onViewInsights: () => void;
   updateProperty: (propertyId: string, updates: Partial<Property>) => void;
   onViewTenant?: (tenantId: string) => void;
+  onAddTenant?: () => void;
+  onSelectExistingTenant?: (tenantId: string) => void;
 }
 
 export function PropertyDetails({
   property,
+  tenants = [],
   onBack,
   onEdit,
   onManageDocuments,
   onManagePhotos,
   onViewInsights,
   updateProperty,
-  onViewTenant
+  onViewTenant,
+  onAddTenant,
+  onSelectExistingTenant
 }: PropertyDetailsProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+
+  // Filter tenants to only show those without a property assigned or with different property
+  const availableTenants = useMemo(() => {
+    return tenants.filter(tenant => !tenant.propertyId || tenant.propertyId === '' || tenant.propertyId !== property?.id);
+  }, [tenants, property?.id]);
 
   // Memoize formatted dates to prevent excessive re-renders
   const formattedDates = useMemo(() => {
@@ -599,9 +612,35 @@ export function PropertyDetails({
                     <User className="w-6 h-6 text-muted-foreground" />
                   </div>
                   <p className="text-muted-foreground mb-2">Property is vacant</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground mb-4">
                     Ready for new tenant
                   </p>
+                  {onAddTenant && (
+                    <Button onClick={onAddTenant} className="w-full mb-3">
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Add Tenant
+                    </Button>
+                  )}
+                  {availableTenants.length > 0 && onSelectExistingTenant && (
+                    <>
+                      <Separator className="my-4" />
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground mb-2">Or select existing tenant</p>
+                        <Select onValueChange={onSelectExistingTenant}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select existing tenant" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableTenants.map((tenant) => (
+                              <SelectItem key={tenant.id} value={tenant.id}>
+                                {tenant.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
                 </div>
               </Card>
             )}

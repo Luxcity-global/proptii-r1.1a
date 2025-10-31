@@ -33,6 +33,7 @@ interface AddTenantProps {
   properties: Property[];
   onSave: (tenant: Omit<Tenant, 'id'>) => void;
   onBack: () => void;
+  preselectedPropertyId?: string;
 }
 
 // Define form steps for Typeform-style progression
@@ -267,7 +268,7 @@ function formReducer(state: FormState, action: FormAction): FormState {
   }
 }
 
-export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
+export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }: AddTenantProps) {
   // Phase 4: Replace useState with useReducer for advanced state management
   const [state, dispatch] = useReducer(formReducer, initialFormState);
   const [isGuidelinesExpanded, setIsGuidelinesExpanded] = useState(false);
@@ -336,6 +337,13 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
       return () => clearTimeout(timer);
     }
   }, [state.currentStep]);
+
+  // Set preselected property on mount
+  useEffect(() => {
+    if (preselectedPropertyId && !state.formData.propertyId) {
+      dispatch({ type: 'UPDATE_FIELD', field: 'propertyId', value: preselectedPropertyId });
+    }
+  }, [preselectedPropertyId]);
 
   // Update property address when property is selected
   useEffect(() => {

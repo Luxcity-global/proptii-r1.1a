@@ -1349,6 +1349,7 @@ export default function App() {
       case 'contracts':
         return (
           <ContractsPage
+            tenants={tenants}
             onBack={() => setNavigationScreen('dashboard')}
           />
         );
@@ -1659,6 +1660,7 @@ export default function App() {
         return (
           <PropertyDetails
             property={selectedProperty}
+            tenants={tenants}
             onBack={() => navigateToScreen('main-app')}
             onEdit={(property) => {
               // Enter editing mode and prefill setup data from the selected property
@@ -1691,6 +1693,42 @@ export default function App() {
               if (tenant) {
                 selectTenant(tenant);
                 navigateToScreen('tenant-details');
+              }
+            }}
+            onAddTenant={() => navigateToScreen('add-tenant')}
+            onSelectExistingTenant={async (tenantId) => {
+              if (!selectedProperty) return;
+              
+              const tenant = tenants.find(t => t.id === tenantId);
+              if (!tenant) return;
+              
+              // Update the property to assign the tenant
+              try {
+                await updateProperty(selectedProperty.id, {
+                  status: 'occupied',
+                  tenantId: tenant.id
+                });
+                
+                // Update the tenant's property assignment
+                await tenantService.updateTenant(tenant.id, {
+                  propertyId: selectedProperty.id,
+                  propertyAddress: selectedProperty.address
+                });
+                
+                // Refresh the tenant data
+                const updatedTenant = await tenantService.getTenant(tenant.id);
+                if (updatedTenant) {
+                  setTenants(prev => prev.map(t => t.id === tenant.id ? updatedTenant : t));
+                }
+                
+                // Update the property with tenant data
+                const updatedProperty = await propertyService.getProperty(selectedProperty.id);
+                if (updatedProperty) {
+                  setSelectedProperty(updatedProperty);
+                }
+              } catch (error) {
+                console.error('Failed to assign tenant to property:', error);
+                alert('Failed to assign tenant to property');
               }
             }}
           />
@@ -1925,6 +1963,7 @@ export default function App() {
         return (
           <AddTenant
             properties={properties}
+            preselectedPropertyId={selectedProperty?.id}
             onSave={(tenant) => {
               addTenant(tenant);
               navigateToScreen('main-app');

@@ -19,6 +19,7 @@ import {
   MoreHorizontal,
   BarChart3,
   User,
+  UserPlus,
   Mail,
   Phone,
   Eye
@@ -39,6 +40,7 @@ interface PropertyPreviewProps {
   updateProperty: (propertyId: string, updates: Partial<Property>) => void;
   onViewTenant?: (tenantId: string) => void;
   onPublishProperty?: () => void;
+  onAddTenant?: () => void;
 }
 
 export function PropertyPreview({
@@ -51,7 +53,8 @@ export function PropertyPreview({
   onViewInsights,
   updateProperty,
   onViewTenant,
-  onPublishProperty
+  onPublishProperty,
+  onAddTenant
 }: PropertyPreviewProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   
@@ -540,9 +543,15 @@ export function PropertyPreview({
                     <User className="w-6 h-6 text-muted-foreground" />
                   </div>
                   <p className="text-muted-foreground mb-2">Property is vacant</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground mb-4">
                     Ready for new tenant
                   </p>
+                  {onAddTenant && (
+                    <Button onClick={onAddTenant} className="w-full">
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Add Tenant
+                    </Button>
+                  )}
                 </div>
               </Card>
             )}

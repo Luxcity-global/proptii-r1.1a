@@ -20,14 +20,15 @@ interface SendContractModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSend: (contractData: {
-    file: File;
+    file?: File;
     recipientName: string;
     recipientEmail: string;
     additionalEmail?: string;
   }) => void;
+  tenants?: Array<{ id: string; name: string; email: string; propertyId?: string }>;
 }
 
-export function SendContractModal({ isOpen, onClose, onSend }: SendContractModalProps) {
+export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: SendContractModalProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [recipientName, setRecipientName] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
@@ -37,13 +38,13 @@ export function SendContractModal({ isOpen, onClose, onSend }: SendContractModal
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isUploading, setIsUploading] = useState(false);
 
-  // Mock existing tenants for selection
-  const existingTenants = [
-    { id: '1', name: 'Sarah Johnson', email: 'sarah.johnson@email.com', property: '123 Regent Street, London W1B 4EA' },
-    { id: '2', name: 'Michael Chen', email: 'michael.chen@email.com', property: '45 Victoria Park Road, London E9 7JN' },
-    { id: '3', name: 'Emma Watson', email: 'emma.watson@email.com', property: '78 Oak Gardens, London SW4 9AL' },
-    { id: '4', name: 'David Rodriguez', email: 'david.rodriguez@email.com', property: '92 Maple Court, London N1 5QT' }
-  ];
+  // Use real tenant data passed as prop, with fallback to empty array
+  const existingTenants = tenants.length > 0 ? tenants.map(t => ({
+    id: t.id,
+    name: t.name,
+    email: t.email,
+    property: t.propertyId || ''
+  })) : [];
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -95,9 +96,7 @@ export function SendContractModal({ isOpen, onClose, onSend }: SendContractModal
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!selectedFile) {
-      newErrors.file = 'Please select a contract file';
-    }
+    // File is optional for testing email functionality
 
     if (recipientType === 'manual') {
       if (!recipientName.trim()) {
@@ -127,7 +126,7 @@ export function SendContractModal({ isOpen, onClose, onSend }: SendContractModal
 
     try {
       const contractData = {
-        file: selectedFile!,
+        file: selectedFile || undefined,
         recipientName: recipientType === 'manual' ? recipientName : existingTenants.find(t => t.id === selectedExistingTenant)?.name || '',
         recipientEmail: recipientType === 'manual' ? recipientEmail : existingTenants.find(t => t.id === selectedExistingTenant)?.email || '',
         additionalEmail: additionalEmail.trim() || undefined
@@ -288,7 +287,7 @@ export function SendContractModal({ isOpen, onClose, onSend }: SendContractModal
             <Card className="border border-gray-200">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-semibold" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                  Contract File
+                  Contract File (Optional)
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -379,6 +378,7 @@ export function SendContractModal({ isOpen, onClose, onSend }: SendContractModal
                 </div>
               </CardContent>
             </Card>
+
           </div>
         </div>
 
@@ -395,7 +395,7 @@ export function SendContractModal({ isOpen, onClose, onSend }: SendContractModal
           <Button
             type="button"
             onClick={handleSend}
-            disabled={isUploading || !selectedFile}
+            disabled={isUploading}
             style={{ backgroundColor: '#DC5F12' }}
           >
             {isUploading ? (

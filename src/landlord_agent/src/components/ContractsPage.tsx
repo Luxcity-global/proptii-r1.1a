@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -45,10 +46,11 @@ export interface Contract {
 }
 
 interface ContractsPageProps {
+  tenants?: Array<{ id: string; name: string; email: string; propertyId?: string }>;
   onBack?: () => void;
 }
 
-export function ContractsPage({ onBack }: ContractsPageProps) {
+export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
   const [activeTab, setActiveTab] = useState<'sent' | 'unsigned' | 'signed'>('sent');
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -167,7 +169,7 @@ export function ContractsPage({ onBack }: ContractsPageProps) {
   };
 
   const handleSendContract = async (contractData: {
-    file: File;
+    file?: File;
     recipientName: string;
     recipientEmail: string;
     additionalEmail?: string;
@@ -175,36 +177,63 @@ export function ContractsPage({ onBack }: ContractsPageProps) {
     try {
       setError(null);
       
-      console.log('Sending contract to:', contractData.recipientEmail);
+      console.log('Sending email to:', contractData.recipientEmail);
       
-      // Create contract document and send email
-      const contractId = await contractService.createContract({
-        title: contractData.file.name.replace(/\.[^/.]+$/, ''), // Remove extension
-        propertyAddress: '', // TODO: Get from context or props
-        tenantName: contractData.recipientName,
-        tenantEmail: contractData.recipientEmail, // This email will receive the contract
-        contractType: 'tenancy-agreement', // Default type
-        additionalInfo: contractData.additionalEmail ? contractData.additionalEmail : undefined, // Additional notes
-        status: 'sent',
-        sentDate: new Date(),
-        expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
-      }, contractData.file, true); // true = send email
+      if (contractData.file) {
+        // Create contract document and send email
+        const contractId = await contractService.createContract({
+          title: contractData.file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+          propertyAddress: '', // TODO: Get from context or props
+          tenantName: contractData.recipientName,
+          tenantEmail: contractData.recipientEmail, // This email will receive the contract
+          contractType: 'tenancy-agreement', // Default type
+          additionalInfo: contractData.additionalEmail ? contractData.additionalEmail : undefined, // Additional notes
+          status: 'sent',
+          sentDate: new Date(),
+          expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+        }, contractData.file, true, false); // true = send email, false = don't try to attach PDF (to avoid CORS issues)
 
-      // Reload contracts to show the new one
-      await loadContracts();
-      setIsSendModalOpen(false);
-      
-      console.log('Contract sent successfully to', contractData.recipientEmail, 'ID:', contractId);
-      
-      // Show success message (you can replace this with a toast notification if available)
-      alert(`Contract sent successfully to ${contractData.recipientName} (${contractData.recipientEmail})!\n\nNote: Please check your backend server logs to verify the email was actually sent.`);
+        // Reload contracts to show the new one
+        await loadContracts();
+        setIsSendModalOpen(false);
+        
+        console.log('Contract sent successfully to', contractData.recipientEmail, 'ID:', contractId);
+        
+        // Show success message (you can replace this with a toast notification if available)
+        alert(`Contract sent successfully to ${contractData.recipientName} (${contractData.recipientEmail})!\n\nNote: Please check your backend server logs to verify the email was actually sent.`);
+      } else {
+        // Send a simple test email without contract
+        const API_BASE_URL = window.location.hostname === 'localhost'
+          ? 'http://localhost:10000/api'
+          : 'https://proptii-r1-1a.onrender.com/api';
+        
+        const formData = new FormData();
+        formData.append('to', contractData.recipientEmail);
+        formData.append('subject', 'Test Email from Proptii');
+        formData.append('html', `
+          <h2>Hello ${contractData.recipientName}!</h2>
+          <p>This is a test email from Proptii Property Management System.</p>
+          ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
+          <p>Best regards,<br>Proptii Team</p>
+        `);
+        
+        const response = await axios.post(`${API_BASE_URL}/email/send`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 30000
+        });
+        
+        setIsSendModalOpen(false);
+        
+        console.log('Test email sent successfully');
+        alert(`Test email sent successfully to ${contractData.recipientName} (${contractData.recipientEmail})!`);
+      }
     } catch (err: any) {
-      console.error('Error sending contract:', err);
-      const errorMessage = err?.message || 'Failed to send contract. Please try again.';
+      console.error('Error sending email:', err);
+      const errorMessage = err?.message || 'Failed to send email. Please try again.';
       setError(errorMessage);
       
       // Show error message
-      alert(`Error sending contract: ${errorMessage}`);
+      alert(`Error sending email: ${errorMessage}`);
     }
   };
 
@@ -541,6 +570,7 @@ export function ContractsPage({ onBack }: ContractsPageProps) {
         isOpen={isSendModalOpen}
         onClose={() => setIsSendModalOpen(false)}
         onSend={handleSendContract}
+        tenants={tenants}
       />
     </div>
   );

@@ -27,7 +27,8 @@ class ContractService {
   async createContract(
     contractData: Omit<Contract, 'id' | 'fileUrl' | 'fileName'>,
     file: File,
-    sendEmail: boolean = true
+    sendEmail: boolean = true,
+    includeAttachment: boolean = false
   ): Promise<string> {
     try {
       // 1. Upload file to Firebase Storage
@@ -64,7 +65,7 @@ class ContractService {
             fileName: file.name,
             additionalInfo: contractData.additionalInfo,
             expiryDate: contractData.expiryDate
-          }, true); // true = try to include attachment, but send without it if fetch fails
+          }, includeAttachment); // includeAttachment = whether to try fetching attachment
 
           // Update contract with email status
           if (emailResult.success) {
