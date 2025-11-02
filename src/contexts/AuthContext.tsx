@@ -310,6 +310,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     initializeAuth();
 
+    // Authentication bridge - listen for requests from landlord app
+    const handleAuthStateRequest = (event: MessageEvent) => {
+      if (event.data.type === 'REQUEST_AUTH_STATE') {
+        console.log('Tenant app received auth state request from landlord app');
+        
+        const authState = {
+          isAuthenticated,
+          user,
+          isLoading
+        };
+        
+        // Send authentication state to landlord app
+        event.source?.postMessage({
+          type: 'AUTH_STATE',
+          payload: authState
+        }, '*');
+        
+        // Also store in localStorage for direct access
+        localStorage.setItem('proptii_auth_state', JSON.stringify(authState));
+      }
+    };
+
+    // Listen for authentication state requests
+    window.addEventListener('message', handleAuthStateRequest);
+
     // Listen for session timeout
     const handleSessionTimeout = () => {
       logout();
@@ -335,8 +360,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       window.removeEventListener('session_timeout', handleSessionTimeout);
       window.removeEventListener('account-locked', handleAccountLockout);
       window.removeEventListener('password-reuse-attempt', handlePasswordReuseAttempt);
+      window.removeEventListener('message', handleAuthStateRequest);
     };
   }, [instance, accounts]);
+
+  // Broadcast authentication state changes to landlord app
+  useEffect(() => {
+    const authState = {
+      isAuthenticated,
+      user,
+      isLoading
+    };
+
+    // Store in localStorage for landlord app access
+    localStorage.setItem('proptii_auth_state', JSON.stringify(authState));
+
+    // Broadcast to any listening landlord apps
+    window.dispatchEvent(new CustomEvent('authStateChanged', {
+      detail: authState
+    }));
+
+    console.log('Authentication state updated:', authState);
+  }, [isAuthenticated, user, isLoading]);
 
   const login = async (): Promise<void> => {
     try {

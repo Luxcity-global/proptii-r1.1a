@@ -131,7 +131,7 @@
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
     "express-async-handler": "^1.2.0",
-    "firebase": "^12.4.0",
+    "firebase": "^12.5.0",
     "glob": "^10.3.10",
     "googleapis": "^149.0.0",
     "jose": "^6.0.12",

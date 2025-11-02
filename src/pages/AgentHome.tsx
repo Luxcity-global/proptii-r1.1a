@@ -1,9 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
+import { RoleSelectionPopup } from '../components/RoleSelectionPopup';
+
+type UserRole = 'landlord' | 'agent';
 
 // Add preload link for the hero image
 const heroImageUrl = '/images/hero-agent-happy-couple.jpg';
@@ -17,14 +20,42 @@ const preloadHeroImage = () => {
 
 const AgentHome = () => {
   const navigate = useNavigate();
+  const [showRolePopup, setShowRolePopup] = useState(true);
+  const [selectedRole, setSelectedRole] = useState<UserRole>('landlord');
 
   // Preload hero image when component mounts
   useEffect(() => {
     preloadHeroImage();
   }, []);
 
+  const handleRoleSelected = (role: UserRole) => {
+    setSelectedRole(role);
+    // Don't close popup immediately - let user see the role was selected
+    // Popup will close when they click "Continue" button
+  };
+
+  const handleRoleContinue = (role: UserRole) => {
+    setSelectedRole(role);
+    setShowRolePopup(false);
+    
+    // Just close the popup and let the user decide what to do next
+    // The "Go to Dashboard" button will handle the navigation
+  };
+
+  const handleStartNewListing = () => {
+    if (selectedRole === 'landlord') {
+      // Navigate to the landlord app served from public directory
+      window.location.href = '/landlord/index.html';
+    } else {
+      // For agents, navigate to the landlord app with agent role
+      // Use a different approach - navigate to landlord app and pass role via localStorage
+      localStorage.setItem('userRole', 'agent');
+      window.location.href = '/landlord/index.html';
+    }
+  };
+
   return (
-    <div className="min-h-screen font-nunito">
+    <div className="min-h-screen font-archivo">
       <Navbar isAgent={true} />
 
       {/* Hero Section */}
@@ -69,17 +100,18 @@ const AgentHome = () => {
             Streamline your property listings and reach more potential tenants.
           </p>
 
-          {/* Start New Listing Button */}
-          <Link
-            to="/listings/new"
+          {/* Go to Dashboard Button */}
+          <button
+            onClick={handleStartNewListing}
             className="inline-block px-8 py-4 bg-[#FFEFD4] text-black rounded-full text-lg font-semibold hover:bg-opacity-90 transition-all"
           >
-            Start New Listing
-          </Link>
+            {selectedRole === 'landlord' ? 'Go to Landlord Dashboard' : 'Go to Agent Dashboard'}
+          </button>
         </div>
       </section>
 
-      {/**The new services section */}
+
+      {/* Next Steps Section */}
       <section className="relative py-16 md:py-20 bg-[#f9f5f0]">
         {/* Background Image (Blobs) */}
         <img
@@ -91,83 +123,119 @@ const AgentHome = () => {
         />
 
         <div className="max-w-7xl mx-auto px-4 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-            {/* Book Viewing Card */}
-            <div className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
-              <div className="mb-5 md:mb-6">
-                <img
-                  src="/images/viewing-room.jpg"
-                  alt="Modern living room"
-                  className="w-full h-full object-cover rounded-lg"
-                  loading="lazy"
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                />
+          {/* Section Header */}
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-[#374957] mb-4">
+              What would you like to do next?
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Choose how you'd like to continue setting up your property management system. You can always access these options later from your&nbsp;dashboard.
+            </p>
+          </div>
+
+          {/* Action Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-8 action-cards-section">
+            {/* Go to Dashboard Card */}
+            <div className="bg-white rounded-2xl shadow-lg border border-[#D1D5DB] p-8 md:p-10 text-center hover:shadow-xl transition-shadow min-h-[280px] flex flex-col justify-between">
+              <div>
+                <div className="mb-8">
+                  <div className="w-16 h-16 bg-[#EBF4FF] rounded-full flex items-center justify-center mx-auto">
+                    <svg className="w-8 h-8 text-[#3B82F6]" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold text-[#374957] mb-4">Go to Dashboard</h3>
+                <p className="text-gray-600 mb-8">Explore your property management&nbsp;dashboard</p>
               </div>
-              <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Book Viewing</h3>
-              <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
-                Save time and effort with our AI-powered booking service. Simply enter your desired property details and let our system handle the rest.
-              </p>
               <button
-                onClick={() => navigate('/bookviewing')}
-                className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
-                Learn More
+                onClick={() => navigate('/landlord')}
+                className="text-[#374957] hover:text-[#DC5F12] hover:border-[#DC5F12] border border-transparent rounded-full px-8 py-3 font-medium flex items-center justify-center mx-auto group transition-all"
+              >
+                View Dashboard
+                <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </button>
             </div>
 
-            {/* Referencing Card */}
-            <div className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
-              <div className="mb-5 md:mb-6">
-                <img
-                  src="/images/referencing-person.jpg"
-                  alt="Professional woman with tablet"
-                  className="w-full h-full object-cover rounded-lg"
-                  loading="lazy"
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                />
+            {/* Add a Property Card (Recommended) */}
+            <div className="bg-white rounded-2xl shadow-lg border-2 border-[#136C9E] p-8 md:p-10 text-center hover:shadow-xl transition-shadow relative min-h-[280px] flex flex-col justify-between">
+              {/* Recommended Badge */}
+              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                <span className="bg-[#136C9E] text-white px-4 py-1 rounded-full text-sm font-medium">
+                  Recommended
+                </span>
               </div>
-              <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Referencing</h3>
-              <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
-                Ensure peace of mind for both landlords and tenants. Our rigorous referencing process verifies renter or buyer identity, financial stability, and rental history.
-              </p>
+              
+              <div>
+                <div className="mb-8">
+                  <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto">
+                    <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold text-[#374957] mb-4">Add a Property</h3>
+                <p className="text-gray-600 mb-8">Get started by adding a property to your&nbsp;portfolio</p>
+              </div>
               <button
-                onClick={() => navigate('/referencing')}
-                className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
-                Learn More
+                onClick={() => navigate('/listings/new')}
+                className="bg-[#DC5F12] hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#f97316] hover:py-4 hover:shadow-2xl hover:shadow-[#DC5F12]/70 text-white px-8 py-3 rounded-full font-medium flex items-center justify-center mx-auto group transition-all duration-300"
+              >
+                Add Property
+                <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </button>
             </div>
 
-            {/* Contract Card */}
-            <div className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
-              <div className="mb-5 md:mb-6">
-                <img
-                  src="/images/modern-building.jpg"
-                  alt="Modern glass building"
-                  className="w-full h-full object-cover rounded-lg"
-                  loading="lazy"
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                />
+            {/* Setup Company Profile Card */}
+            <div className="bg-white rounded-2xl shadow-lg border border-[#D1D5DB] p-8 md:p-10 text-center hover:shadow-xl transition-shadow min-h-[280px] flex flex-col justify-between">
+              <div>
+                <div className="mb-8">
+                  <div className="w-16 h-16 bg-[#E6FFFA] rounded-full flex items-center justify-center mx-auto">
+                    <svg className="w-8 h-8 text-[#06B6D4]" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-6a1 1 0 00-1-1H9a1 1 0 00-1 1v6a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="text-xl font-bold text-[#374957] mb-4">Setup Company Profile</h3>
+                <p className="text-gray-600 mb-8">Add company details, logo, and professional&nbsp;settings</p>
               </div>
-              <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Contract</h3>
-              <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
-                Save time and reduce errors with our contract management solution. We offer a range of customizable lease agreement templates to suit your specific needs.
-              </p>
               <button
-                onClick={() => navigate('/contracts')}
-                className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
-                Learn More
+                onClick={() => navigate('/profile/company')}
+                className="text-[#374957] hover:text-[#DC5F12] hover:border-[#DC5F12] border border-transparent rounded-full px-8 py-3 font-medium flex items-center justify-center mx-auto group transition-all"
+              >
+                Setup Company
+                <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </button>
             </div>
           </div>
+
+          {/* Bottom Note */}
+          <div className="text-center">
+            <p className="text-gray-500 text-sm">
+              Don't worry - you can access all of these features anytime from your&nbsp;dashboard
+            </p>
+          </div>
         </div>
       </section>
-
-      {/**End of the new services section */}
 
       {/* FAQ Section */}
       <FAQSection />
 
       {/* Footer */}
       <Footer />
+
+      {/* Role Selection Popup */}
+      <RoleSelectionPopup 
+        isOpen={showRolePopup} 
+        onRoleSelected={handleRoleSelected}
+        onContinue={handleRoleContinue}
+      />
     </div>
   );
 };
