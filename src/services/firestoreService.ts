@@ -127,9 +127,21 @@ export interface UserFile {
   updatedAt: Timestamp;
 }
 
+export interface SupportFormData {
+  id: string;
+  subject: string;
+  heading: string;
+  body: string;
+  email: string;
+  status: 'pending' | 'in-progress' | 'resolved';
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 class FirestoreService {
   private readonly collectionName = 'referencingForms';
   private readonly filesCollectionName = 'userFiles';
+  private readonly supportFormsCollectionName = 'supportForms';
 
   /**
    * Clean form data by removing undefined values
@@ -442,6 +454,134 @@ class FirestoreService {
       return { success: true };
     } catch (error) {
       console.error('❌ Error deleting user file from Firestore:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      };
+    }
+  }
+
+  /**
+   * Save support form submission to Firestore
+   */
+  async saveSupportForm(
+    formData: {
+      subject: string;
+      heading: string;
+      body: string;
+      email: string;
+    }
+  ): Promise<{ success: boolean; formId?: string; error?: string }> {
+    try {
+      // Check if we're online
+      if (!navigator.onLine) {
+        console.warn('⚠️ Device is offline, data will be saved when connection is restored');
+        return { 
+          success: false, 
+          error: 'Device is offline. Data will be saved when connection is restored.' 
+        };
+      }
+
+      const formId = `support_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const docRef = doc(db, this.supportFormsCollectionName, formId);
+      
+      const supportFormData: SupportFormData = {
+        id: formId,
+        subject: formData.subject,
+        heading: formData.heading,
+        body: formData.body,
+        email: formData.email,
+        status: 'pending',
+        createdAt: serverTimestamp() as Timestamp,
+        updatedAt: serverTimestamp() as Timestamp
+      };
+
+      await setDoc(docRef, supportFormData);
+      
+      console.log('✅ Support form saved to Firestore successfully');
+      return { success: true, formId };
+    } catch (error: any) {
+      console.error('❌ Error saving support form to Firestore:', error);
+      
+      // Handle specific Firebase errors
+      if (error.code === 'unavailable') {
+        return { 
+          success: false, 
+          error: 'Firestore is currently unavailable. Please check your internet connection and try again.' 
+        };
+      }
+      
+      if (error.code === 'permission-denied') {
+        console.warn('⚠️ Firestore permission denied - this is expected if Firestore security rules are not configured yet');
+        return { 
+          success: false, 
+          error: 'Firestore access denied. Please configure Firestore security rules or check your Firebase setup.' 
+        };
+      }
+      
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      };
+    }
+  }
+
+  /**
+   * Get all support form submissions
+   */
+  async getAllSupportForms(): Promise<{ success: boolean; forms?: SupportFormData[]; error?: string }> {
+    try {
+      console.log('🔍 Querying Firestore for all support forms');
+      const querySnapshot = await getDocs(collection(db, this.supportFormsCollectionName));
+      const forms: SupportFormData[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        forms.push(doc.data() as SupportFormData);
+      });
+      
+      // Sort by creation date (newest first)
+      forms.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+      
+      console.log(`✅ Found ${forms.length} support form(s)`);
+      return { success: true, forms };
+    } catch (error: any) {
+      console.error('❌ Error getting support forms from Firestore:', error);
+      
+      // Handle specific Firebase errors
+      if (error.code === 'permission-denied') {
+        console.warn('⚠️ Firestore permission denied for getAllSupportForms');
+        return { 
+          success: false, 
+          error: 'Permission denied. Please configure Firestore security rules.' 
+        };
+      }
+      
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      };
+    }
+  }
+
+  /**
+   * Update support form status
+   */
+  async updateSupportFormStatus(
+    formId: string,
+    status: 'pending' | 'in-progress' | 'resolved'
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const docRef = doc(db, this.supportFormsCollectionName, formId);
+      
+      await updateDoc(docRef, {
+        status,
+        updatedAt: serverTimestamp()
+      });
+      
+      console.log('✅ Support form status updated successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error updating support form status:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error occurred' 

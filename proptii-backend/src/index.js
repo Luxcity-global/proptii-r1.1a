@@ -4,6 +4,7 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import referencingRoutes from './routes/referencingRoutes.js';
 import sheetsRoutes from './routes/sheetsRoutes.js';
+import supportRoutes from './routes/supportRoutes.js';
 import { emailService } from './services/emailService.js';
 
 dotenv.config();
@@ -23,6 +24,7 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 // API routes
 app.use('/api/referencing', referencingRoutes);
 app.use('/api/sheets', sheetsRoutes);
+app.use('/api/support', supportRoutes);
 
 // Test route to verify server is running
 app.get('/', (req, res) => {
