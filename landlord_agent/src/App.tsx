@@ -358,6 +358,29 @@ function AppContent() {
     }
   }, [azureUser, userProfile, currentScreen]);
 
+  // Allow external app to request starting at a specific screen (e.g., add property/company profile flow)
+  React.useEffect(() => {
+    try {
+      // Prefer query param if present
+      const params = new URLSearchParams(window.location.search);
+      const qpStart = params.get('start');
+      if (qpStart === 'property-setup-step1' || qpStart === 'company-profile-setup') {
+        setCurrentScreen(qpStart as Screen);
+        return;
+      }
+      const startScreen = localStorage.getItem('startScreen');
+      if (startScreen === 'property-setup-step1') {
+        setCurrentScreen('property-setup-step1');
+        localStorage.removeItem('startScreen');
+      } else if (startScreen === 'company-profile-setup') {
+        setCurrentScreen('company-profile-setup');
+        localStorage.removeItem('startScreen');
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
   // Initialize with mock data for better demonstration
   React.useEffect(() => {
     // Mock tenants first

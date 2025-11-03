@@ -406,6 +406,29 @@ export default function App() {
     }
   }, []);
 
+  // Optional deep-link: start directly at specific flows when requested
+  React.useEffect(() => {
+    try {
+      // Prefer query param if present
+      const params = new URLSearchParams(window.location.search);
+      const qpStart = params.get('start');
+      if (qpStart === 'property-setup-step1' || qpStart === 'company-profile-setup') {
+        setCurrentScreen(qpStart as Screen);
+        return;
+      }
+      const startScreen = localStorage.getItem('startScreen');
+      if (startScreen === 'property-setup-step1') {
+        setCurrentScreen('property-setup-step1');
+        localStorage.removeItem('startScreen');
+      } else if (startScreen === 'company-profile-setup') {
+        setCurrentScreen('company-profile-setup');
+        localStorage.removeItem('startScreen');
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
   // Helper: Compress image to reduce size for Firestore
   const compressImage = (file: File, maxSizeKB: number = 150): Promise<File> => {
     return new Promise((resolve) => {

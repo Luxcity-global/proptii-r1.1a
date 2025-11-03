@@ -54,6 +54,26 @@ const AgentHome = () => {
     }
   };
 
+  const handleAddProperty = () => {
+    // Pass selected role into landlord app
+    if (selectedRole === 'agent') {
+      localStorage.setItem('userRole', 'agent');
+    }
+    // Instruct landlord app to open property setup flow immediately
+    localStorage.setItem('startScreen', 'property-setup-step1');
+    window.location.href = '/landlord/index.html?start=property-setup-step1';
+  };
+
+  const handleSetupProfile = () => {
+    // Respect selected role for landlord-agent app
+    if (selectedRole === 'agent') {
+      localStorage.setItem('userRole', 'agent');
+    }
+    // Deep link to the company/landlord profile setup flow
+    localStorage.setItem('startScreen', 'company-profile-setup');
+    window.location.href = '/landlord/index.html?start=company-profile-setup';
+  };
+
   return (
     <div className="min-h-screen font-archivo">
       <Navbar isAgent={true} />
@@ -149,7 +169,7 @@ const AgentHome = () => {
                 <p className="text-gray-600 mb-8">Explore your property management&nbsp;dashboard</p>
               </div>
               <button
-                onClick={() => navigate('/landlord')}
+                onClick={handleStartNewListing}
                 className="text-[#374957] hover:text-[#DC5F12] hover:border-[#DC5F12] border border-transparent rounded-full px-8 py-3 font-medium flex items-center justify-center mx-auto group transition-all"
               >
                 View Dashboard
@@ -180,7 +200,7 @@ const AgentHome = () => {
                 <p className="text-gray-600 mb-8">Get started by adding a property to your&nbsp;portfolio</p>
               </div>
               <button
-                onClick={() => navigate('/listings/new')}
+                onClick={handleAddProperty}
                 className="bg-[#DC5F12] hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#f97316] hover:py-4 hover:shadow-2xl hover:shadow-[#DC5F12]/70 text-white px-8 py-3 rounded-full font-medium flex items-center justify-center mx-auto group transition-all duration-300"
               >
                 Add Property
@@ -190,7 +210,7 @@ const AgentHome = () => {
               </button>
             </div>
 
-            {/* Setup Company Profile Card */}
+            {/* Setup Profile Card (role-aware) */}
             <div className="bg-white rounded-2xl shadow-lg border border-[#D1D5DB] p-8 md:p-10 text-center hover:shadow-xl transition-shadow min-h-[280px] flex flex-col justify-between">
               <div>
                 <div className="mb-8">
@@ -200,14 +220,18 @@ const AgentHome = () => {
                     </svg>
                   </div>
                 </div>
-                <h3 className="text-xl font-bold text-[#374957] mb-4">Setup Company Profile</h3>
-                <p className="text-gray-600 mb-8">Add company details, logo, and professional&nbsp;settings</p>
+                <h3 className="text-xl font-bold text-[#374957] mb-4">{selectedRole === 'agent' ? 'Setup Company Profile' : 'Setup Landlord Profile'}</h3>
+                <p className="text-gray-600 mb-8">
+                  {selectedRole === 'agent'
+                    ? 'Add company details, logo, and professional\u00A0settings'
+                    : 'Add your landlord details, contact info, and optional branding'}
+                </p>
               </div>
               <button
-                onClick={() => navigate('/profile/company')}
+                onClick={handleSetupProfile}
                 className="text-[#374957] hover:text-[#DC5F12] hover:border-[#DC5F12] border border-transparent rounded-full px-8 py-3 font-medium flex items-center justify-center mx-auto group transition-all"
               >
-                Setup Company
+                {selectedRole === 'agent' ? 'Setup Company' : 'Setup Landlord'}
                 <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
