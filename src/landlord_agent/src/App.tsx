@@ -663,14 +663,15 @@ export default function App() {
         }
       }
     ];
-    // Load tenants from Firestore; show empty state on no data/error
+    // Delay tenant load until after initial render; properties will be fetched in another effect
     (async () => {
       try {
-        const fetched = await tenantService.getTenants();
-        console.log('Tenants loaded from Firestore:', fetched.length);
-        setTenants(fetched);
+        // Initial unscoped load to avoid blocking UI; will be refined in the effect below
+        const initialTenants = await tenantService.getTenants();
+        console.log('[Init] Tenants initially loaded (unscoped):', initialTenants.length);
+        setTenants(initialTenants);
       } catch (e) {
-        console.warn('Failed to load tenants from Firestore, showing empty list');
+        console.warn('Failed initial tenant load, leaving empty list', e);
         setTenants([]);
       }
     })();
@@ -890,7 +891,9 @@ export default function App() {
         createdAt: new Date('2023-06-15')
       }
     ];
-    setProperties(mockProperties);
+    // DISABLED: Mock data - replaced by Firestore data scoped to user
+    // setProperties(mockProperties);
+    console.log('🚫 Mock properties disabled - using Firestore data scoped to user');
 
     // Mock market insights
     const mockInsights: MarketInsight[] = [
@@ -958,6 +961,47 @@ export default function App() {
     setArrearsAlerts(mockArrearsAlerts);
   }, []);
 
+  // Reload and scope tenants once we know the current user's properties
+  React.useEffect(() => {
+    const loadScopedTenants = async () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const uidFromQuery = params.get('uid');
+        let userId: string | null = null;
+        if (uidFromQuery) userId = uidFromQuery;
+        if (!userId && typeof (window as any).getUserInfo === 'function') {
+          const info = (window as any).getUserInfo();
+          userId = info?.id || info?.sub || info?.oid || null;
+        }
+        if (!userId) {
+          const cached = localStorage.getItem('proptii_auth_state');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            userId = parsed?.user?.localAccountId || parsed?.user?.homeAccountId || parsed?.user?.id || null;
+          }
+        }
+        if (!userId) userId = userProfile?.email || null;
+
+        console.log('🔁 Scoping tenants for userId:', userId);
+        let list = await tenantService.getTenants(userId || undefined);
+
+        // If docs lack userId, fall back to scoping by owned property IDs
+        if (userId) {
+          const ownedPropertyIds = new Set(properties.map(p => p.id));
+          if (ownedPropertyIds.size > 0) {
+            const before = list.length;
+            list = list.filter(t => !t.propertyId || ownedPropertyIds.has(t.propertyId));
+            console.log(`✅ Tenant fallback filter by propertyIds: ${before} -> ${list.length}`);
+          }
+        }
+        setTenants(list);
+      } catch (e) {
+        console.warn('Failed to scope tenants; keeping current list', e);
+      }
+    };
+    loadScopedTenants();
+  }, [properties, userProfile]);
+
   const navigateToScreen = (screen: Screen) => {
     setIsTransitioning(true);
     
@@ -981,35 +1025,148 @@ export default function App() {
     setNavigationScreen('dashboard');
   };
 
-  // Load properties from Firebase on mount
+  // Load properties from Firebase on mount (scoped to current user)
   React.useEffect(() => {
     const loadProperties = async () => {
       try {
-        const fetchedProperties = await propertyService.getProperties();
-        console.log('Properties loaded from Firebase:', fetchedProperties.length);
-        // Log photos for each property
+        const getCurrentUserId = (): string | null => {
+          try {
+            // PRIORITY 1: Direct from userProfile (most reliable)
+            if (userProfile && (userProfile as any).id) {
+              const uid = (userProfile as any).id;
+              console.log('🔍 UserId from userProfile.id:', uid);
+              return uid;
+            }
+            
+            // PRIORITY 2: Query parameter
+            const params = new URLSearchParams(window.location.search);
+            const uidFromQuery = params.get('uid');
+            if (uidFromQuery) {
+              console.log('🔍 UserId from query param:', uidFromQuery);
+              return uidFromQuery;
+            }
+            
+            // PRIORITY 3: getUserInfo function
+            if (typeof (window as any).getUserInfo === 'function') {
+              const info = (window as any).getUserInfo();
+              console.log('🔍 getUserInfo() returned:', info);
+              if (info?.id || info?.sub || info?.oid) {
+                const uid = info.id || info.sub || info.oid;
+                console.log('🔍 UserId from getUserInfo:', uid);
+                return uid;
+              }
+            }
+            
+            // PRIORITY 4: localStorage auth state
+            const cached = localStorage.getItem('proptii_auth_state');
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              console.log('🔍 Cached auth state:', parsed);
+              // Check both nested user.id AND top-level user id fields
+              const uid = parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId;
+              if (uid) {
+                console.log('🔍 UserId from localStorage:', uid);
+                return uid;
+              }
+            }
+          } catch (e) {
+            console.error('🔍 Error extracting userId:', e);
+          }
+          
+          // FALLBACK: Email
+          const emailFallback = userProfile?.email;
+          console.log('🔍 Using email as userId fallback:', emailFallback);
+          return emailFallback || null;
+        };
+
+        const currentUserId = getCurrentUserId();
+        console.log('✅ Final extracted userId for scoping:', currentUserId);
+        
+        if (!currentUserId) {
+          console.warn('⚠️ No userId found - loading all properties (this should not happen in production)');
+        }
+        
+        const fetchedProperties = await propertyService.getProperties(currentUserId ? { userId: currentUserId } : undefined);
+        console.log(`✅ Properties loaded from Firebase (filtered by userId: ${currentUserId}):`, fetchedProperties.length);
+        
+        // Verify each property has the correct userId
         fetchedProperties.forEach((prop, idx) => {
+          const propData = prop as any;
+          const propUserId = propData.userId;
+          const isMatch = propUserId === currentUserId;
           console.log(`Property ${idx + 1} (${prop.address}):`, {
             id: prop.id,
-            photosCount: prop.photos?.length || 0,
-            photos: prop.photos
+            userId: propUserId || '❌ MISSING',
+            expectedUserId: currentUserId,
+            match: isMatch ? '✅' : '❌ MISMATCH',
+            photosCount: prop.photos?.length || 0
           });
+          if (!isMatch && currentUserId) {
+            console.error(`❌ PROPERTY USER MISMATCH: Property "${prop.address}" has userId="${propUserId}" but expected "${currentUserId}"`);
+          }
         });
         setProperties(fetchedProperties);
       } catch (error) {
         console.error('Error loading properties:', error);
-        // Keep existing mock data if Firebase fails
+        // Don't set mock data - keep empty array if Firebase fails
+        setProperties([]);
       }
     };
     loadProperties();
-  }, []);
+  }, [userProfile]);
 
   const addProperty = async (property: Omit<Property, 'id' | 'createdAt'>) => {
     try {
       // Strip any accidental id/createdAt fields before saving
       const { id: _ignoredId, createdAt: _ignoredCreatedAt, ...safeProperty } = property as any;
-      // Save to Firebase
-      const propertyId = await propertyService.createProperty(safeProperty);
+      // Save to Firebase (scoped) - use same extraction logic as loading
+      const currentUserId = (() => {
+        try {
+          // PRIORITY 1: Direct from userProfile
+          if (userProfile && (userProfile as any).id) {
+            const uid = (userProfile as any).id;
+            console.log('✅ Creating property with userId from userProfile.id:', uid);
+            return uid;
+          }
+          
+          // PRIORITY 2: Query parameter
+          const params = new URLSearchParams(window.location.search);
+          const uidFromQuery = params.get('uid');
+          if (uidFromQuery) {
+            console.log('✅ Creating property with userId from query:', uidFromQuery);
+            return uidFromQuery;
+          }
+          
+          // PRIORITY 3: getUserInfo
+          if (typeof (window as any).getUserInfo === 'function') {
+            const info = (window as any).getUserInfo();
+            const uid = info?.id || info?.sub || info?.oid;
+            if (uid) {
+              console.log('✅ Creating property with userId from getUserInfo:', uid);
+              return uid;
+            }
+          }
+          
+          // PRIORITY 4: localStorage
+          const cached = localStorage.getItem('proptii_auth_state');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            const uid = parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId;
+            if (uid) {
+              console.log('✅ Creating property with userId from localStorage:', uid);
+              return uid;
+            }
+          }
+        } catch (e) {
+          console.error('❌ Error extracting userId for property creation:', e);
+        }
+        const emailFallback = userProfile?.email || 'unknown';
+        console.warn('⚠️ Using email as userId fallback for property creation:', emailFallback);
+        return emailFallback;
+      })();
+      
+      console.log('📝 About to create property with userId:', currentUserId);
+      const propertyId = await propertyService.createProperty(safeProperty, currentUserId);
       
       // Fetch the created property to get full data with timestamps
       const newProperty = await propertyService.getProperty(propertyId);
@@ -1107,7 +1264,33 @@ export default function App() {
   const addTenant = async (tenant: Omit<Tenant, 'id'>) => {
     try {
       console.log('[App] addTenant called with:', tenant);
-      const id = await tenantService.createTenant(tenant);
+      const currentUserId = (() => {
+        try {
+          // PRIORITY 1: Direct from userProfile
+          if (userProfile && (userProfile as any).id) {
+            return (userProfile as any).id;
+          }
+          // PRIORITY 2: Query parameter
+          const params = new URLSearchParams(window.location.search);
+          const uidFromQuery = params.get('uid');
+          if (uidFromQuery) return uidFromQuery;
+          // PRIORITY 3: getUserInfo
+          if (typeof (window as any).getUserInfo === 'function') {
+            const info = (window as any).getUserInfo();
+            const uid = info?.id || info?.sub || info?.oid;
+            if (uid) return uid;
+          }
+          // PRIORITY 4: localStorage
+          const cached = localStorage.getItem('proptii_auth_state');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            return parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId || null;
+          }
+        } catch {}
+        return userProfile?.email || 'unknown';
+      })();
+      console.log('📝 Creating tenant with userId:', currentUserId);
+      const id = await tenantService.createTenant(tenant, currentUserId);
       console.log('[App] tenant created with id:', id);
       const saved = await tenantService.getTenant(id);
       if (saved) {
