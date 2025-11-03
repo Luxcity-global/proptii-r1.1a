@@ -27,6 +27,7 @@ class ContractService {
   async createContract(
     contractData: Omit<Contract, 'id' | 'fileUrl' | 'fileName'>,
     file: File,
+    ownerUserId: string,
     sendEmail: boolean = true,
     includeAttachment: boolean = false
   ): Promise<string> {
@@ -43,12 +44,14 @@ class ContractService {
         fileUrl,
         filePath,
         fileName: file.name,
+        userId: ownerUserId, // Scope contract to owner
         createdAt: Timestamp.now(),
         sentDate: Timestamp.now(),
         notificationSent: false,
         reminderCount: 0,
         status: 'sent' as const
       };
+      console.log('✅ ContractService: Creating contract with userId:', ownerUserId);
 
       const docRef = await addDoc(this.contractsCollection, contractDoc);
       const contractId = docRef.id;
@@ -96,7 +99,8 @@ class ContractService {
   async createContractWithBase64(
     contractData: Omit<Contract, 'id' | 'fileUrl' | 'fileName'>,
     fileName: string,
-    base64Data: string
+    base64Data: string,
+    ownerUserId: string
   ): Promise<string> {
     try {
       // Store the base64 data URL directly
@@ -111,12 +115,14 @@ class ContractService {
         contractType: contractData.contractType,
         fileUrl,
         fileName: fileName,
+        userId: ownerUserId, // Scope contract to owner
         createdAt: Timestamp.now(),
         sentDate: Timestamp.now(),
         notificationSent: true,
         reminderCount: 0,
         status: 'sent' as const
       };
+      console.log('✅ ContractService: Creating contract with base64 and userId:', ownerUserId);
       
       // Only include optional fields if they exist
       if (contractData.expiryDate) {
@@ -141,6 +147,7 @@ class ContractService {
    */
   async getContracts(
     filters?: {
+      userId?: string;
       status?: Contract['status'];
       tenantId?: string;
       propertyId?: string;
@@ -148,6 +155,14 @@ class ContractService {
   ): Promise<Contract[]> {
     try {
       const constraints: QueryConstraint[] = [];
+
+      // userId filter should be applied first for security
+      if (filters?.userId) {
+        console.log('🔍 ContractService: Filtering by userId:', filters.userId);
+        constraints.push(where('userId', '==', filters.userId));
+      } else {
+        console.warn('⚠️ ContractService: No userId filter provided - will load all contracts');
+      }
 
       if (filters?.status) {
         constraints.push(where('status', '==', filters.status));
@@ -166,7 +181,9 @@ class ContractService {
           constraints.push(orderBy('createdAt', 'desc'));
           const q = query(this.contractsCollection, ...constraints);
           const querySnapshot = await getDocs(q);
-          return this.mapContractDocs(querySnapshot.docs);
+          const contracts = this.mapContractDocs(querySnapshot.docs);
+          console.log(`✅ ContractService: Found ${contracts.length} contracts for userId: ${filters?.userId || 'none'}`);
+          return contracts;
         } catch (indexError: any) {
           // If index error, fetch without orderBy and sort in memory
           if (indexError.code === 'failed-precondition' && indexError.message?.includes('index')) {
@@ -180,8 +197,17 @@ class ContractService {
           throw indexError;
         }
       } else {
-        // No filters, fetch all and sort in memory
-        const querySnapshot = await getDocs(this.contractsCollection);
+        // No filters, fetch all and sort in memory (with userId filter if provided)
+        let querySnapshot;
+        if (filters?.userId) {
+          // Still apply userId filter even if no other filters
+          const q = query(this.contractsCollection, where('userId', '==', filters.userId));
+          querySnapshot = await getDocs(q);
+          console.log(`✅ ContractService: Found ${querySnapshot.docs.length} contracts for userId: ${filters.userId} (no other filters)`);
+        } else {
+          console.warn('⚠️ ContractService: Fetching all contracts (no userId filter)');
+          querySnapshot = await getDocs(this.contractsCollection);
+        }
         const contracts = this.mapContractDocs(querySnapshot.docs);
         return contracts.sort((a, b) => b.sentDate.getTime() - a.sentDate.getTime());
       }
@@ -197,7 +223,7 @@ class ContractService {
   private mapContractDocs(docs: any[]): Contract[] {
     return docs.map(doc => {
       const data = doc.data();
-      return {
+      const contract: Contract & { userId?: string } = {
         id: doc.id,
         title: data.title || '',
         propertyAddress: data.propertyAddress || '',
@@ -211,7 +237,12 @@ class ContractService {
         signedDate: data.signedDate?.toDate(),
         expiryDate: data.expiryDate?.toDate(),
         additionalInfo: data.additionalInfo,
-      } as Contract;
+      };
+      // Preserve userId for verification
+      if (data.userId) {
+        (contract as any).userId = data.userId;
+      }
+      return contract;
     });
   }
 
@@ -225,7 +256,7 @@ class ContractService {
 
       if (docSnap.exists()) {
         const data = docSnap.data();
-        return {
+        const contract: Contract & { userId?: string } = {
           id: docSnap.id,
           title: data.title || '',
           propertyAddress: data.propertyAddress || '',
@@ -240,7 +271,12 @@ class ContractService {
           expiryDate: data.expiryDate?.toDate(),
           additionalInfo: data.additionalInfo,
           filePath: data.filePath, // Internal use only
-        } as Contract;
+        };
+        // Preserve userId
+        if (data.userId) {
+          (contract as any).userId = data.userId;
+        }
+        return contract;
       }
       return null;
     } catch (error) {

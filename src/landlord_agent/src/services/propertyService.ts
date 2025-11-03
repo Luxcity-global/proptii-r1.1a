@@ -20,10 +20,11 @@ class PropertyService {
   private propertiesCollection = collection(db, 'properties');
 
   /**
-   * Create a new property
+   * Create a new property scoped to the current user
    */
   async createProperty(
-    propertyData: Omit<Property, 'id' | 'createdAt' | 'tenant'>
+    propertyData: Omit<Property, 'id' | 'createdAt' | 'tenant'>,
+    ownerUserId: string
   ): Promise<string> {
     try {
       console.log('Creating property with photos:', propertyData.photos?.length || 0, 'photos');
@@ -47,14 +48,17 @@ class PropertyService {
 
       const propertyDoc = {
         ...clean,
+        userId: ownerUserId,
         photos: cleanedPhotos,
         documents: propertyData.documents || [], // Include documents if provided
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       };
 
+      console.log('✅ PropertyService: Creating property with userId:', ownerUserId);
       console.log('Property document to save:', {
         address: propertyDoc.address,
+        userId: propertyDoc.userId,
         photosCount: propertyDoc.photos?.length || 0,
         photos: propertyDoc.photos
       });
@@ -94,7 +98,10 @@ class PropertyService {
         constraints.push(where('type', '==', filters.type));
       }
       if (filters?.userId) {
+        console.log('🔍 PropertyService: Filtering by userId:', filters.userId);
         constraints.push(where('userId', '==', filters.userId));
+      } else {
+        console.warn('⚠️ PropertyService: No userId filter provided - will load all properties');
       }
 
       // Try to query with orderBy, fallback to in-memory sorting if index missing
@@ -103,7 +110,9 @@ class PropertyService {
           constraints.push(orderBy('createdAt', 'desc'));
           const q = query(this.propertiesCollection, ...constraints);
           const querySnapshot = await getDocs(q);
-          return this.mapPropertyDocs(querySnapshot.docs);
+          const properties = this.mapPropertyDocs(querySnapshot.docs);
+          console.log(`✅ PropertyService: Found ${properties.length} properties for userId: ${filters?.userId || 'none'}`);
+          return properties;
         } catch (indexError: any) {
           if (indexError.code === 'failed-precondition' && indexError.message?.includes('index')) {
             console.warn('Firestore index missing. Fetching without orderBy and sorting in memory.');
@@ -288,8 +297,11 @@ class PropertyService {
    */
   private mapPropertyDoc(doc: any): Property {
     const data = doc.data();
-    console.log('Mapping property document:', doc.id, 'Raw photos data:', data.photos);
-    const mappedProperty = {
+    console.log('📋 Mapping property document:', doc.id);
+    console.log('   - Address:', data.address);
+    console.log('   - userId in document:', data.userId || '❌ MISSING');
+    console.log('   - Photos count:', data.photos?.length || 0);
+    const mappedProperty: any = {
       id: doc.id,
       address: data.address || '',
       type: data.type || '',
@@ -304,6 +316,7 @@ class PropertyService {
       documents: this.mapDocuments(data.documents || []),
       createdAt: data.createdAt?.toDate() || new Date(),
       tenantId: data.tenantId,
+      userId: data.userId, // Preserve userId for verification
     };
     console.log('Mapped property photos:', mappedProperty.photos.length);
     return mappedProperty;

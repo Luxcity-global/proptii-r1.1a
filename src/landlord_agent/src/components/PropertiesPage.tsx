@@ -234,7 +234,11 @@ export function PropertiesPage({
                   Occupied
                 </p>
                 <p className="text-2xl font-semibold text-green-600">
-                  {properties.filter(p => p.status === 'occupied').length}
+                  {properties.filter(p => {
+                    // A property is occupied if it has a tenant OR if status is explicitly 'occupied'
+                    const hasTenant = !!p.tenantId || !!p.tenant || tenants.some(t => t.propertyId === p.id);
+                    return p.status === 'occupied' || hasTenant;
+                  }).length}
                 </p>
               </div>
               
@@ -245,7 +249,12 @@ export function PropertiesPage({
                   Vacant
                 </p>
                 <p className="text-2xl font-semibold text-orange-600">
-                  {properties.filter(p => p.status === 'vacant').length}
+                  {properties.filter(p => {
+                    // A property is vacant if status is 'vacant' AND it has no tenant
+                    // (properties with status 'under-renovation' won't match this condition)
+                    const hasTenant = !!p.tenantId || !!p.tenant || tenants.some(t => t.propertyId === p.id);
+                    return p.status === 'vacant' && !hasTenant;
+                  }).length}
                 </p>
               </div>
             </div>

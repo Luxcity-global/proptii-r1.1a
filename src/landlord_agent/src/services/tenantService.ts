@@ -5,25 +5,54 @@ import type { Tenant } from '../App';
 class TenantService {
   private tenantsCollection = collection(db, 'tenants');
 
-  async createTenant(tenantData: Omit<Tenant, 'id'>): Promise<string> {
-    const payload: any = this.toFirestore(tenantData);
+  async createTenant(tenantData: Omit<Tenant, 'id'>, ownerUserId: string): Promise<string> {
+    const payload: any = this.toFirestore({ ...tenantData, userId: ownerUserId });
+    console.log('✅ TenantService: Creating tenant with userId:', ownerUserId);
     console.log('[tenantService] createTenant payload:', payload);
     const ref = await addDoc(this.tenantsCollection, payload);
     console.log('[tenantService] created tenant with id:', ref.id);
     return ref.id;
   }
 
-  async getTenants(): Promise<Tenant[]> {
+  async getTenants(ownerUserId?: string): Promise<Tenant[]> {
     try {
-      const q = query(this.tenantsCollection, orderBy('createdAt', 'desc'));
-      const snap = await getDocs(q);
-      const list = snap.docs.map(d => this.fromFirestore(d.id, d.data()));
+      if (ownerUserId) {
+        console.log('🔍 TenantService: Filtering by userId:', ownerUserId);
+      } else {
+        console.warn('⚠️ TenantService: No userId filter provided - will load all tenants');
+      }
+      const base = query(this.tenantsCollection, orderBy('createdAt', 'desc'));
+      const snap = await getDocs(base);
+      let list = snap.docs.map(d => this.fromFirestore(d.id, d.data()));
+      if (ownerUserId) {
+        const beforeFilter = list.length;
+        // Log each tenant's userId for debugging
+        list.forEach(t => {
+          const tUserId = (t as any).userId;
+          console.log(`🔍 Tenant ${t.id} (${t.name}): userId=${tUserId || '❌ MISSING'}, matches filter: ${tUserId === ownerUserId ? '✅' : '❌'}`);
+        });
+        list = list.filter(t => {
+          const tUserId = (t as any).userId;
+          const matches = tUserId === ownerUserId;
+          if (!matches && tUserId) {
+            console.warn(`⚠️ Tenant ${t.id} (${t.name}) filtered out: userId "${tUserId}" !== "${ownerUserId}"`);
+          }
+          return matches;
+        });
+        console.log(`✅ TenantService: Filtered ${beforeFilter} tenants to ${list.length} for userId: ${ownerUserId}`);
+      }
       console.log('[tenantService] getTenants (ordered) count:', list.length);
       return list;
     } catch {
       // Fallback without order if index missing
+      console.warn('⚠️ TenantService: Firestore index missing, fetching without orderBy');
       const snap = await getDocs(this.tenantsCollection);
-      const list = snap.docs.map(d => this.fromFirestore(d.id, d.data()));
+      let list = snap.docs.map(d => this.fromFirestore(d.id, d.data()));
+      if (ownerUserId) {
+        const beforeFilter = list.length;
+        list = list.filter(t => (t as any).userId === ownerUserId);
+        console.log(`✅ TenantService (fallback): Filtered ${beforeFilter} tenants to ${list.length} for userId: ${ownerUserId}`);
+      }
       console.log('[tenantService] getTenants (no order) count:', list.length);
       return list;
     }
@@ -65,7 +94,7 @@ class TenantService {
   }
 
   private fromFirestore(id: string, data: any): Tenant {
-    return {
+    const tenant: Tenant & { userId?: string } = {
       id,
       name: data.name || '',
       email: data.email || '',
@@ -84,6 +113,12 @@ class TenantService {
       lastPaymentDate: data.lastPaymentDate?.toDate ? data.lastPaymentDate.toDate() : data.lastPaymentDate,
       overdueAmount: data.overdueAmount,
     };
+    // Preserve userId field for filtering (even though it's not in Tenant type)
+    if (data.userId) {
+      (tenant as any).userId = data.userId;
+      console.log('📋 TenantService: Preserved userId for tenant:', id, 'userId:', data.userId);
+    }
+    return tenant;
   }
 }
 

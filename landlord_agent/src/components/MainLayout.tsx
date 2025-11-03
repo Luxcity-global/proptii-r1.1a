@@ -19,8 +19,8 @@ import { UserProfile } from '../App';
 import { LogoutButton } from './auth/LogoutButton';
 
 // Import logos
-const proptiiLogoLarge = '/src/assets/proptii_logo_large.png';
-const proptiiLogoSmall = '/src/assets/proptii_logo_small.png';
+const proptiiLogoLarge = '/images/proptii-logo.png'; // Full logo for expanded sidebar
+const proptiiLogoSmall = '/images/Proptii ico.png'; // Icon only for collapsed sidebar
 
 export type NavigationScreen = 'dashboard' | 'properties' | 'documents' | 'clients' | 'insights' | 'inbox';
 

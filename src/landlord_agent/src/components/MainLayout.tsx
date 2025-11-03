@@ -18,8 +18,8 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { UserProfile } from '../App';
 
 // Import logos
-const proptiiLogoLarge = './images/proptii-logo.png';
-const proptiiLogoSmall = './images/Proptii-logo-icon.png';
+const proptiiLogoLarge = '/images/proptii-logo.png'; // Full logo for expanded sidebar
+const proptiiLogoSmall = '/images/Proptii ico.png'; // Icon only for collapsed sidebar
 
 export type NavigationScreen = 'dashboard' | 'properties' | 'documents' | 'clients' | 'insights' | 'inbox' | 'contracts';
 
