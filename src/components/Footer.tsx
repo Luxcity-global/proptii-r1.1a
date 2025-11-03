@@ -141,7 +141,7 @@ function Footer() {
         {/* Social Media Icons */}
         <div className="px-6 py-6 text-center">
           <div className="flex justify-center space-x-4 mb-6">
-            <a href="https://www.youtube.com" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
+            <a href="https://www.youtube.com/@Luxcity-v1" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
               <FontAwesomeIcon icon={faYoutube} />
             </a>
             <a href="https://www.instagram.com/luxcity_tech/" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
@@ -153,7 +153,7 @@ function Footer() {
             <a href="#" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
               <FontAwesomeIcon icon={faTiktok} />
             </a>
-            <a href="#" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
+            <a href="https://dribbble.com/dev-one" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
               <FontAwesomeIcon icon={faDribbble} />
             </a>
           </div>
@@ -251,10 +251,10 @@ function Footer() {
             <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
               <FontAwesomeIcon icon={faTiktok} />
             </a>
-            <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
+            <a href="https://www.youtube.com/@Luxcity-v1" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
               <FontAwesomeIcon icon={faYoutube} />
             </a>
-            <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
+            <a href="https://dribbble.com/dev-one" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
               <FontAwesomeIcon icon={faDribbble} />
             </a>
           </div>
