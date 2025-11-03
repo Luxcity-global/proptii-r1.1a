@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import Navbar from '../components/Navbar';
+import AgentNavbar from '../components/AgentNavbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import { RoleSelectionPopup } from '../components/RoleSelectionPopup';
@@ -76,7 +76,7 @@ const AgentHome = () => {
 
   return (
     <div className="min-h-screen font-archivo">
-      <Navbar isAgent={true} />
+      <AgentNavbar isAgent={true} />
 
       {/* Hero Section */}
       <section className="h-[80vh] relative flex items-center">

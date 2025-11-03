@@ -1295,7 +1295,17 @@ export default function App() {
       const saved = await tenantService.getTenant(id);
       if (saved) {
         console.log('[App] fetched saved tenant:', saved);
-        setTenants(prev => [...prev, saved]);
+        // Ensure userId is preserved when adding to state
+        const tenantWithUserId = { ...saved, userId: currentUserId } as any;
+        console.log('[App] Adding tenant to state with userId:', currentUserId);
+        setTenants(prev => {
+          // Check if tenant already exists (avoid duplicates)
+          if (prev.some(t => t.id === tenantWithUserId.id)) {
+            console.log('[App] Tenant already in list, updating instead');
+            return prev.map(t => t.id === tenantWithUserId.id ? tenantWithUserId : t);
+          }
+          return [...prev, tenantWithUserId];
+        });
         return;
       }
     } catch (e) {
@@ -1556,6 +1566,7 @@ export default function App() {
         return (
           <ContractsPage
             tenants={tenants}
+            userProfile={userProfile}
             onBack={() => setNavigationScreen('dashboard')}
           />
         );

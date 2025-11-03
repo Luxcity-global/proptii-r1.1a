@@ -39,7 +39,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         <button onClick={() => navigate('/referencing')}>
           <img
             src={isCollapsed ? '/images/Proptii ico.png' : '/images/proptii-logo.png'}
-            alt="Proptii"
+            alt="Proptii Logo"
             className="h-8 object-contain"
           />
         </button>

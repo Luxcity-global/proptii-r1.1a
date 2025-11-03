@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserCircle, ChevronDown, Settings, LogOut, Menu, X } from 'lucide-react';
 
-interface NavbarProps {
+interface AgentNavbarProps {
   isAgent?: boolean;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ isAgent = false }) => {
+const AgentNavbar: React.FC<AgentNavbarProps> = ({ isAgent = false }) => {
   const { isAuthenticated, user, login, logout, editProfile, isLoading } = useAuth();
-  const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [loginInProgress, setLoginInProgress] = useState(false);
@@ -71,7 +70,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false }) => {
       // If we get here, the popup login was successful
       console.log("Login successful via popup");
     } catch (error) {
-      console.error("Login error in Navbar:", error);
+      console.error("Login error in AgentNavbar:", error);
       setLoginInProgress(false);
 
       // Check if the error is related to popup blocking
@@ -110,11 +109,18 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false }) => {
     setIsMobileMenuOpen(false);
   };
 
-  // Navigate to the tenant dashboard
+  // Navigate to the landlord/agent dashboard
   const handleGoToDashboard = () => {
-    setIsDropdownOpen(false);
-    setIsMobileMenuOpen(false);
-    navigate('/dashboard');
+    try {
+      if (isAgent) {
+        localStorage.setItem('userRole', 'agent');
+      }
+      // Redirect to landlord/agent dashboard
+      window.location.href = '/landlord/index.html';
+    } finally {
+      setIsDropdownOpen(false);
+      setIsMobileMenuOpen(false);
+    }
   };
 
   return (
@@ -366,4 +372,5 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false }) => {
   );
 };
 
-export default Navbar;
+export default AgentNavbar;
+

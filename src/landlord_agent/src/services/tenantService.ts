@@ -26,7 +26,19 @@ class TenantService {
       let list = snap.docs.map(d => this.fromFirestore(d.id, d.data()));
       if (ownerUserId) {
         const beforeFilter = list.length;
-        list = list.filter(t => (t as any).userId === ownerUserId);
+        // Log each tenant's userId for debugging
+        list.forEach(t => {
+          const tUserId = (t as any).userId;
+          console.log(`🔍 Tenant ${t.id} (${t.name}): userId=${tUserId || '❌ MISSING'}, matches filter: ${tUserId === ownerUserId ? '✅' : '❌'}`);
+        });
+        list = list.filter(t => {
+          const tUserId = (t as any).userId;
+          const matches = tUserId === ownerUserId;
+          if (!matches && tUserId) {
+            console.warn(`⚠️ Tenant ${t.id} (${t.name}) filtered out: userId "${tUserId}" !== "${ownerUserId}"`);
+          }
+          return matches;
+        });
         console.log(`✅ TenantService: Filtered ${beforeFilter} tenants to ${list.length} for userId: ${ownerUserId}`);
       }
       console.log('[tenantService] getTenants (ordered) count:', list.length);
@@ -82,7 +94,7 @@ class TenantService {
   }
 
   private fromFirestore(id: string, data: any): Tenant {
-    return {
+    const tenant: Tenant & { userId?: string } = {
       id,
       name: data.name || '',
       email: data.email || '',
@@ -101,6 +113,12 @@ class TenantService {
       lastPaymentDate: data.lastPaymentDate?.toDate ? data.lastPaymentDate.toDate() : data.lastPaymentDate,
       overdueAmount: data.overdueAmount,
     };
+    // Preserve userId field for filtering (even though it's not in Tenant type)
+    if (data.userId) {
+      (tenant as any).userId = data.userId;
+      console.log('📋 TenantService: Preserved userId for tenant:', id, 'userId:', data.userId);
+    }
+    return tenant;
   }
 }
 

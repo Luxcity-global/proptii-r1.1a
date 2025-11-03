@@ -25,7 +25,7 @@ app.use(cors({
 }));
 
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Increase limit for base64 data
 
 // Configure multer for file uploads
 const upload = multer({
@@ -138,6 +138,101 @@ app.post('/api/email/send', upload.array('attachments', 10), async (req, res) =>
     }
 });
 
+// Email sending route for base64 attachments (used by ContractsPage)
+// Use multer to parse multipart/form-data (even though we're not uploading files, FormData requires multer)
+app.post('/api/email/send-base64', upload.none(), async (req, res) => {
+    try {
+        console.log('Received base64 email request:', {
+            to: req.body.to,
+            subject: req.body.subject,
+            hasBase64: !!req.body.attachmentBase64,
+            filename: req.body.attachmentFilename,
+            bodyKeys: Object.keys(req.body)
+        });
+
+        const { to, subject, html, attachmentBase64, attachmentFilename, attachmentMimeType } = req.body;
+
+        if (!to || !subject || !html) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required email fields',
+                details: {
+                    to: !!to,
+                    subject: !!subject,
+                    html: !!html,
+                    receivedFields: Object.keys(req.body)
+                }
+            });
+        }
+
+        // Decode base64 attachment if provided
+        const attachments = [];
+        if (attachmentBase64 && attachmentFilename) {
+            try {
+                // Remove data URL prefix if present (e.g., "data:application/pdf;base64,...")
+                const base64Data = attachmentBase64.includes(',') 
+                    ? attachmentBase64.split(',')[1] 
+                    : attachmentBase64;
+                
+                const buffer = Buffer.from(base64Data, 'base64');
+                attachments.push({
+                    filename: attachmentFilename,
+                    content: buffer,
+                    contentType: attachmentMimeType || 'application/octet-stream'
+                });
+                console.log(`Attachment decoded: ${attachmentFilename} (${buffer.length} bytes)`);
+            } catch (decodeError) {
+                console.error('Error decoding base64 attachment:', decodeError);
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid base64 attachment',
+                    details: decodeError.message
+                });
+            }
+        }
+
+        const mailOptions = {
+            from: process.env.SMTP_FROM_EMAIL,
+            to,
+            subject,
+            html,
+            attachments
+        };
+
+        console.log('Attempting to send email with base64 attachment:', {
+            from: mailOptions.from,
+            to: mailOptions.to,
+            subject: mailOptions.subject,
+            attachmentsCount: attachments.length,
+            attachmentFilename: attachmentFilename || 'none'
+        });
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log('Email sent successfully with base64 attachment:', info);
+
+        res.json({
+            success: true,
+            messageId: info.messageId
+        });
+    } catch (error) {
+        console.error('Error sending email with base64:', error);
+        console.error('Error stack:', error.stack);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            details: process.env.NODE_ENV === 'development' ? {
+                stack: error.stack,
+                smtp: {
+                    host: process.env.SMTP_HOST,
+                    port: process.env.SMTP_PORT,
+                    user: process.env.SMTP_USER ? '***@' + process.env.SMTP_USER.split('@')[1] : undefined,
+                    fromEmail: process.env.SMTP_FROM_EMAIL
+                }
+            } : undefined
+        });
+    }
+});
+
 // Basic route to check if server is running
 app.get('/', (req, res) => {
     res.json({ message: 'Email server is running' });
@@ -203,7 +298,7 @@ app.use((err, req, res, next) => {
     });
 });
 
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`API URL: http://localhost:${PORT}`);
