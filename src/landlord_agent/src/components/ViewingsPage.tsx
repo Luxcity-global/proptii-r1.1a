@@ -509,7 +509,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   }
 
   return (
-    <div className="space-y-6 pb-10" style={{ fontFamily: 'Archivo, sans-serif' }}>
+    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6" style={{ fontFamily: 'Archivo, sans-serif' }}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Viewings & Requests</h1>
