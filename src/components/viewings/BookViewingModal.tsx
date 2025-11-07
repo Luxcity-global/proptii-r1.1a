@@ -367,11 +367,17 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         const userIdToUse = user?.id || 'anonymous';
         console.log('Using user ID for Firestore save:', userIdToUse);
         
+        const managerInfo = {
+          landlordId: property.agent?.id || null,
+          agentId: property.agent?.id || null
+        };
+
         const firestoreResult = await viewingService.saveViewingBooking(
           userIdToUse,
           property,
           viewing,
-          property.id || undefined
+          property.id || undefined,
+          managerInfo
         );
 
         console.log('Firestore result:', firestoreResult);

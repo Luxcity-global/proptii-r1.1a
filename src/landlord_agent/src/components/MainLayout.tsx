@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature } from 'lucide-react';
+import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature, CalendarDays } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -21,7 +21,7 @@ import { UserProfile } from '../App';
 const proptiiLogoLarge = '/images/proptii-logo.png'; // Full logo for expanded sidebar
 const proptiiLogoSmall = '/images/Proptii ico.png'; // Icon only for collapsed sidebar
 
-export type NavigationScreen = 'dashboard' | 'properties' | 'documents' | 'clients' | 'insights' | 'inbox' | 'contracts';
+export type NavigationScreen = 'dashboard' | 'properties' | 'documents' | 'viewings' | 'clients' | 'insights' | 'inbox' | 'contracts';
 
 interface MainLayoutProps {
   currentScreen: NavigationScreen;
@@ -278,6 +278,11 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
       id: 'documents' as NavigationScreen,
       icon: FileText,
       label: 'Documents',
+    },
+    {
+      id: 'viewings' as NavigationScreen,
+      icon: CalendarDays,
+      label: 'Viewings',
     },
           {
             id: 'contracts' as NavigationScreen,

@@ -19,6 +19,8 @@ export interface ViewingBooking {
   id: string;
   userId: string;
   propertyId?: string | null;
+  landlordId?: string | null;
+  agentId?: string | null;
   property: {
     street: string;
     town: string;
@@ -70,7 +72,11 @@ class ViewingService {
     userId: string,
     property: ViewingBooking['property'],
     viewingDetails: ViewingBooking['viewingDetails'],
-    propertyId?: string
+    propertyId?: string,
+    managerInfo?: {
+      landlordId?: string | null;
+      agentId?: string | null;
+    }
   ): Promise<{ success: boolean; bookingId?: string; error?: string }> {
     try {
       // Check if we're online
@@ -89,6 +95,8 @@ class ViewingService {
         id: bookingId,
         userId,
         propertyId: propertyId || null, // Handle undefined propertyId
+        landlordId: managerInfo?.landlordId ?? property.agent?.id ?? null,
+        agentId: managerInfo?.agentId ?? property.agent?.id ?? null,
         property,
         viewingDetails,
         status: 'pending',
@@ -124,6 +132,56 @@ class ViewingService {
         error: error instanceof Error ? error.message : 'Unknown error occurred' 
       };
     }
+  }
+
+  private async getViewingsByManagerField(
+    field: 'landlordId' | 'agentId',
+    managerId: string,
+    status?: ViewingBooking['status']
+  ): Promise<ViewingBooking[]> {
+    try {
+      const constraints = [
+        where(field, '==', managerId)
+      ];
+
+      if (status) {
+        constraints.push(where('status', '==', status));
+      }
+
+      constraints.push(orderBy('createdAt', 'desc'));
+
+      const q = query(collection(db, this.collectionName), ...constraints);
+      const snapshot = await getDocs(q);
+      const bookings: ViewingBooking[] = [];
+      snapshot.forEach((doc) => bookings.push(doc.data() as ViewingBooking));
+      return bookings;
+    } catch (error: any) {
+      // Fallback without orderBy if index is missing
+      if (error.code === 'failed-precondition' && error.message?.includes('index')) {
+        const fallbackConstraints = [where(field, '==', managerId)];
+        if (status) {
+          fallbackConstraints.push(where('status', '==', status));
+        }
+        const fallbackQuery = query(collection(db, this.collectionName), ...fallbackConstraints);
+        const fallbackSnapshot = await getDocs(fallbackQuery);
+        const bookings: ViewingBooking[] = [];
+        fallbackSnapshot.forEach((doc) => bookings.push(doc.data() as ViewingBooking));
+        // Sort in memory since we removed orderBy
+        return bookings.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      }
+      console.error('❌ Error fetching manager viewings:', error);
+      throw error;
+    }
+  }
+
+  private mergeViewingsById(...lists: ViewingBooking[][]): ViewingBooking[] {
+    const map = new Map<string, ViewingBooking>();
+    lists.flat().forEach((booking) => {
+      if (!map.has(booking.id)) {
+        map.set(booking.id, booking);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
   }
 
   /**
@@ -194,6 +252,80 @@ class ViewingService {
     }
   }
 
+  async getManagerViewingBookings(managerId: string): Promise<{ success: boolean; bookings?: ViewingBooking[]; error?: string }> {
+    try {
+      const landlordBookings = await this.getViewingsByManagerField('landlordId', managerId);
+      const agentBookings = await this.getViewingsByManagerField('agentId', managerId);
+      const bookings = this.mergeViewingsById(landlordBookings, agentBookings);
+      return { success: true, bookings };
+    } catch (error) {
+      console.error('❌ Error getting manager viewing bookings:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  async getManagerViewingBookingsByStatus(
+    managerId: string,
+    status: ViewingBooking['status']
+  ): Promise<{ success: boolean; bookings?: ViewingBooking[]; error?: string }> {
+    try {
+      const landlordBookings = await this.getViewingsByManagerField('landlordId', managerId, status);
+      const agentBookings = await this.getViewingsByManagerField('agentId', managerId, status);
+      const bookings = this.mergeViewingsById(landlordBookings, agentBookings);
+      return { success: true, bookings };
+    } catch (error) {
+      console.error('❌ Error getting manager viewing bookings by status:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  private calculateStatsFromBookings(bookings: ViewingBooking[]): ViewingStats {
+    return bookings.reduce<ViewingStats>((stats, booking) => {
+      stats.total++;
+      switch (booking.status) {
+        case 'pending':
+        case 'confirmed':
+          stats.upcoming++;
+          break;
+        case 'completed':
+          stats.completed++;
+          break;
+        case 'rescheduled':
+          stats.rescheduled++;
+          break;
+      }
+      return stats;
+    }, {
+      upcoming: 0,
+      completed: 0,
+      rescheduled: 0,
+      total: 0
+    });
+  }
+
+  async getManagerViewingStats(managerId: string): Promise<{ success: boolean; stats?: ViewingStats; error?: string }> {
+    try {
+      const { success, bookings, error } = await this.getManagerViewingBookings(managerId);
+      if (!success || !bookings) {
+        return { success: false, error };
+      }
+      const stats = this.calculateStatsFromBookings(bookings);
+      return { success: true, stats };
+    } catch (error) {
+      console.error('❌ Error getting manager viewing stats:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
   /**
    * Update viewing booking status
    */
@@ -201,7 +333,10 @@ class ViewingService {
     bookingId: string,
     status: ViewingBooking['status'],
     notes?: string,
-    agentNotes?: string
+    agentNotes?: string,
+    updates?: {
+      viewingDetails?: ViewingBooking['viewingDetails'];
+    }
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const docRef = doc(db, this.collectionName, bookingId);
@@ -228,6 +363,7 @@ class ViewingService {
 
       if (notes) updateData.notes = notes;
       if (agentNotes) updateData.agentNotes = agentNotes;
+      if (updates?.viewingDetails) updateData.viewingDetails = updates.viewingDetails;
 
       await updateDoc(docRef, updateData);
       
@@ -339,6 +475,67 @@ class ViewingService {
     );
   }
 
+  subscribeToManagerViewingBookings(
+    managerId: string,
+    callback: (bookings: ViewingBooking[]) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    const landlordMap = new Map<string, ViewingBooking>();
+    const agentMap = new Map<string, ViewingBooking>();
+
+    const emit = () => {
+      const bookings = this.mergeViewingsById(
+        Array.from(landlordMap.values()),
+        Array.from(agentMap.values())
+      );
+      callback(bookings);
+    };
+
+    const handleError = (error: Error) => {
+      console.error('❌ Error in manager viewing subscription:', error);
+      if (onError) {
+        onError(error);
+      }
+    };
+
+    const landlordQuery = query(
+      collection(db, this.collectionName),
+      where('landlordId', '==', managerId),
+      orderBy('createdAt', 'desc')
+    );
+
+    const agentQuery = query(
+      collection(db, this.collectionName),
+      where('agentId', '==', managerId),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribeLandlord = onSnapshot(
+      landlordQuery,
+      (snapshot) => {
+        landlordMap.clear();
+        snapshot.forEach((doc) => landlordMap.set(doc.id, doc.data() as ViewingBooking));
+        emit();
+      },
+      handleError
+    );
+
+    const unsubscribeAgent = onSnapshot(
+      agentQuery,
+      (snapshot) => {
+        agentMap.clear();
+        snapshot.forEach((doc) => agentMap.set(doc.id, doc.data() as ViewingBooking));
+        emit();
+      },
+      handleError
+    );
+
+    return () => {
+      unsubscribeLandlord();
+      unsubscribeAgent();
+    };
+  }
+
   /**
    * Subscribe to real-time updates for viewing stats
    */
@@ -389,6 +586,65 @@ class ViewingService {
         }
       }
     );
+  }
+
+  subscribeToManagerViewingStats(
+    managerId: string,
+    callback: (stats: ViewingStats) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    const landlordMap = new Map<string, ViewingBooking>();
+    const agentMap = new Map<string, ViewingBooking>();
+
+    const emit = () => {
+      const bookings = this.mergeViewingsById(
+        Array.from(landlordMap.values()),
+        Array.from(agentMap.values())
+      );
+      callback(this.calculateStatsFromBookings(bookings));
+    };
+
+    const handleError = (error: Error) => {
+      console.error('❌ Error in manager viewing stats subscription:', error);
+      if (onError) {
+        onError(error);
+      }
+    };
+
+    const landlordQuery = query(
+      collection(db, this.collectionName),
+      where('landlordId', '==', managerId)
+    );
+
+    const agentQuery = query(
+      collection(db, this.collectionName),
+      where('agentId', '==', managerId)
+    );
+
+    const unsubscribeLandlord = onSnapshot(
+      landlordQuery,
+      (snapshot) => {
+        landlordMap.clear();
+        snapshot.forEach((doc) => landlordMap.set(doc.id, doc.data() as ViewingBooking));
+        emit();
+      },
+      handleError
+    );
+
+    const unsubscribeAgent = onSnapshot(
+      agentQuery,
+      (snapshot) => {
+        agentMap.clear();
+        snapshot.forEach((doc) => agentMap.set(doc.id, doc.data() as ViewingBooking));
+        emit();
+      },
+      handleError
+    );
+
+    return () => {
+      unsubscribeLandlord();
+      unsubscribeAgent();
+    };
   }
 }
 

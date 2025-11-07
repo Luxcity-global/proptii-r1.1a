@@ -108,6 +108,32 @@ class TenantService {
 
   private toFirestore(input: Partial<Tenant>, isPartial: boolean = false) {
     const out: any = { ...input };
+
+    const removeUndefined = (value: any) => {
+      if (Array.isArray(value)) {
+        for (let i = value.length - 1; i >= 0; i--) {
+          const element = value[i];
+          if (element === undefined) {
+            value.splice(i, 1);
+          } else if (element && typeof element === 'object') {
+            removeUndefined(element);
+          }
+        }
+      } else if (value && typeof value === 'object') {
+        Object.keys(value).forEach((key) => {
+          const nested = value[key];
+          if (nested === undefined) {
+            delete value[key];
+          } else if (nested && typeof nested === 'object') {
+            removeUndefined(nested);
+            if (!Array.isArray(nested) && Object.keys(nested).length === 0) {
+              // Leave empty objects intact for Firestore merge semantics
+            }
+          }
+        });
+      }
+    };
+
     if (!isPartial) {
       out.createdAt = Timestamp.now();
     }
@@ -123,6 +149,7 @@ class TenantService {
     if ('firstPaymentDate' in out && out.firstPaymentDate instanceof Date) {
       out.firstPaymentDate = Timestamp.fromDate(out.firstPaymentDate);
     }
+    removeUndefined(out);
     return out;
   }
 

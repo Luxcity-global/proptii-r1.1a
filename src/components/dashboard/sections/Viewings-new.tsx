@@ -512,7 +512,11 @@ const Viewings: React.FC = () => {
         user.id,
         testProperty,
         testViewingDetails,
-        'test-property-1'
+        'test-property-1',
+        {
+          landlordId: testProperty.agent?.id || null,
+          agentId: testProperty.agent?.id || null,
+        }
       );
 
       console.log('Test viewing result:', result);

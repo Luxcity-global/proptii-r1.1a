@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { RoleSelection } from './components/RoleSelection';
 import { ProfileSetup } from './components/ProfileSetup';
@@ -38,6 +38,7 @@ import { ContractsPage } from './components/ContractsPage';
 import { propertyService } from './services/propertyService';
 import { tenantService } from './services/tenantService';
 import { marketInsightService } from './services/marketInsightService';
+import ViewingsPage from './components/ViewingsPage';
 import { storage, db } from './config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, query, where, onSnapshot, Unsubscribe, doc, updateDoc, Timestamp } from 'firebase/firestore';
@@ -302,6 +303,39 @@ export default function App() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editingPropertyId, setEditingPropertyId] = useState<string | null>(null);
+
+  const resolveManagerId = useCallback((): string | null => {
+    try {
+      if (userProfile && (userProfile as any).id) {
+        return (userProfile as any).id;
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const uidFromQuery = params.get('uid');
+      if (uidFromQuery) {
+        return uidFromQuery;
+      }
+
+      if (typeof (window as any).getUserInfo === 'function') {
+        const info = (window as any).getUserInfo();
+        if (info?.id || info?.sub || info?.oid) {
+          return info.id || info.sub || info.oid;
+        }
+      }
+
+      const cached = localStorage.getItem('proptii_auth_state');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const uid = parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId;
+        if (uid) {
+          return uid;
+        }
+      }
+    } catch (err) {
+      console.error('Error resolving manager id:', err);
+    }
+    return null;
+  }, [userProfile]);
   
   // Property setup state
   const [propertySetupData, setPropertySetupData] = useState<PropertySetupData>({
@@ -1855,6 +1889,15 @@ export default function App() {
               // In real app, this would export document data
               console.log('Export documents as:', format);
             }}
+          />
+        );
+
+      case 'viewings':
+        return (
+          <ViewingsPage
+            managerId={resolveManagerId()}
+            managerName={userProfile?.name}
+            managerEmail={userProfile?.email}
           />
         );
 

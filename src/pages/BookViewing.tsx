@@ -120,14 +120,24 @@ const BookViewing = () => {
             }
           };
 
+          const managerInfo = {
+            landlordId: parsedData.agent?.id || null,
+            agentId: parsedData.agent?.id || null
+          };
+
           bookViewingRequestService
-            .saveRequest(user.id, parsedData.id || `property_${Date.now()}`, {
-              street: parsedData.street,
-              town: parsedData.town,
-              city: parsedData.city,
-              postcode: parsedData.postcode,
-              agent: parsedData.agent
-            })
+            .saveRequest(
+              user.id,
+              parsedData.id || `property_${Date.now()}`,
+              {
+                street: parsedData.street,
+                town: parsedData.town,
+                city: parsedData.city,
+                postcode: parsedData.postcode,
+                agent: parsedData.agent
+              },
+              managerInfo
+            )
             .then((r) => {
               if (r.success) {
                 sessionStorage.setItem('book_viewing_request_id', r.requestId || '');
