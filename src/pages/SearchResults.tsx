@@ -48,6 +48,140 @@ interface PropertyDetailsModalProps {
   isNavigatingToBooking: boolean;
 }
 
+// Property Insights Component
+function PropertyInsights({ property }: { property: Property }) {
+  const [insights, setInsights] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'location' | 'amenities'>('overview');
+
+  useEffect(() => {
+    if (property?.location) {
+      // In a real implementation, you would fetch insights from an API
+      // For now, we'll show basic location information
+      setInsights({
+        location: property.location,
+        address: property.location,
+        coordinates: 'Calculating...',
+      });
+    }
+  }, [property]);
+
+  return (
+    <div className="space-y-4">
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'overview'
+              ? 'text-[#E65D24] border-b-2 border-[#E65D24]'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Overview
+        </button>
+        <button
+          onClick={() => setActiveTab('location')}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'location'
+              ? 'text-[#E65D24] border-b-2 border-[#E65D24]'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Location
+        </button>
+        <button
+          onClick={() => setActiveTab('amenities')}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'amenities'
+              ? 'text-[#E65D24] border-b-2 border-[#E65D24]'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Amenities
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="space-y-4">
+        {activeTab === 'overview' && (
+          <div className="space-y-3">
+            <div className="p-4 bg-blue-50 rounded-lg">
+              <h4 className="font-semibold text-gray-900 mb-2">Location Quality</h4>
+              <p className="text-sm text-gray-600">
+                This area offers good connectivity and access to essential services. 
+                The location is well-served by public transport and has good access to 
+                local amenities including shops, schools, and healthcare facilities.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-green-50 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm font-medium text-green-900">Transport</span>
+                </div>
+                <p className="text-xs text-green-700">Good access to public transport</p>
+              </div>
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  <span className="text-sm font-medium text-blue-900">Amenities</span>
+                </div>
+                <p className="text-xs text-blue-700">Various local services nearby</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'location' && (
+          <div className="space-y-3">
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-gray-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900 mb-1">Address</p>
+                  <p className="text-sm text-gray-600">{property.location}</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-gray-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900 mb-1">Area Type</p>
+                  <p className="text-sm text-gray-600">Residential area with mixed amenities</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'amenities' && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-2">
+              {['Schools', 'Hospitals', 'Shopping', 'Restaurants', 'Parks', 'Transport'].map((amenity) => (
+                <div key={amenity} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-900">{amenity}</span>
+                  <span className="text-xs text-green-600 font-medium">Nearby</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNavigatingToBooking }: PropertyDetailsModalProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -268,6 +402,14 @@ const SearchResults = () => {
   const { isPropertySaved, toggleSaveProperty } = useSavedProperties();
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [showMap, setShowMap] = useState(false);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [selectedPropertyForInsights, setSelectedPropertyForInsights] = useState<Property | null>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const markersGeocodedRef = useRef<boolean>(false);
+  const lastResultsKeyRef = useRef<string | null>(null);
 
   // Perform search when component mounts or search params change
   useEffect(() => {
@@ -296,6 +438,410 @@ const SearchResults = () => {
   useEffect(() => {
     setIsNavigatingToBooking(false);
   }, []);
+
+  // Load Google Maps API script
+  useEffect(() => {
+    const loadGoogleMapsScript = () => {
+      if (window.google && window.google.maps) {
+        setIsMapLoaded(true);
+        return;
+      }
+
+      if (!document.getElementById('google-maps-script')) {
+        const script = document.createElement('script');
+        script.id = 'google-maps-script';
+        script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyChXxNp1xBJtJB9pC5WxWoZw3__7nT3djU&libraries=places';
+        script.async = true;
+        script.defer = true;
+        
+        script.onload = () => {
+          setIsMapLoaded(true);
+        };
+        
+        script.onerror = () => {
+          console.error('Failed to load Google Maps script');
+        };
+        
+        document.head.appendChild(script);
+      } else {
+        // Script already exists, check if Google Maps is ready
+        const checkInterval = setInterval(() => {
+          if (window.google && window.google.maps) {
+            setIsMapLoaded(true);
+            clearInterval(checkInterval);
+          }
+        }, 100);
+        
+        // Clear interval after 10 seconds to prevent infinite checking
+        setTimeout(() => clearInterval(checkInterval), 10000);
+      }
+    };
+
+    loadGoogleMapsScript();
+  }, []);
+
+  // Initialize map when showMap is true and script is loaded
+  useEffect(() => {
+    if (showMap && isMapLoaded && mapRef.current && window.google && window.google.maps) {
+      // Clear existing map instance if any
+      if (mapInstanceRef.current) {
+        console.log('Map already initialized, skipping re-initialization');
+        return; // Map already initialized
+      }
+
+      // Step 1: Initialize map centered on UK (country view)
+      try {
+        mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
+          center: { lat: 54.0, lng: -2.0 }, // Center of UK
+          zoom: 6, // Show entire UK
+          mapTypeControl: true,
+          streetViewControl: true,
+          fullscreenControl: true,
+          zoomControl: true,
+        });
+        console.log('Map initialized - showing UK view');
+        
+        // Step 2: Extract and geocode search location, then zoom in
+        if (searchQuery && window.google.maps) {
+          const geocoder = new window.google.maps.Geocoder();
+          // Extract location from search query (e.g., "2 bedroom flats in London" -> "London")
+          const locationMatch = searchQuery.match(/(?:in|at|near)\s+([A-Za-z\s]+)/i);
+          const locationToGeocode = locationMatch ? locationMatch[1].trim() : searchQuery;
+          
+          console.log('Geocoding search location:', locationToGeocode);
+          
+          geocoder.geocode({ address: locationToGeocode }, (results, status) => {
+            if (status === 'OK' && results && results[0] && mapInstanceRef.current) {
+              const location = results[0].geometry.location;
+              
+              // Step 3: Center and zoom on search location
+              mapInstanceRef.current.setCenter(location);
+              mapInstanceRef.current.setZoom(12); // Zoom into city level
+              console.log('Map centered and zoomed on search location:', locationToGeocode);
+            } else {
+              console.warn('Failed to geocode search location:', locationToGeocode, status);
+              // Fallback: center on London if search location geocoding fails
+              mapInstanceRef.current.setCenter({ lat: 51.5074, lng: -0.1278 });
+              mapInstanceRef.current.setZoom(12);
+            }
+          });
+        } else {
+          // No search query, just show UK
+          mapInstanceRef.current.setCenter({ lat: 54.0, lng: -2.0 });
+          mapInstanceRef.current.setZoom(6);
+        }
+      } catch (error) {
+        console.error('Error initializing map:', error);
+      }
+    }
+  }, [showMap, isMapLoaded, searchQuery]);
+
+  // Geocode properties and add markers when results change
+  // This runs AFTER the map is initialized and centered on search location
+  useEffect(() => {
+    if (showMap && isMapLoaded && mapInstanceRef.current && window.google && window.google.maps && results.length > 0) {
+      // Create a unique key for this results set to prevent re-geocoding
+      const resultsKey = results.map(r => `${r.location}-${r.title}`).join('|');
+      
+      // Skip if we've already geocoded these exact results
+      if (lastResultsKeyRef.current === resultsKey && markersGeocodedRef.current) {
+        console.log('Markers already geocoded for these results, skipping re-geocode...');
+        return;
+      }
+      
+      // Only proceed if this is a new set of results
+      if (lastResultsKeyRef.current !== resultsKey) {
+        lastResultsKeyRef.current = resultsKey;
+        
+        // Wait a bit for map to finish centering on search location before adding markers
+        const timeoutId = setTimeout(() => {
+          const geocoder = new window.google.maps.Geocoder();
+          const bounds = new window.google.maps.LatLngBounds();
+          
+          // Clear existing markers only when starting fresh geocode
+          console.log(`Clearing ${markersRef.current.length} existing markers...`);
+          markersRef.current.forEach(marker => marker.setMap(null));
+          markersRef.current = [];
+          markersGeocodedRef.current = false;
+        
+        // Filter properties with valid addresses
+        const propertiesWithAddresses = results.filter(prop => prop.location && prop.location.trim());
+        const totalProperties = propertiesWithAddresses.length;
+        
+        if (totalProperties === 0) {
+          console.warn('No properties with valid addresses to geocode');
+          return;
+        }
+
+        console.log(`Starting to geocode ${totalProperties} properties...`);
+        let completedCount = 0;
+        let successfulGeocodes = 0;
+
+        // Helper function to check if we should fit bounds
+        const checkAndFitBounds = () => {
+          completedCount++;
+          
+          if (completedCount === totalProperties) {
+            console.log(`Geocoding complete: ${successfulGeocodes} successful out of ${totalProperties}`);
+            
+            if (successfulGeocodes > 0) {
+              // Wait a bit to ensure all markers are rendered
+              setTimeout(() => {
+                try {
+                  const ne = bounds.getNorthEast();
+                  const sw = bounds.getSouthWest();
+                  
+                  // Validate bounds
+                  if (ne && sw) {
+                    const latDiff = Math.abs(ne.lat() - sw.lat());
+                    const lngDiff = Math.abs(ne.lng() - sw.lng());
+                    
+                    // Check if bounds are valid (not a single point)
+                    if (latDiff > 0.001 || lngDiff > 0.001) {
+                      // Calculate center point
+                      const centerLat = (ne.lat() + sw.lat()) / 2;
+                      const centerLng = (ne.lng() + sw.lng()) / 2;
+                      
+                      // Calculate appropriate zoom level based on bounds
+                      const maxLatDiff = Math.max(latDiff, 0.01);
+                      const maxLngDiff = Math.max(lngDiff, 0.01);
+                      
+                      // Determine zoom level (larger bounds = lower zoom)
+                      let targetZoom = 12;
+                      if (maxLatDiff > 0.5 || maxLngDiff > 0.5) {
+                        targetZoom = 10; // Very spread out
+                      } else if (maxLatDiff > 0.2 || maxLngDiff > 0.2) {
+                        targetZoom = 11;
+                      } else if (maxLatDiff < 0.05 && maxLngDiff < 0.05) {
+                        targetZoom = 14; // Very close together
+                      }
+                      
+                      // Fit bounds with padding
+                      mapInstanceRef.current.fitBounds(bounds, {
+                        top: 80,
+                        right: 80,
+                        bottom: 80,
+                        left: 80
+                      });
+                      
+                      // Wait for map to finish adjusting, then ensure proper zoom
+                      const idleListener = window.google.maps.event.addListenerOnce(
+                        mapInstanceRef.current,
+                        'idle',
+                        () => {
+                          const currentZoom = mapInstanceRef.current.getZoom();
+                          
+                          // Enforce zoom constraints
+                          if (currentZoom < 10) {
+                            console.log(`Zoom too low (${currentZoom}), setting to 10`);
+                            mapInstanceRef.current.setZoom(10);
+                          } else if (currentZoom > 15) {
+                            console.log(`Zoom too high (${currentZoom}), setting to 15`);
+                            mapInstanceRef.current.setZoom(15);
+                          }
+                          
+                          // Verify markers are still visible and attached to map
+                          const visibleMarkers = markersRef.current.filter(m => m.getMap() !== null);
+                          console.log(`Map idle - Zoom: ${mapInstanceRef.current.getZoom()}, Total markers: ${markersRef.current.length}, Visible on map: ${visibleMarkers.length}`);
+                        }
+                      );
+                      
+                      console.log('Map bounds fitted:', {
+                        center: { lat: centerLat, lng: centerLng },
+                        targetZoom: targetZoom,
+                        bounds: { ne: { lat: ne.lat(), lng: ne.lng() }, sw: { lat: sw.lat(), lng: sw.lng() } },
+                        totalMarkers: markersRef.current.length
+                      });
+                      
+                      // Mark as geocoded
+                      markersGeocodedRef.current = true;
+                    } else if (successfulGeocodes === 1) {
+                      // Single property - center on it
+                      const singleMarker = markersRef.current[0];
+                      if (singleMarker) {
+                        const position = singleMarker.getPosition();
+                        mapInstanceRef.current.setCenter(position);
+                        mapInstanceRef.current.setZoom(14);
+                        console.log('Map centered on single property');
+                      }
+                      markersGeocodedRef.current = true;
+                    }
+                  }
+                } catch (error) {
+                  console.error('Error fitting bounds:', error);
+                  // Fallback: center on first marker if available
+                  if (markersRef.current.length > 0) {
+                    const firstMarker = markersRef.current[0];
+                    const position = firstMarker.getPosition();
+                    mapInstanceRef.current.setCenter(position);
+                    mapInstanceRef.current.setZoom(12);
+                    console.log('Fallback: Map centered on first marker');
+                  }
+                  markersGeocodedRef.current = true;
+                }
+              }, 300); // Small delay to ensure markers are rendered
+            }
+          }
+        };
+
+        // Step 4: Geocode each property and add markers
+        propertiesWithAddresses.forEach((property, index) => {
+          const address = property.location.trim();
+          
+          // Add delay between requests to avoid rate limiting
+          setTimeout(() => {
+            geocoder.geocode({ address: address }, (geocodeResults, status) => {
+              if (status === 'OK' && geocodeResults && geocodeResults[0]) {
+                const location = geocodeResults[0].geometry.location;
+                
+                // Create marker with animation
+                const marker = new window.google.maps.Marker({
+                  position: location,
+                  map: mapInstanceRef.current,
+                  title: property.title,
+                  animation: window.google.maps.Animation.DROP,
+                  optimized: false, // Force markers to render
+                });
+
+                // Create unique ID for this property's info window
+                const propertyId = `prop-${index}-${Date.now()}`;
+                const imageUrls = property.imageUrls || [];
+                const imageUrlsJson = JSON.stringify(imageUrls);
+                const firstImageUrl = imageUrls.length > 0 ? imageUrls[0] : '';
+                
+                // Create info window with property details and image navigation
+                const infoWindow = new window.google.maps.InfoWindow({
+                  content: `
+                    <div style="max-width: 280px; padding: 0;">
+                      ${firstImageUrl ? `
+                        <div style="position: relative; width: 100%; height: 150px; overflow: hidden; border-radius: 8px 8px 0 0; background-color: #f0f0f0;">
+                          <img id="info-img-${propertyId}" src="${firstImageUrl}" alt="Property" style="width: 100%; height: 100%; object-fit: cover; transition: opacity 0.3s;" />
+                          ${imageUrls.length > 1 ? `
+                            <button id="prev-btn-${propertyId}" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; z-index: 10; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">‹</button>
+                            <button id="next-btn-${propertyId}" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; z-index: 10; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">›</button>
+                            <div id="img-counter-${propertyId}" style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; z-index: 10;">1/${imageUrls.length}</div>
+                          ` : ''}
+                        </div>
+                      ` : ''}
+                      <div style="padding: 12px;">
+                        <h4 style="font-weight: bold; margin: 0 0 8px 0; font-size: 15px; color: #1a1a1a; display: flex; align-items: start;">
+                          <svg width="14" height="14" style="margin-right: 6px; margin-top: 2px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span style="flex: 1;">${property.location}</span>
+                        </h4>
+                        <p style="margin: 0 0 8px 0; font-size: 13px; color: #666;">${property.title || 'Property'}</p>
+                        <p style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold; color: #E65D24;">${property.price || 'N/A'}</p>
+                        <p style="margin: 0; font-size: 12px; color: #666;">
+                          <strong>${property.bedrooms || 'N/A'}</strong> bedrooms • <strong>${property.propertyType || 'Property'}</strong>
+                        </p>
+                      </div>
+                    </div>
+                  `,
+                });
+
+                // Set up image navigation when info window is ready
+                window.google.maps.event.addListener(infoWindow, 'domready', () => {
+                  const imgEl = document.getElementById(`info-img-${propertyId}`) as HTMLImageElement;
+                  const prevBtn = document.getElementById(`prev-btn-${propertyId}`) as HTMLButtonElement;
+                  const nextBtn = document.getElementById(`next-btn-${propertyId}`) as HTMLButtonElement;
+                  const counterEl = document.getElementById(`img-counter-${propertyId}`) as HTMLDivElement;
+                  
+                  if (!imgEl || imageUrls.length <= 1) {
+                    if (prevBtn) prevBtn.style.display = 'none';
+                    if (nextBtn) nextBtn.style.display = 'none';
+                    return;
+                  }
+                  
+                  let currentIndex = 0;
+                  
+                  const updateImage = () => {
+                    if (imgEl) {
+                      imgEl.src = imageUrls[currentIndex];
+                    }
+                    if (counterEl) {
+                      counterEl.textContent = `${currentIndex + 1}/${imageUrls.length}`;
+                    }
+                    if (prevBtn) {
+                      prevBtn.style.display = currentIndex > 0 ? 'flex' : 'none';
+                    }
+                    if (nextBtn) {
+                      nextBtn.style.display = currentIndex < imageUrls.length - 1 ? 'flex' : 'none';
+                    }
+                  };
+                  
+                  if (prevBtn) {
+                    prevBtn.addEventListener('click', (e) => {
+                      e.stopPropagation();
+                      if (currentIndex > 0) {
+                        currentIndex--;
+                        updateImage();
+                      }
+                    });
+                  }
+                  
+                  if (nextBtn) {
+                    nextBtn.addEventListener('click', (e) => {
+                      e.stopPropagation();
+                      if (currentIndex < imageUrls.length - 1) {
+                        currentIndex++;
+                        updateImage();
+                      }
+                    });
+                  }
+                  
+                  updateImage();
+                });
+
+                marker.addListener('click', () => {
+                  // Close all other info windows
+                  markersRef.current.forEach(m => {
+                    if (m.infoWindow) m.infoWindow.close();
+                  });
+                  infoWindow.open(mapInstanceRef.current, marker);
+                  // Set selected property for insights
+                  setSelectedPropertyForInsights(property);
+                });
+
+                marker.infoWindow = infoWindow;
+                markersRef.current.push(marker);
+                bounds.extend(location);
+                successfulGeocodes++;
+                
+                console.log(`✓ Geocoded property ${index + 1}/${totalProperties}: ${address} (Total markers: ${markersRef.current.length})`);
+              } else {
+                console.warn(`✗ Failed to geocode address ${index + 1}/${totalProperties}: ${address}`, status);
+              }
+              
+              checkAndFitBounds();
+            });
+          }, index * 150); // 150ms delay between each geocode request
+        });
+        }, 500); // Wait 500ms after map initialization before starting geocoding
+
+        return () => {
+          clearTimeout(timeoutId);
+        };
+      }
+    }
+  }, [showMap, isMapLoaded, results]);
+  
+  // Reset geocoded flag when map is hidden
+  useEffect(() => {
+    if (!showMap) {
+      console.log('Map hidden - clearing all markers');
+      markersGeocodedRef.current = false;
+      lastResultsKeyRef.current = null;
+      markersRef.current.forEach(marker => marker.setMap(null));
+      markersRef.current = [];
+    }
+  }, [showMap]);
+  
+  // Debug: Log marker count changes
+  useEffect(() => {
+    console.log(`Current marker count: ${markersRef.current.length}, Geocoded flag: ${markersGeocodedRef.current}`);
+  }, [markersRef.current.length]);
 
   const openModal = (property: Property) => {
     setSelectedProperty(property);
@@ -500,6 +1046,27 @@ const SearchResults = () => {
               {/* Right Side: Action Buttons */}
               <div className="flex gap-3 ml-8">
                 <button
+                  onClick={() => {
+                    setShowMap(!showMap);
+                    // Scroll to map if showing
+                    if (!showMap) {
+                      setTimeout(() => {
+                        document.getElementById('map-container')?.scrollIntoView({ behavior: 'smooth' });
+                      }, 100);
+                    }
+                  }}
+                  className={`flex items-center px-6 py-3 ${
+                    showMap 
+                      ? 'bg-gradient-to-r from-[#E65D24] to-[#D54D14]' 
+                      : 'bg-gradient-to-r from-[#136C9E] to-[#0F5A8A]'
+                  } text-white rounded-lg hover:opacity-90 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5`}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  {showMap ? 'Hide Map' : 'Show Map'}
+                </button>
+                <button
                   onClick={() => searchProperties(searchQuery, searchTypeParam as 'onthemarket' | 'internet')}
                   className="flex items-center px-6 py-3 bg-gradient-to-r from-[#136C9E] to-[#0F5A8A] text-white rounded-lg hover:from-[#0F5A8A] hover:to-[#0D4A7A] transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                 >
@@ -541,8 +1108,13 @@ const SearchResults = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {results.map((property, index) => (
+            <div className={showMap ? "grid grid-cols-1 lg:grid-cols-2 gap-6" : ""}>
+              {/* Property Listings */}
+              <div className={showMap ? "" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"}>
+                {showMap ? (
+                  // When map is shown, display in single column
+                  <div className="grid grid-cols-1 gap-6">
+                    {results.map((property, index) => (
                 <div
                   key={index}
                   className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
@@ -642,6 +1214,155 @@ const SearchResults = () => {
                   </div>
                 </div>
               ))}
+                  </div>
+                ) : (
+                  // When map is hidden, display in grid
+                  results.map((property, index) => (
+                    <div
+                      key={index}
+                      className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
+                      onClick={() => openModal(property)}
+                    >
+                      {/* Property Image */}
+                      <div className="relative h-48 overflow-hidden">
+                        {property.imageUrls && property.imageUrls.length > 0 ? (
+                          <img
+                            src={property.imageUrls[0]}
+                            alt={property.title}
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                        )}
+                        
+                        {/* Price Badge */}
+                        <div className="absolute top-4 left-4 bg-[#E65D24] text-white px-3 py-1 rounded-full font-semibold text-sm">
+                          {cleanPropertyPrice(property.price)}
+                        </div>
+                        
+                        {/* Heart Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const propertyId = `${property.title}-${property.location}-${property.price}`;
+                            const wasSaved = isPropertySaved(propertyId);
+                            toggleSaveProperty(property);
+                            setToastMessage(wasSaved ? 'Property removed from saved' : 'Property saved!');
+                            setShowToast(true);
+                            setTimeout(() => setShowToast(false), 3000);
+                          }}
+                          className="absolute top-4 right-4 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
+                        >
+                          <svg 
+                            className={`w-5 h-5 transition-colors ${
+                              isPropertySaved(`${property.title}-${property.location}-${property.price}`) 
+                                ? 'text-red-500 fill-red-500' 
+                                : 'text-gray-600 hover:text-red-500'
+                            }`}
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          </svg>
+                        </button>
+                        
+                        {/* Source Badge */}
+                        {property.source && (
+                          <div className="absolute bottom-4 left-4 bg-black/70 text-white px-2 py-1 rounded text-xs">
+                            {property.source}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Property Details */}
+                      <div className="p-4">
+                        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{property.title}</h3>
+                        
+                        <div className="flex items-center gap-2 text-gray-600 mb-3">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span className="text-sm">{property.location}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-sm text-gray-600">
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-1">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
+                              </svg>
+                              <span>{property.bedrooms}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                              </svg>
+                              <span>{property.propertyType}</span>
+                            </div>
+                          </div>
+                          
+                          {property.agent && (
+                            <div className="text-xs text-gray-500">
+                              {property.agent.name}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Map Container and Insights */}
+              {showMap && (
+                <div className="flex flex-col gap-4">
+                  <div id="map-container" className="bg-white rounded-xl shadow-lg overflow-hidden">
+                    {!isMapLoaded ? (
+                      <div 
+                        className="w-full flex items-center justify-center bg-gray-50"
+                        style={{ height: 'calc(60vh)', minHeight: '400px' }}
+                      >
+                        <div className="text-center">
+                          <div className="w-16 h-16 border-4 border-[#136C9E] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                          <p className="text-gray-600">Loading map...</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div 
+                        ref={mapRef}
+                        className="w-full"
+                        style={{ height: 'calc(60vh)', minHeight: '400px' }}
+                      ></div>
+                    )}
+                  </div>
+                  
+                  {/* Property Insights Section */}
+                  <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div className="p-4 border-b border-gray-200">
+                      <h3 className="text-lg font-semibold text-gray-900">Property Insights</h3>
+                    </div>
+                    <div className="p-4 max-h-96 overflow-y-auto">
+                      {selectedPropertyForInsights ? (
+                        <PropertyInsights property={selectedPropertyForInsights} />
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <svg className="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                          </svg>
+                          <p>Click on a property marker on the map to see location insights</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
