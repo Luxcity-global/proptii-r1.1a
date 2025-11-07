@@ -181,7 +181,11 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
                         placeholder="Name, email, or property address..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
+                        className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
+                        style={{
+                          '--tw-ring-color': '#8FCDFF',
+                          '--tw-ring-opacity': '0.5'
+                        } as React.CSSProperties}
                       />
                     </div>
                   </div>

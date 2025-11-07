@@ -34,6 +34,7 @@ import {
   ChevronRight,
   Phone,
   Mail,
+  CheckCircle2,
 } from "lucide-react";
 import { Property, UserProfile, MarketInsight } from "../App";
 import {
@@ -723,42 +724,57 @@ export function Dashboard({
           {/* Left Column - Priority Alerts */}
           <div>
             {/* Priority Alerts Section - Redesigned */}
-            {(vacancyAlerts.length > 0 || arrearsAlerts.length > 0) && (
-              <div className="shadow-sm overflow-hidden" style={{ 
-                background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', 
-                border: '1px solid #80B2FF', 
-                height: '320px',
-                borderRadius: '20px'
-              }}>
-                <div className="flex h-full">
-                  {/* Left Blue Panel */}
-                  <div className="p-6 flex flex-col items-start min-w-[200px] rounded-l-xl" style={{ 
-                    background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', 
-                    color: '#374957', 
-                    fontFamily: 'Archivo, sans-serif'
-                  }}>
-                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mb-3">
-                      <AlertTriangle className="w-5 h-5" style={{ color: '#374957' }} />
+            <div className="shadow-sm overflow-hidden" style={{ 
+              background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', 
+              border: '1px solid #80B2FF', 
+              height: '320px',
+              borderRadius: '20px'
+            }}>
+              <div className="flex h-full">
+                {/* Left Blue Panel */}
+                <div className="p-6 flex flex-col items-start min-w-[200px] rounded-l-xl" style={{ 
+                  background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', 
+                  color: '#374957', 
+                  fontFamily: 'Archivo, sans-serif'
+                }}>
+                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mb-3">
+                    <AlertTriangle className="w-5 h-5" style={{ color: '#374957' }} />
+                  </div>
+                  <h2 className="text-lg font-semibold">Priority<br />Alerts</h2>
+                  <div className="flex-1"></div>
+                  <div className="mt-auto">
+                    <div className="font-bold block mb-1" style={{ fontSize: '32px', lineHeight: '1' }}>
+                      {vacancyAlerts.length + arrearsAlerts.length}
                     </div>
-                    <h2 className="text-lg font-semibold">Priority<br />Alerts</h2>
-                    <div className="flex-1"></div>
-                    <div className="mt-auto">
-                      <div className="font-bold block mb-1" style={{ fontSize: '32px', lineHeight: '1' }}>
-                        {vacancyAlerts.length + arrearsAlerts.length}
-                      </div>
-                      <div className="text-sm opacity-90 mb-2 block">Alerts</div>
-                      <div className="text-xs opacity-75">
-                        As of {new Date().toLocaleDateString('en-GB', { 
-                          day: '2-digit', 
-                          month: '2-digit', 
-                          year: 'numeric' 
-                        })}
-                      </div>
+                    <div className="text-sm opacity-90 mb-2 block">Alerts</div>
+                    <div className="text-xs opacity-75">
+                      As of {new Date().toLocaleDateString('en-GB', { 
+                        day: '2-digit', 
+                        month: '2-digit', 
+                        year: 'numeric' 
+                      })}
                     </div>
+                  </div>
                 </div>
 
-                  {/* Right White Panel */}
-                  <div className="flex-1 p-4 bg-white relative z-10" style={{ borderRadius: '20px', boxShadow: '-4px 0 24px rgba(70, 95, 194, 0.4)' }}>
+                {/* Right White Panel */}
+                <div className="flex-1 p-4 bg-white relative z-10" style={{ borderRadius: '20px', boxShadow: '-4px 0 24px rgba(70, 95, 194, 0.4)' }}>
+                  {vacancyAlerts.length === 0 && arrearsAlerts.length === 0 ? (
+                    // Empty State
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center py-8">
+                        <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <CheckCircle2 className="w-8 h-8 text-green-500" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-700 mb-2" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                          All Clear!
+                        </h3>
+                        <p className="text-sm text-gray-500 max-w-xs" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                          You have no priority alerts at this time. Everything is running smoothly.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
                     <div className="space-y-3">
                   {vacancyAlerts.slice(0, 2).map((alert) => (
                     <Card
@@ -851,10 +867,10 @@ export function Dashboard({
                     </Card>
                   ))}
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Right Column - Quick Stats */}

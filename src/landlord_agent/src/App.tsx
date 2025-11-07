@@ -29,6 +29,7 @@ import { TenantInbox } from './components/TenantInbox';
 import { PropertyPreview } from './components/PropertyPreview';
 import { TenantSelection } from './components/TenantSelection';
 import { AddTenant } from './components/AddTenant';
+import { alertService, type Alert } from './services/alertService';
 import { InviteTenant } from './components/InviteTenant';
 import { SelectExistingTenant } from './components/SelectExistingTenant';
 import { AddLandlord } from './components/AddLandlord';
@@ -36,8 +37,10 @@ import { AddLandlordWizard } from './components/AddLandlordWizard';
 import { ContractsPage } from './components/ContractsPage';
 import { propertyService } from './services/propertyService';
 import { tenantService } from './services/tenantService';
-import { storage } from './config/firebase';
+import { marketInsightService } from './services/marketInsightService';
+import { storage, db } from './config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { collection, query, where, onSnapshot, Unsubscribe, doc, updateDoc, Timestamp } from 'firebase/firestore';
 
 export type UserRole = 'landlord' | 'agent';
 
@@ -101,13 +104,21 @@ export interface PropertyDocument {
 
 export interface MarketInsight {
   id: string;
-  type: 'market-trend' | 'regulatory-change' | 'demand-shift' | 'price-change';
+  type: 'market-trend' | 'regulatory-change' | 'demand-shift' | 'price-change' | 'rental-demand' | 'epc-requirements' | 'property-values';
   title: string;
   description: string;
   severity: 'low' | 'medium' | 'high';
   actionRequired: boolean;
   date: Date;
   area?: string;
+  region?: string;
+  value?: number;
+  unit?: string;
+  trend?: 'up' | 'down' | 'stable';
+  source?: string;
+  link?: string;
+  effectiveDate?: Date;
+  expiryDate?: Date;
 }
 
 export interface Tenant {
@@ -123,6 +134,8 @@ export interface Tenant {
   status: 'active' | 'pending' | 'ended';
   referencingStatus: 'not-started' | 'in-progress' | 'complete';
   paymentStatus: 'current' | 'overdue' | 'payment-plan';
+  paymentFrequency?: 'monthly' | 'yearly' | 'fixed-time';
+  firstPaymentDate?: Date;
   avatar?: string;
   emergencyContact?: {
     name: string;
@@ -277,6 +290,7 @@ export default function App() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const editingTenantRef = React.useRef<Tenant | null>(null);
   const [selectedLandlord, setSelectedLandlord] = useState<any | null>(null);
   const [selectedVacancyAlert, setSelectedVacancyAlert] = useState<VacancyRiskAlert | null>(null);
   const [selectedArrearsAlert, setSelectedArrearsAlert] = useState<ArrearsAlert | null>(null);
@@ -284,6 +298,7 @@ export default function App() {
   const [marketInsights, setMarketInsights] = useState<MarketInsight[]>([]);
   const [vacancyAlerts, setVacancyAlerts] = useState<VacancyRiskAlert[]>([]);
   const [arrearsAlerts, setArrearsAlerts] = useState<ArrearsAlert[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editingPropertyId, setEditingPropertyId] = useState<string | null>(null);
@@ -895,93 +910,72 @@ export default function App() {
     // setProperties(mockProperties);
     console.log('🚫 Mock properties disabled - using Firestore data scoped to user');
 
-    // Mock market insights
-    const mockInsights: MarketInsight[] = [
-      {
-        id: '1',
-        type: 'market-trend',
-        title: 'Rental demand increased 12% in your area',
-        description: 'East London properties showing strong growth. Consider reviewing rent prices.',
-        severity: 'medium',
-        actionRequired: false,
-        date: new Date('2024-06-01'),
-        area: 'East London'
-      },
-      {
-        id: '2',
-        type: 'regulatory-change',
-        title: 'New EPC requirements coming 2025',
-        description: 'Properties must achieve minimum grade C by April 2025. Review your compliance status.',
-        severity: 'high',
-        actionRequired: true,
-        date: new Date('2024-06-15')
-      }
-    ];
-    setMarketInsights(mockInsights);
+    // Market insights will be loaded from Firestore via useEffect
+    // This allows real-time updates and actual UK market data
+    console.log('📊 Market insights will be loaded from Firestore');
 
-    // Mock vacancy alerts
-    const mockVacancyAlerts: VacancyRiskAlert[] = [
-      {
-        id: 'v1',
-        propertyId: '1',
-        propertyAddress: '123 Regent Street, London W1B 4EA',
-        riskScore: 85,
-        predictedVacancyDate: new Date('2025-03-15'),
-        currentTenantEndDate: new Date('2025-02-28'),
-        factors: {
-          marketTrend: 75,
-          seasonality: 90,
-          tenantHistory: 60,
-          propertyCondition: 80
-        },
-        recommendations: {
-          optimalRentPrice: 2650,
-          marketingStartDate: new Date('2025-01-15'),
-          urgencyLevel: 'high'
-        },
-        status: 'new'
-      }
-    ];
-    setVacancyAlerts(mockVacancyAlerts);
-
-    // Mock arrears alerts
-    const mockArrearsAlerts: ArrearsAlert[] = [
-      {
-        id: 'a1',
-        tenantId: 't1',
-        tenantName: 'Sarah Johnson',
-        propertyAddress: '123 Regent Street, London W1B 4EA',
-        overdueAmount: 2400,
-        daysPastDue: 12,
-        defaultRiskScore: 65,
-        lastPaymentDate: new Date('2024-10-01'),
-        status: 'new'
-      }
-    ];
-    setArrearsAlerts(mockArrearsAlerts);
+    // Alerts will be loaded from Firestore in useEffect below
+    console.log('🚫 Alerts will be loaded from Firestore');
+    setVacancyAlerts([]);
+    setArrearsAlerts([]);
+    setAlerts([]);
   }, []);
 
   // Reload and scope tenants once we know the current user's properties
   React.useEffect(() => {
     const loadScopedTenants = async () => {
       try {
-        const params = new URLSearchParams(window.location.search);
-        const uidFromQuery = params.get('uid');
-        let userId: string | null = null;
-        if (uidFromQuery) userId = uidFromQuery;
-        if (!userId && typeof (window as any).getUserInfo === 'function') {
-          const info = (window as any).getUserInfo();
-          userId = info?.id || info?.sub || info?.oid || null;
-        }
-        if (!userId) {
-          const cached = localStorage.getItem('proptii_auth_state');
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            userId = parsed?.user?.localAccountId || parsed?.user?.homeAccountId || parsed?.user?.id || null;
+        // Use the same userId extraction logic as addTenant and loadProperties
+        const getCurrentUserId = (): string | null => {
+          try {
+            // PRIORITY 1: Direct from userProfile (most reliable)
+            if (userProfile && (userProfile as any).id) {
+              const uid = (userProfile as any).id;
+              console.log('🔍 UserId from userProfile.id:', uid);
+              return uid;
+            }
+            
+            // PRIORITY 2: Query parameter
+            const params = new URLSearchParams(window.location.search);
+            const uidFromQuery = params.get('uid');
+            if (uidFromQuery) {
+              console.log('🔍 UserId from query param:', uidFromQuery);
+              return uidFromQuery;
+            }
+            
+            // PRIORITY 3: getUserInfo function
+            if (typeof (window as any).getUserInfo === 'function') {
+              const info = (window as any).getUserInfo();
+              console.log('🔍 getUserInfo() returned:', info);
+              if (info?.id || info?.sub || info?.oid) {
+                const uid = info.id || info.sub || info.oid;
+                console.log('🔍 UserId from getUserInfo:', uid);
+                return uid;
+              }
+            }
+            
+            // PRIORITY 4: localStorage auth state
+            const cached = localStorage.getItem('proptii_auth_state');
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              console.log('🔍 Cached auth state:', parsed);
+              // Check both nested user.id AND top-level user id fields
+              const uid = parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId;
+              if (uid) {
+                console.log('🔍 UserId from localStorage:', uid);
+                return uid;
+              }
+            }
+          } catch (e) {
+            console.error('🔍 Error extracting userId:', e);
           }
-        }
-        if (!userId) userId = userProfile?.email || null;
+          
+          // Don't use email as fallback - it won't match stored userIds
+          console.warn('⚠️ No userId found - tenants may not load correctly');
+          return null;
+        };
 
+        const userId = getCurrentUserId();
         console.log('🔁 Scoping tenants for userId:', userId);
         let list = await tenantService.getTenants(userId || undefined);
 
@@ -1115,6 +1109,278 @@ export default function App() {
     loadProperties();
   }, [userProfile]);
 
+  // Helper function to get current user ID
+  const getCurrentUserId = (): string | null => {
+    try {
+      if (userProfile && (userProfile as any).id) {
+        return (userProfile as any).id;
+      }
+      const params = new URLSearchParams(window.location.search);
+      const uidFromQuery = params.get('uid');
+      if (uidFromQuery) return uidFromQuery;
+      if (typeof (window as any).getUserInfo === 'function') {
+        const info = (window as any).getUserInfo();
+        return info?.id || info?.sub || info?.oid || null;
+      }
+      const cached = localStorage.getItem('proptii_auth_state');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId || null;
+      }
+    } catch (e) {
+      console.error('Error extracting userId for alerts:', e);
+    }
+    return userProfile?.email || null;
+  };
+
+  // Function to process alerts and update state
+  const processAlerts = (activeAlerts: Alert[]) => {
+    setAlerts(activeAlerts);
+
+    // Convert alerts to Dashboard format
+    const vacancyAlertsList: VacancyRiskAlert[] = [];
+    const arrearsAlertsList: ArrearsAlert[] = [];
+
+    for (const alert of activeAlerts) {
+      if (alert.type === 'lease-expiry' && alert.leaseExpiryDate) {
+        // Convert lease expiry alert to vacancy alert format
+        vacancyAlertsList.push({
+          id: alert.id,
+          propertyId: alert.propertyId || '',
+          propertyAddress: alert.propertyAddress || '',
+          riskScore: alert.daysUntilExpiry ? Math.min(100, Math.max(0, 100 - (alert.daysUntilExpiry * 3))) : 50,
+          predictedVacancyDate: alert.leaseExpiryDate,
+          currentTenantEndDate: alert.leaseExpiryDate,
+          factors: {
+            marketTrend: 50,
+            seasonality: 50,
+            tenantHistory: 50,
+            propertyCondition: 50
+          },
+          recommendations: {
+            optimalRentPrice: 0,
+            marketingStartDate: new Date(),
+            urgencyLevel: alert.severity === 'critical' ? 'high' : alert.severity === 'high' ? 'medium' : 'low'
+          },
+          status: 'new'
+        });
+      } else if (alert.type === 'rent-arrears') {
+        arrearsAlertsList.push({
+          id: alert.id,
+          tenantId: alert.tenantId || '',
+          tenantName: alert.tenantName || '',
+          propertyAddress: alert.propertyAddress || '',
+          overdueAmount: alert.overdueAmount || 0,
+          daysPastDue: alert.daysPastDue || 0,
+          defaultRiskScore: 65, // Default risk score
+          lastPaymentDate: alert.lastPaymentDate || new Date(),
+          status: 'new'
+        });
+      }
+    }
+
+    setVacancyAlerts(vacancyAlertsList);
+    setArrearsAlerts(arrearsAlertsList);
+  };
+
+  // Real-time Firestore listeners for tenants, properties, and alerts
+  React.useEffect(() => {
+    const currentUserId = getCurrentUserId();
+    if (!currentUserId) {
+      console.warn('⚠️ No userId found - cannot set up real-time listeners');
+      return;
+    }
+
+    console.log('🔔 Setting up real-time Firestore listeners for userId:', currentUserId);
+    const unsubscribes: Unsubscribe[] = [];
+
+    // Debounce function to prevent too many rapid alert generations
+    let alertGenerationTimeout: NodeJS.Timeout | null = null;
+    const debouncedGenerateAlerts = () => {
+      if (alertGenerationTimeout) {
+        clearTimeout(alertGenerationTimeout);
+      }
+      alertGenerationTimeout = setTimeout(async () => {
+        try {
+          console.log('🔄 Real-time update detected - regenerating alerts');
+          await alertService.generateAlerts(currentUserId);
+        } catch (error) {
+          console.error('Error generating alerts from real-time update:', error);
+        }
+      }, 1000); // Wait 1 second after last change before regenerating
+    };
+
+    // Listen to tenants collection changes
+    try {
+      const tenantsQuery = query(
+        collection(db, 'tenants'),
+        where('userId', '==', currentUserId)
+      );
+      const tenantsUnsubscribe = onSnapshot(tenantsQuery, 
+        (snapshot) => {
+          console.log('👥 Real-time tenant update detected:', snapshot.docChanges().length, 'changes');
+          debouncedGenerateAlerts();
+        },
+        (error) => {
+          console.error('Error listening to tenants:', error);
+        }
+      );
+      unsubscribes.push(tenantsUnsubscribe);
+    } catch (error) {
+      console.error('Error setting up tenants listener:', error);
+    }
+
+    // Listen to properties collection changes
+    try {
+      const propertiesQuery = query(
+        collection(db, 'properties'),
+        where('userId', '==', currentUserId)
+      );
+      const propertiesUnsubscribe = onSnapshot(propertiesQuery,
+        (snapshot) => {
+          console.log('🏠 Real-time property update detected:', snapshot.docChanges().length, 'changes');
+          debouncedGenerateAlerts();
+        },
+        (error) => {
+          console.error('Error listening to properties:', error);
+        }
+      );
+      unsubscribes.push(propertiesUnsubscribe);
+    } catch (error) {
+      console.error('Error setting up properties listener:', error);
+    }
+
+    // Listen to alerts collection changes (real-time alert updates)
+    try {
+      const alertsQuery = query(
+        collection(db, 'alerts'),
+        where('userId', '==', currentUserId),
+        where('status', '==', 'active')
+      );
+      const alertsUnsubscribe = onSnapshot(alertsQuery,
+        async (snapshot) => {
+          console.log('🔔 Real-time alert update detected:', snapshot.docs.length, 'active alerts');
+          // Map Firestore documents to Alert objects
+          const activeAlerts = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              type: data.type,
+              status: data.status,
+              severity: data.severity,
+              userId: data.userId,
+              tenantId: data.tenantId,
+              contractId: data.contractId,
+              propertyId: data.propertyId,
+              title: data.title,
+              description: data.description,
+              leaseExpiryDate: data.leaseExpiryDate?.toDate(),
+              daysUntilExpiry: data.daysUntilExpiry,
+              contractTitle: data.contractTitle,
+              contractSentDate: data.contractSentDate?.toDate(),
+              overdueAmount: data.overdueAmount,
+              daysPastDue: data.daysPastDue,
+              lastPaymentDate: data.lastPaymentDate?.toDate(),
+              paymentFrequency: data.paymentFrequency,
+              propertyAddress: data.propertyAddress,
+              tenantName: data.tenantName,
+              createdAt: data.createdAt?.toDate() || new Date(),
+              updatedAt: data.updatedAt?.toDate() || new Date(),
+              resolvedAt: data.resolvedAt?.toDate(),
+              dismissedAt: data.dismissedAt?.toDate()
+            } as Alert;
+          });
+          processAlerts(activeAlerts);
+        },
+        (error) => {
+          console.error('Error listening to alerts:', error);
+        }
+      );
+      unsubscribes.push(alertsUnsubscribe);
+    } catch (error) {
+      console.error('Error setting up alerts listener:', error);
+      // Fallback: if listener fails, try initial load
+      alertService.getActiveAlerts(currentUserId).then(processAlerts).catch(console.error);
+    }
+
+    // Initial alert generation
+    alertService.generateAlerts(currentUserId).catch(console.error);
+
+    // Cleanup
+    return () => {
+      console.log('🧹 Cleaning up real-time Firestore listeners');
+      unsubscribes.forEach(unsub => unsub());
+      if (alertGenerationTimeout) {
+        clearTimeout(alertGenerationTimeout);
+      }
+    };
+  }, [userProfile]);
+
+  // Load market insights from Firestore
+  React.useEffect(() => {
+    const currentUserId = getCurrentUserId();
+    
+    console.log('📊 Setting up market insights listener');
+    
+    // Fetch GOV.UK regulatory changes on app load (once per day)
+    const lastFetchKey = 'govuk_insights_last_fetch';
+    const lastFetch = localStorage.getItem(lastFetchKey);
+    const now = Date.now();
+    const oneDay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    
+    // Only fetch if we haven't fetched in the last 24 hours
+    if (!lastFetch || (now - parseInt(lastFetch)) > oneDay) {
+      console.log('🔄 Fetching GOV.UK regulatory changes (24h check passed)...');
+      marketInsightService.fetchGOVUKRegulatoryChanges()
+        .then(count => {
+          console.log(`✅ Fetched ${count} new GOV.UK insights`);
+          localStorage.setItem(lastFetchKey, now.toString());
+        })
+        .catch(error => {
+          console.warn('⚠️ Failed to fetch GOV.UK insights (will retry later):', error);
+          // Don't block the app if this fails
+        });
+    } else {
+      const hoursSinceFetch = Math.floor((now - parseInt(lastFetch)) / (60 * 60 * 1000));
+      console.log(`ℹ️  GOV.UK insights fetched ${hoursSinceFetch} hours ago, skipping (fetch once per day)`);
+    }
+    
+    // Set up real-time listener for market insights
+    const unsubscribe = marketInsightService.subscribeToInsights(
+      (insights) => {
+        console.log(`✅ Loaded ${insights.length} market insights from Firestore`);
+        setMarketInsights(insights);
+      },
+      currentUserId || undefined
+    );
+
+    // Also try initial load
+    if (currentUserId) {
+      marketInsightService.getActiveInsights(currentUserId).then(insights => {
+        console.log(`✅ Initially loaded ${insights.length} market insights`);
+        setMarketInsights(insights);
+      }).catch(error => {
+        console.error('Error loading market insights:', error);
+        // Fallback to empty array if Firestore query fails
+        setMarketInsights([]);
+      });
+    } else {
+      // If no userId, still try to load general insights (not user-specific)
+      marketInsightService.getActiveInsights().then(insights => {
+        console.log(`✅ Loaded ${insights.length} general market insights`);
+        setMarketInsights(insights);
+      }).catch(error => {
+        console.error('Error loading market insights:', error);
+        setMarketInsights([]);
+      });
+    }
+
+    return () => {
+      console.log('🧹 Cleaning up market insights listener');
+      unsubscribe();
+    };
+  }, [userProfile]);
+
   const addProperty = async (property: Omit<Property, 'id' | 'createdAt'>) => {
     try {
       // Strip any accidental id/createdAt fields before saving
@@ -1211,6 +1477,15 @@ export default function App() {
         setSelectedProperty(prev => prev ? { ...prev, ...updates } : null);
       }
       console.log('Property updated in Firebase:', propertyId);
+      
+      // Trigger alert regeneration after property update
+      const currentUserId = getCurrentUserId();
+      if (currentUserId) {
+        console.log('🔄 Triggering alert regeneration after property update');
+        alertService.generateAlerts(currentUserId).catch(error => {
+          console.warn('⚠️ Failed to regenerate alerts after property update:', error);
+        });
+      }
     } catch (error) {
       console.error('Error updating property in Firebase:', error);
       // Fallback to local state update if Firebase fails
@@ -1263,7 +1538,7 @@ export default function App() {
 
   const addTenant = async (tenant: Omit<Tenant, 'id'>) => {
     try {
-      console.log('[App] addTenant called with:', tenant);
+      console.log('📝 [App] addTenant called with tenant data:', tenant);
       const currentUserId = (() => {
         try {
           // PRIORITY 1: Direct from userProfile
@@ -1286,18 +1561,32 @@ export default function App() {
             const parsed = JSON.parse(cached);
             return parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId || null;
           }
-        } catch {}
+        } catch (e) {
+          console.error('❌ [App] Error extracting userId:', e);
+        }
         return userProfile?.email || 'unknown';
       })();
-      console.log('📝 Creating tenant with userId:', currentUserId);
+      console.log('📝 [App] Creating tenant with userId:', currentUserId);
+      
       const id = await tenantService.createTenant(tenant, currentUserId);
-      console.log('[App] tenant created with id:', id);
+      console.log('✅ [App] Tenant created with id:', id);
+      
       const saved = await tenantService.getTenant(id);
       if (saved) {
-        console.log('[App] fetched saved tenant:', saved);
+        console.log('✅ [App] Fetched saved tenant from Firestore:', saved);
         // Ensure userId is preserved when adding to state
         const tenantWithUserId = { ...saved, userId: currentUserId } as any;
-        console.log('[App] Adding tenant to state with userId:', currentUserId);
+        console.log('✅ [App] Adding tenant to state with userId:', currentUserId);
+        
+        // Trigger alert generation after tenant is created (to check for lease expiry, etc.)
+        try {
+          console.log('🔄 Triggering alert generation after tenant creation...');
+          await alertService.generateAlerts(currentUserId);
+          console.log('✅ Alerts updated after tenant creation');
+        } catch (alertError) {
+          console.warn('⚠️ Failed to generate alerts after tenant creation:', alertError);
+        }
+        
         setTenants(prev => {
           // Check if tenant already exists (avoid duplicates)
           if (prev.some(t => t.id === tenantWithUserId.id)) {
@@ -1307,13 +1596,19 @@ export default function App() {
           return [...prev, tenantWithUserId];
         });
         return;
+      } else {
+        console.error('❌ [App] ERROR: Tenant was not found in Firestore after creation!');
+        throw new Error('Tenant was not saved to Firestore');
       }
     } catch (e) {
-      console.warn('[App] addTenant failed, falling back:', e);
-      // ignore and fallback
+      console.error('❌ [App] addTenant failed:', e);
+      console.error('❌ [App] Error details:', {
+        message: e instanceof Error ? e.message : 'Unknown error',
+        stack: e instanceof Error ? e.stack : undefined
+      });
+      // Re-throw the error so it can be caught by the calling code
+      throw e;
     }
-    const fallback: Tenant = { ...tenant, id: `tenant-${Date.now()}` };
-    setTenants(prev => [...prev, fallback]);
   };
 
   const addLandlord = (landlordData: any) => {
@@ -1461,7 +1756,8 @@ export default function App() {
               selectProperty(property);
               navigateToScreen('photo-management');
             }}
-            onViewInsights={() => navigateToScreen('portfolio-insights')}
+            // COMMENTED OUT FOR THIS RELEASE - Insights page not in scope
+            onViewInsights={() => {/* navigateToScreen('portfolio-insights') */}}
             onViewVacancyAlert={(alertId) => {
               const alert = vacancyAlerts.find(a => a.id === alertId);
               if (alert) {
@@ -1624,22 +1920,23 @@ export default function App() {
           />
         );
 
-      case 'inbox':
-        return (
-          <TenantInbox
-            onBack={() => setNavigationScreen('dashboard')}
-          />
-        );
+      // COMMENTED OUT FOR THIS RELEASE - Inbox and Insights pages not in scope
+      // case 'inbox':
+      //   return (
+      //     <TenantInbox
+      //       onBack={() => setNavigationScreen('dashboard')}
+      //     />
+      //   );
 
-      case 'insights':
-        return (
-          <PortfolioInsights
-            properties={properties}
-            userProfile={userProfile}
-            onBack={() => setNavigationScreen('dashboard')}
-            marketInsights={marketInsights}
-          />
-        );
+      // case 'insights':
+      //   return (
+      //     <PortfolioInsights
+      //       properties={properties}
+      //       userProfile={userProfile}
+      //       onBack={() => setNavigationScreen('dashboard')}
+      //       marketInsights={marketInsights}
+      //     />
+      //   );
 
       default:
         return (
@@ -1659,7 +1956,8 @@ export default function App() {
               selectProperty(property);
               navigateToScreen('photo-management');
             }}
-            onViewInsights={() => navigateToScreen('portfolio-insights')}
+            // COMMENTED OUT FOR THIS RELEASE - Insights page not in scope
+            onViewInsights={() => {/* navigateToScreen('portfolio-insights') */}}
             onViewVacancyAlert={(alertId) => {
               const alert = vacancyAlerts.find(a => a.id === alertId);
               if (alert) {
@@ -1903,7 +2201,8 @@ export default function App() {
             }}
             onManageDocuments={() => navigateToScreen('document-management')}
             onManagePhotos={() => navigateToScreen('photo-management')}
-            onViewInsights={() => navigateToScreen('property-insights')}
+            // COMMENTED OUT FOR THIS RELEASE - Insights page not in scope
+            onViewInsights={() => {/* navigateToScreen('property-insights') */}}
             updateProperty={updateProperty}
             onViewTenant={(tenantId) => {
               const tenant = tenants.find(t => t.id === tenantId);
@@ -1948,6 +2247,140 @@ export default function App() {
                 alert('Failed to assign tenant to property');
               }
             }}
+            onRemoveTenant={async (tenantId, propertyId) => {
+              try {
+                console.log(`🔄 Removing tenant ${tenantId} from property ${propertyId}`);
+                
+                // Remove tenant's property assignment
+                await tenantService.updateTenant(tenantId, {
+                  propertyId: '',
+                  propertyAddress: ''
+                });
+                console.log(`✅ Updated tenant ${tenantId} to remove property assignment`);
+                
+                // Update property: remove tenantId field and set status to vacant
+                const { deleteField } = await import('firebase/firestore');
+                const propertyDocRef = doc(db, 'properties', propertyId);
+                await updateDoc(propertyDocRef, {
+                  status: 'vacant',
+                  tenantId: deleteField(),
+                  updatedAt: Timestamp.now()
+                });
+                console.log(`✅ Updated property ${propertyId} to remove tenantId and set status to vacant`);
+                
+                // Update local state immediately
+                setProperties(prev => 
+                  prev.map(p => 
+                    p.id === propertyId 
+                      ? { ...p, status: 'vacant' as const, tenantId: undefined, tenant: undefined }
+                      : p
+                  )
+                );
+                
+                if (selectedProperty && selectedProperty.id === propertyId) {
+                  setSelectedProperty(prev => prev ? { 
+                    ...prev, 
+                    status: 'vacant' as const, 
+                    tenantId: undefined, 
+                    tenant: undefined 
+                  } : null);
+                }
+                
+                // Refresh tenant data
+                const updatedTenant = await tenantService.getTenant(tenantId);
+                if (updatedTenant) {
+                  setTenants(prev => prev.map(t => t.id === tenantId ? updatedTenant : t));
+                  console.log(`✅ Refreshed tenant data for ${tenantId}`);
+                }
+                
+                // Refresh property data from Firestore to ensure consistency
+                const updatedProperty = await propertyService.getProperty(propertyId);
+                if (updatedProperty) {
+                  setSelectedProperty(updatedProperty);
+                  setProperties(prev => 
+                    prev.map(p => p.id === propertyId ? updatedProperty : p)
+                  );
+                  console.log(`✅ Refreshed property data for ${propertyId}`);
+                }
+                
+                // Trigger alert regeneration after tenant removal
+                const currentUserId = getCurrentUserId();
+                if (currentUserId) {
+                  console.log('🔄 Triggering alert regeneration after tenant removal');
+                  alertService.generateAlerts(currentUserId).catch(error => {
+                    console.warn('⚠️ Failed to regenerate alerts after tenant removal:', error);
+                  });
+                }
+                
+                console.log(`✅ Successfully removed tenant ${tenantId} from property ${propertyId}`);
+              } catch (error) {
+                console.error('❌ Failed to remove tenant from property:', error);
+                alert('Failed to remove tenant from property. Please try again.');
+              }
+            }}
+            onChangeTenant={async (propertyId, newTenantId) => {
+              if (!selectedProperty) return;
+              
+              try {
+                const currentTenant = selectedProperty.tenant;
+                const newTenant = tenants.find(t => t.id === newTenantId);
+                
+                if (!newTenant) {
+                  alert('Selected tenant not found');
+                  return;
+                }
+                
+                // Remove current tenant's property assignment
+                if (currentTenant?.id) {
+                  await tenantService.updateTenant(currentTenant.id, {
+                    propertyId: '',
+                    propertyAddress: ''
+                  });
+                  
+                  // Refresh current tenant data
+                  const updatedCurrentTenant = await tenantService.getTenant(currentTenant.id);
+                  if (updatedCurrentTenant) {
+                    setTenants(prev => prev.map(t => t.id === currentTenant.id ? updatedCurrentTenant : t));
+                  }
+                }
+                
+                // Assign new tenant to property
+                await tenantService.updateTenant(newTenantId, {
+                  propertyId: propertyId,
+                  propertyAddress: selectedProperty.address
+                });
+                
+                // Update property with new tenant
+                await updateProperty(propertyId, {
+                  status: 'occupied',
+                  tenantId: newTenantId
+                });
+                
+                // Refresh new tenant data
+                const updatedNewTenant = await tenantService.getTenant(newTenantId);
+                if (updatedNewTenant) {
+                  setTenants(prev => prev.map(t => t.id === newTenantId ? updatedNewTenant : t));
+                }
+                
+                // Refresh property data
+                const updatedProperty = await propertyService.getProperty(propertyId);
+                if (updatedProperty) {
+                  setSelectedProperty(updatedProperty);
+                }
+                
+                // Trigger alert regeneration after tenant change
+                const currentUserId = getCurrentUserId();
+                if (currentUserId) {
+                  console.log('🔄 Triggering alert regeneration after tenant change');
+                  alertService.generateAlerts(currentUserId).catch(error => {
+                    console.warn('⚠️ Failed to regenerate alerts after tenant change:', error);
+                  });
+                }
+              } catch (error) {
+                console.error('Failed to change tenant:', error);
+                alert('Failed to change tenant');
+              }
+            }}
           />
         );
       
@@ -1970,23 +2403,24 @@ export default function App() {
           />
         );
       
-      case 'portfolio-insights':
-        return (
-          <PortfolioInsights
-            properties={properties}
-            userProfile={userProfile}
-            onBack={() => navigateToScreen('main-app')}
-            marketInsights={marketInsights}
-          />
-        );
+      // COMMENTED OUT FOR THIS RELEASE - Insights pages not in scope
+      // case 'portfolio-insights':
+      //   return (
+      //     <PortfolioInsights
+      //       properties={properties}
+      //       userProfile={userProfile}
+      //       onBack={() => navigateToScreen('main-app')}
+      //       marketInsights={marketInsights}
+      //     />
+      //   );
       
-      case 'property-insights':
-        return (
-          <PropertyInsights
-            property={selectedProperty}
-            onBack={() => navigateToScreen('property-details')}
-          />
-        );
+      // case 'property-insights':
+      //   return (
+      //     <PropertyInsights
+      //       property={selectedProperty}
+      //       onBack={() => navigateToScreen('property-details')}
+      //     />
+      //   );
       
       case 'tenant-details':
         return (
@@ -1994,8 +2428,11 @@ export default function App() {
             tenant={selectedTenant}
             onBack={() => navigateToScreen('main-app')}
             onEdit={(tenant) => {
+              console.log('🔍 Edit button clicked, tenant:', tenant);
               setSelectedTenant(tenant);
-              // Could add tenant editing functionality here
+              editingTenantRef.current = tenant; // Store in ref for immediate access
+              console.log('🔍 selectedTenant set to:', tenant);
+              navigateToScreen('add-tenant');
             }}
           />
         );
@@ -2067,12 +2504,13 @@ export default function App() {
           />
         );
       
-      case 'tenant-inbox':
-        return (
-          <TenantInbox
-            onBack={() => navigateToScreen('main-app')}
-          />
-        );
+      // COMMENTED OUT FOR THIS RELEASE - Tenant Inbox page not in scope
+      // case 'tenant-inbox':
+      //   return (
+      //     <TenantInbox
+      //       onBack={() => navigateToScreen('main-app')}
+      //     />
+      //   );
       
       case 'property-preview':
         console.log('Rendering PropertyPreview component with setup data:', propertySetupData);
@@ -2177,16 +2615,48 @@ export default function App() {
         );
 
       case 'add-tenant':
+        // Use ref value if available, otherwise fall back to state (for async updates)
+        const tenantToEdit = editingTenantRef.current || selectedTenant;
+        console.log('🔍 Rendering AddTenant with selectedTenant:', selectedTenant, 'ref:', editingTenantRef.current, 'using:', tenantToEdit);
         return (
           <AddTenant
             properties={properties}
             preselectedPropertyId={selectedProperty?.id}
-            onSave={(tenant) => {
-              addTenant(tenant);
+            userProfile={userProfile}
+            initialTenant={tenantToEdit}
+            onSave={async (tenant) => {
+              const tenantId = editingTenantRef.current?.id || selectedTenant?.id;
+              if (tenantId) {
+                // Update existing tenant
+                try {
+                  const { tenantService } = await import('./services/tenantService');
+                  await tenantService.updateTenant(tenantId, tenant);
+                  // Refresh tenant list
+                  const updatedTenant = await tenantService.getTenant(tenantId);
+                  if (updatedTenant) {
+                    setTenants(prev => prev.map(t => t.id === tenantId ? updatedTenant : t));
+                  }
+                } catch (error) {
+                  console.error('Error updating tenant:', error);
+                  alert('Failed to update tenant. Please try again.');
+                  return;
+                }
+              } else {
+                // Add new tenant
+                addTenant(tenant);
+              }
+              setSelectedTenant(null);
+              editingTenantRef.current = null; // Clear ref
               navigateToScreen('main-app');
               setNavigationScreen('clients');
             }}
-            onBack={() => navigateToScreen('tenant-selection')}
+            onBack={() => {
+              if (editingTenantRef.current || selectedTenant) {
+                navigateToScreen('tenant-details');
+              } else {
+                navigateToScreen('tenant-selection');
+              }
+            }}
           />
         );
 
@@ -2224,6 +2694,7 @@ export default function App() {
         // Use the new wizard
         return (
           <AddLandlordWizard
+            userProfile={userProfile}
             onBack={() => {
               navigateToScreen('main-app');
               setNavigationScreen('clients');

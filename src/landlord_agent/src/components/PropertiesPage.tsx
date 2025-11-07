@@ -112,7 +112,26 @@ export function PropertiesPage({
   };
 
   const getTenantForProperty = (propertyId: string) => {
-    return tenants.find(tenant => tenant.propertyId === propertyId);
+    // First, try to find tenant by propertyId (tenant has propertyId set)
+    let tenant = tenants.find(tenant => tenant.propertyId === propertyId);
+    
+    // If not found, try to find by property's tenantId (property has tenantId set)
+    if (!tenant) {
+      const property = properties.find(p => p.id === propertyId);
+      if (property?.tenantId) {
+        tenant = tenants.find(t => t.id === property.tenantId);
+      }
+    }
+    
+    // Also check if property has tenant object directly (for backward compatibility)
+    if (!tenant) {
+      const property = properties.find(p => p.id === propertyId);
+      if (property?.tenant) {
+        tenant = property.tenant;
+      }
+    }
+    
+    return tenant;
   };
 
   const getArrearsForTenant = (tenantId: string) => {
@@ -409,7 +428,7 @@ export function PropertiesPage({
       )}
 
       {/* Filters and Search */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
@@ -431,12 +450,16 @@ export function PropertiesPage({
         </div>
         
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search properties..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
+            style={{
+              '--tw-ring-color': '#8FCDFF',
+              '--tw-ring-opacity': '0.5'
+            } as React.CSSProperties}
           />
         </div>
         
@@ -466,16 +489,6 @@ export function PropertiesPage({
               ))}
             </SelectContent>
           </Select>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowImportDialog(true)}
-            className="px-3"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Import
-          </Button>
         </div>
       </div>
 
@@ -712,12 +725,14 @@ export function PropertiesPage({
         </div>
       )}
 
-      {/* Import Properties Dialog */}
+      {/* Import Properties Dialog - Hidden for now */}
+      {/* 
       <ImportPropertiesDialog
         isOpen={showImportDialog}
         onClose={() => setShowImportDialog(false)}
         onImport={handleImportPropertiesSubmit}
       />
+      */}
     </div>
   );
 }

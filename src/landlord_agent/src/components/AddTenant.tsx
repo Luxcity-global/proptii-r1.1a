@@ -27,13 +27,15 @@ import {
   ChevronRight,
   Sparkles
 } from 'lucide-react';
-import { Property, Tenant } from '../App';
+import { Property, Tenant, UserProfile } from '../App';
 
 interface AddTenantProps {
   properties: Property[];
   onSave: (tenant: Omit<Tenant, 'id'>) => void;
   onBack: () => void;
   preselectedPropertyId?: string;
+  userProfile?: UserProfile | null;
+  initialTenant?: Tenant | null;
 }
 
 // Define form steps for Typeform-style progression
@@ -44,6 +46,7 @@ const FORM_STEPS = [
   { id: 'phone', title: 'Phone Number', icon: Phone, required: true, description: "What's their phone number?" },
   { id: 'property', title: 'Property Selection', icon: Home, required: true, description: "Which property will they occupy?" },
   { id: 'rent', title: 'Rent Amount', icon: PoundSterling, required: true, description: "What's the monthly rent?" },
+  { id: 'paymentFrequency', title: 'Payment Frequency', icon: Calendar, required: true, description: "How often does the tenant pay rent?" },
   { id: 'leaseStart', title: 'Lease Start Date', icon: Calendar, required: true, description: "When does the lease start?" },
   { id: 'leaseEnd', title: 'Lease End Date', icon: Calendar, required: true, description: "When does the lease end?" },
   { id: 'emergencyName', title: 'Emergency Contact Name', icon: Users, required: true, description: "Who is their emergency contact?" },
@@ -63,6 +66,8 @@ interface TenantFormData {
   propertyId: string;
   propertyAddress: string;
   rentAmount: string;
+  paymentFrequency: 'monthly' | 'yearly' | 'fixed-time';
+  firstPaymentDate: string;
   leaseStart: string;
   leaseEnd: string;
   status: 'active' | 'pending' | 'inactive';
@@ -129,6 +134,8 @@ const initialFormState: FormState = {
     propertyId: '',
     propertyAddress: '',
     rentAmount: '',
+    paymentFrequency: 'monthly',
+    firstPaymentDate: '',
     leaseStart: '',
     leaseEnd: '',
     status: 'pending',
@@ -258,22 +265,81 @@ function formReducer(state: FormState, action: FormAction): FormState {
       return initialFormState;
     
     case 'LOAD_STATE':
-      return {
+      console.log('🔍 LOAD_STATE action received:', action.state);
+      const { formData: newFormData, ...restState } = action.state;
+      const newState = {
         ...state,
-        ...action.state
+        ...restState,
+        formData: newFormData ? {
+          ...state.formData,
+          ...newFormData
+        } : state.formData
       };
+      console.log('🔍 New state after LOAD_STATE - formData.name:', newState.formData.name, 'formData.email:', newState.formData.email, 'formData.phone:', newState.formData.phone);
+      return newState;
     
     default:
       return state;
   }
 }
 
-export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }: AddTenantProps) {
+export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, userProfile, initialTenant }: AddTenantProps) {
   // Phase 4: Replace useState with useReducer for advanced state management
   const [state, dispatch] = useReducer(formReducer, initialFormState);
   const [isGuidelinesExpanded, setIsGuidelinesExpanded] = useState(false);
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+
+  // Debug: Log initialTenant on mount
+  console.log('🔍 AddTenant mounted with initialTenant:', initialTenant);
+  console.log('🔍 AddTenant - initialTenant?.name:', initialTenant?.name, 'initialTenant?.email:', initialTenant?.email);
+
+  // Helper function to convert Tenant to TenantFormData
+  const tenantToFormData = (tenant: Tenant): Partial<TenantFormData> => {
+    const formatDate = (date: Date | string | undefined): string => {
+      if (!date) return '';
+      const d = date instanceof Date ? date : new Date(date);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    return {
+      name: tenant.name || '',
+      email: tenant.email || '',
+      phone: tenant.phone || '',
+      propertyId: tenant.propertyId || '',
+      propertyAddress: tenant.propertyAddress || '',
+      rentAmount: tenant.rentAmount?.toString() || '',
+      paymentFrequency: tenant.paymentFrequency || 'monthly',
+      firstPaymentDate: formatDate(tenant.firstPaymentDate),
+      leaseStart: formatDate(tenant.leaseStart),
+      leaseEnd: formatDate(tenant.leaseEnd),
+      status: tenant.status === 'ended' ? 'inactive' : (tenant.status || 'pending'),
+      referencingStatus: tenant.referencingStatus === 'complete' ? 'completed' : (tenant.referencingStatus || 'not-started'),
+      paymentStatus: tenant.paymentStatus === 'payment-plan' ? 'current' : (tenant.paymentStatus === 'overdue' ? 'overdue' : 'current'),
+      emergencyContactName: tenant.emergencyContact?.name || '',
+      emergencyContactPhone: tenant.emergencyContact?.phone || '',
+      emergencyContactRelationship: tenant.emergencyContact?.relationship || '',
+      defaultRiskScore: tenant.defaultRiskScore?.toString() || '',
+      notes: (tenant as any).notes || '',
+      employer: (tenant as any).employer || '',
+      jobTitle: (tenant as any).jobTitle || '',
+      annualIncome: (tenant as any).annualIncome?.toString() || (tenant as any).annualSalary?.toString() || '',
+      employmentType: (tenant as any).employmentType || 'full-time',
+      previousLandlordName: '',
+      previousLandlordPhone: '',
+      previousRentAmount: '',
+      previousLeaseStart: '',
+      previousLeaseEnd: '',
+      previousLandlordReference: '',
+      bankName: '',
+      accountNumber: '',
+      sortCode: '',
+      documentsUploaded: []
+    };
+  };
 
   // Currency formatting functions
   const formatCurrency = (value: string) => {
@@ -310,22 +376,58 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
     return dt.getTime() >= today.getTime();
   };
 
-  // Load progress on component mount
+  // Load progress on component mount or pre-fill with initialTenant
   useEffect(() => {
-    const loaded = loadProgress();
-    if (!loaded) {
-      applySmartDefaults(FORM_STEPS[0].id);
+    console.log('🔍 useEffect triggered with initialTenant:', initialTenant);
+    if (initialTenant) {
+      console.log('✅ initialTenant exists, pre-filling form');
+      // Clear any saved progress when editing
+      localStorage.removeItem('tenantFormProgress');
+      
+      // Pre-fill form with tenant data
+      const formData = tenantToFormData(initialTenant);
+      console.log('🔍 Pre-filling form with tenant data:', initialTenant, 'formData:', formData);
+      console.log('🔍 Form data keys:', Object.keys(formData));
+      console.log('🔍 Form data values - name:', formData.name, 'email:', formData.email, 'phone:', formData.phone);
+      
+      // Dispatch each field individually to ensure they're set
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          console.log(`🔍 Dispatching UPDATE_FIELD for ${key}:`, value);
+          dispatch({ type: 'UPDATE_FIELD', field: key as keyof TenantFormData, value });
+        }
+      });
+      
+      // Mark steps as completed
+      dispatch({ 
+        type: 'LOAD_STATE', 
+        state: {
+          completedSteps: new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+        }
+      });
+      
+      console.log('✅ Dispatched all field updates');
+    } else {
+      console.log('⚠️ No initialTenant, loading progress or applying defaults');
+      const loaded = loadProgress();
+      if (!loaded) {
+        applySmartDefaults(FORM_STEPS[0].id);
+      }
     }
-  }, []);
+  }, [initialTenant]);
 
-  // Auto-save progress with debouncing
+  // Auto-save progress with debouncing (skip when editing)
   useEffect(() => {
+    if (initialTenant) {
+      // Don't auto-save when editing an existing tenant
+      return;
+    }
     const timer = setTimeout(() => {
       saveProgress();
     }, 1000); // Debounce saves
 
     return () => clearTimeout(timer);
-  }, [state.formData, state.currentStep, state.completedSteps, state.skippedSteps]);
+  }, [state.formData, state.currentStep, state.completedSteps, state.skippedSteps, initialTenant]);
 
   // Auto-expand guidelines on step 1 for 5 seconds
   useEffect(() => {
@@ -340,10 +442,13 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
 
   // Set preselected property on mount
   useEffect(() => {
+    if (initialTenant) {
+      return; // Don't override property when editing
+    }
     if (preselectedPropertyId && !state.formData.propertyId) {
       dispatch({ type: 'UPDATE_FIELD', field: 'propertyId', value: preselectedPropertyId });
     }
-  }, [preselectedPropertyId]);
+  }, [preselectedPropertyId, initialTenant]);
 
   // Update property address when property is selected
   useEffect(() => {
@@ -429,6 +534,15 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
           errorMessage = 'Please enter a valid rent amount';
         }
         break;
+      case 'firstPaymentDate':
+        if (!value) {
+          isValid = false;
+          errorMessage = 'First payment date is required';
+        } else if (!toDateOnly(value)) {
+          isValid = false;
+          errorMessage = 'Please enter a valid date';
+        }
+        break;
       case 'leaseStart':
       case 'leaseEnd':
         if (!value) {
@@ -503,29 +617,33 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
     // Validate current step before proceeding
     const currentStepInfo = FORM_STEPS[state.currentStep];
     if (currentStepInfo && currentStepInfo.required && !validateStep(currentStepInfo.id)) {
+      console.log('❌ Validation failed for step:', currentStepInfo.id);
       return; // Don't proceed if validation fails
     }
 
     if (state.currentStep < FORM_STEPS.length - 1) {
+      const nextStep = state.currentStep + 1;
+      console.log('✅ Navigating to step:', nextStep);
       dispatch({ type: 'SET_TRANSITIONING', isTransitioning: true });
       // Mark current step as completed
       dispatch({ type: 'MARK_STEP_COMPLETED', step: state.currentStep });
       
       // Add a slight delay for smoother transition
       setTimeout(() => {
-        dispatch({ type: 'SET_CURRENT_STEP', step: state.currentStep + 1 });
+        dispatch({ type: 'SET_CURRENT_STEP', step: nextStep });
         setTimeout(() => {
           dispatch({ type: 'SET_TRANSITIONING', isTransitioning: false });
         }, 100);
       }, 200);
     }
-  }, [state.currentStep]);
+  }, [state.currentStep, state.formData]);
 
   const goToPreviousStep = useCallback(() => {
     if (state.currentStep > 0) {
+      const prevStep = state.currentStep - 1;
       dispatch({ type: 'SET_TRANSITIONING', isTransitioning: true });
       setTimeout(() => {
-        dispatch({ type: 'SET_CURRENT_STEP', step: state.currentStep - 1 });
+        dispatch({ type: 'SET_CURRENT_STEP', step: prevStep });
         setTimeout(() => {
           dispatch({ type: 'SET_TRANSITIONING', isTransitioning: false });
         }, 100);
@@ -650,6 +768,8 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
         return !!state.formData.propertyId;
       case 'rent':
         return !isNaN(parseFloat(state.formData.rentAmount)) && parseFloat(state.formData.rentAmount) > 0;
+      case 'paymentFrequency':
+        return !!state.formData.paymentFrequency && ['monthly', 'yearly', 'fixed-time'].includes(state.formData.paymentFrequency) && !!state.formData.firstPaymentDate;
       case 'leaseStart':
       case 'leaseEnd':
         return !!state.formData[stepId as keyof TenantFormData] && isTodayOrFuture(state.formData[stepId as keyof TenantFormData] as string);
@@ -709,13 +829,21 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
       const normalizedPayment =
         (state.formData.paymentStatus as any) === 'partial' ? 'payment-plan' : state.formData.paymentStatus;
 
-      const tenant: Omit<Tenant, 'id'> = {
+      const tenant: Omit<Tenant, 'id'> & {
+        notes?: string;
+        employer?: string;
+        jobTitle?: string;
+        annualIncome?: number;
+        employmentType?: string;
+      } = {
         name: state.formData.name,
         email: state.formData.email,
         phone: state.formData.phone,
         propertyId: state.formData.propertyId,
         propertyAddress: state.formData.propertyAddress,
         rentAmount: parseFloat(state.formData.rentAmount) || 0,
+        paymentFrequency: state.formData.paymentFrequency,
+        firstPaymentDate: toDateOnly(state.formData.firstPaymentDate) || new Date(),
         leaseStart: toDateOnly(state.formData.leaseStart) || new Date(),
         leaseEnd: toDateOnly(state.formData.leaseEnd) || new Date(),
         status: state.formData.status,
@@ -726,25 +854,23 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
           phone: state.formData.emergencyContactPhone,
           relationship: state.formData.emergencyContactRelationship
         },
-        defaultRiskScore: parseInt(state.formData.defaultRiskScore) || 75
+        defaultRiskScore: parseInt(state.formData.defaultRiskScore) || 75,
+        // Additional fields for steps 12-15
+        notes: state.formData.notes || undefined,
+        employer: state.formData.employer || undefined,
+        jobTitle: state.formData.jobTitle || undefined,
+        annualIncome: state.formData.annualIncome ? parseFloat(state.formData.annualIncome.replace(/[^\d.]/g, '')) : undefined,
+        employmentType: state.formData.employmentType || undefined
       };
 
-      // Simulate API call with retry logic
-      let attempts = 0;
-      const maxAttempts = 3;
-      
-      while (attempts < maxAttempts) {
-        try {
-          onSave(tenant);
-          break; // Success
-        } catch (error) {
-          attempts++;
-          if (attempts >= maxAttempts) {
-            throw error;
-          }
-          dispatch({ type: 'SET_RETRYING', isRetrying: true });
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempts)); // Exponential backoff
-        }
+      // Call onSave and wait for it to complete (it's async)
+      console.log('📤 [AddTenant] Calling onSave with tenant data:', tenant);
+      try {
+        await onSave(tenant);
+        console.log('✅ [AddTenant] onSave completed successfully');
+      } catch (error) {
+        console.error('❌ [AddTenant] Error in onSave:', error);
+        throw error;
       }
 
       // Mark saved and move to success step
@@ -795,6 +921,18 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [state.currentStep, goToNextStep, goToPreviousStep, onBack]);
 
+  // Helper function to get dynamic title with user's first name
+  const getStepTitle = useCallback((step: typeof FORM_STEPS[0]) => {
+    if (step.id === 'welcome') {
+      // Extract first name from full name
+      const fullName = userProfile?.name || '';
+      const firstName = fullName.split(' ')[0] || 'there';
+      console.log('🔍 getStepTitle - userProfile:', userProfile, 'fullName:', fullName, 'firstName:', firstName);
+      return `Hello ${firstName}`;
+    }
+    return step.title;
+  }, [userProfile]);
+
   // Phase 4: Performance optimization with useMemo
   const currentStepInfo = useMemo(() => FORM_STEPS[state.currentStep], [state.currentStep]);
   const progress = useMemo(() => ((state.currentStep + 1) / FORM_STEPS.length) * 100, [state.currentStep]);
@@ -828,7 +966,7 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
               </div>
             </div>
             <div className="space-y-4">
-              <h1 className="font-bold" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '2.5rem', color: '#136C9E' }}>{step.title}</h1>
+              <h1 className="font-bold" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '2.5rem', color: '#136C9E' }}>{getStepTitle(step)}</h1>
               <p className="text-xl text-gray-600 max-w-md mx-auto" style={{ fontFamily: 'Archivo, sans-serif' }}>{step.description}</p>
             </div>
           </div>
@@ -874,7 +1012,7 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
                     }}
                     placeholder="Enter full name"
                   />
-                {state.formData.name && (
+                {state.formData.name && !state.errors.name && validateStep('name') && (
                   <CheckCircle className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />
                 )}
                 {state.errors.name && (
@@ -931,7 +1069,7 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
                     }}
                     placeholder="Enter email address"
                   />
-                {state.formData.email && (
+                {state.formData.email && !state.errors.email && validateStep('email') && (
                   <CheckCircle className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />
                 )}
                 {state.errors.email && (
@@ -988,7 +1126,7 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
                     }}
                     placeholder="Enter phone number"
                   />
-                {state.formData.phone && (
+                {state.formData.phone && !state.errors.phone && validateStep('phone') && (
                   <CheckCircle className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />
                 )}
                 {state.errors.phone && (
@@ -1047,10 +1185,18 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
                     ))}
                   </SelectContent>
                 </Select>
-                {state.formData.propertyId && (
+                {state.formData.propertyId && !state.errors.propertyId && validateStep('property') && (
                   <CheckCircle className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '16px' }} />
                 )}
+                {state.errors.propertyId && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10" style={{ right: '16px' }}>
+                    <AlertTriangle className="w-5 h-5 text-red-500 animate-shake" />
+                  </div>
+                )}
               </div>
+              {state.errors.propertyId && (
+                <p className="text-red-500 text-sm animate-fade-in-up">{state.errors.propertyId}</p>
+              )}
             </div>
           </div>
         );
@@ -1102,7 +1248,7 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
                       placeholder="Enter monthly rent"
                     />
                 </div>
-                {state.formData.rentAmount && (
+                {state.formData.rentAmount && !state.errors.rentAmount && validateStep('rent') && (
                   <CheckCircle className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />
                 )}
                 {state.errors.rentAmount && (
@@ -1114,6 +1260,88 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
               {state.errors.rentAmount && (
                 <p className="text-red-500 text-sm animate-fade-in-up">{state.errors.rentAmount}</p>
               )}
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'paymentFrequency':
+        return (
+          <div className="space-y-8 animate-fade-in-up">
+            <div className="text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: '#E8F4F8' }}>
+                  <IconComponent className="w-8 h-8" style={{ color: '#4E97CC' }} />
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold" style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}>{getStepTitle(step)}</h2>
+              <p className="text-lg text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>{step.description}</p>
+            </div>
+            <div className="space-y-6">
+              <div className="space-y-3">
+                {(['monthly', 'yearly', 'fixed-time'] as const).map((frequency) => (
+                  <button
+                    key={frequency}
+                    type="button"
+                    onClick={() => handleInputChange('paymentFrequency', frequency)}
+                    className={`w-full p-4 rounded-xl border-2 transition-all duration-300 text-left ${
+                      state.formData.paymentFrequency === frequency
+                        ? 'border-[#4E97CC] bg-[#E8F4F8] shadow-lg'
+                        : 'border-gray-300 bg-white hover:border-[#4E97CC] hover:bg-gray-50'
+                    } ${state.errors.paymentFrequency ? 'border-red-500' : ''}`}
+                    style={{ fontFamily: 'Archivo, sans-serif' }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-medium capitalize">
+                        {frequency === 'fixed-time' ? 'Fixed Time' : frequency.charAt(0).toUpperCase() + frequency.slice(1)}
+                      </span>
+                      {state.formData.paymentFrequency === frequency && (
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {state.errors.paymentFrequency && (
+                <p className="text-red-500 text-sm animate-fade-in-up">{state.errors.paymentFrequency}</p>
+              )}
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-gray-700" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  Date of First Payment <span className="text-red-500">*</span>
+                </label>
+                <div className="relative group">
+                  <Input
+                    id="firstPaymentDate"
+                    type="date"
+                    value={state.formData.firstPaymentDate}
+                    onChange={(e) => handleInputChange('firstPaymentDate', e.target.value)}
+                    onFocus={() => handleInputFocus('firstPaymentDate')}
+                    onBlur={() => handleInputBlur()}
+                    className={`w-full text-lg py-6 px-6 border-2 transition-all duration-300 rounded-2xl focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none ${
+                      state.focusedField === 'firstPaymentDate' || state.formData.firstPaymentDate
+                        ? 'bg-white shadow-lg '
+                        : 'border-gray-300 bg-gray-50'
+                    } ${state.errors.firstPaymentDate ? 'border-red-500 animate-shake' : ''}`}
+                    style={{ 
+                      fontFamily: 'Archivo, sans-serif',
+                      borderColor: state.focusedField === 'firstPaymentDate' || state.formData.firstPaymentDate ? '#4E97CC' : undefined,
+                      outline: 'none',
+                      '--tw-ring-color': '#8FCDFF',
+                      '--tw-ring-opacity': '0.5'
+                    }}
+                  />
+                  {state.formData.firstPaymentDate && !state.errors.firstPaymentDate && toDateOnly(state.formData.firstPaymentDate) && (
+                    <CheckCircle className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />
+                  )}
+                  {state.errors.firstPaymentDate && (
+                    <div className="absolute right-6 top-1/2 -translate-y-1/2 z-10" style={{ right: '24px' }}>
+                      <AlertTriangle className="w-5 h-5 text-red-500 animate-shake" />
+                    </div>
+                  )}
+                </div>
+                {state.errors.firstPaymentDate && (
+                  <p className="text-red-500 text-sm animate-fade-in-up">{state.errors.firstPaymentDate}</p>
+                )}
               </div>
             </div>
           </div>
@@ -1133,7 +1361,7 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
               </div>
             </div>
             <div className="space-y-4">
-              <h1 className="font-bold" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '2.5rem', color: '#136C9E' }}>{step.title}</h1>
+              <h1 className="font-bold" style={{ fontFamily: 'Archivo, sans-serif', fontSize: '2.5rem', color: '#136C9E' }}>{getStepTitle(step)}</h1>
               <p className="text-xl text-gray-600 max-w-md mx-auto" style={{ fontFamily: 'Archivo, sans-serif' }}>{step.description}</p>
               <button
                 onClick={() => {
@@ -1204,8 +1432,13 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
                     }}
                     placeholder="Enter emergency contact name"
                   />
-                {state.formData.emergencyContactName && (
+                {state.formData.emergencyContactName && !state.errors.emergencyContactName && validateStep('emergencyName') && (
                   <CheckCircle className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />
+                )}
+                {state.errors.emergencyContactName && (
+                  <div className="absolute right-6 top-1/2 -translate-y-1/2 z-10" style={{ right: '24px' }}>
+                    <AlertTriangle className="w-5 h-5 text-red-500 animate-shake" />
+                  </div>
                 )}
                 </div>
                 {state.errors.emergencyContactName && (
@@ -1256,8 +1489,13 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
                     }}
                     placeholder="Enter emergency contact phone number"
                   />
-                {state.formData.emergencyContactPhone && (
+                {state.formData.emergencyContactPhone && !state.errors.emergencyContactPhone && validateStep('emergencyPhone') && (
                   <CheckCircle className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />
+                )}
+                {state.errors.emergencyContactPhone && (
+                  <div className="absolute right-6 top-1/2 -translate-y-1/2 z-10" style={{ right: '24px' }}>
+                    <AlertTriangle className="w-5 h-5 text-red-500 animate-shake" />
+                  </div>
                 )}
                 </div>
                 {state.errors.emergencyContactPhone && (
@@ -1313,8 +1551,13 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
-                {state.formData.emergencyContactRelationship && (
+                {state.formData.emergencyContactRelationship && !state.errors.emergencyContactRelationship && validateStep('emergencyRelation') && (
                   <CheckCircle className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />
+                )}
+                {state.errors.emergencyContactRelationship && (
+                  <div className="absolute right-6 top-1/2 -translate-y-1/2 z-10" style={{ right: '24px' }}>
+                    <AlertTriangle className="w-5 h-5 text-red-500 animate-shake" />
+                  </div>
                 )}
                 </div>
                 {state.errors.emergencyContactRelationship && (
@@ -1423,6 +1666,14 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
                       }}
                       placeholder="Enter annual income"
                     />
+                    {state.formData.annualIncome && !state.errors.annualIncome && validateStep('income') && (
+                      <CheckCircle className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />
+                    )}
+                    {state.errors.annualIncome && (
+                      <div className="absolute right-6 top-1/2 -translate-y-1/2 z-10" style={{ right: '24px' }}>
+                        <AlertTriangle className="w-5 h-5 text-red-500 animate-shake" />
+                      </div>
+                    )}
                   </div>
                 </div>
                 {state.errors.annualIncome && (
@@ -1522,6 +1773,16 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
                         <p className="text-lg" style={{ fontFamily: 'Archivo, sans-serif' }}>£{state.formData.rentAmount}</p>
                       </div>
                       <div>
+                        <Label className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Payment Frequency</Label>
+                        <p className="text-lg capitalize" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                          {state.formData.paymentFrequency === 'fixed-time' ? 'Fixed Time' : state.formData.paymentFrequency.charAt(0).toUpperCase() + state.formData.paymentFrequency.slice(1)}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>First Payment Date</Label>
+                        <p className="text-lg" style={{ fontFamily: 'Archivo, sans-serif' }}>{state.formData.firstPaymentDate || 'Not set'}</p>
+                      </div>
+                      <div>
                         <Label className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Lease Start</Label>
                         <p className="text-lg" style={{ fontFamily: 'Archivo, sans-serif' }}>{state.formData.leaseStart}</p>
                       </div>
@@ -1593,8 +1854,13 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
                       '--tw-ring-opacity': '0.5'
                     }}
                   />
-                {state.formData[step.id as keyof TenantFormData] && (
+                {state.formData[step.id as keyof TenantFormData] && !state.errors[step.id as keyof TenantFormData] && validateStep(step.id) && (
                   <CheckCircle className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />
+                )}
+                {state.errors[step.id as keyof TenantFormData] && (
+                  <div className="absolute right-6 top-1/2 -translate-y-1/2 z-10" style={{ right: '24px' }}>
+                    <AlertTriangle className="w-5 h-5 text-red-500 animate-shake" />
+                  </div>
                 )}
                 </div>
                 {state.errors[step.id as keyof TenantFormData] && (
@@ -1706,7 +1972,7 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
                       {isCompleted ? '✓' : isSkipped ? '○' : index + 1}
                     </div>
                     <span className="font-medium truncate" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957', fontSize: '13px' }}>
-                      {step.title}
+                      {getStepTitle(step)}
                     </span>
                   </button>
                 );
@@ -1847,7 +2113,18 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId }:
                   </button>
                 )}
                 <button
-                  onClick={goToNextStep}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    // Force validation check with current state
+                    const currentStepInfo = FORM_STEPS[state.currentStep];
+                    const isValid = currentStepInfo ? validateStep(currentStepInfo.id) : true;
+                    console.log('🔍 Continue clicked - Step:', state.currentStep, 'Valid:', isValid, 'Data:', state.formData);
+                    if (isValid && !state.isTransitioning && !state.isLoading) {
+                      goToNextStep();
+                    } else {
+                      console.log('⚠️ Cannot proceed - Valid:', isValid, 'Transitioning:', state.isTransitioning, 'Loading:', state.isLoading);
+                    }
+                  }}
                   disabled={state.isTransitioning || state.isLoading || !isCurrentStepValid}
                   className={`px-8 py-3 rounded-full flex items-center space-x-2 transition-all duration-300 min-w-[140px] font-medium ${
                     isCurrentStepValid 

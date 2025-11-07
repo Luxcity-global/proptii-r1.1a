@@ -34,6 +34,7 @@ import {
   ChevronRight,
   Phone,
   Mail,
+  CheckCircle2,
 } from "lucide-react";
 import { Property, UserProfile, MarketInsight, Tenant } from "../App";
 import {
@@ -211,13 +212,20 @@ export function Dashboard({
   );
 
   const totalProperties = mockProperties.length;
-  // Derive occupancy from tenants if available; else use stored status
+  // Derive occupancy: A property is occupied if it has a tenant OR if status is explicitly 'occupied'
+  // A property is vacant if status is 'vacant' AND it has no tenant
   const tenantOccupiedIds = new Set((tenants || []).map(t => t.propertyId));
-  const occupiedProperties = (tenants && tenants.length > 0)
-    ? mockProperties.filter(p => tenantOccupiedIds.has(p.id)).length
-    : mockProperties.filter(p => p.status === 'occupied').length;
+  const occupiedProperties = mockProperties.filter(p => {
+    const hasTenant = tenantOccupiedIds.has(p.id);
+    return p.status === 'occupied' || hasTenant;
+  }).length;
+  
   const renovatingCount = mockProperties.filter(p => p.status === 'under-renovation').length;
-  const vacantProperties = Math.max(totalProperties - occupiedProperties - renovatingCount, 0);
+  
+  const vacantProperties = mockProperties.filter(p => {
+    const hasTenant = tenantOccupiedIds.has(p.id);
+    return p.status === 'vacant' && !hasTenant;
+  }).length;
   const expiringDocuments = mockProperties.reduce(
     (count, p) =>
       count +
@@ -229,9 +237,12 @@ export function Dashboard({
     0,
   );
 
-  const totalRent = (tenants && tenants.length > 0)
-    ? mockProperties.filter(p => tenantOccupiedIds.has(p.id)).reduce((sum, p) => sum + p.rent, 0)
-    : mockProperties.filter((p) => p.status === 'occupied').reduce((sum, p) => sum + p.rent, 0);
+  const totalRent = mockProperties
+    .filter(p => {
+      const hasTenant = tenantOccupiedIds.has(p.id);
+      return p.status === 'occupied' || hasTenant;
+    })
+    .reduce((sum, p) => sum + (p.rent || 0), 0);
 
   // Chart data processing
   const getOccupancyData = () => {
@@ -249,9 +260,10 @@ export function Dashboard({
   };
 
   const getRentData = () => {
-    const occupiedList = (tenants && tenants.length > 0)
-      ? mockProperties.filter(p => tenantOccupiedIds.has(p.id))
-      : mockProperties.filter(p => p.status === 'occupied');
+    const occupiedList = mockProperties.filter(p => {
+      const hasTenant = tenantOccupiedIds.has(p.id);
+      return p.status === 'occupied' || hasTenant;
+    });
     const rentData = occupiedList
       .map(p => ({
         name: p.address.split(',')[0].slice(0, 20) + (p.address.split(',')[0].length > 20 ? '...' : ''),
@@ -354,60 +366,53 @@ export function Dashboard({
   const safeCurrentIndex = Math.max(0, Math.min(currentChartIndex, chartData.length - 1));
   const currentChart = chartData[safeCurrentIndex];
 
-  // Mock market insights
-  const mockInsights: MarketInsight[] = [
-    {
-      id: "1",
-      type: "market-trend",
-      title: "Rental demand increased 12% in your area",
-      description:
-        "East London properties showing strong growth. Consider reviewing rent prices.",
-      severity: "medium",
-      actionRequired: false,
-      date: new Date("2024-06-01"),
-      area: "East London"
-    },
-    {
-      id: "2",
-      type: "regulatory-change",
-      title: "New EPC requirements coming 2025",
-      description:
-        "Properties must achieve minimum grade C by April 2025. Review your compliance status.",
-      severity: "high",
-      actionRequired: true,
-      date: new Date("2024-06-15")
-    },
-    {
-      id: "3",
-      type: "price-change",
-      title: "Property values up 8.5% this quarter",
-      description:
-        "Your portfolio value has increased significantly. Great time to review insurance coverage.",
-      severity: "low",
-      actionRequired: false,
-      date: new Date("2024-06-20")
-    }
-  ];
-
-  const activeInsights = mockInsights.filter(
+  // Filter insights that haven't been dismissed locally
+  // Note: Real dismissals are handled via marketInsightService
+  const activeInsights = marketInsights.filter(
     (insight) => !dismissedInsights.includes(insight.id)
   );
+  
+  // Debug logging
+  React.useEffect(() => {
+    console.log('📊 Dashboard: marketInsights prop:', marketInsights.length);
+    console.log('📊 Dashboard: activeInsights after filtering:', activeInsights.length);
+    if (marketInsights.length > 0) {
+      console.log('📊 Dashboard: Sample insight:', marketInsights[0]);
+    }
+  }, [marketInsights, activeInsights]);
 
-  const dismissInsight = (insightId: string) => {
+  const dismissInsight = async (insightId: string) => {
+    // Add to local dismissed list for immediate UI update
     setDismissedInsights((prev) => [...prev, insightId]);
+    
+    // Also save dismissal to Firestore (if userId available)
+    // This would require passing userId to Dashboard, or handling it in App.tsx
+    // For now, we'll just handle local dismissal
+    try {
+      // If you have userId available, you can call:
+      // await marketInsightService.dismissInsight(insightId, userId);
+      console.log(`📌 Insight ${insightId} dismissed (local only)`);
+    } catch (error) {
+      console.error('Error dismissing insight:', error);
+      // Revert local dismissal on error
+      setDismissedInsights((prev) => prev.filter(id => id !== insightId));
+    }
   };
 
   const getInsightIcon = (type: MarketInsight["type"]) => {
     switch (type) {
       case "market-trend":
+      case "rental-demand":
         return <TrendingUp className="w-4 h-4 text-blue-600" />;
       case "regulatory-change":
+      case "epc-requirements":
         return (
           <AlertTriangle className="w-4 h-4 text-red-600" />
         );
       case "demand-shift":
         return <Users className="w-4 h-4 text-green-600" />;
       case "price-change":
+      case "property-values":
         return (
           <PoundSterling className="w-4 h-4 text-purple-600" />
         );
@@ -460,42 +465,69 @@ export function Dashboard({
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7' }}>
       {/* Clean Header */}
-      <div className="sticky top-8 z-50 mt-8 max-w-7xl mx-auto bg-white shadow-lg rounded-xl">
-        <div className="px-8 py-6">
-          <div className="flex items-center justify-between min-w-0">
-            <div className="flex items-center space-x-6 flex-1 min-w-0">
-              {/* Avatar Circle */}
-              <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium text-lg flex-shrink-0">
+      <div className="max-w-7xl mx-auto mt-8">
+        <div 
+          className="bg-white shadow-lg rounded-xl px-8 py-6"
+          style={{ fontFamily: 'Archivo, sans-serif' }}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Left Column - Welcome Message */}
+            <div className="flex items-center">
+              <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium text-lg mr-3">
                 {(userProfile?.name || "Tosin Lanipekun").charAt(0).toUpperCase()}
               </div>
-              
-              <div className="min-w-0">
-                <h1 className="text-xl font-semibold mb-1 truncate" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
-                  Welcome <span style={{ color: '#136C9E' }}>{userProfile?.name || "Tosin Lanipekun"}</span> <span className="inline-flex items-center ml-2"><span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span><span className="text-sm font-normal text-green-600">Verified</span></span>
-              </h1>
-                <p className="text-sm text-gray-500 truncate">
-                Here's what's happening with your property portfolio
-              </p>
-            </div>
-
-              {/* Contacts Section - Moved closer to welcome */}
-              <div className="flex flex-col space-y-2 flex-shrink-0">
-                <div className="flex items-center space-x-2 px-3 py-2 rounded-lg" style={{ backgroundColor: '#F7F7F7' }}>
-                  <Phone className="w-4 h-4" style={{ color: '#374957' }} />
-                  <span className="text-sm" style={{ color: '#374957' }}>{userProfile?.phone || '+44 7911 123456'}</span>
-                </div>
-                <div className="flex items-center space-x-2 px-3 py-2 rounded-lg" style={{ backgroundColor: '#F7F7F7' }}>
-                  <Mail className="w-4 h-4" style={{ color: '#374957' }} />
-                  <span className="text-sm" style={{ color: '#374957' }}>{userProfile?.email || 'TosinLanipekun@Luxcity.omnimicrosoft'}</span>
-                </div>
+              <div>
+                <h1 
+                  className="text-xl font-semibold mb-1"
+                  style={{ 
+                    color: '#374957',
+                    fontFamily: 'Archivo, sans-serif'
+                  }}
+                >
+                  Welcome <span style={{ color: '#136C9E' }}>{userProfile?.name || "Tosin Lanipekun"}</span>
+                </h1>
+                <p 
+                  className="text-sm"
+                  style={{ color: '#717182' }}
+                >
+                  Here's what's happening with your property portfolio
+                </p>
+                <span className="inline-flex items-center">
+                  <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                  <span className="text-sm font-normal text-green-600">Verified</span>
+                </span>
               </div>
             </div>
-            
-            <div className="flex items-center space-x-4 flex-shrink-0">
+
+            {/* Middle Column - Contact Info */}
+            <div className="flex flex-col justify-center space-y-2">
+              <div 
+                className="flex items-center space-x-2 px-3 py-2 rounded-lg"
+                style={{ backgroundColor: '#F7F7F7', width: '280px' }}
+              >
+                <Phone className="w-4 h-4 flex-shrink-0" style={{ color: '#374957' }} />
+                <span className="text-sm" style={{ color: '#374957' }}>
+                  {userProfile?.phone || '+44 7911 123456'}
+                </span>
+              </div>
+              
+              <div 
+                className="flex items-center space-x-2 px-3 py-2 rounded-lg"
+                style={{ backgroundColor: '#F7F7F7', width: '280px' }}
+              >
+                <Mail className="w-4 h-4 flex-shrink-0" style={{ color: '#374957' }} />
+                <span className="text-sm" style={{ color: '#374957' }}>
+                  {userProfile?.email || 'TosinLanipekun@Luxcity.omnimicrosoft'}
+                </span>
+              </div>
+            </div>
+
+            {/* Right Column - Portfolio Insights and Add Property Button */}
+            <div className="flex justify-end items-center space-x-4">
               {/* Portfolio Insights Card */}
-                <Card
-                className="px-4 py-3 cursor-pointer transition-all duration-300 min-h-[3.5rem] flex items-center justify-center flex-shrink-0"
-                  onClick={onViewInsights}
+              <div
+                className="bg-white rounded-2xl border border-gray-200 px-6 py-4 cursor-pointer transition-all duration-300 min-h-[3.5rem] flex items-center justify-center flex-shrink-0"
+                onClick={onViewInsights}
                 style={{
                   boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
                 }}
@@ -509,17 +541,20 @@ export function Dashboard({
                   e.currentTarget.style.transform = 'translateY(0px)';
                   e.currentTarget.style.background = 'white';
                 }}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="text-left">
-                      <p className="text-sm leading-tight">Portfolio Insights</p>
-                      <p className="text-xs text-muted-foreground leading-tight">AI Powered</p>
-                    </div>
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#136C9E' }}>
-                      <BarChart3 className="w-4 h-4 text-white" />
-                    </div>
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="text-left">
+                    <p className="text-sm leading-tight font-medium" style={{ color: '#374957' }}>Portfolio Insights</p>
+                    <p className="text-xs leading-tight" style={{ color: '#717182' }}>AI Powered</p>
                   </div>
-                </Card>
+                  <div 
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: '#136C9E' }}
+                  >
+                    <BarChart3 className="w-4 h-4 text-white" />
+                  </div>
+                </div>
+              </div>
               
               {/* Add Property Button */}
               <Button 
@@ -638,151 +673,63 @@ export function Dashboard({
           </Card>
         </div>
 
-        {/* Market Insights Section */}
-        {activeInsights.length > 0 && (
-          <div className="mb-8">
-            <div className="flex items-center mb-6">
-              <BarChart3 className="w-5 h-5 mr-3 text-[#374957]" />
-              <h2 className="text-[16px] font-medium text-[#374957]">
-                Market Insights
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {activeInsights
-                .slice(0, 3)
-                .map((insight, index) => {
-                  // Define colors for each insight type to match the image
-                  const getInsightStyling = (
-                    insightIndex: number
-                  ) => {
-                    const styles = [
-                      {
-                        bg: "bg-[#fef3e2]",
-                        border: "border-[#f4c430]",
-                        icon: "text-[#b8860b]"
-                      }, // Yellow/orange
-                      {
-                        bg: "bg-[#fef0f0]",
-                        border: "border-[#f87171]",
-                        icon: "text-[#dc2626]"
-                      }, // Red/pink
-                      {
-                        bg: "bg-[#f0f4ff]",
-                        border: "border-[#93c5fd]",
-                        icon: "text-[#3b82f6]"
-                      } // Blue
-                    ];
-                    return styles[insightIndex] || styles[0];
-                  };
-
-                  const styling = getInsightStyling(index);
-
-                  return (
-                    <Card
-                      key={insight.id}
-                      className={`p-4 ${styling.bg} ${styling.border} border rounded-xl hover:shadow-lg transition-shadow relative`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-3 flex-1">
-                          <div
-                            className={`${styling.icon} mt-1`}
-                          >
-                            {index === 0 && (
-                              <TrendingUp className="w-4 h-4" />
-                            )}
-                            {index === 1 && (
-                              <AlertTriangle className="w-4 h-4" />
-                            )}
-                            {index === 2 && (
-                              <PoundSterling className="w-4 h-4" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium mb-2 text-[14px] leading-tight" style={{ color: '#374957' }}>
-                              {insight.title}
-                            </h4>
-                            <p className="text-[12px] text-gray-600 mb-3 leading-relaxed">
-                              {insight.description}
-                            </p>
-
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
-                                {insight.area && (
-                                  <span className="text-[10px] font-medium text-gray-700 bg-white/60 px-2 py-1 rounded">
-                                    {insight.area}
-                                  </span>
-                                )}
-                              </div>
-                              <button
-                                onClick={onViewInsights}
-                                className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer bg-white/60 px-3 py-1 rounded hover:bg-white/80 transition-colors"
-                              >
-                                Details
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="p-1 h-6 w-6 absolute top-2 right-2 hover:bg-white/60"
-                          onClick={() =>
-                            dismissInsight(insight.id)
-                          }
-                        >
-                          <X className="w-3 h-3 text-gray-400 hover:text-gray-600" />
-                        </Button>
-                      </div>
-                    </Card>
-                  );
-                })}
-            </div>
-          </div>
-        )}
-
         <div className="grid lg:grid-cols-2 gap-8 mb-8">
           {/* Left Column - Priority Alerts */}
           <div>
             {/* Priority Alerts Section - Redesigned */}
-            {(vacancyAlerts.length > 0 || arrearsAlerts.length > 0) && (
-              <div className="shadow-sm overflow-hidden" style={{ 
-                background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', 
-                border: '1px solid #80B2FF', 
-                height: '320px',
-                borderRadius: '20px'
-              }}>
-                <div className="flex h-full">
-                  {/* Left Blue Panel */}
-                  <div className="p-6 flex flex-col items-start min-w-[200px] rounded-l-xl" style={{ 
-                    background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', 
-                    color: '#374957', 
-                    fontFamily: 'Archivo, sans-serif'
-                  }}>
-                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mb-3">
-                      <AlertTriangle className="w-5 h-5" style={{ color: '#374957' }} />
+            <div className="shadow-sm overflow-hidden" style={{ 
+              background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', 
+              border: '1px solid #80B2FF', 
+              height: '320px',
+              borderRadius: '20px'
+            }}>
+              <div className="flex h-full">
+                {/* Left Blue Panel */}
+                <div className="p-6 flex flex-col items-start min-w-[200px] rounded-l-xl" style={{ 
+                  background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', 
+                  color: '#374957', 
+                  fontFamily: 'Archivo, sans-serif'
+                }}>
+                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mb-3">
+                    <AlertTriangle className="w-5 h-5" style={{ color: '#374957' }} />
+                  </div>
+                  <h2 className="text-lg font-semibold">Priority<br />Alerts</h2>
+                  <div className="flex-1"></div>
+                  <div className="mt-auto">
+                    <div className="font-bold block mb-1" style={{ fontSize: '32px', lineHeight: '1' }}>
+                      {vacancyAlerts.length + arrearsAlerts.length}
                     </div>
-                    <h2 className="text-lg font-semibold">Priority<br />Alerts</h2>
-                    <div className="flex-1"></div>
-                    <div className="mt-auto">
-                      <div className="font-bold block mb-1" style={{ fontSize: '32px', lineHeight: '1' }}>
-                        {vacancyAlerts.length + arrearsAlerts.length}
-                      </div>
-                      <div className="text-sm opacity-90 mb-2 block">Alerts</div>
-                      <div className="text-xs opacity-75">
-                        As of {new Date().toLocaleDateString('en-GB', { 
-                          day: '2-digit', 
-                          month: '2-digit', 
-                          year: 'numeric' 
-                        })}
-                      </div>
+                    <div className="text-sm opacity-90 mb-2 block">Alerts</div>
+                    <div className="text-xs opacity-75">
+                      As of {new Date().toLocaleDateString('en-GB', { 
+                        day: '2-digit', 
+                        month: '2-digit', 
+                        year: 'numeric' 
+                      })}
                     </div>
+                  </div>
                 </div>
 
-                  {/* Right White Panel */}
-                  <div className="flex-1 p-4 bg-white relative z-10" style={{ borderRadius: '20px', boxShadow: '-4px 0 24px rgba(70, 95, 194, 0.4)' }}>
-                    <div className="space-y-3">
-                  {vacancyAlerts.slice(0, 2).map((alert) => (
+                {/* Right White Panel */}
+                <div className="flex-1 p-4 bg-white relative z-10 overflow-hidden flex flex-col" style={{ borderRadius: '20px', boxShadow: '-4px 0 24px rgba(70, 95, 194, 0.4)' }}>
+                  {vacancyAlerts.length === 0 && arrearsAlerts.length === 0 ? (
+                    // Empty State
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center py-8">
+                        <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <CheckCircle2 className="w-8 h-8 text-green-500" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-700 mb-2" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                          All Clear!
+                        </h3>
+                        <p className="text-sm text-gray-500 max-w-xs" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                          You have no priority alerts at this time. Everything is running smoothly.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 overflow-y-auto flex-1 pr-2" style={{ maxHeight: '100%' }}>
+                  {vacancyAlerts.map((alert) => (
                     <Card
                       key={alert.id}
                       className="p-6 border-0 bg-white hover:shadow-md transition-shadow cursor-pointer"
@@ -831,7 +778,7 @@ export function Dashboard({
                     <div className="border-t border-gray-200"></div>
                   )}
 
-                  {arrearsAlerts.slice(0, 2).map((alert) => (
+                  {arrearsAlerts.map((alert) => (
                     <Card
                       key={alert.id}
                       className="p-6 border-0 bg-white hover:shadow-md transition-shadow cursor-pointer"
@@ -873,10 +820,10 @@ export function Dashboard({
                     </Card>
                   ))}
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Right Column - Quick Stats */}
@@ -1037,7 +984,11 @@ export function Dashboard({
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder="Search properties by address or type..."
-                  className="pl-10"
+                  className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
+                  style={{
+                    '--tw-ring-color': '#8FCDFF',
+                    '--tw-ring-opacity': '0.5'
+                  } as React.CSSProperties}
                   value={searchTerm}
                   onChange={(e) =>
                     setSearchTerm(e.target.value)

@@ -22,13 +22,17 @@ import {
   UserPlus,
   Mail,
   Phone,
-  Eye
+  Eye,
+  X,
+  UserX,
+  UserCheck
 } from 'lucide-react';
 import { Property, Tenant } from '../App';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Separator } from './ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 
 interface PropertyDetailsProps {
   property: Property | null;
@@ -42,6 +46,8 @@ interface PropertyDetailsProps {
   onViewTenant?: (tenantId: string) => void;
   onAddTenant?: () => void;
   onSelectExistingTenant?: (tenantId: string) => void;
+  onRemoveTenant?: (tenantId: string, propertyId: string) => void;
+  onChangeTenant?: (propertyId: string, newTenantId: string) => void;
 }
 
 export function PropertyDetails({
@@ -55,14 +61,28 @@ export function PropertyDetails({
   updateProperty,
   onViewTenant,
   onAddTenant,
-  onSelectExistingTenant
+  onSelectExistingTenant,
+  onRemoveTenant,
+  onChangeTenant
 }: PropertyDetailsProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [showChangeTenantDialog, setShowChangeTenantDialog] = useState(false);
+  const [selectedNewTenantId, setSelectedNewTenantId] = useState<string>('');
 
   // Filter tenants to only show those without a property assigned or with different property
   const availableTenants = useMemo(() => {
     return tenants.filter(tenant => !tenant.propertyId || tenant.propertyId === '' || tenant.propertyId !== property?.id);
   }, [tenants, property?.id]);
+
+  // Include current tenant in available list for swapping
+  const allAvailableTenants = useMemo(() => {
+    const otherTenants = tenants.filter(tenant => !tenant.propertyId || tenant.propertyId === '' || tenant.propertyId !== property?.id);
+    // Also include the current tenant if there is one
+    if (property?.tenant) {
+      return [property.tenant, ...otherTenants];
+    }
+    return otherTenants;
+  }, [tenants, property?.id, property?.tenant]);
 
   // Memoize formatted dates to prevent excessive re-renders
   const formattedDates = useMemo(() => {
@@ -590,16 +610,46 @@ export function PropertyDetails({
                     </div>
                   )}
 
-                  {onViewTenant && property.tenant.id && (
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={() => onViewTenant(property.tenant!.id)}
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      View Tenant Details
-                    </Button>
-                  )}
+                  <div className="space-y-2 pt-2">
+                    {onViewTenant && property.tenant.id && (
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => onViewTenant(property.tenant!.id)}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        View Tenant Details
+                      </Button>
+                    )}
+                    
+                    <div className="flex gap-2">
+                      {onChangeTenant && property.tenant.id && (
+                        <Button 
+                          variant="outline" 
+                          className="flex-1"
+                          onClick={() => setShowChangeTenantDialog(true)}
+                        >
+                          <UserCheck className="w-4 h-4 mr-2" />
+                          Change Tenant
+                        </Button>
+                      )}
+                      
+                      {onRemoveTenant && property.tenant.id && (
+                        <Button 
+                          variant="outline" 
+                          className="flex-1 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                          onClick={() => {
+                            if (window.confirm(`Are you sure you want to remove ${property.tenant?.name} from this property?`)) {
+                              onRemoveTenant(property.tenant!.id, property.id);
+                            }
+                          }}
+                        >
+                          <UserX className="w-4 h-4 mr-2" />
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </Card>
             )}
@@ -735,6 +785,77 @@ export function PropertyDetails({
           </div>
         </div>
       </div>
+
+      {/* Change Tenant Dialog */}
+      <Dialog open={showChangeTenantDialog} onOpenChange={setShowChangeTenantDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Tenant</DialogTitle>
+            <DialogDescription>
+              Select a new tenant to assign to this property. The current tenant will be removed.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <Select value={selectedNewTenantId} onValueChange={setSelectedNewTenantId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a tenant" />
+              </SelectTrigger>
+              <SelectContent>
+                {allAvailableTenants.length === 0 ? (
+                  <div className="p-2 text-sm text-muted-foreground text-center">
+                    No available tenants
+                  </div>
+                ) : (
+                  allAvailableTenants.map((tenant) => (
+                    <SelectItem key={tenant.id} value={tenant.id}>
+                      <div className="flex items-center space-x-2">
+                        <span>{tenant.name}</span>
+                        {tenant.propertyId === property?.id && (
+                          <Badge variant="secondary" className="text-xs">Current</Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            
+            {selectedNewTenantId && (
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm font-medium mb-1">Selected Tenant:</p>
+                <p className="text-sm text-muted-foreground">
+                  {allAvailableTenants.find(t => t.id === selectedNewTenantId)?.name || 'Unknown'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowChangeTenantDialog(false);
+                setSelectedNewTenantId('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (selectedNewTenantId && onChangeTenant) {
+                  onChangeTenant(property!.id, selectedNewTenantId);
+                  setShowChangeTenantDialog(false);
+                  setSelectedNewTenantId('');
+                }
+              }}
+              disabled={!selectedNewTenantId}
+            >
+              Change Tenant
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

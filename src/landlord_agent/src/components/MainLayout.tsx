@@ -166,7 +166,7 @@ function CustomSidebarTrigger() {
   };
 
   return (
-    <div className="border-t border-sidebar-border pt-2 pb-2 pl-4 pr-2 space-y-2">
+    <div className="border-t border-sidebar-border pt-2 pb-2 px-4 space-y-2">
       {/* Collapse/Expand Trigger */}
       <button
         onClick={toggleSidebar}
@@ -290,16 +290,17 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
       icon: Users,
       label: 'Clients',
     },
-    {
-      id: 'inbox' as NavigationScreen,
-      icon: Inbox,
-      label: 'Inbox',
-    },
-    {
-      id: 'insights' as NavigationScreen,
-      icon: BarChart3,
-      label: 'Insights',
-    },
+    // COMMENTED OUT FOR THIS RELEASE - Inbox and Insights pages not in scope
+    // {
+    //   id: 'inbox' as NavigationScreen,
+    //   icon: Inbox,
+    //   label: 'Inbox',
+    // },
+    // {
+    //   id: 'insights' as NavigationScreen,
+    //   icon: BarChart3,
+    //   label: 'Insights',
+    // },
   ];
 
   return (

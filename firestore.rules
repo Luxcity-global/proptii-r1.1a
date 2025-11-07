@@ -17,11 +17,21 @@ service cloud.firestore {
     }
 
     // Properties collection
+    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
+    // For development, we allow all access. For production, you should:
+    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
+    // 2. Use Cloud Functions to validate Azure AD tokens, OR
+    // 3. Use a different authentication approach
     match /properties/{propertyId} {
-      allow read: if true; // Public read access
-      allow create: if isAuthenticated(); // Allow any authenticated user to create
-      allow update, delete: if isAuthenticated() && 
-        (resource.data.userId == request.auth.uid || resource.data.agentId == request.auth.uid || request.auth.token.admin == true);
+      // Development: Allow all reads and writes
+      // TODO: Secure this for production - see note above
+      allow read, write: if true;
+      
+      // Production-ready rule (commented out until Firebase Auth is set up):
+      // allow read: if true; // Public read access
+      // allow create: if isAuthenticated(); // Allow any authenticated user to create
+      // allow update, delete: if isAuthenticated() && 
+      //   (resource.data.userId == request.auth.uid || resource.data.agentId == request.auth.uid || request.auth.token.admin == true);
     }
 
     // Viewing requests
@@ -133,6 +143,72 @@ service cloud.firestore {
       
       // Alternative: Allow all for development
       // allow read, write: if true;
+    }
+
+    // Alerts collection
+    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
+    // For development, we allow all access. For production, you should:
+    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
+    // 2. Use Cloud Functions to validate Azure AD tokens, OR
+    // 3. Use a different authentication approach
+    match /alerts/{alertId} {
+      // Development: Allow all reads and writes
+      // TODO: Secure this for production - see note above
+      allow read, write: if true;
+      
+      // Production-ready rule (commented out until Firebase Auth is set up):
+      // allow read, write: if request.auth != null && 
+      //   resource.data.userId == request.auth.uid;
+    }
+
+    // Tenants collection
+    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
+    // For development, we allow all access. For production, you should:
+    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
+    // 2. Use Cloud Functions to validate Azure AD tokens, OR
+    // 3. Use a different authentication approach
+    match /tenants/{tenantId} {
+      // Development: Allow all reads and writes
+      // TODO: Secure this for production - see note above
+      allow read, write: if true;
+      
+      // Production-ready rule (commented out until Firebase Auth is set up):
+      // allow read, write: if request.auth != null && 
+      //   resource.data.userId == request.auth.uid;
+    }
+
+    // Contracts collection
+    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
+    // For development, we allow all access. For production, you should:
+    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
+    // 2. Use Cloud Functions to validate Azure AD tokens, OR
+    // 3. Use a different authentication approach
+    match /contracts/{contractId} {
+      // Development: Allow all reads and writes
+      // TODO: Secure this for production - see note above
+      allow read, write: if true;
+      
+      // Production-ready rule (commented out until Firebase Auth is set up):
+      // allow read, write: if request.auth != null && 
+      //   resource.data.userId == request.auth.uid;
+    }
+
+    // Market Insights collection
+    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
+    // For development, we allow all reads and writes. For production, you should:
+    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
+    // 2. Use Cloud Functions to validate Azure AD tokens, OR
+    // 3. Use a different authentication approach
+    match /marketInsights/{insightId} {
+      // Development: Allow all reads (for users) and writes (for Cloud Functions)
+      // TODO: Secure this for production - see note above
+      allow read: if true; // Anyone can read market insights
+      allow write: if true; // Cloud Functions can write (and users can dismiss)
+      
+      // Production-ready rule (commented out until Firebase Auth is set up):
+      // allow read: if true; // Market insights are public
+      // allow create, update: if request.auth != null; // Only authenticated can create/update
+      // allow delete: if false; // Don't allow deletion (archive instead)
     }
   }
 } 

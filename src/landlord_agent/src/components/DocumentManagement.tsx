@@ -105,7 +105,6 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
     const file = e.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-      setErrors(prev => ({ ...prev, file: '' }));
     }
   };
 
@@ -427,7 +426,11 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder="Search documents..."
-                  className="pl-10"
+                  className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
+                  style={{
+                    '--tw-ring-color': '#8FCDFF',
+                    '--tw-ring-opacity': '0.5'
+                  } as React.CSSProperties}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />

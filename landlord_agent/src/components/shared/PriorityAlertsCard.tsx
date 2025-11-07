@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card } from '../ui/card';
-import { AlertTriangle, PoundSterling, Bell, Shield, Clock, DollarSign } from 'lucide-react';
+import { AlertTriangle, PoundSterling, Bell, Shield, Clock, DollarSign, CheckCircle2 } from 'lucide-react';
 
 export interface AlertItem {
   id: string;
@@ -115,9 +115,79 @@ export function PriorityAlertsCard({
     });
   };
 
-  if (alerts.length === 0) return null;
-
   const displayedAlerts = alerts.slice(0, maxAlerts);
+
+  // Empty state when there are no alerts
+  if (alerts.length === 0) {
+    return (
+      <div 
+        className={`shadow-sm overflow-hidden ${className}`}
+        style={{ 
+          background: `linear-gradient(to bottom, ${customGradient.from}, ${customGradient.to})`, 
+          border: `1px solid ${customBorderColor}`, 
+          height,
+          borderRadius: '20px'
+        }}
+      >
+        <div className="flex h-full">
+          {/* Left Blue Panel */}
+          <div 
+            className="p-6 flex flex-col items-start min-w-[200px] rounded-l-xl" 
+            style={{ 
+              background: `linear-gradient(to bottom, ${customGradient.from}, ${customGradient.to})`, 
+              color: '#374957', 
+              fontFamily: 'Archivo, sans-serif'
+            }}
+          >
+            <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mb-3">
+              <AlertTriangle className="w-5 h-5" style={{ color: '#374957' }} />
+            </div>
+            <h2 className="text-lg font-semibold">{title}</h2>
+            {subtitle && <p className="text-sm opacity-75 mt-1">{subtitle}</p>}
+            <div className="flex-1"></div>
+            <div className="mt-auto">
+              <div className="font-bold block mb-1" style={{ fontSize: '32px', lineHeight: '1' }}>
+                0
+              </div>
+              <div className="text-sm opacity-90 mb-2 block">
+                Alerts
+              </div>
+              {showDate && (
+                <div className="text-xs opacity-75">
+                  As of {new Date().toLocaleDateString('en-GB', { 
+                    day: '2-digit', 
+                    month: '2-digit', 
+                    year: 'numeric' 
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right White Panel - Empty State */}
+          <div 
+            className="flex-1 p-4 bg-white relative z-10 flex items-center justify-center" 
+            style={{ 
+              borderRadius: '20px', 
+              boxShadow: '-4px 0 24px rgba(70, 95, 194, 0.4)' 
+            }}
+          >
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-8 h-8 text-green-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-700 mb-2" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                All Clear!
+              </h3>
+              <p className="text-sm text-gray-500 max-w-xs" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                You have no priority alerts at this time. Everything is running smoothly.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 

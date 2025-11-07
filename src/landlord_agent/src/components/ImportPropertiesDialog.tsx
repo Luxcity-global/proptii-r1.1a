@@ -327,7 +327,15 @@ export function ImportPropertiesDialog({ isOpen, onClose, onImport }: ImportProp
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent 
         className="overflow-y-auto"
-        style={{ width: '90vw', maxWidth: '90vw', height: '90vh', maxHeight: '90vh' }}
+        style={{ 
+          width: '90vw', 
+          maxWidth: '90vw', 
+          height: '90vh', 
+          maxHeight: '90vh',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)'
+        }}
       >
         <DialogHeader>
           <DialogTitle>Import Properties</DialogTitle>

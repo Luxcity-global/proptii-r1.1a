@@ -463,7 +463,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
           </TabsList>
 
           <TabsContent value="tenants" className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
+          <div className="flex flex-col sm:flex-row gap-4 items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -471,11 +471,15 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                   placeholder="Search tenants..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
+                  style={{
+                    '--tw-ring-color': '#8FCDFF',
+                    '--tw-ring-opacity': '0.5'
+                  } as React.CSSProperties}
                 />
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <Button
                 variant="ghost"
                 size="sm"
@@ -591,15 +595,19 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                   <CardContent className="p-6 cursor-pointer" onClick={() => onViewTenant(tenant)}>
                     <div className="flex items-start justify-between">
                       <div className="flex items-start space-x-4 flex-1">
-                        <div className="flex items-center pt-1">
+                        <div 
+                          className="flex items-center pt-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <input
                             type="checkbox"
                             checked={selectedTenants.includes(tenant.id)}
+                            onClick={(e) => e.stopPropagation()}
                             onChange={(e) => {
                               e.stopPropagation();
                               toggleTenantSelection(tenant.id);
                             }}
-                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                           />
                         </div>
                         <Avatar className="h-12 w-12">
@@ -715,7 +723,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
 
         {userRole === 'agent' && (
           <TabsContent value="landlords" className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
+          <div className="flex flex-col sm:flex-row gap-4 items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -723,11 +731,15 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                   placeholder="Search landlords..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
+                  style={{
+                    '--tw-ring-color': '#8FCDFF',
+                    '--tw-ring-opacity': '0.5'
+                  } as React.CSSProperties}
                 />
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <Button
                 variant="ghost"
                 size="sm"
@@ -918,7 +930,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
       ) : (
         // For landlord users, show tenant list directly without tabs
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
+          <div className="flex flex-col sm:flex-row gap-4 items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -926,11 +938,15 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                   placeholder="Search tenants..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
+                  style={{
+                    '--tw-ring-color': '#8FCDFF',
+                    '--tw-ring-opacity': '0.5'
+                  } as React.CSSProperties}
                 />
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <Button
                 variant="ghost"
                 size="sm"
@@ -1034,16 +1050,20 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                   <CardContent className="p-6 cursor-pointer" onClick={() => onViewTenant(tenant)}>
                     <div className="flex items-start justify-between">
                       <div className="flex items-start space-x-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedTenants.includes(tenant.id)}
+                        <div 
                           onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            toggleTenantSelection(tenant.id);
-                          }}
-                          className="mt-1"
-                        />
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedTenants.includes(tenant.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              toggleTenantSelection(tenant.id);
+                            }}
+                            className="mt-1 cursor-pointer"
+                          />
+                        </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="text-lg font-semibold">{tenant.name}</h3>

@@ -332,7 +332,7 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
 
             <div className="flex items-center space-x-2">
               {onEdit && (
-                <Button variant="outline" onClick={() => onEdit(mockTenant)}>
+                <Button variant="outline" onClick={() => onEdit(tenant || mockTenant)}>
                   <Edit3 className="w-4 h-4 mr-2" style={{ color: '#DC5F12' }} />
                   Edit
                 </Button>

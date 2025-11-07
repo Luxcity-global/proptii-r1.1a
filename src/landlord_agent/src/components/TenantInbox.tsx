@@ -255,7 +255,11 @@ export function TenantInbox({ onBack }: TenantInboxProps) {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       placeholder="Search messages..."
-                      className="pl-10"
+                      className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
+                      style={{
+                        '--tw-ring-color': '#8FCDFF',
+                        '--tw-ring-opacity': '0.5'
+                      } as React.CSSProperties}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />

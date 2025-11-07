@@ -466,16 +466,6 @@ export function PropertiesPage({
               ))}
             </SelectContent>
           </Select>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowImportDialog(true)}
-            className="px-3"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Import
-          </Button>
         </div>
       </div>
 
@@ -701,12 +691,14 @@ export function PropertiesPage({
         </div>
       )}
 
-      {/* Import Properties Dialog */}
+      {/* Import Properties Dialog - Hidden for now */}
+      {/* 
       <ImportPropertiesDialog
         isOpen={showImportDialog}
         onClose={() => setShowImportDialog(false)}
         onImport={handleImportPropertiesSubmit}
       />
+      */}
     </div>
   );
 }
