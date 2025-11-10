@@ -485,13 +485,13 @@ export function Dashboard({
                   }}
                 >
                   Welcome <span style={{ color: '#136C9E' }}>{userProfile?.name || "Tosin Lanipekun"}</span>
-                </h1>
+              </h1>
                 <p 
                   className="text-sm"
                   style={{ color: '#717182' }}
                 >
-                  Here's what's happening with your property portfolio
-                </p>
+                Here's what's happening with your property portfolio
+              </p>
                 <span className="inline-flex items-center">
                   <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
                   <span className="text-sm font-normal text-green-600">Verified</span>
@@ -509,7 +509,7 @@ export function Dashboard({
                 <span className="text-sm" style={{ color: '#374957' }}>
                   {userProfile?.phone || '+44 7911 123456'}
                 </span>
-              </div>
+                </div>
               
               <div 
                 className="flex items-center space-x-2 px-3 py-2 rounded-lg"
@@ -521,13 +521,13 @@ export function Dashboard({
                 </span>
               </div>
             </div>
-
+            
             {/* Right Column - Portfolio Insights and Add Property Button */}
             <div className="flex justify-end items-center space-x-4">
               {/* Portfolio Insights Card */}
               <div
                 className="bg-white rounded-2xl border border-gray-200 px-6 py-4 cursor-pointer transition-all duration-300 min-h-[3.5rem] flex items-center justify-center flex-shrink-0"
-                onClick={onViewInsights}
+                  onClick={onViewInsights}
                 style={{
                   boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
                 }}
@@ -541,19 +541,19 @@ export function Dashboard({
                   e.currentTarget.style.transform = 'translateY(0px)';
                   e.currentTarget.style.background = 'white';
                 }}
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="text-left">
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="text-left">
                     <p className="text-sm leading-tight font-medium" style={{ color: '#374957' }}>Portfolio Insights</p>
                     <p className="text-xs leading-tight" style={{ color: '#717182' }}>AI Powered</p>
-                  </div>
+                    </div>
                   <div 
                     className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                     style={{ backgroundColor: '#136C9E' }}
                   >
-                    <BarChart3 className="w-4 h-4 text-white" />
+                      <BarChart3 className="w-4 h-4 text-white" />
+                    </div>
                   </div>
-                </div>
               </div>
               
               {/* Add Property Button */}

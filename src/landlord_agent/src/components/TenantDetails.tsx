@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Switch } from './ui/switch';
+import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { DocumentUploadModal } from './DocumentUploadModal';
@@ -28,6 +30,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 import { Tenant } from '../App';
+import { tenantService } from '../services/tenantService';
 
 interface TenantReference {
   id: string;
@@ -70,15 +73,272 @@ interface TenantDocument {
   status: 'valid' | 'expired' | 'pending';
 }
 
+
+type PaymentScheduleStatus = 'pending' | 'paid' | 'overdue';
+
+interface PaymentScheduleEntryView {
+  id: string;
+  amount: number;
+  periodLabel: string;
+  periodStart: Date;
+  periodEnd: Date;
+  dueDate: Date;
+  status: PaymentScheduleStatus;
+  paidAt?: Date;
+}
+
+interface StoredScheduleEntry {
+  status: PaymentScheduleStatus;
+  paidAt?: string;
+}
+
+const PAYMENT_SCHEDULE_STORAGE_PREFIX = 'tenant_payment_schedule_';
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const PAYMENT_INTERVALS: Record<NonNullable<Tenant['paymentFrequency']>, number> = {
+  monthly: 31,
+  yearly: 365,
+  'fixed-time': 0,
+};
+
+const startOfDay = (value: Date): Date => {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const addDays = (date: Date, days: number): Date => {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+};
+
+const formatPeriodLabelLocal = (date: Date, frequency: Tenant['paymentFrequency']): string => {
+  if (frequency === 'yearly') {
+    return date.getFullYear().toString();
+  }
+  if (frequency === 'monthly') {
+    return date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  }
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const getIntervalDays = (tenant: Tenant): number => {
+  if (tenant.paymentIntervalDays && tenant.paymentIntervalDays > 0) {
+    return tenant.paymentIntervalDays;
+  }
+  const frequency = tenant.paymentFrequency || 'monthly';
+  return PAYMENT_INTERVALS[frequency];
+};
+
+const scheduleStorageKey = (tenantId: string) => `${PAYMENT_SCHEDULE_STORAGE_PREFIX}${tenantId}`;
+
+const loadStoredSchedule = (tenantId: string): Record<string, StoredScheduleEntry> => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(scheduleStorageKey(tenantId));
+    return raw ? JSON.parse(raw) : {};
+  } catch (error) {
+    console.warn('Failed to load stored payment schedule', error);
+    return {};
+  }
+};
+
+const persistSchedule = (tenantId: string, schedule: PaymentScheduleEntryView[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const payload: Record<string, StoredScheduleEntry> = {};
+    schedule.forEach((entry) => {
+      payload[entry.id] = {
+        status: entry.status,
+        ...(entry.paidAt ? { paidAt: entry.paidAt.toISOString() } : {}),
+      };
+    });
+    window.localStorage.setItem(scheduleStorageKey(tenantId), JSON.stringify(payload));
+  } catch (error) {
+    console.warn('Failed to persist payment schedule', error);
+  }
+};
+
+const deriveStatus = (entry: PaymentScheduleEntryView, now: Date = new Date()): PaymentScheduleStatus => {
+  if (entry.status === 'paid') {
+    return 'paid';
+  }
+  return now.getTime() >= entry.periodEnd.getTime() ? 'overdue' : 'pending';
+};
+
+const generatePaymentSchedule = (
+  tenant: Tenant,
+  stored: Record<string, StoredScheduleEntry>
+): PaymentScheduleEntryView[] => {
+  const now = new Date();
+  const frequency = tenant.paymentFrequency || 'monthly';
+  const intervalDays = getIntervalDays(tenant);
+  const firstDue = startOfDay(tenant.firstPaymentDate ?? tenant.leaseStart ?? now);
+  const leaseEnd = tenant.leaseEnd ? startOfDay(tenant.leaseEnd) : undefined;
+  const maxIterations = frequency === 'yearly' ? 10 : frequency === 'fixed-time' ? 1 : 24;
+
+  const schedule: PaymentScheduleEntryView[] = [];
+  let cursor = firstDue;
+  let iteration = 0;
+
+  while (iteration < maxIterations && (!leaseEnd || cursor.getTime() <= leaseEnd.getTime())) {
+    const id = `${tenant.id}_${cursor.getTime()}`;
+    const periodStart = cursor;
+    const periodEnd = frequency === 'fixed-time' ? cursor : addDays(periodStart, intervalDays);
+    const storedEntry = stored[id];
+    let status: PaymentScheduleStatus = storedEntry?.status || 'pending';
+    let paidAt = storedEntry?.paidAt ? new Date(storedEntry.paidAt) : undefined;
+
+    if (storedEntry?.status === 'paid') {
+      status = 'paid';
+      if (!paidAt) {
+        paidAt = new Date();
+      }
+    } else {
+      status = now.getTime() >= periodEnd.getTime() ? 'overdue' : 'pending';
+      paidAt = undefined;
+    }
+
+    schedule.push({
+      id,
+      amount: tenant.rentAmount,
+      periodLabel: formatPeriodLabelLocal(periodStart, frequency),
+      periodStart,
+      periodEnd,
+      dueDate: periodStart,
+      status,
+      paidAt,
+    });
+
+    if (frequency === 'fixed-time') {
+      break;
+    }
+
+    cursor = addDays(periodStart, intervalDays);
+    iteration += 1;
+  }
+
+  return schedule;
+};
+
+
 interface TenantDetailsProps {
   tenant: Tenant | null;
   onBack: () => void;
   onEdit?: (tenant: Tenant) => void;
+  onTenantUpdate?: (tenant: Tenant) => void;
 }
 
-export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
+const computeScheduleSummary = (schedule: PaymentScheduleEntryView[]) => {
+  let overdueAmount = 0;
+  let lastPayment: Date | undefined;
+
+  schedule.forEach((entry) => {
+    if (entry.status === 'overdue') {
+      overdueAmount += entry.amount;
+    }
+    if (entry.status === 'paid' && entry.paidAt) {
+      if (!lastPayment || entry.paidAt > lastPayment) {
+        lastPayment = entry.paidAt;
+      }
+    }
+  });
+
+  return { overdueAmount, lastPayment };
+};
+
+export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: TenantDetailsProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [paymentSchedule, setPaymentSchedule] = useState<PaymentScheduleEntryView[]>(() => {
+    const stored = loadStoredSchedule(tenant.id);
+    return generatePaymentSchedule(tenant, stored);
+  });
+
+  useEffect(() => {
+    const stored = loadStoredSchedule(tenant.id);
+    setPaymentSchedule(generatePaymentSchedule(tenant, stored));
+  }, [
+    tenant.id,
+    tenant.paymentFrequency,
+    tenant.firstPaymentDate,
+    tenant.leaseStart,
+    tenant.leaseEnd,
+    tenant.rentAmount,
+    tenant.paymentIntervalDays
+  ]);
+
+  useEffect(() => {
+    persistSchedule(tenant.id, paymentSchedule);
+  }, [tenant.id, paymentSchedule]);
+
+  const syncTenantPaymentStatus = useCallback(async (updatedSchedule: PaymentScheduleEntryView[]) => {
+    if (!tenant) return;
+    const { overdueAmount, lastPayment } = computeScheduleSummary(updatedSchedule);
+    const paymentStatus: Tenant['paymentStatus'] = overdueAmount > 0 ? 'overdue' : 'current';
+
+    try {
+      await tenantService.updateTenant(tenant.id, {
+        paymentStatus,
+        overdueAmount,
+        lastPaymentDate: lastPayment || undefined,
+      });
+      const updatedTenant: Tenant = {
+        ...tenant,
+        paymentStatus,
+        overdueAmount,
+        lastPaymentDate: lastPayment || undefined,
+      };
+      onTenantUpdate?.(updatedTenant);
+    } catch (error) {
+      console.error('❌ Failed to update tenant payment status:', error);
+    }
+  }, [tenant, onTenantUpdate]);
+
+  const handlePaymentToggle = (entryId: string, checked: boolean) => {
+    setPaymentSchedule((prev) => {
+      const now = new Date();
+      const updatedSchedule = prev.map((entry) => {
+        if (entry.id !== entryId) {
+          if (entry.status === 'paid') {
+            return entry;
+          }
+          return { ...entry, status: deriveStatus(entry, now) };
+        }
+
+        if (checked) {
+          return { ...entry, status: 'paid', paidAt: now };
+        }
+
+        const resetEntry: PaymentScheduleEntryView = {
+          ...entry,
+          status: 'pending',
+          paidAt: undefined,
+        };
+        return { ...resetEntry, status: deriveStatus(resetEntry, now) };
+      });
+
+      syncTenantPaymentStatus(updatedSchedule);
+      return updatedSchedule;
+    });
+  };
+
+  const paymentSummary = useMemo(() => computeScheduleSummary(paymentSchedule), [paymentSchedule]);
+
+  const computedPaymentStatus: Tenant['paymentStatus'] = paymentSummary.overdueAmount > 0 ? 'overdue' : 'current';
+
+  const rentPaymentsHistory: RentPayment[] = useMemo(
+    () =>
+      paymentSchedule.map((entry) => ({
+        id: entry.id,
+        amount: entry.amount,
+        dueDate: entry.dueDate,
+        paidDate: entry.paidAt,
+        status: entry.status,
+      })),
+    [paymentSchedule]
+  );
 
   if (!tenant) {
     return (
@@ -94,6 +354,9 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
   // Mock additional data for demonstration
   const mockTenant: Tenant = {
     ...tenant,
+    paymentStatus: computedPaymentStatus,
+    overdueAmount: paymentSummary.overdueAmount,
+    lastPaymentDate: paymentSummary.lastPayment ?? tenant?.lastPaymentDate,
     depositAmount: tenant.rentAmount * 1.5,
     monthlyRent: tenant.rentAmount,
     tenancyType: 'assured-shorthold',
@@ -125,31 +388,7 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
         notes: 'No issues reported, always paid on time'
       }
     ],
-    rentPayments: [
-      {
-        id: '1',
-        amount: tenant.rentAmount,
-        dueDate: new Date('2024-06-01'),
-        paidDate: new Date('2024-05-28'),
-        status: 'paid',
-        paymentMethod: 'Bank Transfer'
-      },
-      {
-        id: '2',
-        amount: tenant.rentAmount,
-        dueDate: new Date('2024-07-01'),
-        paidDate: new Date('2024-06-30'),
-        status: 'paid',
-        paymentMethod: 'Bank Transfer'
-      },
-      {
-        id: '3',
-        amount: tenant.rentAmount,
-        dueDate: new Date('2024-08-01'),
-        status: 'pending',
-        paymentMethod: 'Bank Transfer'
-      }
-    ],
+    rentPayments: rentPaymentsHistory,
     maintenanceRequests: [
       {
         id: '1',
@@ -367,10 +606,10 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
       {/* Content */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+            {/* <TabsTrigger value="maintenance">Maintenance</TabsTrigger> */}
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="references">References</TabsTrigger>
           </TabsList>
@@ -485,20 +724,20 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Payment Status</p>
-                      <Badge className={tenant.paymentStatus === 'current' ? 'bg-green-100 text-green-800' : 
-                                       tenant.paymentStatus === 'overdue' ? 'bg-red-100 text-red-800' : 
+                      <Badge className={mockTenant.paymentStatus === 'current' ? 'bg-green-100 text-green-800' : 
+                                       mockTenant.paymentStatus === 'overdue' ? 'bg-red-100 text-red-800' : 
                                        'bg-orange-100 text-orange-800'}>
-                        {tenant.paymentStatus === 'current' ? 'Current' : 
-                         tenant.paymentStatus === 'overdue' ? 'Overdue' : 'Payment Plan'}
+                        {mockTenant.paymentStatus === 'current' ? 'Current' : 
+                         mockTenant.paymentStatus === 'overdue' ? 'Overdue' : 'Payment Plan'}
                       </Badge>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Last Payment</p>
-                      <p>{tenant.lastPaymentDate ? formatDate(tenant.lastPaymentDate) : 'No record'}</p>
+                      <p>{mockTenant.lastPaymentDate ? formatDate(mockTenant.lastPaymentDate) : 'No record'}</p>
                     </div>
                   </div>
                   
-                  {tenant.paymentStatus === 'overdue' && tenant.overdueAmount && (
+                  {mockTenant.paymentStatus === 'overdue' && mockTenant.overdueAmount && (
                     <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                       <div className="flex items-center justify-between">
                       <div className="flex items-center text-red-800">
@@ -506,34 +745,34 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                         <span className="font-medium">Rent Arrears</span>
                       </div>
                         <span className="font-semibold text-red-800">
-                          £{tenant.overdueAmount.toLocaleString()}
+                          £{mockTenant.overdueAmount.toLocaleString()}
                         </span>
                       </div>
-                      {tenant.defaultRiskScore && (
+                      {mockTenant.defaultRiskScore && (
                         <div className="mt-2 text-sm text-red-700">
-                          Default Risk Score: {tenant.defaultRiskScore}%
+                          Default Risk Score: {mockTenant.defaultRiskScore}%
                         </div>
                       )}
                     </div>
                   )}
                   
-                  {tenant.defaultRiskScore && tenant.paymentStatus === 'current' && (
+                  {mockTenant.defaultRiskScore && mockTenant.paymentStatus === 'current' && (
                     <div>
                       <p className="text-sm text-muted-foreground">Default Risk Score</p>
                       <div className="flex items-center space-x-2">
                         <div className={`w-full bg-gray-200 rounded-full h-2 ${
-                          tenant.defaultRiskScore >= 70 ? 'bg-red-200' : 
-                          tenant.defaultRiskScore >= 40 ? 'bg-orange-200' : 'bg-green-200'
+                          mockTenant.defaultRiskScore >= 70 ? 'bg-red-200' : 
+                          mockTenant.defaultRiskScore >= 40 ? 'bg-orange-200' : 'bg-green-200'
                         }`}>
                           <div 
                             className={`h-2 rounded-full ${
-                              tenant.defaultRiskScore >= 70 ? 'bg-red-500' : 
-                              tenant.defaultRiskScore >= 40 ? 'bg-orange-500' : 'bg-green-500'
+                              mockTenant.defaultRiskScore >= 70 ? 'bg-red-500' : 
+                              mockTenant.defaultRiskScore >= 40 ? 'bg-orange-500' : 'bg-green-500'
                             }`}
-                            style={{ width: `${tenant.defaultRiskScore}%` }}
+                            style={{ width: `${mockTenant.defaultRiskScore}%` }}
                           ></div>
                         </div>
-                        <span className="text-sm font-medium">{tenant.defaultRiskScore}%</span>
+                        <span className="text-sm font-medium">{mockTenant.defaultRiskScore}%</span>
                       </div>
                     </div>
                   )}
@@ -574,10 +813,21 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                             {payment.paidDate && ` • Paid: ${formatDate(payment.paidDate)}`}
                           </p>
                         </div>
+                        <Badge className={getStatusColor(payment.status)}>
+                          {payment.status}
+                        </Badge>
                       </div>
-                      <Badge className={getStatusColor(payment.status)}>
-                        {payment.status}
-                      </Badge>
+                      <div className="flex items-center space-x-3">
+                    <Label htmlFor={`payment-toggle-${payment.id}`} className="text-sm text-muted-foreground">
+                      {payment.status === 'paid' ? 'Marked as paid' : 'Mark as paid'}
+                    </Label>
+                        <Switch
+                          id={`payment-toggle-${payment.id}`}
+                          checked={payment.status === 'paid'}
+                          onCheckedChange={(checked) => handlePaymentToggle(payment.id, checked)}
+                          aria-label={`Mark payment due ${formatDate(payment.dueDate)} as paid`}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -585,7 +835,7 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
             </Card>
           </TabsContent>
 
-          <TabsContent value="maintenance" className="space-y-6">
+          {/* <TabsContent value="maintenance" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
@@ -620,7 +870,7 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          </TabsContent> */}
 
           <TabsContent value="documents" className="space-y-6">
             <Card>
@@ -727,3 +977,9 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
     </div>
   );
 }
+
+
+
+
+
+

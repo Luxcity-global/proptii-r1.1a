@@ -4,7 +4,10 @@ import nodemailer from 'nodemailer';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { initializeApp, cert, applicationDefault, getApps } from 'firebase-admin/app';
+import { getStorage } from 'firebase-admin/storage';
 
 // Get directory name in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -14,6 +17,86 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const app = express();
+
+let firebaseBucket = null;
+
+const initializeFirebaseStorage = () => {
+    if (firebaseBucket) {
+        return firebaseBucket;
+    }
+
+    try {
+        let serviceAccount = null;
+
+        if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+            try {
+                serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+            } catch (parseError) {
+                console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:', parseError);
+            }
+        } else {
+            const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || path.join(__dirname, 'service-account.json');
+            if (fs.existsSync(serviceAccountPath)) {
+                try {
+                    const serviceAccountRaw = fs.readFileSync(serviceAccountPath, 'utf8');
+                    serviceAccount = JSON.parse(serviceAccountRaw);
+                } catch (fileError) {
+                    console.error('Failed to read service-account.json:', fileError);
+                }
+            }
+        }
+
+        if (serviceAccount?.private_key && serviceAccount.private_key.includes('\\n')) {
+            serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        }
+
+        let credential = null;
+
+        if (serviceAccount) {
+            credential = cert(serviceAccount);
+        } else {
+            try {
+                credential = applicationDefault();
+            } catch (credentialError) {
+                console.warn('Firebase application default credentials are not available:', credentialError.message);
+            }
+        }
+
+        if (!credential) {
+            console.warn('Firebase credentials not provided; property document uploads will be disabled.');
+            return null;
+        }
+
+        const bucketName =
+            process.env.FIREBASE_STORAGE_BUCKET ||
+            serviceAccount?.storageBucket ||
+            (serviceAccount?.project_id ? `${serviceAccount.project_id}.appspot.com` : undefined);
+
+        if (!bucketName) {
+            console.warn('Firebase storage bucket not configured; property document uploads will be disabled.');
+            return null;
+        }
+
+        const apps = getApps();
+        const firebaseApp = apps.length
+            ? apps[0]
+            : initializeApp({
+                  credential,
+                  storageBucket: bucketName,
+              });
+
+        firebaseBucket = getStorage(firebaseApp).bucket(bucketName);
+        console.log(`Firebase Storage bucket ready: ${firebaseBucket.name}`);
+
+        return firebaseBucket;
+    } catch (error) {
+        console.error('Failed to initialize Firebase Storage:', error);
+        firebaseBucket = null;
+        return null;
+    }
+};
+
+initializeFirebaseStorage();
 
 // Enable CORS for all routes with proper configuration for file uploads
 app.use(cors({
@@ -134,6 +217,89 @@ app.post('/api/email/send', upload.array('attachments', 10), async (req, res) =>
                     fromEmail: process.env.SMTP_FROM_EMAIL
                 }
             } : undefined
+        });
+    }
+});
+
+// Property document upload route for landlord portal
+app.post('/api/property/upload-document', upload.single('document'), async (req, res) => {
+    console.log('Received property document upload request');
+
+    if (!req.file) {
+        return res.status(400).json({
+            success: false,
+            error: 'No document file provided',
+        });
+    }
+
+    const bucket = firebaseBucket || initializeFirebaseStorage();
+
+    if (!bucket) {
+        return res.status(503).json({
+            success: false,
+            error: 'Document storage service is not configured',
+        });
+    }
+
+    const originalName = req.file.originalname || 'document';
+    const normalizedName = originalName
+        .toLowerCase()
+        .replace(/[^a-z0-9.\-_]/g, '-');
+    const sanitizedName = normalizedName.replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+    const originalExtension = originalName.includes('.') ? originalName.substring(originalName.lastIndexOf('.')).toLowerCase() : '';
+    const fallbackName = originalExtension ? `document${originalExtension}` : 'document.bin';
+    const safeName = sanitizedName || fallbackName;
+    const timestamp = Date.now();
+    const destinationPath = `property-documents/${timestamp}-${safeName}`;
+
+    try {
+        const file = bucket.file(destinationPath);
+
+        await file.save(req.file.buffer, {
+            resumable: false,
+            metadata: {
+                contentType: req.file.mimetype || 'application/octet-stream',
+                metadata: {
+                    originalName,
+                    uploadedAt: new Date().toISOString(),
+                },
+            },
+        });
+
+        let publicUrl = null;
+
+        try {
+            await file.makePublic();
+            publicUrl = file.publicUrl();
+        } catch (makePublicError) {
+            console.warn('makePublic failed, falling back to signed URL:', makePublicError.message);
+        }
+
+        if (!publicUrl) {
+            const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+            const [signedUrl] = await file.getSignedUrl({
+                action: 'read',
+                expires: expiresAt,
+            });
+            publicUrl = signedUrl;
+        }
+
+        res.json({
+            success: true,
+            document: {
+                url: publicUrl,
+                path: destinationPath,
+                name: originalName,
+                type: req.file.mimetype,
+                size: req.file.size,
+            },
+        });
+    } catch (error) {
+        console.error('Error uploading property document:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to upload document',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined,
         });
     }
 });

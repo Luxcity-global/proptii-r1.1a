@@ -414,10 +414,10 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, u
       console.log('✅ Dispatched all field updates');
     } else {
       console.log('⚠️ No initialTenant, loading progress or applying defaults');
-      const loaded = loadProgress();
-      if (!loaded) {
-        applySmartDefaults(FORM_STEPS[0].id);
-      }
+    const loaded = loadProgress();
+    if (!loaded) {
+      applySmartDefaults(FORM_STEPS[0].id);
+    }
     }
   }, [initialTenant]);
 

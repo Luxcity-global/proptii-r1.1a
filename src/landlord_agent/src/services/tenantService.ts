@@ -7,12 +7,12 @@ class TenantService {
 
   async createTenant(tenantData: Omit<Tenant, 'id'>, ownerUserId: string): Promise<string> {
     try {
-      const payload: any = this.toFirestore({ ...tenantData, userId: ownerUserId });
-      console.log('✅ TenantService: Creating tenant with userId:', ownerUserId);
+    const payload: any = this.toFirestore({ ...tenantData, userId: ownerUserId });
+    console.log('✅ TenantService: Creating tenant with userId:', ownerUserId);
       console.log('[tenantService] createTenant payload:', JSON.stringify(payload, null, 2));
       console.log('[tenantService] Firestore collection:', this.tenantsCollection.path);
       
-      const ref = await addDoc(this.tenantsCollection, payload);
+    const ref = await addDoc(this.tenantsCollection, payload);
       console.log('✅ [tenantService] Successfully created tenant with id:', ref.id);
       console.log('✅ [tenantService] Document path:', ref.path);
       
@@ -25,7 +25,7 @@ class TenantService {
         console.error('❌ [tenantService] ERROR: Document was not created in Firestore!');
       }
       
-      return ref.id;
+    return ref.id;
     } catch (error) {
       console.error('❌ [tenantService] ERROR creating tenant:', error);
       console.error('❌ [tenantService] Error details:', {

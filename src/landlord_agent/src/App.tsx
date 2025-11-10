@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import axios from 'axios';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { RoleSelection } from './components/RoleSelection';
 import { ProfileSetup } from './components/ProfileSetup';
@@ -137,6 +138,7 @@ export interface Tenant {
   paymentStatus: 'current' | 'overdue' | 'payment-plan';
   paymentFrequency?: 'monthly' | 'yearly' | 'fixed-time';
   firstPaymentDate?: Date;
+  paymentIntervalDays?: number;
   avatar?: string;
   emergencyContact?: {
     name: string;
@@ -582,6 +584,49 @@ export default function App() {
     return uploadedPhotos;
   };
 
+  const uploadPropertyDocuments = async (documentFiles: File[]): Promise<PropertyDocument[]> => {
+    if (documentFiles.length === 0) {
+      return [];
+    }
+
+    const API_BASE_URL = window.location.hostname === 'localhost'
+      ? 'http://localhost:10000/api'
+      : 'https://proptii-r1-1a.onrender.com/api';
+
+    const uploadPromises = documentFiles.map(async (file, index) => {
+      const formData = new FormData();
+      formData.append('document', file);
+
+      try {
+        const response = await axios.post(`${API_BASE_URL}/property/upload-document`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 30000
+        });
+
+        const uploaded = response.data?.document;
+        if (!uploaded?.url) {
+          throw new Error('Document upload did not return a URL');
+        }
+
+        return {
+          id: `doc-${Date.now()}-${index}`,
+          name: uploaded.name || file.name,
+          type: 'other', // Default classification; can be refined later
+          url: uploaded.url,
+          issueDate: new Date(),
+          status: 'valid'
+        } as PropertyDocument;
+      } catch (error) {
+        console.error(`❌ Error uploading document ${file.name}:`, error);
+        throw error;
+      }
+    });
+
+    const uploadedDocuments = await Promise.all(uploadPromises);
+    console.log(`✅ Uploaded ${uploadedDocuments.length} property documents`);
+    return uploadedDocuments;
+  };
+
   // Convert property setup data to Property object
   const createPropertyFromSetupData = (): Property => {
     const { propertyType, propertyDetails, amenities, images, additionalNotes } = propertySetupData;
@@ -970,8 +1015,8 @@ export default function App() {
             }
             
             // PRIORITY 2: Query parameter
-            const params = new URLSearchParams(window.location.search);
-            const uidFromQuery = params.get('uid');
+        const params = new URLSearchParams(window.location.search);
+        const uidFromQuery = params.get('uid');
             if (uidFromQuery) {
               console.log('🔍 UserId from query param:', uidFromQuery);
               return uidFromQuery;
@@ -979,7 +1024,7 @@ export default function App() {
             
             // PRIORITY 3: getUserInfo function
             if (typeof (window as any).getUserInfo === 'function') {
-              const info = (window as any).getUserInfo();
+          const info = (window as any).getUserInfo();
               console.log('🔍 getUserInfo() returned:', info);
               if (info?.id || info?.sub || info?.oid) {
                 const uid = info.id || info.sub || info.oid;
@@ -989,17 +1034,17 @@ export default function App() {
             }
             
             // PRIORITY 4: localStorage auth state
-            const cached = localStorage.getItem('proptii_auth_state');
-            if (cached) {
-              const parsed = JSON.parse(cached);
+          const cached = localStorage.getItem('proptii_auth_state');
+          if (cached) {
+            const parsed = JSON.parse(cached);
               console.log('🔍 Cached auth state:', parsed);
               // Check both nested user.id AND top-level user id fields
               const uid = parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId;
               if (uid) {
                 console.log('🔍 UserId from localStorage:', uid);
                 return uid;
-              }
-            }
+          }
+        }
           } catch (e) {
             console.error('🔍 Error extracting userId:', e);
           }
@@ -2477,6 +2522,40 @@ export default function App() {
               console.log('🔍 selectedTenant set to:', tenant);
               navigateToScreen('add-tenant');
             }}
+            onTenantUpdate={(updatedTenant) => {
+              setSelectedTenant(updatedTenant);
+              setTenants(prev => prev.map(t => t.id === updatedTenant.id ? updatedTenant : t));
+              setProperties(prev => prev.map(property => {
+                if (property.tenant?.id === updatedTenant.id) {
+                  return {
+                    ...property,
+                    tenant: {
+                      ...property.tenant,
+                      ...updatedTenant
+                    }
+                  };
+                }
+                return property;
+              }));
+              setArrearsAlerts(prev => {
+                const remainingAlerts = prev.filter(alert => alert.tenantId !== updatedTenant.id);
+                if (updatedTenant.paymentStatus === 'overdue') {
+                  const nextAlert = {
+                    id: `local-${updatedTenant.id}`,
+                    tenantId: updatedTenant.id,
+                    tenantName: updatedTenant.name,
+                    propertyAddress: updatedTenant.propertyAddress,
+                    overdueAmount: updatedTenant.overdueAmount || 0,
+                    daysPastDue: 0,
+                    defaultRiskScore: updatedTenant.defaultRiskScore || 65,
+                    lastPaymentDate: updatedTenant.lastPaymentDate || undefined,
+                    status: 'new' as const
+                  };
+                  return [...remainingAlerts, nextAlert];
+                }
+                return remainingAlerts;
+              });
+            }}
           />
         );
 
@@ -2585,16 +2664,30 @@ export default function App() {
                   console.warn('No image files to upload');
                 }
                 
-                // 2. Convert setup data to property
+                // 2. Upload documents to Firebase Storage
+                let uploadedDocuments: PropertyDocument[] = [];
+                if (propertySetupData.propertyDetails.uploadedDocuments.length > 0) {
+                  console.log('Uploading property documents...');
+                  uploadedDocuments = await uploadPropertyDocuments(propertySetupData.propertyDetails.uploadedDocuments);
+                  console.log('Uploaded documents:', uploadedDocuments);
+                }
+
+                // 3. Convert setup data to property
                 const newProperty = createPropertyFromSetupData();
                 
-                // 3. Replace preview URLs with uploaded Firebase Storage URLs
+                // 4. Replace preview URLs with uploaded Firebase Storage URLs
                 if (uploadedPhotos.length > 0) {
                   console.log('Replacing preview URLs with Firebase Storage URLs');
                   newProperty.photos = uploadedPhotos;
                 } else {
                   console.warn('No photos to add to property');
                   newProperty.photos = [];
+                }
+                
+                if (uploadedDocuments.length > 0) {
+                  newProperty.documents = uploadedDocuments;
+                } else {
+                  newProperty.documents = [];
                 }
                 
                 if (isEditing && editingPropertyId) {
@@ -2686,7 +2779,7 @@ export default function App() {
                 }
               } else {
                 // Add new tenant
-                addTenant(tenant);
+              addTenant(tenant);
               }
               setSelectedTenant(null);
               editingTenantRef.current = null; // Clear ref

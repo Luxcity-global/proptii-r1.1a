@@ -1,10 +1,10 @@
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDoc, 
+import {
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  getDoc,
   getDocs,
   query,
   where,
@@ -14,6 +14,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import type { Tenant } from '../App';
 
 export type AlertType = 'lease-expiry' | 'unsigned-contract' | 'rent-arrears';
 export type AlertStatus = 'active' | 'resolved' | 'dismissed';
@@ -54,6 +55,90 @@ export interface Alert {
   updatedAt: Date;
   resolvedAt?: Date;
   dismissedAt?: Date;
+}
+
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
+const MAX_FREQUENCY_ITERATIONS = 120;
+
+type EvaluatedPaymentStatus = {
+  status: Tenant['paymentStatus'];
+  overdueAmount: number;
+  daysPastDue: number;
+  dueDate?: Date;
+};
+
+function normaliseDate(value?: Date | string | null): Date | undefined {
+  if (!value) return undefined;
+  if (value instanceof Date) return value;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+function addFrequencyInterval(date: Date, frequency: NonNullable<Tenant['paymentFrequency']>): Date {
+  const next = new Date(date.getTime());
+  if (frequency === 'monthly') {
+    next.setMonth(next.getMonth() + 1);
+  } else if (frequency === 'yearly') {
+    next.setFullYear(next.getFullYear() + 1);
+  }
+  return next;
+}
+
+function evaluateTenantPaymentStatus(tenant: Tenant, now: Date): EvaluatedPaymentStatus | null {
+  // Do not auto-adjust tenants on payment plans
+  if (tenant.paymentStatus === 'payment-plan') {
+    return null;
+  }
+
+  const rentAmount = tenant.rentAmount || 0;
+  if (rentAmount <= 0) {
+    return null;
+  }
+
+  const frequency: NonNullable<Tenant['paymentFrequency']> = (tenant.paymentFrequency || 'monthly') as NonNullable<Tenant['paymentFrequency']>;
+  const firstDue = normaliseDate(tenant.firstPaymentDate) || normaliseDate(tenant.leaseStart);
+  if (!firstDue) {
+    return null;
+  }
+
+  const lastPayment = normaliseDate(tenant.lastPaymentDate);
+
+  if (frequency === 'fixed-time') {
+    const hasPaid = lastPayment ? lastPayment.getTime() >= firstDue.getTime() : false;
+    const isOverdue = !hasPaid && now.getTime() > firstDue.getTime();
+    const daysPastDue = isOverdue ? Math.max(1, Math.ceil((now.getTime() - firstDue.getTime()) / MS_IN_DAY)) : 0;
+    return {
+      status: isOverdue ? 'overdue' : 'current',
+      overdueAmount: isOverdue ? rentAmount : 0,
+      daysPastDue,
+      dueDate: firstDue
+    };
+  }
+
+  let dueDate = new Date(firstDue.getTime());
+  let iterations = 0;
+
+  if (lastPayment) {
+    while (dueDate.getTime() <= lastPayment.getTime() && iterations < MAX_FREQUENCY_ITERATIONS) {
+      dueDate = addFrequencyInterval(dueDate, frequency);
+      iterations += 1;
+    }
+  }
+
+  // Safety net to avoid runaway loops
+  if (iterations >= MAX_FREQUENCY_ITERATIONS) {
+    console.warn(`⚠️ AlertService: Hit iteration cap while evaluating payment schedule for tenant ${tenant.id}`);
+  }
+
+  const isOverdue = now.getTime() > dueDate.getTime();
+  const daysPastDue = isOverdue ? Math.max(1, Math.ceil((now.getTime() - dueDate.getTime()) / MS_IN_DAY)) : 0;
+
+  return {
+    status: isOverdue ? 'overdue' : 'current',
+    overdueAmount: isOverdue ? rentAmount : 0,
+    daysPastDue,
+    dueDate
+  };
 }
 
 class AlertService {
@@ -243,6 +328,7 @@ class AlertService {
 
     const batch = writeBatch(db);
     let alertCount = 0;
+    let tenantStatusUpdates = 0;
 
     try {
       // 1. Check for lease expiry alerts
@@ -258,6 +344,31 @@ class AlertService {
       console.log(`   Checking ${tenants.length} tenants`);
 
       for (const tenant of tenants) {
+        let computedDaysPastDue: number | null = null;
+
+        const evaluatedStatus = evaluateTenantPaymentStatus(tenant, today);
+        if (evaluatedStatus) {
+          const tenantOverdueAmount = typeof tenant.overdueAmount === 'number' ? tenant.overdueAmount : 0;
+          const statusChanged = tenant.paymentStatus !== evaluatedStatus.status;
+          const overdueChanged = tenantOverdueAmount !== evaluatedStatus.overdueAmount;
+
+          if (statusChanged || overdueChanged) {
+            const tenantRef = doc(db, 'tenants', tenant.id);
+            batch.update(tenantRef, {
+              paymentStatus: evaluatedStatus.status,
+              overdueAmount: evaluatedStatus.overdueAmount,
+              updatedAt: Timestamp.now()
+            });
+            tenantStatusUpdates++;
+            tenant.paymentStatus = evaluatedStatus.status;
+            tenant.overdueAmount = evaluatedStatus.overdueAmount;
+          }
+
+          if (evaluatedStatus.status === 'overdue') {
+            computedDaysPastDue = evaluatedStatus.daysPastDue;
+          }
+        }
+
         // Check both 'active' and 'pending' tenants for lease expiry alerts
         // (pending tenants might have leases expiring before they even move in)
         if (tenant.leaseEnd && (tenant.status === 'active' || tenant.status === 'pending')) {
@@ -353,23 +464,26 @@ class AlertService {
         }
 
         // 2. Check for rent arrears alerts
-        if (tenant.paymentStatus === 'overdue' && tenant.overdueAmount && tenant.overdueAmount > 0) {
+        const overdueAmountValue = typeof tenant.overdueAmount === 'number' ? tenant.overdueAmount : 0;
+        if (tenant.paymentStatus === 'overdue' && overdueAmountValue > 0) {
           const exists = await this.alertExists(userId, 'rent-arrears', tenant.id);
           
           if (!exists) {
-            const lastPayment = tenant.lastPaymentDate instanceof Date 
-              ? tenant.lastPaymentDate 
-              : tenant.lastPaymentDate 
-                ? new Date(tenant.lastPaymentDate) 
+            const lastPayment = tenant.lastPaymentDate instanceof Date
+              ? tenant.lastPaymentDate
+              : tenant.lastPaymentDate
+                ? new Date(tenant.lastPaymentDate)
                 : null;
-            
-            const daysPastDue = lastPayment 
-              ? Math.ceil((now.getTime() - lastPayment.getTime()) / (1000 * 60 * 60 * 24))
+
+            const fallbackDaysPastDue = lastPayment
+              ? Math.max(1, Math.ceil((now.getTime() - lastPayment.getTime()) / MS_IN_DAY))
               : 0;
+
+            const daysPastDue = computedDaysPastDue ?? fallbackDaysPastDue;
 
             const severity = daysPastDue >= 30 ? 'critical' : daysPastDue >= 14 ? 'high' : 'medium';
             const alertRef = doc(this.alertsCollection);
-            batch.set(alertRef, {
+            const alertData: any = {
               type: 'rent-arrears',
               status: 'active',
               severity,
@@ -377,16 +491,21 @@ class AlertService {
               tenantId: tenant.id,
               propertyId: tenant.propertyId,
               title: `Rent Arrears - ${tenant.name}`,
-              description: `£${tenant.overdueAmount.toLocaleString()} overdue for ${tenant.propertyAddress}`,
-              overdueAmount: tenant.overdueAmount,
+              description: `£${overdueAmountValue.toLocaleString()} overdue for ${tenant.propertyAddress}`,
+              overdueAmount: overdueAmountValue,
               daysPastDue,
-              lastPaymentDate: lastPayment ? Timestamp.fromDate(lastPayment) : undefined,
               paymentFrequency: (tenant as any).paymentFrequency || 'monthly',
               propertyAddress: tenant.propertyAddress,
               tenantName: tenant.name,
               createdAt: Timestamp.now(),
               updatedAt: Timestamp.now()
-            });
+            };
+
+            if (lastPayment) {
+              alertData.lastPaymentDate = Timestamp.fromDate(lastPayment);
+            }
+
+            batch.set(alertRef, alertData);
             alertCount++;
           }
         }
@@ -535,7 +654,8 @@ class AlertService {
       }
 
       // Commit all changes (new alerts + resolved alerts)
-      if (alertCount > 0 || resolvedCount > 0) {
+      const hasChanges = alertCount > 0 || resolvedCount > 0 || tenantStatusUpdates > 0;
+      if (hasChanges) {
         await batch.commit();
         if (alertCount > 0) {
           console.log(`✅ AlertService: Generated ${alertCount} new alerts`);
@@ -543,9 +663,12 @@ class AlertService {
         if (resolvedCount > 0) {
           console.log(`✅ AlertService: Resolved ${resolvedCount} outdated alerts`);
         }
+        if (tenantStatusUpdates > 0) {
+          console.log(`✅ AlertService: Updated payment status for ${tenantStatusUpdates} tenant${tenantStatusUpdates === 1 ? '' : 's'}`);
+        }
         console.log(`   Collection: 'alerts'`);
       } else {
-        console.log('✅ AlertService: No new alerts to generate and no outdated alerts to clean up');
+        console.log('✅ AlertService: No changes required (alerts or tenant statuses)');
         console.log('   This means either:');
         console.log('   - No tenants have leases expiring within 30 days');
         console.log('   - Alerts already exist for expiring leases');

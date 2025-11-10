@@ -409,10 +409,10 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, u
       console.log('✅ Dispatched all field updates');
     } else {
       console.log('⚠️ No initialTenant, loading progress or applying defaults');
-      const loaded = loadProgress();
-      if (!loaded) {
-        applySmartDefaults(FORM_STEPS[0].id);
-      }
+    const loaded = loadProgress();
+    if (!loaded) {
+      applySmartDefaults(FORM_STEPS[0].id);
+    }
     }
   }, [initialTenant]);
 
@@ -868,9 +868,9 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, u
       try {
         await onSave(tenant);
         console.log('✅ [AddTenant] onSave completed successfully');
-      } catch (error) {
+        } catch (error) {
         console.error('❌ [AddTenant] Error in onSave:', error);
-        throw error;
+            throw error;
       }
 
       // Mark saved and move to success step
