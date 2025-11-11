@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -28,6 +28,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 import { Tenant } from '../App';
+import { referencingService, ReferencingDocument } from '../services/referencingService';
 
 interface TenantReference {
   id: string;
@@ -68,6 +69,9 @@ interface TenantDocument {
   dateUploaded: Date;
   expiryDate?: Date;
   status: 'valid' | 'expired' | 'pending';
+  downloadUrl?: string;
+  fileSize?: number;
+  fileType?: string;
 }
 
 interface TenantDetailsProps {
@@ -79,6 +83,10 @@ interface TenantDetailsProps {
 export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [referencingStatus, setReferencingStatus] = useState<'not-started' | 'in-progress' | 'complete'>('not-started');
+  const [referencingData, setReferencingData] = useState<ReferencingDocument | null>(null);
+  const [isLoadingReferencing, setIsLoadingReferencing] = useState(true);
+  const [referencingDocuments, setReferencingDocuments] = useState<TenantDocument[]>([]);
 
   if (!tenant) {
     return (
@@ -90,6 +98,114 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
       </div>
     );
   }
+
+  // Fetch real referencing data from Firestore
+  useEffect(() => {
+    const fetchReferencingStatus = async () => {
+      if (!tenant.email) {
+        console.warn('[TenantDetails] No email found for tenant, skipping referencing check');
+        setIsLoadingReferencing(false);
+        return;
+      }
+
+      setIsLoadingReferencing(true);
+      console.log(`[TenantDetails] Fetching referencing status for: ${tenant.email}`);
+      
+      const result = await referencingService.getReferencingStatusByEmail(tenant.email);
+      
+      console.log('[TenantDetails] Referencing result:', result);
+      
+      setReferencingStatus(result.status);
+      setReferencingData(result.data || null);
+      setIsLoadingReferencing(false);
+    };
+
+    fetchReferencingStatus();
+  }, [tenant.email]);
+
+  // Extract referencing documents from Firestore data
+  useEffect(() => {
+    if (!referencingData || !referencingData.formData) {
+      setReferencingDocuments([]);
+      return;
+    }
+
+    const docs: TenantDocument[] = [];
+    const formData = referencingData.formData;
+
+    // Identity Proof
+    if (formData.identity?.identityProof) {
+      docs.push({
+        id: 'ref-identity',
+        name: `Identity Document - ${formData.identity.identityProof.name}`,
+        type: 'id-document',
+        dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
+        status: 'valid',
+        downloadUrl: formData.identity.identityProof.dataUrl,
+        fileSize: formData.identity.identityProof.size,
+        fileType: formData.identity.identityProof.type
+      });
+    }
+
+    // Employment Proof
+    if (formData.employment?.proofDocument) {
+      docs.push({
+        id: 'ref-employment',
+        name: `Employment Proof - ${formData.employment.proofDocument.name}`,
+        type: 'other',
+        dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
+        status: 'valid',
+        downloadUrl: formData.employment.proofDocument.dataUrl,
+        fileSize: formData.employment.proofDocument.size,
+        fileType: formData.employment.proofDocument.type
+      });
+    }
+
+    // Residential Proof
+    if (formData.residential?.proofDocument) {
+      docs.push({
+        id: 'ref-residential',
+        name: `Proof of Address - ${formData.residential.proofDocument.name}`,
+        type: 'other',
+        dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
+        status: 'valid',
+        downloadUrl: formData.residential.proofDocument.dataUrl,
+        fileSize: formData.residential.proofDocument.size,
+        fileType: formData.residential.proofDocument.type
+      });
+    }
+
+    // Financial Proof
+    if (formData.financial?.proofOfIncomeDocument) {
+      docs.push({
+        id: 'ref-financial',
+        name: `Proof of Income - ${formData.financial.proofOfIncomeDocument.name}`,
+        type: 'other',
+        dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
+        status: 'valid',
+        downloadUrl: formData.financial.proofOfIncomeDocument.dataUrl,
+        fileSize: formData.financial.proofOfIncomeDocument.size,
+        fileType: formData.financial.proofOfIncomeDocument.type
+      });
+    }
+
+    // Guarantor Identity Document
+    if (formData.guarantor?.identityDocument) {
+      docs.push({
+        id: 'ref-guarantor',
+        name: `Guarantor ID - ${formData.guarantor.identityDocument.name}`,
+        type: 'other',
+        dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
+        status: 'valid',
+        downloadUrl: formData.guarantor.identityDocument.dataUrl,
+        fileSize: formData.guarantor.identityDocument.size,
+        fileType: formData.guarantor.identityDocument.type
+      });
+    }
+
+    console.log(`[TenantDetails] Extracted ${docs.length} referencing documents`);
+    setReferencingDocuments(docs);
+  }, [referencingData]);
 
   // Mock additional data for demonstration
   const mockTenant: Tenant = {
@@ -299,6 +415,53 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
     });
   };
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const handleDownloadDocument = (document: TenantDocument) => {
+    if (!document.downloadUrl) {
+      console.warn('No download URL available for document:', document.name);
+      return;
+    }
+
+    try {
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = document.downloadUrl;
+      link.download = document.name || 'document';
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('Document download initiated:', document.name);
+    } catch (error) {
+      console.error('Error downloading document:', error);
+    }
+  };
+
+  const handleViewDocument = (document: TenantDocument) => {
+    if (!document.downloadUrl) {
+      console.warn('No download URL available for document:', document.name);
+      return;
+    }
+
+    try {
+      // Open document in new tab
+      window.open(document.downloadUrl, '_blank');
+      console.log('Document opened in new tab:', document.name);
+    } catch (error) {
+      console.error('Error viewing document:', error);
+    }
+  };
+
+  // Combine mock documents with referencing documents
+  const allDocuments = [...(mockTenant.documents || []), ...referencingDocuments];
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -322,9 +485,16 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                     <Badge className={getStatusColor(mockTenant.status)}>
                       {mockTenant.status}
                     </Badge>
-                    <Badge className={getReferencingStatusColor(mockTenant.referencingStatus)}>
-                      Referencing: {getReferencingStatusLabel(mockTenant.referencingStatus)}
-                    </Badge>
+                    {isLoadingReferencing ? (
+                      <Badge className="bg-gray-100 text-gray-800">
+                        <Clock className="w-3 h-3 mr-1 animate-spin" />
+                        Checking referencing...
+                      </Badge>
+                    ) : (
+                      <Badge className={getReferencingStatusColor(referencingStatus)}>
+                        Referencing: {getReferencingStatusLabel(referencingStatus)}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>
@@ -629,6 +799,11 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                   <CardTitle className="flex items-center">
                     <FileText className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
                     Documents
+                    {referencingDocuments.length > 0 && (
+                      <Badge className="ml-3 bg-blue-100 text-blue-800">
+                        {referencingDocuments.length} from referencing
+                      </Badge>
+                    )}
                   </CardTitle>
                   <Button
                     onClick={() => setIsUploadModalOpen(true)}
@@ -658,25 +833,82 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {mockTenant.documents?.map((document) => (
-                    <div key={document.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <FileText className="w-5 h-5" style={{ color: '#DC5F12' }} />
-                        <div>
-                          <p className="font-medium">{document.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Uploaded: {formatDate(document.dateUploaded)}
-                            {document.expiryDate && ` • Expires: ${formatDate(document.expiryDate)}`}
-                          </p>
+                {isLoadingReferencing ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Clock className="w-6 h-6 mr-2 animate-spin text-gray-400" />
+                    <p className="text-muted-foreground">Loading documents...</p>
+                  </div>
+                ) : allDocuments.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-muted-foreground">No documents available</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Upload documents or have the tenant complete referencing
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {allDocuments.map((document) => {
+                      const isReferencingDoc = document.id.startsWith('ref-');
+                      
+                      return (
+                        <div key={document.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-4 flex-1">
+                              <FileText className="w-5 h-5 mt-1" style={{ color: '#DC5F12' }} />
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="font-medium">{document.name}</p>
+                                  {isReferencingDoc && (
+                                    <Badge className="bg-blue-100 text-blue-800 text-xs">
+                                      Referencing
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="text-sm text-muted-foreground space-y-1">
+                                  <p>
+                                    Uploaded: {formatDate(document.dateUploaded)}
+                                    {document.expiryDate && ` • Expires: ${formatDate(document.expiryDate)}`}
+                                  </p>
+                                  {document.fileSize && (
+                                    <p className="flex items-center gap-4">
+                                      <span>Size: {formatFileSize(document.fileSize)}</span>
+                                      {document.fileType && <span>Type: {document.fileType}</span>}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 ml-4">
+                              <Badge className={getStatusColor(document.status)}>
+                                {document.status}
+                              </Badge>
+                              {document.downloadUrl && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="p-2">
+                                      <MoreHorizontal className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleViewDocument(document)}>
+                                      <FileText className="w-4 h-4 mr-2" style={{ color: '#DC5F12' }} />
+                                      View Document
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDownloadDocument(document)}>
+                                      <FileText className="w-4 h-4 mr-2" style={{ color: '#DC5F12' }} />
+                                      Download
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <Badge className={getStatusColor(document.status)}>
-                        {document.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

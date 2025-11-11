@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import UserService, { User } from '../../services/userService';
 import contractEmailService from '../../services/contractEmailService';
 import signedContractsFirestoreService from '../../services/signedContractsFirestoreService';
+import contractSyncService from '../../services/contractSyncService';
 
 interface SendContractProps {
   contractData: {
@@ -239,6 +240,16 @@ const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfByte
       const successfulEmails = emailResults.filter(r => r.success);
       const failedEmails = emailResults.filter(r => !r.success);
 
+      // Check if any recipients are landlords/agents
+      console.log('🔍 Checking if recipients are landlords/agents...');
+      const recipientEmailList = validRecipients.map(r => r.email);
+      const landlordCheck = await contractSyncService.checkRecipientsForLandlords(recipientEmailList);
+      
+      if (landlordCheck.hasLandlords && landlordCheck.landlords.length > 0) {
+        console.log('✅ Found landlord/agent recipients:', landlordCheck.landlords.length);
+        console.log('📋 Landlords:', landlordCheck.landlords.map(l => `${l.name} (${l.email})`).join(', '));
+      }
+
       // Save or update contract in Firestore with complete data including signed PDF
       console.log('🔄 Saving signed contract to Firestore via Send button...');
       
@@ -295,6 +306,29 @@ const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfByte
         
         if (result.success) {
           console.log('✅ Signed contract saved to Firestore successfully:', result.contractId);
+          
+          // If any recipients are landlords/agents, sync to landlord dashboard
+          if (landlordCheck.hasLandlords && landlordCheck.landlords.length > 0) {
+            console.log('🔄 Syncing signed contract to landlord dashboard(s)...');
+            
+            // Get the full signed contract data that was just saved
+            const savedContract = await signedContractsFirestoreService.getSignedContractById(result.contractId!);
+            
+            if (savedContract.success && savedContract.contract) {
+              const landlordEmails = landlordCheck.landlords.map(l => l.email);
+              const syncResult = await contractSyncService.syncToMultipleLandlords(
+                savedContract.contract,
+                landlordEmails
+              );
+              
+              if (syncResult.success) {
+                console.log(`✅ Successfully synced to ${syncResult.syncedCount} landlord dashboard(s)`);
+                console.log('📊 Sync results:', syncResult.results);
+              } else {
+                console.error('❌ Failed to sync to landlord dashboards');
+              }
+            }
+          }
         } else {
           console.error('❌ Failed to save signed contract to Firestore:', result.error);
         }

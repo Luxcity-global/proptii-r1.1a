@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature } from 'lucide-react';
 import {
   Sidebar,
@@ -69,18 +70,19 @@ function CustomSidebarHeader() {
 }
 
 // Custom Navigation Menu with perfect alignment
-function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
+function CustomNavigationMenu({ navigationItems, currentScreen }: {
   navigationItems: Array<{
     id: NavigationScreen;
     icon: React.ComponentType<{ className?: string }>;
     label: string;
     hasNotification?: boolean;
+    path: string;
   }>;
   currentScreen: NavigationScreen;
-  onNavigate: (screen: NavigationScreen) => void;
 }) {
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
+  const navigate = useNavigate();
 
   return (
     <div className="pt-2 pb-2 pl-4 pr-2">
@@ -90,7 +92,7 @@ function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
           return (
             <button
               key={item.id}
-              onClick={() => onNavigate(item.id)}
+              onClick={() => navigate(item.path)}
               className={`
                 w-full flex items-center h-10 px-3 rounded-md text-sm font-medium transition-colors
                 ${isCollapsed ? 'justify-center' : 'justify-start'}
@@ -206,16 +208,16 @@ function CustomSidebarTrigger() {
 function CustomSidebar({ 
   navigationItems, 
   currentScreen, 
-  onNavigate, 
   userProfile 
 }: {
   navigationItems: Array<{
     id: NavigationScreen;
     icon: React.ComponentType<{ className?: string }>;
     label: string;
+    hasNotification?: boolean;
+    path: string;
   }>;
   currentScreen: NavigationScreen;
-  onNavigate: (screen: NavigationScreen) => void;
   userProfile: UserProfile | null;
 }) {
   const { state } = useSidebar();
@@ -239,7 +241,6 @@ function CustomSidebar({
             <CustomNavigationMenu 
               navigationItems={navigationItems}
               currentScreen={currentScreen}
-              onNavigate={onNavigate}
             />
           </div>
           
@@ -268,37 +269,44 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
       id: 'dashboard' as NavigationScreen,
       icon: Home,
       label: 'Dashboard',
+      path: '/dashboard',
     },
     {
       id: 'properties' as NavigationScreen,
       icon: Building2,
       label: 'Properties',
+      path: '/properties',
     },
     {
       id: 'documents' as NavigationScreen,
       icon: FileText,
       label: 'Documents',
+      path: '/documents',
     },
-          {
-            id: 'contracts' as NavigationScreen,
-            icon: FileSignature,
-            label: 'Contracts',
-            hasNotification: true, // This would be dynamic based on unsigned contracts
-          },
+    {
+      id: 'contracts' as NavigationScreen,
+      icon: FileSignature,
+      label: 'Contracts',
+      hasNotification: true, // This would be dynamic based on unsigned contracts
+      path: '/contracts',
+    },
     {
       id: 'clients' as NavigationScreen,
       icon: Users,
       label: 'Clients',
+      path: '/clients',
     },
     {
       id: 'inbox' as NavigationScreen,
       icon: Inbox,
       label: 'Inbox',
+      path: '/inbox',
     },
     {
       id: 'insights' as NavigationScreen,
       icon: BarChart3,
       label: 'Insights',
+      path: '/insights',
     },
   ];
 
@@ -315,7 +323,6 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
         <CustomSidebar 
           navigationItems={navigationItems}
           currentScreen={currentScreen}
-          onNavigate={onNavigate}
           userProfile={userProfile}
         />
 

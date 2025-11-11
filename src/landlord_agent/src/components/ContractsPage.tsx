@@ -56,16 +56,52 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [landlordEmail, setLandlordEmail] = useState<string | null>(null);
 
-  // Load contracts when tab changes
+  // Get landlord email from localStorage/auth on component mount
+  useEffect(() => {
+    const getUserEmail = () => {
+      // Try to get from localStorage (set during login/registration)
+      const storedEmail = localStorage.getItem('landlordEmail');
+      if (storedEmail) {
+        console.log('✅ Found landlord email in localStorage:', storedEmail);
+        setLandlordEmail(storedEmail);
+        return;
+      }
+
+      // Try to get from proptii_auth_state
+      const authState = localStorage.getItem('proptii_auth_state');
+      if (authState) {
+        try {
+          const parsed = JSON.parse(authState);
+          if (parsed?.user?.email) {
+            console.log('✅ Found landlord email in auth state:', parsed.user.email);
+            setLandlordEmail(parsed.user.email);
+            return;
+          }
+        } catch (e) {
+          console.error('Error parsing auth state:', e);
+        }
+      }
+
+      console.log('⚠️ No landlord email found - will show all contracts');
+    };
+
+    getUserEmail();
+  }, []);
+
+  // Load contracts when tab changes or landlordEmail is set
   useEffect(() => {
     loadContracts();
-  }, [activeTab]);
+  }, [activeTab, landlordEmail]);
 
   const loadContracts = async () => {
     try {
       setLoading(true);
       setError(null);
+      
+      console.log('🔄 ContractsPage - Loading contracts for tab:', activeTab);
+      console.log('🔄 ContractsPage - Landlord email:', landlordEmail);
       
       const statusMap: Record<string, Contract['status']> = {
         'sent': 'sent',
@@ -73,13 +109,39 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
         'signed': 'signed'
       };
       
-      const fetchedContracts = await contractService.getContracts({
+      // Build filters
+      const filters: any = {
         status: statusMap[activeTab]
-      });
+      };
+      
+      // Add landlordEmail filter if available
+      if (landlordEmail) {
+        filters.landlordEmail = landlordEmail;
+        console.log('🔍 Filtering contracts by landlord email:', landlordEmail);
+      }
+      
+      const fetchedContracts = await contractService.getContracts(filters);
+      
+      console.log(`✅ ContractsPage - Loaded ${fetchedContracts.length} contracts with status '${activeTab}'`);
+      
+      // Log details of signed contracts for debugging
+      if (activeTab === 'signed' && fetchedContracts.length > 0) {
+        console.log('📋 Signed contracts:', fetchedContracts.map(c => ({
+          title: c.title,
+          tenant: c.tenantName,
+          signedDate: c.signedDate,
+          landlordEmail: (c as any).landlordEmail
+        })));
+      } else if (activeTab === 'signed' && fetchedContracts.length === 0) {
+        console.log('ℹ️ No signed contracts found for this landlord');
+        if (landlordEmail) {
+          console.log('💡 Make sure tenants are sending contracts to:', landlordEmail);
+        }
+      }
       
       setContracts(fetchedContracts);
     } catch (err) {
-      console.error('Error loading contracts:', err);
+      console.error('❌ ContractsPage - Error loading contracts:', err);
       setError('Failed to load contracts. Please try again.');
       // Fallback to empty array on error
       setContracts([]);
@@ -326,6 +388,12 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
                     <div className="text-sm text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
                       {contract.fileName}
                     </div>
+                    {/* Show badge if contract was synced from tenant app */}
+                    {contract.additionalInfo && contract.additionalInfo.includes('Signed contract sent from tenant app') && (
+                      <Badge className="mt-1 bg-green-100 text-green-800 border-0 text-xs">
+                        Received from Tenant
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </TableCell>
@@ -432,12 +500,12 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
               background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
               fontFamily: 'Archivo, sans-serif'
             }}
-            onMouseEnter={(e) => {
+            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
               e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
               e.currentTarget.style.transform = 'translateY(-2px)';
             }}
-            onMouseLeave={(e) => {
+            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
               e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
               e.currentTarget.style.transform = 'translateY(0px)';
@@ -518,7 +586,7 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
         )}
 
         {/* Contracts Tabs */}
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(value: string) => setActiveTab(value as 'sent' | 'unsigned' | 'signed')} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="sent">
               Sent ({totalSent})

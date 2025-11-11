@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, Mail, Phone, Calendar, Home, DollarSign, User, MapPin, Filter, AlertTriangle, PoundSterling, Eye, Users, TrendingUp, Shield, Clock, Trash2, Download, Upload, Archive, CheckSquare, Square, Copy, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Tenant, Property, ArrearsAlert, UserRole } from '../App';
+import { referencingService } from '../services/referencingService';
 
 
 
@@ -58,6 +59,30 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
   const [selectedTenants, setSelectedTenants] = useState<string[]>([]);
   const [selectedLandlords, setSelectedLandlords] = useState<string[]>([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
+  const [referencingStatuses, setReferencingStatuses] = useState<Map<string, 'not-started' | 'in-progress' | 'complete'>>(new Map());
+  const [isLoadingReferencingStatuses, setIsLoadingReferencingStatuses] = useState(false);
+
+  // Fetch referencing statuses for all tenants
+  useEffect(() => {
+    const fetchReferencingStatuses = async () => {
+      if (tenants.length === 0) return;
+      
+      setIsLoadingReferencingStatuses(true);
+      console.log('[ClientsPage] Fetching referencing statuses for', tenants.length, 'tenants');
+      
+      const emails = tenants
+        .filter(t => t.email && t.email.trim())
+        .map(t => t.email);
+      
+      const statuses = await referencingService.getReferencingStatusForTenants(emails);
+      
+      console.log('[ClientsPage] Fetched referencing statuses:', statuses.size);
+      setReferencingStatuses(statuses);
+      setIsLoadingReferencingStatuses(false);
+    };
+
+    fetchReferencingStatuses();
+  }, [tenants]);
 
   const getPropertyForTenant = (tenantId: string) => {
     const tenant = tenants.find(t => t.id === tenantId);
@@ -614,9 +639,16 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                             <Badge className={getStatusColor(tenant.status)}>
                               {tenant.status}
                             </Badge>
-                            <Badge className={getReferencingStatusColor(tenant.referencingStatus)}>
-                              Referencing: {getReferencingStatusLabel(tenant.referencingStatus)}
-                            </Badge>
+                            {isLoadingReferencingStatuses ? (
+                              <Badge className="bg-gray-100 text-gray-800">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Loading...
+                              </Badge>
+                            ) : (
+                              <Badge className={getReferencingStatusColor(referencingStatuses.get(tenant.email) || 'not-started')}>
+                                Referencing: {getReferencingStatusLabel(referencingStatuses.get(tenant.email) || 'not-started')}
+                              </Badge>
+                            )}
                             {arrears && (
                               <Badge className="bg-red-100 text-red-800 border-red-200">
                                 <AlertTriangle className="h-3 w-3 mr-1" />

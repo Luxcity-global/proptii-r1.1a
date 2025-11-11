@@ -144,6 +144,7 @@ class ContractService {
       status?: Contract['status'];
       tenantId?: string;
       propertyId?: string;
+      landlordEmail?: string;
     }
   ): Promise<Contract[]> {
     try {
@@ -157,6 +158,9 @@ class ContractService {
       }
       if (filters?.propertyId) {
         constraints.push(where('propertyId', '==', filters.propertyId));
+      }
+      if (filters?.landlordEmail) {
+        constraints.push(where('landlordEmail', '==', filters.landlordEmail));
       }
 
       // Only add orderBy if we have filters, otherwise it requires an index

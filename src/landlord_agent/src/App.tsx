@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Routes, Route } from 'react-router-dom';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { RoleSelection } from './components/RoleSelection';
 import { ProfileSetup } from './components/ProfileSetup';
@@ -268,9 +269,48 @@ interface PropertySetupData {
   additionalNotes: string;
 }
 
+const getInitialNavigationScreen = (path: string): NavigationScreen => {
+  if (!path) return 'dashboard';
+
+  if (path === '/' || path === '/dashboard') {
+    return 'dashboard';
+  }
+
+  if (path.startsWith('/properties') || path.startsWith('/property/')) {
+    return 'properties';
+  }
+
+  if (path.startsWith('/documents') || path.startsWith('/document')) {
+    return 'documents';
+  }
+
+  if (path.startsWith('/clients') || path.startsWith('/tenant/') || path.startsWith('/landlord/')) {
+    return 'clients';
+  }
+
+  if (path.startsWith('/contracts')) {
+    return 'contracts';
+  }
+
+  if (path.startsWith('/insights') || path.startsWith('/portfolio-insights')) {
+    return 'insights';
+  }
+
+  if (path.startsWith('/inbox')) {
+    return 'inbox';
+  }
+
+  return 'dashboard';
+};
+
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const [currentScreen, setCurrentScreen] = useState<Screen>('main-app');
-  const [navigationScreen, setNavigationScreen] = useState<NavigationScreen>('dashboard');
+  const [navigationScreen, setNavigationScreen] = useState<NavigationScreen>(
+    () => getInitialNavigationScreen(location.pathname)
+  );
   const [userRole, setUserRole] = useState<UserRole>('landlord');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -316,6 +356,234 @@ export default function App() {
       propertyDetails: { ...prev.propertyDetails, ...updates }
     }));
   };
+
+  // URL to Screen mapping
+  const urlToScreen: Record<string, { screen: Screen; nav?: NavigationScreen }> = {
+    '/': { screen: 'main-app', nav: 'dashboard' },
+    '/dashboard': { screen: 'main-app', nav: 'dashboard' },
+    '/properties': { screen: 'main-app', nav: 'properties' },
+    '/documents': { screen: 'main-app', nav: 'documents' },
+    '/clients': { screen: 'main-app', nav: 'clients' },
+    '/contracts': { screen: 'main-app', nav: 'contracts' },
+    '/insights': { screen: 'main-app', nav: 'insights' },
+    '/inbox': { screen: 'main-app', nav: 'inbox' },
+    '/property/:id': { screen: 'property-details' },
+    '/tenant/:id': { screen: 'tenant-details' },
+    '/landlord/:id': { screen: 'landlord-details' },
+    '/add-property': { screen: 'property-setup-step1' },
+    '/add-tenant': { screen: 'tenant-selection' },
+    '/add-landlord': { screen: 'add-landlord' },
+    '/vacancy-alerts/:id': { screen: 'vacancy-prevention' },
+    '/arrears-alerts/:id': { screen: 'arrears-management' },
+  };
+
+  // Screen to URL mapping
+  const screenToUrl = (screen: Screen, navScreen?: NavigationScreen): string => {
+    if (screen === 'main-app') {
+      switch (navScreen) {
+        case 'dashboard': return '/dashboard';
+        case 'properties': return '/properties';
+        case 'documents': return '/documents';
+        case 'clients': return '/clients';
+        case 'contracts': return '/contracts';
+        case 'insights': return '/insights';
+        case 'inbox': return '/inbox';
+        default: return '/dashboard';
+      }
+    }
+    
+    const urlMap: Record<Screen, string> = {
+      'welcome': '/welcome',
+      'role-selection': '/role-selection',
+      'profile-setup': '/profile-setup',
+      'onboarding-options': '/onboarding-options',
+      'company-profile-setup': '/company-profile-setup',
+      'property-setup-step1': '/add-property',
+      'property-type-selection': '/add-property/type',
+      'property-details-selection': '/add-property/details',
+      'amenities-selection': '/add-property/amenities',
+      'images-notes-selection': '/add-property/images',
+      'property-setup': '/add-property/legacy',
+      'photo-upload': '/add-property/photos',
+      'main-app': '/dashboard',
+      'property-details': selectedProperty ? `/property/${selectedProperty.id}` : '/properties',
+      'document-management': selectedProperty ? `/property/${selectedProperty.id}/documents` : '/properties',
+      'photo-management': selectedProperty ? `/property/${selectedProperty.id}/photos` : '/properties',
+      'portfolio-insights': '/portfolio-insights',
+      'property-insights': selectedProperty ? `/property/${selectedProperty.id}/insights` : '/properties',
+      'tenant-details': selectedTenant ? `/tenant/${selectedTenant.id}` : '/clients',
+      'landlord-details': selectedLandlord ? `/landlord/${selectedLandlord.id}` : '/clients',
+      'vacancy-prevention': selectedVacancyAlert ? `/vacancy-alerts/${selectedVacancyAlert.id}` : '/dashboard',
+      'arrears-management': selectedArrearsAlert ? `/arrears-alerts/${selectedArrearsAlert.id}` : '/dashboard',
+      'tenant-inbox': '/inbox',
+      'property-preview': '/add-property/preview',
+      'tenant-selection': '/add-tenant',
+      'add-tenant': '/add-tenant/manual',
+      'invite-tenant': '/add-tenant/invite',
+      'select-existing-tenant': '/add-tenant/existing',
+      'add-landlord': '/add-landlord',
+    };
+    
+    return urlMap[screen] || '/dashboard';
+  };
+
+  // Sync URL to State (when user navigates via browser back/forward)
+  useEffect(() => {
+    const path = location.pathname;
+    
+    // Extract IDs from path if present
+    const propertyMatch = path.match(/\/property\/([^\/]+)/);
+    const tenantMatch = path.match(/\/tenant\/([^\/]+)/);
+    const landlordMatch = path.match(/\/landlord\/([^\/]+)/);
+    const vacancyMatch = path.match(/\/vacancy-alerts\/([^\/]+)/);
+    const arrearsMatch = path.match(/\/arrears-alerts\/([^\/]+)/);
+    
+    if (propertyMatch && propertyMatch[1]) {
+      const propId = propertyMatch[1];
+      const prop = properties.find(p => p.id === propId);
+      if (prop) {
+        selectProperty(prop);
+        if (path.includes('/documents')) {
+          setCurrentScreen('document-management');
+        } else if (path.includes('/photos')) {
+          setCurrentScreen('photo-management');
+        } else if (path.includes('/insights')) {
+          setCurrentScreen('property-insights');
+        } else {
+          setCurrentScreen('property-details');
+        }
+        return;
+      }
+    }
+    
+    if (tenantMatch && tenantMatch[1]) {
+      const tenantId = tenantMatch[1];
+      const tenant = tenants.find(t => t.id === tenantId);
+      if (tenant) {
+        setSelectedTenant(tenant);
+        setCurrentScreen('tenant-details');
+        return;
+      }
+    }
+    
+    if (landlordMatch && landlordMatch[1]) {
+      // Load landlord details if needed
+      setCurrentScreen('landlord-details');
+      return;
+    }
+    
+    if (vacancyMatch && vacancyMatch[1]) {
+      const alert = vacancyAlerts.find(a => a.id === vacancyMatch[1]);
+      if (alert) {
+        setSelectedVacancyAlert(alert);
+        setCurrentScreen('vacancy-prevention');
+        return;
+      }
+    }
+    
+    if (arrearsMatch && arrearsMatch[1]) {
+      const alert = arrearsAlerts.find(a => a.id === arrearsMatch[1]);
+      if (alert) {
+        setSelectedArrearsAlert(alert);
+        setCurrentScreen('arrears-management');
+        return;
+      }
+    }
+    
+    // Handle simple paths
+    switch (path) {
+      case '/':
+      case '/dashboard':
+        setCurrentScreen('main-app');
+        setNavigationScreen('dashboard');
+        break;
+      case '/properties':
+        setCurrentScreen('main-app');
+        setNavigationScreen('properties');
+        break;
+      case '/documents':
+        setCurrentScreen('main-app');
+        setNavigationScreen('documents');
+        break;
+      case '/clients':
+        setCurrentScreen('main-app');
+        setNavigationScreen('clients');
+        break;
+      case '/contracts':
+        setCurrentScreen('main-app');
+        setNavigationScreen('contracts');
+        break;
+      case '/insights':
+        setCurrentScreen('main-app');
+        setNavigationScreen('insights');
+        break;
+      case '/inbox':
+        setCurrentScreen('main-app');
+        setNavigationScreen('inbox');
+        break;
+      case '/add-property':
+        setCurrentScreen('property-setup-step1');
+        break;
+      case '/add-property/type':
+        setCurrentScreen('property-type-selection');
+        break;
+      case '/add-property/details':
+        setCurrentScreen('property-details-selection');
+        break;
+      case '/add-property/amenities':
+        setCurrentScreen('amenities-selection');
+        break;
+      case '/add-property/images':
+        setCurrentScreen('images-notes-selection');
+        break;
+      case '/add-property/preview':
+        setCurrentScreen('property-preview');
+        break;
+      case '/add-tenant':
+        setCurrentScreen('tenant-selection');
+        break;
+      case '/add-tenant/manual':
+        setCurrentScreen('add-tenant');
+        break;
+      case '/add-tenant/invite':
+        setCurrentScreen('invite-tenant');
+        break;
+      case '/add-tenant/existing':
+        setCurrentScreen('select-existing-tenant');
+        break;
+      case '/add-landlord':
+        setCurrentScreen('add-landlord');
+        break;
+      case '/portfolio-insights':
+        setCurrentScreen('portfolio-insights');
+        break;
+      case '/welcome':
+        setCurrentScreen('welcome');
+        break;
+      case '/role-selection':
+        setCurrentScreen('role-selection');
+        break;
+      case '/profile-setup':
+        setCurrentScreen('profile-setup');
+        break;
+      case '/onboarding-options':
+        setCurrentScreen('onboarding-options');
+        break;
+      case '/company-profile-setup':
+        setCurrentScreen('company-profile-setup');
+        break;
+    }
+  }, [location.pathname, properties, tenants, vacancyAlerts, arrearsAlerts]);
+
+  // Sync State to URL (when state changes programmatically)
+  useEffect(() => {
+    if (currentScreen === 'main-app') {
+      const url = screenToUrl(currentScreen, navigationScreen);
+      if (url && url !== location.pathname) {
+        navigate(url, { replace: false });
+      }
+    }
+  }, [currentScreen, navigationScreen, selectedProperty, selectedTenant, selectedLandlord, selectedVacancyAlert, selectedArrearsAlert]);
 
   // Listen for authentication changes from the bridge script
   React.useEffect(() => {
@@ -941,6 +1209,12 @@ export default function App() {
     setTimeout(() => {
       setCurrentScreen(screen);
       setIsTransitioning(false);
+      
+      // Update URL to match the new screen
+      const url = screenToUrl(screen, navigationScreen);
+      if (url !== location.pathname) {
+        navigate(url, { replace: false });
+      }
       
       // Clear selected property when navigating to certain screens
       if (screen === 'main-app' || screen === 'property-setup') {

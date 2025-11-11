@@ -5,6 +5,8 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import { RoleSelectionPopup } from '../components/RoleSelectionPopup';
+import landlordUserService from '../services/landlordUserService';
+import { useAuth } from '../contexts/AuthContext';
 
 type UserRole = 'landlord' | 'agent';
 
@@ -20,6 +22,7 @@ const preloadHeroImage = () => {
 
 const AgentHome = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [showRolePopup, setShowRolePopup] = useState(true);
   const [selectedRole, setSelectedRole] = useState<UserRole>('landlord');
 
@@ -34,24 +37,58 @@ const AgentHome = () => {
     // Popup will close when they click "Continue" button
   };
 
-  const handleRoleContinue = (role: UserRole) => {
+  const handleRoleContinue = async (role: UserRole) => {
     setSelectedRole(role);
     setShowRolePopup(false);
     
-    // Just close the popup and let the user decide what to do next
-    // The "Go to Dashboard" button will handle the navigation
+    // Automatically register user if they have email
+    const userEmail = user?.email || '';
+    const userName = user?.name || '';
+    
+    if (userEmail && userName) {
+      console.log('🔄 Auto-registering user as', role, ':', userEmail);
+      
+      try {
+        // Check if already registered first
+        const checkResult = await landlordUserService.isLandlordOrAgent(userEmail);
+        
+        if (checkResult.isLandlord) {
+          console.log('✅ User already registered as', checkResult.user?.role);
+          localStorage.setItem('landlordEmail', userEmail);
+          return;
+        }
+        
+        // Auto-register
+        const result = await landlordUserService.registerLandlordUser({
+          email: userEmail,
+          name: userName,
+          role: role,
+          phone: user?.phone,
+          // companyName will be omitted if undefined
+        });
+        
+        if (result.success) {
+          console.log('✅ Auto-registered successfully:', result.userId);
+          localStorage.setItem('landlordEmail', userEmail);
+        } else {
+          console.error('❌ Auto-registration failed:', result.error);
+          // Continue anyway - user can still use the app
+        }
+      } catch (error) {
+        console.error('❌ Error during auto-registration:', error);
+        // Continue anyway - user can still use the app
+      }
+    } else {
+      console.log('⚠️ No user email/name available for auto-registration');
+    }
   };
 
-  const handleStartNewListing = () => {
-    if (selectedRole === 'landlord') {
-      // Navigate to the landlord app served from public directory
-      window.location.href = '/landlord/index.html';
-    } else {
-      // For agents, navigate to the landlord app with agent role
-      // Use a different approach - navigate to landlord app and pass role via localStorage
-      localStorage.setItem('userRole', 'agent');
-      window.location.href = '/landlord/index.html';
-    }
+
+  const handleGoToDashboard = () => {
+    // Store the selected role in localStorage for the dashboard to use
+    localStorage.setItem('userRole', selectedRole);
+    // Navigate to the landlord dashboard (served from public/landlord/)
+    window.location.href = '/landlord/index.html';
   };
 
   return (
@@ -102,7 +139,7 @@ const AgentHome = () => {
 
           {/* Go to Dashboard Button */}
           <button
-            onClick={handleStartNewListing}
+            onClick={handleGoToDashboard}
             className="inline-block px-8 py-4 bg-[#FFEFD4] text-black rounded-full text-lg font-semibold hover:bg-opacity-90 transition-all"
           >
             {selectedRole === 'landlord' ? 'Go to Landlord Dashboard' : 'Go to Agent Dashboard'}

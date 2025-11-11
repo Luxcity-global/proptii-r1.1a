@@ -111,7 +111,22 @@ export default defineConfig(({ mode = 'development' }) => {
   const isStaging = mode === 'staging';
 
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      // Custom plugin to handle SPA fallback for landlord dashboard
+      {
+        name: 'landlord-spa-fallback',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            // Check if request is for landlord app route (not a file)
+            if (req.url && req.url.startsWith('/landlord/') && !req.url.includes('.')) {
+              req.url = '/landlord/index.html';
+            }
+            next();
+          });
+        },
+      }
+    ],
     // Temporarily disabled CSP for development
     // server: {
     //   headers: {
