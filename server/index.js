@@ -142,14 +142,24 @@ app.post('/api/referencing/:userId/agent', async (req, res) => {
     }
 });
 
-// Email sending route with file upload middleware
-app.post('/api/email/send', upload.array('attachments', 10), async (req, res) => {
+// Email sending route - handles both JSON and multipart/form-data
+app.post('/api/email/send', (req, res, next) => {
+    // Check if request has files (multipart) or is JSON
+    if (req.headers['content-type']?.includes('multipart/form-data')) {
+        // Use multer for multipart requests with attachments
+        upload.array('attachments', 10)(req, res, next);
+    } else {
+        // For JSON requests, just pass through (express.json() already parsed it)
+        next();
+    }
+}, async (req, res) => {
     try {
         console.log('Received email request:', {
             to: req.body.to,
             subject: req.body.subject,
             filesCount: req.files?.length || 0,
-            bodyKeys: Object.keys(req.body)
+            bodyKeys: Object.keys(req.body),
+            contentType: req.headers['content-type']
         });
 
         const { to, subject, html } = req.body;

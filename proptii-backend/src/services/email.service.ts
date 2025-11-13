@@ -89,16 +89,55 @@ export class EmailService {
         }
       }
 
-      // Create zip file of attachments if needed (only for agent emails)
-      const emailAttachments = [];
-      if (params.emailType === 'agent' && params.attachments?.length > 0) {
-        // For agent emails, we expect a single zip file containing all documents
-        const zipAttachment = params.attachments[0];
-        if (zipAttachment) {
+      const emailAttachments: nodemailer.SendMailOptions['attachments'] = [];
+
+      if (params.attachments?.length) {
+        for (const attachment of params.attachments) {
+          if (!attachment) {
+            continue;
+          }
+
+          const filename =
+            attachment.filename ||
+            attachment.name ||
+            'attachment';
+
+          let content =
+            attachment.content ||
+            attachment.buffer ||
+            null;
+
+          if (!content && attachment.base64) {
+            try {
+              content = Buffer.from(attachment.base64, 'base64');
+            } catch (error) {
+              console.warn(
+                'Failed to decode base64 attachment, skipping attachment',
+                {
+                  filename,
+                  error:
+                    error instanceof Error ? error.message : 'Unknown error',
+                },
+              );
+              continue;
+            }
+          }
+
+          if (!content) {
+            console.warn('Attachment missing content, skipping', {
+              filename,
+            });
+            continue;
+          }
+
           emailAttachments.push({
-            filename: zipAttachment.filename,
-            content: zipAttachment.content,
-            contentType: 'application/zip'
+            filename,
+            content,
+            contentType:
+              attachment.contentType ||
+              attachment.mimeType ||
+              attachment.type ||
+              undefined,
           });
         }
       }

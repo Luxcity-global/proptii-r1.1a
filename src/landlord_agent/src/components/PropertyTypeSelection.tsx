@@ -46,7 +46,7 @@ export function PropertyTypeSelection({ selectedType: propSelectedType, onTypeSe
           <div className="flex items-center justify-between mb-12 px-4">
             <div className="flex items-center space-x-4">
               <img 
-                src="./images/proptii-logo.png" 
+                src="/images/proptii-logo.png" 
                 alt="Proptii Logo" 
                 className="h-8 w-auto cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={onHome}

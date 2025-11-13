@@ -8,6 +8,8 @@ import { ReferencingModule } from './modules/referencing.module';
 import { SearchModule } from './search/search.module';
 import { SheetsModule } from './sheets/sheets.module';
 import { ContractModule } from './modules/contract.module';
+import { StorageModule } from './storage/storage.module';
+import { PropertyDocumentController } from './controllers/property-document.controller';
 
 @Module({
   imports: [
@@ -21,8 +23,9 @@ import { ContractModule } from './modules/contract.module';
     SearchModule,
     SheetsModule,
     ContractModule,
+    StorageModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, PropertyDocumentController],
   providers: [AppService],
 })
 export class AppModule { }

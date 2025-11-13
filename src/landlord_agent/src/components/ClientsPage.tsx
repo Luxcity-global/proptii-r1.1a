@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Plus, Search, Mail, Phone, Calendar, Home, DollarSign, User, MapPin, Filter, AlertTriangle, PoundSterling, Eye, Users, TrendingUp, Shield, Clock, Trash2, Download, Upload, Archive, CheckSquare, Square, Copy, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -64,30 +64,65 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
     return tenant ? properties.find(p => p.id === tenant.propertyId) : null;
   };
 
-  const getArrearsForTenant = (tenantId: string) => {
-    return arrearsAlerts.find(alert => alert.tenantId === tenantId);
-  };
+  const arrearsByTenant = useMemo(() => {
+    const map = new Map<string, ArrearsAlert>();
+    arrearsAlerts.forEach(alert => {
+      if (alert.tenantId) {
+        map.set(alert.tenantId, alert);
+      }
+    });
+    return map;
+  }, [arrearsAlerts]);
+
+  const getArrearsForTenant = useCallback((tenantId: string) => {
+    return arrearsByTenant.get(tenantId) || null;
+  }, [arrearsByTenant]);
+
+  const getEffectivePaymentStatus = useCallback((tenant: Tenant): Tenant['paymentStatus'] => {
+    if (arrearsByTenant.has(tenant.id)) {
+      return 'overdue';
+    }
+    if (typeof tenant.overdueAmount === 'number' && tenant.overdueAmount > 0) {
+      return 'overdue';
+    }
+    return tenant.paymentStatus;
+  }, [arrearsByTenant]);
 
   // Calculate summary statistics
-  const getTenantSummary = () => {
+  const summary = useMemo(() => {
     const totalTenants = tenants.length;
-    const overdueCount = tenants.filter(t => t.paymentStatus === 'overdue').length;
-    const currentCount = tenants.filter(t => t.paymentStatus === 'current').length;
-    const totalOverdueAmount = arrearsAlerts.reduce((sum, alert) => sum + alert.overdueAmount, 0);
-    
-    // Calculate leases expiring in next 3 months
+    let overdueCount = 0;
+    let currentCount = 0;
+
+    tenants.forEach(tenant => {
+      const status = getEffectivePaymentStatus(tenant);
+      if (status === 'overdue') {
+        overdueCount += 1;
+      } else if (status === 'current') {
+        currentCount += 1;
+      }
+    });
+
+    const totalOverdueFromAlerts = arrearsAlerts.reduce((sum, alert) => sum + (alert.overdueAmount || 0), 0);
+    const overdueWithoutAlert = tenants.reduce((sum, tenant) => {
+      if (!arrearsByTenant.has(tenant.id) && getEffectivePaymentStatus(tenant) === 'overdue') {
+        return sum + (tenant.overdueAmount || 0);
+      }
+      return sum;
+    }, 0);
+    const totalOverdueAmount = totalOverdueFromAlerts + overdueWithoutAlert;
+
     const threeMonthsFromNow = new Date();
     threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
-    const leasesExpiringSoon = tenants.filter(t => 
+    const leasesExpiringSoon = tenants.filter(t =>
       t.leaseEnd <= threeMonthsFromNow && t.status === 'active'
     ).length;
-    
-    // Calculate average risk score
+
     const tenantsWithRisk = tenants.filter(t => t.defaultRiskScore !== undefined);
-    const avgRiskScore = tenantsWithRisk.length > 0 
+    const avgRiskScore = tenantsWithRisk.length > 0
       ? Math.round(tenantsWithRisk.reduce((sum, t) => sum + (t.defaultRiskScore || 0), 0) / tenantsWithRisk.length)
       : 0;
-    
+
     return {
       totalTenants,
       overdueCount,
@@ -96,9 +131,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
       leasesExpiringSoon,
       avgRiskScore
     };
-  };
-
-  const summary = getTenantSummary();
+  }, [arrearsAlerts, arrearsByTenant, getEffectivePaymentStatus, tenants]);
 
   // Selection functions
   const toggleTenantSelection = (tenantId: string) => {
@@ -179,11 +212,6 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
       onExportLandlords(format);
     }
   };
-
-  // Update showBulkActions based on selection
-  React.useEffect(() => {
-    setShowBulkActions(selectedTenants.length > 0 || selectedLandlords.length > 0);
-  }, [selectedTenants, selectedLandlords]);
 
   const mockLandlords: Landlord[] = [
     {
@@ -341,6 +369,10 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
     const matchesFilter = landlordFilter === 'all' || landlord.status === landlordFilter;
     return matchesSearch && matchesFilter;
   });
+
+  React.useEffect(() => {
+    setShowBulkActions(selectedTenants.length > 0 || selectedLandlords.length > 0);
+  }, [selectedTenants, selectedLandlords]);
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
@@ -584,12 +616,20 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
             {filteredTenants.map((tenant) => {
               const property = getPropertyForTenant(tenant.id);
               const arrears = getArrearsForTenant(tenant.id);
+              const effectiveStatus = getEffectivePaymentStatus(tenant);
+              const isOverdue = effectiveStatus === 'overdue';
+              const effectiveOverdueAmount = arrears?.overdueAmount ?? tenant.overdueAmount ?? 0;
+              const showArrearsPanel = isOverdue && effectiveOverdueAmount > 0;
+              const lastPayment = arrears?.lastPaymentDate || tenant.lastPaymentDate;
+              const overdueMessage = arrears?.daysPastDue
+                ? `${arrears.daysPastDue} days past due`
+                : 'Marked as overdue';
               
               return (
                 <Card 
                   key={tenant.id} 
                   className={`hover:shadow-md transition-shadow ${
-                    arrears ? 'border-red-200 bg-red-50/50' : ''
+                    isOverdue ? 'border-red-200 bg-red-50/50' : ''
                   } ${selectedTenants.includes(tenant.id) ? 'ring-2 ring-blue-500' : ''}`}
                 >
                   <CardContent className="p-6 cursor-pointer" onClick={() => onViewTenant(tenant)}>
@@ -625,10 +665,10 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                             <Badge className={getReferencingStatusColor(tenant.referencingStatus)}>
                               Referencing: {getReferencingStatusLabel(tenant.referencingStatus)}
                             </Badge>
-                            {arrears && (
+                            {isOverdue && (
                               <Badge className="bg-red-100 text-red-800 border-red-200">
                                 <AlertTriangle className="h-3 w-3 mr-1" />
-                                Arrears
+                                {arrears ? 'Arrears' : 'Overdue'}
                               </Badge>
                             )}
                           </div>
@@ -656,22 +696,24 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                           </div>
                           
                           {/* Arrears Alert */}
-                          {arrears && (
+                          {showArrearsPanel && (
                             <div className="p-3 bg-red-100 border border-red-200 rounded-lg">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center text-red-800">
                                   <PoundSterling className="h-4 w-4 mr-2" />
                                   <span className="font-medium">
-                                    £{arrears.overdueAmount.toLocaleString()} overdue
+                                    £{effectiveOverdueAmount.toLocaleString()} overdue
                                   </span>
                                 </div>
                                 <span className="text-sm text-red-600">
-                                  {arrears.daysPastDue} days past due
+                                  {overdueMessage}
                                 </span>
                               </div>
-                              <div className="mt-1 text-sm text-red-700">
-                                Default Risk Score: {arrears.defaultRiskScore}%
-                              </div>
+                              {arrears?.defaultRiskScore && (
+                                <div className="mt-1 text-sm text-red-700">
+                                  Default Risk Score: {arrears.defaultRiskScore}%
+                                </div>
+                              )}
                             </div>
                           )}
                           
@@ -1039,12 +1081,20 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
             {filteredTenants.map((tenant) => {
               const property = getPropertyForTenant(tenant.id);
               const arrears = getArrearsForTenant(tenant.id);
-              
+              const effectiveStatus = getEffectivePaymentStatus(tenant);
+              const isOverdue = effectiveStatus === 'overdue';
+              const effectiveOverdueAmount = arrears?.overdueAmount ?? tenant.overdueAmount ?? 0;
+              const showArrearsPanel = isOverdue && effectiveOverdueAmount > 0;
+              const lastPayment = arrears?.lastPaymentDate || tenant.lastPaymentDate;
+              const overdueMessage = arrears?.daysPastDue
+                ? `${arrears.daysPastDue} days past due`
+                : 'Marked as overdue';
+
               return (
                 <Card 
                   key={tenant.id} 
                   className={`hover:shadow-md transition-shadow ${
-                    arrears ? 'border-red-200 bg-red-50/50' : ''
+                    isOverdue ? 'border-red-200 bg-red-50/50' : ''
                   } ${selectedTenants.includes(tenant.id) ? 'ring-2 ring-blue-500' : ''}`}
                 >
                   <CardContent className="p-6 cursor-pointer" onClick={() => onViewTenant(tenant)}>
@@ -1067,13 +1117,17 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="text-lg font-semibold">{tenant.name}</h3>
-                            <Badge variant={tenant.paymentStatus === 'current' ? 'default' : 'destructive'}>
-                              {tenant.paymentStatus}
+                            <Badge variant={isOverdue ? 'destructive' : 'default'}>
+                              {effectiveStatus === 'payment-plan'
+                                ? 'Payment Plan'
+                                : effectiveStatus === 'overdue'
+                                  ? 'Overdue'
+                                  : 'Current'}
                             </Badge>
-                            {arrears && (
+                            {isOverdue && (
                               <Badge variant="destructive" className="bg-red-100 text-red-800">
                                 <AlertTriangle className="h-3 w-3 mr-1" />
-                                Overdue
+                                {arrears ? 'Arrears' : 'Overdue'}
                               </Badge>
                             )}
                           </div>
@@ -1105,15 +1159,22 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                             </div>
                           </div>
 
-                          {arrears && (
+                          {showArrearsPanel && (
                             <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                               <div className="flex items-center gap-2 text-red-800 font-medium">
                                 <AlertTriangle className="h-4 w-4" />
-                                Overdue Amount: £{arrears.overdueAmount}
+                                Overdue Amount: £{effectiveOverdueAmount.toLocaleString()}
                               </div>
-                              <p className="text-red-700 text-sm mt-1">
-                                Last payment: {formatDate(arrears.lastPaymentDate)}
-                              </p>
+                              {lastPayment && (
+                                <p className="text-red-700 text-sm mt-1">
+                                  Last payment: {formatDate(lastPayment)}
+                                </p>
+                              )}
+                              {!arrears?.daysPastDue && (
+                                <p className="text-red-700 text-sm">
+                                  {overdueMessage}
+                                </p>
+                              )}
                             </div>
                           )}
                         </div>

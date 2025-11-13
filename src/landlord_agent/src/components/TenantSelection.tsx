@@ -76,7 +76,7 @@ export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <img 
-              src="./images/proptii-logo.png" 
+              src="/images/proptii-logo.png" 
               alt="Proptii Logo" 
               className="h-8 w-auto"
             />

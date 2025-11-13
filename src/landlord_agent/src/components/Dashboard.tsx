@@ -98,6 +98,73 @@ export function Dashboard({
   >([]);
   const [currentChartIndex, setCurrentChartIndex] = useState(0);
 
+  const uniqueVacancyAlerts = React.useMemo(() => {
+    if (!vacancyAlerts) return [];
+    const seen = new Set<string>();
+    return vacancyAlerts.filter((alert) => {
+      if (!alert) return false;
+      const key =
+        alert.id ||
+        alert.propertyId ||
+        `${alert.propertyAddress || "unknown"}-${alert.predictedVacancyDate || ""}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  }, [vacancyAlerts]);
+
+  const uniqueArrearsAlerts = React.useMemo(() => {
+    if (!arrearsAlerts) return [];
+    const byTenantOrAddress = new Map<string, (typeof arrearsAlerts)[number]>();
+
+    arrearsAlerts.forEach((alert) => {
+      if (!alert) return;
+      const key =
+        (alert.tenantId && alert.tenantId.toString()) ||
+        (alert.propertyAddress && alert.propertyAddress.trim().toLowerCase()) ||
+        alert.id;
+      if (!key) return;
+
+      const existing = byTenantOrAddress.get(key);
+      if (!existing) {
+        byTenantOrAddress.set(key, alert);
+        return;
+      }
+
+      const existingAmount = existing.overdueAmount ?? 0;
+      const currentAmount = alert.overdueAmount ?? 0;
+      const existingDays = existing.daysPastDue ?? 0;
+      const currentDays = alert.daysPastDue ?? 0;
+
+      if (
+        currentAmount > existingAmount ||
+        (currentAmount === existingAmount && currentDays > existingDays)
+      ) {
+        byTenantOrAddress.set(key, alert);
+      }
+    });
+
+    return Array.from(byTenantOrAddress.values());
+  }, [arrearsAlerts]);
+
+  const combinedAlerts = React.useMemo(
+    () => [
+      ...uniqueVacancyAlerts.map((alert) => ({
+        type: "vacancy" as const,
+        alert,
+      })),
+      ...uniqueArrearsAlerts.map((alert) => ({
+        type: "arrears" as const,
+        alert,
+      })),
+    ],
+    [uniqueVacancyAlerts, uniqueArrearsAlerts]
+  );
+
+  const totalPriorityAlerts = combinedAlerts.length;
+
   // Mock data for demonstration
   const mockProperties: Property[] =
     properties.length === 0
@@ -697,7 +764,7 @@ export function Dashboard({
                   <div className="flex-1"></div>
                   <div className="mt-auto">
                     <div className="font-bold block mb-1" style={{ fontSize: '32px', lineHeight: '1' }}>
-                      {vacancyAlerts.length + arrearsAlerts.length}
+                      {totalPriorityAlerts}
                     </div>
                     <div className="text-sm opacity-90 mb-2 block">Alerts</div>
                     <div className="text-xs opacity-75">
@@ -712,7 +779,7 @@ export function Dashboard({
 
                 {/* Right White Panel */}
                 <div className="flex-1 p-4 bg-white relative z-10 overflow-hidden flex flex-col" style={{ borderRadius: '20px', boxShadow: '-4px 0 24px rgba(70, 95, 194, 0.4)' }}>
-                  {vacancyAlerts.length === 0 && arrearsAlerts.length === 0 ? (
+                  {totalPriorityAlerts === 0 ? (
                     // Empty State
                     <div className="flex items-center justify-center h-full">
                       <div className="text-center py-8">
@@ -729,96 +796,107 @@ export function Dashboard({
                     </div>
                   ) : (
                     <div className="space-y-3 overflow-y-auto flex-1 pr-2" style={{ maxHeight: '100%' }}>
-                  {vacancyAlerts.map((alert) => (
-                    <Card
-                      key={alert.id}
-                      className="p-6 border-0 bg-white hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() =>
-                        onViewVacancyAlert?.(alert.id)
-                      }
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-4 flex-1">
-                          <AlertTriangle className="w-4 h-4 text-[#ca390c] mt-1" />
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium mb-1 text-[#ca390c] text-[14px]">
-                              High Vacancy Risk
-                            </h4>
-                            <p className="text-[12px] text-[#374957] mb-3">
-                              {alert.propertyAddress}
-                            </p>
-                            <div className="flex items-baseline space-x-3">
-                              <span className="text-[12px] font-bold text-[#ca390c]">
-                                {alert.riskScore}% Risk Score
-                              </span>
-                              <span className="text-[12px] text-[#374957]">
-                                Predicted:{" "}
-                                {alert.predictedVacancyDate.toLocaleDateString(
-                                  "en-GB",
-                                  {
-                                    day: "2-digit",
-                                    month: "2-digit",
-                                    year: "numeric"
-                                  }
-                                )}
+                  {combinedAlerts.map((item, index) => {
+                    const isVacancy = item.type === "vacancy";
+                    const alert = item.alert;
+                    const predictedDate =
+                      isVacancy && alert?.predictedVacancyDate
+                        ? alert.predictedVacancyDate instanceof Date
+                          ? alert.predictedVacancyDate
+                          : new Date(alert.predictedVacancyDate)
+                        : null;
+
+                    return (
+                      <React.Fragment key={alert.id}>
+                        {index > 0 && (
+                          <div className="border-t border-gray-200"></div>
+                        )}
+                        <Card
+                          className="p-6 border-0 bg-white hover:shadow-md transition-shadow cursor-pointer"
+                          onClick={() =>
+                            isVacancy
+                              ? onViewVacancyAlert?.(alert.id)
+                              : onViewArrearsAlert?.(alert.id)
+                          }
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-4 flex-1">
+                              {isVacancy ? (
+                                <AlertTriangle className="w-4 h-4 text-[#ca390c] mt-1" />
+                              ) : (
+                                <PoundSterling className="w-4 h-4 text-[#b8585e] mt-1" />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <h4
+                                  className={`font-medium mb-1 text-[14px] ${
+                                    isVacancy
+                                      ? "text-[#ca390c]"
+                                      : "text-[#b44d53]"
+                                  }`}
+                                >
+                                  {isVacancy ? "High Vacancy Risk" : "Rent Arrears"}
+                                </h4>
+                                <p className="text-[12px] text-[#374957] mb-3">
+                                  {isVacancy ? (
+                                    alert.propertyAddress
+                                  ) : (
+                                    <>
+                                      {alert.tenantName}
+                                      <br />
+                                      {alert.propertyAddress}
+                                    </>
+                                  )}
+                                </p>
+                                <div className="flex items-baseline space-x-3">
+                                  {isVacancy ? (
+                                    <>
+                                      <span className="text-[12px] font-bold text-[#ca390c]">
+                                        {alert.riskScore}% Risk Score
+                                      </span>
+                                      <span className="text-[12px] text-[#374957]">
+                                        Predicted:{" "}
+                                        {predictedDate
+                                          ? predictedDate.toLocaleDateString("en-GB", {
+                                              day: "2-digit",
+                                              month: "2-digit",
+                                              year: "numeric",
+                                            })
+                                          : "Date TBC"}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="text-[12px] font-bold text-[#b44d53]">
+                                        £{alert.overdueAmount?.toLocaleString() ?? "0"} overdue
+                                      </span>
+                                      <span className="text-[12px] text-[#374957]">
+                                        {(alert.daysPastDue ?? 0)} days past due
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div
+                              className={`border rounded-[6px] px-4 py-1 flex items-center justify-center ${
+                                isVacancy
+                                  ? "border-[#ffbc73]"
+                                  : "border-[#ffacac]"
+                              }`}
+                            >
+                              <span
+                                className={`text-[10px] font-bold ${
+                                  isVacancy ? "text-[#ca390c]" : "text-[#c61626]"
+                                }`}
+                              >
+                                {isVacancy ? "View Details" : "Manage"}
                               </span>
                             </div>
                           </div>
-                        </div>
-                        <div className="border border-[#ffbc73] rounded-[6px] px-4 py-1 flex items-center justify-center">
-                          <span className="text-[10px] font-bold text-[#ca390c]">
-                            View Details
-                          </span>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-
-                  {vacancyAlerts.length > 0 && arrearsAlerts.length > 0 && (
-                    <div className="border-t border-gray-200"></div>
-                  )}
-
-                  {arrearsAlerts.map((alert) => (
-                    <Card
-                      key={alert.id}
-                      className="p-6 border-0 bg-white hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() =>
-                        onViewArrearsAlert?.(alert.id)
-                      }
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-4 flex-1">
-                          <PoundSterling className="w-4 h-4 text-[#b8585e] mt-1" />
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium mb-1 text-[#b44d53] text-[14px]">
-                              Rent Arrears
-                            </h4>
-                            <p className="text-[12px] text-[#374957] mb-3">
-                              {alert.tenantName}<br />
-                              {alert.propertyAddress}
-                            </p>
-                            <div className="flex items-baseline space-x-3">
-                              <span className="text-[12px] font-bold text-[#b44d53]">
-                                £
-                                {alert.overdueAmount?.toLocaleString() ||
-                                  "2,400"}{" "}
-                                overdue
-                              </span>
-                              <span className="text-[12px] text-[#374957]">
-                                {alert.daysPastDue} days past
-                                due
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="border border-[#ffacac] rounded-[6px] px-4 py-1 flex items-center justify-center">
-                          <span className="text-[10px] font-bold text-[#c61626]">
-                            Manage
-                          </span>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
+                        </Card>
+                      </React.Fragment>
+                    );
+                  })}
                     </div>
                   )}
                 </div>
