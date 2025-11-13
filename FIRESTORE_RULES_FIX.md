@@ -179,3 +179,6 @@ After publishing rules, check console:
 
 **Apply the development rules now** to fix the error immediately. You can tighten security later when deploying to production.
 
+
+
+

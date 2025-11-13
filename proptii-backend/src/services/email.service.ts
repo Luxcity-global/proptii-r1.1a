@@ -206,6 +206,10 @@ export class EmailService {
             <p>Dear ${employment.referenceFullName || 'Sir/Madam'},</p>
             <p>${identity.firstName || ''} ${identity.lastName || ''} has provided your details as an employment reference for their rental application.</p>
             <p>We would appreciate it if you could support their application by completing the reference at your earliest convenience.</p>
+            
+            <div class="cta">
+              <a href="${baseUrl}/?responseType=referee&applicant=${encodeURIComponent(identity.firstName + ' ' + identity.lastName)}&email=${encodeURIComponent(employment.referenceEmail || '')}&tenantEmail=${encodeURIComponent(identity.email || '')}" class="button">👉 Provide Reference Response</a>
+            </div>
           `
         );
 
@@ -216,6 +220,10 @@ export class EmailService {
             <p>Dear ${guarantor.firstName || ''} ${guarantor.lastName || ''},</p>
             <p>${identity.firstName || ''} ${identity.lastName || ''} has listed you as a guarantor for their rental application.</p>
             <p>Please confirm your willingness to support their tenancy and provide any requested documentation.</p>
+            
+            <div class="cta">
+              <a href="${baseUrl}/?responseType=guarantor&applicant=${encodeURIComponent(identity.firstName + ' ' + identity.lastName)}&email=${encodeURIComponent(guarantor.email || '')}&tenantEmail=${encodeURIComponent(identity.email || '')}" class="button">👉 Provide Guarantor Response</a>
+            </div>
           `
         );
 

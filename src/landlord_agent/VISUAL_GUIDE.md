@@ -392,3 +392,6 @@ All documents use the same file icon (📄) but are distinguished by:
 This visual guide shows exactly what users will see when viewing tenant documents in the landlord/agent dashboard!
 
 
+
+
+

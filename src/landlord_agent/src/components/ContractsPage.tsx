@@ -252,7 +252,7 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
       console.log('Sending email to:', contractData.recipientEmail);
       
       const API_BASE_URL = window.location.hostname === 'localhost'
-        ? 'http://localhost:10000/api'
+        ? 'http://localhost:3000/api'
         : 'https://proptii-r1-1a.onrender.com/api';
       
       if (contractData.file) {
@@ -300,7 +300,8 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
             status: 'sent',
             sentDate: new Date(),
             expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-          }, contractData.file.name, base64Data);
+            landlordEmail: landlordEmail || undefined, // Include landlord email for filtering
+          } as any, contractData.file.name, base64Data);
           
           console.log('Contract saved to Firestore:', contractId);
           

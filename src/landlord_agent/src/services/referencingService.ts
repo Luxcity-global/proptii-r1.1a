@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 export interface StoredFile {
@@ -161,15 +161,138 @@ class ReferencingService {
   ): Promise<Map<string, 'not-started' | 'in-progress' | 'complete'>> {
     const statusMap = new Map<string, 'not-started' | 'in-progress' | 'complete'>();
     
-    // Fetch status for each email
-    const promises = emails.map(async (email) => {
-      const result = await this.getReferencingStatusByEmail(email);
-      statusMap.set(email, result.status);
-    });
+    // Process emails in smaller batches to avoid overwhelming Firestore
+    const BATCH_SIZE = 5; // Process 5 tenants at a time
+    const batches: string[][] = [];
     
-    await Promise.all(promises);
+    // Split emails into batches
+    for (let i = 0; i < emails.length; i += BATCH_SIZE) {
+      batches.push(emails.slice(i, i + BATCH_SIZE));
+    }
+    
+    console.log(`[referencingService] Processing ${emails.length} emails in ${batches.length} batches`);
+    
+    // Process each batch sequentially
+    for (const batch of batches) {
+      const promises = batch.map(async (email) => {
+        const result = await this.getReferencingStatusByEmail(email);
+        statusMap.set(email, result.status);
+      });
+      
+      await Promise.all(promises);
+      
+      // Small delay between batches to avoid rate limiting
+      if (batches.length > 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    console.log(`[referencingService] Completed processing ${statusMap.size} tenant statuses`);
     
     return statusMap;
+  }
+
+  /**
+   * Get referee and guarantor responses for a tenant (directly from Firestore)
+   */
+  async getRefereeGuarantorResponses(
+    tenantEmail: string
+  ): Promise<{ 
+    success: boolean; 
+    refereeResponses?: any[]; 
+    guarantorResponses?: any[]; 
+    error?: string 
+  }> {
+    try {
+      console.log(`🔍 [landlord_agent] Querying Firestore for referee/guarantor responses for: ${tenantEmail}`);
+      
+      // Query for all responses linked to this tenant email
+      const q = query(
+        collection(db, 'referee_guarantor_responses'),
+        where('tenantEmail', '==', tenantEmail)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const refereeResponses: any[] = [];
+      const guarantorResponses: any[] = [];
+      
+      querySnapshot.forEach((document) => {
+        const data = document.data();
+        // Include document ID for delete operations
+        const responseData = { ...data, id: document.id };
+        if (data.responseType === 'referee' || data.type === 'referee_response') {
+          refereeResponses.push(responseData);
+        } else if (data.responseType === 'guarantor' || data.type === 'guarantor_response') {
+          guarantorResponses.push(responseData);
+        }
+      });
+      
+      // Sort by creation date (newest first)
+      const sortByDate = (a: any, b: any) => {
+        const aDate = a.createdAt?.toMillis?.() || new Date(a.submittedAt || a.createdAt).getTime();
+        const bDate = b.createdAt?.toMillis?.() || new Date(b.submittedAt || b.createdAt).getTime();
+        return bDate - aDate;
+      };
+      
+      refereeResponses.sort(sortByDate);
+      guarantorResponses.sort(sortByDate);
+      
+      console.log(`✅ [landlord_agent] Found ${refereeResponses.length} referee and ${guarantorResponses.length} guarantor responses`);
+      return { 
+        success: true, 
+        refereeResponses, 
+        guarantorResponses 
+      };
+    } catch (error: any) {
+      console.error('❌ [landlord_agent] Error getting referee/guarantor responses from Firestore:', error);
+      
+      // Handle specific Firebase errors
+      if (error.code === 'permission-denied') {
+        console.warn('⚠️ [landlord_agent] Firestore permission denied for getRefereeGuarantorResponses');
+        return { 
+          success: false, 
+          refereeResponses: [],
+          guarantorResponses: [],
+          error: 'Permission denied. Please configure Firestore security rules.' 
+        };
+      }
+      
+      return { 
+        success: false, 
+        refereeResponses: [],
+        guarantorResponses: [],
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      };
+    }
+  }
+
+  /**
+   * Delete a referee or guarantor response
+   */
+  async deleteResponse(responseId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log(`🗑️ [landlord_agent] Deleting response: ${responseId}`);
+      
+      const docRef = doc(db, 'referee_guarantor_responses', responseId);
+      await deleteDoc(docRef);
+      
+      console.log(`✅ [landlord_agent] Successfully deleted response: ${responseId}`);
+      return { success: true };
+    } catch (error: any) {
+      console.error('❌ [landlord_agent] Error deleting response:', error);
+      
+      if (error.code === 'permission-denied') {
+        return { 
+          success: false, 
+          error: 'Permission denied. Please configure Firestore security rules.' 
+        };
+      }
+      
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      };
+    }
   }
 }
 

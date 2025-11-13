@@ -588,6 +588,74 @@ class FirestoreService {
       };
     }
   }
+
+  /**
+   * Get referee and guarantor responses for a tenant
+   */
+  async getRefereeGuarantorResponses(
+    tenantEmail: string
+  ): Promise<{ 
+    success: boolean; 
+    refereeResponses?: any[]; 
+    guarantorResponses?: any[]; 
+    error?: string 
+  }> {
+    try {
+      console.log(`🔍 Querying Firestore for referee/guarantor responses for: ${tenantEmail}`);
+      
+      // Query for all responses linked to this tenant email
+      const q = query(
+        collection(db, 'referee_guarantor_responses'),
+        where('tenantEmail', '==', tenantEmail)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const refereeResponses: any[] = [];
+      const guarantorResponses: any[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.responseType === 'referee' || data.type === 'referee_response') {
+          refereeResponses.push(data);
+        } else if (data.responseType === 'guarantor' || data.type === 'guarantor_response') {
+          guarantorResponses.push(data);
+        }
+      });
+      
+      // Sort by creation date (newest first)
+      const sortByDate = (a: any, b: any) => {
+        const aDate = a.createdAt?.toMillis?.() || new Date(a.submittedAt || a.createdAt).getTime();
+        const bDate = b.createdAt?.toMillis?.() || new Date(b.submittedAt || b.createdAt).getTime();
+        return bDate - aDate;
+      };
+      
+      refereeResponses.sort(sortByDate);
+      guarantorResponses.sort(sortByDate);
+      
+      console.log(`✅ Found ${refereeResponses.length} referee and ${guarantorResponses.length} guarantor responses`);
+      return { 
+        success: true, 
+        refereeResponses, 
+        guarantorResponses 
+      };
+    } catch (error: any) {
+      console.error('❌ Error getting referee/guarantor responses from Firestore:', error);
+      
+      // Handle specific Firebase errors
+      if (error.code === 'permission-denied') {
+        console.warn('⚠️ Firestore permission denied for getRefereeGuarantorResponses');
+        return { 
+          success: false, 
+          error: 'Permission denied. Please configure Firestore security rules.' 
+        };
+      }
+      
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      };
+    }
+  }
 }
 
 export const firestoreService = new FirestoreService();

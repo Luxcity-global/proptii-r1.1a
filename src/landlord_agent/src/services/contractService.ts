@@ -94,7 +94,7 @@ class ContractService {
    * Create a contract without uploading to Firebase Storage (for base64 emails)
    */
   async createContractWithBase64(
-    contractData: Omit<Contract, 'id' | 'fileUrl' | 'fileName'>,
+    contractData: Omit<Contract, 'id' | 'fileUrl' | 'fileName'> & { landlordEmail?: string },
     fileName: string,
     base64Data: string
   ): Promise<string> {
@@ -124,6 +124,9 @@ class ContractService {
       }
       if (contractData.additionalInfo) {
         contractDoc.additionalInfo = contractData.additionalInfo;
+      }
+      if ((contractData as any).landlordEmail) {
+        contractDoc.landlordEmail = (contractData as any).landlordEmail;
       }
 
       const docRef = await addDoc(this.contractsCollection, contractDoc);

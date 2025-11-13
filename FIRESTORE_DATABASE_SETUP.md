@@ -488,3 +488,6 @@ async function migrateExistingContracts() {
 - Development rules: Permissive (for testing)
 - Production rules: Authentication + authorization required
 
+
+
+

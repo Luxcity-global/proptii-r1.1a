@@ -130,4 +130,30 @@ export class ReferencingController {
   async testEmail(@Body() data: { email: string }) {
     return await this.referencingService.testEmail(data.email);
   }
+
+  @Post('response')
+  @HttpCode(200)
+  async saveRefereeGuarantorResponse(@Body() data: any) {
+    try {
+      console.log('Received referee/guarantor response:', data);
+      const result = await this.referencingService.saveRefereeGuarantorResponse(data);
+      return result;
+    } catch (error) {
+      console.error('Error saving referee/guarantor response:', error);
+      throw error;
+    }
+  }
+
+  @Get('responses/:tenantEmail')
+  @HttpCode(200)
+  async getRefereeGuarantorResponses(@Param('tenantEmail') tenantEmail: string) {
+    try {
+      console.log('Fetching responses for tenant:', tenantEmail);
+      const result = await this.referencingService.getRefereeGuarantorResponses(tenantEmail);
+      return result;
+    } catch (error) {
+      console.error('Error fetching referee/guarantor responses:', error);
+      throw error;
+    }
+  }
 } 

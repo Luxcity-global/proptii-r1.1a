@@ -259,6 +259,9 @@ export class ContractEmailService {
   }): string {
     const { recipientName, contractName, senderName } = params;
     
+    // Get the base URL for links in the email
+    const baseUrl = process.env.APP_URL || 'https://proptii.com';
+    
     // Unified base styles matching email.service.ts
     const baseStyles = `
       body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background: #f5f7fa; padding: 24px 0; margin: 0; }
@@ -329,6 +332,10 @@ export class ContractEmailService {
               <li>Keep a copy for your records</li>
               <li>Contact your agent if you have any questions about the contract terms</li>
             </ul>
+          </div>
+          
+          <div class="cta">
+            <a href="${baseUrl}/landlord/contracts?tab=signed" class="button">👉 View All Signed Contracts</a>
           </div>
           
           <p>If you have any questions about this contract or need assistance, please don't hesitate to reach out to us.</p>

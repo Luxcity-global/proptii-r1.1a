@@ -18,7 +18,7 @@ interface SendEmailResponse {
 }
 
 const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:10000/api'
+  ? 'http://localhost:3000/api'
   : 'https://proptii-r1-1a.onrender.com/api';
 
 class ContractEmailService {
@@ -276,7 +276,7 @@ class ContractEmailService {
       
       if (axios.isAxiosError(error)) {
         if (error.code === 'ECONNREFUSED') {
-          errorMessage = `Cannot connect to backend server at ${this.API_URL.replace('/api', '')}. Please ensure the server is running on port 10000.`;
+          errorMessage = `Cannot connect to backend server at ${this.API_URL.replace('/api', '')}. Please ensure the server is running on port 3000.`;
         } else if (error.response) {
           // Server responded with error status
           errorMessage = error.response.data?.error || error.response.data?.message || `Server error: ${error.response.status}`;

@@ -1,17 +1,43 @@
 import { Link } from 'react-router-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import { SearchInput } from '../components/SearchInput';
 import ErrorBoundary from '../components/ErrorBoundary';
+import RefereeGuarantorResponseModal from '../components/referencing/RefereeGuarantorResponseModal';
 
 import { useState, useEffect } from 'react';
 
 const Home = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [searchInputHeight, setSearchInputHeight] = useState(50);
+  const [isResponseModalOpen, setIsResponseModalOpen] = useState(false);
+  const [responseType, setResponseType] = useState<'referee' | 'guarantor'>('referee');
+  const [applicantName, setApplicantName] = useState('');
+  const [prefilledEmail, setPrefilledEmail] = useState('');
+  const [tenantEmail, setTenantEmail] = useState('');
+
+  // Check for query parameters to open the response modal
+  useEffect(() => {
+    const responseTypeParam = searchParams.get('responseType');
+    const applicantParam = searchParams.get('applicant');
+    const emailParam = searchParams.get('email');
+    const tenantEmailParam = searchParams.get('tenantEmail');
+
+    if (responseTypeParam && (responseTypeParam === 'referee' || responseTypeParam === 'guarantor')) {
+      setResponseType(responseTypeParam);
+      setApplicantName(applicantParam || '');
+      setPrefilledEmail(emailParam || '');
+      setTenantEmail(tenantEmailParam || '');
+      setIsResponseModalOpen(true);
+      
+      // Clear query parameters from URL without reloading
+      setSearchParams({});
+    }
+  }, [searchParams, setSearchParams]);
 
   // useEffect(() => {
   //   const checkBackend = async () => {
@@ -54,9 +80,23 @@ const Home = () => {
 
 
 
+  const handleCloseResponseModal = () => {
+    setIsResponseModalOpen(false);
+  };
+
   return (
     <div className="min-h-screen flex flex-col font-nunito">
       <Navbar />
+
+      {/* Referee/Guarantor Response Modal */}
+      <RefereeGuarantorResponseModal
+        isOpen={isResponseModalOpen}
+        onClose={handleCloseResponseModal}
+        responseType={responseType}
+        applicantName={applicantName}
+        prefilledEmail={prefilledEmail}
+        tenantEmail={tenantEmail}
+      />
 
       {/* Hero Section */}
       <section 

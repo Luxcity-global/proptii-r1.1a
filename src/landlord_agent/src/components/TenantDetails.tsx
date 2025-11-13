@@ -23,7 +23,8 @@ import {
   UserCheck,
   Shield,
   CreditCard,
-  MoreHorizontal
+  MoreHorizontal,
+  Trash2
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
@@ -87,6 +88,9 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
   const [referencingData, setReferencingData] = useState<ReferencingDocument | null>(null);
   const [isLoadingReferencing, setIsLoadingReferencing] = useState(true);
   const [referencingDocuments, setReferencingDocuments] = useState<TenantDocument[]>([]);
+  const [refereeResponses, setRefereeResponses] = useState<any[]>([]);
+  const [guarantorResponses, setGuarantorResponses] = useState<any[]>([]);
+  const [isLoadingResponses, setIsLoadingResponses] = useState(true);
 
   if (!tenant) {
     return (
@@ -207,6 +211,72 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
     setReferencingDocuments(docs);
   }, [referencingData]);
 
+  // Fetch referee and guarantor responses from Firestore (no backend needed)
+  useEffect(() => {
+    const fetchRefereeGuarantorResponses = async () => {
+      if (!tenant.email) {
+        console.warn('[TenantDetails] No email found for tenant, skipping response fetch');
+        setIsLoadingResponses(false);
+        return;
+      }
+
+      setIsLoadingResponses(true);
+      console.log(`[TenantDetails] Fetching referee/guarantor responses for: ${tenant.email}`);
+
+      try {
+        // Fetch directly from Firestore using referencingService
+        const result = await referencingService.getRefereeGuarantorResponses(tenant.email);
+        
+        if (result.success) {
+          console.log('[TenantDetails] Referee/Guarantor responses:', result);
+          setRefereeResponses(result.refereeResponses || []);
+          setGuarantorResponses(result.guarantorResponses || []);
+        } else {
+          console.error('[TenantDetails] Failed to fetch responses:', result.error);
+        }
+      } catch (error) {
+        console.error('[TenantDetails] Error fetching responses:', error);
+      } finally {
+        setIsLoadingResponses(false);
+      }
+    };
+
+    fetchRefereeGuarantorResponses();
+  }, [tenant.email]);
+
+  // Handle deleting a referee or guarantor response
+  const handleDeleteResponse = async (responseId: string, responseType: 'referee' | 'guarantor') => {
+    if (!window.confirm(`Are you sure you want to delete this ${responseType} response? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      console.log(`[TenantDetails] Deleting ${responseType} response:`, responseId);
+      
+      const result = await referencingService.deleteResponse(responseId);
+      
+      if (result.success) {
+        console.log(`✅ [TenantDetails] Successfully deleted ${responseType} response`);
+        
+        // Remove from local state immediately
+        if (responseType === 'referee') {
+          setRefereeResponses(prev => prev.filter(r => r.id !== responseId));
+        } else {
+          setGuarantorResponses(prev => prev.filter(r => r.id !== responseId));
+        }
+        
+        // Optional: Show success message
+        alert(`${responseType.charAt(0).toUpperCase() + responseType.slice(1)} response deleted successfully`);
+      } else {
+        console.error(`❌ [TenantDetails] Failed to delete ${responseType} response:`, result.error);
+        alert(`Failed to delete response: ${result.error}`);
+      }
+    } catch (error) {
+      console.error(`❌ [TenantDetails] Error deleting ${responseType} response:`, error);
+      alert('An unexpected error occurred while deleting the response');
+    }
+  };
+
   // Mock additional data for demonstration
   const mockTenant: Tenant = {
     ...tenant,
@@ -218,29 +288,6 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
     employer: 'Tech Solutions Ltd',
     annualSalary: 45000,
     notes: 'Excellent tenant with good payment history. Prefers email communication for non-urgent matters.',
-    references: [
-      {
-        id: '1',
-        type: 'employment',
-        contactName: 'HR Department - Tech Solutions Ltd',
-        contactEmail: 'hr@techsolutions.com',
-        contactPhone: '+44 20 7123 4567',
-        status: 'satisfactory',
-        dateRequested: new Date('2024-01-01'),
-        dateReceived: new Date('2024-01-03'),
-        notes: 'Confirmed employment and salary details'
-      },
-      {
-        id: '2',
-        type: 'previous-landlord',
-        contactName: 'John Smith Properties',
-        contactPhone: '+44 20 7987 6543',
-        status: 'satisfactory',
-        dateRequested: new Date('2024-01-01'),
-        dateReceived: new Date('2024-01-05'),
-        notes: 'No issues reported, always paid on time'
-      }
-    ],
     rentPayments: [
       {
         id: '1',
@@ -914,36 +961,163 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
           </TabsContent>
 
           <TabsContent value="references" className="space-y-6">
+            {/* Referee Responses */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <UserCheck className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
-                  Reference Checks
+                  Employment Referee Responses
+                  {refereeResponses.length > 0 && (
+                    <Badge className="ml-3 bg-blue-100 text-blue-800">
+                      {refereeResponses.length} response{refereeResponses.length !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {mockTenant.references?.map((reference) => (
-                    <div key={reference.id} className="p-4 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <h4 className="font-medium">{reference.contactName}</h4>
-                          <p className="text-sm text-muted-foreground capitalize">{reference.type.replace('-', ' ')} Reference</p>
+                {isLoadingResponses ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Clock className="w-6 h-6 mr-2 animate-spin text-gray-400" />
+                    <p className="text-muted-foreground">Loading referee responses...</p>
+                  </div>
+                ) : refereeResponses.length === 0 ? (
+                  <div className="text-center py-8">
+                    <UserCheck className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-muted-foreground">No referee responses yet</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Responses will appear here once the referee completes the form
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {refereeResponses.map((response, index) => (
+                      <div key={response.id || index} className="p-4 border rounded-lg">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h4 className="font-medium">{response.firstName} {response.lastName}</h4>
+                            <p className="text-sm text-muted-foreground">Employment Referee</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge className={response.consent === 'agree' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                              {response.consent === 'agree' ? '✓ Agreed' : '✗ Declined'}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                              onClick={() => handleDeleteResponse(response.id, 'referee')}
+                              title="Delete response"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <Badge className={getStatusColor(reference.status)}>
-                          {reference.status}
-                        </Badge>
+                        <div className="space-y-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Email: </span>
+                            <span>{response.email}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Submitted: </span>
+                            <span>{new Date(response.submittedAt || response.createdAt).toLocaleDateString('en-GB', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}</span>
+                          </div>
+                          {response.reason && (
+                            <div className="mt-3 p-3 bg-muted/50 rounded-md">
+                              <p className="text-muted-foreground font-medium mb-1">Comments:</p>
+                              <p className="text-foreground">{response.reason}</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-sm text-muted-foreground space-y-1">
-                        {reference.contactEmail && <p>Email: {reference.contactEmail}</p>}
-                        {reference.contactPhone && <p>Phone: {reference.contactPhone}</p>}
-                        <p>Requested: {formatDate(reference.dateRequested)}</p>
-                        {reference.dateReceived && <p>Received: {formatDate(reference.dateReceived)}</p>}
-                        {reference.notes && <p className="mt-2 italic">Notes: {reference.notes}</p>}
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Guarantor Responses */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Shield className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
+                  Guarantor Responses
+                  {guarantorResponses.length > 0 && (
+                    <Badge className="ml-3 bg-blue-100 text-blue-800">
+                      {guarantorResponses.length} response{guarantorResponses.length !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingResponses ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Clock className="w-6 h-6 mr-2 animate-spin text-gray-400" />
+                    <p className="text-muted-foreground">Loading guarantor responses...</p>
+                  </div>
+                ) : guarantorResponses.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Shield className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-muted-foreground">No guarantor responses yet</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Responses will appear here once the guarantor completes the form
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {guarantorResponses.map((response, index) => (
+                      <div key={response.id || index} className="p-4 border rounded-lg">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h4 className="font-medium">{response.firstName} {response.lastName}</h4>
+                            <p className="text-sm text-muted-foreground">Guarantor</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge className={response.consent === 'agree' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                              {response.consent === 'agree' ? '✓ Agreed' : '✗ Declined'}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                              onClick={() => handleDeleteResponse(response.id, 'guarantor')}
+                              title="Delete response"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Email: </span>
+                            <span>{response.email}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Submitted: </span>
+                            <span>{new Date(response.submittedAt || response.createdAt).toLocaleDateString('en-GB', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}</span>
+                          </div>
+                          {response.reason && (
+                            <div className="mt-3 p-3 bg-muted/50 rounded-md">
+                              <p className="text-muted-foreground font-medium mb-1">Comments:</p>
+                              <p className="text-foreground">{response.reason}</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

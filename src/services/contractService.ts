@@ -378,6 +378,170 @@ class ContractService {
       }
     );
   }
+
+  /**
+   * Get contracts received by tenant email (from landlords)
+   * These are stored in the 'contracts' collection (shared between landlord and tenant apps)
+   */
+  async getReceivedContracts(
+    tenantEmail: string,
+    statusFilter?: 'sent' | 'unsigned' | 'signed'
+  ): Promise<{ success: boolean; contracts?: any[]; error?: string }> {
+    try {
+      console.log('🔄 Getting contracts received by tenant:', tenantEmail);
+      
+      const constraints = [where('tenantEmail', '==', tenantEmail)];
+      
+      if (statusFilter) {
+        constraints.push(where('status', '==', statusFilter));
+      }
+      
+      const q = query(
+        collection(db, 'contracts'), // Different collection than contractTemplates
+        ...constraints,
+        orderBy('sentDate', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const contracts: any[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        contracts.push({
+          id: doc.id,
+          title: data.title || '',
+          propertyAddress: data.propertyAddress || '',
+          tenantName: data.tenantName || '',
+          tenantEmail: data.tenantEmail || '',
+          landlordEmail: data.landlordEmail || '',
+          status: data.status || 'sent',
+          contractType: data.contractType || 'other',
+          fileUrl: data.fileUrl || '',
+          fileName: data.fileName || '',
+          sentDate: data.sentDate?.toDate?.() || new Date(data.sentDate),
+          signedDate: data.signedDate?.toDate?.(),
+          expiryDate: data.expiryDate?.toDate?.(),
+          additionalInfo: data.additionalInfo,
+        });
+      });
+      
+      console.log(`✅ Found ${contracts.length} contracts for tenant ${tenantEmail}`);
+      return { success: true, contracts };
+    } catch (error: any) {
+      console.error('❌ Error getting received contracts:', error);
+      
+      // If it's an index error, try without orderBy
+      if (error.code === 'failed-precondition' && error.message?.includes('index')) {
+        console.warn('⚠️ Firestore index missing, retrying without orderBy');
+        try {
+          const constraints = [where('tenantEmail', '==', tenantEmail)];
+          if (statusFilter) {
+            constraints.push(where('status', '==', statusFilter));
+          }
+          
+          const q = query(collection(db, 'contracts'), ...constraints);
+          const querySnapshot = await getDocs(q);
+          const contracts: any[] = [];
+          
+          querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            contracts.push({
+              id: doc.id,
+              title: data.title || '',
+              propertyAddress: data.propertyAddress || '',
+              tenantName: data.tenantName || '',
+              tenantEmail: data.tenantEmail || '',
+              landlordEmail: data.landlordEmail || '',
+              status: data.status || 'sent',
+              contractType: data.contractType || 'other',
+              fileUrl: data.fileUrl || '',
+              fileName: data.fileName || '',
+              sentDate: data.sentDate?.toDate?.() || new Date(data.sentDate),
+              signedDate: data.signedDate?.toDate?.(),
+              expiryDate: data.expiryDate?.toDate?.(),
+              additionalInfo: data.additionalInfo,
+            });
+          });
+          
+          // Sort in memory
+          contracts.sort((a, b) => b.sentDate.getTime() - a.sentDate.getTime());
+          
+          console.log(`✅ Found ${contracts.length} contracts (without index)`);
+          return { success: true, contracts };
+        } catch (retryError) {
+          console.error('❌ Retry failed:', retryError);
+          return { 
+            success: false, 
+            error: retryError instanceof Error ? retryError.message : 'Unknown error' 
+          };
+        }
+      }
+      
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      };
+    }
+  }
+
+  /**
+   * Subscribe to real-time updates for received contracts
+   */
+  subscribeToReceivedContracts(
+    tenantEmail: string,
+    callback: (contracts: any[]) => void,
+    statusFilter?: 'sent' | 'unsigned' | 'signed',
+    onError?: (error: Error) => void
+  ): () => void {
+    console.log('🔄 Subscribing to contracts for tenant:', tenantEmail);
+    
+    const constraints = [where('tenantEmail', '==', tenantEmail)];
+    if (statusFilter) {
+      constraints.push(where('status', '==', statusFilter));
+    }
+    
+    const q = query(
+      collection(db, 'contracts'),
+      ...constraints
+    );
+
+    return onSnapshot(
+      q,
+      (querySnapshot) => {
+        const contracts: any[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          contracts.push({
+            id: doc.id,
+            title: data.title || '',
+            propertyAddress: data.propertyAddress || '',
+            tenantName: data.tenantName || '',
+            tenantEmail: data.tenantEmail || '',
+            landlordEmail: data.landlordEmail || '',
+            status: data.status || 'sent',
+            contractType: data.contractType || 'other',
+            fileUrl: data.fileUrl || '',
+            fileName: data.fileName || '',
+            sentDate: data.sentDate?.toDate?.() || new Date(data.sentDate),
+            signedDate: data.signedDate?.toDate?.(),
+            expiryDate: data.expiryDate?.toDate?.(),
+            additionalInfo: data.additionalInfo,
+          });
+        });
+        
+        // Sort by sent date
+        contracts.sort((a, b) => b.sentDate.getTime() - a.sentDate.getTime());
+        
+        callback(contracts);
+      },
+      (error) => {
+        console.error('❌ Error in received contracts subscription:', error);
+        if (onError) {
+          onError(error);
+        }
+      }
+    );
+  }
 }
 
 export const contractService = new ContractService();

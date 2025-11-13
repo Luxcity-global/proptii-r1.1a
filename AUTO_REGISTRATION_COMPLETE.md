@@ -207,3 +207,6 @@ await setDoc(docRef, landlordUser);  // ✅ Works!
 
 Read `FIRESTORE_RULES_FIX.md` for detailed instructions.
 
+
+
+
