@@ -5,8 +5,9 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { ArrowLeft, Mail, Send, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Mail, Send, CheckCircle, AlertCircle, Plus } from 'lucide-react';
 import { Property } from '../App';
+import axios from 'axios';
 
 interface InviteTenantProps {
   properties: Property[];
@@ -58,22 +59,183 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
     return Object.keys(newErrors).length === 0;
   };
 
+  const generateInvitationEmailHTML = (property: Property | undefined) => {
+    const propertyAddress = property?.address || 'the property';
+    const invitationTypeText = formData.inviteType === 'new-tenant' 
+      ? 'create a new account and complete your tenant profile'
+      : 'complete your tenant profile';
+    
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { 
+            font-family: Arial, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            background-color: #DC5F12;
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 24px;
+          }
+          .content {
+            background-color: #f9f9f9;
+            padding: 30px;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+          }
+          .property-info {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #DC5F12;
+          }
+          .property-info h3 {
+            margin-top: 0;
+            color: #374957;
+          }
+          .custom-message {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-style: italic;
+            border-left: 3px solid #DC5F12;
+          }
+          .cta-button {
+            display: inline-block;
+            background-color: #DC5F12;
+            color: white !important;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-weight: bold;
+          }
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 0.9em;
+            color: #666;
+            text-align: center;
+          }
+          .footer-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 16px;
+          }
+          .footer-logo img {
+            height: 40px;
+            margin-right: 10px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Tenant Invitation</h1>
+        </div>
+        <div class="content">
+          <p>Hello,</p>
+          
+          <p>You have been invited to ${invitationTypeText} on Proptii.</p>
+          
+          <div class="property-info">
+            <h3>Property Details</h3>
+            <p><strong>Address:</strong> ${propertyAddress}</p>
+          </div>
+          
+          ${formData.customMessage ? `
+            <div class="custom-message">
+              <strong>Personal Message:</strong><br>
+              ${formData.customMessage}
+            </div>
+          ` : ''}
+          
+          <p>Please click the button below to ${formData.inviteType === 'new-tenant' ? 'create your account and' : ''} complete your tenant profile:</p>
+          
+          <div style="text-align: center;">
+            <a href="https://proptii.com/tenant/register" class="cta-button">
+              ${formData.inviteType === 'new-tenant' ? 'Create Account & Complete Profile' : 'Complete Your Profile'}
+            </a>
+          </div>
+          
+          <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
+          
+          <p>Best regards,<br>The Proptii Team</p>
+        </div>
+        
+        <div class="footer">
+          <p>This is an automated message from Proptii</p>
+          <div class="footer-logo">
+            <img src="https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png" alt="Proptii Logo" />
+          </div>
+          <p style="margin-top: 10px;">
+            <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions.</em>
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+  };
+
   const handleSendInvitation = async () => {
     if (!validateForm()) return;
     
     setIsLoading(true);
+    setErrors({});
     
     try {
-      // Mock email sending - in real implementation, this would call your email service
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const selectedProperty = properties.find(p => p.id === formData.propertyId);
       
-      // Mock success
-      console.log('Sending invitation email:', {
-        to: formData.email,
-        property: properties.find(p => p.id === formData.propertyId)?.address,
-        message: formData.customMessage,
-        type: formData.inviteType
-      });
+      if (!selectedProperty) {
+        throw new Error('Selected property not found');
+      }
+
+      // Determine API base URL
+      const API_BASE_URL = window.location.hostname === 'localhost'
+        ? 'http://localhost:10000/api'
+        : 'https://proptii-r1-1a.onrender.com/api';
+
+      // Generate email HTML
+      const emailHTML = generateInvitationEmailHTML(selectedProperty);
+      const emailSubject = `Invitation to join as tenant for ${selectedProperty.address}`;
+
+      // Send email via API
+      const response = await axios.post(
+        `${API_BASE_URL}/email/send`,
+        {
+          to: formData.email,
+          subject: emailSubject,
+          html: emailHTML
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          timeout: 30000
+        }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Failed to send email');
+      }
+
+      console.log('Invitation email sent successfully:', response.data.messageId);
       
       setIsSuccess(true);
       
@@ -82,9 +244,24 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
         onSuccess();
       }, 3000);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to send invitation:', error);
-      setErrors({ general: 'Failed to send invitation. Please try again.' });
+      
+      let errorMessage = 'Failed to send invitation. Please try again.';
+      
+      if (axios.isAxiosError(error)) {
+        if (error.code === 'ECONNREFUSED') {
+          errorMessage = 'Cannot connect to email server. Please ensure the backend is running.';
+        } else if (error.response?.data?.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      setErrors({ general: errorMessage });
     } finally {
       setIsLoading(false);
     }
@@ -136,18 +313,10 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <img 
-              src="./images/proptii-logo.png" 
+              src="/images/proptii-logo.png" 
               alt="Proptii Logo" 
               className="h-8 w-auto"
             />
-          </div>
-          <div className="flex items-center space-x-3">
-            <Button variant="outline" className="rounded-full px-4 py-2">
-              Questions?
-            </Button>
-            <Button variant="outline" className="rounded-full px-4 py-2">
-              Save & exit
-            </Button>
           </div>
         </div>
 
@@ -270,18 +439,37 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
               <Button 
                 onClick={handleSendInvitation}
                 disabled={isLoading}
-                className="px-8"
-                style={{ backgroundColor: '#DC5F12', borderColor: '#DC5F12' }}
+                className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto"
+                style={{ 
+                  backgroundColor: '#DC5F12', 
+                  borderColor: '#DC5F12', 
+                  minWidth: '180px',
+                  background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isLoading) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
+                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isLoading) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                    e.currentTarget.style.transform = 'translateY(0px)';
+                  }
+                }}
               >
                 {isLoading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                    Sending...
+                    <span>Sending...</span>
                   </>
                 ) : (
                   <>
-                    <Send className="w-4 h-4 mr-2" />
-                    Send Invitation
+                    <Send className="w-4 h-4" strokeWidth={2.5} />
+                    <span>Send Invitation</span>
                   </>
                 )}
               </Button>

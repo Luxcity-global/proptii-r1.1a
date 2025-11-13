@@ -16,6 +16,21 @@ import {
 import { db } from '../config/firebase';
 import type { Tenant } from '../App';
 
+const isDevLoggingEnabled = import.meta.env.DEV;
+const isVerboseAlertLoggingEnabled = import.meta.env.VITE_ALERT_DEBUG === 'true';
+
+const debugLog = (...args: any[]) => {
+  if (isDevLoggingEnabled && isVerboseAlertLoggingEnabled) {
+    console.log(...args);
+  }
+};
+
+const debugWarn = (...args: any[]) => {
+  if (isDevLoggingEnabled && isVerboseAlertLoggingEnabled) {
+    console.warn(...args);
+  }
+};
+
 export type AlertType = 'lease-expiry' | 'unsigned-contract' | 'rent-arrears';
 export type AlertStatus = 'active' | 'resolved' | 'dismissed';
 export type AlertSeverity = 'low' | 'medium' | 'high' | 'critical';
@@ -161,7 +176,7 @@ class AlertService {
       };
       
       const docRef = await addDoc(this.alertsCollection, alertDoc);
-      console.log('✅ AlertService: Created alert:', docRef.id, alertData.type);
+      debugLog('✅ AlertService: Created alert:', docRef.id, alertData.type);
       return docRef.id;
     } catch (error) {
       console.error('Error creating alert:', error);
@@ -262,7 +277,7 @@ class AlertService {
       }
 
       await updateDoc(docRef, updateData);
-      console.log('✅ AlertService: Updated alert status:', alertId, status);
+      debugLog('✅ AlertService: Updated alert status:', alertId, status);
     } catch (error) {
       console.error('Error updating alert status:', error);
       throw error;
@@ -276,7 +291,7 @@ class AlertService {
     try {
       const docRef = doc(this.alertsCollection, alertId);
       await deleteDoc(docRef);
-      console.log('✅ AlertService: Deleted alert:', alertId);
+      debugLog('✅ AlertService: Deleted alert:', alertId);
     } catch (error) {
       console.error('Error deleting alert:', error);
       throw error;
@@ -320,7 +335,7 @@ class AlertService {
    * This is called periodically or on-demand to check for new alerts
    */
   async generateAlerts(userId: string): Promise<void> {
-    console.log('🔔 AlertService: Generating alerts for userId:', userId);
+    debugLog('🔔 AlertService: Generating alerts for userId:', userId);
     
     // Import services here to avoid circular dependencies
     const { tenantService } = await import('./tenantService');
@@ -338,10 +353,10 @@ class AlertService {
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-      console.log('🔍 AlertService: Checking lease expiry alerts');
-      console.log(`   Today: ${today.toISOString()}`);
-      console.log(`   30 days from now: ${thirtyDaysFromNow.toISOString()}`);
-      console.log(`   Checking ${tenants.length} tenants`);
+      debugLog('🔍 AlertService: Checking lease expiry alerts');
+      debugLog(`   Today: ${today.toISOString()}`);
+      debugLog(`   30 days from now: ${thirtyDaysFromNow.toISOString()}`);
+      debugLog(`   Checking ${tenants.length} tenants`);
 
       for (const tenant of tenants) {
         let computedDaysPastDue: number | null = null;
@@ -351,8 +366,10 @@ class AlertService {
           const tenantOverdueAmount = typeof tenant.overdueAmount === 'number' ? tenant.overdueAmount : 0;
           const statusChanged = tenant.paymentStatus !== evaluatedStatus.status;
           const overdueChanged = tenantOverdueAmount !== evaluatedStatus.overdueAmount;
+          const hasManualOverdue = tenant.paymentStatus === 'overdue' && tenantOverdueAmount > 0;
+          const shouldApplyEvaluatedStatus = !hasManualOverdue || evaluatedStatus.status === 'overdue';
 
-          if (statusChanged || overdueChanged) {
+          if (shouldApplyEvaluatedStatus && (statusChanged || overdueChanged)) {
             const tenantRef = doc(db, 'tenants', tenant.id);
             batch.update(tenantRef, {
               paymentStatus: evaluatedStatus.status,
@@ -379,7 +396,7 @@ class AlertService {
           // Check if lease expires within 30 days (including today and tomorrow)
           const daysUntilExpiry = Math.ceil((leaseEndDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
           
-          console.log(`   Tenant: ${tenant.name}, Lease End: ${leaseEndDate.toISOString()}, Days until expiry: ${daysUntilExpiry}, Status: ${tenant.status}`);
+          debugLog(`   Tenant: ${tenant.name}, Lease End: ${leaseEndDate.toISOString()}, Days until expiry: ${daysUntilExpiry}, Status: ${tenant.status}`);
           
           if (daysUntilExpiry >= 0 && daysUntilExpiry <= 30) {
             // Check if alert exists for this tenant
@@ -401,8 +418,8 @@ class AlertService {
               }
             }
             
-            console.log(`   Alert exists for tenant? ${existsForTenant}`);
-            console.log(`   Alert exists for property? ${existingPropertyAlert !== null}`);
+            debugLog(`   Alert exists for tenant? ${existsForTenant}`);
+            debugLog(`   Alert exists for property? ${existingPropertyAlert !== null}`);
             
             if (!existsForTenant && !existingPropertyAlert) {
               // No alert exists - create new one
@@ -425,7 +442,7 @@ class AlertService {
                 updatedAt: Timestamp.now()
               });
               alertCount++;
-              console.log(`   ✅ Created lease expiry alert for ${tenant.name} (${daysUntilExpiry} days)`);
+              debugLog(`   ✅ Created lease expiry alert for ${tenant.name} (${daysUntilExpiry} days)`);
             } else if (existingPropertyAlert) {
               // Alert exists for this property - check if we should update it with earlier expiry
               const existingAlertData = existingPropertyAlert.data();
@@ -445,21 +462,21 @@ class AlertService {
                   severity,
                   updatedAt: Timestamp.now()
                 });
-                console.log(`   ✅ Updated property alert with earlier expiry for ${tenant.name} (${daysUntilExpiry} days, was ${existingDaysUntilExpiry})`);
+                debugLog(`   ✅ Updated property alert with earlier expiry for ${tenant.name} (${daysUntilExpiry} days, was ${existingDaysUntilExpiry})`);
               } else {
-                console.log(`   ⏭️  Alert already exists for property ${tenant.propertyAddress} with earlier expiry (${existingDaysUntilExpiry} days)`);
+                debugLog(`   ⏭️  Alert already exists for property ${tenant.propertyAddress} with earlier expiry (${existingDaysUntilExpiry} days)`);
               }
             } else {
-              console.log(`   ⏭️  Alert already exists for ${tenant.name}`);
+              debugLog(`   ⏭️  Alert already exists for ${tenant.name}`);
             }
           } else {
-            console.log(`   ⏭️  Tenant ${tenant.name}: lease expires in ${daysUntilExpiry} days (outside 30-day window)`);
+            debugLog(`   ⏭️  Tenant ${tenant.name}: lease expires in ${daysUntilExpiry} days (outside 30-day window)`);
           }
         } else {
           if (tenant.leaseEnd) {
-            console.log(`   ⏭️  Tenant ${tenant.name}: status is ${tenant.status} (not active or pending)`);
+            debugLog(`   ⏭️  Tenant ${tenant.name}: status is ${tenant.status} (not active or pending)`);
           } else {
-            console.log(`   ⏭️  Tenant ${tenant.name}: no leaseEnd date`);
+            debugLog(`   ⏭️  Tenant ${tenant.name}: no leaseEnd date`);
           }
         }
 
@@ -549,7 +566,7 @@ class AlertService {
       }
 
       // 4. Clean up duplicate alerts for the same property (keep only the one with earliest expiry)
-      console.log('🧹 AlertService: Cleaning up duplicate property alerts');
+      debugLog('🧹 AlertService: Cleaning up duplicate property alerts');
       const activeAlerts = await this.getActiveAlerts(userId);
       const propertyAlertsMap = new Map<string, Alert[]>();
       const resolvedDuplicateIds = new Set<string>();
@@ -572,7 +589,7 @@ class AlertService {
           const keepAlert = alerts[0];
           const resolveAlerts = alerts.slice(1);
           
-          console.log(`   🔍 Property ${keepAlert.propertyAddress} has ${alerts.length} alerts, keeping earliest (${keepAlert.daysUntilExpiry} days)`);
+          debugLog(`   🔍 Property ${keepAlert.propertyAddress} has ${alerts.length} alerts, keeping earliest (${keepAlert.daysUntilExpiry} days)`);
           
           for (const alertToResolve of resolveAlerts) {
             resolvedDuplicateIds.add(alertToResolve.id);
@@ -582,13 +599,13 @@ class AlertService {
               resolvedAt: Timestamp.now(),
               updatedAt: Timestamp.now()
             });
-            console.log(`   ✅ Resolving duplicate alert for ${alertToResolve.tenantName} (keeping ${keepAlert.tenantName})`);
+            debugLog(`   ✅ Resolving duplicate alert for ${alertToResolve.tenantName} (keeping ${keepAlert.tenantName})`);
           }
         }
       }
 
       // 5. Clean up alerts that no longer meet criteria
-      console.log('🧹 AlertService: Cleaning up outdated alerts');
+      debugLog('🧹 AlertService: Cleaning up outdated alerts');
       let resolvedCount = resolvedDuplicateIds.size;
 
       for (const alert of activeAlerts) {
@@ -649,7 +666,7 @@ class AlertService {
             updatedAt: Timestamp.now()
           });
           resolvedCount++;
-          console.log(`   ✅ Resolving alert: ${alert.title} - ${reason}`);
+          debugLog(`   ✅ Resolving alert: ${alert.title} - ${reason}`);
         }
       }
 
@@ -658,22 +675,22 @@ class AlertService {
       if (hasChanges) {
         await batch.commit();
         if (alertCount > 0) {
-          console.log(`✅ AlertService: Generated ${alertCount} new alerts`);
+          debugLog(`✅ AlertService: Generated ${alertCount} new alerts`);
         }
         if (resolvedCount > 0) {
-          console.log(`✅ AlertService: Resolved ${resolvedCount} outdated alerts`);
+          debugLog(`✅ AlertService: Resolved ${resolvedCount} outdated alerts`);
         }
         if (tenantStatusUpdates > 0) {
-          console.log(`✅ AlertService: Updated payment status for ${tenantStatusUpdates} tenant${tenantStatusUpdates === 1 ? '' : 's'}`);
+          debugLog(`✅ AlertService: Updated payment status for ${tenantStatusUpdates} tenant${tenantStatusUpdates === 1 ? '' : 's'}`);
         }
-        console.log(`   Collection: 'alerts'`);
+        debugLog(`   Collection: 'alerts'`);
       } else {
-        console.log('✅ AlertService: No changes required (alerts or tenant statuses)');
-        console.log('   This means either:');
-        console.log('   - No tenants have leases expiring within 30 days');
-        console.log('   - Alerts already exist for expiring leases');
-        console.log('   - Tenants are not active or missing leaseEnd dates');
-        console.log('   - All existing alerts are still valid');
+        debugLog('✅ AlertService: No changes required (alerts or tenant statuses)');
+        debugLog('   This means either:');
+        debugLog('   - No tenants have leases expiring within 30 days');
+        debugLog('   - Alerts already exist for expiring leases');
+        debugLog('   - Tenants are not active or missing leaseEnd dates');
+        debugLog('   - All existing alerts are still valid');
       }
     } catch (error) {
       console.error('❌ Error generating alerts:', error);

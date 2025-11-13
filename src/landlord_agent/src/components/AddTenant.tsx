@@ -33,6 +33,7 @@ interface AddTenantProps {
   properties: Property[];
   onSave: (tenant: Omit<Tenant, 'id'>) => void;
   onBack: () => void;
+  onBackToSelection?: () => void;
   preselectedPropertyId?: string;
   userProfile?: UserProfile | null;
   initialTenant?: Tenant | null;
@@ -283,7 +284,7 @@ function formReducer(state: FormState, action: FormAction): FormState {
   }
 }
 
-export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, userProfile, initialTenant }: AddTenantProps) {
+export function AddTenant({ properties, onSave, onBack, onBackToSelection, preselectedPropertyId, userProfile, initialTenant }: AddTenantProps) {
   // Phase 4: Replace useState with useReducer for advanced state management
   const [state, dispatch] = useReducer(formReducer, initialFormState);
   const [isGuidelinesExpanded, setIsGuidelinesExpanded] = useState(false);
@@ -305,6 +306,8 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, u
       return `${year}-${month}-${day}`;
     };
 
+    const tenantLike = tenant as any;
+
     return {
       name: tenant.name || '',
       email: tenant.email || '',
@@ -323,21 +326,11 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, u
       emergencyContactPhone: tenant.emergencyContact?.phone || '',
       emergencyContactRelationship: tenant.emergencyContact?.relationship || '',
       defaultRiskScore: tenant.defaultRiskScore?.toString() || '',
-      notes: (tenant as any).notes || '',
-      employer: (tenant as any).employer || '',
-      jobTitle: (tenant as any).jobTitle || '',
-      annualIncome: (tenant as any).annualIncome?.toString() || (tenant as any).annualSalary?.toString() || '',
-      employmentType: (tenant as any).employmentType || 'full-time',
-      previousLandlordName: '',
-      previousLandlordPhone: '',
-      previousRentAmount: '',
-      previousLeaseStart: '',
-      previousLeaseEnd: '',
-      previousLandlordReference: '',
-      bankName: '',
-      accountNumber: '',
-      sortCode: '',
-      documentsUploaded: []
+      notes: tenantLike.notes || '',
+      employer: tenantLike.employer || '',
+      jobTitle: tenantLike.jobTitle || '',
+      annualIncome: tenantLike.annualIncome?.toString() || tenantLike.annualSalary?.toString() || '',
+      employmentType: tenantLike.employmentType || 'full-time'
     };
   };
 
@@ -667,6 +660,13 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, u
   const handleInputBlur = () => {
     dispatch({ type: 'SET_FOCUSED_FIELD', field: null });
   };
+  const navigateBackToSelection = useCallback(() => {
+    if (onBackToSelection) {
+      onBackToSelection();
+    } else {
+      onBack();
+    }
+  }, [onBack, onBackToSelection]);
 
   // Smart defaults function
   const applySmartDefaults = (stepId: string) => {
@@ -2049,13 +2049,24 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, u
       {/* Progress Bar */}
       <div className="w-full bg-white shadow-lg border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-6" style={{ paddingTop: '20px', paddingBottom: '20px' }}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
-              Step {state.currentStep + 1} of {FORM_STEPS.length}
-            </span>
-            <span className="text-sm text-gray-500" style={{ fontFamily: 'Archivo, sans-serif' }}>
-              {Math.round(progress)}% Complete
-            </span>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-2">
+            <div className="flex items-center justify-between gap-4 w-full sm:w-auto">
+              <span className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                Step {state.currentStep + 1} of {FORM_STEPS.length}
+              </span>
+              <span className="text-sm text-gray-500" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                {Math.round(progress)}% Complete
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={navigateBackToSelection}
+              className="self-end sm:self-auto"
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              Back to Selection
+            </Button>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2 relative">
             <div

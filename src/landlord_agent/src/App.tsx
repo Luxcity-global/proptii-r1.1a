@@ -1000,80 +1000,81 @@ export default function App() {
     setAlerts([]);
   }, []);
 
-  // Reload and scope tenants once we know the current user's properties
-  React.useEffect(() => {
-    const loadScopedTenants = async () => {
-      try {
-        // Use the same userId extraction logic as addTenant and loadProperties
-        const getCurrentUserId = (): string | null => {
-          try {
-            // PRIORITY 1: Direct from userProfile (most reliable)
-            if (userProfile && (userProfile as any).id) {
-              const uid = (userProfile as any).id;
-              console.log('🔍 UserId from userProfile.id:', uid);
+  const loadScopedTenants = React.useCallback(async () => {
+    try {
+      // Use the same userId extraction logic as addTenant and loadProperties
+      const getCurrentUserId = (): string | null => {
+        try {
+          // PRIORITY 1: Direct from userProfile (most reliable)
+          if (userProfile && (userProfile as any).id) {
+            const uid = (userProfile as any).id;
+            console.log('🔍 UserId from userProfile.id:', uid);
+            return uid;
+          }
+
+          // PRIORITY 2: Query parameter
+          const params = new URLSearchParams(window.location.search);
+          const uidFromQuery = params.get('uid');
+          if (uidFromQuery) {
+            console.log('🔍 UserId from query param:', uidFromQuery);
+            return uidFromQuery;
+          }
+
+          // PRIORITY 3: getUserInfo function
+          if (typeof (window as any).getUserInfo === 'function') {
+            const info = (window as any).getUserInfo();
+            console.log('🔍 getUserInfo() returned:', info);
+            if (info?.id || info?.sub || info?.oid) {
+              const uid = info.id || info.sub || info.oid;
+              console.log('🔍 UserId from getUserInfo:', uid);
               return uid;
             }
-            
-            // PRIORITY 2: Query parameter
-        const params = new URLSearchParams(window.location.search);
-        const uidFromQuery = params.get('uid');
-            if (uidFromQuery) {
-              console.log('🔍 UserId from query param:', uidFromQuery);
-              return uidFromQuery;
-            }
-            
-            // PRIORITY 3: getUserInfo function
-            if (typeof (window as any).getUserInfo === 'function') {
-          const info = (window as any).getUserInfo();
-              console.log('🔍 getUserInfo() returned:', info);
-              if (info?.id || info?.sub || info?.oid) {
-                const uid = info.id || info.sub || info.oid;
-                console.log('🔍 UserId from getUserInfo:', uid);
-                return uid;
-              }
-            }
-            
-            // PRIORITY 4: localStorage auth state
+          }
+
+          // PRIORITY 4: localStorage auth state
           const cached = localStorage.getItem('proptii_auth_state');
           if (cached) {
             const parsed = JSON.parse(cached);
-              console.log('🔍 Cached auth state:', parsed);
-              // Check both nested user.id AND top-level user id fields
-              const uid = parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId;
-              if (uid) {
-                console.log('🔍 UserId from localStorage:', uid);
-                return uid;
+            console.log('🔍 Cached auth state:', parsed);
+            // Check both nested user.id AND top-level user id fields
+            const uid = parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId;
+            if (uid) {
+              console.log('🔍 UserId from localStorage:', uid);
+              return uid;
+            }
           }
+        } catch (e) {
+          console.error('🔍 Error extracting userId:', e);
         }
-          } catch (e) {
-            console.error('🔍 Error extracting userId:', e);
-          }
-          
-          // Don't use email as fallback - it won't match stored userIds
-          console.warn('⚠️ No userId found - tenants may not load correctly');
-          return null;
-        };
 
-        const userId = getCurrentUserId();
-        console.log('🔁 Scoping tenants for userId:', userId);
-        let list = await tenantService.getTenants(userId || undefined);
+        // Don't use email as fallback - it won't match stored userIds
+        console.warn('⚠️ No userId found - tenants may not load correctly');
+        return null;
+      };
 
-        // If docs lack userId, fall back to scoping by owned property IDs
-        if (userId) {
-          const ownedPropertyIds = new Set(properties.map(p => p.id));
-          if (ownedPropertyIds.size > 0) {
-            const before = list.length;
-            list = list.filter(t => !t.propertyId || ownedPropertyIds.has(t.propertyId));
-            console.log(`✅ Tenant fallback filter by propertyIds: ${before} -> ${list.length}`);
-          }
+      const userId = getCurrentUserId();
+      console.log('🔁 Scoping tenants for userId:', userId);
+      let list = await tenantService.getTenants(userId || undefined);
+
+      // If docs lack userId, fall back to scoping by owned property IDs
+      if (userId) {
+        const ownedPropertyIds = new Set(properties.map(p => p.id));
+        if (ownedPropertyIds.size > 0) {
+          const before = list.length;
+          list = list.filter(t => !t.propertyId || ownedPropertyIds.has(t.propertyId));
+          console.log(`✅ Tenant fallback filter by propertyIds: ${before} -> ${list.length}`);
         }
-        setTenants(list);
-      } catch (e) {
-        console.warn('Failed to scope tenants; keeping current list', e);
       }
-    };
-    loadScopedTenants();
+      setTenants(list);
+    } catch (e) {
+      console.warn('Failed to scope tenants; keeping current list', e);
+    }
   }, [properties, userProfile]);
+
+  // Reload and scope tenants once we know the current user's properties
+  React.useEffect(() => {
+    loadScopedTenants();
+  }, [loadScopedTenants]);
 
   const navigateToScreen = (screen: Screen) => {
     setIsTransitioning(true);
@@ -1186,7 +1187,7 @@ export default function App() {
       }
     };
     loadProperties();
-  }, [userProfile]);
+  }, [userProfile, loadScopedTenants]);
 
   // Helper function to get current user ID
   const getCurrentUserId = (): string | null => {
@@ -1262,31 +1263,87 @@ export default function App() {
     setArrearsAlerts(arrearsAlertsList);
   };
 
+  // Ensure tenant state reflects arrears alerts for immediate UI feedback
+  React.useEffect(() => {
+    setTenants(prev => {
+      if (prev.length === 0 && arrearsAlerts.length === 0) {
+        return prev;
+      }
+
+      const alertsByTenant = new Map<string, ArrearsAlert>();
+      arrearsAlerts.forEach(alert => {
+        if (alert.tenantId) {
+          alertsByTenant.set(alert.tenantId, alert);
+        }
+      });
+
+      let hasChanges = false;
+      const updated = prev.map(tenant => {
+        const alert = alertsByTenant.get(tenant.id);
+        if (alert) {
+          const overdueAmount = alert.overdueAmount ?? tenant.overdueAmount ?? 0;
+          if (
+            tenant.paymentStatus !== 'overdue' ||
+            tenant.overdueAmount !== overdueAmount ||
+            tenant.lastPaymentDate?.getTime() !== alert.lastPaymentDate?.getTime()
+          ) {
+            hasChanges = true;
+            return {
+              ...tenant,
+              paymentStatus: 'overdue' as const,
+              overdueAmount,
+              lastPaymentDate: alert.lastPaymentDate ?? tenant.lastPaymentDate
+            };
+          }
+        }
+        return tenant;
+      });
+
+      return hasChanges ? updated : prev;
+    });
+  }, [arrearsAlerts]);
+
   // Real-time Firestore listeners for tenants, properties, and alerts
   React.useEffect(() => {
     const currentUserId = getCurrentUserId();
+    const shouldLogRealtimeDebug = import.meta.env.DEV && import.meta.env.VITE_REALTIME_DEBUG === 'true';
     if (!currentUserId) {
-      console.warn('⚠️ No userId found - cannot set up real-time listeners');
+      if (shouldLogRealtimeDebug) {
+        console.warn('⚠️ No userId found - cannot set up real-time listeners');
+      }
       return;
     }
 
-    console.log('🔔 Setting up real-time Firestore listeners for userId:', currentUserId);
+    if (shouldLogRealtimeDebug) {
+      console.log('🔔 Setting up real-time Firestore listeners for userId:', currentUserId);
+    }
     const unsubscribes: Unsubscribe[] = [];
 
+    // Track if we're currently generating alerts to prevent feedback loops
+    let isGeneratingAlerts = false;
+    
     // Debounce function to prevent too many rapid alert generations
     let alertGenerationTimeout: NodeJS.Timeout | null = null;
     const debouncedGenerateAlerts = () => {
+      if (isGeneratingAlerts) {
+        return; // Skip if already generating to prevent loops
+      }
       if (alertGenerationTimeout) {
         clearTimeout(alertGenerationTimeout);
       }
       alertGenerationTimeout = setTimeout(async () => {
         try {
-          console.log('🔄 Real-time update detected - regenerating alerts');
+          isGeneratingAlerts = true;
+          if (shouldLogRealtimeDebug) {
+            console.log('🔄 Real-time update detected - regenerating alerts');
+          }
           await alertService.generateAlerts(currentUserId);
         } catch (error) {
           console.error('Error generating alerts from real-time update:', error);
+        } finally {
+          isGeneratingAlerts = false;
         }
-      }, 1000); // Wait 1 second after last change before regenerating
+      }, 2000); // Increased to 2 seconds to reduce frequency
     };
 
     // Listen to tenants collection changes
@@ -1296,9 +1353,19 @@ export default function App() {
         where('userId', '==', currentUserId)
       );
       const tenantsUnsubscribe = onSnapshot(tenantsQuery, 
-        (snapshot) => {
-          console.log('👥 Real-time tenant update detected:', snapshot.docChanges().length, 'changes');
-          debouncedGenerateAlerts();
+        async (snapshot) => {
+          if (shouldLogRealtimeDebug) {
+            console.log('👥 Real-time tenant update detected:', snapshot.docChanges().length, 'changes');
+          }
+          try {
+            await loadScopedTenants();
+          } catch (error) {
+            console.error('Error refreshing tenants after snapshot update:', error);
+          }
+          // Only trigger alert generation if not already generating
+          if (!isGeneratingAlerts) {
+            debouncedGenerateAlerts();
+          }
         },
         (error) => {
           console.error('Error listening to tenants:', error);
@@ -1317,8 +1384,13 @@ export default function App() {
       );
       const propertiesUnsubscribe = onSnapshot(propertiesQuery,
         (snapshot) => {
-          console.log('🏠 Real-time property update detected:', snapshot.docChanges().length, 'changes');
-          debouncedGenerateAlerts();
+          if (shouldLogRealtimeDebug) {
+            console.log('🏠 Real-time property update detected:', snapshot.docChanges().length, 'changes');
+          }
+          // Only trigger alert generation if not already generating
+          if (!isGeneratingAlerts) {
+            debouncedGenerateAlerts();
+          }
         },
         (error) => {
           console.error('Error listening to properties:', error);
@@ -1338,7 +1410,9 @@ export default function App() {
       );
       const alertsUnsubscribe = onSnapshot(alertsQuery,
         async (snapshot) => {
-          console.log('🔔 Real-time alert update detected:', snapshot.docs.length, 'active alerts');
+          if (shouldLogRealtimeDebug) {
+            console.log('🔔 Real-time alert update detected:', snapshot.docs.length, 'active alerts');
+          }
           // Map Firestore documents to Alert objects
           const activeAlerts = snapshot.docs.map(doc => {
             const data = doc.data();
@@ -1387,19 +1461,24 @@ export default function App() {
 
     // Cleanup
     return () => {
-      console.log('🧹 Cleaning up real-time Firestore listeners');
+      if (shouldLogRealtimeDebug) {
+        console.log('🧹 Cleaning up real-time Firestore listeners');
+      }
       unsubscribes.forEach(unsub => unsub());
       if (alertGenerationTimeout) {
         clearTimeout(alertGenerationTimeout);
       }
     };
-  }, [userProfile]);
+  }, [userProfile, loadScopedTenants]);
 
   // Load market insights from Firestore
   React.useEffect(() => {
     const currentUserId = getCurrentUserId();
+    const shouldLogMarketInsights = import.meta.env.DEV && import.meta.env.VITE_MARKET_INSIGHTS_DEBUG === 'true';
     
-    console.log('📊 Setting up market insights listener');
+    if (shouldLogMarketInsights) {
+      console.log('📊 Setting up market insights listener');
+    }
     
     // Fetch GOV.UK regulatory changes on app load (once per day)
     const lastFetchKey = 'govuk_insights_last_fetch';
@@ -1409,10 +1488,14 @@ export default function App() {
     
     // Only fetch if we haven't fetched in the last 24 hours
     if (!lastFetch || (now - parseInt(lastFetch)) > oneDay) {
-      console.log('🔄 Fetching GOV.UK regulatory changes (24h check passed)...');
+      if (shouldLogMarketInsights) {
+        console.log('🔄 Fetching GOV.UK regulatory changes (24h check passed)...');
+      }
       marketInsightService.fetchGOVUKRegulatoryChanges()
         .then(count => {
-          console.log(`✅ Fetched ${count} new GOV.UK insights`);
+          if (shouldLogMarketInsights) {
+            console.log(`✅ Fetched ${count} new GOV.UK insights`);
+          }
           localStorage.setItem(lastFetchKey, now.toString());
         })
         .catch(error => {
@@ -1420,14 +1503,18 @@ export default function App() {
           // Don't block the app if this fails
         });
     } else {
-      const hoursSinceFetch = Math.floor((now - parseInt(lastFetch)) / (60 * 60 * 1000));
-      console.log(`ℹ️  GOV.UK insights fetched ${hoursSinceFetch} hours ago, skipping (fetch once per day)`);
+      if (shouldLogMarketInsights) {
+        const hoursSinceFetch = Math.floor((now - parseInt(lastFetch)) / (60 * 60 * 1000));
+        console.log(`ℹ️  GOV.UK insights fetched ${hoursSinceFetch} hours ago, skipping (fetch once per day)`);
+      }
     }
     
     // Set up real-time listener for market insights
     const unsubscribe = marketInsightService.subscribeToInsights(
       (insights) => {
-        console.log(`✅ Loaded ${insights.length} market insights from Firestore`);
+        if (shouldLogMarketInsights) {
+          console.log(`✅ Loaded ${insights.length} market insights from Firestore`);
+        }
         setMarketInsights(insights);
       },
       currentUserId || undefined
@@ -1436,7 +1523,9 @@ export default function App() {
     // Also try initial load
     if (currentUserId) {
       marketInsightService.getActiveInsights(currentUserId).then(insights => {
-        console.log(`✅ Initially loaded ${insights.length} market insights`);
+        if (shouldLogMarketInsights) {
+          console.log(`✅ Initially loaded ${insights.length} market insights`);
+        }
         setMarketInsights(insights);
       }).catch(error => {
         console.error('Error loading market insights:', error);
@@ -1446,7 +1535,9 @@ export default function App() {
     } else {
       // If no userId, still try to load general insights (not user-specific)
       marketInsightService.getActiveInsights().then(insights => {
-        console.log(`✅ Loaded ${insights.length} general market insights`);
+        if (shouldLogMarketInsights) {
+          console.log(`✅ Loaded ${insights.length} general market insights`);
+        }
         setMarketInsights(insights);
       }).catch(error => {
         console.error('Error loading market insights:', error);
@@ -1455,7 +1546,9 @@ export default function App() {
     }
 
     return () => {
-      console.log('🧹 Cleaning up market insights listener');
+      if (shouldLogMarketInsights) {
+        console.log('🧹 Cleaning up market insights listener');
+      }
       unsubscribe();
     };
   }, [userProfile]);
@@ -1970,7 +2063,11 @@ export default function App() {
               selectProperty(property);
               navigateToScreen('property-details');
             }}
-            onAddTenant={() => navigateToScreen('tenant-selection')}
+            onAddTenant={() => {
+              editingTenantRef.current = null;
+              setSelectedTenant(null);
+              navigateToScreen('tenant-selection');
+            }}
             onAddLandlord={() => navigateToScreen('add-landlord')}
             onViewLandlord={(landlord) => {
               selectLandlord(landlord);
@@ -2299,7 +2396,11 @@ export default function App() {
                 navigateToScreen('tenant-details');
               }
             }}
-            onAddTenant={() => navigateToScreen('add-tenant')}
+            onAddTenant={() => {
+              editingTenantRef.current = null;
+              setSelectedTenant(null);
+              navigateToScreen('add-tenant');
+            }}
             onSelectExistingTenant={async (tenantId) => {
               if (!selectedProperty) return;
               
@@ -2555,6 +2656,12 @@ export default function App() {
                 }
                 return remainingAlerts;
               });
+              const currentUserId = resolveManagerId();
+              if (currentUserId) {
+                alertService.generateAlerts(currentUserId).catch(error => {
+                  console.warn('⚠️ Failed to regenerate alerts after tenant payment update:', error);
+                });
+              }
             }}
           />
         );
@@ -2740,7 +2847,11 @@ export default function App() {
       case 'tenant-selection':
         return (
           <TenantSelection
-            onManualInput={() => navigateToScreen('add-tenant')}
+            onManualInput={() => {
+              editingTenantRef.current = null;
+              setSelectedTenant(null);
+              navigateToScreen('add-tenant');
+            }}
             onInviteEmail={() => navigateToScreen('invite-tenant')}
             onSelectExisting={() => navigateToScreen('select-existing-tenant')}
             onBack={() => {
@@ -2760,6 +2871,11 @@ export default function App() {
             preselectedPropertyId={selectedProperty?.id}
             userProfile={userProfile}
             initialTenant={tenantToEdit}
+            onBackToSelection={() => {
+              setSelectedTenant(null);
+              editingTenantRef.current = null;
+              navigateToScreen('tenant-selection');
+            }}
             onSave={async (tenant) => {
               const tenantId = editingTenantRef.current?.id || selectedTenant?.id;
               if (tenantId) {
@@ -2787,7 +2903,10 @@ export default function App() {
               setNavigationScreen('clients');
             }}
             onBack={() => {
-              if (editingTenantRef.current || selectedTenant) {
+              if (editingTenantRef.current) {
+                editingTenantRef.current = null;
+                navigateToScreen('tenant-details');
+              } else if (selectedTenant) {
                 navigateToScreen('tenant-details');
               } else {
                 navigateToScreen('tenant-selection');

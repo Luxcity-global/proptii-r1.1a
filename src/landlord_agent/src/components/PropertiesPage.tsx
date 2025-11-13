@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Search, Filter, Eye, Edit, MoreHorizontal, MapPin, BedSingle, Building2, Camera, FileText, User, Users, AlertTriangle, PoundSterling, Trash2, Download, Upload, Archive, CheckSquare, Square, Copy, Star, StarOff, ChevronDown } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Plus, Search, Filter, Eye, Edit, MoreHorizontal, MapPin, BedSingle, Building2, Camera, FileText, User, Users, AlertTriangle, PoundSterling, Trash2, Download, Upload, Archive, CheckSquare, Square, Copy, Star, StarOff, ChevronDown, Calendar } from 'lucide-react';
 import { ImportPropertiesDialog } from './ImportPropertiesDialog';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader } from './ui/card';
@@ -57,6 +57,49 @@ export function PropertiesPage({
     
     return matchesSearch && matchesStatus && matchesType;
   });
+
+  const {
+    propertiesEndingSoonCount,
+    propertiesOverdueRentCount,
+    totalOverdueRentAmount
+  } = useMemo(() => {
+    const now = new Date();
+    const threshold = new Date(now);
+    threshold.setDate(threshold.getDate() + 90);
+
+    const arrearsByTenantId = new Map<string, ArrearsAlert>();
+    arrearsAlerts.forEach(alert => arrearsByTenantId.set(alert.tenantId, alert));
+
+    const endingSoon = new Set<string>();
+    const overdue = new Set<string>();
+    let overdueAmountTotal = 0;
+
+    properties.forEach(property => {
+      const tenant = property.tenant || tenants.find(t => t.propertyId === property.id);
+      if (!tenant) return;
+
+      const leaseEnd = tenant.leaseEnd instanceof Date ? tenant.leaseEnd : new Date(tenant.leaseEnd);
+      if (tenant.status === 'active' && leaseEnd >= now && leaseEnd <= threshold) {
+        endingSoon.add(property.id);
+      }
+
+      const tenantAlert = arrearsByTenantId.get(tenant.id);
+      const alertAmount = tenantAlert?.overdueAmount ?? 0;
+      const tenantOverdueAmount = tenant.overdueAmount ?? 0;
+      const hasOverdueRent = tenant.paymentStatus === 'overdue' || alertAmount > 0 || tenantOverdueAmount > 0;
+
+      if (hasOverdueRent) {
+        overdue.add(property.id);
+        overdueAmountTotal += alertAmount > 0 ? alertAmount : tenantOverdueAmount;
+      }
+    });
+
+    return {
+      propertiesEndingSoonCount: endingSoon.size,
+      propertiesOverdueRentCount: overdue.size,
+      totalOverdueRentAmount: overdueAmountTotal
+    };
+  }, [arrearsAlerts, properties, tenants]);
 
   const getStatusColor = (status: Property['status']) => {
     switch (status) {
@@ -306,17 +349,17 @@ export function PropertiesPage({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-muted-foreground mb-1">
-                Under Renovation
+                Tenancies Ending Soon
               </p>
-              <p className="text-2xl font-semibold text-yellow-600">
-                {properties.filter(p => p.status === 'under-renovation').length}
+              <p className="text-2xl font-semibold text-orange-600">
+                {propertiesEndingSoonCount}
               </p>
               <p className="text-xs text-muted-foreground">
-                Properties
+                Within 90 days
               </p>
             </div>
-            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-yellow-600" />
+            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+              <Calendar className="w-6 h-6 text-orange-600" />
             </div>
           </div>
         </Card>
@@ -325,15 +368,13 @@ export function PropertiesPage({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-muted-foreground mb-1">
-                Compliance Issues
+                Overdue Rent
               </p>
               <p className="text-2xl font-semibold text-red-600">
-                {properties.reduce((count, p) => 
-                  count + p.documents.filter(d => d.status === 'expiring-soon' || d.status === 'expired').length, 0
-                )}
+                {propertiesOverdueRentCount}
               </p>
               <p className="text-xs text-muted-foreground">
-                Documents need attention
+                £{totalOverdueRentAmount.toLocaleString()} outstanding
               </p>
             </div>
             <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">

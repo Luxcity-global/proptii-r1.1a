@@ -24,6 +24,14 @@ import { Property, PropertyDocument } from '../App';
 import { propertyService } from '../services/propertyService';
 import axios from 'axios';
 
+interface SelectedDocumentForm {
+  file: File;
+  name: string;
+  type: string;
+  issueDate: string;
+  expiryDate: string;
+}
+
 interface DocumentManagementProps {
   property: Property | null;
   onBack: () => void;
@@ -35,13 +43,7 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [uploadForm, setUploadForm] = useState({
-    name: '',
-    type: '',
-    issueDate: '',
-    expiryDate: ''
-  });
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedDocuments, setSelectedDocuments] = useState<SelectedDocumentForm[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
   if (!property) {
@@ -102,21 +104,56 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (!files.length) {
+      return;
     }
+
+    setSelectedDocuments(prev => [
+      ...prev,
+      ...files.map(file => ({
+        file,
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        type: '',
+        issueDate: '',
+        expiryDate: ''
+      }))
+    ]);
+
+    // Reset the input to allow re-selecting the same files if needed
+    e.target.value = '';
+  };
+
+  const handleDocumentFieldChange = <K extends keyof SelectedDocumentForm>(
+    index: number,
+    key: K,
+    value: SelectedDocumentForm[K]
+  ) => {
+    setSelectedDocuments(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [key]: value };
+      return updated;
+    });
+  };
+
+  const handleRemoveSelectedDocument = (index: number) => {
+    setSelectedDocuments(prev => prev.filter((_, idx) => idx !== index));
   };
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!uploadForm.name || !uploadForm.type || !uploadForm.issueDate) {
+    if (!selectedDocuments.length) {
+      alert('Please select at least one document to upload');
       return;
     }
 
-    if (!selectedFile) {
-      alert('Please select a file to upload');
+    const incompleteDoc = selectedDocuments.find(
+      doc => !doc.name || !doc.type || !doc.issueDate
+    );
+
+    if (incompleteDoc) {
+      alert('Please complete all required fields for each document');
       return;
     }
 
@@ -128,50 +165,48 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
         ? 'http://localhost:10000/api'
         : 'https://proptii-r1-1a.onrender.com/api';
 
-      console.log('Uploading document to backend:', selectedFile.name);
-      
-      const formData = new FormData();
-      formData.append('document', selectedFile);
+      const uploadedCount = selectedDocuments.length;
 
-      const uploadResponse = await axios.post(`${API_BASE_URL}/property/upload-document`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 30000
-      });
+      for (const docForm of selectedDocuments) {
+        console.log('Uploading document to backend:', docForm.file.name);
 
-      console.log('Document uploaded successfully:', uploadResponse.data);
+        const formData = new FormData();
+        formData.append('document', docForm.file);
 
-      const newDocument: Omit<PropertyDocument, 'id'> = {
-        name: uploadForm.name,
-        type: uploadForm.type as PropertyDocument['type'],
-        url: uploadResponse.data.document.url, // Store Firebase Storage URL
-        issueDate: new Date(uploadForm.issueDate),
-        expiryDate: uploadForm.expiryDate ? new Date(uploadForm.expiryDate) : undefined,
-        status: 'valid'
-      };
+        const uploadResponse = await axios.post(`${API_BASE_URL}/property/upload-document`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 30000
+        });
 
-      // Update status based on expiry date
-      if (newDocument.expiryDate) {
-        const tempDoc = { ...newDocument, id: 'temp' } as PropertyDocument;
-        newDocument.status = getDocumentStatus(tempDoc);
+        console.log('Document uploaded successfully:', uploadResponse.data);
+
+        const newDocument: Omit<PropertyDocument, 'id'> = {
+          name: docForm.name,
+          type: docForm.type as PropertyDocument['type'],
+          url: uploadResponse.data.document.url, // Store Firebase Storage URL
+          issueDate: new Date(docForm.issueDate),
+          expiryDate: docForm.expiryDate ? new Date(docForm.expiryDate) : undefined,
+          status: 'valid'
+        };
+
+        // Update status based on expiry date
+        if (newDocument.expiryDate) {
+          const tempDoc = { ...newDocument, id: 'temp' } as PropertyDocument;
+          newDocument.status = getDocumentStatus(tempDoc);
+        }
+
+        // Save to Firestore
+        await propertyService.addDocumentToProperty(property.id, newDocument);
+
+        // Call the callback for UI updates
+        onDocumentAdd(property.id, newDocument);
       }
 
-      // Save to Firestore
-      await propertyService.addDocumentToProperty(property.id, newDocument);
-      
-      // Call the callback for UI updates
-      onDocumentAdd(property.id, newDocument);
-      
       // Reset form
-      setUploadForm({
-        name: '',
-        type: '',
-        issueDate: '',
-        expiryDate: ''
-      });
-      setSelectedFile(null);
+      setSelectedDocuments([]);
       setIsUploadOpen(false);
       
-      alert('Document uploaded successfully!');
+      alert(`Uploaded ${uploadedCount} document${uploadedCount > 1 ? 's' : ''} successfully!`);
     } catch (error) {
       console.error('Error uploading document:', error);
       alert('Failed to upload document. Please try again.');
@@ -249,105 +284,124 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
                 </DialogHeader>
                 <form onSubmit={handleUpload} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="doc-name">Document Name *</Label>
-                    <Input
-                      id="doc-name"
-                      placeholder="e.g., Gas Safety Certificate 2024"
-                      value={uploadForm.name}
-                      onChange={(e) => setUploadForm(prev => ({ ...prev, name: e.target.value }))}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="doc-type">Document Type *</Label>
-                    <Select 
-                      value={uploadForm.type} 
-                      onValueChange={(value) => setUploadForm(prev => ({ ...prev, type: value }))}
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select document type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {documentTypes.map(type => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="issue-date">Issue Date *</Label>
-                      <Input
-                        id="issue-date"
-                        type="date"
-                        value={uploadForm.issueDate}
-                        onChange={(e) => setUploadForm(prev => ({ ...prev, issueDate: e.target.value }))}
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="expiry-date">Expiry Date</Label>
-                      <Input
-                        id="expiry-date"
-                        type="date"
-                        value={uploadForm.expiryDate}
-                        onChange={(e) => setUploadForm(prev => ({ ...prev, expiryDate: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
                     <Label>Document File *</Label>
-                    {!selectedFile ? (
-                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                        <input
-                          type="file"
-                          id="file-upload"
-                          className="hidden"
-                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                          onChange={handleFileSelect}
-                        />
-                        <label htmlFor="file-upload" className="cursor-pointer block">
-                          <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                          <p className="text-sm text-muted-foreground mb-2">
-                            Drag and drop your file here, or click to browse
-                          </p>
-                          <Button type="button" variant="outline" size="sm">
-                            Browse Files
-                          </Button>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            PDF, JPG, PNG up to 2MB
-                          </p>
-                        </label>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <FileText className="w-8 h-8 text-orange-600" />
-                          <div>
-                            <p className="text-sm font-medium">{selectedFile.name}</p>
-                            <p className="text-xs text-gray-500">
-                              {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedFile(null)}
-                        >
-                          <X className="w-4 h-4" />
+                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                      <input
+                        type="file"
+                        id="file-upload"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                        multiple
+                        onChange={handleFileSelect}
+                      />
+                      <label htmlFor="file-upload" className="cursor-pointer block">
+                        <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Drag and drop your files here, or click to browse
+                        </p>
+                        <Button type="button" variant="outline" size="sm">
+                          Browse Files
                         </Button>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          PDF, JPG, PNG up to 2MB
+                        </p>
+                      </label>
+                    </div>
+                    {selectedDocuments.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center">
+                        No files selected yet.
+                      </p>
+                    )}
+                    {selectedDocuments.length > 0 && (
+                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-muted-foreground">
+                          {selectedDocuments.length} file{selectedDocuments.length > 1 ? 's' : ''} selected. You can add more files or edit details below.
+                        </p>
                       </div>
                     )}
                   </div>
+
+                  {selectedDocuments.length > 0 && (
+                    <div className="space-y-4">
+                      {selectedDocuments.map((docForm, index) => (
+                        <Card key={docForm.file.name + docForm.file.lastModified} className="p-4 border border-muted-foreground/20">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center space-x-3">
+                              <FileText className="w-6 h-6 text-orange-600" />
+                              <div>
+                                <p className="text-sm font-medium">{docForm.file.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {(docForm.file.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveSelectedDocument(index)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor={`doc-name-${index}`}>Document Name *</Label>
+                              <Input
+                                id={`doc-name-${index}`}
+                                placeholder="Enter document name"
+                                value={docForm.name}
+                                onChange={(e) => handleDocumentFieldChange(index, 'name', e.target.value)}
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor={`doc-type-${index}`}>Document Type *</Label>
+                              <Select
+                                value={docForm.type}
+                                onValueChange={(value) => handleDocumentFieldChange(index, 'type', value)}
+                                required
+                              >
+                                <SelectTrigger id={`doc-type-${index}`}>
+                                  <SelectValue placeholder="Select document type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {documentTypes.map(type => (
+                                    <SelectItem key={type.value} value={type.value}>
+                                      {type.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor={`issue-date-${index}`}>Issue Date *</Label>
+                              <Input
+                                id={`issue-date-${index}`}
+                                type="date"
+                                value={docForm.issueDate}
+                                onChange={(e) => handleDocumentFieldChange(index, 'issueDate', e.target.value)}
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor={`expiry-date-${index}`}>Expiry Date</Label>
+                              <Input
+                                id={`expiry-date-${index}`}
+                                type="date"
+                                value={docForm.expiryDate}
+                                onChange={(e) => handleDocumentFieldChange(index, 'expiryDate', e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="flex justify-end space-x-2 pt-4">
                     <Button 
@@ -357,8 +411,8 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
                     >
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={isUploading}>
-                      {isUploading ? 'Uploading...' : 'Upload Document'}
+                    <Button type="submit" disabled={isUploading || selectedDocuments.length === 0}>
+                      {isUploading ? 'Uploading...' : `Upload Document${selectedDocuments.length > 1 ? 's' : ''}`}
                     </Button>
                   </div>
                 </form>
