@@ -83,6 +83,7 @@
     "clean-restart": "node scripts/clean-restart.js"
   },
   "dependencies": {
+    "@azure-rest/ai-inference": "^1.0.0-beta.6",
     "@azure/arm-cdn": "^7.0.0",
     "@azure/arm-frontdoor": "^5.0.0",
     "@azure/core-auth": "^1.9.0",
