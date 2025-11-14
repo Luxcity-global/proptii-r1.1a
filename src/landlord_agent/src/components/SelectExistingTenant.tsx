@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -6,54 +6,143 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { ArrowLeft, Search, Users, Home, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Search, Users, Home, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { Property, Tenant } from '../App';
+import { tenantService } from '../services/tenantService';
+import axios from 'axios';
+
+interface AzureUser {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  givenName: string;
+  surname: string;
+  createdAt?: string;
+  azureObjectId: string;
+  userPrincipalName: string;
+}
 
 interface SelectExistingTenantProps {
   properties: Property[];
   existingTenants: Tenant[];
   onBack: () => void;
   onSuccess: () => void;
+  userId?: string;
 }
 
-export function SelectExistingTenant({ properties, existingTenants, onBack, onSuccess }: SelectExistingTenantProps) {
+export function SelectExistingTenant({ properties, existingTenants, onBack, onSuccess, userId }: SelectExistingTenantProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [azureUsers, setAzureUsers] = useState<AzureUser[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [selectedPropertyId, setSelectedPropertyId] = useState('');
-  const [selectedTenantId, setSelectedTenantId] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Filter tenants based on search and status
-  const filteredTenants = useMemo(() => {
-    return existingTenants.filter(tenant => {
-      const matchesSearch = 
-        tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tenant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tenant.propertyAddress.toLowerCase().includes(searchTerm.toLowerCase());
+  // Fetch Azure AD B2C users
+  useEffect(() => {
+    const fetchAzureUsers = async () => {
+      setIsLoadingUsers(true);
+      setError(null);
+      try {
+        const API_BASE_URL = window.location.hostname === 'localhost' 
+          ? 'http://localhost:10000/api' 
+          : 'https://proptii-r1-1a.onrender.com/api';
+        
+        const response = await axios.get(`${API_BASE_URL}/azure-users`, {
+          params: searchTerm ? { search: searchTerm } : {}
+        });
+
+        if (response.data.success) {
+          setAzureUsers(response.data.users || []);
+        } else {
+          throw new Error(response.data.error || 'Failed to fetch users');
+        }
+      } catch (err: any) {
+        console.error('Error fetching Azure AD B2C users:', err);
+        setError(err.response?.data?.error || err.message || 'Failed to load users from Azure AD B2C');
+      } finally {
+        setIsLoadingUsers(false);
+      }
+    };
+
+    // Debounce search
+    const timeoutId = setTimeout(() => {
+      fetchAzureUsers();
+    }, searchTerm ? 500 : 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  // Get current user ID
+  const getCurrentUserId = (): string => {
+    try {
+      if (userId) return userId;
       
-      const matchesStatus = statusFilter === 'all' || tenant.status === statusFilter;
+      // Try to get from localStorage
+      const cached = localStorage.getItem('proptii_auth_state');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId || '';
+      }
       
-      return matchesSearch && matchesStatus;
-    });
-  }, [existingTenants, searchTerm, statusFilter]);
+      return '';
+    } catch (e) {
+      console.error('Error extracting userId:', e);
+      return '';
+    }
+  };
 
   const handleAssignTenant = async () => {
-    if (!selectedTenantId || !selectedPropertyId) return;
+    if (!selectedUserId || !selectedPropertyId) return;
     
     setIsLoading(true);
+    setError(null);
     
     try {
-      // Mock assignment - in real implementation, this would update the database
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      const selectedTenant = existingTenants.find(t => t.id === selectedTenantId);
+      const selectedUser = azureUsers.find(u => u.id === selectedUserId);
       const selectedProperty = properties.find(p => p.id === selectedPropertyId);
       
-      console.log('Assigning tenant to property:', {
-        tenant: selectedTenant?.name,
-        property: selectedProperty?.address
-      });
+      if (!selectedUser || !selectedProperty) {
+        throw new Error('Selected user or property not found');
+      }
+
+      const currentUserId = getCurrentUserId();
+      if (!currentUserId) {
+        throw new Error('User ID not found. Please log in again.');
+      }
+
+      // Create tenant in Firestore from Azure AD B2C user
+      const tenantData: Omit<Tenant, 'id'> = {
+        name: selectedUser.name,
+        email: selectedUser.email,
+        phone: selectedUser.phone || '',
+        propertyId: selectedProperty.id,
+        propertyAddress: selectedProperty.address,
+        rentAmount: 0, // Will be set later
+        paymentFrequency: 'monthly',
+        firstPaymentDate: new Date(),
+        leaseStart: new Date(),
+        leaseEnd: new Date(),
+        status: 'active',
+        referencingStatus: 'not-started',
+        paymentStatus: 'up-to-date',
+        emergencyContact: {
+          name: '',
+          phone: '',
+          relationship: ''
+        },
+        defaultRiskScore: 75,
+        // Store Azure AD B2C reference
+        azureObjectId: selectedUser.azureObjectId,
+        userPrincipalName: selectedUser.userPrincipalName
+      };
+
+      // Create tenant in Firestore
+      const tenantId = await tenantService.createTenant(tenantData, currentUserId);
+      console.log('✅ Tenant created in Firestore:', tenantId);
       
       setIsSuccess(true);
       
@@ -62,30 +151,16 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
         onSuccess();
       }, 3000);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to assign tenant:', error);
+      setError(error.message || 'Failed to assign tenant. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const selectedTenant = existingTenants.find(t => t.id === selectedTenantId);
+  const selectedUser = azureUsers.find(u => u.id === selectedUserId);
   const selectedProperty = properties.find(p => p.id === selectedPropertyId);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'overdue':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'ended':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
 
   if (isSuccess) {
     return (
@@ -99,7 +174,7 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
               Tenant Assigned!
             </h2>
             <p className="text-gray-600 mb-6">
-              <strong>{selectedTenant?.name}</strong> has been assigned to <strong>{selectedProperty?.address}</strong>
+              <strong>{selectedUser?.name}</strong> has been created as a tenant and assigned to <strong>{selectedProperty?.address}</strong>
             </p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <div className="flex items-start space-x-3">
@@ -135,29 +210,21 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
               className="h-8 w-auto"
             />
           </div>
-          <div className="flex items-center space-x-3">
-            <Button variant="outline" className="rounded-full px-4 py-2">
-              Questions?
-            </Button>
-            <Button variant="outline" className="rounded-full px-4 py-2">
-              Save & exit
-            </Button>
-          </div>
         </div>
 
         {/* Main Content */}
         <div className="flex-1 py-8">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-6">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: '#DC5F12' }}>
-                <Users className="w-8 h-8 text-white" />
+              <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: '#D1FAE5' }}>
+                <Users className="w-8 h-8" style={{ color: '#10B981' }} />
               </div>
             </div>
             <h1 className="text-4xl font-bold mb-4" style={{ color: '#374957' }}>
-              Select Existing Tenant
+              Select a tenant from our existing users
             </h1>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Choose an existing tenant from your database and assign them to a property
+              Choose a user from your directory and assign them as a tenant to a property
             </p>
           </div>
 
@@ -171,14 +238,14 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="search">Search Tenants</Label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                       <Input
                         id="search"
-                        placeholder="Name, email, or property address..."
+                        placeholder="Search by name or email..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
@@ -187,22 +254,10 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
                           '--tw-ring-opacity': '0.5'
                         } as React.CSSProperties}
                       />
+                      {isLoadingUsers && (
+                        <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                      )}
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Status Filter</Label>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="overdue">Overdue</SelectItem>
-                        <SelectItem value="ended">Ended</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="property">Assign to Property</Label>
@@ -223,12 +278,26 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
               </CardContent>
             </Card>
 
-            {/* Tenant List */}
+            {/* Error Message */}
+            {error && (
+              <Card className="mb-6 bg-red-50 border-red-200">
+                <CardContent className="p-4">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-red-800 text-sm">{error}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Azure AD B2C Users List */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>Available Tenants ({filteredTenants.length})</span>
-                  {selectedTenant && selectedProperty && (
+                  <span>Available Users ({azureUsers.length})</span>
+                  {selectedUser && selectedProperty && (
                     <Button 
                       onClick={handleAssignTenant}
                       disabled={isLoading}
@@ -251,45 +320,52 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {filteredTenants.length === 0 ? (
+                {isLoadingUsers && azureUsers.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Loader2 className="w-12 h-12 text-gray-400 mx-auto mb-4 animate-spin" />
+                    <p className="text-gray-500">Loading users from Azure AD B2C...</p>
+                  </div>
+                ) : azureUsers.length === 0 ? (
                   <div className="text-center py-12">
                     <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">No tenants found matching your criteria</p>
+                    <p className="text-gray-500">No users found in Azure AD B2C</p>
+                    <p className="text-gray-400 text-sm mt-2">Try adjusting your search</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {filteredTenants.map((tenant) => (
+                    {azureUsers.map((user) => (
                       <Card
-                        key={tenant.id}
+                        key={user.id}
                         className={`cursor-pointer transition-all duration-200 ${
-                          selectedTenantId === tenant.id 
+                          selectedUserId === user.id 
                             ? 'ring-2 ring-orange-500 shadow-lg' 
                             : 'hover:shadow-md'
                         }`}
-                        onClick={() => setSelectedTenantId(tenant.id)}
+                        onClick={() => setSelectedUserId(user.id)}
                       >
                         <CardContent className="p-6">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-4">
                               <Avatar className="h-12 w-12">
-                                {tenant.avatar && <AvatarImage src={tenant.avatar} alt={tenant.name} />}
                                 <AvatarFallback>
-                                  {tenant.name.split(' ').map(n => n[0]).join('')}
+                                  {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
                               <div>
                                 <h3 className="font-semibold text-lg" style={{ color: '#374957' }}>
-                                  {tenant.name}
+                                  {user.name}
                                 </h3>
-                                <p className="text-gray-600">{tenant.email}</p>
-                                <p className="text-sm text-gray-500">{tenant.propertyAddress}</p>
+                                <p className="text-gray-600">{user.email}</p>
+                                {user.phone && (
+                                  <p className="text-sm text-gray-500">{user.phone}</p>
+                                )}
                               </div>
                             </div>
                             <div className="flex items-center space-x-3">
-                              <Badge className={getStatusColor(tenant.status)}>
-                                {tenant.status}
+                              <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                Azure AD B2C
                               </Badge>
-                              {selectedTenantId === tenant.id && (
+                              {selectedUserId === user.id && (
                                 <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
                                   <CheckCircle className="w-4 h-4 text-white" />
                                 </div>
@@ -305,7 +381,7 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
             </Card>
 
             {/* Assignment Preview */}
-            {selectedTenant && selectedProperty && (
+            {selectedUser && selectedProperty && (
               <Card className="mt-6 bg-blue-50 border-blue-200">
                 <CardContent className="p-6">
                   <div className="flex items-start space-x-3">
@@ -313,10 +389,10 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
                     <div>
                       <h3 className="font-medium text-blue-900 mb-2">Assignment Preview</h3>
                       <p className="text-blue-800 text-sm">
-                        <strong>{selectedTenant.name}</strong> will be assigned to <strong>{selectedProperty.address}</strong>
+                        <strong>{selectedUser.name}</strong> will be created as a tenant and assigned to <strong>{selectedProperty.address}</strong>
                       </p>
                       <p className="text-blue-700 text-xs mt-1">
-                        A verification request will be sent to confirm the tenant is occupying this property.
+                        A tenant record will be created in Firestore and linked to this property.
                       </p>
                     </div>
                   </div>
@@ -329,7 +405,7 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
               <Button variant="outline" onClick={onBack}>
                 Back
               </Button>
-              {selectedTenant && selectedProperty && (
+              {selectedUser && selectedProperty && (
                 <Button 
                   onClick={handleAssignTenant}
                   disabled={isLoading}
@@ -339,12 +415,12 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
                   {isLoading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                      Assigning...
+                      Creating Tenant...
                     </>
                   ) : (
                     <>
                       <Home className="w-4 h-4 mr-2" />
-                      Assign Tenant to Property
+                      Create Tenant & Assign to Property
                     </>
                   )}
                 </Button>

@@ -8,13 +8,91 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { initializeApp, cert, applicationDefault, getApps } from 'firebase-admin/app';
 import { getStorage } from 'firebase-admin/storage';
+// Import will be done after env vars are loaded
+let azureGraphService;
 
 // Get directory name in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables from root directory
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
+// Load environment variables - try multiple methods
+const rootEnvPath = path.join(__dirname, '..', '.env');
+const serverEnvPath = path.join(__dirname, '.env');
+
+console.log('📁 Attempting to load .env files...');
+console.log('   Root .env path:', rootEnvPath);
+console.log('   Root .env exists:', fs.existsSync(rootEnvPath));
+console.log('   Server .env path:', serverEnvPath);
+console.log('   Server .env exists:', fs.existsSync(serverEnvPath));
+
+// Method 1: Try dotenv from root
+if (fs.existsSync(rootEnvPath)) {
+  const result = dotenv.config({ path: rootEnvPath });
+  if (result.error) {
+    console.error('❌ Error loading root .env:', result.error);
+  } else {
+    console.log('✅ Root .env loaded via dotenv');
+  }
+}
+
+// Method 2: Try dotenv from server directory
+if (fs.existsSync(serverEnvPath)) {
+  const result = dotenv.config({ path: serverEnvPath, override: false });
+  if (result.error) {
+    console.error('❌ Error loading server .env:', result.error);
+  } else {
+    console.log('✅ Server .env loaded via dotenv');
+  }
+}
+
+// Method 3: Manual parsing as fallback if variables still missing
+if (!process.env.AZURE_AD_B2C_CLIENT_ID) {
+  console.log('⚠️ Variables still missing, trying manual file read...');
+  const envFile = fs.existsSync(serverEnvPath) ? serverEnvPath : rootEnvPath;
+  if (fs.existsSync(envFile)) {
+    try {
+      const envContent = fs.readFileSync(envFile, 'utf8');
+      const lines = envContent.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+          const [key, ...valueParts] = trimmed.split('=');
+          const value = valueParts.join('=').trim();
+          if (key.startsWith('AZURE_AD_B2C_')) {
+            process.env[key.trim()] = value;
+            console.log(`   ✅ Manually set: ${key.trim()}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error manually reading .env:', error);
+    }
+  }
+}
+
+// Debug: Check if Azure AD B2C vars are loaded
+console.log('🔍 Environment variables check after loading:');
+console.log('  AZURE_AD_B2C_CLIENT_ID:', process.env.AZURE_AD_B2C_CLIENT_ID ? `SET (${process.env.AZURE_AD_B2C_CLIENT_ID.substring(0, 8)}...)` : 'MISSING');
+console.log('  AZURE_AD_B2C_CLIENT_SECRET:', process.env.AZURE_AD_B2C_CLIENT_SECRET ? 'SET (***)' : 'MISSING');
+console.log('  AZURE_AD_B2C_TENANT_ID:', process.env.AZURE_AD_B2C_TENANT_ID ? `SET (${process.env.AZURE_AD_B2C_TENANT_ID.substring(0, 8)}...)` : 'MISSING');
+
+// Import and create the service AFTER env vars are loaded
+let azureGraphServiceModule;
+try {
+  azureGraphServiceModule = await import('./services/azureGraphService.js');
+  // Create a new instance now that env vars are loaded
+  if (azureGraphServiceModule.createAzureGraphService) {
+    azureGraphService = azureGraphServiceModule.createAzureGraphService();
+    console.log('✅ Azure Graph Service created with fresh instance');
+  } else {
+    azureGraphService = azureGraphServiceModule.default;
+    console.log('✅ Azure Graph Service initialized (using default export)');
+  }
+} catch (error) {
+  console.error('❌ Error importing Azure Graph Service:', error);
+  // Create a dummy service that will fail gracefully
+  azureGraphService = { isConfigured: false, getAllUsers: () => Promise.reject(new Error('Service not initialized')) };
+}
 
 const app = express();
 
@@ -405,6 +483,49 @@ app.post('/api/email/send-base64', upload.none(), async (req, res) => {
                     fromEmail: process.env.SMTP_FROM_EMAIL
                 }
             } : undefined
+        });
+    }
+});
+
+// Azure AD B2C Users API
+app.get('/api/azure-users', async (req, res) => {
+    try {
+        console.log('📥 Request received for /api/azure-users');
+        const { search } = req.query;
+        
+        // Check if service is configured
+        if (!azureGraphService.isConfigured) {
+            console.error('❌ Azure AD B2C service is not configured');
+            return res.status(500).json({
+                success: false,
+                error: 'Azure AD B2C is not configured',
+                details: 'Please check environment variables: AZURE_AD_B2C_CLIENT_ID, AZURE_AD_B2C_CLIENT_SECRET, AZURE_AD_B2C_TENANT_ID'
+            });
+        }
+        
+        console.log('🔍 Fetching users from Azure AD B2C...');
+        let users;
+        if (search) {
+            console.log('  Using search term:', search);
+            users = await azureGraphService.searchUsers(search);
+        } else {
+            users = await azureGraphService.getAllUsers();
+        }
+
+        console.log(`✅ Successfully fetched ${users.length} users`);
+        res.json({
+            success: true,
+            users: users,
+            count: users.length
+        });
+    } catch (error) {
+        console.error('❌ Error fetching Azure AD B2C users:', error);
+        console.error('   Error message:', error.message);
+        console.error('   Error stack:', error.stack);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to fetch users from Azure AD B2C',
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });

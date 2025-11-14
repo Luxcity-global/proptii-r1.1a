@@ -497,8 +497,8 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Button variant="ghost" size="sm" asChild>
-                              <a href={document.url} target="_blank" rel="noopener noreferrer">
-                                <Eye className="h-4 w-4" />
+                              <a href={document.url} target="_blank" rel="noopener noreferrer" download>
+                                <Download className="h-4 w-4" />
                               </a>
                             </Button>
                             <Button 

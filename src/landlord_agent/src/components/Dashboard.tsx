@@ -1304,6 +1304,7 @@ export function Dashboard({
                       size="sm"
                       className="flex-1"
                       onClick={() => onViewProperty(property)}
+                      style={{ borderColor: '#f3f3f3' }}
                     >
                       <Eye className="w-4 h-4 mr-2" />
                       View
@@ -1314,6 +1315,7 @@ export function Dashboard({
                       onClick={() =>
                         onManageDocuments(property)
                       }
+                      style={{ borderColor: '#f3f3f3' }}
                     >
                       <FileText className="w-4 h-4" />
                     </Button>
@@ -1321,6 +1323,7 @@ export function Dashboard({
                       variant="outline"
                       size="sm"
                       onClick={() => onManagePhotos(property)}
+                      style={{ borderColor: '#f3f3f3' }}
                     >
                       <Image className="w-4 h-4" />
                     </Button>
