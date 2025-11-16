@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, Mail, Phone, Calendar, Home, DollarSign, User, MapPin, Filter, AlertTriangle, PoundSterling, Eye, Users, TrendingUp, Shield, Clock, Trash2, Download, Upload, Archive, CheckSquare, Square, Copy, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Tenant, Property, ArrearsAlert, UserRole } from '../App';
+import { referencingService } from '../services/referencingService';
 
 
 
@@ -58,71 +59,60 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
   const [selectedTenants, setSelectedTenants] = useState<string[]>([]);
   const [selectedLandlords, setSelectedLandlords] = useState<string[]>([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
+  const [referencingStatuses, setReferencingStatuses] = useState<Map<string, 'not-started' | 'in-progress' | 'complete'>>(new Map());
+  const [isLoadingReferencingStatuses, setIsLoadingReferencingStatuses] = useState(false);
+
+  // Fetch referencing statuses for all tenants
+  useEffect(() => {
+    const fetchReferencingStatuses = async () => {
+      if (tenants.length === 0) return;
+      
+      setIsLoadingReferencingStatuses(true);
+      console.log('[ClientsPage] Fetching referencing statuses for', tenants.length, 'tenants');
+      
+      const emails = tenants
+        .filter(t => t.email && t.email.trim())
+        .map(t => t.email);
+      
+      const statuses = await referencingService.getReferencingStatusForTenants(emails);
+      
+      console.log('[ClientsPage] Fetched referencing statuses:', statuses.size);
+      setReferencingStatuses(statuses);
+      setIsLoadingReferencingStatuses(false);
+    };
+
+    fetchReferencingStatuses();
+  }, [tenants]);
 
   const getPropertyForTenant = (tenantId: string) => {
     const tenant = tenants.find(t => t.id === tenantId);
     return tenant ? properties.find(p => p.id === tenant.propertyId) : null;
   };
 
-  const arrearsByTenant = useMemo(() => {
-    const map = new Map<string, ArrearsAlert>();
-    arrearsAlerts.forEach(alert => {
-      if (alert.tenantId) {
-        map.set(alert.tenantId, alert);
-      }
-    });
-    return map;
-  }, [arrearsAlerts]);
-
-  const getArrearsForTenant = useCallback((tenantId: string) => {
-    return arrearsByTenant.get(tenantId) || null;
-  }, [arrearsByTenant]);
-
-  const getEffectivePaymentStatus = useCallback((tenant: Tenant): Tenant['paymentStatus'] => {
-    if (arrearsByTenant.has(tenant.id)) {
-      return 'overdue';
-    }
-    if (typeof tenant.overdueAmount === 'number' && tenant.overdueAmount > 0) {
-      return 'overdue';
-    }
-    return tenant.paymentStatus;
-  }, [arrearsByTenant]);
+  const getArrearsForTenant = (tenantId: string) => {
+    return arrearsAlerts.find(alert => alert.tenantId === tenantId);
+  };
 
   // Calculate summary statistics
-  const summary = useMemo(() => {
+  const getTenantSummary = () => {
     const totalTenants = tenants.length;
-    let overdueCount = 0;
-    let currentCount = 0;
-
-    tenants.forEach(tenant => {
-      const status = getEffectivePaymentStatus(tenant);
-      if (status === 'overdue') {
-        overdueCount += 1;
-      } else if (status === 'current') {
-        currentCount += 1;
-      }
-    });
-
-    const totalOverdueFromAlerts = arrearsAlerts.reduce((sum, alert) => sum + (alert.overdueAmount || 0), 0);
-    const overdueWithoutAlert = tenants.reduce((sum, tenant) => {
-      if (!arrearsByTenant.has(tenant.id) && getEffectivePaymentStatus(tenant) === 'overdue') {
-        return sum + (tenant.overdueAmount || 0);
-      }
-      return sum;
-    }, 0);
-    const totalOverdueAmount = totalOverdueFromAlerts + overdueWithoutAlert;
-
+    const overdueCount = tenants.filter(t => t.paymentStatus === 'overdue').length;
+    const currentCount = tenants.filter(t => t.paymentStatus === 'current').length;
+    const totalOverdueAmount = arrearsAlerts.reduce((sum, alert) => sum + alert.overdueAmount, 0);
+    
+    // Calculate leases expiring in next 3 months
     const threeMonthsFromNow = new Date();
     threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
-    const leasesExpiringSoon = tenants.filter(t =>
+    const leasesExpiringSoon = tenants.filter(t => 
       t.leaseEnd <= threeMonthsFromNow && t.status === 'active'
     ).length;
-
+    
+    // Calculate average risk score
     const tenantsWithRisk = tenants.filter(t => t.defaultRiskScore !== undefined);
-    const avgRiskScore = tenantsWithRisk.length > 0
+    const avgRiskScore = tenantsWithRisk.length > 0 
       ? Math.round(tenantsWithRisk.reduce((sum, t) => sum + (t.defaultRiskScore || 0), 0) / tenantsWithRisk.length)
       : 0;
-
+    
     return {
       totalTenants,
       overdueCount,
@@ -131,7 +121,9 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
       leasesExpiringSoon,
       avgRiskScore
     };
-  }, [arrearsAlerts, arrearsByTenant, getEffectivePaymentStatus, tenants]);
+  };
+
+  const summary = getTenantSummary();
 
   // Selection functions
   const toggleTenantSelection = (tenantId: string) => {
@@ -212,6 +204,11 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
       onExportLandlords(format);
     }
   };
+
+  // Update showBulkActions based on selection
+  React.useEffect(() => {
+    setShowBulkActions(selectedTenants.length > 0 || selectedLandlords.length > 0);
+  }, [selectedTenants, selectedLandlords]);
 
   const mockLandlords: Landlord[] = [
     {
@@ -370,10 +367,6 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
     return matchesSearch && matchesFilter;
   });
 
-  React.useEffect(() => {
-    setShowBulkActions(selectedTenants.length > 0 || selectedLandlords.length > 0);
-  }, [selectedTenants, selectedLandlords]);
-
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
       <div className="flex justify-between items-start">
@@ -495,7 +488,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
           </TabsList>
 
           <TabsContent value="tenants" className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -503,15 +496,11 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                   placeholder="Search tenants..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
-                  style={{
-                    '--tw-ring-color': '#8FCDFF',
-                    '--tw-ring-opacity': '0.5'
-                  } as React.CSSProperties}
+                  className="pl-10"
                 />
               </div>
             </div>
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-2">
               <Button
                 variant="ghost"
                 size="sm"
@@ -616,38 +605,26 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
             {filteredTenants.map((tenant) => {
               const property = getPropertyForTenant(tenant.id);
               const arrears = getArrearsForTenant(tenant.id);
-              const effectiveStatus = getEffectivePaymentStatus(tenant);
-              const isOverdue = effectiveStatus === 'overdue';
-              const effectiveOverdueAmount = arrears?.overdueAmount ?? tenant.overdueAmount ?? 0;
-              const showArrearsPanel = isOverdue && effectiveOverdueAmount > 0;
-              const lastPayment = arrears?.lastPaymentDate || tenant.lastPaymentDate;
-              const overdueMessage = arrears?.daysPastDue
-                ? `${arrears.daysPastDue} days past due`
-                : 'Marked as overdue';
               
               return (
                 <Card 
                   key={tenant.id} 
                   className={`hover:shadow-md transition-shadow ${
-                    isOverdue ? 'border-red-200 bg-red-50/50' : ''
+                    arrears ? 'border-red-200 bg-red-50/50' : ''
                   } ${selectedTenants.includes(tenant.id) ? 'ring-2 ring-blue-500' : ''}`}
                 >
                   <CardContent className="p-6 cursor-pointer" onClick={() => onViewTenant(tenant)}>
                     <div className="flex items-start justify-between">
                       <div className="flex items-start space-x-4 flex-1">
-                        <div 
-                          className="flex items-center pt-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <div className="flex items-center pt-1">
                           <input
                             type="checkbox"
                             checked={selectedTenants.includes(tenant.id)}
-                            onClick={(e) => e.stopPropagation()}
                             onChange={(e) => {
                               e.stopPropagation();
                               toggleTenantSelection(tenant.id);
                             }}
-                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                           />
                         </div>
                         <Avatar className="h-12 w-12">
@@ -662,13 +639,20 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                             <Badge className={getStatusColor(tenant.status)}>
                               {tenant.status}
                             </Badge>
-                            <Badge className={getReferencingStatusColor(tenant.referencingStatus)}>
-                              Referencing: {getReferencingStatusLabel(tenant.referencingStatus)}
-                            </Badge>
-                            {isOverdue && (
+                            {isLoadingReferencingStatuses ? (
+                              <Badge className="bg-gray-100 text-gray-800">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Loading...
+                              </Badge>
+                            ) : (
+                              <Badge className={getReferencingStatusColor(referencingStatuses.get(tenant.email) || 'not-started')}>
+                                Referencing: {getReferencingStatusLabel(referencingStatuses.get(tenant.email) || 'not-started')}
+                              </Badge>
+                            )}
+                            {arrears && (
                               <Badge className="bg-red-100 text-red-800 border-red-200">
                                 <AlertTriangle className="h-3 w-3 mr-1" />
-                                {arrears ? 'Arrears' : 'Overdue'}
+                                Arrears
                               </Badge>
                             )}
                           </div>
@@ -696,24 +680,22 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                           </div>
                           
                           {/* Arrears Alert */}
-                          {showArrearsPanel && (
+                          {arrears && (
                             <div className="p-3 bg-red-100 border border-red-200 rounded-lg">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center text-red-800">
                                   <PoundSterling className="h-4 w-4 mr-2" />
                                   <span className="font-medium">
-                                    £{effectiveOverdueAmount.toLocaleString()} overdue
+                                    £{arrears.overdueAmount.toLocaleString()} overdue
                                   </span>
                                 </div>
                                 <span className="text-sm text-red-600">
-                                  {overdueMessage}
+                                  {arrears.daysPastDue} days past due
                                 </span>
                               </div>
-                              {arrears?.defaultRiskScore && (
-                                <div className="mt-1 text-sm text-red-700">
-                                  Default Risk Score: {arrears.defaultRiskScore}%
-                                </div>
-                              )}
+                              <div className="mt-1 text-sm text-red-700">
+                                Default Risk Score: {arrears.defaultRiskScore}%
+                              </div>
                             </div>
                           )}
                           
@@ -765,7 +747,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
 
         {userRole === 'agent' && (
           <TabsContent value="landlords" className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -773,15 +755,11 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                   placeholder="Search landlords..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
-                  style={{
-                    '--tw-ring-color': '#8FCDFF',
-                    '--tw-ring-opacity': '0.5'
-                  } as React.CSSProperties}
+                  className="pl-10"
                 />
               </div>
             </div>
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-2">
               <Button
                 variant="ghost"
                 size="sm"
@@ -972,7 +950,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
       ) : (
         // For landlord users, show tenant list directly without tabs
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -980,15 +958,11 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                   placeholder="Search tenants..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
-                  style={{
-                    '--tw-ring-color': '#8FCDFF',
-                    '--tw-ring-opacity': '0.5'
-                  } as React.CSSProperties}
+                  className="pl-10"
                 />
               </div>
             </div>
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-2">
               <Button
                 variant="ghost"
                 size="sm"
@@ -1081,53 +1055,37 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
             {filteredTenants.map((tenant) => {
               const property = getPropertyForTenant(tenant.id);
               const arrears = getArrearsForTenant(tenant.id);
-              const effectiveStatus = getEffectivePaymentStatus(tenant);
-              const isOverdue = effectiveStatus === 'overdue';
-              const effectiveOverdueAmount = arrears?.overdueAmount ?? tenant.overdueAmount ?? 0;
-              const showArrearsPanel = isOverdue && effectiveOverdueAmount > 0;
-              const lastPayment = arrears?.lastPaymentDate || tenant.lastPaymentDate;
-              const overdueMessage = arrears?.daysPastDue
-                ? `${arrears.daysPastDue} days past due`
-                : 'Marked as overdue';
-
+              
               return (
                 <Card 
                   key={tenant.id} 
                   className={`hover:shadow-md transition-shadow ${
-                    isOverdue ? 'border-red-200 bg-red-50/50' : ''
+                    arrears ? 'border-red-200 bg-red-50/50' : ''
                   } ${selectedTenants.includes(tenant.id) ? 'ring-2 ring-blue-500' : ''}`}
                 >
                   <CardContent className="p-6 cursor-pointer" onClick={() => onViewTenant(tenant)}>
                     <div className="flex items-start justify-between">
                       <div className="flex items-start space-x-4">
-                        <div 
+                        <input
+                          type="checkbox"
+                          checked={selectedTenants.includes(tenant.id)}
                           onClick={(e) => e.stopPropagation()}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedTenants.includes(tenant.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              toggleTenantSelection(tenant.id);
-                            }}
-                            className="mt-1 cursor-pointer"
-                          />
-                        </div>
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            toggleTenantSelection(tenant.id);
+                          }}
+                          className="mt-1"
+                        />
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="text-lg font-semibold">{tenant.name}</h3>
-                            <Badge variant={isOverdue ? 'destructive' : 'default'}>
-                              {effectiveStatus === 'payment-plan'
-                                ? 'Payment Plan'
-                                : effectiveStatus === 'overdue'
-                                  ? 'Overdue'
-                                  : 'Current'}
+                            <Badge variant={tenant.paymentStatus === 'current' ? 'default' : 'destructive'}>
+                              {tenant.paymentStatus}
                             </Badge>
-                            {isOverdue && (
+                            {arrears && (
                               <Badge variant="destructive" className="bg-red-100 text-red-800">
                                 <AlertTriangle className="h-3 w-3 mr-1" />
-                                {arrears ? 'Arrears' : 'Overdue'}
+                                Overdue
                               </Badge>
                             )}
                           </div>
@@ -1159,22 +1117,15 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                             </div>
                           </div>
 
-                          {showArrearsPanel && (
+                          {arrears && (
                             <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                               <div className="flex items-center gap-2 text-red-800 font-medium">
                                 <AlertTriangle className="h-4 w-4" />
-                                Overdue Amount: £{effectiveOverdueAmount.toLocaleString()}
+                                Overdue Amount: £{arrears.overdueAmount}
                               </div>
-                              {lastPayment && (
-                                <p className="text-red-700 text-sm mt-1">
-                                  Last payment: {formatDate(lastPayment)}
-                                </p>
-                              )}
-                              {!arrears?.daysPastDue && (
-                                <p className="text-red-700 text-sm">
-                                  {overdueMessage}
-                                </p>
-                              )}
+                              <p className="text-red-700 text-sm mt-1">
+                                Last payment: {formatDate(arrears.lastPaymentDate)}
+                              </p>
                             </div>
                           )}
                         </div>

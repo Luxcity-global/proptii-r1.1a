@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCheckCircle, faEllipsisH, faTimesCircle, faUser, faBriefcase, faHome, faMoneyBill, faUserShield, faBuilding } from "@fortawesome/free-solid-svg-icons";
 import { formatDate } from '../../../utils/formatters';
@@ -7,6 +7,7 @@ import {
   styled,
 } from '@mui/material';
 import { useDashboardData } from '../../../hooks/useDashboardData';
+import { useAuth } from '../../../contexts/AuthContext';
 import zIndex from "@mui/material/styles/zIndex";
 
 interface CheckItem {
@@ -178,6 +179,10 @@ const TenantReferencing: React.FC = () => {
 
   } = useDashboardData();
 
+  const { user } = useAuth();
+  const [refereeResponses, setRefereeResponses] = useState<any[]>([]);
+  const [guarantorResponses, setGuarantorResponses] = useState<any[]>([]);
+  const [isLoadingResponses, setIsLoadingResponses] = useState(true);
 
   const referencingProgress = (dashboardSummary?.referencing.progress || 0); // This should match the percentage in DashboardHome.tsx
 
@@ -190,6 +195,41 @@ const TenantReferencing: React.FC = () => {
 
   // Calculate the strokeDashoffset based on the progress fraction
   const strokeDashoffset = 251 * (1 - progressFraction);
+
+  // Fetch referee and guarantor responses
+  useEffect(() => {
+    const fetchRefereeGuarantorResponses = async () => {
+      if (!user?.email) {
+        console.warn('[TenantReferencing] No email found for user, skipping response fetch');
+        setIsLoadingResponses(false);
+        return;
+      }
+
+      setIsLoadingResponses(true);
+      console.log(`[TenantReferencing] Fetching referee/guarantor responses for: ${user.email}`);
+
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+        const response = await fetch(`${apiUrl}/referencing/responses/${encodeURIComponent(user.email)}`);
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('[TenantReferencing] Referee/Guarantor responses:', result);
+          
+          setRefereeResponses(result.data?.refereeResponses || []);
+          setGuarantorResponses(result.data?.guarantorResponses || []);
+        } else {
+          console.error('[TenantReferencing] Failed to fetch responses:', response.statusText);
+        }
+      } catch (error) {
+        console.error('[TenantReferencing] Error fetching responses:', error);
+      } finally {
+        setIsLoadingResponses(false);
+      }
+    };
+
+    fetchRefereeGuarantorResponses();
+  }, [user?.email]);
 
 
   return (
@@ -334,6 +374,133 @@ const TenantReferencing: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Referee and Guarantor Responses Section */}
+      <div className="mt-8">
+        <Typography variant="h5" component="h2" className="mb-4">
+          Reference Responses
+        </Typography>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Employment Referee Responses */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Employment References</h3>
+              {refereeResponses.length > 0 && (
+                <span className="text-sm text-gray-600">
+                  {refereeResponses.length} response{refereeResponses.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            
+            {isLoadingResponses ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              </div>
+            ) : refereeResponses.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <FontAwesomeIcon icon={faUser} className="text-4xl mb-3 opacity-50" />
+                <p>No referee responses yet</p>
+                <p className="text-sm mt-1">Responses will appear here once your referees submit their feedback</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {refereeResponses.map((response, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-800">
+                          {response.firstName} {response.lastName}
+                        </h4>
+                        <p className="text-sm text-gray-600">{response.email}</p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        response.consent === 'agree' 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {response.consent === 'agree' ? '✓ Agreed' : '✗ Declined'}
+                      </span>
+                    </div>
+                    
+                    <div className="mb-2">
+                      <p className="text-sm text-gray-500">
+                        Submitted: {new Date(response.submittedAt || response.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    
+                    {response.reason && (
+                      <div className="mt-3 p-3 bg-gray-50 rounded">
+                        <p className="text-sm font-medium text-gray-700 mb-1">Comments:</p>
+                        <p className="text-sm text-gray-600">{response.reason}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Guarantor Responses */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Guarantor Responses</h3>
+              {guarantorResponses.length > 0 && (
+                <span className="text-sm text-gray-600">
+                  {guarantorResponses.length} response{guarantorResponses.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            
+            {isLoadingResponses ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              </div>
+            ) : guarantorResponses.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <FontAwesomeIcon icon={faUserShield} className="text-4xl mb-3 opacity-50" />
+                <p>No guarantor responses yet</p>
+                <p className="text-sm mt-1">Responses will appear here once your guarantor submits their feedback</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {guarantorResponses.map((response, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-800">
+                          {response.firstName} {response.lastName}
+                        </h4>
+                        <p className="text-sm text-gray-600">{response.email}</p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        response.consent === 'agree' 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {response.consent === 'agree' ? '✓ Agreed' : '✗ Declined'}
+                      </span>
+                    </div>
+                    
+                    <div className="mb-2">
+                      <p className="text-sm text-gray-500">
+                        Submitted: {new Date(response.submittedAt || response.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    
+                    {response.reason && (
+                      <div className="mt-3 p-3 bg-gray-50 rounded">
+                        <p className="text-sm font-medium text-gray-700 mb-1">Comments:</p>
+                        <p className="text-sm text-gray-600">{response.reason}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

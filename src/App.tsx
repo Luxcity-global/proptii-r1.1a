@@ -56,6 +56,7 @@ export const App: React.FC = () => {
             {/* Protected Routes */}
             <Route path="/agent" element={<AgentHome />} />
             <Route path="/Agent" element={<AgentHome />} />
+            <Route path="/landlord" element={<LandlordDemo />} />
             <Route path="/landlord-demo" element={<LandlordDemo />} />
 
             <Route path="/referencing" element={<Referencing />} />

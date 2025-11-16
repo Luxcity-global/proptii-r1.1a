@@ -162,7 +162,7 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
     try {
       // Upload file to backend (which handles Firebase Storage upload without CORS issues)
       const API_BASE_URL = window.location.hostname === 'localhost'
-        ? 'http://localhost:10000/api'
+        ? 'http://localhost:3000/api'
         : 'https://proptii-r1-1a.onrender.com/api';
 
       const uploadedCount = selectedDocuments.length;

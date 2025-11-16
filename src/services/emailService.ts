@@ -68,6 +68,11 @@ class EmailService {
     const financial = formData.financial || {};
     const guarantor = formData.guarantor || {};
     const agentDetails = formData.agentDetails || {};
+    
+    // Get the base URL for links in the email
+    const baseUrl = import.meta.env.VITE_APP_URL || 
+                    (typeof window !== 'undefined' && window.location ? window.location.origin : 
+                    (import.meta.env.DEV ? 'http://localhost:5173' : 'https://proptii.com'));
 
     const htmlString = `
       <!DOCTYPE html>
@@ -142,8 +147,15 @@ class EmailService {
         
         <p>Once completed, you will receive the confirmation forms from the Referee and Guarantor. Please review all submissions and verify the documents. 
         Once confirmed, you may proceed to accept the user as a tenant.</p>
+
+        <div style="margin: 24px 0; text-align: center;">
+          <a href="${baseUrl}/landlord/clients" 
+             style="display: inline-block; background: linear-gradient(135deg, #DC5F12 0%, #FF6B1A 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 50px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(220, 95, 18, 0.3); transition: all 0.3s ease;">
+            👉 Review Documents in Proptii
+          </a>
+        </div>
         
-        <p>Please contact ${identity.firstName || ''} on ${identity.email || ''} if you need more documents. Let us know if you need support during the verification process.</p>
+        <p>If you need any assistance during the verification process, please contact our support team through your Proptii dashboard.</p>
         
         <div style="margin-top: 32px;">
           Best regards,<br>

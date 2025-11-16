@@ -1,10 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Switch } from './ui/switch';
-import { Label } from './ui/label';
 import { Separator } from './ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { DocumentUploadModal } from './DocumentUploadModal';
@@ -25,12 +23,13 @@ import {
   UserCheck,
   Shield,
   CreditCard,
-  MoreHorizontal
+  MoreHorizontal,
+  Trash2
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 import { Tenant } from '../App';
-import { tenantService } from '../services/tenantService';
+import { referencingService, ReferencingDocument } from '../services/referencingService';
 
 interface TenantReference {
   id: string;
@@ -71,274 +70,27 @@ interface TenantDocument {
   dateUploaded: Date;
   expiryDate?: Date;
   status: 'valid' | 'expired' | 'pending';
+  downloadUrl?: string;
+  fileSize?: number;
+  fileType?: string;
 }
-
-
-type PaymentScheduleStatus = 'pending' | 'paid' | 'overdue';
-
-interface PaymentScheduleEntryView {
-  id: string;
-  amount: number;
-  periodLabel: string;
-  periodStart: Date;
-  periodEnd: Date;
-  dueDate: Date;
-  status: PaymentScheduleStatus;
-  paidAt?: Date;
-}
-
-interface StoredScheduleEntry {
-  status: PaymentScheduleStatus;
-  paidAt?: string;
-}
-
-const PAYMENT_SCHEDULE_STORAGE_PREFIX = 'tenant_payment_schedule_';
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-const PAYMENT_INTERVALS: Record<NonNullable<Tenant['paymentFrequency']>, number> = {
-  monthly: 31,
-  yearly: 365,
-  'fixed-time': 0,
-};
-
-const startOfDay = (value: Date): Date => {
-  const date = new Date(value);
-  date.setHours(0, 0, 0, 0);
-  return date;
-};
-
-const addDays = (date: Date, days: number): Date => {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-};
-
-const formatPeriodLabelLocal = (date: Date, frequency: Tenant['paymentFrequency']): string => {
-  if (frequency === 'yearly') {
-    return date.getFullYear().toString();
-  }
-  if (frequency === 'monthly') {
-    return date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-  }
-  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-};
-
-const getIntervalDays = (tenant: Tenant): number => {
-  if (tenant.paymentIntervalDays && tenant.paymentIntervalDays > 0) {
-    return tenant.paymentIntervalDays;
-  }
-  const frequency = tenant.paymentFrequency || 'monthly';
-  return PAYMENT_INTERVALS[frequency];
-};
-
-const scheduleStorageKey = (tenantId: string) => `${PAYMENT_SCHEDULE_STORAGE_PREFIX}${tenantId}`;
-
-const loadStoredSchedule = (tenantId: string): Record<string, StoredScheduleEntry> => {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem(scheduleStorageKey(tenantId));
-    return raw ? JSON.parse(raw) : {};
-  } catch (error) {
-    console.warn('Failed to load stored payment schedule', error);
-    return {};
-  }
-};
-
-const persistSchedule = (tenantId: string, schedule: PaymentScheduleEntryView[]) => {
-  if (typeof window === 'undefined') return;
-  try {
-    const payload: Record<string, StoredScheduleEntry> = {};
-    schedule.forEach((entry) => {
-      payload[entry.id] = {
-        status: entry.status,
-        ...(entry.paidAt ? { paidAt: entry.paidAt.toISOString() } : {}),
-      };
-    });
-    window.localStorage.setItem(scheduleStorageKey(tenantId), JSON.stringify(payload));
-  } catch (error) {
-    console.warn('Failed to persist payment schedule', error);
-  }
-};
-
-const deriveStatus = (entry: PaymentScheduleEntryView, now: Date = new Date()): PaymentScheduleStatus => {
-  if (entry.status === 'paid') {
-    return 'paid';
-  }
-  return now.getTime() >= entry.periodEnd.getTime() ? 'overdue' : 'pending';
-};
-
-const generatePaymentSchedule = (
-  tenant: Tenant,
-  stored: Record<string, StoredScheduleEntry>
-): PaymentScheduleEntryView[] => {
-  const now = new Date();
-  const frequency = tenant.paymentFrequency || 'monthly';
-  const intervalDays = getIntervalDays(tenant);
-  const firstDue = startOfDay(tenant.firstPaymentDate ?? tenant.leaseStart ?? now);
-  const leaseEnd = tenant.leaseEnd ? startOfDay(tenant.leaseEnd) : undefined;
-  const maxIterations = frequency === 'yearly' ? 10 : frequency === 'fixed-time' ? 1 : 24;
-
-  const schedule: PaymentScheduleEntryView[] = [];
-  let cursor = firstDue;
-  let iteration = 0;
-
-  while (iteration < maxIterations && (!leaseEnd || cursor.getTime() <= leaseEnd.getTime())) {
-    const id = `${tenant.id}_${cursor.getTime()}`;
-    const periodStart = cursor;
-    const periodEnd = frequency === 'fixed-time' ? cursor : addDays(periodStart, intervalDays);
-    const storedEntry = stored[id];
-    let status: PaymentScheduleStatus = storedEntry?.status || 'pending';
-    let paidAt = storedEntry?.paidAt ? new Date(storedEntry.paidAt) : undefined;
-
-    if (storedEntry?.status === 'paid') {
-      status = 'paid';
-      if (!paidAt) {
-        paidAt = new Date();
-      }
-    } else {
-      status = now.getTime() >= periodEnd.getTime() ? 'overdue' : 'pending';
-      paidAt = undefined;
-    }
-
-    schedule.push({
-      id,
-      amount: tenant.rentAmount,
-      periodLabel: formatPeriodLabelLocal(periodStart, frequency),
-      periodStart,
-      periodEnd,
-      dueDate: periodStart,
-      status,
-      paidAt,
-    });
-
-    if (frequency === 'fixed-time') {
-      break;
-    }
-
-    cursor = addDays(periodStart, intervalDays);
-    iteration += 1;
-  }
-
-  return schedule;
-};
-
 
 interface TenantDetailsProps {
   tenant: Tenant | null;
   onBack: () => void;
   onEdit?: (tenant: Tenant) => void;
-  onTenantUpdate?: (tenant: Tenant) => void;
 }
 
-const computeScheduleSummary = (schedule: PaymentScheduleEntryView[]) => {
-  let overdueAmount = 0;
-  let lastPayment: Date | undefined;
-
-  schedule.forEach((entry) => {
-    if (entry.status === 'overdue') {
-      overdueAmount += entry.amount;
-    }
-    if (entry.status === 'paid' && entry.paidAt) {
-      if (!lastPayment || entry.paidAt > lastPayment) {
-        lastPayment = entry.paidAt;
-      }
-    }
-  });
-
-  return { overdueAmount, lastPayment };
-};
-
-export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: TenantDetailsProps) {
+export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [paymentSchedule, setPaymentSchedule] = useState<PaymentScheduleEntryView[]>(() => {
-    const stored = loadStoredSchedule(tenant.id);
-    return generatePaymentSchedule(tenant, stored);
-  });
-
-  useEffect(() => {
-    const stored = loadStoredSchedule(tenant.id);
-    setPaymentSchedule(generatePaymentSchedule(tenant, stored));
-  }, [
-    tenant.id,
-    tenant.paymentFrequency,
-    tenant.firstPaymentDate,
-    tenant.leaseStart,
-    tenant.leaseEnd,
-    tenant.rentAmount,
-    tenant.paymentIntervalDays
-  ]);
-
-  useEffect(() => {
-    persistSchedule(tenant.id, paymentSchedule);
-  }, [tenant.id, paymentSchedule]);
-
-  const syncTenantPaymentStatus = useCallback(async (updatedSchedule: PaymentScheduleEntryView[]) => {
-    if (!tenant) return;
-    const { overdueAmount, lastPayment } = computeScheduleSummary(updatedSchedule);
-    const paymentStatus: Tenant['paymentStatus'] = overdueAmount > 0 ? 'overdue' : 'current';
-
-    try {
-      await tenantService.updateTenant(tenant.id, {
-        paymentStatus,
-        overdueAmount,
-        lastPaymentDate: lastPayment || undefined,
-      });
-      const updatedTenant: Tenant = {
-        ...tenant,
-        paymentStatus,
-        overdueAmount,
-        lastPaymentDate: lastPayment || undefined,
-      };
-      onTenantUpdate?.(updatedTenant);
-    } catch (error) {
-      console.error('❌ Failed to update tenant payment status:', error);
-    }
-  }, [tenant, onTenantUpdate]);
-
-  const handlePaymentToggle = (entryId: string, checked: boolean) => {
-    setPaymentSchedule((prev) => {
-      const now = new Date();
-      const updatedSchedule = prev.map((entry) => {
-        if (entry.id !== entryId) {
-          if (entry.status === 'paid') {
-            return entry;
-          }
-          return { ...entry, status: deriveStatus(entry, now) };
-        }
-
-        if (checked) {
-          return { ...entry, status: 'paid', paidAt: now };
-        }
-
-        const resetEntry: PaymentScheduleEntryView = {
-          ...entry,
-          status: 'pending',
-          paidAt: undefined,
-        };
-        return { ...resetEntry, status: deriveStatus(resetEntry, now) };
-      });
-
-      syncTenantPaymentStatus(updatedSchedule);
-      return updatedSchedule;
-    });
-  };
-
-  const paymentSummary = useMemo(() => computeScheduleSummary(paymentSchedule), [paymentSchedule]);
-
-  const computedPaymentStatus: Tenant['paymentStatus'] = paymentSummary.overdueAmount > 0 ? 'overdue' : 'current';
-
-  const rentPaymentsHistory: RentPayment[] = useMemo(
-    () =>
-      paymentSchedule.map((entry) => ({
-        id: entry.id,
-        amount: entry.amount,
-        dueDate: entry.dueDate,
-        paidDate: entry.paidAt,
-        status: entry.status,
-      })),
-    [paymentSchedule]
-  );
+  const [referencingStatus, setReferencingStatus] = useState<'not-started' | 'in-progress' | 'complete'>('not-started');
+  const [referencingData, setReferencingData] = useState<ReferencingDocument | null>(null);
+  const [isLoadingReferencing, setIsLoadingReferencing] = useState(true);
+  const [referencingDocuments, setReferencingDocuments] = useState<TenantDocument[]>([]);
+  const [refereeResponses, setRefereeResponses] = useState<any[]>([]);
+  const [guarantorResponses, setGuarantorResponses] = useState<any[]>([]);
+  const [isLoadingResponses, setIsLoadingResponses] = useState(true);
 
   if (!tenant) {
     return (
@@ -351,12 +103,183 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     );
   }
 
+  // Fetch real referencing data from Firestore
+  useEffect(() => {
+    const fetchReferencingStatus = async () => {
+      if (!tenant.email) {
+        console.warn('[TenantDetails] No email found for tenant, skipping referencing check');
+        setIsLoadingReferencing(false);
+        return;
+      }
+
+      setIsLoadingReferencing(true);
+      console.log(`[TenantDetails] Fetching referencing status for: ${tenant.email}`);
+      
+      const result = await referencingService.getReferencingStatusByEmail(tenant.email);
+      
+      console.log('[TenantDetails] Referencing result:', result);
+      
+      setReferencingStatus(result.status);
+      setReferencingData(result.data || null);
+      setIsLoadingReferencing(false);
+    };
+
+    fetchReferencingStatus();
+  }, [tenant.email]);
+
+  // Extract referencing documents from Firestore data
+  useEffect(() => {
+    if (!referencingData || !referencingData.formData) {
+      setReferencingDocuments([]);
+      return;
+    }
+
+    const docs: TenantDocument[] = [];
+    const formData = referencingData.formData;
+
+    // Identity Proof
+    if (formData.identity?.identityProof) {
+      docs.push({
+        id: 'ref-identity',
+        name: `Identity Document - ${formData.identity.identityProof.name}`,
+        type: 'id-document',
+        dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
+        status: 'valid',
+        downloadUrl: formData.identity.identityProof.dataUrl,
+        fileSize: formData.identity.identityProof.size,
+        fileType: formData.identity.identityProof.type
+      });
+    }
+
+    // Employment Proof
+    if (formData.employment?.proofDocument) {
+      docs.push({
+        id: 'ref-employment',
+        name: `Employment Proof - ${formData.employment.proofDocument.name}`,
+        type: 'other',
+        dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
+        status: 'valid',
+        downloadUrl: formData.employment.proofDocument.dataUrl,
+        fileSize: formData.employment.proofDocument.size,
+        fileType: formData.employment.proofDocument.type
+      });
+    }
+
+    // Residential Proof
+    if (formData.residential?.proofDocument) {
+      docs.push({
+        id: 'ref-residential',
+        name: `Proof of Address - ${formData.residential.proofDocument.name}`,
+        type: 'other',
+        dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
+        status: 'valid',
+        downloadUrl: formData.residential.proofDocument.dataUrl,
+        fileSize: formData.residential.proofDocument.size,
+        fileType: formData.residential.proofDocument.type
+      });
+    }
+
+    // Financial Proof
+    if (formData.financial?.proofOfIncomeDocument) {
+      docs.push({
+        id: 'ref-financial',
+        name: `Proof of Income - ${formData.financial.proofOfIncomeDocument.name}`,
+        type: 'other',
+        dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
+        status: 'valid',
+        downloadUrl: formData.financial.proofOfIncomeDocument.dataUrl,
+        fileSize: formData.financial.proofOfIncomeDocument.size,
+        fileType: formData.financial.proofOfIncomeDocument.type
+      });
+    }
+
+    // Guarantor Identity Document
+    if (formData.guarantor?.identityDocument) {
+      docs.push({
+        id: 'ref-guarantor',
+        name: `Guarantor ID - ${formData.guarantor.identityDocument.name}`,
+        type: 'other',
+        dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
+        status: 'valid',
+        downloadUrl: formData.guarantor.identityDocument.dataUrl,
+        fileSize: formData.guarantor.identityDocument.size,
+        fileType: formData.guarantor.identityDocument.type
+      });
+    }
+
+    console.log(`[TenantDetails] Extracted ${docs.length} referencing documents`);
+    setReferencingDocuments(docs);
+  }, [referencingData]);
+
+  // Fetch referee and guarantor responses from Firestore (no backend needed)
+  useEffect(() => {
+    const fetchRefereeGuarantorResponses = async () => {
+      if (!tenant.email) {
+        console.warn('[TenantDetails] No email found for tenant, skipping response fetch');
+        setIsLoadingResponses(false);
+        return;
+      }
+
+      setIsLoadingResponses(true);
+      console.log(`[TenantDetails] Fetching referee/guarantor responses for: ${tenant.email}`);
+
+      try {
+        // Fetch directly from Firestore using referencingService
+        const result = await referencingService.getRefereeGuarantorResponses(tenant.email);
+        
+        if (result.success) {
+          console.log('[TenantDetails] Referee/Guarantor responses:', result);
+          setRefereeResponses(result.refereeResponses || []);
+          setGuarantorResponses(result.guarantorResponses || []);
+        } else {
+          console.error('[TenantDetails] Failed to fetch responses:', result.error);
+        }
+      } catch (error) {
+        console.error('[TenantDetails] Error fetching responses:', error);
+      } finally {
+        setIsLoadingResponses(false);
+      }
+    };
+
+    fetchRefereeGuarantorResponses();
+  }, [tenant.email]);
+
+  // Handle deleting a referee or guarantor response
+  const handleDeleteResponse = async (responseId: string, responseType: 'referee' | 'guarantor') => {
+    if (!window.confirm(`Are you sure you want to delete this ${responseType} response? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      console.log(`[TenantDetails] Deleting ${responseType} response:`, responseId);
+      
+      const result = await referencingService.deleteResponse(responseId);
+      
+      if (result.success) {
+        console.log(`✅ [TenantDetails] Successfully deleted ${responseType} response`);
+        
+        // Remove from local state immediately
+        if (responseType === 'referee') {
+          setRefereeResponses(prev => prev.filter(r => r.id !== responseId));
+        } else {
+          setGuarantorResponses(prev => prev.filter(r => r.id !== responseId));
+        }
+        
+        // Optional: Show success message
+        alert(`${responseType.charAt(0).toUpperCase() + responseType.slice(1)} response deleted successfully`);
+      } else {
+        console.error(`❌ [TenantDetails] Failed to delete ${responseType} response:`, result.error);
+        alert(`Failed to delete response: ${result.error}`);
+      }
+    } catch (error) {
+      console.error(`❌ [TenantDetails] Error deleting ${responseType} response:`, error);
+      alert('An unexpected error occurred while deleting the response');
+    }
+  };
+
   // Mock additional data for demonstration
   const mockTenant: Tenant = {
     ...tenant,
-    paymentStatus: computedPaymentStatus,
-    overdueAmount: paymentSummary.overdueAmount,
-    lastPaymentDate: paymentSummary.lastPayment ?? tenant?.lastPaymentDate,
     depositAmount: tenant.rentAmount * 1.5,
     monthlyRent: tenant.rentAmount,
     tenancyType: 'assured-shorthold',
@@ -365,30 +288,31 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     employer: 'Tech Solutions Ltd',
     annualSalary: 45000,
     notes: 'Excellent tenant with good payment history. Prefers email communication for non-urgent matters.',
-    references: [
+    rentPayments: [
       {
         id: '1',
-        type: 'employment',
-        contactName: 'HR Department - Tech Solutions Ltd',
-        contactEmail: 'hr@techsolutions.com',
-        contactPhone: '+44 20 7123 4567',
-        status: 'satisfactory',
-        dateRequested: new Date('2024-01-01'),
-        dateReceived: new Date('2024-01-03'),
-        notes: 'Confirmed employment and salary details'
+        amount: tenant.rentAmount,
+        dueDate: new Date('2024-06-01'),
+        paidDate: new Date('2024-05-28'),
+        status: 'paid',
+        paymentMethod: 'Bank Transfer'
       },
       {
         id: '2',
-        type: 'previous-landlord',
-        contactName: 'John Smith Properties',
-        contactPhone: '+44 20 7987 6543',
-        status: 'satisfactory',
-        dateRequested: new Date('2024-01-01'),
-        dateReceived: new Date('2024-01-05'),
-        notes: 'No issues reported, always paid on time'
+        amount: tenant.rentAmount,
+        dueDate: new Date('2024-07-01'),
+        paidDate: new Date('2024-06-30'),
+        status: 'paid',
+        paymentMethod: 'Bank Transfer'
+      },
+      {
+        id: '3',
+        amount: tenant.rentAmount,
+        dueDate: new Date('2024-08-01'),
+        status: 'pending',
+        paymentMethod: 'Bank Transfer'
       }
     ],
-    rentPayments: rentPaymentsHistory,
     maintenanceRequests: [
       {
         id: '1',
@@ -538,6 +462,53 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     });
   };
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const handleDownloadDocument = (document: TenantDocument) => {
+    if (!document.downloadUrl) {
+      console.warn('No download URL available for document:', document.name);
+      return;
+    }
+
+    try {
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = document.downloadUrl;
+      link.download = document.name || 'document';
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('Document download initiated:', document.name);
+    } catch (error) {
+      console.error('Error downloading document:', error);
+    }
+  };
+
+  const handleViewDocument = (document: TenantDocument) => {
+    if (!document.downloadUrl) {
+      console.warn('No download URL available for document:', document.name);
+      return;
+    }
+
+    try {
+      // Open document in new tab
+      window.open(document.downloadUrl, '_blank');
+      console.log('Document opened in new tab:', document.name);
+    } catch (error) {
+      console.error('Error viewing document:', error);
+    }
+  };
+
+  // Combine mock documents with referencing documents
+  const allDocuments = [...(mockTenant.documents || []), ...referencingDocuments];
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -561,9 +532,16 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
                     <Badge className={getStatusColor(mockTenant.status)}>
                       {mockTenant.status}
                     </Badge>
-                    <Badge className={getReferencingStatusColor(mockTenant.referencingStatus)}>
-                      Referencing: {getReferencingStatusLabel(mockTenant.referencingStatus)}
-                    </Badge>
+                    {isLoadingReferencing ? (
+                      <Badge className="bg-gray-100 text-gray-800">
+                        <Clock className="w-3 h-3 mr-1 animate-spin" />
+                        Checking referencing...
+                      </Badge>
+                    ) : (
+                      <Badge className={getReferencingStatusColor(referencingStatus)}>
+                        Referencing: {getReferencingStatusLabel(referencingStatus)}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>
@@ -571,7 +549,7 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
 
             <div className="flex items-center space-x-2">
               {onEdit && (
-                <Button variant="outline" onClick={() => onEdit(tenant || mockTenant)}>
+                <Button variant="outline" onClick={() => onEdit(mockTenant)}>
                   <Edit3 className="w-4 h-4 mr-2" style={{ color: '#DC5F12' }} />
                   Edit
                 </Button>
@@ -606,10 +584,10 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
       {/* Content */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
-            {/* <TabsTrigger value="maintenance">Maintenance</TabsTrigger> */}
+            <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="references">References</TabsTrigger>
           </TabsList>
@@ -724,20 +702,20 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Payment Status</p>
-                      <Badge className={mockTenant.paymentStatus === 'current' ? 'bg-green-100 text-green-800' : 
-                                       mockTenant.paymentStatus === 'overdue' ? 'bg-red-100 text-red-800' : 
+                      <Badge className={tenant.paymentStatus === 'current' ? 'bg-green-100 text-green-800' : 
+                                       tenant.paymentStatus === 'overdue' ? 'bg-red-100 text-red-800' : 
                                        'bg-orange-100 text-orange-800'}>
-                        {mockTenant.paymentStatus === 'current' ? 'Current' : 
-                         mockTenant.paymentStatus === 'overdue' ? 'Overdue' : 'Payment Plan'}
+                        {tenant.paymentStatus === 'current' ? 'Current' : 
+                         tenant.paymentStatus === 'overdue' ? 'Overdue' : 'Payment Plan'}
                       </Badge>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Last Payment</p>
-                      <p>{mockTenant.lastPaymentDate ? formatDate(mockTenant.lastPaymentDate) : 'No record'}</p>
+                      <p>{tenant.lastPaymentDate ? formatDate(tenant.lastPaymentDate) : 'No record'}</p>
                     </div>
                   </div>
                   
-                  {mockTenant.paymentStatus === 'overdue' && mockTenant.overdueAmount && (
+                  {tenant.paymentStatus === 'overdue' && tenant.overdueAmount && (
                     <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                       <div className="flex items-center justify-between">
                       <div className="flex items-center text-red-800">
@@ -745,34 +723,34 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
                         <span className="font-medium">Rent Arrears</span>
                       </div>
                         <span className="font-semibold text-red-800">
-                          £{mockTenant.overdueAmount.toLocaleString()}
+                          £{tenant.overdueAmount.toLocaleString()}
                         </span>
                       </div>
-                      {mockTenant.defaultRiskScore && (
+                      {tenant.defaultRiskScore && (
                         <div className="mt-2 text-sm text-red-700">
-                          Default Risk Score: {mockTenant.defaultRiskScore}%
+                          Default Risk Score: {tenant.defaultRiskScore}%
                         </div>
                       )}
                     </div>
                   )}
                   
-                  {mockTenant.defaultRiskScore && mockTenant.paymentStatus === 'current' && (
+                  {tenant.defaultRiskScore && tenant.paymentStatus === 'current' && (
                     <div>
                       <p className="text-sm text-muted-foreground">Default Risk Score</p>
                       <div className="flex items-center space-x-2">
                         <div className={`w-full bg-gray-200 rounded-full h-2 ${
-                          mockTenant.defaultRiskScore >= 70 ? 'bg-red-200' : 
-                          mockTenant.defaultRiskScore >= 40 ? 'bg-orange-200' : 'bg-green-200'
+                          tenant.defaultRiskScore >= 70 ? 'bg-red-200' : 
+                          tenant.defaultRiskScore >= 40 ? 'bg-orange-200' : 'bg-green-200'
                         }`}>
                           <div 
                             className={`h-2 rounded-full ${
-                              mockTenant.defaultRiskScore >= 70 ? 'bg-red-500' : 
-                              mockTenant.defaultRiskScore >= 40 ? 'bg-orange-500' : 'bg-green-500'
+                              tenant.defaultRiskScore >= 70 ? 'bg-red-500' : 
+                              tenant.defaultRiskScore >= 40 ? 'bg-orange-500' : 'bg-green-500'
                             }`}
-                            style={{ width: `${mockTenant.defaultRiskScore}%` }}
+                            style={{ width: `${tenant.defaultRiskScore}%` }}
                           ></div>
                         </div>
-                        <span className="text-sm font-medium">{mockTenant.defaultRiskScore}%</span>
+                        <span className="text-sm font-medium">{tenant.defaultRiskScore}%</span>
                       </div>
                     </div>
                   )}
@@ -813,21 +791,10 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
                             {payment.paidDate && ` • Paid: ${formatDate(payment.paidDate)}`}
                           </p>
                         </div>
-                        <Badge className={getStatusColor(payment.status)}>
-                          {payment.status}
-                        </Badge>
                       </div>
-                      <div className="flex items-center space-x-3">
-                    <Label htmlFor={`payment-toggle-${payment.id}`} className="text-sm text-muted-foreground">
-                      {payment.status === 'paid' ? 'Marked as paid' : 'Mark as paid'}
-                    </Label>
-                        <Switch
-                          id={`payment-toggle-${payment.id}`}
-                          checked={payment.status === 'paid'}
-                          onCheckedChange={(checked) => handlePaymentToggle(payment.id, checked)}
-                          aria-label={`Mark payment due ${formatDate(payment.dueDate)} as paid`}
-                        />
-                      </div>
+                      <Badge className={getStatusColor(payment.status)}>
+                        {payment.status}
+                      </Badge>
                     </div>
                   ))}
                 </div>
@@ -835,7 +802,7 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
             </Card>
           </TabsContent>
 
-          {/* <TabsContent value="maintenance" className="space-y-6">
+          <TabsContent value="maintenance" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
@@ -870,7 +837,7 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
                 </div>
               </CardContent>
             </Card>
-          </TabsContent> */}
+          </TabsContent>
 
           <TabsContent value="documents" className="space-y-6">
             <Card>
@@ -879,6 +846,11 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
                   <CardTitle className="flex items-center">
                     <FileText className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
                     Documents
+                    {referencingDocuments.length > 0 && (
+                      <Badge className="ml-3 bg-blue-100 text-blue-800">
+                        {referencingDocuments.length} from referencing
+                      </Badge>
+                    )}
                   </CardTitle>
                   <Button
                     onClick={() => setIsUploadModalOpen(true)}
@@ -908,60 +880,244 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {mockTenant.documents?.map((document) => (
-                    <div key={document.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <FileText className="w-5 h-5" style={{ color: '#DC5F12' }} />
-                        <div>
-                          <p className="font-medium">{document.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Uploaded: {formatDate(document.dateUploaded)}
-                            {document.expiryDate && ` • Expires: ${formatDate(document.expiryDate)}`}
-                          </p>
+                {isLoadingReferencing ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Clock className="w-6 h-6 mr-2 animate-spin text-gray-400" />
+                    <p className="text-muted-foreground">Loading documents...</p>
+                  </div>
+                ) : allDocuments.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-muted-foreground">No documents available</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Upload documents or have the tenant complete referencing
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {allDocuments.map((document) => {
+                      const isReferencingDoc = document.id.startsWith('ref-');
+                      
+                      return (
+                        <div key={document.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-4 flex-1">
+                              <FileText className="w-5 h-5 mt-1" style={{ color: '#DC5F12' }} />
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="font-medium">{document.name}</p>
+                                  {isReferencingDoc && (
+                                    <Badge className="bg-blue-100 text-blue-800 text-xs">
+                                      Referencing
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="text-sm text-muted-foreground space-y-1">
+                                  <p>
+                                    Uploaded: {formatDate(document.dateUploaded)}
+                                    {document.expiryDate && ` • Expires: ${formatDate(document.expiryDate)}`}
+                                  </p>
+                                  {document.fileSize && (
+                                    <p className="flex items-center gap-4">
+                                      <span>Size: {formatFileSize(document.fileSize)}</span>
+                                      {document.fileType && <span>Type: {document.fileType}</span>}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 ml-4">
+                              <Badge className={getStatusColor(document.status)}>
+                                {document.status}
+                              </Badge>
+                              {document.downloadUrl && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="p-2">
+                                      <MoreHorizontal className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleViewDocument(document)}>
+                                      <FileText className="w-4 h-4 mr-2" style={{ color: '#DC5F12' }} />
+                                      View Document
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDownloadDocument(document)}>
+                                      <FileText className="w-4 h-4 mr-2" style={{ color: '#DC5F12' }} />
+                                      Download
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <Badge className={getStatusColor(document.status)}>
-                        {document.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="references" className="space-y-6">
+            {/* Referee Responses */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <UserCheck className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
-                  Reference Checks
+                  Employment Referee Responses
+                  {refereeResponses.length > 0 && (
+                    <Badge className="ml-3 bg-blue-100 text-blue-800">
+                      {refereeResponses.length} response{refereeResponses.length !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {mockTenant.references?.map((reference) => (
-                    <div key={reference.id} className="p-4 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <h4 className="font-medium">{reference.contactName}</h4>
-                          <p className="text-sm text-muted-foreground capitalize">{reference.type.replace('-', ' ')} Reference</p>
+                {isLoadingResponses ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Clock className="w-6 h-6 mr-2 animate-spin text-gray-400" />
+                    <p className="text-muted-foreground">Loading referee responses...</p>
+                  </div>
+                ) : refereeResponses.length === 0 ? (
+                  <div className="text-center py-8">
+                    <UserCheck className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-muted-foreground">No referee responses yet</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Responses will appear here once the referee completes the form
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {refereeResponses.map((response, index) => (
+                      <div key={response.id || index} className="p-4 border rounded-lg">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h4 className="font-medium">{response.firstName} {response.lastName}</h4>
+                            <p className="text-sm text-muted-foreground">Employment Referee</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge className={response.consent === 'agree' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                              {response.consent === 'agree' ? '✓ Agreed' : '✗ Declined'}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                              onClick={() => handleDeleteResponse(response.id, 'referee')}
+                              title="Delete response"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <Badge className={getStatusColor(reference.status)}>
-                          {reference.status}
-                        </Badge>
+                        <div className="space-y-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Email: </span>
+                            <span>{response.email}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Submitted: </span>
+                            <span>{new Date(response.submittedAt || response.createdAt).toLocaleDateString('en-GB', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}</span>
+                          </div>
+                          {response.reason && (
+                            <div className="mt-3 p-3 bg-muted/50 rounded-md">
+                              <p className="text-muted-foreground font-medium mb-1">Comments:</p>
+                              <p className="text-foreground">{response.reason}</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-sm text-muted-foreground space-y-1">
-                        {reference.contactEmail && <p>Email: {reference.contactEmail}</p>}
-                        {reference.contactPhone && <p>Phone: {reference.contactPhone}</p>}
-                        <p>Requested: {formatDate(reference.dateRequested)}</p>
-                        {reference.dateReceived && <p>Received: {formatDate(reference.dateReceived)}</p>}
-                        {reference.notes && <p className="mt-2 italic">Notes: {reference.notes}</p>}
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Guarantor Responses */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Shield className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
+                  Guarantor Responses
+                  {guarantorResponses.length > 0 && (
+                    <Badge className="ml-3 bg-blue-100 text-blue-800">
+                      {guarantorResponses.length} response{guarantorResponses.length !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingResponses ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Clock className="w-6 h-6 mr-2 animate-spin text-gray-400" />
+                    <p className="text-muted-foreground">Loading guarantor responses...</p>
+                  </div>
+                ) : guarantorResponses.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Shield className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-muted-foreground">No guarantor responses yet</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Responses will appear here once the guarantor completes the form
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {guarantorResponses.map((response, index) => (
+                      <div key={response.id || index} className="p-4 border rounded-lg">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h4 className="font-medium">{response.firstName} {response.lastName}</h4>
+                            <p className="text-sm text-muted-foreground">Guarantor</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge className={response.consent === 'agree' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                              {response.consent === 'agree' ? '✓ Agreed' : '✗ Declined'}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                              onClick={() => handleDeleteResponse(response.id, 'guarantor')}
+                              title="Delete response"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Email: </span>
+                            <span>{response.email}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Submitted: </span>
+                            <span>{new Date(response.submittedAt || response.createdAt).toLocaleDateString('en-GB', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}</span>
+                          </div>
+                          {response.reason && (
+                            <div className="mt-3 p-3 bg-muted/50 rounded-md">
+                              <p className="text-muted-foreground font-medium mb-1">Comments:</p>
+                              <p className="text-foreground">{response.reason}</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -977,9 +1133,3 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     </div>
   );
 }
-
-
-
-
-
-

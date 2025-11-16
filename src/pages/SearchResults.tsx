@@ -255,6 +255,341 @@ function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNav
   );
 }
 
+// Location Insights Component
+function LocationInsights({ searchQuery, propertyCount }: { searchQuery: string; propertyCount: number }) {
+  const [activeTab, setActiveTab] = useState<'overview' | 'strengths' | 'recommendations' | 'amenities'>('overview');
+
+  // Extract location from search query
+  const locationMatch = searchQuery.match(/(?:in|at|near)\s+([A-Za-z\s,]+)/i);
+  const location = locationMatch ? locationMatch[1].trim() : searchQuery;
+
+  return (
+    <div className="mt-4 bg-white rounded-xl shadow-lg overflow-hidden">
+      <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-[#136C9E] to-[#1a8cc9]">
+        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+          </svg>
+          Location Insights - {location}
+        </h3>
+        <p className="text-sm text-blue-50 mt-1">{propertyCount} properties found in this area</p>
+      </div>
+      
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200 bg-gray-50">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`flex-1 px-4 py-3 text-sm font-medium transition-all ${
+            activeTab === 'overview'
+              ? 'text-[#E65D24] bg-white border-b-2 border-[#E65D24]'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <span className="flex items-center justify-center gap-2">
+            <span>📊</span>
+            Overview
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('strengths')}
+          className={`flex-1 px-4 py-3 text-sm font-medium transition-all ${
+            activeTab === 'strengths'
+              ? 'text-[#E65D24] bg-white border-b-2 border-[#E65D24]'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <span className="flex items-center justify-center gap-2">
+            <span>💪</span>
+            Strengths
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('recommendations')}
+          className={`flex-1 px-4 py-3 text-sm font-medium transition-all ${
+            activeTab === 'recommendations'
+              ? 'text-[#E65D24] bg-white border-b-2 border-[#E65D24]'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <span className="flex items-center justify-center gap-2">
+            <span>💡</span>
+            Tips
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('amenities')}
+          className={`flex-1 px-4 py-3 text-sm font-medium transition-all ${
+            activeTab === 'amenities'
+              ? 'text-[#E65D24] bg-white border-b-2 border-[#E65D24]'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <span className="flex items-center justify-center gap-2">
+            <span>🏪</span>
+            Amenities
+          </span>
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="p-4 max-h-96 overflow-y-auto">
+        {activeTab === 'overview' && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-xl">🏘️</span>
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-gray-900 mb-2">Area Assessment</h4>
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    {location} is a well-connected residential area with good access to public transport 
+                    and local amenities. The neighborhood offers a balanced mix of residential properties 
+                    and essential services, making it suitable for both families and professionals.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="font-semibold text-green-900">Transport Links</span>
+                </div>
+                <p className="text-sm text-green-700">Excellent access to public transport networks and major routes</p>
+              </div>
+              
+              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                  <span className="font-semibold text-purple-900">Education</span>
+                </div>
+                <p className="text-sm text-purple-700">Multiple schools and educational facilities in the vicinity</p>
+              </div>
+              
+              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <span className="font-semibold text-orange-900">Shopping</span>
+                </div>
+                <p className="text-sm text-orange-700">Convenient access to supermarkets and retail outlets</p>
+              </div>
+              
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  <span className="font-semibold text-blue-900">Healthcare</span>
+                </div>
+                <p className="text-sm text-blue-700">Medical facilities and pharmacies readily available</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'strengths' && (
+          <div className="space-y-4">
+            <div className="border-l-4 border-green-500 bg-green-50 p-4 rounded">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">🎯</span>
+                <h4 className="font-semibold text-gray-900">Property Availability</h4>
+                <span className="ml-auto px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">High</span>
+              </div>
+              <p className="text-sm text-gray-700 mb-2">
+                <strong>Impact:</strong> Excellent selection of properties
+              </p>
+              <ul className="text-sm text-gray-600 space-y-1 ml-4 list-disc">
+                <li>{propertyCount} properties currently available in this area</li>
+                <li>Diverse range of property types and price points</li>
+                <li>Multiple landlords offering competitive pricing</li>
+              </ul>
+            </div>
+
+            <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">🚉</span>
+                <h4 className="font-semibold text-gray-900">Connectivity</h4>
+                <span className="ml-auto px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">Excellent</span>
+              </div>
+              <p className="text-sm text-gray-700 mb-2">
+                <strong>Impact:</strong> Easy commuting and accessibility
+              </p>
+              <ul className="text-sm text-gray-600 space-y-1 ml-4 list-disc">
+                <li>Well-served by public transport</li>
+                <li>Close to major road networks</li>
+                <li>Good walkability score</li>
+              </ul>
+            </div>
+
+            <div className="border-l-4 border-purple-500 bg-purple-50 p-4 rounded">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">🏪</span>
+                <h4 className="font-semibold text-gray-900">Local Amenities</h4>
+                <span className="ml-auto px-2 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded-full">Good</span>
+              </div>
+              <p className="text-sm text-gray-700 mb-2">
+                <strong>Impact:</strong> Convenient daily living
+              </p>
+              <ul className="text-sm text-gray-600 space-y-1 ml-4 list-disc">
+                <li>Multiple supermarkets and shops nearby</li>
+                <li>Restaurants and cafes in walking distance</li>
+                <li>Parks and recreational facilities available</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'recommendations' && (
+          <div className="space-y-4">
+            <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">💡</span>
+                <h4 className="font-semibold text-gray-900">Viewing Tips</h4>
+                <span className="ml-auto px-2 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded">High Priority</span>
+              </div>
+              <ul className="text-sm text-gray-700 space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-0.5">✓</span>
+                  <span>Schedule viewings during different times of day to assess noise levels and lighting</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-0.5">✓</span>
+                  <span>Check water pressure, heating systems, and inspect for any dampness</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-0.5">✓</span>
+                  <span>Ask about council tax band, utility costs, and any additional fees</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">📍</span>
+                <h4 className="font-semibold text-gray-900">Location Research</h4>
+                <span className="ml-auto px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">Medium Priority</span>
+              </div>
+              <ul className="text-sm text-gray-700 space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-0.5">→</span>
+                  <span>Visit the area at different times to get a feel for the neighborhood</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-0.5">→</span>
+                  <span>Check local crime statistics and community reviews</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-0.5">→</span>
+                  <span>Research future development plans that might affect the area</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl">⚡</span>
+                <h4 className="font-semibold text-gray-900">Quick Actions</h4>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between p-2 bg-white rounded border border-green-200">
+                  <span className="text-gray-700">Compare prices with similar properties</span>
+                  <span className="text-xs text-green-600 font-medium">Important</span>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-white rounded border border-green-200">
+                  <span className="text-gray-700">Read landlord reviews if available</span>
+                  <span className="text-xs text-green-600 font-medium">Recommended</span>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-white rounded border border-green-200">
+                  <span className="text-gray-700">Prepare questions about tenancy terms</span>
+                  <span className="text-xs text-green-600 font-medium">Essential</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'amenities' && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-2">
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🏫</span>
+                  <span className="font-medium text-gray-900">Schools & Education</span>
+                </div>
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Nearby</span>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-red-50 to-red-100 rounded-lg border border-red-200">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🏥</span>
+                  <span className="font-medium text-gray-900">Hospitals & Clinics</span>
+                </div>
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Accessible</span>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border border-orange-200">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🛒</span>
+                  <span className="font-medium text-gray-900">Shopping Centers</span>
+                </div>
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Within 1km</span>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🍽️</span>
+                  <span className="font-medium text-gray-900">Restaurants & Cafes</span>
+                </div>
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Nearby</span>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🌳</span>
+                  <span className="font-medium text-gray-900">Parks & Recreation</span>
+                </div>
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Available</span>
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-indigo-100 rounded-lg border border-indigo-200">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🚇</span>
+                  <span className="font-medium text-gray-900">Public Transport</span>
+                </div>
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Excellent</span>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">💪</span>
+                  <span className="font-medium text-gray-900">Gyms & Fitness</span>
+                </div>
+                <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">Available</span>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-pink-100 rounded-lg border border-pink-200">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🎬</span>
+                  <span className="font-medium text-gray-900">Entertainment</span>
+                </div>
+                <span className="px-3 py-1 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-full">Moderate</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const SearchResults = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -268,6 +603,13 @@ const SearchResults = () => {
   const { isPropertySaved, toggleSaveProperty } = useSavedProperties();
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [showMap, setShowMap] = useState(false);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const markersGeocodedRef = useRef<boolean>(false);
+  const lastResultsKeyRef = useRef<string | null>(null);
 
   // Perform search when component mounts or search params change
   useEffect(() => {
@@ -296,6 +638,408 @@ const SearchResults = () => {
   useEffect(() => {
     setIsNavigatingToBooking(false);
   }, []);
+
+  // Load Google Maps API script
+  useEffect(() => {
+    const loadGoogleMapsScript = () => {
+      if (window.google && window.google.maps) {
+        setIsMapLoaded(true);
+        return;
+      }
+
+      if (!document.getElementById('google-maps-script')) {
+        const script = document.createElement('script');
+        script.id = 'google-maps-script';
+        script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyChXxNp1xBJtJB9pC5WxWoZw3__7nT3djU&libraries=places';
+        script.async = true;
+        script.defer = true;
+        
+        script.onload = () => {
+          setIsMapLoaded(true);
+        };
+        
+        script.onerror = () => {
+          console.error('Failed to load Google Maps script');
+        };
+        
+        document.head.appendChild(script);
+      } else {
+        // Script already exists, check if Google Maps is ready
+        const checkInterval = setInterval(() => {
+          if (window.google && window.google.maps) {
+            setIsMapLoaded(true);
+            clearInterval(checkInterval);
+          }
+        }, 100);
+        
+        // Clear interval after 10 seconds to prevent infinite checking
+        setTimeout(() => clearInterval(checkInterval), 10000);
+      }
+    };
+
+    loadGoogleMapsScript();
+  }, []);
+
+  // Initialize map when showMap is true and script is loaded
+  useEffect(() => {
+    if (showMap && isMapLoaded && mapRef.current && window.google && window.google.maps) {
+      // Clear existing map instance if any
+      if (mapInstanceRef.current) {
+        console.log('Map already initialized, skipping re-initialization');
+        return; // Map already initialized
+      }
+
+      // Step 1: Initialize map centered on UK (country view)
+      try {
+        mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
+          center: { lat: 54.0, lng: -2.0 }, // Center of UK
+          zoom: 6, // Show entire UK
+          mapTypeControl: true,
+          streetViewControl: true,
+          fullscreenControl: true,
+          zoomControl: true,
+        });
+        console.log('Map initialized - showing UK view');
+        
+        // Step 2: Extract and geocode search location, then zoom in
+        if (searchQuery && window.google.maps) {
+          const geocoder = new window.google.maps.Geocoder();
+          // Extract location from search query (e.g., "2 bedroom flats in London" -> "London")
+          const locationMatch = searchQuery.match(/(?:in|at|near)\s+([A-Za-z\s]+)/i);
+          const locationToGeocode = locationMatch ? locationMatch[1].trim() : searchQuery;
+          
+          console.log('Geocoding search location:', locationToGeocode);
+          
+          geocoder.geocode({ address: locationToGeocode }, (results, status) => {
+            if (status === 'OK' && results && results[0] && mapInstanceRef.current) {
+              const location = results[0].geometry.location;
+              
+              // Step 3: Center and zoom on search location
+              mapInstanceRef.current.setCenter(location);
+              mapInstanceRef.current.setZoom(12); // Zoom into city level
+              console.log('Map centered and zoomed on search location:', locationToGeocode);
+            } else {
+              console.warn('Failed to geocode search location:', locationToGeocode, status);
+              // Fallback: center on London if search location geocoding fails
+              mapInstanceRef.current.setCenter({ lat: 51.5074, lng: -0.1278 });
+              mapInstanceRef.current.setZoom(12);
+            }
+          });
+        } else {
+          // No search query, just show UK
+          mapInstanceRef.current.setCenter({ lat: 54.0, lng: -2.0 });
+          mapInstanceRef.current.setZoom(6);
+        }
+      } catch (error) {
+        console.error('Error initializing map:', error);
+      }
+    }
+  }, [showMap, isMapLoaded, searchQuery]);
+
+  // Geocode properties and add markers when results change
+  // This runs AFTER the map is initialized and centered on search location
+  useEffect(() => {
+    if (showMap && isMapLoaded && mapInstanceRef.current && window.google && window.google.maps && results.length > 0) {
+      // Create a unique key for this results set to prevent re-geocoding
+      const resultsKey = results.map(r => `${r.location}-${r.title}`).join('|');
+      
+      // Skip if we've already geocoded these exact results
+      if (lastResultsKeyRef.current === resultsKey && markersGeocodedRef.current) {
+        console.log('Markers already geocoded for these results, skipping re-geocode...');
+        return;
+      }
+      
+      // Only proceed if this is a new set of results
+      if (lastResultsKeyRef.current !== resultsKey) {
+        lastResultsKeyRef.current = resultsKey;
+        
+        // Wait a bit for map to finish centering on search location before adding markers
+        const timeoutId = setTimeout(() => {
+          const geocoder = new window.google.maps.Geocoder();
+          const bounds = new window.google.maps.LatLngBounds();
+          
+          // Clear existing markers only when starting fresh geocode
+          console.log(`Clearing ${markersRef.current.length} existing markers...`);
+          markersRef.current.forEach(marker => marker.setMap(null));
+          markersRef.current = [];
+          markersGeocodedRef.current = false;
+        
+        // Filter properties with valid addresses
+        const propertiesWithAddresses = results.filter(prop => prop.location && prop.location.trim());
+        const totalProperties = propertiesWithAddresses.length;
+        
+        if (totalProperties === 0) {
+          console.warn('No properties with valid addresses to geocode');
+          return;
+        }
+
+        console.log(`Starting to geocode ${totalProperties} properties...`);
+        let completedCount = 0;
+        let successfulGeocodes = 0;
+
+        // Helper function to check if we should fit bounds
+        const checkAndFitBounds = () => {
+          completedCount++;
+          
+          if (completedCount === totalProperties) {
+            console.log(`Geocoding complete: ${successfulGeocodes} successful out of ${totalProperties}`);
+            
+            if (successfulGeocodes > 0) {
+              // Wait a bit to ensure all markers are rendered
+              setTimeout(() => {
+                try {
+                  const ne = bounds.getNorthEast();
+                  const sw = bounds.getSouthWest();
+                  
+                  // Validate bounds
+                  if (ne && sw) {
+                    const latDiff = Math.abs(ne.lat() - sw.lat());
+                    const lngDiff = Math.abs(ne.lng() - sw.lng());
+                    
+                    // Check if bounds are valid (not a single point)
+                    if (latDiff > 0.001 || lngDiff > 0.001) {
+                      // Calculate center point
+                      const centerLat = (ne.lat() + sw.lat()) / 2;
+                      const centerLng = (ne.lng() + sw.lng()) / 2;
+                      
+                      // Calculate appropriate zoom level based on bounds
+                      const maxLatDiff = Math.max(latDiff, 0.01);
+                      const maxLngDiff = Math.max(lngDiff, 0.01);
+                      
+                      // Determine zoom level (larger bounds = lower zoom)
+                      let targetZoom = 12;
+                      if (maxLatDiff > 0.5 || maxLngDiff > 0.5) {
+                        targetZoom = 10; // Very spread out
+                      } else if (maxLatDiff > 0.2 || maxLngDiff > 0.2) {
+                        targetZoom = 11;
+                      } else if (maxLatDiff < 0.05 && maxLngDiff < 0.05) {
+                        targetZoom = 14; // Very close together
+                      }
+                      
+                      // Fit bounds with padding
+                      mapInstanceRef.current.fitBounds(bounds, {
+                        top: 80,
+                        right: 80,
+                        bottom: 80,
+                        left: 80
+                      });
+                      
+                      // Wait for map to finish adjusting, then ensure proper zoom
+                      const idleListener = window.google.maps.event.addListenerOnce(
+                        mapInstanceRef.current,
+                        'idle',
+                        () => {
+                          const currentZoom = mapInstanceRef.current.getZoom();
+                          
+                          // Enforce zoom constraints
+                          if (currentZoom < 10) {
+                            console.log(`Zoom too low (${currentZoom}), setting to 10`);
+                            mapInstanceRef.current.setZoom(10);
+                          } else if (currentZoom > 15) {
+                            console.log(`Zoom too high (${currentZoom}), setting to 15`);
+                            mapInstanceRef.current.setZoom(15);
+                          }
+                          
+                          // Verify markers are still visible and attached to map
+                          const visibleMarkers = markersRef.current.filter(m => m.getMap() !== null);
+                          console.log(`Map idle - Zoom: ${mapInstanceRef.current.getZoom()}, Total markers: ${markersRef.current.length}, Visible on map: ${visibleMarkers.length}`);
+                        }
+                      );
+                      
+                      console.log('Map bounds fitted:', {
+                        center: { lat: centerLat, lng: centerLng },
+                        targetZoom: targetZoom,
+                        bounds: { ne: { lat: ne.lat(), lng: ne.lng() }, sw: { lat: sw.lat(), lng: sw.lng() } },
+                        totalMarkers: markersRef.current.length
+                      });
+                      
+                      // Mark as geocoded
+                      markersGeocodedRef.current = true;
+                    } else if (successfulGeocodes === 1) {
+                      // Single property - center on it
+                      const singleMarker = markersRef.current[0];
+                      if (singleMarker) {
+                        const position = singleMarker.getPosition();
+                        mapInstanceRef.current.setCenter(position);
+                        mapInstanceRef.current.setZoom(14);
+                        console.log('Map centered on single property');
+                      }
+                      markersGeocodedRef.current = true;
+                    }
+                  }
+                } catch (error) {
+                  console.error('Error fitting bounds:', error);
+                  // Fallback: center on first marker if available
+                  if (markersRef.current.length > 0) {
+                    const firstMarker = markersRef.current[0];
+                    const position = firstMarker.getPosition();
+                    mapInstanceRef.current.setCenter(position);
+                    mapInstanceRef.current.setZoom(12);
+                    console.log('Fallback: Map centered on first marker');
+                  }
+                  markersGeocodedRef.current = true;
+                }
+              }, 300); // Small delay to ensure markers are rendered
+            }
+          }
+        };
+
+        // Step 4: Geocode each property and add markers
+        propertiesWithAddresses.forEach((property, index) => {
+          const address = property.location.trim();
+          
+          // Add delay between requests to avoid rate limiting
+          setTimeout(() => {
+            geocoder.geocode({ address: address }, (geocodeResults, status) => {
+              if (status === 'OK' && geocodeResults && geocodeResults[0]) {
+                const location = geocodeResults[0].geometry.location;
+                
+                // Create marker with animation
+                const marker = new window.google.maps.Marker({
+                  position: location,
+                  map: mapInstanceRef.current,
+                  title: property.title,
+                  animation: window.google.maps.Animation.DROP,
+                  optimized: false, // Force markers to render
+                });
+
+                // Create unique ID for this property's info window
+                const propertyId = `prop-${index}-${Date.now()}`;
+                const imageUrls = property.imageUrls || [];
+                const imageUrlsJson = JSON.stringify(imageUrls);
+                const firstImageUrl = imageUrls.length > 0 ? imageUrls[0] : '';
+                
+                // Create info window with property details and image navigation
+                const infoWindow = new window.google.maps.InfoWindow({
+                  content: `
+                    <div style="max-width: 280px; padding: 0;">
+                      ${firstImageUrl ? `
+                        <div style="position: relative; width: 100%; height: 150px; overflow: hidden; border-radius: 8px 8px 0 0; background-color: #f0f0f0;">
+                          <img id="info-img-${propertyId}" src="${firstImageUrl}" alt="Property" style="width: 100%; height: 100%; object-fit: cover; transition: opacity 0.3s;" />
+                          ${imageUrls.length > 1 ? `
+                            <button id="prev-btn-${propertyId}" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; z-index: 10; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">‹</button>
+                            <button id="next-btn-${propertyId}" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; z-index: 10; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">›</button>
+                            <div id="img-counter-${propertyId}" style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; z-index: 10;">1/${imageUrls.length}</div>
+                          ` : ''}
+                        </div>
+                      ` : ''}
+                      <div style="padding: 12px;">
+                        <h4 style="font-weight: bold; margin: 0 0 8px 0; font-size: 15px; color: #1a1a1a; display: flex; align-items: start;">
+                          <svg width="14" height="14" style="margin-right: 6px; margin-top: 2px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span style="flex: 1;">${property.location}</span>
+                        </h4>
+                        <p style="margin: 0 0 8px 0; font-size: 13px; color: #666;">${property.title || 'Property'}</p>
+                        <p style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold; color: #E65D24;">${property.price || 'N/A'}</p>
+                        <p style="margin: 0; font-size: 12px; color: #666;">
+                          <strong>${property.bedrooms || 'N/A'}</strong> bedrooms • <strong>${property.propertyType || 'Property'}</strong>
+                        </p>
+                      </div>
+                    </div>
+                  `,
+                });
+
+                // Set up image navigation when info window is ready
+                window.google.maps.event.addListener(infoWindow, 'domready', () => {
+                  const imgEl = document.getElementById(`info-img-${propertyId}`) as HTMLImageElement;
+                  const prevBtn = document.getElementById(`prev-btn-${propertyId}`) as HTMLButtonElement;
+                  const nextBtn = document.getElementById(`next-btn-${propertyId}`) as HTMLButtonElement;
+                  const counterEl = document.getElementById(`img-counter-${propertyId}`) as HTMLDivElement;
+                  
+                  if (!imgEl || imageUrls.length <= 1) {
+                    if (prevBtn) prevBtn.style.display = 'none';
+                    if (nextBtn) nextBtn.style.display = 'none';
+                    return;
+                  }
+                  
+                  let currentIndex = 0;
+                  
+                  const updateImage = () => {
+                    if (imgEl) {
+                      imgEl.src = imageUrls[currentIndex];
+                    }
+                    if (counterEl) {
+                      counterEl.textContent = `${currentIndex + 1}/${imageUrls.length}`;
+                    }
+                    if (prevBtn) {
+                      prevBtn.style.display = currentIndex > 0 ? 'flex' : 'none';
+                    }
+                    if (nextBtn) {
+                      nextBtn.style.display = currentIndex < imageUrls.length - 1 ? 'flex' : 'none';
+                    }
+                  };
+                  
+                  if (prevBtn) {
+                    prevBtn.addEventListener('click', (e) => {
+                      e.stopPropagation();
+                      if (currentIndex > 0) {
+                        currentIndex--;
+                        updateImage();
+                      }
+                    });
+                  }
+                  
+                  if (nextBtn) {
+                    nextBtn.addEventListener('click', (e) => {
+                      e.stopPropagation();
+                      if (currentIndex < imageUrls.length - 1) {
+                        currentIndex++;
+                        updateImage();
+                      }
+                    });
+                  }
+                  
+                  updateImage();
+                });
+
+                marker.addListener('click', () => {
+                  // Close all other info windows
+                  markersRef.current.forEach(m => {
+                    if (m.infoWindow) m.infoWindow.close();
+                  });
+                  infoWindow.open(mapInstanceRef.current, marker);
+                });
+
+                marker.infoWindow = infoWindow;
+                markersRef.current.push(marker);
+                bounds.extend(location);
+                successfulGeocodes++;
+                
+                console.log(`✓ Geocoded property ${index + 1}/${totalProperties}: ${address} (Total markers: ${markersRef.current.length})`);
+              } else {
+                console.warn(`✗ Failed to geocode address ${index + 1}/${totalProperties}: ${address}`, status);
+              }
+              
+              checkAndFitBounds();
+            });
+          }, index * 150); // 150ms delay between each geocode request
+        });
+        }, 500); // Wait 500ms after map initialization before starting geocoding
+
+        return () => {
+          clearTimeout(timeoutId);
+        };
+      }
+    }
+  }, [showMap, isMapLoaded, results]);
+  
+  // Reset geocoded flag when map is hidden
+  useEffect(() => {
+    if (!showMap) {
+      console.log('Map hidden - clearing all markers');
+      markersGeocodedRef.current = false;
+      lastResultsKeyRef.current = null;
+      markersRef.current.forEach(marker => marker.setMap(null));
+      markersRef.current = [];
+    }
+  }, [showMap]);
+  
+  // Debug: Log marker count changes
+  useEffect(() => {
+    console.log(`Current marker count: ${markersRef.current.length}, Geocoded flag: ${markersGeocodedRef.current}`);
+  }, [markersRef.current.length]);
 
   const openModal = (property: Property) => {
     setSelectedProperty(property);
@@ -500,6 +1244,27 @@ const SearchResults = () => {
               {/* Right Side: Action Buttons */}
               <div className="flex gap-3 ml-8">
                 <button
+                  onClick={() => {
+                    setShowMap(!showMap);
+                    // Scroll to map if showing
+                    if (!showMap) {
+                      setTimeout(() => {
+                        document.getElementById('map-container')?.scrollIntoView({ behavior: 'smooth' });
+                      }, 100);
+                    }
+                  }}
+                  className={`flex items-center px-6 py-3 ${
+                    showMap 
+                      ? 'bg-gradient-to-r from-[#E65D24] to-[#D54D14]' 
+                      : 'bg-gradient-to-r from-[#136C9E] to-[#0F5A8A]'
+                  } text-white rounded-lg hover:opacity-90 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5`}
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  {showMap ? 'Hide Map' : 'Show Map'}
+                </button>
+                <button
                   onClick={() => searchProperties(searchQuery, searchTypeParam as 'onthemarket' | 'internet')}
                   className="flex items-center px-6 py-3 bg-gradient-to-r from-[#136C9E] to-[#0F5A8A] text-white rounded-lg hover:from-[#0F5A8A] hover:to-[#0D4A7A] transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                 >
@@ -541,8 +1306,13 @@ const SearchResults = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {results.map((property, index) => (
+            <div className={showMap ? "grid grid-cols-1 lg:grid-cols-2 gap-6" : ""}>
+              {/* Property Listings */}
+              <div className={showMap ? "" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"}>
+                {showMap ? (
+                  // When map is shown, display in single column
+                  <div className="grid grid-cols-1 gap-6">
+                    {results.map((property, index) => (
                 <div
                   key={index}
                   className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
@@ -642,6 +1412,139 @@ const SearchResults = () => {
                   </div>
                 </div>
               ))}
+                  </div>
+                ) : (
+                  // When map is hidden, display in grid
+                  results.map((property, index) => (
+                    <div
+                      key={index}
+                      className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
+                      onClick={() => openModal(property)}
+                    >
+                      {/* Property Image */}
+                      <div className="relative h-48 overflow-hidden">
+                        {property.imageUrls && property.imageUrls.length > 0 ? (
+                          <img
+                            src={property.imageUrls[0]}
+                            alt={property.title}
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                        )}
+                        
+                        {/* Price Badge */}
+                        <div className="absolute top-4 left-4 bg-[#E65D24] text-white px-3 py-1 rounded-full font-semibold text-sm">
+                          {cleanPropertyPrice(property.price)}
+                        </div>
+                        
+                        {/* Heart Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const propertyId = `${property.title}-${property.location}-${property.price}`;
+                            const wasSaved = isPropertySaved(propertyId);
+                            toggleSaveProperty(property);
+                            setToastMessage(wasSaved ? 'Property removed from saved' : 'Property saved!');
+                            setShowToast(true);
+                            setTimeout(() => setShowToast(false), 3000);
+                          }}
+                          className="absolute top-4 right-4 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
+                        >
+                          <svg 
+                            className={`w-5 h-5 transition-colors ${
+                              isPropertySaved(`${property.title}-${property.location}-${property.price}`) 
+                                ? 'text-red-500 fill-red-500' 
+                                : 'text-gray-600 hover:text-red-500'
+                            }`}
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          </svg>
+                        </button>
+                        
+                        {/* Source Badge */}
+                        {property.source && (
+                          <div className="absolute bottom-4 left-4 bg-black/70 text-white px-2 py-1 rounded text-xs">
+                            {property.source}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Property Details */}
+                      <div className="p-4">
+                        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{property.title}</h3>
+                        
+                        <div className="flex items-center gap-2 text-gray-600 mb-3">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span className="text-sm">{property.location}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-sm text-gray-600">
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-1">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
+                              </svg>
+                              <span>{property.bedrooms}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                              </svg>
+                              <span>{property.propertyType}</span>
+                            </div>
+                          </div>
+                          
+                          {property.agent && (
+                            <div className="text-xs text-gray-500">
+                              {property.agent.name}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Map Container */}
+              {showMap && (
+                <>
+                  <div id="map-container" className="bg-white rounded-xl shadow-lg overflow-hidden">
+                    {!isMapLoaded ? (
+                      <div 
+                        className="w-full flex items-center justify-center bg-gray-50"
+                        style={{ height: 'calc(100vh - 300px)', minHeight: '600px' }}
+                      >
+                        <div className="text-center">
+                          <div className="w-16 h-16 border-4 border-[#136C9E] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                          <p className="text-gray-600">Loading map...</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div 
+                        ref={mapRef}
+                        className="w-full"
+                        style={{ height: 'calc(100vh - 300px)', minHeight: '600px' }}
+                      ></div>
+                    )}
+                  </div>
+
+                  {/* Location Insights Section */}
+                  <LocationInsights searchQuery={searchQuery} propertyCount={results.length} />
+                </>
+              )}
             </div>
           )}
         </div>

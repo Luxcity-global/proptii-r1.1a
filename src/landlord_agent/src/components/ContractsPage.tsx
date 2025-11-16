@@ -18,12 +18,7 @@ import {
   Building2,
   Loader2,
   FileText,
-  Send,
-  Trash2,
-  Archive,
-  CheckSquare,
-  Square,
-  ChevronDown
+  Send
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -52,77 +47,61 @@ export interface Contract {
 
 interface ContractsPageProps {
   tenants?: Array<{ id: string; name: string; email: string; propertyId?: string }>;
-  userProfile?: { id?: string; email?: string; [key: string]: any } | null;
   onBack?: () => void;
 }
 
-export function ContractsPage({ tenants = [], userProfile, onBack }: ContractsPageProps) {
+export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
   const [activeTab, setActiveTab] = useState<'sent' | 'unsigned' | 'signed'>('sent');
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedContracts, setSelectedContracts] = useState<Set<string>>(new Set());
-  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [landlordEmail, setLandlordEmail] = useState<string | null>(null);
 
-  // Load contracts when tab changes or userProfile changes
+  // Get landlord email from localStorage/auth on component mount
+  useEffect(() => {
+    const getUserEmail = () => {
+      // Try to get from localStorage (set during login/registration)
+      const storedEmail = localStorage.getItem('landlordEmail');
+      if (storedEmail) {
+        console.log('✅ Found landlord email in localStorage:', storedEmail);
+        setLandlordEmail(storedEmail);
+        return;
+      }
+
+      // Try to get from proptii_auth_state
+      const authState = localStorage.getItem('proptii_auth_state');
+      if (authState) {
+        try {
+          const parsed = JSON.parse(authState);
+          if (parsed?.user?.email) {
+            console.log('✅ Found landlord email in auth state:', parsed.user.email);
+            setLandlordEmail(parsed.user.email);
+            return;
+          }
+        } catch (e) {
+          console.error('Error parsing auth state:', e);
+        }
+      }
+
+      console.log('⚠️ No landlord email found - will show all contracts');
+    };
+
+    getUserEmail();
+  }, []);
+
+  // Load contracts when tab changes or landlordEmail is set
   useEffect(() => {
     loadContracts();
-    // Clear selection when tab changes
-    setSelectedContracts(new Set());
-    setShowBulkActions(false);
-  }, [activeTab, userProfile]);
-  
-  // Clear invalid selections when contracts reload
-  useEffect(() => {
-    if (!loading && contracts.length > 0 && selectedContracts.size > 0) {
-      // Only clear if current selection doesn't match any visible contracts
-      const visibleContractIds = new Set(contracts.map(c => c.id));
-      const validSelections = Array.from(selectedContracts).filter(id => visibleContractIds.has(id));
-      if (validSelections.length !== selectedContracts.size) {
-        setSelectedContracts(new Set(validSelections));
-        setShowBulkActions(validSelections.length > 0);
-      }
-    }
-  }, [contracts, loading]);
-
-  // Helper to get current userId
-  const getCurrentUserId = (): string | null => {
-    try {
-      // PRIORITY 1: Direct from userProfile
-      if (userProfile && (userProfile as any).id) {
-        return (userProfile as any).id;
-      }
-      // PRIORITY 2: Query parameter
-      const params = new URLSearchParams(window.location.search);
-      const uidFromQuery = params.get('uid');
-      if (uidFromQuery) return uidFromQuery;
-      // PRIORITY 3: getUserInfo
-      if (typeof (window as any).getUserInfo === 'function') {
-        const info = (window as any).getUserInfo();
-        const uid = info?.id || info?.sub || info?.oid;
-        if (uid) return uid;
-      }
-      // PRIORITY 4: localStorage
-      const cached = localStorage.getItem('proptii_auth_state');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        return parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId || null;
-      }
-    } catch (e) {
-      console.error('Error extracting userId:', e);
-    }
-    // FALLBACK: Email
-    return userProfile?.email || null;
-  };
+  }, [activeTab, landlordEmail]);
 
   const loadContracts = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const currentUserId = getCurrentUserId();
-      console.log('🔍 ContractsPage: Loading contracts for userId:', currentUserId);
+      console.log('🔄 ContractsPage - Loading contracts for tab:', activeTab);
+      console.log('🔄 ContractsPage - Landlord email:', landlordEmail);
       
       const statusMap: Record<string, Contract['status']> = {
         'sent': 'sent',
@@ -130,15 +109,39 @@ export function ContractsPage({ tenants = [], userProfile, onBack }: ContractsPa
         'signed': 'signed'
       };
       
-      const fetchedContracts = await contractService.getContracts({
-        userId: currentUserId || undefined,
+      // Build filters
+      const filters: any = {
         status: statusMap[activeTab]
-      });
+      };
       
-      console.log(`✅ ContractsPage: Loaded ${fetchedContracts.length} contracts`);
+      // Add landlordEmail filter if available
+      if (landlordEmail) {
+        filters.landlordEmail = landlordEmail;
+        console.log('🔍 Filtering contracts by landlord email:', landlordEmail);
+      }
+      
+      const fetchedContracts = await contractService.getContracts(filters);
+      
+      console.log(`✅ ContractsPage - Loaded ${fetchedContracts.length} contracts with status '${activeTab}'`);
+      
+      // Log details of signed contracts for debugging
+      if (activeTab === 'signed' && fetchedContracts.length > 0) {
+        console.log('📋 Signed contracts:', fetchedContracts.map(c => ({
+          title: c.title,
+          tenant: c.tenantName,
+          signedDate: c.signedDate,
+          landlordEmail: (c as any).landlordEmail
+        })));
+      } else if (activeTab === 'signed' && fetchedContracts.length === 0) {
+        console.log('ℹ️ No signed contracts found for this landlord');
+        if (landlordEmail) {
+          console.log('💡 Make sure tenants are sending contracts to:', landlordEmail);
+        }
+      }
+      
       setContracts(fetchedContracts);
     } catch (err) {
-      console.error('Error loading contracts:', err);
+      console.error('❌ ContractsPage - Error loading contracts:', err);
       setError('Failed to load contracts. Please try again.');
       // Fallback to empty array on error
       setContracts([]);
@@ -249,11 +252,11 @@ export function ContractsPage({ tenants = [], userProfile, onBack }: ContractsPa
       console.log('Sending email to:', contractData.recipientEmail);
       
       const API_BASE_URL = window.location.hostname === 'localhost'
-        ? 'http://localhost:10000/api'
+        ? 'http://localhost:3000/api'
         : 'https://proptii-r1-1a.onrender.com/api';
       
       if (contractData.file) {
-        // Convert file to base64
+        // Convert file to base64 and send email with attachment
         console.log('Converting file to base64:', contractData.file.name);
         const base64Data = await fileToBase64(contractData.file);
         
@@ -263,17 +266,31 @@ export function ContractsPage({ tenants = [], userProfile, onBack }: ContractsPa
         
         console.log('File converted to base64, size:', base64Content.length, 'bytes');
         
-        // Save contract to Firestore FIRST (so it's saved even if email fails)
-        let contractId: string | null = null;
-        let emailSent = false;
+        const formData = new FormData();
+        formData.append('to', contractData.recipientEmail);
+        formData.append('subject', `Contract for Review: ${contractData.file.name}`);
+        formData.append('html', `
+          <h2>Hello ${contractData.recipientName}!</h2>
+          <p>Please find attached your contract for review.</p>
+          ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
+          <p>Best regards,<br>Proptii Team</p>
+        `);
         
+        // Send base64 data separately so backend can decode it
+        formData.append('attachmentBase64', base64Content);
+        formData.append('attachmentFilename', contractData.file.name);
+        formData.append('attachmentMimeType', mimeType);
+        
+        const response = await axios.post(`${API_BASE_URL}/email/send-base64`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 30000
+        });
+        
+        console.log('Contract email sent successfully with attachment');
+        
+        // Save contract to Firestore for tracking
         try {
-          const currentUserId = getCurrentUserId();
-          if (!currentUserId) {
-            console.warn('⚠️ ContractsPage: No userId found for contract creation');
-          }
-          console.log('📝 ContractsPage: Creating contract with userId:', currentUserId);
-          contractId = await contractService.createContractWithBase64({
+          const contractId = await contractService.createContractWithBase64({
             title: contractData.file.name.replace(/\.[^/.]+$/, ''),
             propertyAddress: '',
             tenantName: contractData.recipientName,
@@ -283,60 +300,19 @@ export function ContractsPage({ tenants = [], userProfile, onBack }: ContractsPa
             status: 'sent',
             sentDate: new Date(),
             expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-          }, contractData.file.name, base64Data, currentUserId || 'unknown');
+            landlordEmail: landlordEmail || undefined, // Include landlord email for filtering
+          } as any, contractData.file.name, base64Data);
           
-          console.log('✅ Contract saved to Firestore:', contractId);
+          console.log('Contract saved to Firestore:', contractId);
           
           // Reload contracts to show the new one
           await loadContracts();
         } catch (firestoreError) {
-          console.error('❌ Error saving contract to Firestore:', firestoreError);
-          alert(`Failed to save contract: ${firestoreError instanceof Error ? firestoreError.message : 'Unknown error'}`);
-          setIsSendModalOpen(false);
-          return; // Stop if Firestore save fails
+          console.error('Error saving contract to Firestore:', firestoreError);
+          // Don't fail the whole operation if Firestore save fails
         }
         
-        // Try to send email (but don't fail if it doesn't work)
-        try {
-          const formData = new FormData();
-          formData.append('to', contractData.recipientEmail);
-          formData.append('subject', `Contract for Review: ${contractData.file.name}`);
-          formData.append('html', `
-            <h2>Hello ${contractData.recipientName}!</h2>
-            <p>Please find attached your contract for review.</p>
-            ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
-            <p>Best regards,<br>Proptii Team</p>
-          `);
-          
-          // Send base64 data separately so backend can decode it
-          formData.append('attachmentBase64', base64Content);
-          formData.append('attachmentFilename', contractData.file.name);
-          formData.append('attachmentMimeType', mimeType);
-          
-          await axios.post(`${API_BASE_URL}/email/send-base64`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-            timeout: 30000
-          });
-          
-          console.log('✅ Contract email sent successfully with attachment');
-          emailSent = true;
-        } catch (emailError: any) {
-          console.warn('⚠️ Email service unavailable, but contract is saved:', emailError);
-          // Contract is already saved, so we can continue
-          const errorMessage = emailError?.message || 'Email service unavailable';
-          const isNetworkError = errorMessage.includes('Network Error') || errorMessage.includes('ERR_CONNECTION_REFUSED');
-          
-          if (isNetworkError) {
-            alert(`Contract saved successfully! ✅\n\n⚠️ Email service is not available (backend server not running).\n\nContract has been saved to your account and can be sent manually later.\n\nRecipient: ${contractData.recipientName} (${contractData.recipientEmail})`);
-          } else {
-            alert(`Contract saved successfully! ✅\n\n⚠️ Email could not be sent: ${errorMessage}\n\nContract has been saved to your account and can be sent manually later.`);
-          }
-        }
-        
-        // Show success message if email was sent
-        if (emailSent) {
-          alert(`Contract sent successfully! ✅\n\nSent to: ${contractData.recipientName} (${contractData.recipientEmail})\n\nAttachment: ${contractData.file.name}`);
-        }
+        alert(`Contract sent successfully to ${contractData.recipientName} (${contractData.recipientEmail})!\n\nAttachment: ${contractData.file.name}`);
       } else {
         // Send a simple test email without contract
         const formData = new FormData();
@@ -384,225 +360,23 @@ export function ContractsPage({ tenants = [], userProfile, onBack }: ContractsPa
     }
   };
 
-  // Selection functions
-  const toggleContractSelection = (contractId: string) => {
-    const newSelected = new Set(selectedContracts);
-    if (newSelected.has(contractId)) {
-      newSelected.delete(contractId);
-    } else {
-      newSelected.add(contractId);
-    }
-    setSelectedContracts(newSelected);
-    setShowBulkActions(newSelected.size > 0);
-  };
-
-  const selectAllContracts = (contractsToSelect: Contract[]) => {
-    if (selectedContracts.size === contractsToSelect.length && contractsToSelect.length > 0) {
-      setSelectedContracts(new Set());
-      setShowBulkActions(false);
-    } else {
-      setSelectedContracts(new Set(contractsToSelect.map(c => c.id)));
-      setShowBulkActions(true);
-    }
-  };
-
-  const clearSelection = () => {
-    setSelectedContracts(new Set());
-    setShowBulkActions(false);
-  };
-
-  // Bulk action handlers
-  const handleBulkDelete = async () => {
-    if (selectedContracts.size > 0) {
-      const confirmMessage = `Are you sure you want to delete ${selectedContracts.size} contract${selectedContracts.size > 1 ? 's' : ''}?`;
-      if (window.confirm(confirmMessage)) {
-        try {
-          const deletePromises = Array.from(selectedContracts).map(contractId => 
-            contractService.deleteContract(contractId).catch(err => {
-              console.error(`Error deleting contract ${contractId}:`, err);
-              return null;
-            })
-          );
-          await Promise.all(deletePromises);
-          await loadContracts();
-          clearSelection();
-        } catch (err) {
-          console.error('Error deleting contracts:', err);
-          setError('Failed to delete some contracts. Please try again.');
-        }
-      }
-    }
-  };
-
-  const handleBulkExport = async (format: 'json' | 'csv' | 'excel' | 'pdf') => {
-    if (selectedContracts.size > 0) {
-      const selectedContractsData = contracts.filter(c => selectedContracts.has(c.id));
-      
-      if (format === 'json') {
-        const jsonData = JSON.stringify(selectedContractsData, null, 2);
-        const blob = new Blob([jsonData], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `contracts_${new Date().toISOString().split('T')[0]}.json`;
-        link.click();
-        URL.revokeObjectURL(url);
-      } else if (format === 'csv') {
-        const csvRows = [
-          ['Title', 'Property Address', 'Tenant Name', 'Tenant Email', 'Status', 'Sent Date', 'Expiry Date'],
-          ...selectedContractsData.map(c => [
-            c.title,
-            c.propertyAddress,
-            c.tenantName,
-            c.tenantEmail,
-            c.status,
-            c.sentDate.toLocaleDateString(),
-            c.expiryDate?.toLocaleDateString() || ''
-          ])
-        ];
-        const csvContent = csvRows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `contracts_${new Date().toISOString().split('T')[0]}.csv`;
-        link.click();
-        URL.revokeObjectURL(url);
-      } else {
-        console.log(`Export as ${format} not yet implemented`);
-        alert(`Export as ${format.toUpperCase()} will be implemented soon.`);
-      }
-      
-      clearSelection();
-    }
-  };
-
-  const handleBulkArchive = async () => {
-    if (selectedContracts.size > 0) {
-      // Archive functionality could mark contracts as archived in the database
-      // For now, just show a message
-      console.log(`Archiving ${selectedContracts.size} contracts`);
-      alert(`Archive functionality will be implemented soon. ${selectedContracts.size} contract(s) selected.`);
-      clearSelection();
-    }
-  };
-
-  const ContractTable = ({ contracts }: { contracts: Contract[] }) => {
-    const isAllSelected = selectedContracts.size === contracts.length && contracts.length > 0;
-    const isPartiallySelected = selectedContracts.size > 0 && selectedContracts.size < contracts.length;
-
-    return (
-      <div className="space-y-4">
-        {/* Bulk Actions Bar */}
-        {showBulkActions && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-orange-800">
-                  {selectedContracts.size} contract{selectedContracts.size !== 1 ? 's' : ''} selected
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearSelection}
-                  className="text-orange-600 hover:text-orange-800"
-                >
-                  Clear selection
-                </Button>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleBulkArchive}
-                  className="text-orange-600 border-orange-300 hover:bg-orange-50"
-                >
-                  <Archive className="h-4 w-4 mr-2" />
-                  Archive
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-orange-600 border-orange-300 hover:bg-orange-50"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Export
-                      <ChevronDown className="h-4 w-4 ml-1" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => handleBulkExport('json')}>
-                      Export as JSON
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleBulkExport('csv')}>
-                      Export as CSV
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleBulkExport('excel')}>
-                      Export as Excel
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleBulkExport('pdf')}>
-                      Export as PDF
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleBulkDelete}
-                  className="text-orange-600 border-orange-300 hover:bg-orange-50"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead style={{ fontFamily: 'Archivo, sans-serif', width: '50px' }}>
-                  <button
-                    onClick={() => selectAllContracts(contracts)}
-                    className="flex items-center justify-center"
-                  >
-                    {isAllSelected ? (
-                      <CheckSquare className="w-5 h-5 text-orange-600" />
-                    ) : isPartiallySelected ? (
-                      <CheckSquare className="w-5 h-5 text-orange-400" />
-                    ) : (
-                      <Square className="w-5 h-5 text-gray-400" />
-                    )}
-                  </button>
-                </TableHead>
-                <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Contract</TableHead>
-                <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Property</TableHead>
-                <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Tenant</TableHead>
-                <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Status</TableHead>
-                <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Sent Date</TableHead>
-                <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Expiry</TableHead>
-                <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {contracts.map((contract) => (
-                <TableRow key={contract.id} className="hover:bg-gray-50">
-                  <TableCell>
-                    <button
-                      onClick={() => toggleContractSelection(contract.id)}
-                      className="flex items-center justify-center"
-                    >
-                      {selectedContracts.has(contract.id) ? (
-                        <CheckSquare className="w-5 h-5 text-orange-600" />
-                      ) : (
-                        <Square className="w-5 h-5 text-gray-400" />
-                      )}
-                    </button>
-                  </TableCell>
+  const ContractTable = ({ contracts }: { contracts: Contract[] }) => (
+    <div className="border rounded-lg">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Contract</TableHead>
+            <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Property</TableHead>
+            <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Tenant</TableHead>
+            <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Status</TableHead>
+            <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Sent Date</TableHead>
+            <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Expiry</TableHead>
+            <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {contracts.map((contract) => (
+            <TableRow key={contract.id} className="hover:bg-gray-50">
               <TableCell>
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -615,6 +389,12 @@ export function ContractsPage({ tenants = [], userProfile, onBack }: ContractsPa
                     <div className="text-sm text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
                       {contract.fileName}
                     </div>
+                    {/* Show badge if contract was synced from tenant app */}
+                    {contract.additionalInfo && contract.additionalInfo.includes('Signed contract sent from tenant app') && (
+                      <Badge className="mt-1 bg-green-100 text-green-800 border-0 text-xs">
+                        Received from Tenant
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </TableCell>
@@ -693,12 +473,10 @@ export function ContractsPage({ tenants = [], userProfile, onBack }: ContractsPa
               </TableCell>
             </TableRow>
           ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    );
-  };
+        </TableBody>
+      </Table>
+    </div>
+  );
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7' }}>
@@ -723,12 +501,12 @@ export function ContractsPage({ tenants = [], userProfile, onBack }: ContractsPa
               background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
               fontFamily: 'Archivo, sans-serif'
             }}
-            onMouseEnter={(e) => {
+            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
               e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
               e.currentTarget.style.transform = 'translateY(-2px)';
             }}
-            onMouseLeave={(e) => {
+            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
               e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
               e.currentTarget.style.transform = 'translateY(0px)';
@@ -809,7 +587,7 @@ export function ContractsPage({ tenants = [], userProfile, onBack }: ContractsPa
         )}
 
         {/* Contracts Tabs */}
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(value: string) => setActiveTab(value as 'sent' | 'unsigned' | 'signed')} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="sent">
               Sent ({totalSent})

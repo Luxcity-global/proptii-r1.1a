@@ -61,7 +61,8 @@ npm run type-check
 
 ### Environment Variables
 Required environment variables:
-- `VITE_API_URL`: Backend API endpoint
+- `VITE_APP_URL`: Frontend application URL (e.g., `http://localhost:5173` for local dev, `https://proptii.com` for production)
+- `VITE_API_URL`: Backend API endpoint (e.g., `http://localhost:3000` for local dev)
 - `VITE_AZURE_AD_CLIENT_ID`: Azure AD B2C client ID
 - `VITE_AZURE_STORAGE_URL`: Azure Storage account URL
 

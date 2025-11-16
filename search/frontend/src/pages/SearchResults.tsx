@@ -594,6 +594,206 @@ function PropertyCard({ property, onViewDetails }: PropertyCardProps) {
   );
 }
 
+
+// Map Component
+interface MapComponentProps {
+  center?: { lat: number; lng: number };
+  properties?: Property[];
+  selectedProperty?: Property | null;
+  onLocationSelect?: (location: string) => void;
+}
+
+function MapComponent({ center, properties = [], selectedProperty, onLocationSelect }: MapComponentProps) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const [mapLoaded, setMapLoaded] = useState(false);
+
+  useEffect(() => {
+    // Load Google Maps script
+    if (!window.google) {
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyChXxNp1xBJtJB9pC5WxWoZw3__7nT3djU&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        initializeMap();
+      };
+      document.head.appendChild(script);
+    } else {
+      initializeMap();
+    }
+
+    return () => {
+      // Cleanup
+      markersRef.current.forEach(marker => marker.setMap(null));
+      markersRef.current = [];
+    };
+  }, []);
+
+  const initializeMap = () => {
+    if (!mapRef.current || !window.google || !window.google.maps) return;
+
+    const googleMaps = window.google.maps;
+    const defaultCenter = center || { lat: 51.5074, lng: -0.1278 }; // London default
+
+    const map = new googleMaps.Map(mapRef.current, {
+      center: defaultCenter,
+      zoom: 13,
+      mapTypeControl: true,
+      mapTypeControlOptions: {
+        style: googleMaps.MapTypeControlStyle.HORIZONTAL_BAR,
+        position: googleMaps.ControlPosition.TOP_LEFT,
+      },
+      streetViewControl: false,
+      fullscreenControl: true,
+      zoomControl: true,
+      zoomControlOptions: {
+        position: googleMaps.ControlPosition.RIGHT_BOTTOM,
+      },
+    });
+
+    mapInstanceRef.current = map;
+    setMapLoaded(true);
+
+    // Add map type toggle listeners
+    const mapTypeButtons = mapRef.current.parentElement?.querySelectorAll('.map-type-btn');
+    mapTypeButtons?.forEach((btn, index) => {
+      btn.addEventListener('click', () => {
+        const types = ['roadmap', 'satellite'];
+        map.setMapTypeId(types[index] as any);
+      });
+    });
+
+    // Geocode properties and add markers
+    if (properties.length > 0) {
+      geocodeProperties(properties, map);
+    }
+
+    // Update center when selected property changes
+    if (selectedProperty) {
+      geocodeAddress(selectedProperty.location, (location) => {
+        if (location) {
+          map.setCenter(location);
+          map.setZoom(15);
+        }
+      });
+    }
+  };
+
+  const geocodeAddress = (address: string, callback: (location: { lat: number; lng: number } | null) => void) => {
+    if (!window.google?.maps?.Geocoder) {
+      callback(null);
+      return;
+    }
+
+    const googleMaps = window.google.maps;
+    const geocoder = new googleMaps.Geocoder();
+    geocoder.geocode({ address }, (results: any, status: string) => {
+      if (status === 'OK' && results?.[0]) {
+        const location = results[0].geometry.location;
+        callback({ lat: location.lat(), lng: location.lng() });
+      } else {
+        callback(null);
+      }
+    });
+  };
+
+  const geocodeProperties = (props: Property[], map: any) => {
+    if (!window.google?.maps) return;
+    
+    const googleMaps = window.google.maps;
+    
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current = [];
+
+    let completedGeocodes = 0;
+    const bounds = new (googleMaps as any).LatLngBounds();
+
+    props.forEach((property) => {
+      geocodeAddress(property.location, (location) => {
+        if (location && map && googleMaps) {
+          const marker = new googleMaps.Marker({
+            position: location,
+            map,
+            title: property.title,
+            icon: {
+              url: `http://maps.google.com/mapfiles/ms/icons/red-dot.png`,
+              scaledSize: new googleMaps.Size(32, 32),
+            },
+          });
+
+          const infoWindow = new googleMaps.InfoWindow({
+            content: `
+              <div style="padding: 8px;">
+                <h3 style="font-weight: bold; margin-bottom: 4px;">${property.title}</h3>
+                <p style="color: #E65D24; font-weight: bold; margin: 4px 0;">${cleanPropertyPrice(property.price)}</p>
+                <p style="font-size: 12px; color: #666;">${property.location}</p>
+              </div>
+            `,
+          });
+
+          marker.addListener('click', () => {
+            infoWindow.open(map, marker);
+            if (onLocationSelect) {
+              onLocationSelect(property.location);
+            }
+          });
+
+          markersRef.current.push(marker);
+          bounds.extend(location);
+          completedGeocodes++;
+
+          // Fit bounds once all geocoding is complete
+          if (completedGeocodes === props.length) {
+            if (markersRef.current.length === 1) {
+              // If only one marker, center and zoom to it
+              map.setCenter(location);
+              map.setZoom(15);
+            } else if (markersRef.current.length > 1) {
+              // Fit bounds to show all markers
+              map.fitBounds(bounds);
+            }
+          }
+        }
+      });
+    });
+  };
+
+  useEffect(() => {
+    if (mapLoaded && mapInstanceRef.current && properties.length > 0) {
+      // Geocode all properties and add markers
+      geocodeProperties(properties, mapInstanceRef.current);
+    }
+  }, [properties, mapLoaded]);
+
+  useEffect(() => {
+    if (mapLoaded && mapInstanceRef.current && selectedProperty) {
+      geocodeAddress(selectedProperty.location, (location) => {
+        if (location && mapInstanceRef.current) {
+          mapInstanceRef.current.setCenter(location);
+          mapInstanceRef.current.setZoom(15);
+        }
+      });
+    }
+  }, [selectedProperty, mapLoaded]);
+
+  return (
+    <div className="relative h-full w-full" style={{ height: '100%' }}>
+      <div className="absolute top-2 left-2 z-10 flex gap-1 bg-white rounded shadow-sm">
+        <button className="map-type-btn px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded-l">
+          Map
+        </button>
+        <button className="map-type-btn px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded-r">
+          Satellite
+        </button>
+      </div>
+      <div ref={mapRef} className="w-full h-full" style={{ height: '100%' }} />
+    </div>
+  );
+}
+
 // Main SearchResults Component
 function SearchResults() {
   const [searchParams] = useSearchParams();
@@ -817,19 +1017,56 @@ function SearchResults() {
         {/* Property Results */}
         {!loading && results.length > 0 && (
           <>
+            <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
+              {/* Left Column - Property Listings */}
             <div className="space-y-6">
+                {/* Search Summary Card */}
+                <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Search Summary</h3>
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <p><span className="font-medium">Query:</span> {query}</p>
+                        <p><span className="font-medium">Platform:</span> {searchType === 'internet' ? 'Internet Search' : 'On the Market'}</p>
+                        <p>
+                          <span className="font-medium">Results:</span> {results.length} properties found
+                          {results.length > 0 && (
+                            <a href="#" className="text-orange-600 hover:underline ml-2">cached</a>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      className="px-4 py-2 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-colors text-sm"
+                      onClick={() => {
+                        // Scroll to map or toggle map visibility
+                        const mapElement = document.getElementById('map-container');
+                        mapElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }}
+                    >
+                      Show Map
+                    </button>
+                  </div>
+                </div>
+
+                {/* Property Listings */}
+                <div className="space-y-4">
               {currentResults.map((property, index) => (
                 <PropertyCard
                   key={index}
                   property={property}
-                  onViewDetails={handleViewDetails}
+                      onViewDetails={(prop) => {
+                        handleViewDetails(prop);
+                        // Update map location when property is selected
+                        setSelectedProperty(prop);
+                      }}
                 />
               ))}
             </div>
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-12">
+                  <div className="flex items-center justify-center gap-2 mt-8">
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
@@ -864,6 +1101,22 @@ function SearchResults() {
                 </button>
               </div>
             )}
+              </div>
+
+              {/* Right Sidebar - Map Only */}
+              <div className="sticky top-24">
+                <div id="map-container" className="h-[calc(100vh-150px)] min-h-[600px] rounded-lg overflow-hidden border border-gray-200">
+                  <MapComponent 
+                    center={{ lat: 51.5074, lng: -0.1278 }} // Default center for map
+                    properties={results}
+                    selectedProperty={selectedProperty}
+                    onLocationSelect={() => {
+                      // Handle location selection from map
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
           </>
         )}
 

@@ -259,143 +259,88 @@ export class ContractEmailService {
   }): string {
     const { recipientName, contractName, senderName } = params;
     
+    // Get the base URL for links in the email
+    const baseUrl = process.env.APP_URL || 'https://proptii.com';
+    
+    // Unified base styles matching email.service.ts
+    const baseStyles = `
+      body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background: #f5f7fa; padding: 24px 0; margin: 0; }
+      .container { max-width: 640px; margin: 0 auto; padding: 32px 24px; background: #ffffff; box-shadow: 0 8px 24px rgba(19, 108, 158, 0.12); border-radius: 12px; }
+      .header { color: #136C9E; font-size: 24px; font-weight: 700; margin-bottom: 24px; }
+      .details { background: #f5f8fb; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid rgba(19, 108, 158, 0.08); }
+      .details h3 { margin-top: 0; color: #136C9E; font-size: 16px; }
+      .details p { margin: 8px 0; }
+      .footer { margin-top: 40px; font-size: 14px; color: #666; text-align: left; }
+      .footer hr { border: none; border-top: 1px solid #e2e8f0; margin: 24px 0; }
+      a { color: #136C9E; }
+      .cta { text-align: center; margin: 28px 0; }
+      .button { display: inline-block; background: linear-gradient(135deg, #DC5F12 0%, #FF6B1A 100%); color: #ffffff !important; padding: 14px 32px; text-decoration: none; border-radius: 50px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(220, 95, 18, 0.25); transition: all 0.3s ease; }
+      .button:hover { box-shadow: 0 12px 24px rgba(220, 95, 18, 0.35); transform: translateY(-1px); }
+      .grid { display: grid; gap: 16px; }
+      .muted { color: #4b5563; }
+      .attachment-notice { background: #e0f2fe; padding: 16px; border-radius: 10px; margin: 20px 0; text-align: center; border: 1px solid #bae6fd; }
+      .attachment-notice strong { color: #DC5F12; }
+      .list { margin: 0; padding-left: 18px; }
+      .list li { margin: 6px 0; }
+      .status-badge { display: inline-block; background: #d1fae5; color: #065f46; padding: 4px 12px; border-radius: 6px; font-weight: 600; font-size: 14px; }
+    `;
+
+    const customFooter = `
+      <div class="footer">
+        <p>Best regards,<br>${senderName}</p>
+        <hr />
+        <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com">here</a>.</em>
+      </div>
+    `;
+    
     return `
       <!DOCTYPE html>
       <html>
       <head>
-        <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            line-height: 1.6; 
-            color: #333; 
-            max-width: 600px; 
-            margin: 0 auto; 
-            padding: 20px; 
-          }
-          .header { 
-            color: #DC5F12; 
-            font-size: 24px; 
-            margin-bottom: 20px; 
-            font-weight: bold; 
-            text-align: center;
-          }
-          .section { 
-            margin-bottom: 20px; 
-            padding: 15px; 
-            background-color: #f9f9f9; 
-            border-radius: 8px; 
-            border-left: 4px solid #DC5F12;
-          }
-          .section-title { 
-            color: #DC5F12; 
-            margin-bottom: 10px; 
-            font-weight: bold; 
-            font-size: 16px;
-          }
-          .info-item { 
-            margin: 8px 0; 
-            padding: 5px 0;
-          }
-          .contract-details {
-            background-color: #fff;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 15px 0;
-          }
-          .footer { 
-            margin-top: 30px; 
-            padding-top: 20px; 
-            border-top: 1px solid #ddd; 
-            font-size: 0.9em; 
-            color: #666; 
-            text-align: center;
-          }
-          .footer-logo { 
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-            margin-top: 16px; 
-          }
-          .footer-logo img { 
-            height: 40px; 
-            margin-right: 10px; 
-          }
-          .footer-desc { 
-            font-style: italic; 
-            color: #555; 
-            margin-top: 10px; 
-          }
-          .footer-link { 
-            color: #DC5F12; 
-            text-decoration: underline; 
-          }
-          .attachment-notice {
-            background-color: #e8f4fd;
-            border: 1px solid #b3d9ff;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-            text-align: center;
-          }
-          .attachment-notice strong {
-            color: #DC5F12;
-          }
-          hr { 
-            border: none; 
-            border-top: 1px solid #bbb; 
-            margin: 24px 0 16px 0; 
-          }
-        </style>
+        <meta charSet="utf-8" />
+        <style>${baseStyles}</style>
       </head>
       <body>
-        <div class="header">📄 Signed Contract Ready</div>
-        
-        <p>Hi ${recipientName},</p>
-        
-        <p>Great news! Your contract has been successfully signed and is ready for your records.</p>
-        
-        <div class="section">
-          <div class="section-title">Contract Details</div>
-          <div class="contract-details">
-            <div class="info-item"><strong>Contract Name:</strong> ${contractName}</div>
-            <div class="info-item"><strong>Signed Date:</strong> ${new Date().toLocaleDateString('en-GB', {
+        <div class="container">
+          <div class="header">📄 Signed Contract Ready</div>
+          
+          <p>Hi ${recipientName},</p>
+          
+          <p>Great news! Your contract has been successfully signed and is ready for your records.</p>
+          
+          <div class="details">
+            <h3>Contract Details</h3>
+            <p><strong>Contract Name:</strong> ${contractName}</p>
+            <p><strong>Signed Date:</strong> ${new Date().toLocaleDateString('en-GB', {
               weekday: 'long',
               year: 'numeric',
               month: 'long',
               day: 'numeric'
-            })}</div>
-            <div class="info-item"><strong>Status:</strong> ✅ Fully Executed</div>
+            })}</p>
+            <p><strong>Status:</strong> <span class="status-badge">✅ Fully Executed</span></p>
           </div>
-        </div>
-        
-        <div class="attachment-notice">
-          <strong>📎 Contract Attachment</strong><br>
-          Your signed contract is attached to this email as a PDF document. Please save it to your records.
-        </div>
-        
-        <div class="section">
-          <div class="section-title">Next Steps</div>
-          <ul>
-            <li>Download and save the attached contract to your device</li>
-            <li>Keep a copy for your records</li>
-            <li>Contact your agent if you have any questions about the contract terms</li>
-          </ul>
-        </div>
-        
-        <p>If you have any questions about this contract or need assistance, please don't hesitate to reach out to us.</p>
-        
-        <div style="margin-top: 32px;">
-          Best regards,<br>
-          ${senderName}
-        </div>
-        
-        <hr />
-        <div class="footer-desc">
-          <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com" class="footer-link">here</a>.</em>
-        </div>
-        <div class="footer-logo">
-          <img src="https://ci3.googleusercontent.com/meips/ADKq_NY8hEqCfpvIsclrL2Y7Bh5rbsplzRLKZCSdpIpnfd0yj3UbdHYRghh_jcqBeTVksaYGkXybNBH7dR78-7qrgfVu81YmwI4tHtHb3B7ILEq32SZW1Rf1WYXK=s0-d-e1-ft#https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png" alt="Proptii Logo" />
+          
+          <div class="attachment-notice">
+            <strong>📎 Contract Attachment</strong><br>
+            Your signed contract is attached to this email as a PDF document. Please save it to your records.
+          </div>
+          
+          <div class="details">
+            <h3>Next Steps</h3>
+            <ul class="list">
+              <li>Download and save the attached contract to your device</li>
+              <li>Keep a copy for your records</li>
+              <li>Contact your agent if you have any questions about the contract terms</li>
+            </ul>
+          </div>
+          
+          <div class="cta">
+            <a href="${baseUrl}/landlord/contracts?tab=signed" class="button">👉 View All Signed Contracts</a>
+          </div>
+          
+          <p>If you have any questions about this contract or need assistance, please don't hesitate to reach out to us.</p>
+          
+          ${customFooter}
         </div>
       </body>
       </html>

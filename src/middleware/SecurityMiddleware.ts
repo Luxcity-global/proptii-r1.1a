@@ -72,12 +72,12 @@ export class SecurityMiddleware {
 
         return [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com https://maps.googleapis.com https://*.googleapis.com",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' https://fonts.gstatic.com data:",
             "img-src 'self' data: https: blob:",
             `connect-src ${connectSrc}`,
-            "frame-src 'self' https://proptii.b2clogin.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net",
+            "frame-src 'self' https://proptii.b2clogin.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net https://*.google.com",
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",

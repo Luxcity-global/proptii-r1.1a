@@ -97,7 +97,7 @@ class ContractService {
    * Create a contract without uploading to Firebase Storage (for base64 emails)
    */
   async createContractWithBase64(
-    contractData: Omit<Contract, 'id' | 'fileUrl' | 'fileName'>,
+    contractData: Omit<Contract, 'id' | 'fileUrl' | 'fileName'> & { landlordEmail?: string },
     fileName: string,
     base64Data: string,
     ownerUserId: string
@@ -131,6 +131,9 @@ class ContractService {
       if (contractData.additionalInfo) {
         contractDoc.additionalInfo = contractData.additionalInfo;
       }
+      if ((contractData as any).landlordEmail) {
+        contractDoc.landlordEmail = (contractData as any).landlordEmail;
+      }
 
       const docRef = await addDoc(this.contractsCollection, contractDoc);
       console.log('Contract saved to Firestore with base64 URL:', docRef.id);
@@ -151,6 +154,7 @@ class ContractService {
       status?: Contract['status'];
       tenantId?: string;
       propertyId?: string;
+      landlordEmail?: string;
     }
   ): Promise<Contract[]> {
     try {
@@ -172,6 +176,9 @@ class ContractService {
       }
       if (filters?.propertyId) {
         constraints.push(where('propertyId', '==', filters.propertyId));
+      }
+      if (filters?.landlordEmail) {
+        constraints.push(where('landlordEmail', '==', filters.landlordEmail));
       }
 
       // Only add orderBy if we have filters, otherwise it requires an index

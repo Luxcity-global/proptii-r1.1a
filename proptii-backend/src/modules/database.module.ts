@@ -1,5 +1,6 @@
 import { Module, Global } from '@nestjs/common';
 import { CosmosClient } from '@azure/cosmos';
+import { initializeFirestore } from '../config/firestore.config';
 
 @Global()
 @Module({
@@ -24,7 +25,13 @@ import { CosmosClient } from '@azure/cosmos';
         }
       },
     },
+    {
+      provide: 'FIRESTORE',
+      useFactory: async () => {
+        return await initializeFirestore();
+      },
+    },
   ],
-  exports: ['COSMOS_CLIENT'],
+  exports: ['COSMOS_CLIENT', 'FIRESTORE'],
 })
 export class DatabaseModule {} 

@@ -94,9 +94,10 @@ const convertBase64ToFile = (base64: string, fileName: string, fileType: string)
 
 const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'uploaded' | 'deleted'>('uploaded');
+  const [activeTab, setActiveTab] = useState<'uploaded' | 'deleted' | 'received'>('uploaded');
   const [uploadedTemplates, setUploadedTemplates] = useState<Template[]>([]);
   const [deletedTemplates, setDeletedTemplates] = useState<Template[]>([]);
+  const [receivedContracts, setReceivedContracts] = useState<any[]>([]);
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate(); // Initialize navigation
@@ -114,10 +115,11 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
   // New state to track if we're in customize mode and which template is being customized
   const [customizeMode, setCustomizeMode] = useState(false);
   const [customizingTemplateId, setCustomizingTemplateId] = useState<string | null>(null);
+  const [customizingTemplate, setCustomizingTemplate] = useState<Template | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
 
-  // Load templates from Firestore on component mount
+  // Load templates and contracts from Firestore on component mount
   useEffect(() => {
     const loadTemplatesFromFirestore = async () => {
       console.log('🔄 ContractModal - useEffect triggered');
@@ -208,6 +210,25 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
           console.log('❌ Failed to load deleted templates:', deletedResult.error);
           setDeletedTemplates([]);
         }
+
+        // Load received contracts (sent by landlords)
+        if (user?.email) {
+          console.log('🔄 Fetching received contracts for tenant:', user.email);
+          const receivedResult = await contractService.getReceivedContracts(user.email);
+          
+          if (receivedResult.success && receivedResult.contracts) {
+            // Filter out signed contracts - only show sent/unsigned contracts in the received tab
+            // Signed contracts have been completed and sent back to landlord
+            const pendingContracts = receivedResult.contracts.filter(
+              contract => contract.status !== 'signed'
+            );
+            console.log(`✅ Loaded ${pendingContracts.length} pending received contracts (${receivedResult.contracts.length} total, ${receivedResult.contracts.length - pendingContracts.length} signed filtered out)`);
+            setReceivedContracts(pendingContracts);
+          } else {
+            console.log('❌ Failed to load received contracts:', receivedResult.error);
+            setReceivedContracts([]);
+          }
+        }
       } catch (error) {
         console.error('❌ Error loading templates from Firestore:', error);
         console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
@@ -217,7 +238,7 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
     };
 
     loadTemplatesFromFirestore();
-  }, [isOpen, user?.id]);
+  }, [isOpen, user?.id, user?.email]);
 
   // Clear all storage (for testing) - now clears Firestore data
   const handleClearStorage = async () => {
@@ -247,8 +268,10 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
   };*/}
 
 // Handle Customize
-const handleCustomize = (templateId: string) => {
+const handleCustomize = (templateId: string, templateOverride?: Template) => {
+  const template = templateOverride ?? uploadedTemplates.find(t => t.id === templateId) ?? null;
   setCustomizingTemplateId(templateId);
+  setCustomizingTemplate(template);
   setCustomizeMode(true);
   setDropdownOpen(null); // Close the dropdown
 };
@@ -257,13 +280,12 @@ const handleCustomize = (templateId: string) => {
 const handleBackFromCustomize = () => {
   setCustomizeMode(false);
   setCustomizingTemplateId(null);
+  setCustomizingTemplate(null);
 };
 
 // Find the template being customized
 const findCustomizedTemplate = () => {
-  return customizingTemplateId ? 
-    uploadedTemplates.find(t => t.id === customizingTemplateId) || null 
-    : null;
+  return customizingTemplate;
 };
   
 
@@ -704,19 +726,19 @@ const findCustomizedTemplate = () => {
         </div>
 
 
-       {/* Uploaded & Deleted Templates */}
+       {/* Uploaded, Deleted Templates & Received Contracts */}
 <div className="border-b border-gray-300 flex space-x-4">
-  {['uploaded', 'deleted'].map((tab) => (
+  {['uploaded', 'received', 'deleted'].map((tab) => (
     <button
       key={tab}
-      onClick={() => setActiveTab(tab as 'uploaded' | 'deleted')}
+      onClick={() => setActiveTab(tab as 'uploaded' | 'deleted' | 'received')}
       className={`py-2 px-4 font-medium text-sm border-b-2 transition-all ${
         activeTab === tab
           ? 'border-[#DC5F12] text-[#DC5F12]'
           : 'border-transparent text-gray-500 hover:text-gray-700'
       }`}
     >
-      {tab === 'uploaded' ? 'Uploaded Templates' : 'Deleted Templates'}
+      {tab === 'uploaded' ? 'Uploaded Templates' : tab === 'received' ? 'Received Contracts' : 'Deleted Templates'}
     </button>
   ))}
 </div>
@@ -751,7 +773,7 @@ const findCustomizedTemplate = () => {
                 </div>
               </td>
               <td className="p-2 border text-left w-1/5">{template.uploadDate}</td>
-              <td className="p-2 border text-right space-x-2 w-2/5">
+              <td className="p-2 border text-right space-x-2 w-2/5 relative">
                 {/* Manage Button */}
                 <button
                   onClick={() => setDropdownOpen(dropdownOpen === template.id ? null : template.id)}
@@ -768,7 +790,7 @@ const findCustomizedTemplate = () => {
 
                 {/* Dropdown Menu */}
                 {dropdownOpen === template.id && (
-                  <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-300 rounded-md shadow-lg">
+                  <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-300 rounded-md shadow-lg z-20">
                     <button
                       onClick={() => handleCustomize(template.id)}
                       className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100"
@@ -813,6 +835,210 @@ const findCustomizedTemplate = () => {
       )}
 
     </div>
+  ) : activeTab === 'received' ? (
+    <div>
+      <h3 className="text-lg font-semibold text-gray-700 mb-3">Received Contracts</h3>
+      {receivedContracts.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          <p>No contracts received yet</p>
+          <p className="text-sm mt-2">Contracts sent by your landlord will appear here</p>
+        </div>
+      ) : (
+        <table className="w-full border-collapse table-fixed">
+          <thead>
+            <tr className="bg-gray-100 text-gray-700">
+              <th className="p-2 border text-left w-2/5">Contract</th>
+              <th className="p-2 border text-center w-1/5">Date</th>
+              <th className="p-2 border text-right w-2/5">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {receivedContracts.map((contract) => (
+              <tr key={contract.id} className="border-t">
+                <td className="p-2 border text-left max-w-0 w-2/5">
+                  <div className="truncate" title={contract.fileName}>
+                    <strong>{contract.fileName}</strong>
+                  </div>
+                  <div className="text-xs text-gray-500 truncate mt-1">
+                    <span className={`px-2 py-0.5 rounded ${
+                      contract.status === 'signed' ? 'bg-green-100 text-green-800' :
+                      contract.status === 'unsigned' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
+                      {contract.status === 'sent' ? 'Sent' : contract.status === 'unsigned' ? 'Awaiting Signature' : 'Signed'}
+                    </span>
+                  </div>
+                  {contract.landlordEmail && (
+                    <div className="text-xs text-gray-500 truncate mt-1" title={`From: ${contract.landlordEmail}`}>
+                      From: {contract.landlordEmail}
+                    </div>
+                  )}
+                </td>
+                <td className="p-2 border text-left w-1/5">
+                  {contract.sentDate && new Date(contract.sentDate).toLocaleDateString()}
+                </td>
+                <td className="p-2 border text-right space-x-2 w-2/5 relative">
+                  {/* Manage Button */}
+                  <button
+                    onClick={() => setDropdownOpen(dropdownOpen === contract.id ? null : contract.id)}
+                    className="border border-[#136C9E] text-[#136C9E] px-4 py-1 rounded-full hover:bg-[#136C9E]/10"
+                  >
+                    Manage
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Convert base64 to blob for preview
+                      if (contract.fileUrl.startsWith('data:')) {
+                        fetch(contract.fileUrl)
+                          .then(res => res.blob())
+                          .then(blob => {
+                            const file = new File([blob], contract.fileName, { type: 'application/pdf' });
+                            const url = URL.createObjectURL(blob);
+                            handlePreview({
+                              id: contract.id,
+                              name: contract.fileName,
+                              uploadDate: new Date(contract.sentDate).toLocaleDateString(),
+                              fileUrl: url,
+                              imagePreview: null,
+                              file: file
+                            });
+                          });
+                      } else {
+                        window.open(contract.fileUrl, '_blank');
+                      }
+                    }}
+                    className="bg-[#136C9E] text-white px-4 py-1 rounded-full hover:bg-[#0F5B88]"
+                  >
+                    Preview
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {dropdownOpen === contract.id && (
+                    <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-300 rounded-md shadow-lg z-20">
+                      <button
+                        onClick={async () => {
+                          try {
+                            const existingTemplate = uploadedTemplates.find(t => t.id === contract.id);
+                            if (existingTemplate) {
+                              handleCustomize(contract.id, existingTemplate);
+                              return;
+                            }
+
+                          let newTemplate: Template | null = null;
+
+                          if (contract.fileUrl.startsWith('data:')) {
+                            // Extract MIME type from data URL (e.g., "data:application/pdf;base64,..." => "application/pdf")
+                            const mimeTypeMatch = contract.fileUrl.match(/^data:([^;]+);/);
+                            const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'application/pdf';
+                            
+                            // Check if it's a PDF - CustomizePage only supports PDFs
+                            if (mimeType !== 'application/pdf') {
+                              alert(`Cannot customize ${contract.fileName}. Only PDF files can be customized. This file is: ${mimeType}\n\nPlease download the file and convert it to PDF first.`);
+                              setDropdownOpen(null);
+                              return;
+                            }
+                            
+                            console.log('🔄 Extracting file from data URL, MIME type:', mimeType);
+                            const file = convertBase64ToFile(contract.fileUrl, contract.fileName, mimeType);
+                            const url = URL.createObjectURL(file);
+
+                            newTemplate = {
+                              id: contract.id,
+                              name: contract.fileName,
+                              uploadDate: new Date(contract.sentDate).toLocaleDateString(),
+                              fileUrl: url,
+                              imagePreview: null,
+                              file,
+                              fileData: contract.fileUrl.includes(',') ? contract.fileUrl.split(',')[1] : undefined,
+                              fileSize: file.size
+                            };
+                            } else {
+                              const res = await fetch(contract.fileUrl);
+                              if (!res.ok) {
+                                throw new Error(`Failed to fetch contract: ${res.status}`);
+                              }
+
+                              const blob = await res.blob();
+                              const mimeType = blob.type || 'application/pdf';
+                              
+                              // Check if it's a PDF - CustomizePage only supports PDFs
+                              if (mimeType !== 'application/pdf') {
+                                alert(`Cannot customize ${contract.fileName}. Only PDF files can be customized. This file is: ${mimeType}\n\nPlease download the file and convert it to PDF first.`);
+                                setDropdownOpen(null);
+                                return;
+                              }
+                              
+                              const file = new File([blob], contract.fileName, { type: mimeType });
+                              const url = URL.createObjectURL(blob);
+
+                              let fileData: string | undefined;
+                              try {
+                                fileData = await convertFileToBase64(file);
+                              } catch (conversionError) {
+                                console.warn('Failed to convert fetched contract to base64:', conversionError);
+                              }
+
+                              newTemplate = {
+                                id: contract.id,
+                                name: contract.fileName,
+                                uploadDate: new Date(contract.sentDate).toLocaleDateString(),
+                                fileUrl: url,
+                                imagePreview: null,
+                                file,
+                                fileData,
+                                fileSize: blob.size
+                              };
+                            }
+
+                            if (newTemplate) {
+                              const templateToAdd = newTemplate;
+                              setUploadedTemplates(prev => {
+                                if (prev.some(t => t.id === templateToAdd.id)) {
+                                  return prev;
+                                }
+                                return [...prev, templateToAdd];
+                              });
+
+                              handleCustomize(contract.id, templateToAdd);
+                            }
+                          } catch (error) {
+                            console.error('Error preparing contract for customization:', error);
+                            alert('Failed to open contract for customization. Please try again.');
+                          } finally {
+                            setDropdownOpen(null);
+                          }
+                        }}
+                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100"
+                      >
+                        Customize
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Download the contract
+                          if (contract.fileUrl.startsWith('data:')) {
+                            const link = document.createElement('a');
+                            link.href = contract.fileUrl;
+                            link.download = contract.fileName;
+                            link.click();
+                          } else {
+                            window.open(contract.fileUrl, '_blank');
+                          }
+                          setDropdownOpen(null);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100"
+                      >
+                        Download
+                      </button>
+                    </div>
+                  )}
+
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
   ) : (
     <div>
       <h3 className="text-lg font-semibold text-gray-700 mb-3">Deleted Templates</h3>
@@ -833,7 +1059,7 @@ const findCustomizedTemplate = () => {
                 </div>
               </td>
               <td className="p-2 border text-left w-1/5">{template.uploadDate}</td>
-              <td className="p-2 border text-right space-x-2 w-2/5">
+              <td className="p-2 border text-right space-x-2 w-2/5 relative">
                 <button className="border border-red-500 text-red-500 px-4 py-1 rounded-full hover:bg-red-50"
                 onClick={() => setConfirmDelete(template.id)}
                 >
