@@ -130,7 +130,7 @@ class ReferencingService {
       
       // Handle specific Firebase errors
       if (error.code === 'failed-precondition') {
-        console.warn('⚠️ [landlord_agent] Firestore index missing for referencing query');
+        console.log('ℹ️ Firestore index not configured for referencing query');
         return {
           status: 'not-started',
           error: 'Database index required. Please check Firestore console.'

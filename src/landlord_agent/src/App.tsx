@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from 'react';
-import axios from 'axios';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { RoleSelection } from './components/RoleSelection';
 import { ProfileSetup } from './components/ProfileSetup';
@@ -589,41 +588,40 @@ export default function App() {
       return [];
     }
 
-    const API_BASE_URL = window.location.hostname === 'localhost'
-      ? 'http://localhost:10000/api'
-      : 'https://proptii-r1-1a.onrender.com/api';
+    console.log(`Processing ${documentFiles.length} documents...`);
 
-    const uploadPromises = documentFiles.map(async (file, index) => {
-      const formData = new FormData();
-      formData.append('document', file);
+    const convertFileToBase64 = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    };
 
+    const documentPromises = documentFiles.map(async (file, index) => {
       try {
-        const response = await axios.post(`${API_BASE_URL}/property/upload-document`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 30000
-        });
-
-        const uploaded = response.data?.document;
-        if (!uploaded?.url) {
-          throw new Error('Document upload did not return a URL');
-        }
-
+        const timestamp = Date.now();
+        const base64Url = await convertFileToBase64(file);
+        
+        console.log(`✅ Processed document ${index + 1}/${documentFiles.length}: ${file.name}`);
+        
         return {
-          id: `doc-${Date.now()}-${index}`,
-          name: uploaded.name || file.name,
+          id: `doc-${timestamp}-${index}`,
+          name: file.name,
           type: 'other', // Default classification; can be refined later
-          url: uploaded.url,
+          url: base64Url, // Store as base64 data URL
           issueDate: new Date(),
           status: 'valid'
         } as PropertyDocument;
       } catch (error) {
-        console.error(`❌ Error uploading document ${file.name}:`, error);
+        console.error(`❌ Error processing document ${file.name}:`, error);
         throw error;
       }
     });
 
-    const uploadedDocuments = await Promise.all(uploadPromises);
-    console.log(`✅ Uploaded ${uploadedDocuments.length} property documents`);
+    const uploadedDocuments = await Promise.all(documentPromises);
+    console.log(`✅ All ${uploadedDocuments.length} documents processed successfully`);
     return uploadedDocuments;
   };
 
@@ -650,14 +648,18 @@ export default function App() {
       status: 'valid'
     }));
 
-    return {
+    // Parse numeric values, omit if invalid (Firestore doesn't accept undefined)
+    const bedrooms = parseInt(propertyDetails.bedrooms) || 1;
+    const bathrooms = parseInt(propertyDetails.bathrooms);
+    const squareFootage = parseInt(propertyDetails.squareFootage);
+    const rent = parseInt(propertyDetails.monthlyRent) || 0;
+
+    const propertyData: any = {
       id: 'setup-property',
       address: propertyDetails.address,
       type: propertyType || 'Property',
-      bedrooms: parseInt(propertyDetails.bedrooms) || 1,
-      bathrooms: parseInt(propertyDetails.bathrooms) || undefined,
-      squareFootage: parseInt(propertyDetails.squareFootage) || undefined,
-      rent: parseInt(propertyDetails.monthlyRent) || 0,
+      bedrooms,
+      rent,
       status: 'vacant',
       amenities: amenities,
       notes: additionalNotes,
@@ -665,6 +667,16 @@ export default function App() {
       documents: documents,
       createdAt: new Date()
     };
+
+    // Only include optional fields if they have valid values
+    if (!isNaN(bathrooms)) {
+      propertyData.bathrooms = bathrooms;
+    }
+    if (!isNaN(squareFootage)) {
+      propertyData.squareFootage = squareFootage;
+    }
+
+    return propertyData;
   };
 
   // Initialize with mock data for better demonstration
@@ -1053,21 +1065,18 @@ export default function App() {
       };
 
       const userId = getCurrentUserId();
-      console.log('🔁 Scoping tenants for userId:', userId);
       let list = await tenantService.getTenants(userId || undefined);
 
       // If docs lack userId, fall back to scoping by owned property IDs
       if (userId) {
         const ownedPropertyIds = new Set(properties.map(p => p.id));
         if (ownedPropertyIds.size > 0) {
-          const before = list.length;
           list = list.filter(t => !t.propertyId || ownedPropertyIds.has(t.propertyId));
-          console.log(`✅ Tenant fallback filter by propertyIds: ${before} -> ${list.length}`);
         }
       }
       setTenants(list);
     } catch (e) {
-      console.warn('Failed to scope tenants; keeping current list', e);
+      console.error('Failed to load tenants:', e);
     }
   }, [properties, userProfile]);
 
@@ -1154,31 +1163,12 @@ export default function App() {
         };
 
         const currentUserId = getCurrentUserId();
-        console.log('✅ Final extracted userId for scoping:', currentUserId);
         
         if (!currentUserId) {
-          console.warn('⚠️ No userId found - loading all properties (this should not happen in production)');
+          console.warn('⚠️ No userId found');
         }
         
         const fetchedProperties = await propertyService.getProperties(currentUserId ? { userId: currentUserId } : undefined);
-        console.log(`✅ Properties loaded from Firebase (filtered by userId: ${currentUserId}):`, fetchedProperties.length);
-        
-        // Verify each property has the correct userId
-        fetchedProperties.forEach((prop, idx) => {
-          const propData = prop as any;
-          const propUserId = propData.userId;
-          const isMatch = propUserId === currentUserId;
-          console.log(`Property ${idx + 1} (${prop.address}):`, {
-            id: prop.id,
-            userId: propUserId || '❌ MISSING',
-            expectedUserId: currentUserId,
-            match: isMatch ? '✅' : '❌ MISMATCH',
-            photosCount: prop.photos?.length || 0
-          });
-          if (!isMatch && currentUserId) {
-            console.error(`❌ PROPERTY USER MISMATCH: Property "${prop.address}" has userId="${propUserId}" but expected "${currentUserId}"`);
-          }
-        });
         setProperties(fetchedProperties);
       } catch (error) {
         console.error('Error loading properties:', error);
@@ -1321,21 +1311,31 @@ export default function App() {
 
     // Track if we're currently generating alerts to prevent feedback loops
     let isGeneratingAlerts = false;
+    let lastAlertGenerationTime = 0;
+    const ALERT_GENERATION_COOLDOWN = 10000; // 10 seconds minimum between generations
     
-    // Debounce function to prevent too many rapid alert generations
+    // Throttled function to prevent too many rapid alert generations
     let alertGenerationTimeout: NodeJS.Timeout | null = null;
     const debouncedGenerateAlerts = () => {
       if (isGeneratingAlerts) {
         return; // Skip if already generating to prevent loops
       }
+      
+      // Check cooldown period
+      const now = Date.now();
+      if (now - lastAlertGenerationTime < ALERT_GENERATION_COOLDOWN) {
+        return; // Skip if cooldown period hasn't passed
+      }
+      
       if (alertGenerationTimeout) {
         clearTimeout(alertGenerationTimeout);
       }
       alertGenerationTimeout = setTimeout(async () => {
         try {
           isGeneratingAlerts = true;
+          lastAlertGenerationTime = Date.now();
           if (shouldLogRealtimeDebug) {
-            console.log('🔄 Real-time update detected - regenerating alerts');
+            console.log('🔄 Regenerating alerts (throttled)');
           }
           await alertService.generateAlerts(currentUserId);
         } catch (error) {
@@ -1343,7 +1343,7 @@ export default function App() {
         } finally {
           isGeneratingAlerts = false;
         }
-      }, 2000); // Increased to 2 seconds to reduce frequency
+      }, 3000); // 3 seconds delay
     };
 
     // Listen to tenants collection changes
@@ -1554,9 +1554,10 @@ export default function App() {
   }, [userProfile]);
 
   const addProperty = async (property: Omit<Property, 'id' | 'createdAt'>) => {
+    // Strip any accidental id/createdAt fields before saving (define outside try-catch for scope)
+    const { id: _ignoredId, createdAt: _ignoredCreatedAt, ...safeProperty } = property as any;
+    
     try {
-      // Strip any accidental id/createdAt fields before saving
-      const { id: _ignoredId, createdAt: _ignoredCreatedAt, ...safeProperty } = property as any;
       // Save to Firebase (scoped) - use same extraction logic as loading
       const currentUserId = (() => {
         try {
@@ -2166,7 +2167,6 @@ export default function App() {
   };
 
   const renderScreen = () => {
-    console.log('🔍 Current screen:', currentScreen, 'Type:', typeof currentScreen);
     switch (currentScreen) {
       case 'welcome':
         return <WelcomeScreen onGetStarted={() => navigateToScreen('role-selection')} />;

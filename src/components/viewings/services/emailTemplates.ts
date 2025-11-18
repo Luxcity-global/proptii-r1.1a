@@ -10,6 +10,9 @@ interface EmailTemplateData {
   };
 }
 
+// Base URL for Proptii application
+const BASE_URL = process.env.REACT_APP_URL || 'https://proptii.com';
+
 // Helper function to format time strings properly
 const formatTimeString = (timeString: string): string => {
   // If time is in HH:MM format, convert to 12-hour format
@@ -36,6 +39,26 @@ const formatTimeString = (timeString: string): string => {
   }
 
   return timeString; // Return as-is if can't parse
+};
+
+// CTA Button component - matches emailClient.js style
+const getCtaButton = (text: string, url: string): string => {
+  return `
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="${url}" 
+         style="display: inline-block; 
+                padding: 14px 32px; 
+                background: linear-gradient(135deg, #DC5F12 0%, #FF6B1A 100%);
+                color: #ffffff;
+                text-decoration: none;
+                border-radius: 50px;
+                font-weight: 600;
+                font-size: 16px;
+                box-shadow: 0 4px 12px rgba(220, 95, 18, 0.3);">
+        ${text}
+      </a>
+    </div>
+  `;
 };
 
 export const generateAgentEmailTemplate = (data: EmailTemplateData): string => {
@@ -79,6 +102,8 @@ export const generateAgentEmailTemplate = (data: EmailTemplateData): string => {
           <p>If the property is available, please review the request and confirm the appointment at your earliest convenience. If the suggested time doesn't work for you, kindly propose an alternative that suits your schedule.</p>
           <p>Please send your response to ${user.email}.</p>
         </div>
+
+        ${getCtaButton('👉 Manage Viewing Requests on Proptii', `${BASE_URL}/landlord/viewings`)}
 
         <div class="footer">
           <p>Thanks,<br>- The Proptii Team</p>
@@ -130,6 +155,8 @@ export const generateUserEmailTemplate = (data: EmailTemplateData): string => {
         <div class="message">
           <p>The agent will contact you shortly to confirm the appointment.</p>
         </div>
+
+        ${getCtaButton('👉 View My Viewing Requests on Proptii', `${BASE_URL}/dashboard/viewings`)}
 
         <div class="footer">
           <p>Thanks for using Proptii</p>

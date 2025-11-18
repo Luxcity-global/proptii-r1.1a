@@ -100,9 +100,6 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
       setLoading(true);
       setError(null);
       
-      console.log('🔄 ContractsPage - Loading contracts for tab:', activeTab);
-      console.log('🔄 ContractsPage - Landlord email:', landlordEmail);
-      
       const statusMap: Record<string, Contract['status']> = {
         'sent': 'sent',
         'unsigned': 'unsigned',
@@ -117,33 +114,13 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
       // Add landlordEmail filter if available
       if (landlordEmail) {
         filters.landlordEmail = landlordEmail;
-        console.log('🔍 Filtering contracts by landlord email:', landlordEmail);
       }
       
       const fetchedContracts = await contractService.getContracts(filters);
-      
-      console.log(`✅ ContractsPage - Loaded ${fetchedContracts.length} contracts with status '${activeTab}'`);
-      
-      // Log details of signed contracts for debugging
-      if (activeTab === 'signed' && fetchedContracts.length > 0) {
-        console.log('📋 Signed contracts:', fetchedContracts.map(c => ({
-          title: c.title,
-          tenant: c.tenantName,
-          signedDate: c.signedDate,
-          landlordEmail: (c as any).landlordEmail
-        })));
-      } else if (activeTab === 'signed' && fetchedContracts.length === 0) {
-        console.log('ℹ️ No signed contracts found for this landlord');
-        if (landlordEmail) {
-          console.log('💡 Make sure tenants are sending contracts to:', landlordEmail);
-        }
-      }
-      
       setContracts(fetchedContracts);
     } catch (err) {
-      console.error('❌ ContractsPage - Error loading contracts:', err);
+      console.error('❌ Error loading contracts:', err);
       setError('Failed to load contracts. Please try again.');
-      // Fallback to empty array on error
       setContracts([]);
     } finally {
       setLoading(false);

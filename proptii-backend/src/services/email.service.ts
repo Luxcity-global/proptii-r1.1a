@@ -227,6 +227,125 @@ export class EmailService {
           `
         );
 
+      case 'viewing-agent': {
+        const property = formData.property || {};
+        const viewing = formData.viewing || {};
+        const user = formData.user || {};
+        
+        // Format viewing date
+        let viewingDate = 'N/A';
+        if (viewing.date) {
+          try {
+            const date = new Date(viewing.date);
+            viewingDate = date.toLocaleDateString('en-GB', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            });
+          } catch (error) {
+            console.error('Error formatting date:', error);
+          }
+        }
+        
+        // Format viewing time
+        let viewingTime = viewing.time || 'N/A';
+        if (viewing.time && /^\d{2}:\d{2}$/.test(viewing.time)) {
+          const [hours, minutes] = viewing.time.split(':');
+          const hour = parseInt(hours, 10);
+          const ampm = hour >= 12 ? 'PM' : 'AM';
+          const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+          viewingTime = `${displayHour}:${minutes} ${ampm}`;
+        }
+        
+        const agentName = property.agent?.name || 'Agent';
+        const propertyAddress = property.street || 'the property';
+        
+        return wrapEmailContent(
+          'New Viewing Request',
+          `
+            <p>Hi ${agentName},</p>
+            <p>You've received a new viewing request for <strong>${propertyAddress}</strong>.</p>
+            
+            <div class="details">
+              <h3>Viewing Details</h3>
+              <p><strong>Requested by:</strong> ${user.name || 'Not provided'}</p>
+              <p><strong>Preferred date/time:</strong> ${viewingDate} at ${viewingTime}</p>
+              <p><strong>Viewing type:</strong> ${viewing.preference || 'Not specified'}</p>
+              <p><strong>Contact email:</strong> ${user.email || 'Not provided'}</p>
+              <p><strong>Phone number:</strong> ${viewing.userDetails?.phoneNumber || 'Not provided'}</p>
+            </div>
+            
+            <p>If the property is available, please review the request and confirm the appointment at your earliest convenience. If the suggested time doesn't work for you, kindly propose an alternative that suits your schedule.</p>
+            <p>Please send your response to <strong>${user.email}</strong>.</p>
+            
+            <div class="cta">
+              <a href="${baseUrl}/landlord/viewings" class="button">👉 Manage Viewing Requests on Proptii</a>
+            </div>
+          `
+        );
+      }
+
+      case 'viewing-user': {
+        const property = formData.property || {};
+        const viewing = formData.viewing || {};
+        const user = formData.user || {};
+        
+        // Format viewing date
+        let viewingDate = 'N/A';
+        if (viewing.date) {
+          try {
+            const date = new Date(viewing.date);
+            viewingDate = date.toLocaleDateString('en-GB', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            });
+          } catch (error) {
+            console.error('Error formatting date:', error);
+          }
+        }
+        
+        // Format viewing time
+        let viewingTime = viewing.time || 'N/A';
+        if (viewing.time && /^\d{2}:\d{2}$/.test(viewing.time)) {
+          const [hours, minutes] = viewing.time.split(':');
+          const hour = parseInt(hours, 10);
+          const ampm = hour >= 12 ? 'PM' : 'AM';
+          const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+          viewingTime = `${displayHour}:${minutes} ${ampm}`;
+        }
+        
+        const userName = user.name?.split(' ')[0] || 'there';
+        const propertyAddress = property.street || 'the property';
+        const fullAddress = `${property.street || ''}, ${property.city || ''}, ${property.postcode || ''}`.trim().replace(/, ,/g, ',').replace(/^,|,$/g, '');
+        
+        return wrapEmailContent(
+          'Your Viewing Request Confirmation',
+          `
+            <p>Hi ${userName},</p>
+            <p>Your viewing request for <strong>${propertyAddress}</strong> has been sent to the agent.</p>
+            
+            <div class="details">
+              <h3>Here's a summary of what you submitted:</h3>
+              <p><strong>Date/time requested:</strong> ${viewingDate} at ${viewingTime}</p>
+              <p><strong>Viewing type:</strong> ${viewing.preference || 'Not specified'}</p>
+              <p><strong>Agent:</strong> ${property.agent?.name || 'Not provided'}</p>
+              <p><strong>Property address:</strong> ${fullAddress || 'Not provided'}</p>
+            </div>
+            
+            <p>The agent will contact you shortly to confirm the appointment.</p>
+            
+            <div class="cta">
+              <a href="${baseUrl}/dashboard/viewings" class="button">👉 View My Viewing Requests on Proptii</a>
+            </div>
+            
+            <p>Thanks for choosing Proptii — we're here to make renting easy!</p>
+          `
+        );
+      }
+
       default:
         return wrapEmailContent('Proptii Notification', `<p>Email content</p>`);
     }

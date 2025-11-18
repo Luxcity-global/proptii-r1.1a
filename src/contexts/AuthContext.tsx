@@ -146,9 +146,15 @@ const refreshUserData = async (instance: any, accounts: any[], loginRequest: any
       
       if (freshResult && freshResult.account) {
         const phoneNumber = extractPhoneNumber(freshResult.account.idTokenClaims);
+        const stableUserId = 
+          freshResult.account.idTokenClaims?.oid || 
+          freshResult.account.idTokenClaims?.sub ||
+          freshResult.account.localAccountId || 
+          freshResult.account.homeAccountId || 
+          '';
         
         setUser({
-          id: freshResult.account.localAccountId || freshResult.account.homeAccountId || '',
+          id: stableUserId,
           name: freshResult.account.name || '',
           email: freshResult.account.username || '',
           phone: phoneNumber
@@ -160,7 +166,7 @@ const refreshUserData = async (instance: any, accounts: any[], loginRequest: any
         window.dispatchEvent(new CustomEvent('auth-state-changed', {
           detail: {
             success: true,
-            userId: freshResult.account.localAccountId || freshResult.account.homeAccountId
+            userId: stableUserId
           }
         }));
       }
@@ -176,9 +182,15 @@ const refreshUserData = async (instance: any, accounts: any[], loginRequest: any
         
         if (popupResult && popupResult.account) {
           const phoneNumber = extractPhoneNumber(popupResult.account.idTokenClaims);
+          const stableUserId = 
+            popupResult.account.idTokenClaims?.oid || 
+            popupResult.account.idTokenClaims?.sub ||
+            popupResult.account.localAccountId || 
+            popupResult.account.homeAccountId || 
+            '';
           
           setUser({
-            id: popupResult.account.localAccountId || popupResult.account.homeAccountId || '',
+            id: stableUserId,
             name: popupResult.account.name || '',
             email: popupResult.account.username || '',
             phone: phoneNumber
@@ -190,7 +202,7 @@ const refreshUserData = async (instance: any, accounts: any[], loginRequest: any
           window.dispatchEvent(new CustomEvent('auth-state-changed', {
             detail: {
               success: true,
-              userId: popupResult.account.localAccountId || popupResult.account.homeAccountId
+              userId: stableUserId
             }
           }));
         }
@@ -275,8 +287,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           console.log('📞 Final phone number:', phoneNumber);
           
+          const stableUserId = 
+            currentAccount.idTokenClaims?.oid || 
+            currentAccount.idTokenClaims?.sub ||
+            currentAccount.localAccountId || 
+            currentAccount.homeAccountId || 
+            '';
+          
           setUser({
-            id: currentAccount.localAccountId || currentAccount.homeAccountId,
+            id: stableUserId,
             givenName: currentAccount.name?.split(' ')[0],
             familyName: currentAccount.name?.split(' ').slice(1).join(' '),
             email: currentAccount.username,
@@ -394,11 +413,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const result = await instance.loginPopup(loginRequest);
 
       if (result) {
+        // Extract stable userId from token claims (oid or sub)
+        // These are consistent across browsers/sessions, unlike localAccountId
+        const stableUserId = 
+          result.account?.idTokenClaims?.oid || 
+          result.account?.idTokenClaims?.sub ||
+          result.account?.localAccountId || 
+          result.account?.homeAccountId || 
+          '';
+        
         // Dispatch auth state change event with success status
         window.dispatchEvent(new CustomEvent('auth-state-changed', {
           detail: {
             success: true,
-            userId: result.account?.localAccountId || result.account?.homeAccountId
+            userId: stableUserId
           }
         }));
 
@@ -407,6 +435,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Debug: Log all available claims
         console.log('🔍 Login - All available token claims:', result.account?.idTokenClaims);
         console.log('🔍 Login - All account properties:', Object.keys(result.account || {}));
+        console.log('🔑 Login - Using stable userId (oid/sub):', stableUserId);
         
         // Try multiple possible phone number claim names
         const phoneNumber = 
@@ -422,7 +451,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('📞 Login - Phone number found:', phoneNumber);
         
         setUser({
-          id: result.account?.localAccountId || result.account?.homeAccountId || '',
+          id: stableUserId,
           email: result.account?.username || '',
           name: result.account?.name,
           givenName: result.account?.name?.split(' ')[0],
@@ -431,7 +460,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           roles: ['tenant'] // Default role for new users
         });
         
-        console.log('👤 Login - User object set:', { id: result.account?.localAccountId, email: result.account?.username, phone: phoneNumber });
+        console.log('👤 Login - User object set:', { id: stableUserId, email: result.account?.username, phone: phoneNumber });
 
         // Record login activity
         sessionManager.updateActivity('interaction', 'User login');
@@ -440,10 +469,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Login error:', error);
 
       // Dispatch auth state change event with failure status
+      const fallbackUserId = 
+        accounts[0]?.idTokenClaims?.oid || 
+        accounts[0]?.idTokenClaims?.sub ||
+        accounts[0]?.localAccountId || 
+        accounts[0]?.homeAccountId;
+      
       window.dispatchEvent(new CustomEvent('auth-state-changed', {
         detail: {
           success: false,
-          userId: accounts[0]?.localAccountId || accounts[0]?.homeAccountId
+          userId: fallbackUserId
         }
       }));
 
@@ -508,9 +543,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Update user data immediately
         if (result && result.account) {
           const phoneNumber = extractPhoneNumber(result.account.idTokenClaims);
+          const stableUserId = 
+            result.account.idTokenClaims?.oid || 
+            result.account.idTokenClaims?.sub ||
+            result.account.localAccountId || 
+            result.account.homeAccountId || 
+            '';
           
           setUser({
-            id: result.account.localAccountId || result.account.homeAccountId || '',
+            id: stableUserId,
             name: result.account.name || '',
             email: result.account.username || '',
             phone: phoneNumber
@@ -522,7 +563,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           window.dispatchEvent(new CustomEvent('auth-state-changed', {
             detail: {
               success: true,
-              userId: result.account.localAccountId || result.account.homeAccountId
+              userId: stableUserId
             }
           }));
         }

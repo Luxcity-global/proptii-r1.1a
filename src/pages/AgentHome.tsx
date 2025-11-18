@@ -206,7 +206,7 @@ const AgentHome = () => {
                 <p className="text-gray-600 mb-8">Explore your property management&nbsp;dashboard</p>
               </div>
               <button
-                onClick={handleStartNewListing}
+                onClick={handleGoToDashboard}
                 className="text-[#374957] hover:text-[#DC5F12] hover:border-[#DC5F12] border border-transparent rounded-full px-8 py-3 font-medium flex items-center justify-center mx-auto group transition-all"
               >
                 View Dashboard

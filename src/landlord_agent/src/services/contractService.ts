@@ -162,10 +162,7 @@ class ContractService {
 
       // userId filter should be applied first for security
       if (filters?.userId) {
-        console.log('🔍 ContractService: Filtering by userId:', filters.userId);
         constraints.push(where('userId', '==', filters.userId));
-      } else {
-        console.warn('⚠️ ContractService: No userId filter provided - will load all contracts');
       }
 
       if (filters?.status) {
@@ -189,12 +186,11 @@ class ContractService {
           const q = query(this.contractsCollection, ...constraints);
           const querySnapshot = await getDocs(q);
           const contracts = this.mapContractDocs(querySnapshot.docs);
-          console.log(`✅ ContractService: Found ${contracts.length} contracts for userId: ${filters?.userId || 'none'}`);
           return contracts;
         } catch (indexError: any) {
           // If index error, fetch without orderBy and sort in memory
           if (indexError.code === 'failed-precondition' && indexError.message?.includes('index')) {
-            console.warn('Firestore index missing. Fetching without orderBy and sorting in memory.');
+            console.log('ℹ️ Firestore index not configured, using in-memory sort');
             const q = query(this.contractsCollection, ...constraints.slice(0, -1)); // Remove orderBy
             const querySnapshot = await getDocs(q);
             const contracts = this.mapContractDocs(querySnapshot.docs);
@@ -210,9 +206,7 @@ class ContractService {
           // Still apply userId filter even if no other filters
           const q = query(this.contractsCollection, where('userId', '==', filters.userId));
           querySnapshot = await getDocs(q);
-          console.log(`✅ ContractService: Found ${querySnapshot.docs.length} contracts for userId: ${filters.userId} (no other filters)`);
         } else {
-          console.warn('⚠️ ContractService: Fetching all contracts (no userId filter)');
           querySnapshot = await getDocs(this.contractsCollection);
         }
         const contracts = this.mapContractDocs(querySnapshot.docs);

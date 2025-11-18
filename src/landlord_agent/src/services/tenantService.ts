@@ -39,44 +39,34 @@ class TenantService {
 
   async getTenants(ownerUserId?: string): Promise<Tenant[]> {
     try {
-      if (ownerUserId) {
-        console.log('🔍 TenantService: Filtering by userId:', ownerUserId);
-      } else {
-        console.warn('⚠️ TenantService: No userId filter provided - will load all tenants');
-      }
       const base = query(this.tenantsCollection, orderBy('createdAt', 'desc'));
       const snap = await getDocs(base);
       let list = snap.docs.map(d => this.fromFirestore(d.id, d.data()));
       if (ownerUserId) {
         const beforeFilter = list.length;
-        // Log each tenant's userId for debugging
-        list.forEach(t => {
-          const tUserId = (t as any).userId;
-          console.log(`🔍 Tenant ${t.id} (${t.name}): userId=${tUserId || '❌ MISSING'}, matches filter: ${tUserId === ownerUserId ? '✅' : '❌'}`);
-        });
         list = list.filter(t => {
           const tUserId = (t as any).userId;
-          const matches = tUserId === ownerUserId;
-          if (!matches && tUserId) {
-            console.warn(`⚠️ Tenant ${t.id} (${t.name}) filtered out: userId "${tUserId}" !== "${ownerUserId}"`);
-          }
-          return matches;
+          return tUserId === ownerUserId;
         });
-        console.log(`✅ TenantService: Filtered ${beforeFilter} tenants to ${list.length} for userId: ${ownerUserId}`);
+        if (list.length === 0 && beforeFilter > 0) {
+          console.log(`ℹ️ TenantService: ${beforeFilter} tenants in database, 0 belong to your account`);
+        }
       }
-      console.log('[tenantService] getTenants (ordered) count:', list.length);
       return list;
-    } catch {
+    } catch (error: any) {
       // Fallback without order if index missing
-      console.warn('⚠️ TenantService: Firestore index missing, fetching without orderBy');
+      if (error.code === 'failed-precondition' || error.message?.includes('index')) {
+        console.log('ℹ️ Firestore index missing, fetching without orderBy');
+      }
       const snap = await getDocs(this.tenantsCollection);
       let list = snap.docs.map(d => this.fromFirestore(d.id, d.data()));
       if (ownerUserId) {
         const beforeFilter = list.length;
         list = list.filter(t => (t as any).userId === ownerUserId);
-        console.log(`✅ TenantService (fallback): Filtered ${beforeFilter} tenants to ${list.length} for userId: ${ownerUserId}`);
+        if (list.length === 0 && beforeFilter > 0) {
+          console.log(`ℹ️ TenantService: ${beforeFilter} tenants in database, 0 belong to your account`);
+        }
       }
-      console.log('[tenantService] getTenants (no order) count:', list.length);
       return list;
     }
   }
@@ -178,7 +168,6 @@ class TenantService {
     // Preserve userId field for filtering (even though it's not in Tenant type)
     if (data.userId) {
       (tenant as any).userId = data.userId;
-      console.log('📋 TenantService: Preserved userId for tenant:', id, 'userId:', data.userId);
     }
     // Preserve additional fields that aren't in Tenant type (steps 12-15)
     if (data.notes) (tenant as any).notes = data.notes;

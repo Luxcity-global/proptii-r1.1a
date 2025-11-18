@@ -98,10 +98,7 @@ class PropertyService {
         constraints.push(where('type', '==', filters.type));
       }
       if (filters?.userId) {
-        console.log('🔍 PropertyService: Filtering by userId:', filters.userId);
         constraints.push(where('userId', '==', filters.userId));
-      } else {
-        console.warn('⚠️ PropertyService: No userId filter provided - will load all properties');
       }
 
       // Try to query with orderBy, fallback to in-memory sorting if index missing
@@ -111,11 +108,10 @@ class PropertyService {
           const q = query(this.propertiesCollection, ...constraints);
           const querySnapshot = await getDocs(q);
           const properties = this.mapPropertyDocs(querySnapshot.docs);
-          console.log(`✅ PropertyService: Found ${properties.length} properties for userId: ${filters?.userId || 'none'}`);
           return properties;
         } catch (indexError: any) {
           if (indexError.code === 'failed-precondition' && indexError.message?.includes('index')) {
-            console.warn('Firestore index missing. Fetching without orderBy and sorting in memory.');
+            console.log('ℹ️ Firestore index not configured, using in-memory sort');
             const q = query(this.propertiesCollection, ...constraints.slice(0, -1)); // Remove orderBy
             const querySnapshot = await getDocs(q);
             const properties = this.mapPropertyDocs(querySnapshot.docs);

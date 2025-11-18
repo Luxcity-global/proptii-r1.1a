@@ -217,7 +217,7 @@ class AlertService {
         return this.mapAlertDocs(querySnapshot.docs);
       } catch (indexError: any) {
         if (indexError.code === 'failed-precondition' && indexError.message?.includes('index')) {
-          console.warn('Firestore index missing. Fetching without orderBy and sorting in memory.');
+          console.log('ℹ️ Firestore index not configured, using in-memory sort');
           const q = query(this.alertsCollection, ...constraints.slice(0, -1));
           const querySnapshot = await getDocs(q);
           const alerts = this.mapAlertDocs(querySnapshot.docs);
