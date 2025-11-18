@@ -10,6 +10,8 @@ import { SheetsModule } from './sheets/sheets.module';
 import { ContractModule } from './modules/contract.module';
 import { StorageModule } from './storage/storage.module';
 import { PropertyDocumentController } from './controllers/property-document.controller';
+import { AzureUsersController } from './controllers/azure-users.controller';
+import { AzureUsersService } from './services/azure-users.service';
 
 @Module({
   imports: [
@@ -25,7 +27,7 @@ import { PropertyDocumentController } from './controllers/property-document.cont
     ContractModule,
     StorageModule,
   ],
-  controllers: [AppController, PropertyDocumentController],
-  providers: [AppService],
+  controllers: [AppController, PropertyDocumentController, AzureUsersController],
+  providers: [AppService, AzureUsersService],
 })
 export class AppModule { }

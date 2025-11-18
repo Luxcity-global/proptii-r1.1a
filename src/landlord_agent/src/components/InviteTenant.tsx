@@ -61,33 +61,34 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
 
   const generateInvitationEmailHTML = (property: Property | undefined) => {
     const propertyAddress = property?.address || 'the property';
-    const invitationTypeText = formData.inviteType === 'new-tenant' 
-      ? 'create a new account and complete your tenant profile'
-      : 'complete your tenant profile';
+    const invitationTypeText = 'create a new account and complete your tenant profile';
     
     return `
       <!DOCTYPE html>
       <html>
       <head>
         <style>
+          @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap');
           body { 
-            font-family: Arial, sans-serif; 
+            font-family: 'Archivo', Arial, sans-serif; 
             line-height: 1.6; 
-            color: #333; 
+            color: #136C9E; 
             max-width: 600px;
             margin: 0 auto;
             padding: 20px;
           }
           .header {
-            background-color: #DC5F12;
-            color: white;
+            background-color: #E4F1F9;
+            color: #136C9E;
             padding: 30px;
             text-align: center;
             border-radius: 8px 8px 0 0;
+            border-bottom: 1px solid #C5E0F0;
           }
           .header h1 {
             margin: 0;
             font-size: 24px;
+            color: #136C9E;
           }
           .content {
             background-color: #f9f9f9;
@@ -101,7 +102,7 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
             padding: 20px;
             border-radius: 5px;
             margin: 20px 0;
-            border-left: 4px solid #DC5F12;
+            border-left: 4px solid #136C9E;
           }
           .property-info h3 {
             margin-top: 0;
@@ -113,17 +114,18 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
             border-radius: 5px;
             margin: 20px 0;
             font-style: italic;
-            border-left: 3px solid #DC5F12;
+            border-left: 3px solid #136C9E;
           }
           .cta-button {
             display: inline-block;
             background-color: #DC5F12;
             color: white !important;
-            padding: 12px 30px;
+            padding: 14px 36px;
             text-decoration: none;
-            border-radius: 6px;
-            margin: 20px 0;
+            border-radius: 999px;
+            margin: 24px 0;
             font-weight: bold;
+            box-shadow: 0 8px 18px rgba(220, 95, 18, 0.3);
           }
           .footer {
             margin-top: 30px;
@@ -166,11 +168,11 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
             </div>
           ` : ''}
           
-          <p>Please click the button below to ${formData.inviteType === 'new-tenant' ? 'create your account and' : ''} complete your tenant profile:</p>
+          <p>Please click the button below to create your account and complete your tenant profile:</p>
           
           <div style="text-align: center;">
-            <a href="https://proptii.com/tenant/register" class="cta-button">
-              ${formData.inviteType === 'new-tenant' ? 'Create Account & Complete Profile' : 'Complete Your Profile'}
+            <a href="https://proptii-frontend.onrender.com/" class="cta-button">
+              Create Account & Complete Profile
             </a>
           </div>
           
@@ -379,25 +381,6 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
                     </SelectContent>
                   </Select>
                   {errors.propertyId && <p className="text-red-500 text-sm">{errors.propertyId}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="inviteType">Invitation Type</Label>
-                  <Select value={formData.inviteType} onValueChange={(value: 'new-tenant' | 'existing-tenant') => handleInputChange('inviteType', value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new-tenant">New Tenant Registration</SelectItem>
-                      <SelectItem value="existing-tenant">Existing Tenant Assignment</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-gray-500">
-                    {formData.inviteType === 'new-tenant' 
-                      ? 'For tenants who need to create a new account'
-                      : 'For tenants who already have an account on the platform'
-                    }
-                  </p>
                 </div>
 
                 <div className="space-y-2">

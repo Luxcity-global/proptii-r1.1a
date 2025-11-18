@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { ArrowLeft, Search, Users, Home, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Search, Users, Home, CheckCircle, AlertCircle, Loader2, Info } from 'lucide-react';
 import { Property, Tenant } from '../App';
 import { tenantService } from '../services/tenantService';
 import axios from 'axios';
@@ -224,11 +224,28 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
               Select a tenant from our existing users
             </h1>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Choose a user from your directory and assign them as a tenant to a property
+              Choose a user from our directory and assign them as a tenant to a property
             </p>
           </div>
 
           <div className="max-w-4xl mx-auto">
+            {/* Info Section */}
+            <Card className="mb-6 bg-blue-50 border-blue-300" style={{ borderWidth: '1px' }}>
+              <CardContent className="p-4">
+                <div className="flex items-start space-x-3">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: '#136C9E' }}>
+                    <Info className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-800 mb-1">Note</h3>
+                    <p className="text-gray-700 text-sm">
+                      Imported contacts from our database may need to be edited and updated from the tenant details page after assignment. Some information may be incomplete or require verification.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Search and Filters */}
             <Card className="mb-6">
               <CardHeader>
