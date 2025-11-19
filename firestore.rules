@@ -85,6 +85,28 @@ service cloud.firestore {
       //   resource.data.userId == request.auth.uid;
     }
 
+    // Book Viewing Requests collection
+    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
+    // For development, we allow all access. For production, you should:
+    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
+    // 2. Use Cloud Functions to validate Azure AD tokens, OR
+    // 3. Use a different authentication approach
+    match /bookViewingRequests/{documentId} {
+      // Development: Allow all reads and writes
+      // TODO: Secure this for production - see note above
+      allow read, write: if true;
+      
+      // Production-ready rule (commented out until Firebase Auth is set up):
+      // allow read: if request.auth != null && 
+      //   (resource.data.userId == request.auth.uid || 
+      //    resource.data.landlordId == request.auth.uid || 
+      //    resource.data.agentId == request.auth.uid);
+      // allow create: if request.auth != null;
+      // allow update, delete: if request.auth != null && 
+      //   (resource.data.landlordId == request.auth.uid || 
+      //    resource.data.agentId == request.auth.uid);
+    }
+
     // Viewing bookings collection
     // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
     // For development, we allow all access. For production, you should:

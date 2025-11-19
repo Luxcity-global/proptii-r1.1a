@@ -15,7 +15,17 @@ interface EmailData {
   text?: string;
   attachments?: EmailAttachment[];
   formData?: any;
-  emailType?: 'agent' | 'referee' | 'guarantor' | 'user' | 'viewing-agent' | 'viewing-user' | 'viewing-reschedule' | 'viewing-cancel';
+  emailType?:
+    | 'agent'
+    | 'referee'
+    | 'guarantor'
+    | 'user'
+    | 'viewing-agent'
+    | 'viewing-user'
+    | 'viewing-confirmed'
+    | 'viewing-reschedule'
+    | 'viewing-cancel'
+    | 'viewing-cancellation';
 }
 
 interface MultiEmailData {
@@ -91,6 +101,61 @@ export class EmailService {
       .list { margin: 0; padding-left: 18px; }
       .list li { margin: 6px 0; }
     `;
+
+    const propertyData = formData.property || {};
+    const viewingData = formData.viewing || {};
+    const managerData = formData.manager || {};
+    const viewingUser = formData.user || {};
+
+    const formatViewingDate = (dateString?: string) => {
+      if (!dateString) return 'Date to be confirmed';
+      try {
+        const parsedDate = new Date(dateString);
+        if (isNaN(parsedDate.getTime())) return dateString;
+        return parsedDate.toLocaleDateString('en-GB', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+      } catch {
+        return dateString;
+      }
+    };
+
+    const formatViewingTime = (timeString?: string) => {
+      if (!timeString) return 'Time to be confirmed';
+      if (/^\d{2}:\d{2}$/.test(timeString)) {
+        const [hours, minutes] = timeString.split(':');
+        const hourValue = parseInt(hours, 10);
+        const ampm = hourValue >= 12 ? 'PM' : 'AM';
+        const displayHour = hourValue === 0 ? 12 : hourValue > 12 ? hourValue - 12 : hourValue;
+        return `${displayHour}:${minutes} ${ampm}`;
+      }
+      try {
+        const parsedTime = new Date(timeString);
+        if (!isNaN(parsedTime.getTime())) {
+          return parsedTime.toLocaleTimeString('en-GB', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          });
+        }
+      } catch {
+        return timeString;
+      }
+      return timeString;
+    };
+
+    const getFullAddress = () => {
+      const segments = [propertyData.street, propertyData.city, propertyData.postcode].filter(Boolean);
+      return segments.length ? segments.join(', ') : 'Address to be confirmed';
+    };
+
+    const formatMultilineText = (text?: string) => {
+      if (!text) return '';
+      return text.replace(/\n/g, '<br />');
+    };
 
     const defaultFooter = `
       <div class="footer">
@@ -342,6 +407,120 @@ export class EmailService {
             </div>
             
             <p>Thanks for choosing Proptii — we're here to make renting easy!</p>
+          `
+        );
+      }
+
+      case 'viewing-confirmed': {
+        const propertyAddress = propertyData.street || 'the property';
+        const userName = viewingUser.name?.split(' ')[0] || 'there';
+        const managerName = managerData.name || propertyData.agent?.name || 'your agent';
+        const managerEmail = managerData.email || propertyData.agent?.email || '';
+
+        return wrapEmailContent(
+          'Viewing Confirmed 🎉',
+          `
+            <p>Hi ${userName},</p>
+            <p>Your viewing for <strong>${propertyAddress}</strong> is confirmed. We look forward to showing you the property.</p>
+
+            <div class="details">
+              <h3>Appointment Details</h3>
+              <p><strong>Date:</strong> ${formatViewingDate(viewingData.date)}</p>
+              <p><strong>Time:</strong> ${formatViewingTime(viewingData.time)}</p>
+              <p><strong>Viewing type:</strong> ${viewingData.preference || 'In-person viewing'}</p>
+              <p><strong>Address:</strong> ${getFullAddress()}</p>
+              <p><strong>Hosted by:</strong> ${managerName}${managerEmail ? ` &lt;${managerEmail}&gt;` : ''}</p>
+            </div>
+
+            <p>Please arrive a few minutes early and bring any notes or questions you may have about the property. If anything changes, reply directly to this email so we can help reschedule.</p>
+
+            <div class="cta">
+              <a href="${baseUrl}/dashboard/viewings" class="button">👉 View My Viewing Details</a>
+            </div>
+          `
+        );
+      }
+
+      case 'viewing-reschedule': {
+        const isManagerInitiated = !!(managerData.name || managerData.email);
+        const recipientName = isManagerInitiated
+          ? viewingUser.name?.split(' ')[0] || 'there'
+          : propertyData.agent?.name || 'there';
+        const initiatorName = isManagerInitiated
+          ? managerData.name || propertyData.agent?.name || 'Your agent'
+          : viewingUser.name || 'The applicant';
+        const messageIntro = isManagerInitiated
+          ? `${initiatorName} has updated your viewing for <strong>${propertyData.street || 'the property'}</strong>.`
+          : `${initiatorName} would like to reschedule the viewing for <strong>${propertyData.street || 'the property'}</strong>.`;
+        const messageCopy = viewingData.rescheduleMessage
+          ? `
+              <div class="details">
+                <h3>Message from ${initiatorName}</h3>
+                <p>${formatMultilineText(viewingData.rescheduleMessage)}</p>
+              </div>
+            `
+          : '';
+        const ctaPath = isManagerInitiated ? '/dashboard/viewings' : '/landlord/viewings';
+        const ctaLabel = isManagerInitiated ? '👉 View My Updated Viewing' : '👉 Manage Viewing on Proptii';
+
+        return wrapEmailContent(
+          'Viewing Rescheduled',
+          `
+            <p>Hi ${recipientName},</p>
+            <p>${messageIntro}</p>
+
+            <div class="details">
+              <h3>New Appointment Details</h3>
+              <p><strong>Date:</strong> ${formatViewingDate(viewingData.date)}</p>
+              <p><strong>Time:</strong> ${formatViewingTime(viewingData.time)}</p>
+              <p><strong>Viewing type:</strong> ${viewingData.preference || 'In-person viewing'}</p>
+              <p><strong>Address:</strong> ${getFullAddress()}</p>
+            </div>
+
+            ${messageCopy}
+
+            <p>If the new time does not work for you, please reply to this email so we can arrange another slot.</p>
+
+            <div class="cta">
+              <a href="${baseUrl}${ctaPath}" class="button">${ctaLabel}</a>
+            </div>
+          `
+        );
+      }
+
+      case 'viewing-cancel':
+      case 'viewing-cancellation': {
+        const isManagerInitiated = !!(managerData.name || managerData.email);
+        const recipientName = isManagerInitiated
+          ? viewingUser.name?.split(' ')[0] || 'there'
+          : propertyData.agent?.name || 'there';
+        const initiatorName = isManagerInitiated
+          ? managerData.name || propertyData.agent?.name || 'Your agent'
+          : viewingUser.name || 'The applicant';
+        const reasonText =
+          formatMultilineText(viewingData.cancelMessage) ||
+          (isManagerInitiated
+            ? 'The agent cancelled the viewing but did not include a reason.'
+            : 'The applicant cancelled the viewing but did not include a reason.');
+        const ctaPath = isManagerInitiated ? '/dashboard/viewings' : '/landlord/viewings';
+        const ctaLabel = isManagerInitiated ? '👉 View My Viewing Requests' : '👉 Manage Viewings on Proptii';
+
+        return wrapEmailContent(
+          'Viewing Cancelled',
+          `
+            <p>Hi ${recipientName},</p>
+            <p>${initiatorName} has cancelled the viewing for <strong>${propertyData.street || 'the property'}</strong>.</p>
+
+            <div class="details">
+              <h3>Reason for cancellation</h3>
+              <p>${reasonText}</p>
+            </div>
+
+            <p>If you'd like to arrange another visit, simply reply to this email and we'll help set up a new time.</p>
+
+            <div class="cta">
+              <a href="${baseUrl}${ctaPath}" class="button">${ctaLabel}</a>
+            </div>
           `
         );
       }

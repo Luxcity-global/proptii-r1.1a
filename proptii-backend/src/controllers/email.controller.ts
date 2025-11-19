@@ -12,7 +12,17 @@ interface SendEmailPayload {
   to?: string;
   subject?: string;
   html?: string;
-  emailType?: string;
+  emailType?:
+    | 'agent'
+    | 'referee'
+    | 'guarantor'
+    | 'user'
+    | 'viewing-agent'
+    | 'viewing-user'
+    | 'viewing-confirmed'
+    | 'viewing-reschedule'
+    | 'viewing-cancel'
+    | 'viewing-cancellation';
 }
 
 interface SendEmailWithAttachmentPayload extends SendEmailPayload {

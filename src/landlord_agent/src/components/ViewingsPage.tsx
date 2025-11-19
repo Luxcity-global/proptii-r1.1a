@@ -8,7 +8,9 @@ import {
   Mail,
   User,
   Eye,
-  MapPin
+  MapPin,
+  Search,
+  Filter
 } from 'lucide-react';
 import viewingService, { ViewingBooking, ViewingStats } from '../../../services/viewingService';
 import {
@@ -16,6 +18,7 @@ import {
   BookViewingRequest
 } from '../../../services/bookViewingRequestService';
 import emailService from '../../../services/emailService';
+import landlordUserService from '../../../services/landlordUserService';
 
 type TabKey = 'requests' | 'upcoming' | 'past';
 
@@ -101,13 +104,15 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   const [cancelMessage, setCancelMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [filterQuery, setFilterQuery] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'name' | 'email' | 'date'>('all');
 
   useEffect(() => {
     let unsubscribeBookings: (() => void) | undefined;
     let unsubscribeRequests: (() => void) | undefined;
     let unsubscribeStats: (() => void) | undefined;
 
-    if (!managerId) {
+    if (!managerId && !managerEmail) {
       setLoading(false);
       setError('Unable to determine your manager profile. Please sign in again.');
       return;
@@ -118,11 +123,45 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         setLoading(true);
         setError(null);
 
+        // Look up the landlordUser record by email to get the correct landlordUser ID
+        // This is important because the auth user ID might be different from the landlordUser ID
+        let landlordUserId: string | null = null;
+        
+        if (managerEmail) {
+          console.log('🔍 Looking up landlord user by email:', managerEmail);
+          const lookupResult = await landlordUserService.getLandlordUserByEmail(managerEmail);
+          if (lookupResult.success && lookupResult.user?.id) {
+            landlordUserId = lookupResult.user.id;
+            console.log('✅ Found landlord user ID:', landlordUserId, '(from email lookup)');
+          } else {
+            console.log('⚠️ No landlord user found with email:', managerEmail);
+            console.log('ℹ️ Falling back to managerId from auth:', managerId);
+          }
+        }
+
+        // If we still don't have an ID after email lookup, use the managerId as fallback
+        if (!landlordUserId) {
+          landlordUserId = managerId;
+          console.log('ℹ️ Using managerId as fallback:', landlordUserId);
+        }
+
+        if (!landlordUserId) {
+          setError('Unable to find your landlord/agent profile. Please make sure you are registered.');
+          setLoading(false);
+          return;
+        }
+
+        console.log('📊 Loading viewings for landlord user ID:', landlordUserId);
+
         const [requestsResult, bookingsResult, statsResult] = await Promise.all([
-          bookViewingRequestService.getManagerRequests(managerId),
-          viewingService.getManagerViewingBookings(managerId),
-          viewingService.getManagerViewingStats(managerId)
+          bookViewingRequestService.getManagerRequests(landlordUserId),
+          viewingService.getManagerViewingBookings(landlordUserId),
+          viewingService.getManagerViewingStats(landlordUserId)
         ]);
+
+        console.log('📋 Requests result:', requestsResult);
+        console.log('📋 Bookings result:', bookingsResult);
+        console.log('📋 Stats result:', statsResult);
 
         if (requestsResult.success && requestsResult.requests) {
           setRequests(requestsResult.requests);
@@ -130,6 +169,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
         if (bookingsResult.success && bookingsResult.bookings) {
           setBookings(bookingsResult.bookings);
+          console.log('✅ Set bookings:', bookingsResult.bookings.length, 'bookings');
         }
 
         if (statsResult.success && statsResult.stats) {
@@ -137,6 +177,30 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         }
 
         setLoading(false);
+
+        // Set up real-time subscriptions using the landlordUser ID
+        unsubscribeBookings = viewingService.subscribeToManagerViewingBookings(
+          landlordUserId,
+          (items) => {
+            console.log('📡 Real-time bookings update:', items.length, 'bookings');
+            setBookings(items);
+          },
+          (err) => {
+            console.error('Viewing bookings subscription error:', err);
+          }
+        );
+
+        unsubscribeStats = viewingService.subscribeToManagerViewingStats(
+          landlordUserId,
+          (nextStats) => setStats(nextStats),
+          (err) => console.error('Viewing stats subscription error:', err)
+        );
+
+        unsubscribeRequests = bookViewingRequestService.subscribeToManagerRequests(
+          landlordUserId,
+          (items) => setRequests(items),
+          (err) => console.error('Viewing requests subscription error:', err)
+        );
       } catch (err) {
         console.error('Error loading manager viewings:', err);
         setError('Failed to load viewings data. Please try again later.');
@@ -146,38 +210,24 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
     loadInitialData();
 
-    unsubscribeBookings = viewingService.subscribeToManagerViewingBookings(
-      managerId,
-      (items) => setBookings(items),
-      (err) => {
-        console.error('Viewing bookings subscription error:', err);
-      }
-    );
-
-    unsubscribeStats = viewingService.subscribeToManagerViewingStats(
-      managerId,
-      (nextStats) => setStats(nextStats),
-      (err) => console.error('Viewing stats subscription error:', err)
-    );
-
-    unsubscribeRequests = bookViewingRequestService.subscribeToManagerRequests(
-      managerId,
-      (items) => setRequests(items),
-      (err) => console.error('Viewing requests subscription error:', err)
-    );
-
     return () => {
       unsubscribeBookings?.();
       unsubscribeRequests?.();
       unsubscribeStats?.();
     };
-  }, [managerId]);
+  }, [managerId, managerEmail]);
 
   const upcomingViewings = useMemo(
     () =>
       bookings.filter((viewing) =>
-        ['pending', 'confirmed', 'rescheduled'].includes(viewing.status)
+        ['confirmed', 'rescheduled'].includes(viewing.status)
       ),
+    [bookings]
+  );
+
+  const pendingViewings = useMemo(
+    () =>
+      bookings.filter((viewing) => viewing.status === 'pending'),
     [bookings]
   );
 
@@ -194,7 +244,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
     return [
       {
         title: 'Pending Requests',
-        value: requests.length,
+        value: requests.length + pendingViewings.length,
         icon: <Mail className="w-5 h-5 text-blue-600" />,
         accent: 'bg-blue-100'
       },
@@ -217,7 +267,36 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         accent: 'bg-red-100'
       }
     ];
-  }, [requests.length, upcomingViewings.length, stats.completed, bookings]);
+  }, [requests.length, pendingViewings.length, upcomingViewings.length, stats.completed, bookings]);
+
+  // Filter function
+  const filterItems = <T extends { property: { street: string; town: string; city: string }; viewingDetails?: { date?: string; userDetails?: { fullName?: string; email?: string } } }>(items: T[]) => {
+    if (!filterQuery) return items;
+
+    const query = filterQuery.toLowerCase();
+    return items.filter((item) => {
+      const propertyText = `${item.property.street} ${item.property.town} ${item.property.city}`.toLowerCase();
+      const tenantName = item.viewingDetails?.userDetails?.fullName?.toLowerCase() || '';
+      const tenantEmail = item.viewingDetails?.userDetails?.email?.toLowerCase() || '';
+      const date = item.viewingDetails?.date || '';
+
+      switch (filterType) {
+        case 'name':
+          return tenantName.includes(query);
+        case 'email':
+          return tenantEmail.includes(query);
+        case 'date':
+          return date.includes(query);
+        case 'all':
+        default:
+          return propertyText.includes(query) || tenantName.includes(query) || tenantEmail.includes(query) || date.includes(query);
+      }
+    });
+  };
+
+  const filteredUpcomingViewings = useMemo(() => filterItems(upcomingViewings), [upcomingViewings, filterQuery, filterType]);
+  const filteredPendingViewings = useMemo(() => filterItems(pendingViewings), [pendingViewings, filterQuery, filterType]);
+  const filteredPastViewings = useMemo(() => filterItems(pastViewings), [pastViewings, filterQuery, filterType]);
 
   const handleScheduleRequest = (request: BookViewingRequest) => {
     setSelectedRequest(request);
@@ -295,7 +374,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
             }
           },
           attachments: [],
-          emailType: 'viewing-user'
+          emailType: 'viewing-confirmed'
         });
       }
 
@@ -549,204 +628,464 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
       </div>
 
       <div>
-        <div className="mb-6 inline-flex rounded-full border border-gray-200 p-1 bg-white">
-          <button
-            onClick={() => setActiveTab('requests')}
-            className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
-              activeTab === 'requests' ? 'bg-orange-500 text-white' : 'text-gray-600'
-            }`}
-          >
-            Requests ({requests.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('upcoming')}
-            className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
-              activeTab === 'upcoming' ? 'bg-orange-500 text-white' : 'text-gray-600'
-            }`}
-          >
-            Scheduled ({upcomingViewings.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('past')}
-            className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
-              activeTab === 'past' ? 'bg-orange-500 text-white' : 'text-gray-600'
-            }`}
-          >
-            Past ({pastViewings.length})
-          </button>
+        <div className="mb-6 flex items-center justify-between">
+          {/* Tabs */}
+          <div className="inline-flex rounded-full border border-gray-200 p-1 bg-white">
+            <button
+              onClick={() => setActiveTab('requests')}
+              className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+                activeTab === 'requests' ? 'bg-orange-500 text-white' : 'text-gray-600'
+              }`}
+            >
+              Requests ({requests.length + pendingViewings.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('upcoming')}
+              className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+                activeTab === 'upcoming' ? 'bg-orange-500 text-white' : 'text-gray-600'
+              }`}
+            >
+              Scheduled ({upcomingViewings.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('past')}
+              className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+                activeTab === 'past' ? 'bg-orange-500 text-white' : 'text-gray-600'
+              }`}
+            >
+              Past ({pastViewings.length})
+            </button>
+          </div>
+
+          {/* Filter Controls */}
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search viewings..."
+                value={filterQuery}
+                onChange={(e) => setFilterQuery(e.target.value)}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
+              />
+            </div>
+            <div className="relative">
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as 'all' | 'name' | 'email' | 'date')}
+                className="pl-4 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white cursor-pointer"
+              >
+                <option value="all">All Fields</option>
+                <option value="name">Name</option>
+                <option value="email">Email</option>
+                <option value="date">Date</option>
+              </select>
+              <Filter className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
         </div>
 
         {activeTab === 'requests' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {requests.length === 0 ? (
-              <div className="col-span-full bg-white border border-dashed border-gray-200 rounded-xl p-12 text-center">
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            {requests.length === 0 && filteredPendingViewings.length === 0 ? (
+              <div className="p-12 text-center">
                 <Mail className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-700 mb-2">No pending requests</h3>
                 <p className="text-sm text-gray-500">New viewing requests will appear here for approval.</p>
               </div>
             ) : (
-              requests.map((request) => (
-                <div key={request.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-base font-semibold text-gray-900 mb-1">
-                        {request.property.street}
-                      </h3>
-                      <p className="text-sm text-gray-500 flex items-center mb-3">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        {request.property.town}, {request.property.city} {request.property.postcode}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <h4 className="text-xs font-semibold text-gray-600 tracking-wide uppercase mb-2">Agent</h4>
-                    <div className="flex flex-col gap-1 text-sm text-gray-600">
-                      <span className="flex items-center"><User className="w-4 h-4 mr-2" />{request.property.agent.name}</span>
-                      <span className="flex items-center"><Mail className="w-4 h-4 mr-2" />{request.property.agent.email || 'N/A'}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <button
-                      className="flex-1 inline-flex items-center justify-center px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
-                      onClick={() => handleScheduleRequest(request)}
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      Schedule Viewing
-                    </button>
-                    <button
-                      className="flex-1 inline-flex items-center justify-center px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
-                      onClick={() => handleDeclineRequest(request)}
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Decline
-                    </button>
+              <>
+                {/* Table Header */}
+                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                  <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+                    <div className="col-span-2">Property</div>
+                    <div className="col-span-2">Date & Time</div>
+                    <div className="col-span-1">Status</div>
+                    <div className="col-span-2">Tenant Name</div>
+                    <div className="col-span-2">Tenant Email</div>
+                    <div className="col-span-3 text-center">Actions</div>
                   </div>
                 </div>
-              ))
+
+                {/* Table Body */}
+                <div className="divide-y divide-gray-100">
+                  {/* Unscheduled Requests */}
+                  {requests.map((request) => (
+                    <div key={request.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                      <div className="grid grid-cols-12 gap-4 items-center">
+                        {/* Property */}
+                        <div className="col-span-2">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate">
+                            {request.property.street}
+                          </h3>
+                          <p className="text-xs text-gray-500 truncate">
+                            {request.property.town}, {request.property.city}
+                          </p>
+                        </div>
+
+                        {/* Date & Time */}
+                        <div className="col-span-2">
+                          <span className="text-xs text-gray-500 italic">Not scheduled yet</span>
+                        </div>
+
+                        {/* Status */}
+                        <div className="col-span-1">
+                          <span className="inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-blue-100 text-blue-700">
+                            New Request
+                          </span>
+                        </div>
+
+                        {/* Tenant Name */}
+                        <div className="col-span-2">
+                          <span className="text-sm text-gray-500 italic">Not provided</span>
+                        </div>
+
+                        {/* Tenant Email */}
+                        <div className="col-span-2">
+                          <span className="text-sm text-gray-500 italic">Not provided</span>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="col-span-3 flex items-center justify-center gap-2">
+                          <button
+                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition"
+                            onClick={() => handleScheduleRequest(request)}
+                            title="Schedule viewing"
+                          >
+                            <Send className="w-3.5 h-3.5 mr-1" />
+                            Schedule
+                          </button>
+                          <button
+                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 transition"
+                            onClick={() => handleDeclineRequest(request)}
+                            title="Decline request"
+                          >
+                            <X className="w-3.5 h-3.5 mr-1" />
+                            Decline
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Pending Viewings (Scheduled but not confirmed) */}
+                  {filteredPendingViewings.map((viewing) => (
+                    <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                      <div className="grid grid-cols-12 gap-4 items-center">
+                        {/* Property */}
+                        <div className="col-span-2">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate">
+                            {viewing.property.street}
+                          </h3>
+                          <p className="text-xs text-gray-500 truncate">
+                            {viewing.property.town}, {viewing.property.city}
+                          </p>
+                        </div>
+
+                        {/* Date & Time */}
+                        <div className="col-span-2">
+                          <div className="flex items-center text-xs text-gray-600 mb-1">
+                            <Calendar className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <span className="truncate">{formatDate(viewing.viewingDetails?.date || '')}</span>
+                          </div>
+                          <div className="flex items-center text-xs text-gray-600">
+                            <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <span>{formatTime(viewing.viewingDetails?.time || '')}</span>
+                          </div>
+                        </div>
+
+                        {/* Status */}
+                        <div className="col-span-1">
+                          <span className="inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-orange-100 text-orange-700">
+                            Pending
+                          </span>
+                        </div>
+
+                        {/* Tenant Name */}
+                        <div className="col-span-2">
+                          <div className="flex items-center text-sm text-gray-900">
+                            <User className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
+                            <span className="truncate">
+                              {viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Tenant Email */}
+                        <div className="col-span-2">
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Mail className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
+                            <span className="truncate">
+                              {viewing.viewingDetails?.userDetails?.email || 'Not provided'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="col-span-3 flex items-center justify-center gap-2">
+                          <button
+                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition disabled:opacity-50"
+                            onClick={() => handleConfirmViewing(viewing)}
+                            disabled={isProcessing}
+                            title="Confirm viewing"
+                          >
+                            <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                            Confirm
+                          </button>
+                          <button
+                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-blue-300 text-xs font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50"
+                            onClick={() => handleOpenReschedule(viewing)}
+                            disabled={isProcessing}
+                            title="Reschedule viewing"
+                          >
+                            <Send className="w-3.5 h-3.5 mr-1" />
+                            Reschedule
+                          </button>
+                          <button
+                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-red-300 text-xs font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                            onClick={() => handleOpenCancel(viewing)}
+                            disabled={isProcessing}
+                            title="Cancel viewing"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}
 
         {activeTab === 'upcoming' && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {upcomingViewings.length === 0 ? (
-              <div className="col-span-full bg-white border border-dashed border-gray-200 rounded-xl p-12 text-center">
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            {filteredUpcomingViewings.length === 0 ? (
+              <div className="p-12 text-center">
                 <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-700 mb-2">No scheduled viewings</h3>
-                <p className="text-sm text-gray-500">Scheduled viewings will appear here once you confirm requests.</p>
+                <h3 className="text-lg font-medium text-gray-700 mb-2">
+                  {filterQuery ? 'No matching viewings' : 'No scheduled viewings'}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {filterQuery ? 'Try adjusting your search filters' : 'Scheduled viewings will appear here once you confirm requests.'}
+                </p>
               </div>
             ) : (
-              upcomingViewings.map((viewing) => (
-                <div key={viewing.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="text-base font-semibold text-gray-900">
-                        {viewing.property.street}
-                      </h3>
-                      <p className="text-xs text-gray-500 flex items-center mt-1">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {formatDate(viewing.viewingDetails?.date || '')}
-                        <span className="mx-2">•</span>
-                        <Clock className="w-3 h-3 mr-1" />
-                        {formatTime(viewing.viewingDetails?.time || '')}
-                      </p>
-                    </div>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        viewing.status === 'confirmed'
-                          ? 'bg-green-100 text-green-700'
-                          : viewing.status === 'rescheduled'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-orange-100 text-orange-700'
-                      }`}
-                    >
-                      {viewing.status.charAt(0).toUpperCase() + viewing.status.slice(1)}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3 mb-4 text-sm text-gray-600">
-                    <div className="flex items-center">
-                      <User className="w-4 h-4 mr-2" />
-                      {viewing.viewingDetails?.userDetails?.fullName || 'Tenant name unavailable'}
-                    </div>
-                    <div className="flex items-center">
-                      <Mail className="w-4 h-4 mr-2" />
-                      {viewing.viewingDetails?.userDetails?.email || 'Email unavailable'}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    {viewing.status !== 'confirmed' && (
-                      <button
-                        className="flex-1 inline-flex items-center justify-center px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition"
-                        onClick={() => handleConfirmViewing(viewing)}
-                        disabled={isProcessing}
-                      >
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Confirm
-                      </button>
-                    )}
-                    <button
-                      className="flex-1 inline-flex items-center justify-center px-4 py-2 rounded-lg border border-blue-300 text-sm font-medium text-blue-600 hover:bg-blue-50 transition"
-                      onClick={() => handleOpenReschedule(viewing)}
-                      disabled={isProcessing}
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      Reschedule
-                    </button>
-                    <button
-                      className="flex-1 inline-flex items-center justify-center px-4 py-2 rounded-lg border border-red-300 text-sm font-medium text-red-600 hover:bg-red-50 transition"
-                      onClick={() => handleOpenCancel(viewing)}
-                      disabled={isProcessing}
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Cancel
-                    </button>
+              <>
+                {/* Table Header */}
+                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                  <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+                    <div className="col-span-2">Property</div>
+                    <div className="col-span-2">Date & Time</div>
+                    <div className="col-span-1">Status</div>
+                    <div className="col-span-2">Tenant Name</div>
+                    <div className="col-span-2">Tenant Email</div>
+                    <div className="col-span-3 text-center">Actions</div>
                   </div>
                 </div>
-              ))
+
+                {/* Table Body */}
+                <div className="divide-y divide-gray-100">
+                  {filteredUpcomingViewings.map((viewing) => (
+                    <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                      <div className="grid grid-cols-12 gap-4 items-center">
+                        {/* Property */}
+                        <div className="col-span-2">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate">
+                            {viewing.property.street}
+                          </h3>
+                          <p className="text-xs text-gray-500 truncate">
+                            {viewing.property.town}, {viewing.property.city}
+                          </p>
+                        </div>
+
+                        {/* Date & Time */}
+                        <div className="col-span-2">
+                          <div className="flex items-center text-xs text-gray-600 mb-1">
+                            <Calendar className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <span className="truncate">{formatDate(viewing.viewingDetails?.date || '')}</span>
+                          </div>
+                          <div className="flex items-center text-xs text-gray-600">
+                            <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <span>{formatTime(viewing.viewingDetails?.time || '')}</span>
+                          </div>
+                        </div>
+
+                        {/* Status */}
+                        <div className="col-span-1">
+                          <span
+                            className={`inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                              viewing.status === 'confirmed'
+                                ? 'bg-green-100 text-green-700'
+                                : viewing.status === 'rescheduled'
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-orange-100 text-orange-700'
+                            }`}
+                          >
+                            {viewing.status.charAt(0).toUpperCase() + viewing.status.slice(1)}
+                          </span>
+                        </div>
+
+                        {/* Tenant Name */}
+                        <div className="col-span-2">
+                          <div className="flex items-center text-sm text-gray-900">
+                            <User className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
+                            <span className="truncate">
+                              {viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Tenant Email */}
+                        <div className="col-span-2">
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Mail className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
+                            <span className="truncate">
+                              {viewing.viewingDetails?.userDetails?.email || 'Not provided'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="col-span-3 flex items-center justify-center gap-2">
+                          {viewing.status !== 'confirmed' && (
+                            <button
+                              className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition disabled:opacity-50"
+                              onClick={() => handleConfirmViewing(viewing)}
+                              disabled={isProcessing}
+                              title="Confirm viewing"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                              Confirm
+                            </button>
+                          )}
+                          <button
+                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-blue-300 text-xs font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50"
+                            onClick={() => handleOpenReschedule(viewing)}
+                            disabled={isProcessing}
+                            title="Reschedule viewing"
+                          >
+                            <Send className="w-3.5 h-3.5 mr-1" />
+                            Reschedule
+                          </button>
+                          <button
+                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-red-300 text-xs font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                            onClick={() => handleOpenCancel(viewing)}
+                            disabled={isProcessing}
+                            title="Cancel viewing"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}
 
         {activeTab === 'past' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {pastViewings.length === 0 ? (
-              <div className="col-span-full bg-white border border-dashed border-gray-200 rounded-xl p-12 text-center">
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            {filteredPastViewings.length === 0 ? (
+              <div className="p-12 text-center">
                 <Eye className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-700 mb-2">No past viewings</h3>
-                <p className="text-sm text-gray-500">Completed and cancelled viewings will appear here.</p>
+                <h3 className="text-lg font-medium text-gray-700 mb-2">
+                  {filterQuery ? 'No matching viewings' : 'No past viewings'}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {filterQuery ? 'Try adjusting your search filters' : 'Completed and cancelled viewings will appear here.'}
+                </p>
               </div>
             ) : (
-              pastViewings.map((viewing) => (
-                <div key={viewing.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-base font-semibold text-gray-900">
-                        {viewing.property.street}
-                      </h3>
-                      <p className="text-xs text-gray-500 flex items-center mt-1">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {formatDate(viewing.viewingDetails?.date || '')}
-                        <span className="mx-2">•</span>
-                        <Clock className="w-3 h-3 mr-1" />
-                        {formatTime(viewing.viewingDetails?.time || '')}
-                      </p>
-                    </div>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        viewing.status === 'completed'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {viewing.status.charAt(0).toUpperCase() + viewing.status.slice(1)}
-                    </span>
+              <>
+                {/* Table Header */}
+                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                  <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+                    <div className="col-span-2">Property</div>
+                    <div className="col-span-2">Date & Time</div>
+                    <div className="col-span-1">Status</div>
+                    <div className="col-span-2">Tenant Name</div>
+                    <div className="col-span-2">Tenant Email</div>
+                    <div className="col-span-3">Notes</div>
                   </div>
                 </div>
-              ))
+
+                {/* Table Body */}
+                <div className="divide-y divide-gray-100">
+                  {filteredPastViewings.map((viewing) => (
+                    <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                      <div className="grid grid-cols-12 gap-4 items-center">
+                        {/* Property */}
+                        <div className="col-span-2">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate">
+                            {viewing.property.street}
+                          </h3>
+                          <p className="text-xs text-gray-500 truncate">
+                            {viewing.property.town}, {viewing.property.city}
+                          </p>
+                        </div>
+
+                        {/* Date & Time */}
+                        <div className="col-span-2">
+                          <div className="flex items-center text-xs text-gray-600 mb-1">
+                            <Calendar className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <span className="truncate">{formatDate(viewing.viewingDetails?.date || '')}</span>
+                          </div>
+                          <div className="flex items-center text-xs text-gray-600">
+                            <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <span>{formatTime(viewing.viewingDetails?.time || '')}</span>
+                          </div>
+                        </div>
+
+                        {/* Status */}
+                        <div className="col-span-1">
+                          <span
+                            className={`inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+                              viewing.status === 'completed'
+                                ? 'bg-green-100 text-green-700'
+                                : viewing.status === 'cancelled'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-gray-100 text-gray-700'
+                            }`}
+                          >
+                            {viewing.status.charAt(0).toUpperCase() + viewing.status.slice(1)}
+                          </span>
+                        </div>
+
+                        {/* Tenant Name */}
+                        <div className="col-span-2">
+                          <div className="flex items-center text-sm text-gray-900">
+                            <User className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
+                            <span className="truncate">
+                              {viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Tenant Email */}
+                        <div className="col-span-2">
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Mail className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
+                            <span className="truncate">
+                              {viewing.viewingDetails?.userDetails?.email || 'Not provided'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div className="col-span-3">
+                          <span className="text-xs text-gray-500 truncate">
+                            {viewing.notes || viewing.agentNotes || '—'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}

@@ -181,13 +181,20 @@ const Viewings: React.FC = () => {
           );
         }
 
-        // Merge requests placeholders, dedupe by propertyId
-        const mergedMap = new Map<string, ViewingBooking>();
-        [...requestBookings, ...upcoming].forEach(b => {
+        // Only add request placeholders for properties that don't have real bookings
+        const realBookingKeys = new Set<string>();
+        upcoming.forEach(b => {
           const key = b.propertyId || `${b.property.street}-${b.property.town}`;
-          if (!mergedMap.has(key)) mergedMap.set(key, b);
+          realBookingKeys.add(key);
         });
-        upcoming = Array.from(mergedMap.values());
+        
+        const filteredRequestBookings = requestBookings.filter(r => {
+          const key = r.propertyId || `${r.property.street}-${r.property.town}`;
+          return !realBookingKeys.has(key);
+        });
+        
+        // Combine real bookings with filtered request placeholders
+        upcoming = [...upcoming, ...filteredRequestBookings];
         setUpcomingViewings(prev => {
           // Keep any draft at the top if present
           const draft = prev.find(v => String(v.id).startsWith('draft_'));
@@ -198,10 +205,27 @@ const Viewings: React.FC = () => {
         console.log('Upcoming viewings count:', upcoming.length);
 
         console.log('Loading past viewings...');
-        // Load past viewings (completed)
+        // Load past viewings (completed and cancelled)
         const completedResult = await viewingService.getViewingBookingsByStatus(user.id, 'completed');
+        const cancelledResult = await viewingService.getViewingBookingsByStatus(user.id, 'cancelled');
         console.log('Completed result:', completedResult);
-        setPastViewings(completedResult.bookings || []);
+        console.log('Cancelled result:', cancelledResult);
+        
+        let past = [
+          ...(completedResult.bookings || []),
+          ...(cancelledResult.bookings || [])
+        ];
+        
+        // Fallback: if status-scoped queries return nothing (e.g., missing index),
+        // derive past from the all-bookings list
+        if (past.length === 0 && (allBookingsResult.bookings || []).length > 0) {
+          console.log('Using fallback from all bookings to populate past');
+          past = (allBookingsResult.bookings || []).filter(
+            (b: any) => b.status === 'completed' || b.status === 'cancelled'
+          );
+        }
+        
+        setPastViewings(past);
 
       } catch (err) {
         console.error('Error loading viewing data:', err);
@@ -229,18 +253,27 @@ const Viewings: React.FC = () => {
       (bookings) => {
         console.log('Real-time subscription received bookings:', bookings);
         const upcoming = bookings.filter(b => b.status === 'pending' || b.status === 'confirmed');
-        const past = bookings.filter(b => b.status === 'completed');
+        const past = bookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
         console.log('Filtered upcoming:', upcoming);
         console.log('Filtered past:', past);
         setUpcomingViewings(prev => {
-          // keep any request placeholders already shown
+          // Get request placeholders from previous state
           const requests = prev.filter(v => String(v.id).startsWith('request_'));
-          const dedupMap = new Map<string, ViewingBooking>();
-          [...requests, ...upcoming].forEach(b => {
+          
+          // Only keep request placeholders that don't have real bookings
+          const realBookingKeys = new Set<string>();
+          upcoming.forEach(b => {
             const key = b.propertyId || `${b.property.street}-${b.property.town}`;
-            if (!dedupMap.has(key)) dedupMap.set(key, b);
+            realBookingKeys.add(key);
           });
-          return Array.from(dedupMap.values());
+          
+          const filteredRequests = requests.filter(r => {
+            const key = r.propertyId || `${r.property.street}-${r.property.town}`;
+            return !realBookingKeys.has(key);
+          });
+          
+          // Combine real bookings with filtered request placeholders
+          return [...upcoming, ...filteredRequests];
         });
         setPastViewings(past);
       },
@@ -267,12 +300,23 @@ const Viewings: React.FC = () => {
           updatedAt: undefined as any
         }));
         setUpcomingViewings(prev => {
-          const dedupMap = new Map<string, ViewingBooking>();
-          [...requestBookings, ...prev].forEach(b => {
+          // Get real bookings (not request placeholders)
+          const realBookings = prev.filter(v => !String(v.id).startsWith('request_'));
+          
+          // Only add request placeholders for properties that don't have real bookings
+          const realBookingKeys = new Set<string>();
+          realBookings.forEach(b => {
             const key = b.propertyId || `${b.property.street}-${b.property.town}`;
-            if (!dedupMap.has(key)) dedupMap.set(key, b);
+            realBookingKeys.add(key);
           });
-          return Array.from(dedupMap.values());
+          
+          const filteredRequestBookings = requestBookings.filter(r => {
+            const key = r.propertyId || `${r.property.street}-${r.property.town}`;
+            return !realBookingKeys.has(key);
+          });
+          
+          // Combine real bookings with filtered request placeholders
+          return [...realBookings, ...filteredRequestBookings];
         });
       }
     );
@@ -307,7 +351,34 @@ const Viewings: React.FC = () => {
   const currentViewings = activeTab === 'upcoming' ? upcomingViewings : pastViewings;
   const currentSelections = propertySelections;
 
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString();
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'TBD';
+    try {
+      return new Date(dateString).toLocaleDateString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch {
+      return 'TBD';
+    }
+  };
+
+  const formatTime = (timeString: string) => {
+    if (!timeString) return 'TBD';
+    try {
+      const [hour, minute] = timeString.split(':');
+      const date = new Date();
+      date.setHours(Number(hour), Number(minute));
+      return date.toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    } catch {
+      return timeString;
+    }
+  };
 
   const handleReschedule = async (bookingId: string) => {
     const viewing = upcomingViewings.find(v => v.id === bookingId);
@@ -750,7 +821,7 @@ const Viewings: React.FC = () => {
                     </div>
                   <div className="flex items-center">
                     <Clock className="w-3 h-3 mr-1" />
-                      {viewing.viewingDetails.time}
+                      {formatTime(viewing.viewingDetails.time)}
                     </div>
                   </div>
 
@@ -763,6 +834,10 @@ const Viewings: React.FC = () => {
                         ? 'bg-green-100 text-green-800'
                         : viewing.status === 'completed'
                         ? 'bg-blue-100 text-blue-800'
+                        : viewing.status === 'cancelled'
+                        ? 'bg-red-100 text-red-800'
+                        : viewing.status === 'rescheduled'
+                        ? 'bg-orange-100 text-orange-800'
                         : 'bg-gray-100 text-gray-800'
                     }`}>
                       {viewing.status.charAt(0).toUpperCase() + viewing.status.slice(1)}
