@@ -17,6 +17,9 @@ import {
 } from '../../../services/bookViewingRequestService';
 import emailService from '../../../services/emailService';
 
+// Module-level log to confirm file is loaded
+console.log('📦 ViewingsPage.tsx MODULE LOADED');
+
 type TabKey = 'requests' | 'upcoming' | 'past';
 
 interface ViewingsPageProps {
@@ -85,7 +88,12 @@ function formatTime(time: string) {
 }
 
 const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, managerEmail }) => {
+  console.log('🟢 ViewingsPage component RENDERED');
+  console.log('🟢 Props received:', { managerId, managerName, managerEmail });
+  console.log('🟢 About to declare useState hooks...');
+  
   const [loading, setLoading] = useState(true);
+  console.log('🟢 useState hooks declared, loading state:', loading);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('requests');
   const [requests, setRequests] = useState<BookViewingRequest[]>([]);
@@ -102,76 +110,189 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   const [isProcessing, setIsProcessing] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  console.log('🟢 All state hooks declared, about to declare useEffect...');
+  console.log('🟢 managerEmail at useEffect declaration time:', managerEmail);
+  
+  // Test useEffect with empty deps to see if ANY useEffect runs
   useEffect(() => {
+    console.log('🧪🧪🧪 TEST: useEffect with empty deps executed! 🧪🧪🧪');
+  }, []);
+
+  useEffect(() => {
+    console.log('🔵🔵🔵 ViewingsPage useEffect TRIGGERED 🔵🔵🔵');
+    console.log('🔵 managerEmail prop:', managerEmail);
+    console.log('🔵 managerEmail type:', typeof managerEmail);
+    console.log('🔵 managerEmail truthy?', !!managerEmail);
+    console.log('🔵 managerId prop:', managerId);
+    console.log('🔵 managerName prop:', managerName);
+    
     let unsubscribeBookings: (() => void) | undefined;
     let unsubscribeRequests: (() => void) | undefined;
     let unsubscribeStats: (() => void) | undefined;
 
-    if (!managerId) {
+    // Use email for filtering instead of managerId
+    if (!managerEmail) {
+      console.warn('⚠️⚠️⚠️ No managerEmail provided, cannot load viewings ⚠️⚠️⚠️');
       setLoading(false);
-      setError('Unable to determine your manager profile. Please sign in again.');
+      setError('Unable to determine your email. Please sign in again.');
       return;
     }
+    
+    console.log('✅✅✅ managerEmail is available, proceeding with email-based filtering ✅✅✅');
+    console.log('✅ managerEmail value:', managerEmail);
 
     const loadInitialData = async () => {
+      console.log('📥 loadInitialData function called');
+      console.log('📥 About to call service methods with email:', managerEmail);
       try {
         setLoading(true);
         setError(null);
 
-        const [requestsResult, bookingsResult, statsResult] = await Promise.all([
-          bookViewingRequestService.getManagerRequests(managerId),
-          viewingService.getManagerViewingBookings(managerId),
-          viewingService.getManagerViewingStats(managerId)
+        console.log('📥 Getting ALL viewingBookings for email (will filter by status)...');
+        const allBookingsPromise = viewingService.getViewingBookingsByEmail(managerEmail);
+        console.log('📥 Calling getViewingStatsByEmail...');
+        const statsPromise = viewingService.getViewingStatsByEmail(managerEmail);
+        
+        console.log('📥 Waiting for Promise.all...');
+        // Use email-based filtering on viewingBookings collection only
+        const [allBookingsResult, statsResult] = await Promise.all([
+          allBookingsPromise,
+          statsPromise
         ]);
+        
+        // Filter bookings by status: 'pending' = requests, others = bookings
+        const requests: BookViewingRequest[] = [];
+        const bookings: ViewingBooking[] = [];
+        
+        if (allBookingsResult.success && allBookingsResult.bookings) {
+          allBookingsResult.bookings.forEach((booking) => {
+            if (booking.status === 'pending') {
+              // Convert ViewingBooking to BookViewingRequest format for pending requests
+              requests.push({
+                id: booking.id,
+                userId: booking.userId,
+                propertyId: booking.propertyId || '',
+                landlordId: booking.landlordId,
+                agentId: booking.agentId,
+                property: booking.property,
+                status: 'requested' as const,
+                createdAt: booking.createdAt,
+                updatedAt: booking.updatedAt
+              });
+            } else {
+              bookings.push(booking);
+            }
+          });
+        }
+        
+        const requestsResult = { success: true, requests };
+        const bookingsResult = { success: true, bookings };
+        
+        console.log('📥 Promise.all completed');
+        console.log('📥 requestsResult:', requestsResult);
+        console.log('📥 bookingsResult:', bookingsResult);
+        console.log('📥 statsResult:', statsResult);
 
         if (requestsResult.success && requestsResult.requests) {
+          console.log('✅ Setting requests:', requestsResult.requests.length);
           setRequests(requestsResult.requests);
+        } else {
+          console.warn('⚠️ requestsResult not successful:', requestsResult);
         }
 
         if (bookingsResult.success && bookingsResult.bookings) {
+          console.log('✅ Setting bookings:', bookingsResult.bookings.length);
           setBookings(bookingsResult.bookings);
+        } else {
+          console.warn('⚠️ bookingsResult not successful:', bookingsResult);
         }
 
         if (statsResult.success && statsResult.stats) {
+          console.log('✅ Setting stats:', statsResult.stats);
           setStats(statsResult.stats);
+        } else {
+          console.warn('⚠️ statsResult not successful:', statsResult);
         }
 
         setLoading(false);
+        console.log('✅✅✅ loadInitialData completed successfully ✅✅✅');
       } catch (err) {
-        console.error('Error loading manager viewings:', err);
+        console.error('❌❌❌ Error loading manager viewings:', err);
+        console.error('❌ Error details:', {
+          message: err instanceof Error ? err.message : 'Unknown error',
+          stack: err instanceof Error ? err.stack : undefined
+        });
         setError('Failed to load viewings data. Please try again later.');
         setLoading(false);
       }
     };
 
+    console.log('📞 Calling loadInitialData...');
     loadInitialData();
 
-    unsubscribeBookings = viewingService.subscribeToManagerViewingBookings(
-      managerId,
-      (items) => setBookings(items),
+    // Use email-based subscriptions for real-time updates (all from viewingBookings)
+    console.log('📡 Setting up subscriptions with email:', managerEmail);
+    
+    console.log('📡 Subscribing to ALL viewingBookings (will filter by status)...');
+    unsubscribeBookings = viewingService.subscribeToViewingBookingsByEmail(
+      managerEmail,
+      (allItems) => {
+        console.log('📡 All viewingBookings subscription callback received:', allItems.length, 'items');
+        
+        // Filter by status: pending = requests, others = bookings
+        const pendingRequests: BookViewingRequest[] = [];
+        const confirmedBookings: ViewingBooking[] = [];
+        
+        allItems.forEach((item) => {
+          if (item.status === 'pending') {
+            pendingRequests.push({
+              id: item.id,
+              userId: item.userId,
+              propertyId: item.propertyId || '',
+              landlordId: item.landlordId,
+              agentId: item.agentId,
+              property: item.property,
+              status: 'requested' as const,
+              createdAt: item.createdAt,
+              updatedAt: item.updatedAt
+            });
+          } else {
+            confirmedBookings.push(item);
+          }
+        });
+        
+        console.log('📡 Filtered to', pendingRequests.length, 'requests and', confirmedBookings.length, 'bookings');
+        setRequests(pendingRequests);
+        setBookings(confirmedBookings);
+      },
       (err) => {
-        console.error('Viewing bookings subscription error:', err);
+        console.error('❌ Viewing bookings subscription error:', err);
       }
     );
 
-    unsubscribeStats = viewingService.subscribeToManagerViewingStats(
-      managerId,
-      (nextStats) => setStats(nextStats),
-      (err) => console.error('Viewing stats subscription error:', err)
+    console.log('📡 Subscribing to viewing stats...');
+    unsubscribeStats = viewingService.subscribeToViewingStatsByEmail(
+      managerEmail,
+      (nextStats) => {
+        console.log('📡 Viewing stats subscription callback received:', nextStats);
+        setStats(nextStats);
+      },
+      (err) => {
+        console.error('❌ Viewing stats subscription error:', err);
+      }
     );
-
-    unsubscribeRequests = bookViewingRequestService.subscribeToManagerRequests(
-      managerId,
-      (items) => setRequests(items),
-      (err) => console.error('Viewing requests subscription error:', err)
-    );
+    
+    // No separate subscription for requests - they come from the same subscription
+    unsubscribeRequests = undefined;
+    
+    console.log('✅✅✅ All subscriptions set up ✅✅✅');
 
     return () => {
       unsubscribeBookings?.();
       unsubscribeRequests?.();
       unsubscribeStats?.();
     };
-  }, [managerId]);
+  }, [managerEmail]);
 
   const upcomingViewings = useMemo(
     () =>
@@ -242,14 +363,6 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
     setIsProcessing(true);
     try {
-      const property = {
-        street: selectedRequest.property.street,
-        town: selectedRequest.property.town,
-        city: selectedRequest.property.city,
-        postcode: selectedRequest.property.postcode,
-        agent: selectedRequest.property.agent
-      };
-
       const viewingDetails: ViewingBooking['viewingDetails'] = {
         date: scheduleForm.date,
         time: scheduleForm.time,
@@ -261,29 +374,25 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         }
       };
 
-      const result = await viewingService.saveViewingBooking(
-        selectedRequest.userId,
-        property,
-        viewingDetails,
-        selectedRequest.propertyId,
-        {
-          landlordId: managerId,
-          agentId: managerId
-        }
+      // Update the existing viewing booking from 'pending' to 'confirmed' with new details
+      const result = await viewingService.updateViewingStatus(
+        selectedRequest.id,
+        'confirmed',
+        undefined,
+        undefined,
+        { viewingDetails }
       );
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to schedule viewing');
       }
 
-      await bookViewingRequestService.deleteRequest(selectedRequest.id);
-
       if (scheduleForm.tenantEmail) {
         await emailService.sendEmail({
           to: scheduleForm.tenantEmail,
-          subject: `Viewing Scheduled - ${property.street}`,
+          subject: `Viewing Scheduled - ${selectedRequest.property.street}`,
           formData: {
-            property,
+            property: selectedRequest.property,
             viewing: viewingDetails,
             manager: {
               name: managerName,
@@ -313,8 +422,9 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
   const handleDeclineRequest = async (request: BookViewingRequest) => {
     try {
-      await bookViewingRequestService.deleteRequest(request.id);
-      setFeedback({ type: 'success', message: 'Viewing request removed.' });
+      // Update status from 'pending' to 'cancelled' in viewingBookings
+      await viewingService.updateViewingStatus(request.id, 'cancelled', 'Declined by agent');
+      setFeedback({ type: 'success', message: 'Viewing request declined.' });
     } catch (err) {
       console.error('Failed to decline viewing request:', err);
       setFeedback({ type: 'error', message: 'Failed to decline request. Please try again.' });

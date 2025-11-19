@@ -131,6 +131,86 @@ class BookViewingRequestService {
     }
   }
 
+  /**
+   * Get viewing requests filtered by agent email
+   * This allows filtering by the signed-in user's email to show only their requests
+   */
+  async getRequestsByEmail(agentEmail: string): Promise<{ success: boolean; requests?: BookViewingRequest[]; error?: string }> {
+    try {
+      // Normalize email to lowercase for comparison (emails are case-insensitive)
+      const normalizedEmail = agentEmail?.toLowerCase().trim();
+      console.log('🔍 Getting viewing requests for agent email:', normalizedEmail);
+      console.log('🔍 Collection name:', this.collectionName);
+      const q = query(
+        collection(db, this.collectionName),
+        where('property.agent.email', '==', normalizedEmail),
+        orderBy('createdAt', 'desc')
+      );
+      
+      console.log('🔍 About to execute Firestore query...');
+      console.log('🔍 Query details:', {
+        collection: this.collectionName,
+        filter: 'property.agent.email == ' + normalizedEmail,
+        orderBy: 'createdAt desc'
+      });
+      
+      const querySnapshot = await getDocs(q);
+      console.log('🔍 Query completed! Snapshot size:', querySnapshot.size);
+      console.log('🔍 Query empty?', querySnapshot.empty);
+      
+      const requests: BookViewingRequest[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data() as BookViewingRequest;
+        requests.push(data);
+        console.log('📋 Found request:', {
+          id: data.id,
+          agentEmail: data.property?.agent?.email,
+          propertyStreet: data.property?.street
+        });
+      });
+      
+      console.log(`✅✅✅ Retrieved ${requests.length} requests for email: ${normalizedEmail} ✅✅✅`);
+      return { success: true, requests };
+    } catch (error: any) {
+      // Fallback without orderBy if index is missing
+      if (error.code === 'failed-precondition' && error.message?.includes('index')) {
+        console.warn('⚠️ Firestore index missing, falling back to query without orderBy');
+        const normalizedEmail = agentEmail?.toLowerCase().trim();
+        const fallbackQuery = query(
+          collection(db, this.collectionName),
+          where('property.agent.email', '==', normalizedEmail)
+        );
+        const fallbackSnapshot = await getDocs(fallbackQuery);
+        const requests: BookViewingRequest[] = [];
+        fallbackSnapshot.forEach((doc) => {
+          const data = doc.data() as BookViewingRequest;
+          requests.push(data);
+          console.log('📋 Found request (fallback):', {
+            id: data.id,
+            agentEmail: data.property?.agent?.email,
+            propertyStreet: data.property?.street
+          });
+        });
+        // Sort in memory
+        const sorted = requests.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+        console.log(`✅ Retrieved ${sorted.length} requests (fallback) for email: ${normalizedEmail}`);
+        return { success: true, requests: sorted };
+      }
+      console.error('❌ Error getting viewing requests by email:', error);
+      console.error('❌ Error details:', {
+        code: error.code,
+        message: error.message,
+        collectionName: this.collectionName,
+        email: agentEmail
+      });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
   subscribeToUserRequests(
     userId: string,
     callback: (requests: BookViewingRequest[]) => void,
@@ -213,6 +293,47 @@ class BookViewingRequestService {
       unsubscribeLandlord();
       unsubscribeAgent();
     };
+  }
+
+  /**
+   * Subscribe to real-time updates for viewing requests filtered by agent email
+   */
+  subscribeToRequestsByEmail(
+    agentEmail: string,
+    callback: (requests: BookViewingRequest[]) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    const normalizedEmail = agentEmail?.toLowerCase().trim();
+    console.log('🔔 Subscribing to viewing requests for email:', normalizedEmail);
+    const q = query(
+      collection(db, this.collectionName),
+      where('property.agent.email', '==', normalizedEmail),
+      orderBy('createdAt', 'desc')
+    );
+
+    return onSnapshot(
+      q,
+      (querySnapshot) => {
+        const requests: BookViewingRequest[] = [];
+        querySnapshot.forEach((doc) => {
+          requests.push(doc.data() as BookViewingRequest);
+        });
+        console.log(`🔔 Subscription update: ${requests.length} requests for email: ${normalizedEmail}`);
+        callback(requests);
+      },
+      (error) => {
+        console.error('❌ Error in viewing requests by email subscription:', error);
+        console.error('❌ Subscription error details:', {
+          code: error.code,
+          message: error.message,
+          collectionName: this.collectionName,
+          email: normalizedEmail
+        });
+        if (onError) {
+          onError(error);
+        }
+      }
+    );
   }
 
   async deleteRequest(requestId: string): Promise<{ success: boolean; error?: string }> {

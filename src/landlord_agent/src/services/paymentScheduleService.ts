@@ -3,6 +3,7 @@ import {
   doc,
   setDoc,
   updateDoc,
+  getDoc,
   getDocs,
   query,
   where,
@@ -173,14 +174,24 @@ class PaymentScheduleService {
   }
 
   async generateScheduleForTenant(tenant: Tenant, options?: GenerateScheduleOptions): Promise<RentPaymentPeriod[]> {
+    console.log('📅 [paymentScheduleService] generateScheduleForTenant called:', {
+      tenantId: tenant?.id,
+      paymentFrequency: tenant?.paymentFrequency,
+      firstPaymentDate: tenant?.firstPaymentDate,
+      rentAmount: tenant?.rentAmount,
+      leaseStart: tenant?.leaseStart,
+      leaseEnd: tenant?.leaseEnd
+    });
+    
     if (!tenant || !tenant.id) {
-      console.warn('paymentScheduleService.generateScheduleForTenant called without tenant id');
+      console.warn('❌ [paymentScheduleService] generateScheduleForTenant called without tenant id');
       return [];
     }
 
     const intervalDays = this.getIntervalDays(tenant);
+    console.log('📅 [paymentScheduleService] Calculated intervalDays:', intervalDays);
     if (!intervalDays || intervalDays <= 0) {
-      console.warn('paymentScheduleService: invalid intervalDays for tenant', tenant.id, intervalDays);
+      console.warn('❌ [paymentScheduleService] invalid intervalDays for tenant', tenant.id, intervalDays);
       return [];
     }
 
@@ -205,16 +216,28 @@ class PaymentScheduleService {
 
       const payload: RentPaymentPeriodFirestore = {
         tenantId: tenant.id,
-        managerId: managerId || (existingData?.managerId ?? undefined),
         amountDue: tenant.rentAmount ?? existingData?.amountDue ?? 0,
         periodStart: Timestamp.fromDate(inclusiveStart),
         periodEnd: Timestamp.fromDate(periodEnd),
         dueDate: Timestamp.fromDate(inclusiveStart),
         status,
-        paidAt: existingData?.paidAt ?? undefined,
-        notes: existingData?.notes,
         updatedAt: serverTimestamp(),
       };
+      
+      // Only include optional fields if they have values
+      if (managerId || existingData?.managerId) {
+        payload.managerId = managerId || existingData?.managerId;
+      }
+      
+      if (existingData?.notes) {
+        payload.notes = existingData.notes;
+      }
+      
+      if (existingData?.paidAt) {
+        payload.paidAt = existingData.paidAt;
+      } else if (existingData && Object.prototype.hasOwnProperty.call(existingData, 'paidAt') && existingData.paidAt === null) {
+        payload.paidAt = null;
+      }
 
       if (!existingData?.createdAt) {
         payload.createdAt = serverTimestamp();
@@ -234,15 +257,34 @@ class PaymentScheduleService {
       }));
     });
 
+    console.log('📅 [paymentScheduleService] Executing', writes.length, 'writes to Firestore');
     await Promise.all(writes);
-    return this.getTenantPeriods(tenant.id);
+    console.log('✅ [paymentScheduleService] All writes completed, fetching periods');
+    const periods = await this.getTenantPeriods(tenant.id);
+    console.log('✅ [paymentScheduleService] Schedule generation complete, returning', periods.length, 'periods');
+    return periods;
   }
 
   async getTenantPeriods(tenantId: string): Promise<RentPaymentPeriod[]> {
-    const snapshot = await getDocs(
-      query(this.collectionRef, where('tenantId', '==', tenantId), orderBy('periodStart', 'asc'))
-    );
-    return snapshot.docs.map((docSnap) => this.fromFirestore(docSnap.id, docSnap.data() as RentPaymentPeriodFirestore));
+    console.log('🔍 [paymentScheduleService] Getting periods for tenantId:', tenantId);
+    try {
+      const q = query(this.collectionRef, where('tenantId', '==', tenantId), orderBy('periodStart', 'asc'));
+      const snapshot = await getDocs(q);
+      console.log('📊 [paymentScheduleService] getTenantPeriods snapshot:', {
+        size: snapshot.size,
+        empty: snapshot.empty
+      });
+      const periods = snapshot.docs.map((docSnap) => this.fromFirestore(docSnap.id, docSnap.data() as RentPaymentPeriodFirestore));
+      console.log('📊 [paymentScheduleService] getTenantPeriods returning:', periods.length, 'periods');
+      return periods;
+    } catch (error) {
+      console.error('❌ [paymentScheduleService] getTenantPeriods error:', error);
+      console.error('❌ [paymentScheduleService] Error code:', (error as any)?.code);
+      if ((error as any)?.code === 'failed-precondition') {
+        console.error('❌ [paymentScheduleService] Index missing! Check Firestore indexes.');
+      }
+      throw error;
+    }
   }
 
   subscribeToTenantPeriods(
@@ -250,17 +292,39 @@ class PaymentScheduleService {
     callback: (periods: RentPaymentPeriod[]) => void,
     onError?: (error: Error) => void
   ): () => void {
+    console.log('🔍 [paymentScheduleService] Subscribing to periods for tenantId:', tenantId);
+    console.log('🔍 [paymentScheduleService] Collection:', this.collectionRef.path);
     const q = query(this.collectionRef, where('tenantId', '==', tenantId), orderBy('periodStart', 'asc'));
     return onSnapshot(
       q,
       (snapshot) => {
+        console.log('📊 [paymentScheduleService] Snapshot received:', {
+          size: snapshot.size,
+          empty: snapshot.empty,
+          hasPendingWrites: snapshot.metadata.hasPendingWrites,
+          fromCache: snapshot.metadata.fromCache
+        });
         const periods = snapshot.docs.map((docSnap) =>
           this.fromFirestore(docSnap.id, docSnap.data() as RentPaymentPeriodFirestore)
         );
+        console.log('📊 [paymentScheduleService] Mapped periods:', periods.length);
+        if (periods.length > 0) {
+          console.log('📊 [paymentScheduleService] First period:', {
+            id: periods[0].id,
+            amountDue: periods[0].amountDue,
+            dueDate: periods[0].dueDate,
+            status: periods[0].status
+          });
+        }
         callback(periods);
       },
       (error) => {
-        console.error('paymentScheduleService.subscribeToTenantPeriods error', error);
+        console.error('❌ [paymentScheduleService] Subscription error:', error);
+        console.error('❌ [paymentScheduleService] Error code:', (error as any)?.code);
+        console.error('❌ [paymentScheduleService] Error message:', error.message);
+        if ((error as any)?.code === 'failed-precondition') {
+          console.error('❌ [paymentScheduleService] Index missing! Check Firestore indexes.');
+        }
         if (onError) onError(error);
       }
     );
@@ -274,9 +338,13 @@ class PaymentScheduleService {
     const docRef = doc(this.collectionRef, periodId);
     const update: any = {
       status,
-      notes: options?.notes,
       updatedAt: serverTimestamp(),
     };
+
+    // Only include notes if it has a value
+    if (options?.notes) {
+      update.notes = options.notes;
+    }
 
     if (status === 'paid') {
       update.paidAt = Timestamp.fromDate(options?.paidAt ?? new Date());
@@ -289,6 +357,23 @@ class PaymentScheduleService {
 
   async markPeriodPaid(periodId: string, paidAt?: Date): Promise<void> {
     await this.markPeriodStatus(periodId, 'paid', { paidAt: paidAt ?? new Date() });
+  }
+
+  async unmarkPeriodPaid(periodId: string): Promise<void> {
+    // Get the period to determine if it should be overdue or pending
+    const periodDoc = await getDoc(doc(this.collectionRef, periodId));
+    if (!periodDoc.exists()) {
+      throw new Error('Payment period not found');
+    }
+    
+    const periodData = periodDoc.data() as RentPaymentPeriodFirestore;
+    const periodEnd = periodData.periodEnd?.toDate() || periodData.dueDate?.toDate();
+    const now = new Date();
+    
+    // Determine status: overdue if past due date, otherwise pending
+    const newStatus: RentPaymentStatus = periodEnd && periodEnd < now ? 'overdue' : 'pending';
+    
+    await this.markPeriodStatus(periodId, newStatus, { paidAt: null });
   }
 
   async refreshOverdueStatuses(tenantId: string): Promise<number> {

@@ -286,6 +286,13 @@ interface PropertySetupData {
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('main-app');
   const [navigationScreen, setNavigationScreen] = useState<NavigationScreen>('dashboard');
+  
+  // Wrapper function to log navigation changes
+  const handleNavigation = (screen: NavigationScreen) => {
+    console.log('🧭 Navigation triggered to:', screen);
+    console.log('🧭 Current navigationScreen before change:', navigationScreen);
+    setNavigationScreen(screen);
+  };
   const [userRole, setUserRole] = useState<UserRole>('landlord');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -1909,6 +1916,7 @@ export default function App() {
   };
 
   const renderMainAppScreen = () => {
+    console.log('🔄 renderMainAppScreen called with navigationScreen:', navigationScreen);
     switch (navigationScreen) {
       case 'dashboard':
         return (
@@ -2016,27 +2024,253 @@ export default function App() {
               selectProperty(property);
               navigateToScreen('document-management');
             }}
-            onDeleteDocuments={(documentIds) => {
-              // In real app, this would delete documents from properties
-              console.log('Delete documents:', documentIds);
+            onDeleteDocuments={async (documentIds) => {
+              try {
+                // Group documents by property
+                const documentsByProperty = new Map<string, string[]>();
+                
+                properties.forEach(property => {
+                  property.documents.forEach(doc => {
+                    if (documentIds.includes(doc.id)) {
+                      if (!documentsByProperty.has(property.id)) {
+                        documentsByProperty.set(property.id, []);
+                      }
+                      documentsByProperty.get(property.id)!.push(doc.id);
+                    }
+                  });
+                });
+
+                // Update each property
+                const updatePromises = Array.from(documentsByProperty.entries()).map(async ([propertyId, docIdsToDelete]) => {
+                  const property = properties.find(p => p.id === propertyId);
+                  if (!property) return;
+
+                  // Filter out deleted documents
+                  const updatedDocuments = property.documents.filter(doc => !docIdsToDelete.includes(doc.id));
+                  
+                  // Update Firebase - convert dates to Timestamps
+                  await propertyService.updateProperty(propertyId, { 
+                    documents: updatedDocuments.map(doc => ({
+                      id: doc.id,
+                      name: doc.name,
+                      type: doc.type,
+                      url: doc.url,
+                      issueDate: Timestamp.fromDate(doc.issueDate),
+                      expiryDate: doc.expiryDate ? Timestamp.fromDate(doc.expiryDate) : undefined,
+                      status: doc.status
+                    }))
+                  });
+                  
+                  // Update local state
+                  setProperties(prev => 
+                    prev.map(p => p.id === propertyId 
+                      ? { ...p, documents: updatedDocuments }
+                      : p
+                    )
+                  );
+                  
+                  if (selectedProperty && selectedProperty.id === propertyId) {
+                    setSelectedProperty(prev => prev ? { ...prev, documents: updatedDocuments } : null);
+                  }
+                });
+
+                await Promise.all(updatePromises);
+                console.log(`✅ Deleted ${documentIds.length} document(s)`);
+              } catch (error) {
+                console.error('Error deleting documents:', error);
+                alert('Failed to delete documents. Please try again.');
+              }
             }}
-            onArchiveDocuments={(documentIds) => {
-              // In real app, this would archive documents
-              console.log('Archive documents:', documentIds);
+            onArchiveDocuments={async (documentIds) => {
+              try {
+                // Group documents by property
+                const documentsByProperty = new Map<string, string[]>();
+                
+                properties.forEach(property => {
+                  property.documents.forEach(doc => {
+                    if (documentIds.includes(doc.id)) {
+                      if (!documentsByProperty.has(property.id)) {
+                        documentsByProperty.set(property.id, []);
+                      }
+                      documentsByProperty.get(property.id)!.push(doc.id);
+                    }
+                  });
+                });
+
+                // Update each property
+                const updatePromises = Array.from(documentsByProperty.entries()).map(async ([propertyId, docIdsToArchive]) => {
+                  const property = properties.find(p => p.id === propertyId);
+                  if (!property) return;
+
+                  // Mark documents as archived
+                  const updatedDocuments = property.documents.map(doc => 
+                    docIdsToArchive.includes(doc.id)
+                      ? { ...doc, archived: true }
+                      : doc
+                  );
+                  
+                  // Update Firebase - convert dates to Timestamps
+                  await propertyService.updateProperty(propertyId, { 
+                    documents: updatedDocuments.map(doc => ({
+                      id: doc.id,
+                      name: doc.name,
+                      type: doc.type,
+                      url: doc.url,
+                      issueDate: Timestamp.fromDate(doc.issueDate),
+                      expiryDate: doc.expiryDate ? Timestamp.fromDate(doc.expiryDate) : undefined,
+                      status: doc.status,
+                      archived: (doc as any).archived || false
+                    }))
+                  });
+                  
+                  // Update local state
+                  setProperties(prev => 
+                    prev.map(p => p.id === propertyId 
+                      ? { ...p, documents: updatedDocuments }
+                      : p
+                    )
+                  );
+                  
+                  if (selectedProperty && selectedProperty.id === propertyId) {
+                    setSelectedProperty(prev => prev ? { ...prev, documents: updatedDocuments } : null);
+                  }
+                });
+
+                await Promise.all(updatePromises);
+                console.log(`✅ Archived ${documentIds.length} document(s)`);
+              } catch (error) {
+                console.error('Error archiving documents:', error);
+                alert('Failed to archive documents. Please try again.');
+              }
             }}
-            onExportDocuments={(format) => {
-              // In real app, this would export document data
-              console.log('Export documents as:', format);
+            onExportDocuments={(format, documentIds) => {
+              try {
+                // Get selected documents with property information
+                const selectedDocsWithProperty: Array<PropertyDocument & { propertyAddress: string; propertyId: string }> = [];
+                
+                properties.forEach(property => {
+                  property.documents.forEach(doc => {
+                    if (documentIds.includes(doc.id)) {
+                      selectedDocsWithProperty.push({
+                        ...doc,
+                        propertyAddress: property.address,
+                        propertyId: property.id
+                      });
+                    }
+                  });
+                });
+
+                if (selectedDocsWithProperty.length === 0) {
+                  alert('No documents selected for export');
+                  return;
+                }
+
+                // Export based on format
+                switch (format) {
+                  case 'json':
+                    const jsonData = JSON.stringify(selectedDocsWithProperty, null, 2);
+                    const jsonBlob = new Blob([jsonData], { type: 'application/json' });
+                    const jsonUrl = URL.createObjectURL(jsonBlob);
+                    const jsonLink = document.createElement('a');
+                    jsonLink.href = jsonUrl;
+                    jsonLink.download = `documents-export-${new Date().toISOString().split('T')[0]}.json`;
+                    jsonLink.click();
+                    URL.revokeObjectURL(jsonUrl);
+                    break;
+
+                  case 'csv':
+                    const csvHeaders = ['Document Name', 'Property Address', 'Type', 'Issue Date', 'Expiry Date', 'Status', 'URL'];
+                    const csvRows = selectedDocsWithProperty.map(doc => [
+                      doc.name,
+                      doc.propertyAddress,
+                      doc.type,
+                      doc.issueDate.toISOString().split('T')[0],
+                      doc.expiryDate ? doc.expiryDate.toISOString().split('T')[0] : '',
+                      doc.status,
+                      doc.url
+                    ]);
+                    const csvContent = [csvHeaders, ...csvRows]
+                      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+                      .join('\n');
+                    const csvBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const csvUrl = URL.createObjectURL(csvBlob);
+                    const csvLink = document.createElement('a');
+                    csvLink.href = csvUrl;
+                    csvLink.download = `documents-export-${new Date().toISOString().split('T')[0]}.csv`;
+                    csvLink.click();
+                    URL.revokeObjectURL(csvUrl);
+                    break;
+
+                  case 'excel':
+                    // For Excel, we'll create a CSV file with .xlsx extension
+                    // In a production app, you'd use a library like xlsx
+                    const excelHeaders = ['Document Name', 'Property Address', 'Type', 'Issue Date', 'Expiry Date', 'Status', 'URL'];
+                    const excelRows = selectedDocsWithProperty.map(doc => [
+                      doc.name,
+                      doc.propertyAddress,
+                      doc.type,
+                      doc.issueDate.toISOString().split('T')[0],
+                      doc.expiryDate ? doc.expiryDate.toISOString().split('T')[0] : '',
+                      doc.status,
+                      doc.url
+                    ]);
+                    const excelContent = [excelHeaders, ...excelRows]
+                      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+                      .join('\n');
+                    const excelBlob = new Blob([excelContent], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                    const excelUrl = URL.createObjectURL(excelBlob);
+                    const excelLink = document.createElement('a');
+                    excelLink.href = excelUrl;
+                    excelLink.download = `documents-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+                    excelLink.click();
+                    URL.revokeObjectURL(excelUrl);
+                    break;
+
+                  case 'pdf':
+                    // For PDF, we'll create a simple text representation
+                    // In a production app, you'd use a library like jsPDF
+                    const pdfContent = `Documents Export\n${'='.repeat(50)}\n\n` +
+                      selectedDocsWithProperty.map((doc, index) => 
+                        `${index + 1}. ${doc.name}\n` +
+                        `   Property: ${doc.propertyAddress}\n` +
+                        `   Type: ${doc.type}\n` +
+                        `   Issue Date: ${doc.issueDate.toISOString().split('T')[0]}\n` +
+                        `   Expiry Date: ${doc.expiryDate ? doc.expiryDate.toISOString().split('T')[0] : 'N/A'}\n` +
+                        `   Status: ${doc.status}\n` +
+                        `   URL: ${doc.url}\n`
+                      ).join('\n');
+                    const pdfBlob = new Blob([pdfContent], { type: 'application/pdf' });
+                    const pdfUrl = URL.createObjectURL(pdfBlob);
+                    const pdfLink = document.createElement('a');
+                    pdfLink.href = pdfUrl;
+                    pdfLink.download = `documents-export-${new Date().toISOString().split('T')[0]}.pdf`;
+                    pdfLink.click();
+                    URL.revokeObjectURL(pdfUrl);
+                    break;
+                }
+
+                console.log(`✅ Exported ${selectedDocsWithProperty.length} document(s) as ${format.toUpperCase()}`);
+              } catch (error) {
+                console.error('Error exporting documents:', error);
+                alert('Failed to export documents. Please try again.');
+              }
             }}
           />
         );
 
       case 'viewings':
+        console.log('🔴🔴🔴 App.tsx: VIEWINGS CASE HIT 🔴🔴🔴');
+        console.log('🔴 App.tsx: Rendering ViewingsPage');
+        console.log('🔴 userProfile:', userProfile);
+        console.log('🔴 userProfile?.email:', userProfile?.email);
+        console.log('🔴 resolveManagerId():', resolveManagerId());
+        const managerEmailValue = userProfile?.email;
+        console.log('🔴 managerEmailValue being passed:', managerEmailValue);
         return (
           <ViewingsPage
             managerId={resolveManagerId()}
             managerName={userProfile?.name}
-            managerEmail={userProfile?.email}
+            managerEmail={managerEmailValue}
           />
         );
 
@@ -2349,7 +2583,7 @@ export default function App() {
         return (
           <MainLayout
             currentScreen={navigationScreen}
-            onNavigate={setNavigationScreen}
+            onNavigate={handleNavigation}
             userProfile={userProfile}
           >
             {renderMainAppScreen()}
@@ -2700,26 +2934,20 @@ export default function App() {
         );
       
       case 'arrears-management':
+        const tenantForArrears = tenants.find(t => t.id === selectedArrearsAlert?.tenantId);
+        if (!tenantForArrears) {
+          // Fallback if tenant not found
+          return (
+            <div className="p-8 text-center">
+              <p className="text-muted-foreground">Tenant not found</p>
+              <Button onClick={() => navigateToScreen('main-app')} className="mt-4">Go Back</Button>
+            </div>
+          );
+        }
         return (
           <ArrearsManagement
             alert={selectedArrearsAlert!}
-            tenant={{
-              id: selectedArrearsAlert?.tenantId || '',
-              name: selectedArrearsAlert?.tenantName || '',
-              email: 'tenant@example.com',
-              phone: '+44 7700 900000',
-              propertyAddress: selectedArrearsAlert?.propertyAddress || '',
-              propertyId: '1',
-              rentAmount: 2400,
-              leaseStart: new Date('2023-03-01'),
-              leaseEnd: new Date('2025-03-01'),
-              status: 'active',
-              referencingStatus: 'complete',
-              paymentStatus: 'overdue',
-              defaultRiskScore: selectedArrearsAlert?.defaultRiskScore,
-              lastPaymentDate: selectedArrearsAlert?.lastPaymentDate,
-              overdueAmount: selectedArrearsAlert?.overdueAmount
-            }}
+            tenant={tenantForArrears}
             onBack={() => navigateToScreen('main-app')}
             onInitiateWorkflow={(workflowType, details) => {
               // Handle workflow initiation
@@ -2883,10 +3111,13 @@ export default function App() {
                 try {
                   const { tenantService } = await import('./services/tenantService');
                   await tenantService.updateTenant(tenantId, tenant);
-                  // Refresh tenant list
+                  // Refresh tenant list and update selected tenant
                   const updatedTenant = await tenantService.getTenant(tenantId);
                   if (updatedTenant) {
                     setTenants(prev => prev.map(t => t.id === tenantId ? updatedTenant : t));
+                    // Keep the updated tenant selected so navigation works correctly
+                    setSelectedTenant(updatedTenant);
+                    editingTenantRef.current = updatedTenant;
                   }
                 } catch (error) {
                   console.error('Error updating tenant:', error);
@@ -2897,19 +3128,22 @@ export default function App() {
                 // Add new tenant
               addTenant(tenant);
               }
-              setSelectedTenant(null);
-              editingTenantRef.current = null; // Clear ref
-              navigateToScreen('main-app');
-              setNavigationScreen('clients');
+              // Don't clear selectedTenant here - let the Done button handle navigation
+              // navigateToScreen('main-app');
+              // setNavigationScreen('clients');
             }}
             onBack={() => {
               if (editingTenantRef.current) {
+                const tenantToShow = editingTenantRef.current;
                 editingTenantRef.current = null;
+                setSelectedTenant(tenantToShow);
                 navigateToScreen('tenant-details');
               } else if (selectedTenant) {
                 navigateToScreen('tenant-details');
               } else {
-                navigateToScreen('tenant-selection');
+                // If no tenant selected, go to clients list instead of tenant-selection
+                navigateToScreen('main-app');
+                setNavigationScreen('clients');
               }
             }}
           />

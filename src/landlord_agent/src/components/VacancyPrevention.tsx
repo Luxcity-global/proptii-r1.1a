@@ -106,8 +106,51 @@ export function VacancyPrevention({ alert, onBack, onInitiatePreMarketing }: Vac
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Risk Score Overview */}
+            {/* Key Dates Section - Visible per user request */}
             <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Calendar className="h-5 w-5 mr-2" />
+                  Key Dates
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">Current Lease End</span>
+                    </div>
+                    <span className="font-medium">
+                      {alert.currentTenantEndDate.toLocaleDateString('en-GB')}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      <span className="text-sm">Predicted Vacancy</span>
+                    </div>
+                    <span className="font-medium text-orange-600">
+                      {alert.predictedVacancyDate.toLocaleDateString('en-GB')}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <Target className="h-4 w-4 text-green-600" />
+                      <span className="text-sm">Start Marketing</span>
+                    </div>
+                    <span className="font-medium text-green-600">
+                      {alert.recommendations.marketingStartDate.toLocaleDateString('en-GB')}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Vacancy Risk Analysis - Hidden per user request (except Key Dates above) */}
+            {/* <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <BarChart3 className="h-5 w-5 mr-2" />
@@ -168,48 +211,12 @@ export function VacancyPrevention({ alert, onBack, onInitiatePreMarketing }: Vac
                       </div>
                     </div>
                   </div>
-
-                  <div className="space-y-4">
-                    <h4>Key Dates</h4>
-                    
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">Current Lease End</span>
-                        </div>
-                        <span className="font-medium">
-                          {alert.currentTenantEndDate.toLocaleDateString('en-GB')}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                        <div className="flex items-center space-x-2">
-                          <AlertTriangle className="h-4 w-4 text-orange-600" />
-                          <span className="text-sm">Predicted Vacancy</span>
-                        </div>
-                        <span className="font-medium text-orange-600">
-                          {alert.predictedVacancyDate.toLocaleDateString('en-GB')}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-center space-x-2">
-                          <Target className="h-4 w-4 text-green-600" />
-                          <span className="text-sm">Start Marketing</span>
-                        </div>
-                        <span className="font-medium text-green-600">
-                          {alert.recommendations.marketingStartDate.toLocaleDateString('en-GB')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </CardContent>
-            </Card>
+            </Card> */}
 
-            {/* AI Recommendations */}
-            <Card>
+            {/* AI Recommendations - Hidden per user request */}
+            {/* <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Sparkles className="h-5 w-5 mr-2" />
@@ -268,7 +275,7 @@ export function VacancyPrevention({ alert, onBack, onInitiatePreMarketing }: Vac
                   </Dialog>
                 </div>
               </CardContent>
-            </Card>
+            </Card> */}
           </div>
 
           {/* Sidebar */}

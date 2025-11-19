@@ -16,7 +16,7 @@ interface DocumentsPageProps {
   onManageDocuments: (property: Property) => void;
   onDeleteDocuments?: (documentIds: string[]) => void;
   onArchiveDocuments?: (documentIds: string[]) => void;
-  onExportDocuments?: (format: 'json' | 'csv' | 'excel' | 'pdf') => void;
+  onExportDocuments?: (format: 'json' | 'csv' | 'excel' | 'pdf', documentIds: string[]) => void;
 }
 
 interface DocumentWithProperty extends PropertyDocument {
@@ -96,7 +96,7 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
 
   const handleBulkExport = (format: 'json' | 'csv' | 'excel' | 'pdf') => {
     if (onExportDocuments) {
-      onExportDocuments(format);
+      onExportDocuments(format, selectedDocuments);
     }
   };
 

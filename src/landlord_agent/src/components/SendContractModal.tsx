@@ -13,8 +13,12 @@ import {
   User, 
   Mail, 
   AlertCircle,
-  Send
+  Send,
+  Search,
+  CheckCircle
 } from 'lucide-react';
+import { Avatar, AvatarFallback } from './ui/avatar';
+import { Badge } from './ui/badge';
 
 interface SendContractModalProps {
   isOpen: boolean;
@@ -35,6 +39,8 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
   const [additionalEmail, setAdditionalEmail] = useState('');
   const [recipientType, setRecipientType] = useState<'manual' | 'existing'>('manual');
   const [selectedExistingTenant, setSelectedExistingTenant] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showTenantList, setShowTenantList] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isUploading, setIsUploading] = useState(false);
 
@@ -45,6 +51,13 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
     email: t.email,
     property: t.propertyId || ''
   })) : [];
+
+  // Filter tenants based on search term
+  const filteredTenants = existingTenants.filter(tenant =>
+    tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    tenant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    tenant.property.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -77,9 +90,12 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
     if (type === 'existing') {
       setRecipientName('');
       setRecipientEmail('');
+      setShowTenantList(true); // Show list when switching to existing tenant mode
       setErrors(prev => ({ ...prev, recipientName: '', recipientEmail: '' }));
     } else {
       setSelectedExistingTenant('');
+      setSearchTerm('');
+      setShowTenantList(true);
     }
   };
 
@@ -89,6 +105,7 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
       setSelectedExistingTenant(tenantId);
       setRecipientName(tenant.name);
       setRecipientEmail(tenant.email);
+      setShowTenantList(false); // Close the list when tenant is selected
       setErrors(prev => ({ ...prev, recipientName: '', recipientEmail: '' }));
     }
   };
@@ -141,6 +158,8 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
       setAdditionalEmail('');
       setRecipientType('manual');
       setSelectedExistingTenant('');
+      setSearchTerm('');
+      setShowTenantList(true);
       setErrors({});
     } catch (error) {
       console.error('Error sending contract:', error);
@@ -159,6 +178,8 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
       setAdditionalEmail('');
       setRecipientType('manual');
       setSelectedExistingTenant('');
+      setSearchTerm('');
+      setShowTenantList(true);
       setErrors({});
     }
   };
@@ -255,23 +276,133 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <Label>Select Existing Tenant</Label>
-                    <Select value={selectedExistingTenant} onValueChange={handleExistingTenantSelect}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose a tenant" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {existingTenants.map((tenant) => (
-                          <SelectItem key={tenant.id} value={tenant.id}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{tenant.name}</span>
-                              <span className="text-sm text-gray-600">{tenant.property}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-4">
+                    {!selectedExistingTenant || showTenantList ? (
+                      <>
+                        <div className="space-y-2">
+                          <Label>Search Tenants</Label>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                            <Input
+                              placeholder="Search by name, email, or property..."
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                              className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        {filteredTenants.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500">
+                            <User className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                            <p>No tenants found</p>
+                            {searchTerm && (
+                              <p className="text-sm mt-2">Try adjusting your search</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-3 max-h-[300px] overflow-y-auto max-w-md">
+                            {filteredTenants.map((tenant) => (
+                              <Card
+                                key={tenant.id}
+                                className={`cursor-pointer transition-all duration-200 ${
+                                  selectedExistingTenant === tenant.id
+                                    ? 'ring-2 shadow-lg'
+                                    : 'hover:shadow-md'
+                                }`}
+                                style={selectedExistingTenant === tenant.id ? {
+                                  borderColor: '#136C9E',
+                                  boxShadow: '0 0 0 2px #136C9E'
+                                } : {}}
+                                onClick={() => handleExistingTenantSelect(tenant.id)}
+                              >
+                                <CardContent className="p-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-start space-x-3 flex-1 min-w-0">
+                                      <Avatar className="h-10 w-10 flex-shrink-0">
+                                        <AvatarFallback className="bg-blue-100 text-blue-600">
+                                          {tenant.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold text-sm mb-1" style={{ color: '#374957' }}>
+                                          {tenant.name}
+                                        </h3>
+                                        <p className="text-gray-600 text-xs truncate" title={tenant.email}>
+                                          {tenant.email}
+                                        </p>
+                                        {tenant.property && (
+                                          <p className="text-gray-500 text-xs mt-1 truncate" title={tenant.property}>
+                                            {tenant.property}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center space-x-2 flex-shrink-0">
+                                      {selectedExistingTenant === tenant.id && (
+                                        <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#136C9E' }}>
+                                          <CheckCircle className="w-4 h-4 text-white" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="space-y-2 max-w-md">
+                        <Label>Selected Tenant</Label>
+                        {(() => {
+                          const selectedTenant = existingTenants.find(t => t.id === selectedExistingTenant);
+                          return selectedTenant ? (
+                            <Card className="ring-2" style={{ borderColor: '#136C9E', boxShadow: '0 0 0 2px #136C9E' }}>
+                              <CardContent className="p-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex items-start space-x-3 flex-1 min-w-0">
+                                    <Avatar className="h-10 w-10 flex-shrink-0">
+                                      <AvatarFallback className="bg-blue-100 text-blue-600">
+                                        {selectedTenant.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 min-w-0">
+                                      <h3 className="font-semibold text-sm mb-1" style={{ color: '#374957' }}>
+                                        {selectedTenant.name}
+                                      </h3>
+                                      <p className="text-gray-600 text-xs truncate" title={selectedTenant.email}>
+                                        {selectedTenant.email}
+                                      </p>
+                                      {selectedTenant.property && (
+                                        <p className="text-gray-500 text-xs mt-1 truncate" title={selectedTenant.property}>
+                                          {selectedTenant.property}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedExistingTenant('');
+                                      setRecipientName('');
+                                      setRecipientEmail('');
+                                      setShowTenantList(true);
+                                    }}
+                                    className="flex-shrink-0"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ) : null;
+                        })()}
+                      </div>
+                    )}
+
                     {errors.existingTenant && (
                       <div className="flex items-center space-x-2 text-red-600 text-sm">
                         <AlertCircle className="w-4 h-4" />

@@ -1,6 +1,7 @@
 import { collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, Timestamp, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { Tenant } from '../App';
+import { paymentScheduleService } from './paymentScheduleService';
 
 class TenantService {
   private tenantsCollection = collection(db, 'tenants');
@@ -23,6 +24,26 @@ class TenantService {
         console.log('✅ [tenantService] Document data:', verifyDoc.data());
       } else {
         console.error('❌ [tenantService] ERROR: Document was not created in Firestore!');
+      }
+      
+      // Generate payment schedule for the tenant
+      try {
+        const createdTenant: Tenant = {
+          ...tenantData,
+          id: ref.id
+        } as Tenant;
+        
+        console.log('📅 [tenantService] Generating payment schedule for tenant:', ref.id);
+        await paymentScheduleService.generateScheduleForTenant(createdTenant, {
+          historyPeriods: 6,
+          futurePeriods: 12,
+          managerId: ownerUserId
+        });
+        console.log('✅ [tenantService] Payment schedule generated successfully');
+      } catch (scheduleError) {
+        console.error('⚠️ [tenantService] Error generating payment schedule:', scheduleError);
+        // Don't fail tenant creation if schedule generation fails
+        // The schedule can be generated later
       }
       
     return ref.id;
@@ -89,6 +110,27 @@ class TenantService {
       console.log('✅ TenantService: Preserving userId during update:', payload.userId);
     }
     await updateDoc(ref, payload);
+    
+    // If payment frequency, first payment date, or rent amount changed, regenerate schedule
+    if (existing && (updates.paymentFrequency || updates.firstPaymentDate || updates.rentAmount !== undefined)) {
+      try {
+        const updatedTenant: Tenant = {
+          ...existing,
+          ...updates
+        } as Tenant;
+        
+        console.log('📅 [tenantService] Regenerating payment schedule due to payment-related changes');
+        await paymentScheduleService.generateScheduleForTenant(updatedTenant, {
+          historyPeriods: 6,
+          futurePeriods: 12,
+          managerId: (existing as any)?.userId
+        });
+        console.log('✅ [tenantService] Payment schedule regenerated successfully');
+      } catch (scheduleError) {
+        console.error('⚠️ [tenantService] Error regenerating payment schedule:', scheduleError);
+        // Don't fail tenant update if schedule regeneration fails
+      }
+    }
   }
 
   async deleteTenant(id: string): Promise<void> {

@@ -107,6 +107,14 @@
         { "fieldPath": "expiryDate", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "rentPaymentPeriods",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tenantId", "order": "ASCENDING" },
+        { "fieldPath": "periodStart", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -557,11 +557,14 @@ export function PropertyDetails({
                       <p className="font-medium truncate">{property.tenant.name || 'Unknown Tenant'}</p>
                       <div className="flex items-center space-x-1">
                         <Badge 
-                          variant={property.tenant.paymentStatus === 'current' ? 'secondary' : 'destructive'}
-                          className="text-xs"
+                          className={`text-xs ${
+                            property.tenant.paymentStatus === 'current' ? 'bg-green-100 text-green-800' : 
+                            property.tenant.paymentStatus === 'overdue' ? 'bg-red-100 text-red-800' : 
+                            'bg-orange-100 text-orange-800'
+                          }`}
                         >
-                          {property.tenant.paymentStatus === 'current' ? 'Current' : 
-                           property.tenant.paymentStatus === 'overdue' ? 'Overdue' : 'Payment Plan'}
+                          {property.tenant.paymentStatus === 'current' ? 'Payment Up-to-Date' : 
+                           property.tenant.paymentStatus === 'overdue' ? 'Payment Overdue' : 'Payment Plan'}
                         </Badge>
                       </div>
                     </div>

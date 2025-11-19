@@ -41,7 +41,7 @@ export class EmailController {
         to,
         subject,
         html,
-        emailType,
+        emailType: emailType as 'agent' | 'referee' | 'guarantor' | 'user' | 'viewing-agent' | 'viewing-user' | 'viewing-reschedule' | 'viewing-cancel' | undefined,
       });
 
       return {
@@ -105,7 +105,7 @@ export class EmailController {
         to,
         subject,
         html,
-        emailType,
+        emailType: emailType as 'agent' | 'referee' | 'guarantor' | 'user' | 'viewing-agent' | 'viewing-user' | 'viewing-reschedule' | 'viewing-cancel' | undefined,
         attachments,
       });
 

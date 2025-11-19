@@ -5,6 +5,8 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Separator } from './ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Switch } from './ui/switch';
+import { Label } from './ui/label';
 import { DocumentUploadModal } from './DocumentUploadModal';
 import { 
   ArrowLeft, 
@@ -24,12 +26,15 @@ import {
   Shield,
   CreditCard,
   MoreHorizontal,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 import { Tenant } from '../App';
 import { referencingService, ReferencingDocument } from '../services/referencingService';
+import { paymentScheduleService, RentPaymentPeriod } from '../services/paymentScheduleService';
+import { tenantService } from '../services/tenantService';
 
 interface TenantReference {
   id: string;
@@ -79,9 +84,10 @@ interface TenantDetailsProps {
   tenant: Tenant | null;
   onBack: () => void;
   onEdit?: (tenant: Tenant) => void;
+  onTenantUpdate?: (tenant: Tenant) => void;
 }
 
-export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
+export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: TenantDetailsProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [referencingStatus, setReferencingStatus] = useState<'not-started' | 'in-progress' | 'complete'>('not-started');
@@ -91,6 +97,9 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
   const [refereeResponses, setRefereeResponses] = useState<any[]>([]);
   const [guarantorResponses, setGuarantorResponses] = useState<any[]>([]);
   const [isLoadingResponses, setIsLoadingResponses] = useState(true);
+  const [paymentPeriods, setPaymentPeriods] = useState<RentPaymentPeriod[]>([]);
+  const [isLoadingPayments, setIsLoadingPayments] = useState(true);
+  const [updatingPayments, setUpdatingPayments] = useState<Record<string, boolean>>({});
 
   if (!tenant) {
     return (
@@ -244,6 +253,96 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
     fetchRefereeGuarantorResponses();
   }, [tenant.email]);
 
+  // Subscribe to payment periods in real-time
+  useEffect(() => {
+    if (!tenant?.id) {
+      console.warn('[TenantDetails] No tenant ID, skipping payment subscription');
+      setIsLoadingPayments(false);
+      return;
+    }
+
+    console.log('🔍 [TenantDetails] Setting up payment periods subscription:', {
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      paymentFrequency: tenant.paymentFrequency,
+      firstPaymentDate: tenant.firstPaymentDate,
+      rentAmount: tenant.rentAmount,
+      leaseStart: tenant.leaseStart,
+      leaseEnd: tenant.leaseEnd
+    });
+
+    setIsLoadingPayments(true);
+    console.log('[TenantDetails] Subscribing to payment periods for tenant:', tenant.id);
+
+    // Subscribe to real-time updates
+    const unsubscribe = paymentScheduleService.subscribeToTenantPeriods(
+      tenant.id,
+      (periods) => {
+        console.log('✅ [TenantDetails] Payment periods updated:', periods.length);
+        if (periods.length === 0) {
+          console.warn('⚠️ [TenantDetails] Received 0 payment periods - schedule may not be generated yet');
+        } else {
+          console.log('✅ [TenantDetails] First period:', {
+            dueDate: periods[0].dueDate,
+            amount: periods[0].amountDue,
+            status: periods[0].status
+          });
+        }
+        setPaymentPeriods(periods);
+        setIsLoadingPayments(false);
+      },
+      (error) => {
+        console.error('❌ [TenantDetails] Error subscribing to payment periods:', error);
+        console.error('❌ [TenantDetails] Error details:', {
+          code: (error as any)?.code,
+          message: error.message,
+          stack: error.stack
+        });
+        setIsLoadingPayments(false);
+      }
+    );
+
+    // Also generate schedule if it doesn't exist yet
+    const ensureSchedule = async () => {
+      try {
+        console.log('🔍 [TenantDetails] Checking for existing payment periods...');
+        const existingPeriods = await paymentScheduleService.getTenantPeriods(tenant.id);
+        console.log('📊 [TenantDetails] Found', existingPeriods.length, 'existing periods');
+        if (existingPeriods.length === 0) {
+          console.log('📅 [TenantDetails] No payment periods found, generating schedule...');
+          console.log('📅 [TenantDetails] Tenant data for generation:', {
+            id: tenant.id,
+            paymentFrequency: tenant.paymentFrequency,
+            firstPaymentDate: tenant.firstPaymentDate,
+            rentAmount: tenant.rentAmount,
+            userId: (tenant as any)?.userId
+          });
+          await paymentScheduleService.generateScheduleForTenant(tenant, {
+            historyPeriods: 6,
+            futurePeriods: 12,
+            managerId: (tenant as any)?.userId
+          });
+          console.log('✅ [TenantDetails] Schedule generation initiated');
+        } else {
+          console.log('✅ [TenantDetails] Payment schedule already exists');
+        }
+      } catch (error) {
+        console.error('❌ [TenantDetails] Error ensuring payment schedule:', error);
+        console.error('❌ [TenantDetails] Error details:', {
+          code: (error as any)?.code,
+          message: error.message,
+          stack: error.stack
+        });
+      }
+    };
+    ensureSchedule();
+
+    return () => {
+      console.log('[TenantDetails] Unsubscribing from payment periods');
+      unsubscribe();
+    };
+  }, [tenant?.id]);
+
   // Handle deleting a referee or guarantor response
   const handleDeleteResponse = async (responseId: string, responseType: 'referee' | 'guarantor') => {
     if (!window.confirm(`Are you sure you want to delete this ${responseType} response? This action cannot be undone.`)) {
@@ -277,7 +376,7 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
     }
   };
 
-  // Mock additional data for demonstration
+  // Mock additional data for demonstration (non-payment related)
   const mockTenant: Tenant = {
     ...tenant,
     depositAmount: tenant.rentAmount * 1.5,
@@ -288,31 +387,6 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
     employer: 'Tech Solutions Ltd',
     annualSalary: 45000,
     notes: 'Excellent tenant with good payment history. Prefers email communication for non-urgent matters.',
-    rentPayments: [
-      {
-        id: '1',
-        amount: tenant.rentAmount,
-        dueDate: new Date('2024-06-01'),
-        paidDate: new Date('2024-05-28'),
-        status: 'paid',
-        paymentMethod: 'Bank Transfer'
-      },
-      {
-        id: '2',
-        amount: tenant.rentAmount,
-        dueDate: new Date('2024-07-01'),
-        paidDate: new Date('2024-06-30'),
-        status: 'paid',
-        paymentMethod: 'Bank Transfer'
-      },
-      {
-        id: '3',
-        amount: tenant.rentAmount,
-        dueDate: new Date('2024-08-01'),
-        status: 'pending',
-        paymentMethod: 'Bank Transfer'
-      }
-    ],
     maintenanceRequests: [
       {
         id: '1',
@@ -334,30 +408,107 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
         category: 'heating'
       }
     ],
-    documents: [
-      {
-        id: '1',
-        name: 'Tenancy Agreement - Signed',
-        type: 'tenancy-agreement',
-        dateUploaded: new Date('2024-01-15'),
-        status: 'valid'
-      },
-      {
-        id: '2',
-        name: 'Deposit Protection Certificate',
-        type: 'deposit-certificate',
-        dateUploaded: new Date('2024-01-15'),
-        status: 'valid'
-      },
-      {
-        id: '3',
-        name: 'Right to Rent Check',
-        type: 'right-to-rent',
-        dateUploaded: new Date('2024-01-10'),
-        expiryDate: new Date('2025-01-10'),
-        status: 'valid'
+    documents: tenant.documents || []
+  };
+
+  // Convert payment periods to display format
+  const rentPayments = paymentPeriods.map((period) => ({
+    id: period.id,
+    amount: period.amountDue,
+    dueDate: period.dueDate,
+    paidDate: period.paidAt,
+    status: period.status === 'paid' ? 'paid' : period.status === 'overdue' ? 'overdue' : 'pending',
+    paymentMethod: period.notes || undefined
+  }));
+
+  const upcomingPayments = paymentPeriods
+    .filter((period) => {
+      if (!period.dueDate) return false;
+      if (period.status === 'paid') return false;
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      return period.dueDate.getTime() >= now.getTime();
+    })
+    .sort((a, b) => (a.dueDate?.getTime() || 0) - (b.dueDate?.getTime() || 0))
+    .slice(0, 3);
+
+  const handleTogglePaymentStatus = async (periodId: string, currentStatus: string) => {
+    if (updatingPayments[periodId]) {
+      return;
+    }
+
+    setUpdatingPayments((prev) => ({ ...prev, [periodId]: true }));
+    try {
+      if (currentStatus === 'paid') {
+        // Unmark as paid
+        console.log('🔄 [TenantDetails] Unmarking payment as unpaid');
+        await paymentScheduleService.unmarkPeriodPaid(periodId);
+      } else {
+        // Mark as paid
+        const paidDate = new Date();
+        await paymentScheduleService.markPeriodPaid(periodId, paidDate);
       }
-    ]
+      
+      // Update tenant's payment status based on payment periods
+      console.log('🔄 [TenantDetails] Updating tenant payment status after payment status change');
+      const updatedPeriods = await paymentScheduleService.getTenantPeriods(tenant.id);
+      
+      // Find the most recent paid period
+      const paidPeriods = updatedPeriods
+        .filter(p => p.status === 'paid' && p.paidAt)
+        .sort((a, b) => (b.paidAt?.getTime() || 0) - (a.paidAt?.getTime() || 0));
+      
+      const lastPaidPeriod = paidPeriods[0];
+      const lastPaymentDate = lastPaidPeriod?.paidAt;
+      
+      // Check if there are any overdue periods
+      const now = new Date();
+      const overduePeriods = updatedPeriods.filter(p => {
+        if (p.status === 'paid') return false;
+        const periodEnd = p.periodEnd || p.dueDate;
+        return periodEnd < now;
+      });
+      
+      // Calculate overdue amount
+      const overdueAmount = overduePeriods.reduce((sum, p) => sum + (p.amountDue || 0), 0);
+      
+      // Determine new payment status
+      let newPaymentStatus: 'current' | 'overdue' | 'payment-plan' = 'current';
+      if (overdueAmount > 0) {
+        newPaymentStatus = 'overdue';
+      } else if (tenant.paymentStatus === 'payment-plan') {
+        newPaymentStatus = 'payment-plan';
+      }
+      
+      // Update tenant record
+      await tenantService.updateTenant(tenant.id, {
+        lastPaymentDate,
+        paymentStatus: newPaymentStatus,
+        overdueAmount: overdueAmount > 0 ? overdueAmount : undefined
+      });
+      
+      // Fetch updated tenant and notify parent
+      const updatedTenant = await tenantService.getTenant(tenant.id);
+      if (updatedTenant && onTenantUpdate) {
+        onTenantUpdate(updatedTenant);
+      }
+      
+      console.log('✅ [TenantDetails] Tenant payment status updated:', {
+        lastPaymentDate,
+        paymentStatus: newPaymentStatus,
+        overdueAmount
+      });
+      
+    } catch (error) {
+      console.error('[TenantDetails] Error toggling payment status:', error);
+      alert('Unable to update payment status. Please try again.');
+    } finally {
+      setUpdatingPayments((prev) => {
+        const next = { ...prev };
+        delete next[periodId];
+        return next;
+      });
+    }
   };
 
   const handleDocumentUpload = (documentData: {
@@ -584,10 +735,9 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
       {/* Content */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="references">References</TabsTrigger>
           </TabsList>
@@ -659,10 +809,6 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                       <p>{formatDate(mockTenant.leaseEnd)}</p>
                     </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Tenancy Type</p>
-                    <p className="capitalize">{mockTenant.tenancyType?.replace('-', ' ')}</p>
-                  </div>
                 </CardContent>
               </Card>
 
@@ -675,18 +821,47 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Employer</p>
-                    <p>{mockTenant.employer}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Annual Salary</p>
-                    <p>{formatCurrency(mockTenant.annualSalary || 0)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Previous Address</p>
-                    <p className="text-sm">{mockTenant.previousAddress}</p>
-                  </div>
+                  {referencingData?.formData?.employment || referencingData?.formData?.financial || referencingData?.formData?.residential ? (
+                    <>
+                      {referencingData.formData.employment?.companyDetails && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Employer</p>
+                          <p>{referencingData.formData.employment.companyDetails}</p>
+                        </div>
+                      )}
+                      {referencingData.formData.employment?.jobPosition && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Job Position</p>
+                          <p>{referencingData.formData.employment.jobPosition}</p>
+                        </div>
+                      )}
+                      {referencingData.formData.financial?.monthlyIncome && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Monthly Income</p>
+                          <p>{formatCurrency(parseFloat(referencingData.formData.financial.monthlyIncome.replace(/[^\d.]/g, '')) || 0)}</p>
+                          {referencingData.formData.financial.monthlyIncome && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Annual: {formatCurrency(parseFloat(referencingData.formData.financial.monthlyIncome.replace(/[^\d.]/g, '')) * 12 || 0)}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {referencingData.formData.residential?.previousAddress && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Previous Address</p>
+                          <p className="text-sm">{referencingData.formData.residential.previousAddress}</p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <CreditCard className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                      <p className="text-muted-foreground font-medium">No employment information available</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Employment and income details will appear here once the tenant completes the referencing process.
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -705,8 +880,8 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                       <Badge className={tenant.paymentStatus === 'current' ? 'bg-green-100 text-green-800' : 
                                        tenant.paymentStatus === 'overdue' ? 'bg-red-100 text-red-800' : 
                                        'bg-orange-100 text-orange-800'}>
-                        {tenant.paymentStatus === 'current' ? 'Current' : 
-                         tenant.paymentStatus === 'overdue' ? 'Overdue' : 'Payment Plan'}
+                        {tenant.paymentStatus === 'current' ? 'Payment Up-to-Date' : 
+                         tenant.paymentStatus === 'overdue' ? 'Payment Overdue' : 'Payment Plan'}
                       </Badge>
                     </div>
                     <div>
@@ -726,34 +901,24 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                           £{tenant.overdueAmount.toLocaleString()}
                         </span>
                       </div>
-                      {tenant.defaultRiskScore && (
-                        <div className="mt-2 text-sm text-red-700">
-                          Default Risk Score: {tenant.defaultRiskScore}%
-                        </div>
-                      )}
                     </div>
                   )}
                   
-                  {tenant.defaultRiskScore && tenant.paymentStatus === 'current' && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">Default Risk Score</p>
-                      <div className="flex items-center space-x-2">
-                        <div className={`w-full bg-gray-200 rounded-full h-2 ${
-                          tenant.defaultRiskScore >= 70 ? 'bg-red-200' : 
-                          tenant.defaultRiskScore >= 40 ? 'bg-orange-200' : 'bg-green-200'
-                        }`}>
-                          <div 
-                            className={`h-2 rounded-full ${
-                              tenant.defaultRiskScore >= 70 ? 'bg-red-500' : 
-                              tenant.defaultRiskScore >= 40 ? 'bg-orange-500' : 'bg-green-500'
-                            }`}
-                            style={{ width: `${tenant.defaultRiskScore}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-sm font-medium">{tenant.defaultRiskScore}%</span>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Next 3 Payment Dates</p>
+                    {upcomingPayments.length > 0 ? (
+                      <div className="space-y-1 text-sm">
+                        {upcomingPayments.map((period) => (
+                          <div key={period.id} className="flex items-center justify-between">
+                            <span>{formatDate(period.dueDate)}</span>
+                            <span className="font-medium">{formatCurrency(period.amountDue)}</span>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No upcoming payments scheduled.</p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -780,61 +945,108 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {mockTenant.rentPayments?.map((payment) => (
-                    <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div>
-                          <p className="font-medium">{formatCurrency(payment.amount)}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Due: {formatDate(payment.dueDate)}
-                            {payment.paidDate && ` • Paid: ${formatDate(payment.paidDate)}`}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge className={getStatusColor(payment.status)}>
-                        {payment.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="maintenance" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Shield className="w-5 h-5 mr-2" style={{ color: '#DC5F12' }} />
-                  Maintenance Requests
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {mockTenant.maintenanceRequests?.map((request) => (
-                    <div key={request.id} className="p-4 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                          {getPriorityIcon(request.priority)}
-                          <h4 className="font-medium">{request.title}</h4>
-                        </div>
-                        <Badge className={getStatusColor(request.status)}>
-                          {request.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">{request.description}</p>
-                      <div className="flex items-center text-xs text-muted-foreground space-x-4">
-                        <span>Priority: {request.priority}</span>
-                        <span>Category: {request.category}</span>
-                        <span>Reported: {formatDate(request.dateReported)}</span>
-                        {request.dateCompleted && (
-                          <span>Completed: {formatDate(request.dateCompleted)}</span>
+                {isLoadingPayments ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Clock className="w-6 h-6 mr-2 animate-spin text-gray-400" />
+                    <p className="text-muted-foreground">Loading payment history...</p>
+                  </div>
+                ) : rentPayments.length === 0 ? (
+                  <div className="text-center py-8">
+                    <PoundSterling className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-muted-foreground font-medium">No payment history yet</p>
+                    <p className="text-sm text-muted-foreground mt-2 mb-4">
+                      Payment periods will appear here once the schedule is generated.
+                    </p>
+                    <div className="mt-4 space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Tenant data: {tenant.paymentFrequency || 'missing'} frequency, 
+                        Rent: £{tenant.rentAmount || 0}, 
+                        First payment: {tenant.firstPaymentDate ? formatDate(tenant.firstPaymentDate) : 'not set'}
+                      </p>
+                      <Button
+                        onClick={async () => {
+                          console.log('🔧 [TenantDetails] Manual schedule generation triggered');
+                          setIsLoadingPayments(true);
+                          try {
+                            await paymentScheduleService.generateScheduleForTenant(tenant, {
+                              historyPeriods: 6,
+                              futurePeriods: 12,
+                              managerId: (tenant as any)?.userId
+                            });
+                            console.log('✅ [TenantDetails] Manual generation completed');
+                            // Refresh periods
+                            const periods = await paymentScheduleService.getTenantPeriods(tenant.id);
+                            setPaymentPeriods(periods);
+                          } catch (error) {
+                            console.error('❌ [TenantDetails] Manual generation failed:', error);
+                            alert('Failed to generate schedule: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                          } finally {
+                            setIsLoadingPayments(false);
+                          }
+                        }}
+                        disabled={isLoadingPayments || !tenant.paymentFrequency || !tenant.rentAmount}
+                        variant="outline"
+                      >
+                        {isLoadingPayments ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          'Generate Payment Schedule'
                         )}
-                      </div>
+                      </Button>
+                      {(!tenant.paymentFrequency || !tenant.rentAmount) && (
+                        <p className="text-xs text-red-600 mt-2">
+                          Missing required data: {!tenant.paymentFrequency && 'Payment Frequency '}
+                          {!tenant.rentAmount && 'Rent Amount'}
+                        </p>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {rentPayments.map((payment) => {
+                      const isMarking = Boolean(updatingPayments[payment.id]);
+                      const isPaid = payment.status === 'paid';
+                      return (
+                        <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg gap-4 flex-wrap">
+                          <div className="flex items-center space-x-4">
+                            <div>
+                              <p className="font-medium">{formatCurrency(payment.amount)}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Due: {formatDate(payment.dueDate)}
+                                {payment.paidDate && ` • Paid: ${formatDate(payment.paidDate)}`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Badge className={getStatusColor(payment.status)}>
+                              {payment.status}
+                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Label htmlFor={`payment-switch-${payment.id}`} className="text-sm text-muted-foreground">
+                                {isPaid ? 'Paid' : 'Unpaid'}
+                              </Label>
+                              {isMarking ? (
+                                <div className="flex items-center justify-center w-10 h-6">
+                                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                                </div>
+                              ) : (
+                                <Switch
+                                  id={`payment-switch-${payment.id}`}
+                                  checked={isPaid}
+                                  onCheckedChange={() => handleTogglePaymentStatus(payment.id, payment.status)}
+                                  disabled={isMarking}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -888,9 +1100,9 @@ export function TenantDetails({ tenant, onBack, onEdit }: TenantDetailsProps) {
                 ) : allDocuments.length === 0 ? (
                   <div className="text-center py-8">
                     <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="text-muted-foreground">No documents available</p>
+                    <p className="text-muted-foreground font-medium">No documents uploaded yet</p>
                     <p className="text-sm text-muted-foreground mt-2">
-                      Upload documents or have the tenant complete referencing
+                      Uploaded files and referencing documents will appear here once available.
                     </p>
                   </div>
                 ) : (

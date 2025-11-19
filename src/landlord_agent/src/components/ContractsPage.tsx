@@ -18,7 +18,8 @@ import {
   Building2,
   Loader2,
   FileText,
-  Send
+  Send,
+  AlertCircle
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -57,43 +58,57 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [landlordEmail, setLandlordEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [showSuccessScreen, setShowSuccessScreen] = useState(false);
+  const [successData, setSuccessData] = useState<{ recipientName: string; recipientEmail: string; fileName: string } | null>(null);
 
-  // Get landlord email from localStorage/auth on component mount
+  // Get landlord email and userId from localStorage/auth on component mount
   useEffect(() => {
-    const getUserEmail = () => {
+    const getUserInfo = () => {
       // Try to get from localStorage (set during login/registration)
       const storedEmail = localStorage.getItem('landlordEmail');
       if (storedEmail) {
         console.log('✅ Found landlord email in localStorage:', storedEmail);
         setLandlordEmail(storedEmail);
-        return;
       }
 
-      // Try to get from proptii_auth_state
+      // Try to get userId and email from proptii_auth_state
       const authState = localStorage.getItem('proptii_auth_state');
       if (authState) {
         try {
           const parsed = JSON.parse(authState);
-          if (parsed?.user?.email) {
+          if (parsed?.user?.email && !storedEmail) {
             console.log('✅ Found landlord email in auth state:', parsed.user.email);
             setLandlordEmail(parsed.user.email);
-            return;
+          }
+          
+          // Get userId
+          const uid = parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId;
+          if (uid) {
+            console.log('✅ Found userId in auth state:', uid);
+            setUserId(uid);
           }
         } catch (e) {
           console.error('Error parsing auth state:', e);
         }
       }
 
-      console.log('⚠️ No landlord email found - will show all contracts');
+      // Try to get userId from query parameter
+      const params = new URLSearchParams(window.location.search);
+      const uidFromQuery = params.get('uid');
+      if (uidFromQuery) {
+        console.log('✅ Found userId in query param:', uidFromQuery);
+        setUserId(uidFromQuery);
+      }
     };
 
-    getUserEmail();
+    getUserInfo();
   }, []);
 
-  // Load contracts when tab changes or landlordEmail is set
+  // Load contracts when tab changes or landlordEmail/userId is set
   useEffect(() => {
     loadContracts();
-  }, [activeTab, landlordEmail]);
+  }, [activeTab, landlordEmail, userId]);
 
   const loadContracts = async () => {
     try {
@@ -111,12 +126,19 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
         status: statusMap[activeTab]
       };
       
-      // Add landlordEmail filter if available
-      if (landlordEmail) {
+      // Prefer userId filter if available (more reliable), otherwise use landlordEmail
+      if (userId) {
+        filters.userId = userId;
+        console.log('🔍 Loading contracts with userId filter:', userId);
+      } else if (landlordEmail) {
         filters.landlordEmail = landlordEmail;
+        console.log('🔍 Loading contracts with landlordEmail filter:', landlordEmail);
+      } else {
+        console.log('⚠️ No userId or landlordEmail - loading all contracts');
       }
       
       const fetchedContracts = await contractService.getContracts(filters);
+      console.log(`✅ Loaded ${fetchedContracts.length} contracts for status: ${statusMap[activeTab]}`);
       setContracts(fetchedContracts);
     } catch (err) {
       console.error('❌ Error loading contracts:', err);
@@ -267,6 +289,26 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
         
         // Save contract to Firestore for tracking
         try {
+          // Get userId if not already set
+          const currentUserId = userId || (() => {
+            try {
+              const authState = localStorage.getItem('proptii_auth_state');
+              if (authState) {
+                const parsed = JSON.parse(authState);
+                return parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId || '';
+              }
+              const params = new URLSearchParams(window.location.search);
+              return params.get('uid') || '';
+            } catch (e) {
+              console.error('Error getting userId:', e);
+              return '';
+            }
+          })();
+
+          if (!currentUserId) {
+            console.warn('⚠️ No userId found - contract will be saved without userId');
+          }
+
           const contractId = await contractService.createContractWithBase64({
             title: contractData.file.name.replace(/\.[^/.]+$/, ''),
             propertyAddress: '',
@@ -278,7 +320,7 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
             sentDate: new Date(),
             expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
             landlordEmail: landlordEmail || undefined, // Include landlord email for filtering
-          } as any, contractData.file.name, base64Data);
+          } as any, contractData.file.name, base64Data, currentUserId || 'unknown');
           
           console.log('Contract saved to Firestore:', contractId);
           
@@ -289,7 +331,14 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
           // Don't fail the whole operation if Firestore save fails
         }
         
-        alert(`Contract sent successfully to ${contractData.recipientName} (${contractData.recipientEmail})!\n\nAttachment: ${contractData.file.name}`);
+        // Show success screen instead of alert
+        setSuccessData({
+          recipientName: contractData.recipientName,
+          recipientEmail: contractData.recipientEmail,
+          fileName: contractData.file.name
+        });
+        setShowSuccessScreen(true);
+        setIsSendModalOpen(false);
       } else {
         // Send a simple test email without contract
         const formData = new FormData();
@@ -454,6 +503,54 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
       </Table>
     </div>
   );
+
+  // Show success screen
+  if (showSuccessScreen && successData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F7F7F7', fontFamily: 'Archivo, sans-serif' }}>
+        <Card className="max-w-md w-full text-center">
+          <CardContent className="p-8">
+            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+            <h2 className="text-2xl font-bold mb-4" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
+              Contract Sent Successfully!
+            </h2>
+            <p className="text-gray-600 mb-6" style={{ fontFamily: 'Archivo, sans-serif' }}>
+              A contract has been sent to <strong>{successData.recipientName}</strong>
+            </p>
+            <p className="text-gray-600 mb-6" style={{ fontFamily: 'Archivo, sans-serif' }}>
+              Email: <strong>{successData.recipientEmail}</strong>
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div className="flex items-start space-x-3">
+                <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="text-left">
+                  <p className="text-sm text-blue-800" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                    Attachment: <strong>{successData.fileName}</strong>
+                  </p>
+                </div>
+              </div>
+            </div>
+            <Button
+              onClick={() => {
+                setShowSuccessScreen(false);
+                setSuccessData(null);
+              }}
+              className="w-full"
+              style={{ 
+                backgroundColor: '#DC5F12', 
+                borderColor: '#DC5F12',
+                fontFamily: 'Archivo, sans-serif'
+              }}
+            >
+              Done
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7' }}>

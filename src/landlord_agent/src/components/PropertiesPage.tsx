@@ -45,18 +45,121 @@ export function PropertiesPage({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [overdueRentFilter, setOverdueRentFilter] = useState<boolean>(false);
+  const [leaseExpiryFilter, setLeaseExpiryFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('default');
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
 
-  const filteredProperties = properties.filter((property) => {
-    const matchesSearch = property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         property.type.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || property.status === statusFilter;
-    const matchesType = typeFilter === 'all' || property.type === typeFilter;
-    
-    return matchesSearch && matchesStatus && matchesType;
-  });
+  const filteredAndSortedProperties = useMemo(() => {
+    const now = new Date();
+    const arrearsByTenantId = new Map<string, ArrearsAlert>();
+    arrearsAlerts.forEach(alert => arrearsByTenantId.set(alert.tenantId, alert));
+
+    // Filter properties
+    let filtered = properties.filter((property) => {
+      const matchesSearch = property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           property.type.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || property.status === statusFilter;
+      const matchesType = typeFilter === 'all' || property.type === typeFilter;
+      
+      // Overdue rent filter
+      let matchesOverdue = true;
+      if (overdueRentFilter) {
+        const tenant = property.tenant || tenants.find(t => t.propertyId === property.id);
+        if (tenant) {
+          const tenantAlert = arrearsByTenantId.get(tenant.id);
+          const alertAmount = tenantAlert?.overdueAmount ?? 0;
+          const tenantOverdueAmount = tenant.overdueAmount ?? 0;
+          const hasOverdueRent = tenant.paymentStatus === 'overdue' || alertAmount > 0 || tenantOverdueAmount > 0;
+          matchesOverdue = hasOverdueRent;
+        } else {
+          matchesOverdue = false; // No tenant means no overdue rent
+        }
+      }
+
+      // Lease expiry filter
+      let matchesLeaseExpiry = true;
+      if (leaseExpiryFilter !== 'all') {
+        const tenant = property.tenant || tenants.find(t => t.propertyId === property.id);
+        if (!tenant) {
+          matchesLeaseExpiry = leaseExpiryFilter === 'no-lease';
+        } else {
+          const leaseEnd = tenant.leaseEnd instanceof Date ? tenant.leaseEnd : new Date(tenant.leaseEnd);
+          const daysUntilExpiry = Math.ceil((leaseEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          
+          switch (leaseExpiryFilter) {
+            case 'expired':
+              matchesLeaseExpiry = daysUntilExpiry < 0;
+              break;
+            case '30-days':
+              matchesLeaseExpiry = daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
+              break;
+            case '60-days':
+              matchesLeaseExpiry = daysUntilExpiry >= 0 && daysUntilExpiry <= 60;
+              break;
+            case '90-days':
+              matchesLeaseExpiry = daysUntilExpiry >= 0 && daysUntilExpiry <= 90;
+              break;
+            default:
+              matchesLeaseExpiry = true;
+          }
+        }
+      }
+      
+      return matchesSearch && matchesStatus && matchesType && matchesOverdue && matchesLeaseExpiry;
+    });
+
+    // Sort properties
+    if (sortBy !== 'default') {
+      filtered = [...filtered].sort((a, b) => {
+        const tenantA = a.tenant || tenants.find(t => t.propertyId === a.id);
+        const tenantB = b.tenant || tenants.find(t => t.propertyId === b.id);
+        const arrearsA = tenantA ? arrearsByTenantId.get(tenantA.id) : null;
+        const arrearsB = tenantB ? arrearsByTenantId.get(tenantB.id) : null;
+
+        switch (sortBy) {
+          case 'rent-asc':
+            return a.rent - b.rent;
+          case 'rent-desc':
+            return b.rent - a.rent;
+          case 'lease-expiry-asc':
+            if (!tenantA && !tenantB) return 0;
+            if (!tenantA) return 1;
+            if (!tenantB) return -1;
+            const leaseEndA = tenantA.leaseEnd instanceof Date ? tenantA.leaseEnd : new Date(tenantA.leaseEnd);
+            const leaseEndB = tenantB.leaseEnd instanceof Date ? tenantB.leaseEnd : new Date(tenantB.leaseEnd);
+            return leaseEndA.getTime() - leaseEndB.getTime();
+          case 'lease-expiry-desc':
+            if (!tenantA && !tenantB) return 0;
+            if (!tenantA) return 1;
+            if (!tenantB) return -1;
+            const leaseEndA2 = tenantA.leaseEnd instanceof Date ? tenantA.leaseEnd : new Date(tenantA.leaseEnd);
+            const leaseEndB2 = tenantB.leaseEnd instanceof Date ? tenantB.leaseEnd : new Date(tenantB.leaseEnd);
+            return leaseEndB2.getTime() - leaseEndA2.getTime();
+          case 'address-asc':
+            return a.address.localeCompare(b.address);
+          case 'address-desc':
+            return b.address.localeCompare(a.address);
+          case 'overdue-asc':
+            const overdueA = arrearsA?.overdueAmount ?? tenantA?.overdueAmount ?? 0;
+            const overdueB = arrearsB?.overdueAmount ?? tenantB?.overdueAmount ?? 0;
+            return overdueA - overdueB;
+          case 'overdue-desc':
+            const overdueA2 = arrearsA?.overdueAmount ?? tenantA?.overdueAmount ?? 0;
+            const overdueB2 = arrearsB?.overdueAmount ?? tenantB?.overdueAmount ?? 0;
+            return overdueB2 - overdueA2;
+          default:
+            return 0;
+        }
+      });
+    }
+
+    return filtered;
+  }, [properties, tenants, arrearsAlerts, searchTerm, statusFilter, typeFilter, overdueRentFilter, leaseExpiryFilter, sortBy]);
+
+  const filteredProperties = filteredAndSortedProperties;
 
   const {
     propertiesEndingSoonCount,
@@ -469,65 +572,119 @@ export function PropertiesPage({
       )}
 
       {/* Filters and Search */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={selectAllProperties}
-            className="p-2"
-          >
-            {isAllSelected ? (
-              <CheckSquare className="h-4 w-4" />
-            ) : isPartiallySelected ? (
-              <CheckSquare className="h-4 w-4 opacity-50" />
-            ) : (
-              <Square className="h-4 w-4" />
-            )}
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            {isAllSelected ? 'Deselect All' : 'Select All'}
-          </span>
+      <div className="space-y-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={selectAllProperties}
+              className="p-2"
+            >
+              {isAllSelected ? (
+                <CheckSquare className="h-4 w-4" />
+              ) : isPartiallySelected ? (
+                <CheckSquare className="h-4 w-4 opacity-50" />
+              ) : (
+                <Square className="h-4 w-4" />
+              )}
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              {isAllSelected ? 'Deselect All' : 'Select All'}
+            </span>
+          </div>
+          
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search properties..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
+              style={{
+                '--tw-ring-color': '#8FCDFF',
+                '--tw-ring-opacity': '0.5'
+              } as React.CSSProperties}
+            />
+          </div>
+          
+          <div className="flex gap-2">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="vacant">Vacant</SelectItem>
+                <SelectItem value="occupied">Occupied</SelectItem>
+                <SelectItem value="under-renovation">Under Renovation</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {getPropertyTypes().map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search properties..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
-            style={{
-              '--tw-ring-color': '#8FCDFF',
-              '--tw-ring-opacity': '0.5'
-            } as React.CSSProperties}
-          />
-        </div>
-        
-        <div className="flex gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Status" />
+
+        {/* Additional Filters Row */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">Additional Filters:</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="overdue-rent-filter"
+              checked={overdueRentFilter}
+              onChange={(e) => setOverdueRentFilter(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+            />
+            <label htmlFor="overdue-rent-filter" className="text-sm text-muted-foreground cursor-pointer">
+              Overdue Rent Only
+            </label>
+          </div>
+
+          <Select value={leaseExpiryFilter} onValueChange={setLeaseExpiryFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Lease Expiry" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="vacant">Vacant</SelectItem>
-              <SelectItem value="occupied">Occupied</SelectItem>
-              <SelectItem value="under-renovation">Under Renovation</SelectItem>
+              <SelectItem value="all">All Leases</SelectItem>
+              <SelectItem value="expired">Expired</SelectItem>
+              <SelectItem value="30-days">Expiring within 30 days</SelectItem>
+              <SelectItem value="60-days">Expiring within 60 days</SelectItem>
+              <SelectItem value="90-days">Expiring within 90 days</SelectItem>
+              <SelectItem value="no-lease">No Lease (Vacant)</SelectItem>
             </SelectContent>
           </Select>
 
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Type" />
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {getPropertyTypes().map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
+              <SelectItem value="default">Default</SelectItem>
+              <SelectItem value="rent-asc">Rent: Low to High</SelectItem>
+              <SelectItem value="rent-desc">Rent: High to Low</SelectItem>
+              <SelectItem value="lease-expiry-asc">Lease Expiry: Soonest First</SelectItem>
+              <SelectItem value="lease-expiry-desc">Lease Expiry: Latest First</SelectItem>
+              <SelectItem value="address-asc">Address: A to Z</SelectItem>
+              <SelectItem value="address-desc">Address: Z to A</SelectItem>
+              <SelectItem value="overdue-desc">Overdue Amount: Highest First</SelectItem>
+              <SelectItem value="overdue-asc">Overdue Amount: Lowest First</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -1,32 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Progress } from './ui/progress';
 import { Separator } from './ui/separator';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
-import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { 
   ArrowLeft, 
   AlertCircle, 
   Calendar, 
   PoundSterling,
-  MessageCircle,
   FileText,
   Clock,
-  TrendingDown,
   Phone,
   Mail,
   User,
-  Download,
-  Send,
-  CreditCard,
-  Scale
+  Download
 } from 'lucide-react';
 import { ArrearsAlert, Tenant } from '../App';
+import { paymentScheduleService, RentPaymentPeriod } from '../services/paymentScheduleService';
 
 interface ArrearsManagementProps {
   alert: ArrearsAlert;
@@ -35,24 +25,35 @@ interface ArrearsManagementProps {
   onInitiateWorkflow: (workflowType: 'reminder' | 'payment-plan' | 'legal', details?: any) => void;
 }
 
-interface PaymentPlanDetails {
-  totalAmount: number;
-  installments: number;
-  frequency: 'weekly' | 'monthly';
-  startDate: Date;
-  additionalTerms: string;
-}
-
 export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }: ArrearsManagementProps) {
-  const [showWorkflowDialog, setShowWorkflowDialog] = useState(false);
-  const [selectedWorkflow, setSelectedWorkflow] = useState<'reminder' | 'payment-plan' | 'legal'>('reminder');
-  const [paymentPlan, setPaymentPlan] = useState<PaymentPlanDetails>({
-    totalAmount: alert.overdueAmount,
-    installments: 4,
-    frequency: 'monthly',
-    startDate: new Date(),
-    additionalTerms: ''
-  });
+  const [paymentPeriods, setPaymentPeriods] = useState<RentPaymentPeriod[]>([]);
+  const [isLoadingPayments, setIsLoadingPayments] = useState(true);
+
+  // Fetch real payment history from payment periods
+  useEffect(() => {
+    const fetchPaymentHistory = async () => {
+      if (!tenant.id) {
+        setIsLoadingPayments(false);
+        return;
+      }
+      
+      try {
+        setIsLoadingPayments(true);
+        const periods = await paymentScheduleService.getTenantPeriods(tenant.id);
+        // Get the last 6 months of payment periods, sorted by due date (newest first)
+        const sortedPeriods = periods
+          .sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime())
+          .slice(0, 6);
+        setPaymentPeriods(sortedPeriods);
+      } catch (error) {
+        console.error('[ArrearsManagement] Error fetching payment history:', error);
+      } finally {
+        setIsLoadingPayments(false);
+      }
+    };
+
+    fetchPaymentHistory();
+  }, [tenant.id]);
 
   const getDaysOverdueColor = (days: number) => {
     if (days >= 30) return 'text-red-600 bg-red-50 border-red-200';
@@ -60,34 +61,31 @@ export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }:
     return 'text-yellow-600 bg-yellow-50 border-yellow-200';
   };
 
-  const getRiskColor = (score: number) => {
-    if (score >= 80) return 'text-red-600';
-    if (score >= 60) return 'text-orange-600';
-    return 'text-yellow-600';
+
+  // Convert payment periods to payment history format
+  const formatPaymentHistory = () => {
+    return paymentPeriods.map((period) => {
+      const now = new Date();
+      const dueDate = period.dueDate;
+      const isOverdue = period.status === 'overdue' || (dueDate < now && period.status !== 'paid');
+      const daysLate = period.status === 'paid' && period.paidAt
+        ? Math.max(0, Math.ceil((period.paidAt.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)))
+        : isOverdue
+        ? Math.max(0, Math.ceil((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)))
+        : 0;
+
+      return {
+        date: period.dueDate,
+        amount: period.amountDue,
+        status: period.status === 'paid' ? 'paid' : isOverdue ? 'overdue' : 'pending',
+        method: period.notes || 'Not specified',
+        daysLate: daysLate > 0 ? daysLate : undefined,
+        paidDate: period.paidAt
+      };
+    });
   };
 
-  const getRiskLevel = (score: number) => {
-    if (score >= 80) return 'HIGH';
-    if (score >= 60) return 'MEDIUM';
-    return 'LOW';
-  };
-
-  const handleWorkflowSubmit = () => {
-    if (selectedWorkflow === 'payment-plan') {
-      onInitiateWorkflow(selectedWorkflow, paymentPlan);
-    } else {
-      onInitiateWorkflow(selectedWorkflow);
-    }
-    setShowWorkflowDialog(false);
-  };
-
-  const paymentHistory = [
-    { date: new Date('2024-11-01'), amount: 2400, status: 'paid', method: 'Bank Transfer' },
-    { date: new Date('2024-10-01'), amount: 2400, status: 'paid', method: 'Bank Transfer' },
-    { date: new Date('2024-09-01'), amount: 2400, status: 'paid', method: 'Bank Transfer' },
-    { date: new Date('2024-08-01'), amount: 2400, status: 'paid', method: 'Bank Transfer' },
-    { date: new Date('2024-07-01'), amount: 2400, status: 'late', method: 'Bank Transfer', daysLate: 5 },
-  ];
+  const paymentHistory = formatPaymentHistory();
 
   return (
     <div className="min-h-screen bg-background">
@@ -130,7 +128,7 @@ export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }:
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid md:grid-cols-3 gap-6">
+                <div className="grid md:grid-cols-2 gap-6">
                   <div className="text-center">
                     <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-red-500 to-red-600 text-white mb-3">
                       <PoundSterling className="h-8 w-8" />
@@ -150,52 +148,6 @@ export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }:
                     </h3>
                     <p className="text-sm text-muted-foreground">Days Overdue</p>
                   </div>
-
-                  <div className="text-center">
-                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white mb-3">
-                      <TrendingDown className="h-8 w-8" />
-                    </div>
-                    <h3 className={`text-2xl font-bold mb-1 ${getRiskColor(alert.defaultRiskScore)}`}>
-                      {alert.defaultRiskScore}%
-                    </h3>
-                    <p className="text-sm text-muted-foreground">Default Risk Score</p>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div>
-                  <h4 className="mb-4">Default Risk Analysis</h4>
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Payment History Score</span>
-                        <span>75%</span>
-                      </div>
-                      <Progress value={75} className="h-2 [&>[data-slot=progress-indicator]]:bg-[#136C9E]" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Communication Responsiveness</span>
-                        <span>45%</span>
-                      </div>
-                      <Progress value={45} className="h-2 [&>[data-slot=progress-indicator]]:bg-[#136C9E]" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Employment Stability</span>
-                        <span>80%</span>
-                      </div>
-                      <Progress value={80} className="h-2 [&>[data-slot=progress-indicator]]:bg-[#136C9E]" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Economic Indicators</span>
-                        <span>60%</span>
-                      </div>
-                      <Progress value={60} className="h-2 [&>[data-slot=progress-indicator]]:bg-[#136C9E]" />
-                    </div>
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -212,105 +164,50 @@ export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }:
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {paymentHistory.map((payment, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 rounded-lg border">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-3 h-3 rounded-full ${
-                          payment.status === 'paid' ? 'bg-green-500' : 
-                          payment.status === 'late' ? 'bg-orange-500' : 'bg-red-500'
-                        }`}></div>
-                        <div>
-                          <p className="font-medium">{payment.date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {payment.method}
-                            {payment.daysLate && ` • ${payment.daysLate} days late`}
-                          </p>
+                {isLoadingPayments ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Clock className="w-6 h-6 mr-2 animate-spin text-gray-400" />
+                    <p className="text-muted-foreground">Loading payment history...</p>
+                  </div>
+                ) : paymentHistory.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-muted-foreground font-medium">No payment history available</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Payment history will appear here once payment periods are generated.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {paymentHistory.map((payment, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 rounded-lg border">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-3 h-3 rounded-full ${
+                            payment.status === 'paid' ? 'bg-green-500' : 
+                            payment.status === 'overdue' ? 'bg-red-500' : 'bg-orange-500'
+                          }`}></div>
+                          <div>
+                            <p className="font-medium">{payment.date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {payment.method}
+                              {payment.daysLate && ` • ${payment.daysLate} days late`}
+                              {payment.paidDate && ` • Paid: ${payment.paidDate.toLocaleDateString('en-GB')}`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium">£{payment.amount.toLocaleString()}</p>
+                          <Badge variant={payment.status === 'paid' ? 'default' : payment.status === 'overdue' ? 'destructive' : 'secondary'} className="text-xs">
+                            {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                          </Badge>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium">£{payment.amount.toLocaleString()}</p>
-                        <Badge variant={payment.status === 'paid' ? 'default' : payment.status === 'late' ? 'secondary' : 'destructive'} className="text-xs">
-                          {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* AI Intervention Options */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <MessageCircle className="h-5 w-5 mr-2" />
-                  AI Intervention Workflows
-                </CardTitle>
-                <CardDescription>
-                  Automated intervention options based on risk assessment and payment history
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-3 gap-4">
-                  <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer border-blue-200" 
-                        onClick={() => { setSelectedWorkflow('reminder'); setShowWorkflowDialog(true); }}>
-                    <div className="text-center">
-                      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mb-3">
-                        <Send className="h-6 w-6 text-blue-600" />
-                      </div>
-                      <h4 className="mb-2">Smart Reminder</h4>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Personalized, empathetic automated reminder sequence
-                      </p>
-                      <Badge variant="outline" className="text-xs">Recommended</Badge>
-                    </div>
-                  </Card>
-
-                  <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer border-orange-200"
-                        onClick={() => { setSelectedWorkflow('payment-plan'); setShowWorkflowDialog(true); }}>
-                    <div className="text-center">
-                      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-orange-100 mb-3">
-                        <CreditCard className="h-6 w-6 text-orange-600" />
-                      </div>
-                      <h4 className="mb-2">Payment Plan</h4>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Flexible payment arrangement with automated tracking
-                      </p>
-                      <Badge variant="secondary" className="text-xs">Medium Risk</Badge>
-                    </div>
-                  </Card>
-
-                  <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer border-red-200"
-                        onClick={() => { setSelectedWorkflow('legal'); setShowWorkflowDialog(true); }}>
-                    <div className="text-center">
-                      <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mb-3">
-                        <Scale className="h-6 w-6 text-red-600" />
-                      </div>
-                      <h4 className="mb-2">Legal Action</h4>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Pre-fill legal documents and initiate proceedings
-                      </p>
-                      <Badge variant="destructive" className="text-xs">High Risk</Badge>
-                    </div>
-                  </Card>
-                </div>
-
-                <Dialog open={showWorkflowDialog} onOpenChange={setShowWorkflowDialog}>
-                  <DialogContent className="max-w-2xl">
-                    <AIInterventionWorkflow
-                      workflowType={selectedWorkflow}
-                      alert={alert}
-                      tenant={tenant}
-                      paymentPlan={paymentPlan}
-                      onPaymentPlanChange={setPaymentPlan}
-                      onConfirm={handleWorkflowSubmit}
-                      onCancel={() => setShowWorkflowDialog(false)}
-                    />
-                  </DialogContent>
-                </Dialog>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Sidebar */}
@@ -400,22 +297,17 @@ export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }:
                       <p className="text-muted-foreground">{alert.daysPastDue} days ago</p>
                     </div>
                   </div>
-                  <div className="flex items-start space-x-2">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
-                    <div>
-                      <p className="font-medium">Default risk score updated</p>
-                      <p className="text-muted-foreground">2 days ago</p>
+                  {tenant.lastPaymentDate && (
+                    <div className="flex items-start space-x-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                      <div>
+                        <p className="font-medium">Last successful payment</p>
+                        <p className="text-muted-foreground">
+                          {tenant.lastPaymentDate.toLocaleDateString('en-GB')}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-start space-x-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                    <div>
-                      <p className="font-medium">Last successful payment</p>
-                      <p className="text-muted-foreground">
-                        {tenant.lastPaymentDate?.toLocaleDateString('en-GB')}
-                      </p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -423,225 +315,5 @@ export function ArrearsManagement({ alert, tenant, onBack, onInitiateWorkflow }:
         </div>
       </div>
     </div>
-  );
-}
-
-interface AIInterventionWorkflowProps {
-  workflowType: 'reminder' | 'payment-plan' | 'legal';
-  alert: ArrearsAlert;
-  tenant: Tenant;
-  paymentPlan: PaymentPlanDetails;
-  onPaymentPlanChange: (plan: PaymentPlanDetails) => void;
-  onConfirm: () => void;
-  onCancel: () => void;
-}
-
-function AIInterventionWorkflow({ 
-  workflowType, 
-  alert, 
-  tenant, 
-  paymentPlan, 
-  onPaymentPlanChange, 
-  onConfirm, 
-  onCancel 
-}: AIInterventionWorkflowProps) {
-  const getWorkflowTitle = () => {
-    switch (workflowType) {
-      case 'reminder': return 'Smart Reminder Sequence';
-      case 'payment-plan': return 'Flexible Payment Plan';
-      case 'legal': return 'Legal Action Preparation';
-    }
-  };
-
-  const getWorkflowIcon = () => {
-    switch (workflowType) {
-      case 'reminder': return <Send className="h-5 w-5" />;
-      case 'payment-plan': return <CreditCard className="h-5 w-5" />;
-      case 'legal': return <Scale className="h-5 w-5" />;
-    }
-  };
-
-  return (
-    <>
-      <DialogHeader>
-        <DialogTitle className="flex items-center">
-          {getWorkflowIcon()}
-          <span className="ml-2">{getWorkflowTitle()}</span>
-        </DialogTitle>
-        <DialogDescription>
-          Configure and initiate AI-powered intervention for {tenant.name}
-        </DialogDescription>
-      </DialogHeader>
-
-      <div className="space-y-6 mt-6">
-        {workflowType === 'reminder' && (
-          <div className="space-y-4">
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-medium mb-2">Automated Reminder Sequence</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>• Initial gentle reminder</span>
-                  <span className="text-muted-foreground">Immediate</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>• Follow-up with payment options</span>
-                  <span className="text-muted-foreground">3 days</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>• Final notice before escalation</span>
-                  <span className="text-muted-foreground">7 days</span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <Label>Preview of first message:</Label>
-              <Textarea
-                value={`Hi ${tenant.name},
-
-I hope you're doing well. I wanted to reach out regarding your rent payment for ${alert.propertyAddress}, which was due on the 1st and is now ${alert.daysPastDue} days overdue.
-
-I understand that sometimes unexpected circumstances can affect our ability to make payments on time. If you're experiencing any difficulties, please don't hesitate to get in touch so we can discuss possible solutions.
-
-The outstanding amount is £${alert.overdueAmount}. You can make your payment through your usual method, or contact me if you need alternative payment arrangements.
-
-Thank you for your prompt attention to this matter.
-
-Best regards,
-Property Management Team`}
-                rows={8}
-                readOnly
-                className="mt-2"
-              />
-            </div>
-          </div>
-        )}
-
-        {workflowType === 'payment-plan' && (
-          <div className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="total-amount">Total Outstanding Amount</Label>
-                <Input
-                  id="total-amount"
-                  type="number"
-                  value={paymentPlan.totalAmount}
-                  onChange={(e) => onPaymentPlanChange({
-                    ...paymentPlan,
-                    totalAmount: parseInt(e.target.value)
-                  })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="installments">Number of Installments</Label>
-                <Input
-                  id="installments"
-                  type="number"
-                  value={paymentPlan.installments}
-                  onChange={(e) => onPaymentPlanChange({
-                    ...paymentPlan,
-                    installments: parseInt(e.target.value)
-                  })}
-                />
-              </div>
-            </div>
-            
-            <div>
-              <Label>Payment Frequency</Label>
-              <RadioGroup
-                value={paymentPlan.frequency}
-                onValueChange={(value) => onPaymentPlanChange({
-                  ...paymentPlan,
-                  frequency: value as 'weekly' | 'monthly'
-                })}
-                className="flex space-x-6 mt-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="weekly" id="weekly" />
-                  <Label htmlFor="weekly">Weekly</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="monthly" id="monthly" />
-                  <Label htmlFor="monthly">Monthly</Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            <div>
-              <Label htmlFor="additional-terms">Additional Terms</Label>
-              <Textarea
-                id="additional-terms"
-                value={paymentPlan.additionalTerms}
-                onChange={(e) => onPaymentPlanChange({
-                  ...paymentPlan,
-                  additionalTerms: e.target.value
-                })}
-                placeholder="Any additional terms or conditions..."
-                rows={3}
-              />
-            </div>
-
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <h4 className="font-medium mb-2">Payment Plan Summary</h4>
-              <div className="text-sm space-y-1">
-                <p>Total Amount: £{paymentPlan.totalAmount.toLocaleString()}</p>
-                <p>Installment Amount: £{Math.ceil(paymentPlan.totalAmount / paymentPlan.installments).toLocaleString()}</p>
-                <p>Frequency: {paymentPlan.frequency.charAt(0).toUpperCase() + paymentPlan.frequency.slice(1)}</p>
-                <p>Duration: {paymentPlan.installments} {paymentPlan.frequency === 'weekly' ? 'weeks' : 'months'}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {workflowType === 'legal' && (
-          <div className="space-y-4">
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <h4 className="font-medium mb-2 text-red-800">Legal Action Preparation</h4>
-              <p className="text-sm text-red-700">
-                This will initiate the legal process for recovering rent arrears. All necessary documentation will be automatically generated and pre-filled.
-              </p>
-            </div>
-            
-            <div className="space-y-3">
-              <h4>Documents to be Generated:</h4>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Section 8 Notice (Ground 8 & 10)</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Rent Arrears Statement</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Evidence Pack (Communications, Payment History)</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Court Application Forms</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-              <p className="text-sm text-orange-800">
-                <strong>Important:</strong> We recommend attempting communication and payment plan options before proceeding with legal action. Legal costs may apply.
-              </p>
-            </div>
-          </div>
-        )}
-
-        <div className="flex justify-end space-x-3 pt-4 border-t">
-          <Button variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button onClick={onConfirm}>
-            {workflowType === 'reminder' && 'Send Reminders'}
-            {workflowType === 'payment-plan' && 'Create Payment Plan'}
-            {workflowType === 'legal' && 'Generate Legal Documents'}
-          </Button>
-        </div>
-      </div>
-    </>
   );
 }
