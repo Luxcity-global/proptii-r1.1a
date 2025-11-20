@@ -6,6 +6,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { EmailService } from '../services/email.service';
 
 interface SendEmailPayload {
@@ -56,7 +57,16 @@ export class EmailController {
   }
 
   @Post('send-base64')
-  @UseInterceptors(AnyFilesInterceptor())
+  @UseInterceptors(
+    AnyFilesInterceptor({
+      storage: memoryStorage(),
+      limits: {
+        fieldSize: 100 * 1024 * 1024, // 100MB limit for form fields (base64 strings)
+        fields: 10, // Maximum number of non-file fields
+        fileSize: 0, // No file uploads expected
+      },
+    }),
+  )
   async sendEmailWithBase64(@Body() body: SendEmailWithAttachmentPayload) {
     const {
       to,

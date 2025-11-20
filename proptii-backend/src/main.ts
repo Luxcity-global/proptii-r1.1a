@@ -33,9 +33,9 @@ async function bootstrap() {
     logger: ['error', 'warn', 'debug', 'log', 'verbose'],
   });
 
-  // Configure body parser to handle larger payloads for file uploads
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  // Configure body parser to handle larger payloads for base64 file uploads
+  app.use(express.json({ limit: '100mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '100mb' }));
   
   // Set global prefix for all routes except root
   app.setGlobalPrefix('api', {

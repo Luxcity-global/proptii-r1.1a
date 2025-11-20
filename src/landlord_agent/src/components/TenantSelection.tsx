@@ -52,7 +52,7 @@ export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting
     {
       id: 'existing',
       title: 'Select Existing User',
-      description: 'Assign an existing tenant from your database to a property',
+      description: 'Assign an existing tenant from our database to a property',
       icon: Users,
       features: [
         'Search existing tenant database',

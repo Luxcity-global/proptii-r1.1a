@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { ArrowLeft, Search, Users, Home, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Search, Users, Home, CheckCircle, AlertCircle, Loader2, Info } from 'lucide-react';
 import { Property, Tenant } from '../App';
 import { tenantService } from '../services/tenantService';
 import axios from 'axios';
@@ -224,11 +224,32 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
               Select a tenant from our existing users
             </h1>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Choose a user from your directory and assign them as a tenant to a property
+              Choose a user from our directory and assign them as a tenant to a property
             </p>
           </div>
 
           <div className="max-w-4xl mx-auto">
+            {/* Information Note */}
+            <Card className="mb-6 bg-blue-50 rounded-xl border border-blue-200">
+              <CardContent className="p-6">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#136C9E' }}>
+                      <Info className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                      Additional Details Required
+                    </h3>
+                    <p className="text-sm leading-relaxed" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                      After assigning a tenant to a property, you'll need to add other relevant details like phone number, lease duration, and payment information later. This step only creates the basic tenant assignment.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Search and Filters */}
             <Card className="mb-6">
               <CardHeader>

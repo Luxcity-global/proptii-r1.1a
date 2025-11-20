@@ -8,3 +8,4 @@ import { AzureUsersController } from '../controllers/azure-users.controller';
   exports: [AzureUsersService],
 })
 export class AzureUsersModule {}
+

@@ -126,14 +126,21 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
         status: statusMap[activeTab]
       };
       
-      // Prefer userId filter if available (more reliable), otherwise use landlordEmail
+      // Add all available user identifiers to maximize chances of finding contracts
+      // Some contracts may have userId, others may have landlordId, others may have landlordEmail
       if (userId) {
         filters.userId = userId;
-        console.log('🔍 Loading contracts with userId filter:', userId);
-      } else if (landlordEmail) {
+        // Also try userId as landlordId since they might be the same
+        filters.landlordId = userId;
+        console.log('🔍 Loading contracts with userId and landlordId filters:', userId);
+      }
+      
+      if (landlordEmail) {
         filters.landlordEmail = landlordEmail;
         console.log('🔍 Loading contracts with landlordEmail filter:', landlordEmail);
-      } else {
+      }
+      
+      if (!userId && !landlordEmail) {
         console.log('⚠️ No userId or landlordEmail - loading all contracts');
       }
       
@@ -232,10 +239,52 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
   // Convert File to base64 data URL (similar to property image upload)
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
+      // Check file size before conversion
+      const maxSize = 50 * 1024 * 1024; // 50MB
+      if (file.size > maxSize) {
+        reject(new Error(`File is too large. Maximum size is 50MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB.`));
+        return;
+      }
+
+      // Warn about large files
+      if (file.size > 20 * 1024 * 1024) {
+        console.log('Processing large file:', file.name, `${(file.size / (1024 * 1024)).toFixed(2)}MB. This may take a moment...`);
+      }
+
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+      
+      // Set timeout for very large files (5 minutes)
+      const timeout = setTimeout(() => {
+        reader.abort();
+        reject(new Error('File conversion timed out. The file may be too large. Please try a smaller file or compress it.'));
+      }, 5 * 60 * 1000);
+
+      reader.onload = () => {
+        clearTimeout(timeout);
+        const result = reader.result as string;
+        console.log('File converted to base64. Original size:', file.size, 'bytes. Base64 size:', result.length, 'bytes');
+        resolve(result);
+      };
+      
+      reader.onerror = (error) => {
+        clearTimeout(timeout);
+        console.error('Error converting file to base64:', error);
+        reject(new Error('Failed to process file. Please try again or use a different file.'));
+      };
+      
+      reader.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentLoaded = Math.round((event.loaded / event.total) * 100);
+          console.log(`File conversion progress: ${percentLoaded}%`);
+        }
+      };
+
+      try {
+        reader.readAsDataURL(file);
+      } catch (error) {
+        clearTimeout(timeout);
+        reject(error);
+      }
     });
   };
 
@@ -256,8 +305,18 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
       
       if (contractData.file) {
         // Convert file to base64 and send email with attachment
-        console.log('Converting file to base64:', contractData.file.name);
-        const base64Data = await fileToBase64(contractData.file);
+        console.log('Converting file to base64:', contractData.file.name, `(${(contractData.file.size / (1024 * 1024)).toFixed(2)}MB)`);
+        
+        let base64Data: string;
+        try {
+          base64Data = await fileToBase64(contractData.file);
+        } catch (conversionError: any) {
+          console.error('Error converting file to base64:', conversionError);
+          const errorMessage = conversionError?.message || 'Failed to process file. The file may be too large or corrupted.';
+          setError(errorMessage);
+          alert(`Error: ${errorMessage}\n\nPlease try:\n- Compressing the file\n- Using a smaller file\n- Checking the file is not corrupted`);
+          return;
+        }
         
         // Extract base64 content (remove data:application/pdf;base64, prefix)
         const base64Content = base64Data.split(',')[1];
@@ -269,10 +328,41 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
         formData.append('to', contractData.recipientEmail);
         formData.append('subject', `Contract for Review: ${contractData.file.name}`);
         formData.append('html', `
-          <h2>Hello ${contractData.recipientName}!</h2>
-          <p>Please find attached your contract for review.</p>
-          ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
-          <p>Best regards,<br>Proptii Team</p>
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 20px;
+              }
+              .cta-button {
+                display: inline-block;
+                background-color: #DC5F12;
+                color: white !important;
+                padding: 12px 30px;
+                text-decoration: none;
+                border-radius: 50px;
+                margin: 20px 0;
+                font-weight: bold;
+                text-align: center;
+              }
+            </style>
+          </head>
+          <body>
+            <h2>Hello ${contractData.recipientName}!</h2>
+            <p>Please find attached your contract for review.</p>
+            ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
+            <div style="text-align: center;">
+              <a href="https://proptii-frontend.onrender.com/contracts" class="cta-button">View Contracts</a>
+            </div>
+            <p>Best regards,<br>Proptii Team</p>
+          </body>
+          </html>
         `);
         
         // Send base64 data separately so backend can decode it
@@ -280,10 +370,96 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
         formData.append('attachmentFilename', contractData.file.name);
         formData.append('attachmentMimeType', mimeType);
         
-        const response = await axios.post(`${API_BASE_URL}/email/send-base64`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 30000
+        // Log request details for debugging
+        const fileSizeMB = contractData.file.size / (1024 * 1024);
+        const base64SizeMB = base64Content.length / (1024 * 1024);
+        console.log(`Sending file:`, {
+          fileName: contractData.file.name,
+          originalSize: `${fileSizeMB.toFixed(2)}MB`,
+          base64Size: `${base64SizeMB.toFixed(2)}MB`,
+          base64Length: base64Content.length,
+          recipientEmail: contractData.recipientEmail,
+          hasSubject: !!formData.get('subject'),
+          hasHtml: !!formData.get('html')
         });
+        
+        // Calculate timeout based on file size (minimum 30s, add 1s per MB)
+        const timeout = Math.max(30000, 30000 + (fileSizeMB * 1000)); // 30s base + 1s per MB
+        
+        console.log(`Sending file (${fileSizeMB.toFixed(2)}MB) with timeout: ${timeout}ms`);
+        
+        let response;
+        try {
+          response = await axios.post(`${API_BASE_URL}/email/send-base64`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: timeout,
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            onUploadProgress: (progressEvent) => {
+              if (progressEvent.total) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                console.log(`Upload progress: ${percentCompleted}%`);
+              }
+            }
+          });
+        } catch (uploadError: any) {
+          console.error('Error uploading file:', uploadError);
+          console.error('Error response:', uploadError?.response);
+          console.error('Error response data:', uploadError?.response?.data);
+          
+          let errorMessage = 'Failed to upload file. Please try again.';
+          
+          if (uploadError.code === 'ECONNABORTED') {
+            errorMessage = 'Upload timed out. The file may be too large. Please try a smaller file or compress it.';
+            setError(errorMessage);
+            alert('Upload timed out. The file may be too large. Please try:\n- Compressing the file\n- Using a smaller file\n- Checking your internet connection');
+            return;
+          }
+          
+          if (uploadError.response?.status === 413) {
+            errorMessage = 'File is too large for the server. Maximum size is 50MB.';
+            setError(errorMessage);
+            alert('File is too large for the server. Please use a file smaller than 50MB.');
+            return;
+          }
+          
+          // Extract error message from various possible response formats
+          if (uploadError.response?.data) {
+            const errorData = uploadError.response.data;
+            
+            // Try different possible error message fields
+            if (typeof errorData === 'string') {
+              errorMessage = errorData;
+            } else if (errorData.error) {
+              errorMessage = typeof errorData.error === 'string' 
+                ? errorData.error 
+                : JSON.stringify(errorData.error);
+            } else if (errorData.message) {
+              errorMessage = typeof errorData.message === 'string'
+                ? errorData.message
+                : JSON.stringify(errorData.message);
+            } else if (errorData.details) {
+              // If details is a string, use it; otherwise format it
+              errorMessage = typeof errorData.details === 'string'
+                ? errorData.details
+                : `Server error: ${errorData.error || 'Unknown error'}. Check console for details.`;
+            } else {
+              // Last resort: stringify the whole error data
+              errorMessage = `Server error: ${JSON.stringify(errorData)}`;
+            }
+          } else if (uploadError.message) {
+            errorMessage = uploadError.message;
+          }
+          
+          // Add status code if available
+          if (uploadError.response?.status) {
+            errorMessage = `[${uploadError.response.status}] ${errorMessage}`;
+          }
+          
+          setError(errorMessage);
+          alert(`Upload failed: ${errorMessage}\n\nPlease check the console for more details.`);
+          return;
+        }
         
         console.log('Contract email sent successfully with attachment');
         
@@ -345,10 +521,41 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
         formData.append('to', contractData.recipientEmail);
         formData.append('subject', 'Test Email from Proptii');
         formData.append('html', `
-          <h2>Hello ${contractData.recipientName}!</h2>
-          <p>This is a test email from Proptii Property Management System.</p>
-          ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
-          <p>Best regards,<br>Proptii Team</p>
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 20px;
+              }
+              .cta-button {
+                display: inline-block;
+                background-color: #DC5F12;
+                color: white !important;
+                padding: 12px 30px;
+                text-decoration: none;
+                border-radius: 50px;
+                margin: 20px 0;
+                font-weight: bold;
+                text-align: center;
+              }
+            </style>
+          </head>
+          <body>
+            <h2>Hello ${contractData.recipientName}!</h2>
+            <p>This is a test email from Proptii Property Management System.</p>
+            ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
+            <div style="text-align: center;">
+              <a href="https://proptii-frontend.onrender.com/contracts" class="cta-button">View Contracts</a>
+            </div>
+            <p>Best regards,<br>Proptii Team</p>
+          </body>
+          </html>
         `);
         
         const response = await axios.post(`${API_BASE_URL}/email/send`, formData, {

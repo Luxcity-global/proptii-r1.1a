@@ -155,66 +155,160 @@ class ContractService {
       tenantId?: string;
       propertyId?: string;
       landlordEmail?: string;
+      landlordId?: string;
     }
   ): Promise<Contract[]> {
     try {
-      const constraints: QueryConstraint[] = [];
+      // If we have multiple user identifiers (userId, landlordId, landlordEmail),
+      // we need to query separately and combine results since Firestore doesn't support OR queries
+      const hasMultipleUserFilters = [filters?.userId, filters?.landlordId, filters?.landlordEmail].filter(Boolean).length > 1;
+      
+      if (hasMultipleUserFilters) {
+        // Query with each identifier separately and combine results
+        const allContracts: Contract[] = [];
+        const contractIds = new Set<string>();
 
-      // userId filter should be applied first for security
-      if (filters?.userId) {
-        constraints.push(where('userId', '==', filters.userId));
-      }
-
-      if (filters?.status) {
-        constraints.push(where('status', '==', filters.status));
-      }
-      if (filters?.tenantId) {
-        constraints.push(where('tenantId', '==', filters.tenantId));
-      }
-      if (filters?.propertyId) {
-        constraints.push(where('propertyId', '==', filters.propertyId));
-      }
-      if (filters?.landlordEmail) {
-        constraints.push(where('landlordEmail', '==', filters.landlordEmail));
-      }
-
-      // Only add orderBy if we have filters, otherwise it requires an index
-      // If no filters, we'll sort in-memory after fetching
-      if (constraints.length > 0) {
-        try {
-          constraints.push(orderBy('createdAt', 'desc'));
-          const q = query(this.contractsCollection, ...constraints);
-          const querySnapshot = await getDocs(q);
-          const contracts = this.mapContractDocs(querySnapshot.docs);
-          return contracts;
-        } catch (indexError: any) {
-          // If index error, fetch without orderBy and sort in memory
-          if (indexError.code === 'failed-precondition' && indexError.message?.includes('index')) {
-            console.log('ℹ️ Firestore index not configured, using in-memory sort');
-            const q = query(this.contractsCollection, ...constraints.slice(0, -1)); // Remove orderBy
-            const querySnapshot = await getDocs(q);
-            const contracts = this.mapContractDocs(querySnapshot.docs);
-            // Sort in memory
-            return contracts.sort((a, b) => b.sentDate.getTime() - a.sentDate.getTime());
-          }
-          throw indexError;
-        }
-      } else {
-        // No filters, fetch all and sort in memory (with userId filter if provided)
-        let querySnapshot;
+        // Query with userId if provided
         if (filters?.userId) {
-          // Still apply userId filter even if no other filters
-          const q = query(this.contractsCollection, where('userId', '==', filters.userId));
-          querySnapshot = await getDocs(q);
-        } else {
-          querySnapshot = await getDocs(this.contractsCollection);
+          try {
+            const userIdContracts = await this.getContractsWithSingleUserFilter({
+              ...filters,
+              userId: filters.userId,
+              landlordId: undefined,
+              landlordEmail: undefined
+            });
+            userIdContracts.forEach(contract => {
+              if (!contractIds.has(contract.id)) {
+                contractIds.add(contract.id);
+                allContracts.push(contract);
+              }
+            });
+          } catch (err) {
+            console.warn('Error querying with userId:', err);
+          }
         }
-        const contracts = this.mapContractDocs(querySnapshot.docs);
-        return contracts.sort((a, b) => b.sentDate.getTime() - a.sentDate.getTime());
+
+        // Query with landlordId if provided
+        if (filters?.landlordId) {
+          try {
+            const landlordIdContracts = await this.getContractsWithSingleUserFilter({
+              ...filters,
+              userId: undefined,
+              landlordId: filters.landlordId,
+              landlordEmail: undefined
+            });
+            landlordIdContracts.forEach(contract => {
+              if (!contractIds.has(contract.id)) {
+                contractIds.add(contract.id);
+                allContracts.push(contract);
+              }
+            });
+          } catch (err) {
+            console.warn('Error querying with landlordId:', err);
+          }
+        }
+
+        // Query with landlordEmail if provided
+        if (filters?.landlordEmail) {
+          try {
+            const landlordEmailContracts = await this.getContractsWithSingleUserFilter({
+              ...filters,
+              userId: undefined,
+              landlordId: undefined,
+              landlordEmail: filters.landlordEmail
+            });
+            landlordEmailContracts.forEach(contract => {
+              if (!contractIds.has(contract.id)) {
+                contractIds.add(contract.id);
+                allContracts.push(contract);
+              }
+            });
+          } catch (err) {
+            console.warn('Error querying with landlordEmail:', err);
+          }
+        }
+
+        // Sort combined results
+        return allContracts.sort((a, b) => b.sentDate.getTime() - a.sentDate.getTime());
+      } else {
+        // Single user filter or no user filter - use original logic
+        return this.getContractsWithSingleUserFilter(filters);
       }
     } catch (error) {
       console.error('Error getting contracts:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Helper method to get contracts with a single user identifier filter
+   */
+  private async getContractsWithSingleUserFilter(
+    filters?: {
+      userId?: string;
+      status?: Contract['status'];
+      tenantId?: string;
+      propertyId?: string;
+      landlordEmail?: string;
+      landlordId?: string;
+    }
+  ): Promise<Contract[]> {
+    const constraints: QueryConstraint[] = [];
+
+    // userId filter should be applied first for security
+    if (filters?.userId) {
+      constraints.push(where('userId', '==', filters.userId));
+    }
+
+    if (filters?.status) {
+      constraints.push(where('status', '==', filters.status));
+    }
+    if (filters?.tenantId) {
+      constraints.push(where('tenantId', '==', filters.tenantId));
+    }
+    if (filters?.propertyId) {
+      constraints.push(where('propertyId', '==', filters.propertyId));
+    }
+    if (filters?.landlordEmail) {
+      constraints.push(where('landlordEmail', '==', filters.landlordEmail));
+    }
+    if (filters?.landlordId) {
+      constraints.push(where('landlordId', '==', filters.landlordId));
+    }
+
+    // Only add orderBy if we have filters, otherwise it requires an index
+    // If no filters, we'll sort in-memory after fetching
+    if (constraints.length > 0) {
+      try {
+        constraints.push(orderBy('createdAt', 'desc'));
+        const q = query(this.contractsCollection, ...constraints);
+        const querySnapshot = await getDocs(q);
+        const contracts = this.mapContractDocs(querySnapshot.docs);
+        return contracts;
+      } catch (indexError: any) {
+        // If index error, fetch without orderBy and sort in memory
+        if (indexError.code === 'failed-precondition' && indexError.message?.includes('index')) {
+          console.log('ℹ️ Firestore index not configured, using in-memory sort');
+          const q = query(this.contractsCollection, ...constraints.slice(0, -1)); // Remove orderBy
+          const querySnapshot = await getDocs(q);
+          const contracts = this.mapContractDocs(querySnapshot.docs);
+          // Sort in memory
+          return contracts.sort((a, b) => b.sentDate.getTime() - a.sentDate.getTime());
+        }
+        throw indexError;
+      }
+    } else {
+      // No filters, fetch all and sort in memory (with userId filter if provided)
+      let querySnapshot;
+      if (filters?.userId) {
+        // Still apply userId filter even if no other filters
+        const q = query(this.contractsCollection, where('userId', '==', filters.userId));
+        querySnapshot = await getDocs(q);
+      } else {
+        querySnapshot = await getDocs(this.contractsCollection);
+      }
+      const contracts = this.mapContractDocs(querySnapshot.docs);
+      return contracts.sort((a, b) => b.sentDate.getTime() - a.sentDate.getTime());
     }
   }
 

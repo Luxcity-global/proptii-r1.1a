@@ -110,3 +110,4 @@ cd src/landlord_agent && npm run build
 
 *This is a static build architecture - it's designed this way for performance and optimization in production.*
 
+

@@ -17,8 +17,7 @@ import {
 } from '../../../services/bookViewingRequestService';
 import emailService from '../../../services/emailService';
 
-// Module-level log to confirm file is loaded
-console.log('📦 ViewingsPage.tsx MODULE LOADED');
+// ViewingsPage component for managing property viewings and requests
 
 type TabKey = 'requests' | 'upcoming' | 'past';
 
@@ -88,12 +87,7 @@ function formatTime(time: string) {
 }
 
 const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, managerEmail }) => {
-  console.log('🟢 ViewingsPage component RENDERED');
-  console.log('🟢 Props received:', { managerId, managerName, managerEmail });
-  console.log('🟢 About to declare useState hooks...');
-  
   const [loading, setLoading] = useState(true);
-  console.log('🟢 useState hooks declared, loading state:', loading);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('requests');
   const [requests, setRequests] = useState<BookViewingRequest[]>([]);
@@ -110,55 +104,26 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   const [isProcessing, setIsProcessing] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  console.log('🟢 All state hooks declared, about to declare useEffect...');
-  console.log('🟢 managerEmail at useEffect declaration time:', managerEmail);
-  
-  // Test useEffect with empty deps to see if ANY useEffect runs
   useEffect(() => {
-    console.log('🧪🧪🧪 TEST: useEffect with empty deps executed! 🧪🧪🧪');
-  }, []);
-
-  useEffect(() => {
-    console.log('🔵🔵🔵 ViewingsPage useEffect TRIGGERED 🔵🔵🔵');
-    console.log('🔵 managerEmail prop:', managerEmail);
-    console.log('🔵 managerEmail type:', typeof managerEmail);
-    console.log('🔵 managerEmail truthy?', !!managerEmail);
-    console.log('🔵 managerId prop:', managerId);
-    console.log('🔵 managerName prop:', managerName);
-    
     let unsubscribeBookings: (() => void) | undefined;
     let unsubscribeRequests: (() => void) | undefined;
     let unsubscribeStats: (() => void) | undefined;
 
     // Use email for filtering instead of managerId
     if (!managerEmail) {
-      console.warn('⚠️⚠️⚠️ No managerEmail provided, cannot load viewings ⚠️⚠️⚠️');
       setLoading(false);
       setError('Unable to determine your email. Please sign in again.');
       return;
     }
-    
-    console.log('✅✅✅ managerEmail is available, proceeding with email-based filtering ✅✅✅');
-    console.log('✅ managerEmail value:', managerEmail);
 
     const loadInitialData = async () => {
-      console.log('📥 loadInitialData function called');
-      console.log('📥 About to call service methods with email:', managerEmail);
       try {
         setLoading(true);
         setError(null);
 
-        console.log('📥 Getting ALL viewingBookings for email (will filter by status)...');
-        const allBookingsPromise = viewingService.getViewingBookingsByEmail(managerEmail);
-        console.log('📥 Calling getViewingStatsByEmail...');
-        const statsPromise = viewingService.getViewingStatsByEmail(managerEmail);
-        
-        console.log('📥 Waiting for Promise.all...');
-        // Use email-based filtering on viewingBookings collection only
-        const [allBookingsResult, statsResult] = await Promise.all([
-          allBookingsPromise,
-          statsPromise
-        ]);
+        // OPTIMIZATION: Fetch bookings once and calculate stats from the same data
+        // This eliminates the duplicate query that was happening in getViewingStatsByEmail
+        const allBookingsResult = await viewingService.getViewingBookingsByEmail(managerEmail);
         
         // Filter bookings by status: 'pending' = requests, others = bookings
         const requests: BookViewingRequest[] = [];
@@ -184,61 +149,51 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
             }
           });
         }
-        
-        const requestsResult = { success: true, requests };
-        const bookingsResult = { success: true, bookings };
-        
-        console.log('📥 Promise.all completed');
-        console.log('📥 requestsResult:', requestsResult);
-        console.log('📥 bookingsResult:', bookingsResult);
-        console.log('📥 statsResult:', statsResult);
 
-        if (requestsResult.success && requestsResult.requests) {
-          console.log('✅ Setting requests:', requestsResult.requests.length);
-          setRequests(requestsResult.requests);
-        } else {
-          console.warn('⚠️ requestsResult not successful:', requestsResult);
+        // OPTIMIZATION: Calculate stats from the bookings we already fetched
+        // instead of making a separate query
+        const calculatedStats: ViewingStats = {
+          upcoming: 0,
+          completed: 0,
+          rescheduled: 0,
+          total: allBookingsResult.bookings?.length || 0
+        };
+
+        if (allBookingsResult.success && allBookingsResult.bookings) {
+          allBookingsResult.bookings.forEach((booking) => {
+            switch (booking.status) {
+              case 'pending':
+              case 'confirmed':
+                calculatedStats.upcoming++;
+                break;
+              case 'completed':
+                calculatedStats.completed++;
+                break;
+              case 'rescheduled':
+                calculatedStats.rescheduled++;
+                break;
+            }
+          });
         }
 
-        if (bookingsResult.success && bookingsResult.bookings) {
-          console.log('✅ Setting bookings:', bookingsResult.bookings.length);
-          setBookings(bookingsResult.bookings);
-        } else {
-          console.warn('⚠️ bookingsResult not successful:', bookingsResult);
-        }
-
-        if (statsResult.success && statsResult.stats) {
-          console.log('✅ Setting stats:', statsResult.stats);
-          setStats(statsResult.stats);
-        } else {
-          console.warn('⚠️ statsResult not successful:', statsResult);
-        }
-
+        // Update state with all data at once
+        setRequests(requests);
+        setBookings(bookings);
+        setStats(calculatedStats);
         setLoading(false);
-        console.log('✅✅✅ loadInitialData completed successfully ✅✅✅');
       } catch (err) {
-        console.error('❌❌❌ Error loading manager viewings:', err);
-        console.error('❌ Error details:', {
-          message: err instanceof Error ? err.message : 'Unknown error',
-          stack: err instanceof Error ? err.stack : undefined
-        });
+        console.error('Error loading manager viewings:', err);
         setError('Failed to load viewings data. Please try again later.');
         setLoading(false);
       }
     };
 
-    console.log('📞 Calling loadInitialData...');
     loadInitialData();
 
     // Use email-based subscriptions for real-time updates (all from viewingBookings)
-    console.log('📡 Setting up subscriptions with email:', managerEmail);
-    
-    console.log('📡 Subscribing to ALL viewingBookings (will filter by status)...');
     unsubscribeBookings = viewingService.subscribeToViewingBookingsByEmail(
       managerEmail,
       (allItems) => {
-        console.log('📡 All viewingBookings subscription callback received:', allItems.length, 'items');
-        
         // Filter by status: pending = requests, others = bookings
         const pendingRequests: BookViewingRequest[] = [];
         const confirmedBookings: ViewingBooking[] = [];
@@ -261,31 +216,42 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
           }
         });
         
-        console.log('📡 Filtered to', pendingRequests.length, 'requests and', confirmedBookings.length, 'bookings');
         setRequests(pendingRequests);
         setBookings(confirmedBookings);
+        
+        // Calculate stats from the updated bookings
+        const calculatedStats: ViewingStats = {
+          upcoming: 0,
+          completed: 0,
+          rescheduled: 0,
+          total: allItems.length
+        };
+        
+        allItems.forEach((booking) => {
+          switch (booking.status) {
+            case 'pending':
+            case 'confirmed':
+              calculatedStats.upcoming++;
+              break;
+            case 'completed':
+              calculatedStats.completed++;
+              break;
+            case 'rescheduled':
+              calculatedStats.rescheduled++;
+              break;
+          }
+        });
+        
+        setStats(calculatedStats);
       },
       (err) => {
-        console.error('❌ Viewing bookings subscription error:', err);
-      }
-    );
-
-    console.log('📡 Subscribing to viewing stats...');
-    unsubscribeStats = viewingService.subscribeToViewingStatsByEmail(
-      managerEmail,
-      (nextStats) => {
-        console.log('📡 Viewing stats subscription callback received:', nextStats);
-        setStats(nextStats);
-      },
-      (err) => {
-        console.error('❌ Viewing stats subscription error:', err);
+        console.error('Viewing bookings subscription error:', err);
       }
     );
     
-    // No separate subscription for requests - they come from the same subscription
+    // No separate subscription for requests or stats - they're calculated from bookings
     unsubscribeRequests = undefined;
-    
-    console.log('✅✅✅ All subscriptions set up ✅✅✅');
+    unsubscribeStats = undefined;
 
     return () => {
       unsubscribeBookings?.();
