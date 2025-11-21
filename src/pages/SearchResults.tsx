@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSearchBackend, type Property } from '../hooks/useSearchBackend';
 import { useSavedProperties } from '../contexts/SavedPropertiesContext';
@@ -608,8 +608,97 @@ const SearchResults = () => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const serviceMarkersRef = useRef<any[]>([]);
+  const searchLocationMarkerRef = useRef<any>(null);
+  const placesServiceRef = useRef<any>(null);
   const markersGeocodedRef = useRef<boolean>(false);
   const lastResultsKeyRef = useRef<string | null>(null);
+  const searchLocationRef = useRef<any>(null);
+  const propertyToMarkerMapRef = useRef<Map<number, any>>(new Map()); // Maps property index to marker
+  const markerToPropertyIndexMapRef = useRef<Map<any, number>>(new Map()); // Maps marker to property index
+
+  // Function to discover nearby services
+  const discoverNearbyServices = (location: any) => {
+    if (!placesServiceRef.current || !mapInstanceRef.current) return;
+    
+    // Service categories to discover
+    const serviceTypes = [
+      { type: 'transit_station', category: 'Transport', icon: '🚇', color: '#2196F3' },
+      { type: 'school', category: 'Education', icon: '🎓', color: '#4CAF50' },
+      { type: 'hospital', category: 'Healthcare', icon: '🏥', color: '#F44336' },
+      { type: 'grocery_or_supermarket', category: 'Shopping', icon: '🛒', color: '#FF9800' },
+      { type: 'park', category: 'Recreation', icon: '🌳', color: '#4CAF50' },
+      { type: 'restaurant', category: 'Dining', icon: '🍽️', color: '#9C27B0' },
+    ];
+    
+    // Clear existing service markers
+    serviceMarkersRef.current.forEach(marker => marker.setMap(null));
+    serviceMarkersRef.current = [];
+    
+    // Discover services for each type
+    serviceTypes.forEach((serviceType, index) => {
+      setTimeout(() => {
+        const request = {
+          location: location,
+          radius: 2000, // 2km radius
+          type: serviceType.type,
+        };
+        
+        placesServiceRef.current.nearbySearch(request, (results: any[], status: string) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+            // Limit to top 5 results per category
+            const topResults = results.slice(0, 5);
+            
+            topResults.forEach((place: any) => {
+              const marker = new window.google.maps.Marker({
+                position: place.geometry.location,
+                map: mapInstanceRef.current,
+                title: place.name,
+                icon: {
+                  path: window.google.maps.SymbolPath.CIRCLE,
+                  scale: 8,
+                  fillColor: serviceType.color,
+                  fillOpacity: 0.8,
+                  strokeColor: '#FFFFFF',
+                  strokeWeight: 2,
+                },
+                zIndex: 500,
+              });
+              
+              // Create info window for service
+              const infoWindow = new window.google.maps.InfoWindow({
+                content: `
+                  <div style="padding: 8px; max-width: 200px;">
+                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                      <span style="font-size: 16px;">${serviceType.icon}</span>
+                      <h4 style="margin: 0; font-size: 13px; font-weight: bold; color: ${serviceType.color};">${place.name}</h4>
+                    </div>
+                    <p style="margin: 0; font-size: 11px; color: #666;">${place.vicinity || place.formatted_address || ''}</p>
+                    ${place.rating ? `<p style="margin: 4px 0 0 0; font-size: 11px; color: #666;">⭐ ${place.rating}/5 (${place.user_ratings_total || 0} reviews)</p>` : ''}
+                  </div>
+                `,
+              });
+              
+              marker.addListener('click', () => {
+                // Close all other info windows
+                serviceMarkersRef.current.forEach(m => {
+                  if (m.infoWindow) m.infoWindow.close();
+                });
+                markersRef.current.forEach(m => {
+                  if (m.infoWindow) m.infoWindow.close();
+                });
+                infoWindow.open(mapInstanceRef.current, marker);
+              });
+              
+              marker.infoWindow = infoWindow;
+              marker.serviceCategory = serviceType.category;
+              serviceMarkersRef.current.push(marker);
+            });
+          }
+        });
+      }, index * 200); // Stagger requests to avoid rate limiting
+    });
+  };
 
   // Perform search when component mounts or search params change
   useEffect(() => {
@@ -682,24 +771,147 @@ const SearchResults = () => {
 
   // Initialize map when showMap is true and script is loaded
   useEffect(() => {
-    if (showMap && isMapLoaded && mapRef.current && window.google && window.google.maps) {
-      // Clear existing map instance if any
+    if (!showMap || !isMapLoaded || !mapRef.current) {
+      return;
+    }
+
+    // Wait a bit to ensure DOM is ready
+    const initTimeout = setTimeout(() => {
+      if (!window.google || !window.google.maps || !mapRef.current) {
+        console.error('Google Maps not available or map container not ready');
+        return;
+      }
+
+      // If map is already initialized, just update search location and services
       if (mapInstanceRef.current) {
-        console.log('Map already initialized, skipping re-initialization');
-        return; // Map already initialized
+        console.log('Map already initialized, updating search location...');
+        
+        // Clear previous search location marker and service markers
+        if (searchLocationMarkerRef.current) {
+          searchLocationMarkerRef.current.setMap(null);
+          searchLocationMarkerRef.current = null;
+        }
+        serviceMarkersRef.current.forEach(marker => marker.setMap(null));
+        serviceMarkersRef.current = [];
+        
+        // Re-geocode search location and discover services
+        if (searchQuery && window.google.maps) {
+          const geocoder = new window.google.maps.Geocoder();
+          const locationMatch = searchQuery.match(/(?:in|at|near)\s+([A-Za-z\s]+)/i);
+          const locationToGeocode = locationMatch ? locationMatch[1].trim() : searchQuery;
+          
+          geocoder.geocode({ address: locationToGeocode }, (results, status) => {
+            if (status === 'OK' && results && results[0] && mapInstanceRef.current) {
+              const location = results[0].geometry.location;
+              searchLocationRef.current = location;
+              
+              // Add search location marker
+              searchLocationMarkerRef.current = new window.google.maps.Marker({
+                position: location,
+                map: mapInstanceRef.current,
+                title: `Search Location: ${locationToGeocode}`,
+                icon: {
+                  path: window.google.maps.SymbolPath.CIRCLE,
+                  scale: 12,
+                  fillColor: '#136C9E',
+                  fillOpacity: 1,
+                  strokeColor: '#FFFFFF',
+                  strokeWeight: 3,
+                },
+                zIndex: 1000,
+              });
+              
+              const searchInfoWindow = new window.google.maps.InfoWindow({
+                content: `
+                  <div style="padding: 8px; max-width: 200px;">
+                    <h4 style="margin: 0 0 4px 0; font-size: 14px; font-weight: bold; color: #136C9E;">📍 Search Location</h4>
+                    <p style="margin: 0; font-size: 12px; color: #666;">${locationToGeocode}</p>
+                  </div>
+                `,
+              });
+              
+              searchLocationMarkerRef.current.addListener('click', () => {
+                searchInfoWindow.open(mapInstanceRef.current, searchLocationMarkerRef.current);
+              });
+              
+              mapInstanceRef.current.setCenter(location);
+              mapInstanceRef.current.setZoom(12);
+              
+              // Discover nearby services
+              discoverNearbyServices(location);
+            }
+          });
+        }
+        return;
       }
 
       // Step 1: Initialize map centered on UK (country view)
       try {
-        mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
-          center: { lat: 54.0, lng: -2.0 }, // Center of UK
-          zoom: 6, // Show entire UK
-          mapTypeControl: true,
-          streetViewControl: true,
-          fullscreenControl: true,
-          zoomControl: true,
-        });
-        console.log('Map initialized - showing UK view');
+        if (!mapRef.current) {
+          console.error('Map container element not found');
+          return;
+        }
+
+        // Ensure the container has dimensions
+        const container = mapRef.current;
+        if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+          console.warn('Map container has no dimensions, retrying in 200ms...');
+          setTimeout(() => {
+            if (mapRef.current && mapRef.current.offsetWidth > 0 && mapRef.current.offsetHeight > 0 && !mapInstanceRef.current) {
+              try {
+                mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
+                  center: { lat: 54.0, lng: -2.0 },
+                  zoom: 6,
+                  mapTypeControl: true,
+                  streetViewControl: true,
+                  fullscreenControl: true,
+                  zoomControl: true,
+                });
+                placesServiceRef.current = new window.google.maps.places.PlacesService(mapInstanceRef.current);
+                console.log('Map initialized successfully (retry)');
+                window.google.maps.event.trigger(mapInstanceRef.current, 'resize');
+              } catch (err) {
+                console.error('Error creating map instance (retry):', err);
+              }
+            }
+          }, 200);
+          return;
+        }
+
+        try {
+          mapInstanceRef.current = new window.google.maps.Map(container, {
+            center: { lat: 54.0, lng: -2.0 }, // Center of UK
+            zoom: 6, // Show entire UK
+            mapTypeControl: true,
+            streetViewControl: true,
+            fullscreenControl: true,
+            zoomControl: true,
+          });
+          
+          // Initialize Places Service
+          placesServiceRef.current = new window.google.maps.places.PlacesService(mapInstanceRef.current);
+          
+          console.log('Map initialized successfully - showing UK view');
+          
+          // Trigger resize event to ensure map renders properly
+          setTimeout(() => {
+            if (mapInstanceRef.current) {
+              window.google.maps.event.trigger(mapInstanceRef.current, 'resize');
+              
+              // Reattach any existing markers to the new map instance (fix for reload issue)
+              if (markersRef.current.length > 0) {
+                console.log(`Reattaching ${markersRef.current.length} markers to map after initialization`);
+                markersRef.current.forEach(marker => {
+                  if (marker.getMap() !== mapInstanceRef.current) {
+                    marker.setMap(mapInstanceRef.current);
+                  }
+                });
+              }
+            }
+          }, 100);
+        } catch (err) {
+          console.error('Error creating map instance:', err);
+        }
         
         // Step 2: Extract and geocode search location, then zoom in
         if (searchQuery && window.google.maps) {
@@ -713,15 +925,61 @@ const SearchResults = () => {
           geocoder.geocode({ address: locationToGeocode }, (results, status) => {
             if (status === 'OK' && results && results[0] && mapInstanceRef.current) {
               const location = results[0].geometry.location;
+              searchLocationRef.current = location;
+              
+              // Places Service should already be initialized in map initialization
+              if (!placesServiceRef.current && mapInstanceRef.current) {
+                placesServiceRef.current = new window.google.maps.places.PlacesService(mapInstanceRef.current);
+              }
+              
+              // Add search location marker (prominent marker)
+              if (searchLocationMarkerRef.current) {
+                searchLocationMarkerRef.current.setMap(null);
+              }
+              
+              searchLocationMarkerRef.current = new window.google.maps.Marker({
+                position: location,
+                map: mapInstanceRef.current,
+                title: `Search Location: ${locationToGeocode}`,
+                icon: {
+                  path: window.google.maps.SymbolPath.CIRCLE,
+                  scale: 12,
+                  fillColor: '#136C9E',
+                  fillOpacity: 1,
+                  strokeColor: '#FFFFFF',
+                  strokeWeight: 3,
+                },
+                zIndex: 1000,
+                animation: window.google.maps.Animation.DROP,
+              });
+              
+              // Add info window for search location
+              const searchInfoWindow = new window.google.maps.InfoWindow({
+                content: `
+                  <div style="padding: 8px; max-width: 200px;">
+                    <h4 style="margin: 0 0 4px 0; font-size: 14px; font-weight: bold; color: #136C9E;">📍 Search Location</h4>
+                    <p style="margin: 0; font-size: 12px; color: #666;">${locationToGeocode}</p>
+                  </div>
+                `,
+              });
+              
+              searchLocationMarkerRef.current.addListener('click', () => {
+                searchInfoWindow.open(mapInstanceRef.current, searchLocationMarkerRef.current);
+              });
               
               // Step 3: Center and zoom on search location
               mapInstanceRef.current.setCenter(location);
               mapInstanceRef.current.setZoom(12); // Zoom into city level
               console.log('Map centered and zoomed on search location:', locationToGeocode);
+              
+              // Discover nearby services
+              discoverNearbyServices(location);
             } else {
               console.warn('Failed to geocode search location:', locationToGeocode, status);
               // Fallback: center on London if search location geocoding fails
-              mapInstanceRef.current.setCenter({ lat: 51.5074, lng: -0.1278 });
+              const fallbackLocation = { lat: 51.5074, lng: -0.1278 };
+              searchLocationRef.current = new window.google.maps.LatLng(fallbackLocation.lat, fallbackLocation.lng);
+              mapInstanceRef.current.setCenter(fallbackLocation);
               mapInstanceRef.current.setZoom(12);
             }
           });
@@ -733,40 +991,361 @@ const SearchResults = () => {
       } catch (error) {
         console.error('Error initializing map:', error);
       }
-    }
+    }, 100); // Small delay to ensure DOM is ready
+
+    return () => {
+      clearTimeout(initTimeout);
+    };
   }, [showMap, isMapLoaded, searchQuery]);
 
+  // Function to recreate markers from cached positions
+  const recreateMarkersFromCache = useCallback((properties: Property[], map: any) => {
+    if (!window.google || !window.google.maps || !map) return false;
+    
+    const markerCacheKey = 'mapMarkerPositions';
+    const cachedMarkers = sessionStorage.getItem(markerCacheKey);
+    if (!cachedMarkers) return false;
+    
+    try {
+      const markerPositions: Array<{ propertyIndex: number; lat: number; lng: number; address: string }> = JSON.parse(cachedMarkers);
+      if (!Array.isArray(markerPositions) || markerPositions.length === 0) return false;
+      
+      console.log(`Recreating ${markerPositions.length} markers from cache...`);
+      
+      const bounds = new window.google.maps.LatLngBounds();
+      let recreatedCount = 0;
+      
+      markerPositions.forEach((cachedMarker) => {
+        const propertyIndex = cachedMarker.propertyIndex;
+        if (propertyIndex >= 0 && propertyIndex < properties.length) {
+          const property = properties[propertyIndex];
+          
+          // Verify the cached address matches the current property address
+          if (property.location.trim() === cachedMarker.address) {
+            const location = new window.google.maps.LatLng(cachedMarker.lat, cachedMarker.lng);
+            
+            // Create marker with pin/pointer icon
+            const pinSvgString = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40"><path d="M16 0C7.163 0 0 7.163 0 16c0 11.25 16 24 16 24s16-12.75 16-24C32 7.163 24.837 0 16 0zm0 9c2.209 0 4 1.791 4 4s-1.791 4-4 4-4-1.791-4-4 1.791-4 4-4z" fill="#E65D24" stroke="#FFFFFF" stroke-width="2"/></svg>';
+            
+            const markerIcon = {
+              url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pinSvgString),
+              scaledSize: new window.google.maps.Size(32, 40),
+              anchor: new window.google.maps.Point(16, 40),
+            };
+            
+            const marker = new window.google.maps.Marker({
+              position: location,
+              map: map,
+              title: property.title,
+              animation: window.google.maps.Animation.DROP,
+              optimized: false,
+              icon: markerIcon,
+              zIndex: 600,
+            });
+            
+            marker.originalIcon = markerIcon;
+            
+            // Verify marker is attached to map
+            if (marker.getMap() !== map) {
+              console.warn(`Marker for property ${propertyIndex} not attached to map, reattaching...`);
+              marker.setMap(map);
+            }
+            
+            // Create info window (same as in geocoding)
+            const propertyId = `prop-${propertyIndex}-${Date.now()}`;
+            const imageUrls = property.imageUrls || [];
+            const firstImageUrl = imageUrls.length > 0 ? imageUrls[0] : '';
+            const cleanedPrice = cleanPropertyPrice(property.price || 'N/A');
+            
+            const infoWindow = new window.google.maps.InfoWindow({
+              content: `
+                <div style="max-width: 320px; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; cursor: pointer;" id="info-card-${propertyId}">
+                  ${firstImageUrl ? `
+                    <div style="position: relative; width: 100%; height: 180px; overflow: hidden; border-radius: 12px 12px 0 0; background-color: #f0f0f0;">
+                      <img id="info-img-${propertyId}" src="${firstImageUrl}" alt="Property" style="width: 100%; height: 100%; object-fit: cover; transition: opacity 0.3s;" />
+                      ${imageUrls.length > 1 ? `
+                        <button id="prev-btn-${propertyId}" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; z-index: 10; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">‹</button>
+                        <button id="next-btn-${propertyId}" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; z-index: 10; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">›</button>
+                        <div id="img-counter-${propertyId}" style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; z-index: 10;">1/${imageUrls.length}</div>
+                      ` : ''}
+                      <div style="position: absolute; top: 12px; left: 12px; background: #E65D24; color: white; padding: 6px 12px; border-radius: 20px; font-weight: 600; font-size: 13px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                        ${cleanedPrice}
+                      </div>
+                      ${property.source ? `
+                        <div style="position: absolute; bottom: 12px; left: 12px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                          ${property.source}
+                        </div>
+                      ` : ''}
+                    </div>
+                  ` : `
+                    <div style="position: relative; width: 100%; height: 180px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); display: flex; align-items: center; justify-content: center; border-radius: 12px 12px 0 0;">
+                      <svg width="48" height="48" style="color: #9ca3af;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <div style="position: absolute; top: 12px; left: 12px; background: #E65D24; color: white; padding: 6px 12px; border-radius: 20px; font-weight: 600; font-size: 13px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                        ${cleanedPrice}
+                      </div>
+                    </div>
+                  `}
+                  <div style="padding: 16px; background: white; border-radius: 0 0 12px 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <h3 style="font-weight: 600; margin: 0 0 12px 0; font-size: 16px; color: #1a1a1a; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                      ${property.location}
+                    </h3>
+                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 12px; color: #4b5563; font-size: 13px;">
+                      <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${property.title || 'Property Listing'}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 16px; font-size: 13px; color: #4b5563;">
+                      <div style="display: flex; align-items: center; gap: 4px;">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
+                        </svg>
+                        <span style="font-weight: 500;">${property.bedrooms || 'N/A'}</span>
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 4px;">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        <span style="font-weight: 500;">${property.propertyType || 'Property'}</span>
+                      </div>
+                    </div>
+                    ${property.agent && property.agent.name ? `
+                      <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
+                        Agent: ${property.agent.name}
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+              `,
+            });
+            
+            // Set up info window handlers (simplified version)
+            window.google.maps.event.addListener(infoWindow, 'domready', () => {
+              const infoCard = document.getElementById(`info-card-${propertyId}`) as HTMLElement;
+              if (infoCard) {
+                infoCard.style.cursor = 'pointer';
+                infoCard.addEventListener('click', () => {
+                  infoWindow.close();
+                  const event = new CustomEvent('openPropertyModal', { 
+                    detail: { property, propertyIndex } 
+                  });
+                  window.dispatchEvent(event);
+                });
+              }
+            });
+            
+            marker.addListener('click', () => {
+              markersRef.current.forEach(m => {
+                if (m.infoWindow) m.infoWindow.close();
+              });
+              infoWindow.open(map, marker);
+            });
+            
+            marker.infoWindow = infoWindow;
+            marker.propertyIndex = propertyIndex;
+            
+            propertyToMarkerMapRef.current.set(propertyIndex, marker);
+            markerToPropertyIndexMapRef.current.set(marker, propertyIndex);
+            
+            markersRef.current.push(marker);
+            bounds.extend(location);
+            recreatedCount++;
+          }
+        }
+      });
+      
+      if (recreatedCount > 0) {
+        // Verify all markers are actually on the map
+        const visibleMarkers = markersRef.current.filter(m => m.getMap() !== null && m.getMap() === map).length;
+        console.log(`Recreated ${recreatedCount} markers, ${visibleMarkers} are visible on map`);
+        
+        // Fit bounds to show all recreated markers
+        setTimeout(() => {
+          if (recreatedCount === 1) {
+            const singleMarker = markersRef.current.find(m => m.getMap() === map);
+            if (singleMarker) {
+              const position = singleMarker.getPosition();
+              map.setCenter(position);
+              map.setZoom(14);
+            }
+          } else if (recreatedCount > 1) {
+            // Create new bounds from visible markers only
+            const visibleBounds = new window.google.maps.LatLngBounds();
+            markersRef.current.forEach(marker => {
+              if (marker.getMap() === map) {
+                visibleBounds.extend(marker.getPosition());
+              }
+            });
+            if (!visibleBounds.isEmpty()) {
+              map.fitBounds(visibleBounds, {
+                top: 80,
+                right: 80,
+                bottom: 80,
+                left: 80
+              });
+            }
+          }
+          markersGeocodedRef.current = true;
+          console.log(`✓ Recreated ${recreatedCount} markers from cache (${visibleMarkers} visible)`);
+        }, 300);
+        return true;
+      } else {
+        console.log('No markers were recreated from cache');
+      }
+    } catch (e) {
+      console.error('Error recreating markers from cache:', e);
+      sessionStorage.removeItem(markerCacheKey);
+    }
+    
+    return false;
+  }, []);
+  
   // Geocode properties and add markers when results change
   // This runs AFTER the map is initialized and centered on search location
   useEffect(() => {
-    if (showMap && isMapLoaded && mapInstanceRef.current && window.google && window.google.maps && results.length > 0) {
+    console.log('Property markers useEffect triggered:', {
+      showMap,
+      isMapLoaded,
+      hasMapInstance: !!mapInstanceRef.current,
+      hasGoogleMaps: !!(window.google && window.google.maps),
+      resultsCount: results.length
+    });
+    
+    // Check if all conditions are met for marker creation
+    const conditionsMet = showMap && isMapLoaded && mapInstanceRef.current && window.google && window.google.maps && results.length > 0;
+    
+    if (conditionsMet) {
       // Create a unique key for this results set to prevent re-geocoding
       const resultsKey = results.map(r => `${r.location}-${r.title}`).join('|');
       
-      // Skip if we've already geocoded these exact results
-      if (lastResultsKeyRef.current === resultsKey && markersGeocodedRef.current) {
-        console.log('Markers already geocoded for these results, skipping re-geocode...');
+      console.log('Checking if markers need to be created:', {
+        currentKey: lastResultsKeyRef.current,
+        newKey: resultsKey,
+        alreadyGeocoded: markersGeocodedRef.current
+      });
+      
+      // Skip if we've already geocoded these exact results AND markers actually exist on the map
+      const existingMarkersCount = markersRef.current.filter(m => m.getMap() !== null).length;
+      if (lastResultsKeyRef.current === resultsKey && markersGeocodedRef.current && existingMarkersCount > 0) {
+        console.log('Markers already geocoded and exist on map, skipping re-geocode...', {
+          existingMarkersCount,
+          totalMarkers: markersRef.current.length
+        });
         return;
       }
       
-      // Only proceed if this is a new set of results
-      if (lastResultsKeyRef.current !== resultsKey) {
-        lastResultsKeyRef.current = resultsKey;
+      // If markers were supposed to be created but don't exist, try cache first
+      if (markersGeocodedRef.current && existingMarkersCount === 0) {
+        console.log('Markers were marked as geocoded but none exist on map - trying cache...');
+        const recreated = recreateMarkersFromCache(results, mapInstanceRef.current);
+        if (recreated) {
+          return; // Successfully recreated from cache
+        }
+        markersGeocodedRef.current = false;
+      }
+      
+      // Try to recreate from cache before geocoding (only if we have cache and results match)
+      if (!markersGeocodedRef.current || lastResultsKeyRef.current !== resultsKey) {
+        const recreated = recreateMarkersFromCache(results, mapInstanceRef.current);
+        if (recreated) {
+          // Successfully recreated from cache - verify markers are on map
+          const visibleMarkers = markersRef.current.filter(m => m.getMap() !== null).length;
+          if (visibleMarkers > 0) {
+            console.log(`Successfully recreated ${visibleMarkers} markers from cache`);
+            lastResultsKeyRef.current = resultsKey;
+            markersGeocodedRef.current = true;
+            return;
+          } else {
+            console.warn('Cache recreation returned true but no markers are visible - will geocode instead');
+            // Clear invalid cache and continue with geocoding
+            sessionStorage.removeItem('mapMarkerPositions');
+            markersRef.current = [];
+          }
+        }
+      }
+      
+      // Update the results key
+      const previousKey = lastResultsKeyRef.current;
+      const resultsChanged = previousKey !== resultsKey;
+      
+      // If results changed significantly, clear old marker cache
+      if (resultsChanged && previousKey) {
+        console.log('Results changed - clearing old marker cache');
+        sessionStorage.removeItem('mapMarkerPositions');
+        // Clear existing markers
+        markersRef.current.forEach(marker => marker.setMap(null));
+        markersRef.current = [];
+        propertyToMarkerMapRef.current.clear();
+        markerToPropertyIndexMapRef.current.clear();
+      }
+      
+      lastResultsKeyRef.current = resultsKey;
+      console.log('Processing results to create markers...', {
+        resultsKey,
+        previousKey,
+        resultsCount: results.length,
+        willCreateMarkers: resultsChanged || !markersGeocodedRef.current,
+        markersAlreadyGeocoded: markersGeocodedRef.current
+      });
+      
+      // Wait a bit for map to finish centering on search location before adding markers
+      console.log('Setting timeout for marker creation (500ms delay)...');
+      let timeoutId: NodeJS.Timeout | null = null;
+      
+      timeoutId = setTimeout(() => {
+        console.log('Timeout executed - starting marker creation process...', {
+          hasMapInstance: !!mapInstanceRef.current,
+          hasGoogleMaps: !!(window.google && window.google.maps),
+          resultsCount: results.length
+        });
         
-        // Wait a bit for map to finish centering on search location before adding markers
-        const timeoutId = setTimeout(() => {
-          const geocoder = new window.google.maps.Geocoder();
-          const bounds = new window.google.maps.LatLngBounds();
-          
-          // Clear existing markers only when starting fresh geocode
-          console.log(`Clearing ${markersRef.current.length} existing markers...`);
-          markersRef.current.forEach(marker => marker.setMap(null));
-          markersRef.current = [];
-          markersGeocodedRef.current = false;
+        if (!mapInstanceRef.current) {
+          console.error('Map instance not available in timeout - retrying in 500ms');
+          setTimeout(() => {
+            if (mapInstanceRef.current && showMap) {
+              // Retry marker creation by triggering the effect again
+              console.log('Retrying marker creation after map instance available');
+              // Force re-trigger by updating a dependency
+              markersGeocodedRef.current = false;
+            }
+          }, 500);
+          return;
+        }
         
+        if (!window.google || !window.google.maps) {
+          console.error('Google Maps not available in timeout');
+          return;
+        }
+        
+        // Double-check: if we have no markers but should have them, ensure we create them
+        const currentMarkerCount = markersRef.current.filter(m => m.getMap() !== null).length;
+        if (currentMarkerCount === 0 && results.length > 0) {
+          console.log('No markers visible - proceeding with geocoding to create markers');
+        }
+        
+        const geocoder = new window.google.maps.Geocoder();
+        const bounds = new window.google.maps.LatLngBounds();
+        
+        // Clear existing markers only when starting fresh geocode
+        console.log(`Clearing ${markersRef.current.length} existing property markers...`);
+        markersRef.current.forEach(marker => marker.setMap(null));
+        markersRef.current = [];
+        markersGeocodedRef.current = false;
+        // Clear property-marker mappings
+        propertyToMarkerMapRef.current.clear();
+        markerToPropertyIndexMapRef.current.clear();
+        
+        // Note: We keep service markers and search location marker as they're based on search query, not results
+      
         // Filter properties with valid addresses
         const propertiesWithAddresses = results.filter(prop => prop.location && prop.location.trim());
         const totalProperties = propertiesWithAddresses.length;
+        
+        console.log('Properties filtered:', {
+          totalResults: results.length,
+          withAddresses: totalProperties,
+          sampleLocations: propertiesWithAddresses.slice(0, 3).map(p => p.location)
+        });
         
         if (totalProperties === 0) {
           console.warn('No properties with valid addresses to geocode');
@@ -843,6 +1422,16 @@ const SearchResults = () => {
                           // Verify markers are still visible and attached to map
                           const visibleMarkers = markersRef.current.filter(m => m.getMap() !== null);
                           console.log(`Map idle - Zoom: ${mapInstanceRef.current.getZoom()}, Total markers: ${markersRef.current.length}, Visible on map: ${visibleMarkers.length}`);
+                          
+                          // Reattach any markers that are not on the map (fix for reload issue)
+                          if (visibleMarkers.length < markersRef.current.length && mapInstanceRef.current) {
+                            console.warn(`Some markers are not attached to map (${visibleMarkers.length}/${markersRef.current.length}), reattaching...`);
+                            markersRef.current.forEach(marker => {
+                              if (marker.getMap() !== mapInstanceRef.current) {
+                                marker.setMap(mapInstanceRef.current);
+                              }
+                            });
+                          }
                         }
                       );
                       
@@ -855,6 +1444,18 @@ const SearchResults = () => {
                       
                       // Mark as geocoded
                       markersGeocodedRef.current = true;
+                      
+                      // Final verification: ensure all markers are visible
+                      const finalVisibleCount = markersRef.current.filter(m => m.getMap() === mapInstanceRef.current).length;
+                      console.log(`✓ Marker creation complete: ${finalVisibleCount}/${markersRef.current.length} markers visible on map`);
+                      if (finalVisibleCount < markersRef.current.length) {
+                        console.warn(`⚠ Some markers are not visible - reattaching...`);
+                        markersRef.current.forEach(marker => {
+                          if (marker.getMap() !== mapInstanceRef.current) {
+                            marker.setMap(mapInstanceRef.current);
+                          }
+                        });
+                      }
                     } else if (successfulGeocodes === 1) {
                       // Single property - center on it
                       const singleMarker = markersRef.current[0];
@@ -863,6 +1464,11 @@ const SearchResults = () => {
                         mapInstanceRef.current.setCenter(position);
                         mapInstanceRef.current.setZoom(14);
                         console.log('Map centered on single property');
+                        
+                        // Verify marker is visible
+                        if (singleMarker.getMap() !== mapInstanceRef.current) {
+                          singleMarker.setMap(mapInstanceRef.current);
+                        }
                       }
                       markersGeocodedRef.current = true;
                     }
@@ -876,6 +1482,11 @@ const SearchResults = () => {
                     mapInstanceRef.current.setCenter(position);
                     mapInstanceRef.current.setZoom(12);
                     console.log('Fallback: Map centered on first marker');
+                    
+                    // Ensure marker is visible
+                    if (firstMarker.getMap() !== mapInstanceRef.current) {
+                      firstMarker.setMap(mapInstanceRef.current);
+                    }
                   }
                   markersGeocodedRef.current = true;
                 }
@@ -894,14 +1505,60 @@ const SearchResults = () => {
               if (status === 'OK' && geocodeResults && geocodeResults[0]) {
                 const location = geocodeResults[0].geometry.location;
                 
-                // Create marker with animation
+                // Create marker with pin/pointer icon - distinct style for properties
+                // Use a proper location pin icon that points to the location
+                // Simple, reliable pin icon using SVG string
+                const pinSvgString = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40"><path d="M16 0C7.163 0 0 7.163 0 16c0 11.25 16 24 16 24s16-12.75 16-24C32 7.163 24.837 0 16 0zm0 9c2.209 0 4 1.791 4 4s-1.791 4-4 4-4-1.791-4-4 1.791-4 4-4z" fill="#E65D24" stroke="#FFFFFF" stroke-width="2"/></svg>';
+                
+                const markerIcon = {
+                  url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pinSvgString),
+                  scaledSize: new window.google.maps.Size(32, 40),
+                  anchor: new window.google.maps.Point(16, 40), // Pin tip points to location
+                };
+                
                 const marker = new window.google.maps.Marker({
                   position: location,
                   map: mapInstanceRef.current,
                   title: property.title,
                   animation: window.google.maps.Animation.DROP,
                   optimized: false, // Force markers to render
+                  icon: markerIcon,
+                  zIndex: 600,
                 });
+                
+                // Store original icon for hover effect
+                marker.originalIcon = markerIcon;
+                
+                // Ensure marker is attached to map (fix for reload issue)
+                if (marker.getMap() !== mapInstanceRef.current && mapInstanceRef.current) {
+                  console.log(`Reattaching marker to map for property ${index + 1}`);
+                  marker.setMap(mapInstanceRef.current);
+                }
+                
+                // Debug: Verify icon is set correctly
+                console.log(`✓ Pin marker created for property ${index + 1}: ${property.title} at ${address}`, {
+                  icon: markerIcon,
+                  position: location,
+                  marker: marker,
+                  attachedToMap: marker.getMap() !== null
+                });
+                
+                // Verify marker icon was set and marker is visible
+                setTimeout(() => {
+                  const actualIcon = marker.getIcon();
+                  const isOnMap = marker.getMap() !== null;
+                  console.log(`Marker verification for property ${index + 1}:`, {
+                    icon: actualIcon,
+                    onMap: isOnMap,
+                    mapInstance: !!mapInstanceRef.current
+                  });
+                  
+                  // If marker is not on map, reattach it
+                  if (!isOnMap && mapInstanceRef.current) {
+                    console.warn(`Marker ${index + 1} not on map, reattaching...`);
+                    marker.setMap(mapInstanceRef.current);
+                  }
+                }, 500);
 
                 // Create unique ID for this property's info window
                 const propertyId = `prop-${index}-${Date.now()}`;
@@ -909,44 +1566,100 @@ const SearchResults = () => {
                 const imageUrlsJson = JSON.stringify(imageUrls);
                 const firstImageUrl = imageUrls.length > 0 ? imageUrls[0] : '';
                 
-                // Create info window with property details and image navigation
+                // Create info window with mini listing card design
+                const cleanedPrice = cleanPropertyPrice(property.price || 'N/A');
                 const infoWindow = new window.google.maps.InfoWindow({
                   content: `
-                    <div style="max-width: 280px; padding: 0;">
+                    <div style="max-width: 320px; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; cursor: pointer;" id="info-card-${propertyId}">
                       ${firstImageUrl ? `
-                        <div style="position: relative; width: 100%; height: 150px; overflow: hidden; border-radius: 8px 8px 0 0; background-color: #f0f0f0;">
+                        <div style="position: relative; width: 100%; height: 180px; overflow: hidden; border-radius: 12px 12px 0 0; background-color: #f0f0f0;">
                           <img id="info-img-${propertyId}" src="${firstImageUrl}" alt="Property" style="width: 100%; height: 100%; object-fit: cover; transition: opacity 0.3s;" />
                           ${imageUrls.length > 1 ? `
                             <button id="prev-btn-${propertyId}" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; z-index: 10; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">‹</button>
                             <button id="next-btn-${propertyId}" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; z-index: 10; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.8)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">›</button>
                             <div id="img-counter-${propertyId}" style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.6); color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; z-index: 10;">1/${imageUrls.length}</div>
                           ` : ''}
+                          <!-- Price Badge -->
+                          <div style="position: absolute; top: 12px; left: 12px; background: #E65D24; color: white; padding: 6px 12px; border-radius: 20px; font-weight: 600; font-size: 13px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                            ${cleanedPrice}
+                          </div>
+                          ${property.source ? `
+                            <div style="position: absolute; bottom: 12px; left: 12px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                              ${property.source}
+                            </div>
+                          ` : ''}
                         </div>
-                      ` : ''}
-                      <div style="padding: 12px;">
-                        <h4 style="font-weight: bold; margin: 0 0 8px 0; font-size: 15px; color: #1a1a1a; display: flex; align-items: start;">
-                          <svg width="14" height="14" style="margin-right: 6px; margin-top: 2px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      ` : `
+                        <div style="position: relative; width: 100%; height: 180px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); display: flex; align-items: center; justify-content: center; border-radius: 12px 12px 0 0;">
+                          <svg width="48" height="48" style="color: #9ca3af;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
-                          <span style="flex: 1;">${property.location}</span>
-                        </h4>
-                        <p style="margin: 0 0 8px 0; font-size: 13px; color: #666;">${property.title || 'Property'}</p>
-                        <p style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold; color: #E65D24;">${property.price || 'N/A'}</p>
-                        <p style="margin: 0; font-size: 12px; color: #666;">
-                          <strong>${property.bedrooms || 'N/A'}</strong> bedrooms • <strong>${property.propertyType || 'Property'}</strong>
-                        </p>
+                          <div style="position: absolute; top: 12px; left: 12px; background: #E65D24; color: white; padding: 6px 12px; border-radius: 20px; font-weight: 600; font-size: 13px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                            ${cleanedPrice}
+                          </div>
+                        </div>
+                      `}
+                      <div style="padding: 16px; background: white; border-radius: 0 0 12px 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <h3 style="font-weight: 600; margin: 0 0 12px 0; font-size: 16px; color: #1a1a1a; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                          ${property.location}
+                        </h3>
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 12px; color: #4b5563; font-size: 13px;">
+                          <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${property.title || 'Property Listing'}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 16px; font-size: 13px; color: #4b5563;">
+                          <div style="display: flex; align-items: center; gap: 4px;">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2z" />
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
+                            </svg>
+                            <span style="font-weight: 500;">${property.bedrooms || 'N/A'}</span>
+                          </div>
+                          <div style="display: flex; align-items: center; gap: 4px;">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                            <span style="font-weight: 500;">${property.propertyType || 'Property'}</span>
+                          </div>
+                        </div>
+                        ${property.agent && property.agent.name ? `
+                          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
+                            Agent: ${property.agent.name}
+                          </div>
+                        ` : ''}
                       </div>
                     </div>
                   `,
                 });
 
-                // Set up image navigation when info window is ready
+                // Set up image navigation and click handler when info window is ready
                 window.google.maps.event.addListener(infoWindow, 'domready', () => {
                   const imgEl = document.getElementById(`info-img-${propertyId}`) as HTMLImageElement;
                   const prevBtn = document.getElementById(`prev-btn-${propertyId}`) as HTMLButtonElement;
                   const nextBtn = document.getElementById(`next-btn-${propertyId}`) as HTMLButtonElement;
                   const counterEl = document.getElementById(`img-counter-${propertyId}`) as HTMLDivElement;
+                  const infoCard = document.getElementById(`info-card-${propertyId}`) as HTMLElement;
+                  
+                  // Add click handler to open full property modal
+                  if (infoCard) {
+                    infoCard.style.cursor = 'pointer';
+                    infoCard.addEventListener('click', (e) => {
+                      // Don't trigger if clicking on image navigation elements (buttons or counter)
+                      const target = e.target as HTMLElement;
+                      if (target.id === `prev-btn-${propertyId}` || target.id === `next-btn-${propertyId}` || 
+                          target.id === `img-counter-${propertyId}` ||
+                          target.closest(`#prev-btn-${propertyId}`) || target.closest(`#next-btn-${propertyId}`) ||
+                          target.closest(`#img-counter-${propertyId}`)) {
+                        return;
+                      }
+                      // Close info window and open full modal
+                      infoWindow.close();
+                      // Dispatch custom event to open modal (will be handled by component)
+                      const event = new CustomEvent('openPropertyModal', { 
+                        detail: { property, propertyIndex: index } 
+                      });
+                      window.dispatchEvent(event);
+                    });
+                  }
                   
                   if (!imgEl || imageUrls.length <= 1) {
                     if (prevBtn) prevBtn.style.display = 'none';
@@ -991,6 +1704,13 @@ const SearchResults = () => {
                     });
                   }
                   
+                  // Prevent image counter from triggering modal
+                  if (counterEl) {
+                    counterEl.addEventListener('click', (e) => {
+                      e.stopPropagation();
+                    });
+                  }
+                  
                   updateImage();
                 });
 
@@ -999,13 +1719,59 @@ const SearchResults = () => {
                   markersRef.current.forEach(m => {
                     if (m.infoWindow) m.infoWindow.close();
                   });
+                  // Open the mini listing card (InfoWindow) - no scrolling
                   infoWindow.open(mapInstanceRef.current, marker);
                 });
 
                 marker.infoWindow = infoWindow;
+                marker.propertyIndex = index; // Store property index on marker
+                
+                // Store bidirectional mapping
+                propertyToMarkerMapRef.current.set(index, marker);
+                markerToPropertyIndexMapRef.current.set(marker, index);
+                
                 markersRef.current.push(marker);
                 bounds.extend(location);
                 successfulGeocodes++;
+                
+                // Verify marker is actually on the map
+                const markerMap = marker.getMap();
+                if (markerMap !== mapInstanceRef.current) {
+                  console.warn(`Marker ${index + 1} not properly attached to map, fixing...`);
+                  marker.setMap(mapInstanceRef.current);
+                }
+                
+                // Cache marker position for persistence on reload
+                const markerCacheKey = 'mapMarkerPositions';
+                const cachedMarkers = sessionStorage.getItem(markerCacheKey);
+                let markerPositions: Array<{ propertyIndex: number; lat: number; lng: number; address: string }> = [];
+                
+                if (cachedMarkers) {
+                  try {
+                    markerPositions = JSON.parse(cachedMarkers);
+                  } catch (e) {
+                    console.warn('Error parsing cached marker positions:', e);
+                    markerPositions = [];
+                  }
+                }
+                
+                // Update or add marker position for this property
+                const existingIndex = markerPositions.findIndex(m => m.propertyIndex === index);
+                const markerData = {
+                  propertyIndex: index,
+                  lat: location.lat(),
+                  lng: location.lng(),
+                  address: address
+                };
+                
+                if (existingIndex >= 0) {
+                  markerPositions[existingIndex] = markerData;
+                } else {
+                  markerPositions.push(markerData);
+                }
+                
+                // Save updated cache
+                sessionStorage.setItem(markerCacheKey, JSON.stringify(markerPositions));
                 
                 console.log(`✓ Geocoded property ${index + 1}/${totalProperties}: ${address} (Total markers: ${markersRef.current.length})`);
               } else {
@@ -1018,33 +1784,191 @@ const SearchResults = () => {
         });
         }, 500); // Wait 500ms after map initialization before starting geocoding
 
-        return () => {
+      // Return cleanup function for this timeout
+      return () => {
+        if (timeoutId) {
+          console.log('Cleaning up marker creation timeout');
           clearTimeout(timeoutId);
-        };
+        }
+      };
+    } else {
+      // Conditions not met - log why
+      const missingConditions = [];
+      if (!showMap) missingConditions.push('showMap=false');
+      if (!isMapLoaded) missingConditions.push('isMapLoaded=false');
+      if (!mapInstanceRef.current) missingConditions.push('mapInstance=null');
+      if (!window.google || !window.google.maps) missingConditions.push('GoogleMaps=not loaded');
+      if (results.length === 0) missingConditions.push('results=empty');
+      
+      console.log('Conditions not met for marker creation:', {
+        showMap,
+        isMapLoaded,
+        hasMapInstance: !!mapInstanceRef.current,
+        hasGoogleMaps: !!(window.google && window.google.maps),
+        resultsLength: results.length,
+        missing: missingConditions.join(', ')
+      });
+      
+      // If we have results and map will be shown, ensure flags are reset so markers will be created when conditions are met
+      if (results.length > 0 && showMap && (!isMapLoaded || !mapInstanceRef.current)) {
+        console.log('Map will be ready soon - ensuring markers will be created when conditions are met');
+        // Don't reset flags here - let the map show/hide effect handle it
       }
     }
-  }, [showMap, isMapLoaded, results]);
+  }, [showMap, isMapLoaded, results, recreateMarkersFromCache]);
   
-  // Reset geocoded flag when map is hidden
+  // Reset geocoded flag when map is hidden, and ensure markers are recreated when map is shown
   useEffect(() => {
     if (!showMap) {
-      console.log('Map hidden - clearing all markers');
-      markersGeocodedRef.current = false;
-      lastResultsKeyRef.current = null;
+      console.log('Map hidden - removing markers from map (keeping cache)');
+      // Only remove markers from map visually, but keep them in refs and cache
       markersRef.current.forEach(marker => marker.setMap(null));
-      markersRef.current = [];
+      serviceMarkersRef.current.forEach(marker => marker.setMap(null));
+      if (searchLocationMarkerRef.current) {
+        searchLocationMarkerRef.current.setMap(null);
+      }
+      // Don't clear markersRef.current, lastResultsKeyRef, or markersGeocodedRef
+      // Don't clear the cache - it persists across hide/show
+      // Don't clear mapInstanceRef - we want to reuse it when map is shown again
+    } else {
+      // When map is shown, restore markers from refs if they exist
+      if (results.length > 0) {
+        if (markersRef.current.length > 0) {
+          console.log(`Map shown - reattaching ${markersRef.current.length} existing markers to map`);
+          markersRef.current.forEach(marker => {
+            if (mapInstanceRef.current && marker.getMap() !== mapInstanceRef.current) {
+              marker.setMap(mapInstanceRef.current);
+            }
+          });
+          // Also restore service markers
+          serviceMarkersRef.current.forEach(marker => {
+            if (mapInstanceRef.current && marker.getMap() !== mapInstanceRef.current) {
+              marker.setMap(mapInstanceRef.current);
+            }
+          });
+          // Restore search location marker
+          if (searchLocationMarkerRef.current && mapInstanceRef.current) {
+            searchLocationMarkerRef.current.setMap(mapInstanceRef.current);
+          }
+        } else {
+          // No markers in refs, try to recreate from cache first
+          console.log('Map shown with results but no markers - trying to recreate from cache...');
+          if (mapInstanceRef.current && results.length > 0 && isMapLoaded) {
+            const recreated = recreateMarkersFromCache(results, mapInstanceRef.current);
+            if (!recreated) {
+              console.log('Cache recreation failed - resetting flags to trigger new marker creation');
+              // Reset flags to force marker creation - the marker creation useEffect will run
+              // because isMapLoaded is in its dependencies and will trigger when map becomes ready
+              markersGeocodedRef.current = false;
+              lastResultsKeyRef.current = null;
+              
+              // If all conditions are already met, the marker creation useEffect should run
+              // If not, it will run when isMapLoaded becomes true
+              console.log('Flags reset - marker creation will happen when conditions are met', {
+                showMap,
+                isMapLoaded,
+                hasMapInstance: !!mapInstanceRef.current,
+                resultsLength: results.length
+              });
+            }
+          } else {
+            // Map not ready yet, reset flags so markers will be created when map is ready
+            console.log('Map not ready yet - will create markers when map is initialized', {
+              hasMapInstance: !!mapInstanceRef.current,
+              isMapLoaded,
+              resultsLength: results.length
+            });
+            markersGeocodedRef.current = false;
+            lastResultsKeyRef.current = null;
+          }
+        }
+      }
     }
-  }, [showMap]);
+  }, [showMap, results.length, isMapLoaded, recreateMarkersFromCache]);
+  
+  // Function to center map on a property's marker
+  const centerMapOnProperty = (propertyIndex: number) => {
+    if (!showMap || !isMapLoaded || !mapInstanceRef.current) return;
+    
+    const marker = propertyToMarkerMapRef.current.get(propertyIndex);
+    if (marker) {
+      const position = marker.getPosition();
+      mapInstanceRef.current.setCenter(position);
+      mapInstanceRef.current.setZoom(15);
+      
+      // Highlight the marker temporarily
+      marker.setAnimation(window.google.maps.Animation.BOUNCE);
+      setTimeout(() => {
+        marker.setAnimation(null);
+      }, 2000);
+      
+      // Open the info window
+      if (marker.infoWindow) {
+        // Close all other info windows
+        markersRef.current.forEach(m => {
+          if (m.infoWindow && m !== marker) m.infoWindow.close();
+        });
+        marker.infoWindow.open(mapInstanceRef.current, marker);
+      }
+    }
+  };
   
   // Debug: Log marker count changes
   useEffect(() => {
     console.log(`Current marker count: ${markersRef.current.length}, Geocoded flag: ${markersGeocodedRef.current}`);
   }, [markersRef.current.length]);
 
-  const openModal = (property: Property) => {
+  const openModal = (property: Property, propertyIndex?: number) => {
     setSelectedProperty(property);
     setIsModalOpen(true);
+    
+    // If map is shown and property index is provided, center on the marker
+    if (showMap && propertyIndex !== undefined) {
+      centerMapOnProperty(propertyIndex);
+    }
   };
+
+  // Listen for custom event from InfoWindow mini listing cards
+  useEffect(() => {
+    const handleOpenPropertyModal = (event: CustomEvent) => {
+      const { property, propertyIndex } = event.detail;
+      if (property) {
+        setSelectedProperty(property);
+        setIsModalOpen(true);
+        
+        // If map is shown and property index is provided, center on the marker
+        if (showMap && propertyIndex !== undefined && mapInstanceRef.current) {
+          const marker = propertyToMarkerMapRef.current.get(propertyIndex);
+          if (marker) {
+            const position = marker.getPosition();
+            mapInstanceRef.current.setCenter(position);
+            mapInstanceRef.current.setZoom(15);
+            
+            // Highlight the marker temporarily
+            marker.setAnimation(window.google.maps.Animation.BOUNCE);
+            setTimeout(() => {
+              marker.setAnimation(null);
+            }, 2000);
+            
+            // Open the info window
+            if (marker.infoWindow) {
+              // Close all other info windows
+              markersRef.current.forEach(m => {
+                if (m.infoWindow && m !== marker) m.infoWindow.close();
+              });
+              marker.infoWindow.open(mapInstanceRef.current, marker);
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener('openPropertyModal', handleOpenPropertyModal as EventListener);
+
+    return () => {
+      window.removeEventListener('openPropertyModal', handleOpenPropertyModal as EventListener);
+    };
+  }, [showMap]);
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -1053,6 +1977,8 @@ const SearchResults = () => {
 
   const handleNewSearch = () => {
     clearCache(); // Clear cached results when starting a new search
+    // Also clear marker positions cache
+    sessionStorage.removeItem('mapMarkerPositions');
     navigate('/');
   };
 
@@ -1315,8 +2241,39 @@ const SearchResults = () => {
                     {results.map((property, index) => (
                 <div
                   key={index}
+                  data-property-index={index}
                   className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
-                  onClick={() => openModal(property)}
+                  onClick={() => openModal(property, index)}
+                  onMouseEnter={() => {
+                    // Highlight marker on hover
+                    if (showMap && isMapLoaded) {
+                      const marker = propertyToMarkerMapRef.current.get(index);
+                      if (marker && marker.originalIcon) {
+                        // Create a larger version of the pin icon for hover
+                        const originalIcon = marker.originalIcon;
+                        if (originalIcon && originalIcon.url) {
+                          // Parse the size from the original icon and increase it
+                          const scaledSize = originalIcon.scaledSize || new window.google.maps.Size(32, 40);
+                          marker.setIcon({
+                            ...originalIcon,
+                            scaledSize: new window.google.maps.Size(
+                              scaledSize.width * 1.3,
+                              scaledSize.height * 1.3
+                            ),
+                          });
+                        }
+                      }
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    // Restore marker size on mouse leave
+                    if (showMap && isMapLoaded) {
+                      const marker = propertyToMarkerMapRef.current.get(index);
+                      if (marker && marker.originalIcon) {
+                        marker.setIcon(marker.originalIcon);
+                      }
+                    }
+                  }}
                 >
                   {/* Property Image */}
                   <div className="relative h-48 overflow-hidden">
@@ -1418,8 +2375,9 @@ const SearchResults = () => {
                   results.map((property, index) => (
                     <div
                       key={index}
+                      data-property-index={index}
                       className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
-                      onClick={() => openModal(property)}
+                      onClick={() => openModal(property, index)}
                     >
                       {/* Property Image */}
                       <div className="relative h-48 overflow-hidden">
@@ -1518,9 +2476,9 @@ const SearchResults = () => {
                 )}
               </div>
 
-              {/* Map Container */}
+              {/* Map Container and Location Insights - Same Column */}
               {showMap && (
-                <>
+                <div className="flex flex-col gap-4">
                   <div id="map-container" className="bg-white rounded-xl shadow-lg overflow-hidden">
                     {!isMapLoaded ? (
                       <div 
@@ -1541,9 +2499,9 @@ const SearchResults = () => {
                     )}
                   </div>
 
-                  {/* Location Insights Section */}
+                  {/* Location Insights Section - Now under the map */}
                   <LocationInsights searchQuery={searchQuery} propertyCount={results.length} />
-                </>
+                </div>
               )}
             </div>
           )}

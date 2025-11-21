@@ -1242,6 +1242,18 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
       }
     }
 
+    // Attempt to dismiss cookie consent banner before scraping
+    try {
+      const acceptButtonSelector = '.otm-CookieBanner button[aria-label="Accept All"]';
+      await page.waitForSelector(acceptButtonSelector, { timeout: 5000 });
+      await page.click(acceptButtonSelector);
+      await page.waitForSelector('.otm-CookieBanner', { hidden: true, timeout: 5000 });
+      console.log('Cookie banner dismissed');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      console.log('No cookie banner to dismiss', message);
+    }
+
     console.log('Waiting for property cards or no-results message...');
     // Wait for either property cards or a no-results message
     await Promise.race([
