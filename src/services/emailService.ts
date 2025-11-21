@@ -12,7 +12,17 @@ interface EmailContent {
   html?: string;
   attachments: EmailAttachment[];
   formData?: any;
-  emailType?: 'agent' | 'referee' | 'guarantor' | 'user' | 'viewing-agent' | 'viewing-user' | 'viewing-reschedule' | 'viewing-cancel';
+  emailType?:
+    | 'agent'
+    | 'referee'
+    | 'guarantor'
+    | 'user'
+    | 'viewing-agent'
+    | 'viewing-user'
+    | 'viewing-confirmed'
+    | 'viewing-reschedule'
+    | 'viewing-cancel'
+    | 'viewing-cancellation';
 }
 
 interface SendEmailResponse {

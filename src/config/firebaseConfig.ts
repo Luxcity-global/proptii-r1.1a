@@ -4,12 +4,13 @@ import { getAuth } from 'firebase/auth';
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBx8x8x8x8x8x8x8x8x8x8x8x8x8x8x8",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "proptii-2ae8d.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "proptii-2ae8d",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "proptii-2ae8d.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "123456789012",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:123456789012:web:abcdef1234567890"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyC0UZxzkhsebn-gSuo7HDRGVid30URQVvA",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "proptii-16946.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "proptii-16946",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "proptii-16946.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "423487822587",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:423487822587:web:9fd069dd01ec5e8267ae5e",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-88HC0TG6JJ"
 };
 
 // Debug: Check if environment variables are loaded (remove in production)

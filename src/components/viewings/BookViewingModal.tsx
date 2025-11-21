@@ -25,6 +25,8 @@ import { BookViewingProvider, useBookViewing } from './context/BookViewingContex
 import { bookingService } from './services/bookingService';
 import { viewingEmailService } from './services/viewingEmailService';
 import { viewingService } from '../../services/viewingService';
+import { bookViewingRequestService } from '../../services/bookViewingRequestService';
+import landlordUserService from '../../services/landlordUserService';
 import { useAuth } from '../../contexts/AuthContext';
 
 import { Home, Event, DoneAll, Close, Warning } from '@mui/icons-material';
@@ -356,7 +358,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         const property = state.selectedProperty;
         const viewing = state.viewingDetails;
 
-        if (!property || !viewing) {
+        if (!property || !viewing || !viewing.date || !viewing.time || !viewing.preference || !viewing.userDetails) {
           throw new Error('Missing property or viewing details');
         }
 
@@ -367,15 +369,65 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         const userIdToUse = user?.id || 'anonymous';
         console.log('Using user ID for Firestore save:', userIdToUse);
         
+        // Look up the landlord/agent by email to get their ID
+        let landlordAgentId: string | null = property.agent?.id || null;
+        
+        if (!landlordAgentId && property.agent?.email) {
+          console.log('🔍 Looking up landlord/agent by email:', property.agent.email);
+          try {
+            const lookupResult = await landlordUserService.getLandlordUserByEmail(property.agent.email);
+            if (lookupResult.success && lookupResult.user?.id) {
+              landlordAgentId = lookupResult.user.id;
+              console.log('✅ Found landlord/agent ID:', landlordAgentId);
+            } else {
+              console.log('⚠️ No landlord/agent found with email:', property.agent.email);
+              console.log('ℹ️ Viewing will be saved without landlord/agent link. They need to register at:', property.agent.email);
+            }
+          } catch (lookupError) {
+            console.warn('⚠️ Error looking up landlord/agent:', lookupError);
+            // Continue without the ID - viewing will still be saved
+          }
+        }
+        
         const managerInfo = {
-          landlordId: property.agent?.id || null,
-          agentId: property.agent?.id || null
+          landlordId: landlordAgentId,
+          agentId: landlordAgentId
+        };
+
+        console.log('Manager info for viewing save:', managerInfo);
+
+        // Save the viewing request to bookViewingRequests collection (for landlord/agent to approve)
+        const requestResult = await bookViewingRequestService.saveRequest(
+          userIdToUse,
+          property.id || `property_${Date.now()}`,
+          property,
+          managerInfo
+        );
+
+        console.log('Viewing request result:', requestResult);
+
+        if (requestResult.error) {
+          console.error('Error saving viewing request:', requestResult.error);
+        } else {
+          console.log('✅ Successfully saved viewing request for landlord/agent approval');
+        }
+
+        // Create a properly typed viewing object for the booking
+        const viewingBookingDetails = {
+          date: viewing.date,
+          time: viewing.time,
+          preference: viewing.preference,
+          userDetails: {
+            fullName: viewing.userDetails.fullName || '',
+            email: viewing.userDetails.email || '',
+            phoneNumber: viewing.userDetails.phoneNumber || ''
+          }
         };
 
         const firestoreResult = await viewingService.saveViewingBooking(
           userIdToUse,
           property,
-          viewing,
+          viewingBookingDetails,
           property.id || undefined,
           managerInfo
         );
@@ -395,7 +447,8 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           await bookingService.scheduleViewing(property, viewing);
           console.log('✅ Successfully saved to existing backend');
         } catch (backendError) {
-          console.warn('⚠️ Backend service not available (this is optional):', backendError.message);
+          const errorMessage = backendError instanceof Error ? backendError.message : 'Unknown error';
+          console.warn('⚠️ Backend service not available (this is optional):', errorMessage);
           // Continue with success flow - backend is optional
         }
 
@@ -416,7 +469,8 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
             console.log('✅ Successfully sent emails');
           }
         } catch (emailError) {
-          console.warn('⚠️ Email service not available (this is optional):', emailError.message);
+          const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
+          console.warn('⚠️ Email service not available (this is optional):', errorMessage);
           // Continue with success flow - emails are optional
         }
 
@@ -765,12 +819,6 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
                 >
                   {activeStep === steps.length - 1 ? 'Submit' : 'Continue'}
                 </Button>
-                {/* Debug info */}
-                {activeStep === steps.length - 1 && (
-                  <div style={{ fontSize: '10px', color: 'red', marginTop: '4px' }}>
-                    Debug: isSaving={isSaving.toString()}, isAllDataComplete={isAllDataComplete().toString()}
-                  </div>
-                )}
               </Box>
             </DialogActions>
           </Box>

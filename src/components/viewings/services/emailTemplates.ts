@@ -105,6 +105,30 @@ export const generateAgentEmailTemplate = (data: EmailTemplateData): string => {
 
         ${getCtaButton('👉 Manage Viewing Requests on Proptii', `${BASE_URL}/landlord/viewings`)}
 
+        <div style="margin-top: 24px; padding: 16px; background-color: #f0f9ff; border-left: 4px solid #136C9E; border-radius: 4px;">
+          <p style="margin: 0 0 8px 0; font-weight: 600; color: #136C9E;">📱 New to Proptii?</p>
+          <p style="margin: 0 0 8px 0; font-size: 14px;">If you don't have a Proptii account yet, register now to:</p>
+          <ul style="margin: 0 0 8px 0; padding-left: 20px; font-size: 14px;">
+            <li>Manage all viewing requests in one place</li>
+            <li>Track confirmed viewings</li>
+            <li>Communicate with tenants efficiently</li>
+            <li>Access your landlord dashboard</li>
+          </ul>
+          <div style="text-align: center; margin-top: 12px;">
+            <a href="${BASE_URL}/landlord/register" 
+               style="display: inline-block; 
+                      padding: 10px 24px; 
+                      background-color: #136C9E;
+                      color: #ffffff;
+                      text-decoration: none;
+                      border-radius: 6px;
+                      font-weight: 600;
+                      font-size: 14px;">
+              Register Now
+            </a>
+          </div>
+        </div>
+
         <div class="footer">
           <p>Thanks,<br>- The Proptii Team</p>
         </div>
