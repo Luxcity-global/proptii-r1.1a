@@ -19,7 +19,10 @@ import {
   Loader2,
   FileText,
   Send,
-  AlertCircle
+  AlertCircle,
+  Trash2,
+  Search,
+  X
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -29,6 +32,8 @@ import {
 } from './ui/dropdown-menu';
 import { SendContractModal } from './SendContractModal';
 import { contractService } from '../services/contractService';
+import { Checkbox } from './ui/checkbox';
+import { Input } from './ui/input';
 
 export interface Contract {
   id: string;
@@ -61,6 +66,9 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
   const [userId, setUserId] = useState<string | null>(null);
   const [showSuccessScreen, setShowSuccessScreen] = useState(false);
   const [successData, setSuccessData] = useState<{ recipientName: string; recipientEmail: string; fileName: string } | null>(null);
+  const [selectedContracts, setSelectedContracts] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showBulkActions, setShowBulkActions] = useState(false);
 
   // Get landlord email and userId from localStorage/auth on component mount
   useEffect(() => {
@@ -156,16 +164,47 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
     }
   };
 
-  const sentContracts = contracts.filter(c => c.status === 'sent');
-  const unsignedContracts = contracts.filter(c => c.status === 'unsigned');
-  const signedContracts = contracts.filter(c => c.status === 'signed');
+  // Base filtered contracts (by status)
+  const baseSentContracts = contracts.filter(c => c.status === 'sent');
+  const baseUnsignedContracts = contracts.filter(c => c.status === 'unsigned');
+  const baseSignedContracts = contracts.filter(c => c.status === 'signed');
 
-  // Calculate overview metrics
-  const totalSent = sentContracts.length;
-  const expiringSoon = sentContracts.filter(c => 
+  // Filter contracts based on search term
+  const filterContracts = (contractsList: Contract[]) => {
+    if (!searchTerm.trim()) return contractsList;
+    
+    const term = searchTerm.toLowerCase();
+    return contractsList.filter(contract =>
+      contract.title.toLowerCase().includes(term) ||
+      contract.fileName.toLowerCase().includes(term) ||
+      contract.tenantName.toLowerCase().includes(term) ||
+      contract.tenantEmail.toLowerCase().includes(term) ||
+      contract.propertyAddress.toLowerCase().includes(term)
+    );
+  };
+
+  const sentContracts = filterContracts(baseSentContracts);
+  const unsignedContracts = filterContracts(baseUnsignedContracts);
+  const signedContracts = filterContracts(baseSignedContracts);
+
+  // Get current tab contracts
+  const getCurrentTabContracts = () => {
+    switch (activeTab) {
+      case 'sent': return sentContracts;
+      case 'unsigned': return unsignedContracts;
+      case 'signed': return signedContracts;
+      default: return [];
+    }
+  };
+
+  const currentTabContracts = getCurrentTabContracts();
+
+  // Calculate overview metrics (use base contracts, not filtered)
+  const totalSent = baseSentContracts.length;
+  const expiringSoon = baseSentContracts.filter(c => 
     c.expiryDate && c.expiryDate <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   ).length;
-  const pendingSignature = unsignedContracts.length;
+  const pendingSignature = baseUnsignedContracts.length;
 
   // Get alerts
   const alerts = [
@@ -593,11 +632,101 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
     }
   };
 
-  const ContractTable = ({ contracts }: { contracts: Contract[] }) => (
+  // Selection handlers
+  const toggleContractSelection = (contractId: string) => {
+    setSelectedContracts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(contractId)) {
+        newSet.delete(contractId);
+      } else {
+        newSet.add(contractId);
+      }
+      setShowBulkActions(newSet.size > 0);
+      return newSet;
+    });
+  };
+
+  const selectAllContracts = (contracts: Contract[]) => {
+    if (selectedContracts.size === contracts.length && contracts.length > 0) {
+      setSelectedContracts(new Set());
+      setShowBulkActions(false);
+    } else {
+      setSelectedContracts(new Set(contracts.map(c => c.id)));
+      setShowBulkActions(contracts.length > 0);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedContracts(new Set());
+    setShowBulkActions(false);
+  };
+
+  // Bulk delete handler
+  const handleBulkDelete = async () => {
+    if (selectedContracts.size === 0) return;
+
+    const count = selectedContracts.size;
+    const confirmMessage = `Are you sure you want to delete ${count} contract${count > 1 ? 's' : ''}? This action cannot be undone.`;
+    
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const deletePromises = Array.from(selectedContracts).map(contractId =>
+        contractService.deleteContract(contractId).catch(err => {
+          console.error(`Error deleting contract ${contractId}:`, err);
+          return { success: false, contractId, error: err };
+        })
+      );
+
+      const results = await Promise.all(deletePromises);
+      const failed = results.filter(r => r && !r.success);
+      
+      if (failed.length > 0) {
+        console.error('Some contracts failed to delete:', failed);
+        alert(`${failed.length} contract${failed.length > 1 ? 's' : ''} failed to delete. Check console for details.`);
+      } else {
+        console.log(`Successfully deleted ${count} contract${count > 1 ? 's' : ''}`);
+      }
+
+      clearSelection();
+      await loadContracts();
+    } catch (error) {
+      console.error('Error during bulk delete:', error);
+      setError('Failed to delete contracts. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update showBulkActions when selection changes
+  useEffect(() => {
+    setShowBulkActions(selectedContracts.size > 0);
+  }, [selectedContracts]);
+
+  // Clear selection when tab changes
+  useEffect(() => {
+    clearSelection();
+  }, [activeTab]);
+
+  const ContractTable = ({ contracts }: { contracts: Contract[] }) => {
+    const isAllSelected = selectedContracts.size === contracts.length && contracts.length > 0;
+    const isPartiallySelected = selectedContracts.size > 0 && selectedContracts.size < contracts.length;
+
+    return (
     <div className="border rounded-lg">
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-12">
+              <Checkbox
+                checked={isAllSelected}
+                onCheckedChange={() => selectAllContracts(contracts)}
+                className={isPartiallySelected ? 'data-[state=checked]:bg-orange-500' : ''}
+              />
+            </TableHead>
             <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Contract</TableHead>
             <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Property</TableHead>
             <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Tenant</TableHead>
@@ -609,7 +738,16 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
         </TableHeader>
         <TableBody>
           {contracts.map((contract) => (
-            <TableRow key={contract.id} className="hover:bg-gray-50">
+            <TableRow 
+              key={contract.id} 
+              className={`hover:bg-gray-50 ${selectedContracts.has(contract.id) ? 'bg-blue-50' : ''}`}
+            >
+              <TableCell>
+                <Checkbox
+                  checked={selectedContracts.has(contract.id)}
+                  onCheckedChange={() => toggleContractSelection(contract.id)}
+                />
+              </TableCell>
               <TableCell>
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -709,7 +847,8 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
         </TableBody>
       </Table>
     </div>
-  );
+    );
+  };
 
   // Show success screen
   if (showSuccessScreen && successData) {
@@ -867,14 +1006,80 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
           </div>
         )}
 
+        {/* Search and Filter Bar */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Search contracts by title, tenant, email, or property..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                  style={{ fontFamily: 'Archivo, sans-serif' }}
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              {searchTerm && (
+                <div className="text-sm text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  {currentTabContracts.length} result{currentTabContracts.length !== 1 ? 's' : ''} found
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Bulk Actions Bar */}
+        {showBulkActions && (
+          <Card className="mb-6 border-orange-200 bg-orange-50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm font-medium" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                    {selectedContracts.size} contract{selectedContracts.size !== 1 ? 's' : ''} selected
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearSelection}
+                    style={{ fontFamily: 'Archivo, sans-serif' }}
+                  >
+                    Clear Selection
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleBulkDelete}
+                    disabled={loading}
+                    style={{ fontFamily: 'Archivo, sans-serif' }}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Selected
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Contracts Tabs */}
         <Tabs value={activeTab} onValueChange={(value: string) => setActiveTab(value as 'sent' | 'unsigned' | 'signed')} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="sent">
-              Sent ({totalSent})
+              Sent ({sentContracts.length})
             </TabsTrigger>
             <TabsTrigger value="unsigned">
-              Unsigned ({pendingSignature})
+              Unsigned ({unsignedContracts.length})
             </TabsTrigger>
             <TabsTrigger value="signed">
               Signed ({signedContracts.length})
