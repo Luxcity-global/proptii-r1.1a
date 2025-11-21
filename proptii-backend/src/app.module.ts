@@ -10,6 +10,7 @@ import { SheetsModule } from './sheets/sheets.module';
 import { ContractModule } from './modules/contract.module';
 import { StorageModule } from './storage/storage.module';
 import { PropertyDocumentController } from './controllers/property-document.controller';
+import { AzureUsersModule } from './modules/azure-users.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PropertyDocumentController } from './controllers/property-document.cont
     SheetsModule,
     ContractModule,
     StorageModule,
+    AzureUsersModule,
   ],
   controllers: [AppController, PropertyDocumentController],
   providers: [AppService],

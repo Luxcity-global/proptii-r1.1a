@@ -13,8 +13,12 @@ import {
   User, 
   Mail, 
   AlertCircle,
-  Send
+  Send,
+  Search,
+  CheckCircle
 } from 'lucide-react';
+import { Avatar, AvatarFallback } from './ui/avatar';
+import { Badge } from './ui/badge';
 
 interface SendContractModalProps {
   isOpen: boolean;
@@ -35,8 +39,12 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
   const [additionalEmail, setAdditionalEmail] = useState('');
   const [recipientType, setRecipientType] = useState<'manual' | 'existing'>('manual');
   const [selectedExistingTenant, setSelectedExistingTenant] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showTenantList, setShowTenantList] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isConverting, setIsConverting] = useState(false);
 
   // Use real tenant data passed as prop, with fallback to empty array
   const existingTenants = tenants.length > 0 ? tenants.map(t => ({
@@ -45,6 +53,13 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
     email: t.email,
     property: t.propertyId || ''
   })) : [];
+
+  // Filter tenants based on search term
+  const filteredTenants = existingTenants.filter(tenant =>
+    tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    tenant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    tenant.property.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -56,10 +71,17 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
         return;
       }
       
-      // Validate file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        setErrors(prev => ({ ...prev, file: 'File size must be less than 10MB' }));
+      // Validate file size (max 50MB)
+      const maxSize = 50 * 1024 * 1024; // 50MB
+      if (file.size > maxSize) {
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        setErrors(prev => ({ ...prev, file: `File size must be less than 50MB. Your file is ${fileSizeMB}MB` }));
         return;
+      }
+      
+      // Warn about large files that might take longer to process
+      if (file.size > 20 * 1024 * 1024) {
+        console.warn('Large file detected:', file.size, 'bytes. This may take longer to process.');
       }
 
       setSelectedFile(file);
@@ -77,9 +99,12 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
     if (type === 'existing') {
       setRecipientName('');
       setRecipientEmail('');
+      setShowTenantList(true); // Show list when switching to existing tenant mode
       setErrors(prev => ({ ...prev, recipientName: '', recipientEmail: '' }));
     } else {
       setSelectedExistingTenant('');
+      setSearchTerm('');
+      setShowTenantList(true);
     }
   };
 
@@ -89,6 +114,7 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
       setSelectedExistingTenant(tenantId);
       setRecipientName(tenant.name);
       setRecipientEmail(tenant.email);
+      setShowTenantList(false); // Close the list when tenant is selected
       setErrors(prev => ({ ...prev, recipientName: '', recipientEmail: '' }));
     }
   };
@@ -123,6 +149,8 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
     if (!validateForm()) return;
 
     setIsUploading(true);
+    setUploadProgress(0);
+    setIsConverting(false);
 
     try {
       const contractData = {
@@ -131,6 +159,27 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
         recipientEmail: recipientType === 'manual' ? recipientEmail : existingTenants.find(t => t.id === selectedExistingTenant)?.email || '',
         additionalEmail: additionalEmail.trim() || undefined
       };
+
+      // If there's a file, show conversion progress
+      if (selectedFile) {
+        setIsConverting(true);
+        setUploadProgress(5);
+        
+        // Simulate progress during file processing
+        // Note: Actual progress is tracked in ContractsPage during conversion
+        const progressInterval = setInterval(() => {
+          setUploadProgress(prev => {
+            if (prev >= 90) {
+              clearInterval(progressInterval);
+              return 90; // Keep at 90% until actual upload completes
+            }
+            return prev + 5;
+          });
+        }, 200);
+        
+        // Clear interval after a delay to prevent memory leaks
+        setTimeout(() => clearInterval(progressInterval), 10000);
+      }
 
       onSend(contractData);
       
@@ -141,11 +190,18 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
       setAdditionalEmail('');
       setRecipientType('manual');
       setSelectedExistingTenant('');
+      setSearchTerm('');
+      setShowTenantList(true);
       setErrors({});
+      setUploadProgress(0);
+      setIsConverting(false);
     } catch (error) {
       console.error('Error sending contract:', error);
+      setErrors(prev => ({ ...prev, file: 'Failed to send contract. Please try again.' }));
     } finally {
       setIsUploading(false);
+      setIsConverting(false);
+      setUploadProgress(0);
     }
   };
 
@@ -159,6 +215,8 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
       setAdditionalEmail('');
       setRecipientType('manual');
       setSelectedExistingTenant('');
+      setSearchTerm('');
+      setShowTenantList(true);
       setErrors({});
     }
   };
@@ -255,23 +313,133 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <Label>Select Existing Tenant</Label>
-                    <Select value={selectedExistingTenant} onValueChange={handleExistingTenantSelect}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose a tenant" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {existingTenants.map((tenant) => (
-                          <SelectItem key={tenant.id} value={tenant.id}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{tenant.name}</span>
-                              <span className="text-sm text-gray-600">{tenant.property}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-4">
+                    {!selectedExistingTenant || showTenantList ? (
+                      <>
+                        <div className="space-y-2">
+                          <Label>Search Tenants</Label>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                            <Input
+                              placeholder="Search by name, email, or property..."
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                              className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        {filteredTenants.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500">
+                            <User className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                            <p>No tenants found</p>
+                            {searchTerm && (
+                              <p className="text-sm mt-2">Try adjusting your search</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-3 max-h-[300px] overflow-y-auto max-w-md">
+                            {filteredTenants.map((tenant) => (
+                              <Card
+                                key={tenant.id}
+                                className={`cursor-pointer transition-all duration-200 ${
+                                  selectedExistingTenant === tenant.id
+                                    ? 'ring-2 shadow-lg'
+                                    : 'hover:shadow-md'
+                                }`}
+                                style={selectedExistingTenant === tenant.id ? {
+                                  borderColor: '#136C9E',
+                                  boxShadow: '0 0 0 2px #136C9E'
+                                } : {}}
+                                onClick={() => handleExistingTenantSelect(tenant.id)}
+                              >
+                                <CardContent className="p-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-start space-x-3 flex-1 min-w-0">
+                                      <Avatar className="h-10 w-10 flex-shrink-0">
+                                        <AvatarFallback className="bg-blue-100 text-blue-600">
+                                          {tenant.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold text-sm mb-1" style={{ color: '#374957' }}>
+                                          {tenant.name}
+                                        </h3>
+                                        <p className="text-gray-600 text-xs truncate" title={tenant.email}>
+                                          {tenant.email}
+                                        </p>
+                                        {tenant.property && (
+                                          <p className="text-gray-500 text-xs mt-1 truncate" title={tenant.property}>
+                                            {tenant.property}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center space-x-2 flex-shrink-0">
+                                      {selectedExistingTenant === tenant.id && (
+                                        <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#136C9E' }}>
+                                          <CheckCircle className="w-4 h-4 text-white" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="space-y-2 max-w-md">
+                        <Label>Selected Tenant</Label>
+                        {(() => {
+                          const selectedTenant = existingTenants.find(t => t.id === selectedExistingTenant);
+                          return selectedTenant ? (
+                            <Card className="ring-2" style={{ borderColor: '#136C9E', boxShadow: '0 0 0 2px #136C9E' }}>
+                              <CardContent className="p-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex items-start space-x-3 flex-1 min-w-0">
+                                    <Avatar className="h-10 w-10 flex-shrink-0">
+                                      <AvatarFallback className="bg-blue-100 text-blue-600">
+                                        {selectedTenant.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 min-w-0">
+                                      <h3 className="font-semibold text-sm mb-1" style={{ color: '#374957' }}>
+                                        {selectedTenant.name}
+                                      </h3>
+                                      <p className="text-gray-600 text-xs truncate" title={selectedTenant.email}>
+                                        {selectedTenant.email}
+                                      </p>
+                                      {selectedTenant.property && (
+                                        <p className="text-gray-500 text-xs mt-1 truncate" title={selectedTenant.property}>
+                                          {selectedTenant.property}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedExistingTenant('');
+                                      setRecipientName('');
+                                      setRecipientEmail('');
+                                      setShowTenantList(true);
+                                    }}
+                                    className="flex-shrink-0"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ) : null;
+                        })()}
+                      </div>
+                    )}
+
                     {errors.existingTenant && (
                       <div className="flex items-center space-x-2 text-red-600 text-sm">
                         <AlertCircle className="w-4 h-4" />
@@ -305,8 +473,11 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
                       <p className="text-lg font-medium mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
                         Upload Contract File
                       </p>
-                      <p className="text-sm text-gray-600 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                      <p className="text-sm text-gray-600 mb-2" style={{ fontFamily: 'Archivo, sans-serif' }}>
                         Drag and drop your contract file here, or click to browse
+                      </p>
+                      <p className="text-xs text-gray-500 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                        Maximum file size: 50MB (PDF, DOC, DOCX)
                       </p>
                       <Button type="button" variant="outline">
                         Choose File
@@ -323,6 +494,9 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
                         </p>
                         <p className="text-sm text-gray-600">
                           {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                          {selectedFile.size > 20 * 1024 * 1024 && (
+                            <span className="text-orange-600 ml-2">(Large file - may take longer)</span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -383,33 +557,48 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
         </div>
 
         {/* Footer - Fixed */}
-        <div className="flex justify-end space-x-3 px-6 py-4 border-t border-gray-200 flex-shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isUploading}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={handleSend}
-            disabled={isUploading}
-            style={{ backgroundColor: '#DC5F12' }}
-          >
-            {isUploading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                Sending...
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4 mr-2" />
-                Send Contract
-              </>
-            )}
-          </Button>
+        <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0">
+          {isUploading && uploadProgress > 0 && (
+            <div className="mb-3">
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-600 mt-1 text-center">
+                {isConverting ? 'Processing file...' : 'Uploading...'} {uploadProgress}%
+              </p>
+            </div>
+          )}
+          <div className="flex justify-end space-x-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={isUploading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSend}
+              disabled={isUploading}
+              style={{ backgroundColor: '#DC5F12' }}
+            >
+              {isUploading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  {isConverting ? 'Processing file...' : 'Sending...'}
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Send Contract
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

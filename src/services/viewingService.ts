@@ -21,6 +21,7 @@ export interface ViewingBooking {
   propertyId?: string | null;
   landlordId?: string | null;
   agentId?: string | null;
+  agentEmail?: string | null; // OPTIMIZATION: Top-level field for fast queries
   property: {
     street: string;
     town: string;
@@ -97,6 +98,7 @@ class ViewingService {
         propertyId: propertyId || null, // Handle undefined propertyId
         landlordId: managerInfo?.landlordId ?? property.agent?.id ?? null,
         agentId: managerInfo?.agentId ?? property.agent?.id ?? null,
+        agentEmail: property.agent?.email?.toLowerCase().trim() || null, // OPTIMIZATION: Denormalize for fast queries
         property,
         viewingDetails,
         status: 'pending',
@@ -319,6 +321,181 @@ class ViewingService {
       return { success: true, stats };
     } catch (error) {
       console.error('❌ Error getting manager viewing stats:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
+   * Get viewing bookings filtered by agent email
+   * This allows filtering by the signed-in user's email to show only their requests
+   */
+  async getViewingBookingsByEmail(agentEmail: string): Promise<{ success: boolean; bookings?: ViewingBooking[]; error?: string }> {
+    try {
+      // Normalize email to lowercase for comparison (emails are case-insensitive)
+      const normalizedEmail = agentEmail?.toLowerCase().trim();
+      
+      // OPTIMIZATION: Try top-level agentEmail field first (much faster than nested field query)
+      // This works for new documents. For backward compatibility, we'll also check nested field.
+      let q = query(
+        collection(db, this.collectionName),
+        where('agentEmail', '==', normalizedEmail),
+        orderBy('createdAt', 'desc')
+      );
+      
+      let querySnapshot;
+      try {
+        querySnapshot = await getDocs(q);
+        // If no results with top-level field, try nested field query for backward compatibility
+        if (querySnapshot.empty) {
+          const nestedQ = query(
+            collection(db, this.collectionName),
+            where('property.agent.email', '==', normalizedEmail)
+          );
+          querySnapshot = await getDocs(nestedQ);
+        }
+      } catch (indexError: any) {
+        // If index is missing, try fallback to nested field query
+        if (indexError.code === 'failed-precondition' && indexError.message?.includes('index')) {
+          // Fallback: Query by nested field (slower, but works for old documents)
+          const nestedQ = query(
+            collection(db, this.collectionName),
+            where('property.agent.email', '==', normalizedEmail)
+          );
+          querySnapshot = await getDocs(nestedQ);
+        } else {
+          throw indexError;
+        }
+      }
+      
+      const bookings: ViewingBooking[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data() as ViewingBooking;
+        bookings.push(data);
+      });
+      
+      // If we used nested field query, filter and sort in memory
+      if (bookings.length > 0 && !bookings[0].agentEmail) {
+        // Filter by email in case some documents don't match
+        const filtered = bookings.filter(b => 
+          b.agentEmail?.toLowerCase() === normalizedEmail || 
+          b.property?.agent?.email?.toLowerCase() === normalizedEmail
+        );
+        // Sort by createdAt descending
+        const sorted = filtered.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+        return { success: true, bookings: sorted };
+      }
+      
+      return { success: true, bookings };
+    } catch (error: any) {
+      // Final fallback: query without orderBy and sort in memory
+      if (error.code === 'failed-precondition' && error.message?.includes('index')) {
+        const normalizedEmail = agentEmail?.toLowerCase().trim();
+        const fallbackQuery = query(
+          collection(db, this.collectionName),
+          where('agentEmail', '==', normalizedEmail)
+        );
+        try {
+          const fallbackSnapshot = await getDocs(fallbackQuery);
+          const bookings: ViewingBooking[] = [];
+          fallbackSnapshot.forEach((doc) => {
+            const data = doc.data() as ViewingBooking;
+            if (data.agentEmail?.toLowerCase() === normalizedEmail || 
+                data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+              bookings.push(data);
+            }
+          });
+          const sorted = bookings.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+          return { success: true, bookings: sorted };
+        } catch {
+          // Last resort: get all and filter in memory (very slow, but works)
+          const allQuery = query(collection(db, this.collectionName));
+          const allSnapshot = await getDocs(allQuery);
+          const bookings: ViewingBooking[] = [];
+          allSnapshot.forEach((doc) => {
+            const data = doc.data() as ViewingBooking;
+            if (data.agentEmail?.toLowerCase() === normalizedEmail || 
+                data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+              bookings.push(data);
+            }
+          });
+          const sorted = bookings.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+          return { success: true, bookings: sorted };
+        }
+      }
+      
+      console.error('Error getting viewing bookings by email:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
+   * Get viewing bookings by agent email and status
+   */
+  async getViewingBookingsByEmailAndStatus(
+    agentEmail: string,
+    status: ViewingBooking['status']
+  ): Promise<{ success: boolean; bookings?: ViewingBooking[]; error?: string }> {
+    try {
+      const normalizedEmail = agentEmail?.toLowerCase().trim();
+      console.log(`🔍 Getting viewing bookings for email: ${normalizedEmail}, status: ${status}`);
+      const q = query(
+        collection(db, this.collectionName),
+        where('property.agent.email', '==', normalizedEmail),
+        where('status', '==', status),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const bookings: ViewingBooking[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        bookings.push(doc.data() as ViewingBooking);
+      });
+      
+      return { success: true, bookings };
+    } catch (error: any) {
+      // Fallback without orderBy if index is missing
+      if (error.code === 'failed-precondition' && error.message?.includes('index')) {
+        const normalizedEmail = agentEmail?.toLowerCase().trim();
+        const fallbackQuery = query(
+          collection(db, this.collectionName),
+          where('property.agent.email', '==', normalizedEmail),
+          where('status', '==', status)
+        );
+        const fallbackSnapshot = await getDocs(fallbackQuery);
+        const bookings: ViewingBooking[] = [];
+        fallbackSnapshot.forEach((doc) => bookings.push(doc.data() as ViewingBooking));
+        const sorted = bookings.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+        return { success: true, bookings: sorted };
+      }
+      console.error('❌ Error getting viewing bookings by email and status:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
+   * Get viewing statistics filtered by agent email
+   */
+  async getViewingStatsByEmail(agentEmail: string): Promise<{ success: boolean; stats?: ViewingStats; error?: string }> {
+    try {
+      const { success, bookings, error } = await this.getViewingBookingsByEmail(agentEmail);
+      if (!success || !bookings) {
+        return { success: false, error };
+      }
+      const stats = this.calculateStatsFromBookings(bookings);
+      return { success: true, stats };
+    } catch (error) {
+      console.error('❌ Error getting viewing stats by email:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -645,6 +822,177 @@ class ViewingService {
       unsubscribeLandlord();
       unsubscribeAgent();
     };
+  }
+
+  /**
+   * Subscribe to real-time updates for viewing bookings filtered by agent email
+   */
+  subscribeToViewingBookingsByEmail(
+    agentEmail: string,
+    callback: (bookings: ViewingBooking[]) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    const normalizedEmail = agentEmail?.toLowerCase().trim();
+    // OPTIMIZATION: Use top-level agentEmail field for faster queries
+    const q = query(
+      collection(db, this.collectionName),
+      where('agentEmail', '==', normalizedEmail),
+      orderBy('createdAt', 'desc')
+    );
+
+    return onSnapshot(
+      q,
+      (querySnapshot) => {
+        const bookings: ViewingBooking[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data() as ViewingBooking;
+          // Filter to ensure we only include matching bookings (for backward compatibility)
+          if (data.agentEmail?.toLowerCase() === normalizedEmail || 
+              data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+            bookings.push(data);
+          }
+        });
+        callback(bookings);
+      },
+      (error) => {
+        // Fallback to nested field query if top-level field query fails
+        if (error.code === 'failed-precondition' || error.message?.includes('index')) {
+          const fallbackQ = query(
+            collection(db, this.collectionName),
+            where('property.agent.email', '==', normalizedEmail)
+          );
+          return onSnapshot(
+            fallbackQ,
+            (querySnapshot) => {
+              const bookings: ViewingBooking[] = [];
+              querySnapshot.forEach((doc) => {
+                const data = doc.data() as ViewingBooking;
+                if (data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+                  bookings.push(data);
+                }
+              });
+              // Sort in memory since we can't use orderBy with nested field
+              const sorted = bookings.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+              callback(sorted);
+            },
+            (fallbackError) => {
+              console.error('Error in viewing bookings subscription:', fallbackError);
+              if (onError) {
+                onError(fallbackError);
+              }
+            }
+          );
+        }
+        console.error('Error in viewing bookings subscription:', error);
+        if (onError) {
+          onError(error);
+        }
+      }
+    );
+  }
+
+  /**
+   * Subscribe to real-time updates for viewing stats filtered by agent email
+   */
+  subscribeToViewingStatsByEmail(
+    agentEmail: string,
+    callback: (stats: ViewingStats) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    const normalizedEmail = agentEmail?.toLowerCase().trim();
+    // OPTIMIZATION: Use top-level agentEmail field
+    const q = query(
+      collection(db, this.collectionName),
+      where('agentEmail', '==', normalizedEmail)
+    );
+
+    return onSnapshot(
+      q,
+      (querySnapshot) => {
+        const stats: ViewingStats = {
+          upcoming: 0,
+          completed: 0,
+          rescheduled: 0,
+          total: 0
+        };
+        
+        querySnapshot.forEach((doc) => {
+          const booking = doc.data() as ViewingBooking;
+          // Filter to ensure we only count matching bookings
+          if (booking.agentEmail?.toLowerCase() === normalizedEmail || 
+              booking.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+            stats.total++;
+            
+            switch (booking.status) {
+              case 'pending':
+              case 'confirmed':
+                stats.upcoming++;
+                break;
+              case 'completed':
+                stats.completed++;
+                break;
+              case 'rescheduled':
+                stats.rescheduled++;
+                break;
+            }
+          }
+        });
+        
+        callback(stats);
+      },
+      (error) => {
+        // Fallback to nested field query
+        if (error.code === 'failed-precondition' || error.message?.includes('index')) {
+          const fallbackQ = query(
+            collection(db, this.collectionName),
+            where('property.agent.email', '==', normalizedEmail)
+          );
+          return onSnapshot(
+            fallbackQ,
+            (querySnapshot) => {
+              const stats: ViewingStats = {
+                upcoming: 0,
+                completed: 0,
+                rescheduled: 0,
+                total: 0
+              };
+              
+              querySnapshot.forEach((doc) => {
+                const booking = doc.data() as ViewingBooking;
+                if (booking.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+                  stats.total++;
+                  
+                  switch (booking.status) {
+                    case 'pending':
+                    case 'confirmed':
+                      stats.upcoming++;
+                      break;
+                    case 'completed':
+                      stats.completed++;
+                      break;
+                    case 'rescheduled':
+                      stats.rescheduled++;
+                      break;
+                  }
+                }
+              });
+              
+              callback(stats);
+            },
+            (fallbackError) => {
+              console.error('Error in viewing stats subscription:', fallbackError);
+              if (onError) {
+                onError(fallbackError);
+              }
+            }
+          );
+        }
+        console.error('Error in viewing stats subscription:', error);
+        if (onError) {
+          onError(error);
+        }
+      }
+    );
   }
 }
 

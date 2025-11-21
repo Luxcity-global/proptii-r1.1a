@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { ArrowLeft, Search, Users, Home, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Search, Users, Home, CheckCircle, AlertCircle, Loader2, Info } from 'lucide-react';
 import { Property, Tenant } from '../App';
 import { tenantService } from '../services/tenantService';
 import axios from 'axios';
@@ -48,7 +48,7 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
       setError(null);
       try {
         const API_BASE_URL = window.location.hostname === 'localhost' 
-          ? 'http://localhost:10000/api' 
+          ? 'http://localhost:3000/api' 
           : 'https://proptii-r1-1a.onrender.com/api';
         
         const response = await axios.get(`${API_BASE_URL}/azure-users`, {
@@ -224,11 +224,32 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
               Select a tenant from our existing users
             </h1>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Choose a user from your directory and assign them as a tenant to a property
+              Choose a user from our directory and assign them as a tenant to a property
             </p>
           </div>
 
           <div className="max-w-4xl mx-auto">
+            {/* Information Note */}
+            <Card className="mb-6 bg-blue-50 rounded-xl border border-blue-200">
+              <CardContent className="p-6">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#136C9E' }}>
+                      <Info className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                      Additional Details Required
+                    </h3>
+                    <p className="text-sm leading-relaxed" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                      After assigning a tenant to a property, you'll need to add other relevant details like phone number, lease duration, and payment information later. This step only creates the basic tenant assignment.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Search and Filters */}
             <Card className="mb-6">
               <CardHeader>
@@ -344,24 +365,33 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
                         onClick={() => setSelectedUserId(user.id)}
                       >
                         <CardContent className="p-6">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                              <Avatar className="h-12 w-12">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start space-x-4 flex-1 min-w-0">
+                              <Avatar className="h-12 w-12 flex-shrink-0">
                                 <AvatarFallback>
                                   {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
-                              <div>
-                                <h3 className="font-semibold text-lg" style={{ color: '#374957' }}>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-lg mb-2" style={{ color: '#374957' }}>
                                   {user.name}
                                 </h3>
-                                <p className="text-gray-600">{user.email}</p>
-                                {user.phone && (
-                                  <p className="text-sm text-gray-500">{user.phone}</p>
-                                )}
+                                <p 
+                                  className="text-gray-600 text-sm" 
+                                  title={user.email}
+                                  style={{ 
+                                    wordBreak: 'break-word', 
+                                    overflowWrap: 'anywhere',
+                                    whiteSpace: 'normal',
+                                    lineHeight: '1.5',
+                                    maxWidth: '100%'
+                                  }}
+                                >
+                                  <span className="font-medium">Email:</span> <span style={{ wordBreak: 'break-all' }}>{user.email}</span>
+                                </p>
                               </div>
                             </div>
-                            <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-3 flex-shrink-0">
                               <Badge className="bg-blue-100 text-blue-800 border-blue-200">
                                 Azure AD B2C
                               </Badge>

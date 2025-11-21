@@ -29,6 +29,7 @@
     "@azure/core-auth": "^1.9.0",
     "@azure/cosmos": "^4.3.0",
     "@azure/identity": "^4.9.1",
+    "@azure/msal-node": "^3.8.2",
     "@azure/storage-blob": "^12.27.0",
     "@nestjs/common": "^11.1.0",
     "@nestjs/config": "^4.0.2",

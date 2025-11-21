@@ -185,8 +185,8 @@ app.use(cors({
     exposedHeaders: ['Content-Type', 'Content-Length']
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Increase limit for base64 data
+app.use(express.json({ limit: '100mb' })); // Increase limit for large base64 data
+app.use(express.urlencoded({ extended: true, limit: '100mb' })); // Increase limit for large base64 data
 
 // Configure multer for file uploads
 const upload = multer({
@@ -194,6 +194,16 @@ const upload = multer({
     limits: {
         fileSize: 10 * 1024 * 1024, // 10MB limit per file
         files: 10 // Maximum 10 files
+    }
+});
+
+// Configure multer specifically for base64 form data (larger field size limits)
+const uploadBase64 = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fieldSize: 100 * 1024 * 1024, // 100MB limit for form fields (base64 strings)
+        fields: 10, // Maximum number of non-file fields
+        fileSize: 0 // No file uploads expected
     }
 });
 
@@ -393,8 +403,8 @@ app.post('/api/property/upload-document', upload.single('document'), async (req,
 });
 
 // Email sending route for base64 attachments (used by ContractsPage)
-// Use multer to parse multipart/form-data (even though we're not uploading files, FormData requires multer)
-app.post('/api/email/send-base64', upload.none(), async (req, res) => {
+// Use multer to parse multipart/form-data with increased limits for large base64 strings
+app.post('/api/email/send-base64', uploadBase64.none(), async (req, res) => {
     try {
         console.log('Received base64 email request:', {
             to: req.body.to,

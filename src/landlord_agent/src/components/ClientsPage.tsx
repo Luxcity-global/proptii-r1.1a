@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Mail, Phone, Calendar, Home, DollarSign, User, MapPin, Filter, AlertTriangle, PoundSterling, Eye, Users, TrendingUp, Shield, Clock, Trash2, Download, Upload, Archive, CheckSquare, Square, Copy, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Search, Mail, Phone, Calendar, Home, DollarSign, User, MapPin, Filter, AlertTriangle, PoundSterling, Eye, Users, TrendingUp, Shield, Clock, Trash2, Download, Upload, Archive, CheckSquare, Square, Copy, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -56,11 +56,17 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
   const [activeTab, setActiveTab] = useState('tenants');
   const [tenantFilter, setTenantFilter] = useState('all');
   const [landlordFilter, setLandlordFilter] = useState('all');
+  const [leaseExpiryFilter, setLeaseExpiryFilter] = useState<string>('all');
+  const [tenantSortBy, setTenantSortBy] = useState<string>('default');
+  const [landlordSortBy, setLandlordSortBy] = useState<string>('default');
+  const [currentTenantPage, setCurrentTenantPage] = useState<number>(1);
   const [selectedTenants, setSelectedTenants] = useState<string[]>([]);
   const [selectedLandlords, setSelectedLandlords] = useState<string[]>([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [referencingStatuses, setReferencingStatuses] = useState<Map<string, 'not-started' | 'in-progress' | 'complete'>>(new Map());
   const [isLoadingReferencingStatuses, setIsLoadingReferencingStatuses] = useState(false);
+
+  const TENANTS_PER_PAGE = 10;
 
   // Fetch referencing statuses for all tenants
   useEffect(() => {
@@ -349,33 +355,194 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
     }).format(date);
   };
 
-  const filteredTenants = tenants.filter(tenant => {
-    const matchesSearch = tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         tenant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         tenant.propertyAddress.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = tenantFilter === 'all' || tenant.status === tenantFilter;
-    return matchesSearch && matchesFilter;
-  });
+  const filteredAndSortedTenants = useMemo(() => {
+    const now = new Date();
+    const arrearsByTenantId = new Map<string, ArrearsAlert>();
+    arrearsAlerts.forEach(alert => arrearsByTenantId.set(alert.tenantId, alert));
 
-  const filteredLandlords = mockLandlords.filter(landlord => {
-    const matchesSearch = landlord.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         landlord.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         landlord.notes.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         landlord.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (landlord.company && landlord.company.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesFilter = landlordFilter === 'all' || landlord.status === landlordFilter;
-    return matchesSearch && matchesFilter;
-  });
+    // Filter tenants
+    let filtered = tenants.filter(tenant => {
+      const matchesSearch = tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           tenant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           tenant.propertyAddress.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesFilter = tenantFilter === 'all' || tenant.status === tenantFilter;
+      
+      // Overdue rent filter (when selected from Sort By dropdown)
+      let matchesOverdue = true;
+      if (tenantSortBy === 'overdue-rent-only') {
+        const tenantAlert = arrearsByTenantId.get(tenant.id);
+        const alertAmount = tenantAlert?.overdueAmount ?? 0;
+        const tenantOverdueAmount = tenant.overdueAmount ?? 0;
+        const hasOverdueRent = tenant.paymentStatus === 'overdue' || alertAmount > 0 || tenantOverdueAmount > 0;
+        matchesOverdue = hasOverdueRent;
+      }
+
+      // Lease expiry filter
+      let matchesLeaseExpiry = true;
+      if (leaseExpiryFilter !== 'all') {
+        const leaseEnd = tenant.leaseEnd instanceof Date ? tenant.leaseEnd : new Date(tenant.leaseEnd);
+        const daysUntilExpiry = Math.ceil((leaseEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        switch (leaseExpiryFilter) {
+          case 'expired':
+            matchesLeaseExpiry = daysUntilExpiry < 0;
+            break;
+          case '30-days':
+            matchesLeaseExpiry = daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
+            break;
+          case '60-days':
+            matchesLeaseExpiry = daysUntilExpiry >= 0 && daysUntilExpiry <= 60;
+            break;
+          case '90-days':
+            matchesLeaseExpiry = daysUntilExpiry >= 0 && daysUntilExpiry <= 90;
+            break;
+          default:
+            matchesLeaseExpiry = true;
+        }
+      }
+      
+      return matchesSearch && matchesFilter && matchesOverdue && matchesLeaseExpiry;
+    });
+
+    // Sort tenants
+    if (tenantSortBy !== 'default' && tenantSortBy !== 'overdue-rent-only') {
+      filtered = [...filtered].sort((a, b) => {
+        const arrearsA = arrearsByTenantId.get(a.id);
+        const arrearsB = arrearsByTenantId.get(b.id);
+
+        switch (tenantSortBy) {
+          case 'name-asc':
+            return a.name.localeCompare(b.name);
+          case 'name-desc':
+            return b.name.localeCompare(a.name);
+          case 'rent-asc':
+            return a.rentAmount - b.rentAmount;
+          case 'rent-desc':
+            return b.rentAmount - a.rentAmount;
+          case 'lease-expiry-asc':
+            const leaseEndA = a.leaseEnd instanceof Date ? a.leaseEnd : new Date(a.leaseEnd);
+            const leaseEndB = b.leaseEnd instanceof Date ? b.leaseEnd : new Date(b.leaseEnd);
+            return leaseEndA.getTime() - leaseEndB.getTime();
+          case 'lease-expiry-desc':
+            const leaseEndA2 = a.leaseEnd instanceof Date ? a.leaseEnd : new Date(a.leaseEnd);
+            const leaseEndB2 = b.leaseEnd instanceof Date ? b.leaseEnd : new Date(b.leaseEnd);
+            return leaseEndB2.getTime() - leaseEndA2.getTime();
+          case 'overdue-desc':
+            const overdueA = arrearsA?.overdueAmount ?? a.overdueAmount ?? 0;
+            const overdueB = arrearsB?.overdueAmount ?? b.overdueAmount ?? 0;
+            return overdueB - overdueA;
+          case 'overdue-asc':
+            const overdueA2 = arrearsA?.overdueAmount ?? a.overdueAmount ?? 0;
+            const overdueB2 = arrearsB?.overdueAmount ?? b.overdueAmount ?? 0;
+            return overdueA2 - overdueB2;
+          default:
+            return 0;
+        }
+      });
+    }
+    // When "Overdue Rent Only" is selected, sort by overdue amount descending
+    else if (tenantSortBy === 'overdue-rent-only') {
+      filtered = [...filtered].sort((a, b) => {
+        const arrearsA = arrearsByTenantId.get(a.id);
+        const arrearsB = arrearsByTenantId.get(b.id);
+        const overdueA = arrearsA?.overdueAmount ?? a.overdueAmount ?? 0;
+        const overdueB = arrearsB?.overdueAmount ?? b.overdueAmount ?? 0;
+        return overdueB - overdueA;
+      });
+    }
+
+    return filtered;
+  }, [tenants, arrearsAlerts, searchTerm, tenantFilter, leaseExpiryFilter, tenantSortBy]);
+
+  const filteredTenants = filteredAndSortedTenants;
+
+  // Pagination for tenants
+  const totalTenantPages = Math.ceil(filteredTenants.length / TENANTS_PER_PAGE);
+  const startIndex = (currentTenantPage - 1) * TENANTS_PER_PAGE;
+  const endIndex = startIndex + TENANTS_PER_PAGE;
+  const paginatedTenants = filteredTenants.slice(startIndex, endIndex);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentTenantPage(1);
+  }, [searchTerm, tenantFilter, leaseExpiryFilter, tenantSortBy]);
+
+  const filteredAndSortedLandlords = useMemo(() => {
+    // Filter landlords
+    let filtered = mockLandlords.filter(landlord => {
+      const matchesSearch = landlord.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           landlord.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           landlord.notes.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           landlord.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (landlord.company && landlord.company.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesFilter = landlordFilter === 'all' || landlord.status === landlordFilter;
+      return matchesSearch && matchesFilter;
+    });
+
+    // Sort landlords
+    if (landlordSortBy !== 'default') {
+      filtered = [...filtered].sort((a, b) => {
+        switch (landlordSortBy) {
+          case 'name-asc':
+            return a.name.localeCompare(b.name);
+          case 'name-desc':
+            return b.name.localeCompare(a.name);
+          case 'properties-asc':
+            return a.portfolio.totalProperties - b.portfolio.totalProperties;
+          case 'properties-desc':
+            return b.portfolio.totalProperties - a.portfolio.totalProperties;
+          case 'income-asc':
+            return a.portfolio.monthlyIncome - b.portfolio.monthlyIncome;
+          case 'income-desc':
+            return b.portfolio.monthlyIncome - a.portfolio.monthlyIncome;
+          case 'portfolio-asc':
+            return a.portfolio.totalValue - b.portfolio.totalValue;
+          case 'portfolio-desc':
+            return b.portfolio.totalValue - a.portfolio.totalValue;
+          default:
+            return 0;
+        }
+      });
+    }
+
+    return filtered;
+  }, [searchTerm, landlordFilter, landlordSortBy]);
+
+  const filteredLandlords = filteredAndSortedLandlords;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-      <div className="flex justify-between items-start">
-        <div className="text-left">
+      <div className="flex items-center justify-between">
+        <div>
           <h1 style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>Your Tenants</h1>
           <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
             Manage your tenants and landlords
           </p>
         </div>
+        <Button 
+          onClick={onAddTenant} 
+          className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto" 
+          style={{ 
+            backgroundColor: '#DC5F12', 
+            borderColor: '#DC5F12', 
+            minWidth: '180px',
+            background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
+            e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
+            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+            e.currentTarget.style.transform = 'translateY(0px)';
+          }}
+        >
+          <Plus className="w-4 h-4" strokeWidth={2.5} />
+          <span>Add Tenant</span>
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -488,36 +655,37 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
           </TabsList>
 
           <TabsContent value="tenants" className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search tenants..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={selectAllTenants}
-                className="flex items-center space-x-2"
+                className="p-2"
               >
-                {selectedTenants.length === filteredTenants.length ? (
+                {selectedTenants.length === filteredTenants.length && filteredTenants.length > 0 ? (
                   <CheckSquare className="h-4 w-4" />
                 ) : (
                   <Square className="h-4 w-4" />
                 )}
-                <span>Select All</span>
               </Button>
+              <span className="text-sm text-muted-foreground">
+                {selectedTenants.length === filteredTenants.length && filteredTenants.length > 0 ? 'Deselect All' : 'Select All'}
+              </span>
+            </div>
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search tenants..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex gap-2">
               <Select value={tenantFilter} onValueChange={setTenantFilter}>
                 <SelectTrigger className="w-[140px]">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue />
+                  <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
@@ -526,30 +694,37 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                   <SelectItem value="ended">Ended</SelectItem>
                 </SelectContent>
               </Select>
-              <Button 
-                onClick={onAddTenant}
-                className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto" 
-                style={{ 
-                  backgroundColor: '#DC5F12', 
-                  borderColor: '#DC5F12', 
-                  minWidth: '180px',
-                  background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-                  e.currentTarget.style.transform = 'translateY(0px)';
-                }}
-              >
-                <Plus className="w-4 h-4" strokeWidth={2.5} />
-                <span>Add Tenant</span>
-              </Button>
             </div>
+
+            <Select value={leaseExpiryFilter} onValueChange={setLeaseExpiryFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Lease Expiry" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Leases</SelectItem>
+                <SelectItem value="expired">Expired</SelectItem>
+                <SelectItem value="30-days">Expiring within 30 days</SelectItem>
+                <SelectItem value="60-days">Expiring within 60 days</SelectItem>
+                <SelectItem value="90-days">Expiring within 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={tenantSortBy} onValueChange={setTenantSortBy}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Default</SelectItem>
+                <SelectItem value="name-asc">Name: A to Z</SelectItem>
+                <SelectItem value="name-desc">Name: Z to A</SelectItem>
+                <SelectItem value="rent-asc">Rent: Low to High</SelectItem>
+                <SelectItem value="rent-desc">Rent: High to Low</SelectItem>
+                <SelectItem value="lease-expiry-asc">Lease Expiry: Soonest First</SelectItem>
+                <SelectItem value="lease-expiry-desc">Lease Expiry: Latest First</SelectItem>
+                <SelectItem value="overdue-desc">Overdue Amount: Highest First</SelectItem>
+                <SelectItem value="overdue-asc">Overdue Amount: Lowest First</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Bulk Actions Bar */}
@@ -601,8 +776,8 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
             </div>
           )}
 
-          <div className="grid gap-4">
-            {filteredTenants.map((tenant) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {paginatedTenants.map((tenant) => {
               const property = getPropertyForTenant(tenant.id);
               const arrears = getArrearsForTenant(tenant.id);
               
@@ -743,58 +918,151 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
               );
             })}
           </div>
+
+          {/* Pagination Controls */}
+          {totalTenantPages > 1 && (
+            <div className="flex items-center justify-between bg-white border border-[#f3f3f3] rounded-lg p-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredTenants.length)} of {filteredTenants.length} tenants
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentTenantPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentTenantPage === 1}
+                  className="flex items-center gap-1"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalTenantPages }, (_, i) => i + 1).map((page) => {
+                    // Show first page, last page, current page, and pages around current
+                    if (
+                      page === 1 ||
+                      page === totalTenantPages ||
+                      (page >= currentTenantPage - 1 && page <= currentTenantPage + 1)
+                    ) {
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentTenantPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentTenantPage(page)}
+                          className="min-w-[40px]"
+                        >
+                          {page}
+                        </Button>
+                      );
+                    } else if (
+                      page === currentTenantPage - 2 ||
+                      page === currentTenantPage + 2
+                    ) {
+                      return (
+                        <span key={page} className="text-muted-foreground px-2">
+                          ...
+                        </span>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentTenantPage(prev => Math.min(totalTenantPages, prev + 1))}
+                  disabled={currentTenantPage === totalTenantPages}
+                  className="flex items-center gap-1"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         {userRole === 'agent' && (
           <TabsContent value="landlords" className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search landlords..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-4 items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={selectAllLandlords}
+                  className="p-2"
+                >
+                  {selectedLandlords.length === filteredLandlords.length && filteredLandlords.length > 0 ? (
+                    <CheckSquare className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  {selectedLandlords.length === filteredLandlords.length && filteredLandlords.length > 0 ? 'Deselect All' : 'Select All'}
+                </span>
+              </div>
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search landlords..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Select value={landlordFilter} onValueChange={setLandlordFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="premium">Premium</SelectItem>
+                    <SelectItem value="new">New</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="suspended">Suspended</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  onClick={onAddLandlord}
+                  className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full hover:shadow-md transition-shadow flex-shrink-0 w-auto" 
+                  style={{ backgroundColor: '#DC5F12', borderColor: '#DC5F12', minWidth: '180px' }}
+                >
+                  <Plus className="w-4 h-4" strokeWidth={2.5} />
+                  <span>Add Landlord</span>
+                </Button>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={selectAllLandlords}
-                className="flex items-center space-x-2"
-              >
-                {selectedLandlords.length === filteredLandlords.length ? (
-                  <CheckSquare className="h-4 w-4" />
-                ) : (
-                  <Square className="h-4 w-4" />
-                )}
-                <span>Select All</span>
-              </Button>
-              <Select value={landlordFilter} onValueChange={setLandlordFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue />
+
+            {/* Additional Filters Row for Landlords */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Sort by:</span>
+              </div>
+
+              <Select value={landlordSortBy} onValueChange={setLandlordSortBy}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="premium">Premium</SelectItem>
-                  <SelectItem value="new">New</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
+                  <SelectItem value="default">Default</SelectItem>
+                  <SelectItem value="name-asc">Name: A to Z</SelectItem>
+                  <SelectItem value="name-desc">Name: Z to A</SelectItem>
+                  <SelectItem value="properties-asc">Properties: Low to High</SelectItem>
+                  <SelectItem value="properties-desc">Properties: High to Low</SelectItem>
+                  <SelectItem value="income-asc">Monthly Income: Low to High</SelectItem>
+                  <SelectItem value="income-desc">Monthly Income: High to Low</SelectItem>
+                  <SelectItem value="portfolio-asc">Portfolio Value: Low to High</SelectItem>
+                  <SelectItem value="portfolio-desc">Portfolio Value: High to Low</SelectItem>
                 </SelectContent>
               </Select>
-              <Button 
-                onClick={onAddLandlord}
-                className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full hover:shadow-md transition-shadow flex-shrink-0 w-auto" 
-                style={{ backgroundColor: '#DC5F12', borderColor: '#DC5F12', minWidth: '180px' }}
-              >
-                <Plus className="w-4 h-4" strokeWidth={2.5} />
-                <span>Add Landlord</span>
-              </Button>
             </div>
           </div>
 
@@ -950,56 +1218,77 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
       ) : (
         // For landlord users, show tenant list directly without tabs
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search tenants..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={selectAllTenants}
-                className="flex items-center space-x-2"
+                className="p-2"
               >
-                {selectedTenants.length === filteredTenants.length ? (
+                {selectedTenants.length === filteredTenants.length && filteredTenants.length > 0 ? (
                   <CheckSquare className="h-4 w-4" />
                 ) : (
                   <Square className="h-4 w-4" />
                 )}
-                <span>{selectedTenants.length === filteredTenants.length ? 'Deselect All' : 'Select All'}</span>
               </Button>
-              <Button 
-                onClick={onAddTenant} 
-                className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto" 
-                style={{ 
-                  backgroundColor: '#DC5F12', 
-                  borderColor: '#DC5F12', 
-                  minWidth: '180px',
-                  background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-                  e.currentTarget.style.transform = 'translateY(0px)';
-                }}
-              >
-                <Plus className="w-4 h-4" strokeWidth={2.5} />
-                <span>Add Tenant</span>
-              </Button>
+              <span className="text-sm text-muted-foreground">
+                {selectedTenants.length === filteredTenants.length && filteredTenants.length > 0 ? 'Deselect All' : 'Select All'}
+              </span>
             </div>
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search tenants..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Select value={tenantFilter} onValueChange={setTenantFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="ended">Ended</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Select value={leaseExpiryFilter} onValueChange={setLeaseExpiryFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Lease Expiry" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Leases</SelectItem>
+                <SelectItem value="expired">Expired</SelectItem>
+                <SelectItem value="30-days">Expiring within 30 days</SelectItem>
+                <SelectItem value="60-days">Expiring within 60 days</SelectItem>
+                <SelectItem value="90-days">Expiring within 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={tenantSortBy} onValueChange={setTenantSortBy}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Default</SelectItem>
+                <SelectItem value="overdue-rent-only">Overdue Rent Only</SelectItem>
+                <SelectItem value="name-asc">Name: A to Z</SelectItem>
+                <SelectItem value="name-desc">Name: Z to A</SelectItem>
+                <SelectItem value="rent-asc">Rent: Low to High</SelectItem>
+                <SelectItem value="rent-desc">Rent: High to Low</SelectItem>
+                <SelectItem value="lease-expiry-asc">Lease Expiry: Soonest First</SelectItem>
+                <SelectItem value="lease-expiry-desc">Lease Expiry: Latest First</SelectItem>
+                <SelectItem value="overdue-desc">Overdue Amount: Highest First</SelectItem>
+                <SelectItem value="overdue-asc">Overdue Amount: Lowest First</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Bulk Actions Bar */}
@@ -1051,8 +1340,8 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
             </div>
           )}
 
-          <div className="grid gap-4">
-            {filteredTenants.map((tenant) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {paginatedTenants.map((tenant) => {
               const property = getPropertyForTenant(tenant.id);
               const arrears = getArrearsForTenant(tenant.id);
               
@@ -1079,8 +1368,12 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="text-lg font-semibold">{tenant.name}</h3>
-                            <Badge variant={tenant.paymentStatus === 'current' ? 'default' : 'destructive'}>
-                              {tenant.paymentStatus}
+                            <Badge className={tenant.paymentStatus === 'current' ? 'bg-green-100 text-green-800' : 
+                                             tenant.paymentStatus === 'overdue' ? 'bg-red-100 text-red-800' : 
+                                             'bg-orange-100 text-orange-800'}>
+                              {tenant.paymentStatus === 'current' ? 'Payment Up-to-Date' : 
+                               tenant.paymentStatus === 'overdue' ? 'Payment Overdue' : 
+                               'Payment Plan'}
                             </Badge>
                             {arrears && (
                               <Badge variant="destructive" className="bg-red-100 text-red-800">
@@ -1136,6 +1429,69 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
               );
             })}
           </div>
+
+          {/* Pagination Controls */}
+          {totalTenantPages > 1 && (
+            <div className="flex items-center justify-between bg-white border border-[#f3f3f3] rounded-lg p-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredTenants.length)} of {filteredTenants.length} tenants
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentTenantPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentTenantPage === 1}
+                  className="flex items-center gap-1"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalTenantPages }, (_, i) => i + 1).map((page) => {
+                    // Show first page, last page, current page, and pages around current
+                    if (
+                      page === 1 ||
+                      page === totalTenantPages ||
+                      (page >= currentTenantPage - 1 && page <= currentTenantPage + 1)
+                    ) {
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentTenantPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentTenantPage(page)}
+                          className="min-w-[40px]"
+                        >
+                          {page}
+                        </Button>
+                      );
+                    } else if (
+                      page === currentTenantPage - 2 ||
+                      page === currentTenantPage + 2
+                    ) {
+                      return (
+                        <span key={page} className="text-muted-foreground px-2">
+                          ...
+                        </span>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentTenantPage(prev => Math.min(totalTenantPages, prev + 1))}
+                  disabled={currentTenantPage === totalTenantPages}
+                  className="flex items-center gap-1"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
