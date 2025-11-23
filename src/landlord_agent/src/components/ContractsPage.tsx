@@ -19,7 +19,11 @@ import {
   Loader2,
   FileText,
   Send,
-  AlertCircle
+  AlertCircle,
+  Search,
+  Trash2,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -61,6 +65,9 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
   const [userId, setUserId] = useState<string | null>(null);
   const [showSuccessScreen, setShowSuccessScreen] = useState(false);
   const [successData, setSuccessData] = useState<{ recipientName: string; recipientEmail: string; fileName: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedContracts, setSelectedContracts] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Get landlord email and userId from localStorage/auth on component mount
   useEffect(() => {
@@ -156,9 +163,23 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
     }
   };
 
-  const sentContracts = contracts.filter(c => c.status === 'sent');
-  const unsignedContracts = contracts.filter(c => c.status === 'unsigned');
-  const signedContracts = contracts.filter(c => c.status === 'signed');
+  // Filter contracts by search query
+  const filterContractsBySearch = (contractsList: Contract[]) => {
+    if (!searchQuery.trim()) return contractsList;
+    
+    const query = searchQuery.toLowerCase();
+    return contractsList.filter(contract => 
+      contract.title.toLowerCase().includes(query) ||
+      contract.fileName.toLowerCase().includes(query) ||
+      contract.tenantName.toLowerCase().includes(query) ||
+      contract.tenantEmail.toLowerCase().includes(query) ||
+      contract.propertyAddress.toLowerCase().includes(query)
+    );
+  };
+
+  const sentContracts = filterContractsBySearch(contracts.filter(c => c.status === 'sent'));
+  const unsignedContracts = filterContractsBySearch(contracts.filter(c => c.status === 'unsigned'));
+  const signedContracts = filterContractsBySearch(contracts.filter(c => c.status === 'signed'));
 
   // Calculate overview metrics
   const totalSent = sentContracts.length;
@@ -593,24 +614,105 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
     }
   };
 
-  const ContractTable = ({ contracts }: { contracts: Contract[] }) => (
-    <div className="border rounded-lg">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Contract</TableHead>
-            <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Property</TableHead>
-            <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Tenant</TableHead>
-            <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Status</TableHead>
-            <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Sent Date</TableHead>
-            <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Expiry</TableHead>
-            <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {contracts.map((contract) => (
-            <TableRow key={contract.id} className="hover:bg-gray-50">
-              <TableCell>
+  const handleToggleSelect = (contractId: string) => {
+    setSelectedContracts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(contractId)) {
+        newSet.delete(contractId);
+      } else {
+        newSet.add(contractId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = (contractsList: Contract[]) => {
+    const allSelected = contractsList.every(c => selectedContracts.has(c.id));
+    if (allSelected) {
+      // Deselect all in this list
+      setSelectedContracts(prev => {
+        const newSet = new Set(prev);
+        contractsList.forEach(c => newSet.delete(c.id));
+        return newSet;
+      });
+    } else {
+      // Select all in this list
+      setSelectedContracts(prev => {
+        const newSet = new Set(prev);
+        contractsList.forEach(c => newSet.add(c.id));
+        return newSet;
+      });
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedContracts(new Set());
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedContracts.size === 0) return;
+    
+    const confirmMessage = `Are you sure you want to delete ${selectedContracts.size} contract(s)? This action cannot be undone.`;
+    if (!window.confirm(confirmMessage)) return;
+
+    setIsDeleting(true);
+    try {
+      const deletePromises = Array.from(selectedContracts).map(contractId =>
+        contractService.deleteContract(contractId).catch(err => {
+          console.error(`Error deleting contract ${contractId}:`, err);
+          return { error: err };
+        })
+      );
+
+      await Promise.all(deletePromises);
+      
+      // Clear selection and reload contracts
+      setSelectedContracts(new Set());
+      await loadContracts();
+    } catch (err) {
+      console.error('Error deleting contracts:', err);
+      setError('Failed to delete some contracts. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const ContractTable = ({ contracts }: { contracts: Contract[] }) => {
+    const allSelected = contracts.length > 0 && contracts.every(c => selectedContracts.has(c.id));
+    const someSelected = contracts.some(c => selectedContracts.has(c.id));
+
+    return (
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead style={{ fontFamily: 'Archivo, sans-serif', width: '50px' }}>Select</TableHead>
+              <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Contract</TableHead>
+              <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Property</TableHead>
+              <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Tenant</TableHead>
+              <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Status</TableHead>
+              <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Sent Date</TableHead>
+              <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Expiry</TableHead>
+              <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {contracts.map((contract) => (
+              <TableRow key={contract.id} className="transition-colors duration-150">
+                <TableCell>
+                  <button
+                    onClick={() => handleToggleSelect(contract.id)}
+                    className="flex items-center justify-center"
+                    title={selectedContracts.has(contract.id) ? 'Deselect' : 'Select'}
+                  >
+                    {selectedContracts.has(contract.id) ? (
+                      <CheckSquare className="w-5 h-5 text-orange-500" />
+                    ) : (
+                      <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
+                    )}
+                  </button>
+                </TableCell>
+                <TableCell>
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
                     {getContractTypeIcon(contract.contractType)}
@@ -710,6 +812,7 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
       </Table>
     </div>
   );
+  };
 
   // Show success screen
   if (showSuccessScreen && successData) {
@@ -867,14 +970,73 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
           </div>
         )}
 
+        {/* Search Bar */}
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search contracts by title, tenant, email, or property..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            />
+          </div>
+        </div>
+
+        {/* Selection Bar */}
+        {selectedContracts.size > 0 && (
+          <div className="mb-6 flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            <div className="flex items-center space-x-3">
+              <span className="text-sm font-medium text-orange-800" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                {selectedContracts.size} contract{selectedContracts.size !== 1 ? 's' : ''} selected
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearSelection}
+                disabled={isDeleting}
+                style={{ fontFamily: 'Archivo, sans-serif' }}
+              >
+                Clear Selection
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteSelected}
+                disabled={isDeleting}
+                style={{ fontFamily: 'Archivo, sans-serif' }}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Selected
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Contracts Tabs */}
-        <Tabs value={activeTab} onValueChange={(value: string) => setActiveTab(value as 'sent' | 'unsigned' | 'signed')} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(value: string) => {
+          setActiveTab(value as 'sent' | 'unsigned' | 'signed');
+          setSelectedContracts(new Set()); // Clear selection when switching tabs
+        }} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="sent">
-              Sent ({totalSent})
+              Sent ({sentContracts.length})
             </TabsTrigger>
             <TabsTrigger value="unsigned">
-              Unsigned ({pendingSignature})
+              Unsigned ({unsignedContracts.length})
             </TabsTrigger>
             <TabsTrigger value="signed">
               Signed ({signedContracts.length})
@@ -906,9 +1068,11 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
             ) : sentContracts.length === 0 ? (
               <Card className="p-12 text-center">
                 <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>No sent contracts</h3>
+                <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                  {searchQuery ? 'No contracts match your search' : 'No sent contracts'}
+                </h3>
                 <p className="text-muted-foreground mb-6" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                  Your sent contracts will appear here
+                  {searchQuery ? 'Try adjusting your search query' : 'Your sent contracts will appear here'}
                 </p>
               </Card>
             ) : (
@@ -927,9 +1091,11 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
             ) : unsignedContracts.length === 0 ? (
               <Card className="p-12 text-center">
                 <Clock className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>No unsigned contracts</h3>
+                <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                  {searchQuery ? 'No contracts match your search' : 'No unsigned contracts'}
+                </h3>
                 <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                  All contracts are up to date
+                  {searchQuery ? 'Try adjusting your search query' : 'All contracts are up to date'}
                 </p>
               </Card>
             ) : (
@@ -948,9 +1114,11 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
             ) : signedContracts.length === 0 ? (
               <Card className="p-12 text-center">
                 <CheckCircle className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>No signed contracts</h3>
+                <h3 className="mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                  {searchQuery ? 'No contracts match your search' : 'No signed contracts'}
+                </h3>
                 <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                  Signed contracts will appear here
+                  {searchQuery ? 'Try adjusting your search query' : 'Signed contracts will appear here'}
                 </p>
               </Card>
             ) : (

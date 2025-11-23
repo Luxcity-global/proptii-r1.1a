@@ -10,7 +10,10 @@ import {
   Eye,
   MapPin,
   Search,
-  Filter
+  Filter,
+  Trash2,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import viewingService, { ViewingBooking, ViewingStats } from '../../../services/viewingService';
 import {
@@ -22,7 +25,7 @@ import landlordUserService from '../../../services/landlordUserService';
 
 // ViewingsPage component for managing property viewings and requests
 
-type TabKey = 'requests' | 'upcoming' | 'past';
+type TabKey = 'requests' | 'upcoming' | 'completed' | 'past';
 
 interface ViewingsPageProps {
   managerId: string | null;
@@ -107,19 +110,16 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   const [isProcessing, setIsProcessing] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [filterQuery, setFilterQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'name' | 'email' | 'date'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'name' | 'email' | 'date' | 'status'>('all');
+  const [selectedViewings, setSelectedViewings] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     let unsubscribeBookings: (() => void) | undefined;
     let unsubscribeRequests: (() => void) | undefined;
     let unsubscribeStats: (() => void) | undefined;
 
-<<<<<<< HEAD
     if (!managerId && !managerEmail) {
-=======
-    // Use email for filtering instead of managerId
-    if (!managerEmail) {
->>>>>>> 990afeeb03f16049c3d8b38a5d3be482dc156d22
       setLoading(false);
       setError('Unable to determine your email. Please sign in again.');
       return;
@@ -130,46 +130,81 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         setLoading(true);
         setError(null);
 
-<<<<<<< HEAD
         // Look up the landlordUser record by email to get the correct landlordUser ID
         // This is important because the auth user ID might be different from the landlordUser ID
         let landlordUserId: string | null = null;
+        let foundLandlordUser: any = null;
         
         if (managerEmail) {
-          console.log('🔍 Looking up landlord user by email:', managerEmail);
           const lookupResult = await landlordUserService.getLandlordUserByEmail(managerEmail);
           if (lookupResult.success && lookupResult.user?.id) {
             landlordUserId = lookupResult.user.id;
-            console.log('✅ Found landlord user ID:', landlordUserId, '(from email lookup)');
-          } else {
-            console.log('⚠️ No landlord user found with email:', managerEmail);
-            console.log('ℹ️ Falling back to managerId from auth:', managerId);
+            foundLandlordUser = lookupResult.user;
           }
         }
 
         // If we still don't have an ID after email lookup, use the managerId as fallback
         if (!landlordUserId) {
           landlordUserId = managerId;
-          console.log('ℹ️ Using managerId as fallback:', landlordUserId);
         }
 
-        if (!landlordUserId) {
-          setError('Unable to find your landlord/agent profile. Please make sure you are registered.');
+        if (!managerEmail) {
+          setError('Unable to determine your email. Please sign in again.');
           setLoading(false);
           return;
         }
 
-        console.log('📊 Loading viewings for landlord user ID:', landlordUserId);
+        const normalizedEmail = managerEmail.toLowerCase().trim();
 
-        const [requestsResult, bookingsResult, statsResult] = await Promise.all([
-          bookViewingRequestService.getManagerRequests(landlordUserId),
-          viewingService.getManagerViewingBookings(landlordUserId),
-          viewingService.getManagerViewingStats(landlordUserId)
-        ]);
+        // PRIORITY: Always query by email first since it's more reliable
+        // Email-based queries will find records regardless of ID mismatches
+        const emailRequestsResult = await bookViewingRequestService.getRequestsByEmail(normalizedEmail);
+        const emailBookingsResult = await viewingService.getViewingBookingsByEmail(normalizedEmail);
 
-        console.log('📋 Requests result:', requestsResult);
-        console.log('📋 Bookings result:', bookingsResult);
-        console.log('📋 Stats result:', statsResult);
+        // Also try ID-based queries (will be merged with email results)
+        let requestsResultById: { success: boolean; requests?: BookViewingRequest[]; error?: string } = { success: true, requests: [] };
+        let bookingsResultById: { success: boolean; bookings?: ViewingBooking[]; error?: string } = { success: true, bookings: [] };
+        let statsResultById: { success: boolean; stats?: ViewingStats; error?: string } = { success: true, stats: { upcoming: 0, completed: 0, rescheduled: 0, total: 0 } };
+
+        if (landlordUserId) {
+          requestsResultById = await bookViewingRequestService.getManagerRequests(landlordUserId);
+          bookingsResultById = await viewingService.getManagerViewingBookings(landlordUserId);
+          statsResultById = await viewingService.getManagerViewingStats(landlordUserId);
+        }
+
+        // Merge email-based and ID-based results
+        // Merge requests
+        const requestsMap = new Map<string, BookViewingRequest>();
+        if (emailRequestsResult.success && emailRequestsResult.requests) {
+          emailRequestsResult.requests.forEach(req => requestsMap.set(req.id, req));
+        }
+        if (landlordUserId && requestsResultById?.success && requestsResultById.requests) {
+          requestsResultById.requests.forEach(req => requestsMap.set(req.id, req));
+        }
+        const mergedRequests = Array.from(requestsMap.values());
+        
+        // Merge bookings
+        const bookingsMap = new Map<string, ViewingBooking>();
+        if (emailBookingsResult.success && emailBookingsResult.bookings) {
+          emailBookingsResult.bookings.forEach(booking => bookingsMap.set(booking.id, booking));
+        }
+        if (landlordUserId && bookingsResultById?.success && bookingsResultById.bookings) {
+          bookingsResultById.bookings.forEach(booking => bookingsMap.set(booking.id, booking));
+        }
+        const mergedBookings = Array.from(bookingsMap.values());
+
+        // Calculate stats from merged bookings
+        const stats = mergedBookings.reduce<ViewingStats>((acc, booking) => {
+          acc.total++;
+          if (['pending', 'confirmed'].includes(booking.status)) acc.upcoming++;
+          if (booking.status === 'completed') acc.completed++;
+          if (booking.status === 'rescheduled') acc.rescheduled++;
+          return acc;
+        }, { upcoming: 0, completed: 0, rescheduled: 0, total: 0 });
+
+        const requestsResult = { success: true, requests: mergedRequests };
+        const bookingsResult = { success: true, bookings: mergedBookings };
+        const statsResult = { success: true, stats };
 
         if (requestsResult.success && requestsResult.requests) {
           setRequests(requestsResult.requests);
@@ -177,97 +212,140 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
         if (bookingsResult.success && bookingsResult.bookings) {
           setBookings(bookingsResult.bookings);
-          console.log('✅ Set bookings:', bookingsResult.bookings.length, 'bookings');
         }
 
         if (statsResult.success && statsResult.stats) {
           setStats(statsResult.stats);
-=======
-        // OPTIMIZATION: Fetch bookings once and calculate stats from the same data
-        // This eliminates the duplicate query that was happening in getViewingStatsByEmail
-        const allBookingsResult = await viewingService.getViewingBookingsByEmail(managerEmail);
-        
-        // Filter bookings by status: 'pending' = requests, others = bookings
-        const requests: BookViewingRequest[] = [];
-        const bookings: ViewingBooking[] = [];
-        
-        if (allBookingsResult.success && allBookingsResult.bookings) {
-          allBookingsResult.bookings.forEach((booking) => {
-            if (booking.status === 'pending') {
-              // Convert ViewingBooking to BookViewingRequest format for pending requests
-              requests.push({
-                id: booking.id,
-                userId: booking.userId,
-                propertyId: booking.propertyId || '',
-                landlordId: booking.landlordId,
-                agentId: booking.agentId,
-                property: booking.property,
-                status: 'requested' as const,
-                createdAt: booking.createdAt,
-                updatedAt: booking.updatedAt
-              });
-            } else {
-              bookings.push(booking);
-            }
-          });
         }
 
-        // OPTIMIZATION: Calculate stats from the bookings we already fetched
-        // instead of making a separate query
-        const calculatedStats: ViewingStats = {
-          upcoming: 0,
-          completed: 0,
-          rescheduled: 0,
-          total: allBookingsResult.bookings?.length || 0
-        };
-
-        if (allBookingsResult.success && allBookingsResult.bookings) {
-          allBookingsResult.bookings.forEach((booking) => {
-            switch (booking.status) {
-              case 'pending':
-              case 'confirmed':
-                calculatedStats.upcoming++;
-                break;
-              case 'completed':
-                calculatedStats.completed++;
-                break;
-              case 'rescheduled':
-                calculatedStats.rescheduled++;
-                break;
-            }
-          });
->>>>>>> 990afeeb03f16049c3d8b38a5d3be482dc156d22
-        }
-
-        // Update state with all data at once
-        setRequests(requests);
-        setBookings(bookings);
-        setStats(calculatedStats);
         setLoading(false);
 
-        // Set up real-time subscriptions using the landlordUser ID
-        unsubscribeBookings = viewingService.subscribeToManagerViewingBookings(
-          landlordUserId,
-          (items) => {
-            console.log('📡 Real-time bookings update:', items.length, 'bookings');
-            setBookings(items);
-          },
-          (err) => {
-            console.error('Viewing bookings subscription error:', err);
-          }
-        );
+        // Set up real-time subscriptions using both ID-based and email-based queries
+        const bookingUnsubscribers: (() => void)[] = [];
+        const requestUnsubscribers: (() => void)[] = [];
+        const statsUnsubscribers: (() => void)[] = [];
 
-        unsubscribeStats = viewingService.subscribeToManagerViewingStats(
-          landlordUserId,
-          (nextStats) => setStats(nextStats),
-          (err) => console.error('Viewing stats subscription error:', err)
-        );
+        // ID-based subscriptions
+        if (landlordUserId) {
+          bookingUnsubscribers.push(
+            viewingService.subscribeToManagerViewingBookings(
+              landlordUserId,
+              (items) => {
+                // Merge with email-based results if available
+                setBookings(prevBookings => {
+                  const merged = new Map<string, ViewingBooking>();
+                  // Add existing bookings from email subscription
+                  prevBookings.forEach(b => merged.set(b.id, b));
+                  // Add/update with ID-based bookings
+                  items.forEach(b => merged.set(b.id, b));
+                  return Array.from(merged.values());
+                });
+              },
+              (err) => {
+                console.error('Viewing bookings subscription error (ID-based):', err);
+              }
+            )
+          );
 
-        unsubscribeRequests = bookViewingRequestService.subscribeToManagerRequests(
-          landlordUserId,
-          (items) => setRequests(items),
-          (err) => console.error('Viewing requests subscription error:', err)
-        );
+          statsUnsubscribers.push(
+            viewingService.subscribeToManagerViewingStats(
+              landlordUserId,
+              (nextStats) => {
+                setStats(nextStats);
+              },
+              (err) => console.error('Viewing stats subscription error (ID-based):', err)
+            )
+          );
+
+          requestUnsubscribers.push(
+            bookViewingRequestService.subscribeToManagerRequests(
+              landlordUserId,
+              (items) => {
+                // Merge with email-based results if available
+                setRequests(prevRequests => {
+                  const merged = new Map<string, BookViewingRequest>();
+                  // Add existing requests from email subscription
+                  prevRequests.forEach(r => merged.set(r.id, r));
+                  // Add/update with ID-based requests
+                  items.forEach(r => merged.set(r.id, r));
+                  return Array.from(merged.values());
+                });
+              },
+              (err) => console.error('Viewing requests subscription error (ID-based):', err)
+            )
+          );
+        }
+
+        // Email-based subscriptions as fallback/additional coverage
+        if (managerEmail) {
+          const normalizedEmailForSub = managerEmail.toLowerCase().trim();
+          bookingUnsubscribers.push(
+            viewingService.subscribeToViewingBookingsByEmail(
+              normalizedEmailForSub,
+              (items) => {
+                // Merge with ID-based results
+                setBookings(prevBookings => {
+                  const merged = new Map<string, ViewingBooking>();
+                  // Add existing bookings from ID subscription
+                  prevBookings.forEach(b => merged.set(b.id, b));
+                  // Add/update with email-based bookings
+                  items.forEach(b => merged.set(b.id, b));
+                  return Array.from(merged.values());
+                });
+              },
+              (err) => {
+                console.error('Viewing bookings subscription error (email-based):', err);
+              }
+            )
+          );
+
+          statsUnsubscribers.push(
+            viewingService.subscribeToViewingStatsByEmail(
+              normalizedEmailForSub,
+              (nextStats) => {
+                // Use email-based stats if ID-based stats are empty
+                setStats(prevStats => {
+                  if (prevStats.total === 0 && nextStats.total > 0) {
+                    return nextStats;
+                  }
+                  return prevStats;
+                });
+              },
+              (err) => console.error('Viewing stats subscription error (email-based):', err)
+            )
+          );
+
+          requestUnsubscribers.push(
+            bookViewingRequestService.subscribeToRequestsByEmail(
+              normalizedEmailForSub,
+              (items) => {
+                // Merge with ID-based results
+                setRequests(prevRequests => {
+                  const merged = new Map<string, BookViewingRequest>();
+                  // Add existing requests from ID subscription
+                  prevRequests.forEach(r => merged.set(r.id, r));
+                  // Add/update with email-based requests
+                  items.forEach(r => merged.set(r.id, r));
+                  return Array.from(merged.values());
+                });
+              },
+              (err) => console.error('Viewing requests subscription error (email-based):', err)
+            )
+          );
+        }
+
+        // Create combined unsubscribe functions
+        unsubscribeBookings = () => {
+          bookingUnsubscribers.forEach(unsub => unsub());
+        };
+
+        unsubscribeStats = () => {
+          statsUnsubscribers.forEach(unsub => unsub());
+        };
+
+        unsubscribeRequests = () => {
+          requestUnsubscribers.forEach(unsub => unsub());
+        };
       } catch (err) {
         console.error('Error loading manager viewings:', err);
         setError('Failed to load viewings data. Please try again later.');
@@ -277,82 +355,72 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
     loadInitialData();
 
-<<<<<<< HEAD
-=======
-    // Use email-based subscriptions for real-time updates (all from viewingBookings)
-    unsubscribeBookings = viewingService.subscribeToViewingBookingsByEmail(
-      managerEmail,
-      (allItems) => {
-        // Filter by status: pending = requests, others = bookings
-        const pendingRequests: BookViewingRequest[] = [];
-        const confirmedBookings: ViewingBooking[] = [];
-        
-        allItems.forEach((item) => {
-          if (item.status === 'pending') {
-            pendingRequests.push({
-              id: item.id,
-              userId: item.userId,
-              propertyId: item.propertyId || '',
-              landlordId: item.landlordId,
-              agentId: item.agentId,
-              property: item.property,
-              status: 'requested' as const,
-              createdAt: item.createdAt,
-              updatedAt: item.updatedAt
-            });
-          } else {
-            confirmedBookings.push(item);
-          }
-        });
-        
-        setRequests(pendingRequests);
-        setBookings(confirmedBookings);
-        
-        // Calculate stats from the updated bookings
-        const calculatedStats: ViewingStats = {
-          upcoming: 0,
-          completed: 0,
-          rescheduled: 0,
-          total: allItems.length
-        };
-        
-        allItems.forEach((booking) => {
-          switch (booking.status) {
-            case 'pending':
-            case 'confirmed':
-              calculatedStats.upcoming++;
-              break;
-            case 'completed':
-              calculatedStats.completed++;
-              break;
-            case 'rescheduled':
-              calculatedStats.rescheduled++;
-              break;
-          }
-        });
-        
-        setStats(calculatedStats);
-      },
-      (err) => {
-        console.error('Viewing bookings subscription error:', err);
-      }
-    );
-    
-    // No separate subscription for requests or stats - they're calculated from bookings
-    unsubscribeRequests = undefined;
-    unsubscribeStats = undefined;
-
->>>>>>> 990afeeb03f16049c3d8b38a5d3be482dc156d22
     return () => {
       unsubscribeBookings?.();
       unsubscribeRequests?.();
       unsubscribeStats?.();
     };
-<<<<<<< HEAD
   }, [managerId, managerEmail]);
-=======
-  }, [managerEmail]);
->>>>>>> 990afeeb03f16049c3d8b38a5d3be482dc156d22
+
+  // Function to check if a viewing date/time has passed
+  const isViewingDatePassed = (viewing: ViewingBooking): boolean => {
+    if (!viewing.viewingDetails?.date || !viewing.viewingDetails?.time) {
+      return false;
+    }
+
+    try {
+      // Combine date and time
+      const dateStr = viewing.viewingDetails.date;
+      const timeStr = viewing.viewingDetails.time;
+      
+      // Parse date (assuming format YYYY-MM-DD)
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const [hour, minute] = timeStr.split(':').map(Number);
+      
+      const viewingDateTime = new Date(year, month - 1, day, hour, minute);
+      const now = new Date();
+      
+      return viewingDateTime < now;
+    } catch (error) {
+      console.error('Error parsing viewing date/time:', error);
+      return false;
+    }
+  };
+
+  // Auto-update past scheduled viewings to completed
+  useEffect(() => {
+    const updatePastViewings = async () => {
+      const pastViewingsToUpdate = bookings.filter(
+        (viewing) =>
+          (viewing.status === 'confirmed' || viewing.status === 'rescheduled') &&
+          isViewingDatePassed(viewing)
+      );
+
+      if (pastViewingsToUpdate.length > 0) {
+        console.log(`🔄 Found ${pastViewingsToUpdate.length} past viewings to auto-complete`);
+        
+        // Update each past viewing to completed status
+        const updatePromises = pastViewingsToUpdate.map((viewing) =>
+          viewingService.updateViewingStatus(viewing.id, 'completed', undefined, 'Auto-completed: Viewing date has passed')
+        );
+
+        try {
+          await Promise.all(updatePromises);
+          console.log(`✅ Auto-completed ${pastViewingsToUpdate.length} past viewings`);
+          
+          // Refresh bookings to reflect updated statuses
+          // The subscriptions will automatically update the state
+        } catch (error) {
+          console.error('Error auto-completing past viewings:', error);
+        }
+      }
+    };
+
+    // Only check if we have bookings and loading is complete
+    if (!loading && bookings.length > 0) {
+      updatePastViewings();
+    }
+  }, [bookings, loading]);
 
   const upcomingViewings = useMemo(
     () =>
@@ -368,16 +436,21 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
     [bookings]
   );
 
+  const completedViewings = useMemo(
+    () =>
+      bookings.filter((viewing) => viewing.status === 'completed'),
+    [bookings]
+  );
+
   const pastViewings = useMemo(
     () =>
-      bookings.filter((viewing) =>
-        ['completed', 'cancelled'].includes(viewing.status)
-      ),
+      bookings.filter((viewing) => viewing.status === 'cancelled'),
     [bookings]
   );
 
   const summaryCards = useMemo(() => {
     const cancelledCount = bookings.filter((viewing) => viewing.status === 'cancelled').length;
+    const completedCount = bookings.filter((viewing) => viewing.status === 'completed').length;
     return [
       {
         title: 'Pending Requests',
@@ -393,7 +466,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
       },
       {
         title: 'Completed Viewings',
-        value: stats.completed,
+        value: completedCount || stats.completed,
         icon: <CheckCircle className="w-5 h-5 text-green-600" />,
         accent: 'bg-green-100'
       },
@@ -407,7 +480,11 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   }, [requests.length, pendingViewings.length, upcomingViewings.length, stats.completed, bookings]);
 
   // Filter function
-  const filterItems = <T extends { property: { street: string; town: string; city: string }; viewingDetails?: { date?: string; userDetails?: { fullName?: string; email?: string } } }>(items: T[]) => {
+  const filterItems = <T extends { 
+    property: { street: string; town: string; city: string }; 
+    viewingDetails?: { date?: string; userDetails?: { fullName?: string; email?: string } };
+    status?: string;
+  }>(items: T[]) => {
     if (!filterQuery) return items;
 
     const query = filterQuery.toLowerCase();
@@ -416,6 +493,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
       const tenantName = item.viewingDetails?.userDetails?.fullName?.toLowerCase() || '';
       const tenantEmail = item.viewingDetails?.userDetails?.email?.toLowerCase() || '';
       const date = item.viewingDetails?.date || '';
+      const status = (item as any).status?.toLowerCase() || '';
 
       switch (filterType) {
         case 'name':
@@ -424,15 +502,22 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
           return tenantEmail.includes(query);
         case 'date':
           return date.includes(query);
+        case 'status':
+          return status.includes(query);
         case 'all':
         default:
-          return propertyText.includes(query) || tenantName.includes(query) || tenantEmail.includes(query) || date.includes(query);
+          return propertyText.includes(query) || 
+                 tenantName.includes(query) || 
+                 tenantEmail.includes(query) || 
+                 date.includes(query) || 
+                 status.includes(query);
       }
     });
   };
 
   const filteredUpcomingViewings = useMemo(() => filterItems(upcomingViewings), [upcomingViewings, filterQuery, filterType]);
   const filteredPendingViewings = useMemo(() => filterItems(pendingViewings), [pendingViewings, filterQuery, filterType]);
+  const filteredCompletedViewings = useMemo(() => filterItems(completedViewings), [completedViewings, filterQuery, filterType]);
   const filteredPastViewings = useMemo(() => filterItems(pastViewings), [pastViewings, filterQuery, filterType]);
 
   const handleScheduleRequest = (request: BookViewingRequest) => {
@@ -687,6 +772,93 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
     }
   };
 
+  const handleToggleSelect = (viewingId: string) => {
+    setSelectedViewings(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(viewingId)) {
+        newSet.delete(viewingId);
+      } else {
+        newSet.add(viewingId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = (viewingsList: ViewingBooking[]) => {
+    const allSelected = viewingsList.every(v => selectedViewings.has(v.id));
+    if (allSelected) {
+      // Deselect all in this list
+      setSelectedViewings(prev => {
+        const newSet = new Set(prev);
+        viewingsList.forEach(v => newSet.delete(v.id));
+        return newSet;
+      });
+    } else {
+      // Select all in this list
+      setSelectedViewings(prev => {
+        const newSet = new Set(prev);
+        viewingsList.forEach(v => newSet.add(v.id));
+        return newSet;
+      });
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedViewings(new Set());
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedViewings.size === 0) return;
+    
+    const confirmMessage = `Are you sure you want to delete ${selectedViewings.size} viewing(s)? This action cannot be undone.`;
+    if (!window.confirm(confirmMessage)) return;
+
+    setIsDeleting(true);
+    try {
+      const deletePromises = Array.from(selectedViewings).map(async (itemId) => {
+        // Check if it's a request or a booking
+        const isRequest = requests.some(r => r.id === itemId);
+        
+        if (isRequest) {
+          // Delete as a request
+          return bookViewingRequestService.deleteRequest(itemId).catch(err => {
+            console.error(`Error deleting request ${itemId}:`, err);
+            return { success: false, error: err };
+          });
+        } else {
+          // Delete as a booking
+          return viewingService.deleteViewingBooking(itemId).catch(err => {
+            console.error(`Error deleting viewing ${itemId}:`, err);
+            return { success: false, error: err };
+          });
+        }
+      });
+
+      const results = await Promise.all(deletePromises);
+      const failed = results.filter(r => !r.success);
+      
+      if (failed.length > 0) {
+        setFeedback({ 
+          type: 'error', 
+          message: `Failed to delete ${failed.length} viewing(s). Please try again.` 
+        });
+      } else {
+        setFeedback({ 
+          type: 'success', 
+          message: `Successfully deleted ${selectedViewings.size} viewing(s).` 
+        });
+      }
+      
+      // Clear selection
+      setSelectedViewings(new Set());
+    } catch (err) {
+      console.error('Error deleting viewings:', err);
+      setFeedback({ type: 'error', message: 'Failed to delete viewings. Please try again.' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -753,12 +925,54 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         ))}
       </div>
 
+      {/* Selection Bar */}
+      {selectedViewings.size > 0 && (
+        <div className="mb-6 flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-lg">
+          <div className="flex items-center space-x-3">
+            <span className="text-sm font-medium text-orange-800" style={{ fontFamily: 'Archivo, sans-serif' }}>
+              {selectedViewings.size} viewing{selectedViewings.size !== 1 ? 's' : ''} selected
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition disabled:opacity-50 text-sm font-medium"
+              onClick={handleClearSelection}
+              disabled={isDeleting}
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              Clear Selection
+            </button>
+            <button
+              className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-2 text-sm font-medium"
+              onClick={handleDeleteSelected}
+              disabled={isDeleting}
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              {isDeleting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  Delete Selected
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div>
         <div className="mb-6 flex items-center justify-between">
           {/* Tabs */}
           <div className="inline-flex rounded-full border border-gray-200 p-1 bg-white">
             <button
-              onClick={() => setActiveTab('requests')}
+              onClick={() => {
+                setActiveTab('requests');
+                setSelectedViewings(new Set()); // Clear selection when switching tabs
+              }}
               className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
                 activeTab === 'requests' ? 'bg-orange-500 text-white' : 'text-gray-600'
               }`}
@@ -766,7 +980,10 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
               Requests ({requests.length + pendingViewings.length})
             </button>
             <button
-              onClick={() => setActiveTab('upcoming')}
+              onClick={() => {
+                setActiveTab('upcoming');
+                setSelectedViewings(new Set()); // Clear selection when switching tabs
+              }}
               className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
                 activeTab === 'upcoming' ? 'bg-orange-500 text-white' : 'text-gray-600'
               }`}
@@ -774,7 +991,21 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
               Scheduled ({upcomingViewings.length})
             </button>
             <button
-              onClick={() => setActiveTab('past')}
+              onClick={() => {
+                setActiveTab('completed');
+                setSelectedViewings(new Set()); // Clear selection when switching tabs
+              }}
+              className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+                activeTab === 'completed' ? 'bg-orange-500 text-white' : 'text-gray-600'
+              }`}
+            >
+              Completed ({completedViewings.length})
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('past');
+                setSelectedViewings(new Set()); // Clear selection when switching tabs
+              }}
               className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
                 activeTab === 'past' ? 'bg-orange-500 text-white' : 'text-gray-600'
               }`}
@@ -798,13 +1029,14 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
             <div className="relative">
               <select
                 value={filterType}
-                onChange={(e) => setFilterType(e.target.value as 'all' | 'name' | 'email' | 'date')}
+                onChange={(e) => setFilterType(e.target.value as 'all' | 'name' | 'email' | 'date' | 'status')}
                 className="pl-4 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white cursor-pointer"
               >
                 <option value="all">All Fields</option>
                 <option value="name">Name</option>
                 <option value="email">Email</option>
                 <option value="date">Date</option>
+                <option value="status">Status</option>
               </select>
               <Filter className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
@@ -824,12 +1056,13 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                 {/* Table Header */}
                 <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                   <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+                    <div className="col-span-1">Select</div>
                     <div className="col-span-2">Property</div>
                     <div className="col-span-2">Date & Time</div>
                     <div className="col-span-1">Status</div>
                     <div className="col-span-2">Tenant Name</div>
                     <div className="col-span-2">Tenant Email</div>
-                    <div className="col-span-3 text-center">Actions</div>
+                    <div className="col-span-2 text-center whitespace-nowrap">Actions</div>
                   </div>
                 </div>
 
@@ -839,6 +1072,20 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                   {requests.map((request) => (
                     <div key={request.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                       <div className="grid grid-cols-12 gap-4 items-center">
+                        {/* Checkbox */}
+                        <div className="col-span-1">
+                          <button
+                            onClick={() => handleToggleSelect(request.id)}
+                            className="flex items-center justify-center"
+                            title={selectedViewings.has(request.id) ? 'Deselect' : 'Select'}
+                          >
+                            {selectedViewings.has(request.id) ? (
+                              <CheckSquare className="w-5 h-5 text-orange-500" />
+                            ) : (
+                              <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
+                            )}
+                          </button>
+                        </div>
                         {/* Property */}
                         <div className="col-span-2">
                           <h3 className="text-sm font-semibold text-gray-900 truncate">
@@ -872,22 +1119,22 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Actions */}
-                        <div className="col-span-3 flex items-center justify-center gap-2">
+                        <div className="col-span-2 flex items-center justify-center gap-1.5 flex-nowrap">
                           <button
-                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition"
+                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition whitespace-nowrap"
                             onClick={() => handleScheduleRequest(request)}
                             title="Schedule viewing"
                           >
-                            <Send className="w-3.5 h-3.5 mr-1" />
-                            Schedule
+                            <Send className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
+                            <span className="hidden sm:inline">Schedule</span>
                           </button>
                           <button
-                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 transition"
+                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 transition whitespace-nowrap"
                             onClick={() => handleDeclineRequest(request)}
                             title="Decline request"
                           >
-                            <X className="w-3.5 h-3.5 mr-1" />
-                            Decline
+                            <X className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
+                            <span className="hidden sm:inline">Decline</span>
                           </button>
                         </div>
                       </div>
@@ -898,6 +1145,20 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                   {filteredPendingViewings.map((viewing) => (
                     <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                       <div className="grid grid-cols-12 gap-4 items-center">
+                        {/* Checkbox */}
+                        <div className="col-span-1">
+                          <button
+                            onClick={() => handleToggleSelect(viewing.id)}
+                            className="flex items-center justify-center"
+                            title={selectedViewings.has(viewing.id) ? 'Deselect' : 'Select'}
+                          >
+                            {selectedViewings.has(viewing.id) ? (
+                              <CheckSquare className="w-5 h-5 text-orange-500" />
+                            ) : (
+                              <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
+                            )}
+                          </button>
+                        </div>
                         {/* Property */}
                         <div className="col-span-2">
                           <h3 className="text-sm font-semibold text-gray-900 truncate">
@@ -948,32 +1209,32 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Actions */}
-                        <div className="col-span-3 flex items-center justify-center gap-2">
+                        <div className="col-span-2 flex items-center justify-center gap-1.5 flex-nowrap">
                           <button
-                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition disabled:opacity-50"
+                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition disabled:opacity-50 whitespace-nowrap"
                             onClick={() => handleConfirmViewing(viewing)}
                             disabled={isProcessing}
                             title="Confirm viewing"
                           >
-                            <CheckCircle className="w-3.5 h-3.5 mr-1" />
-                            Confirm
+                            <CheckCircle className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
+                            <span className="hidden sm:inline">Confirm</span>
                           </button>
                           <button
-                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-blue-300 text-xs font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50"
+                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-blue-300 text-xs font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50 whitespace-nowrap"
                             onClick={() => handleOpenReschedule(viewing)}
                             disabled={isProcessing}
                             title="Reschedule viewing"
                           >
-                            <Send className="w-3.5 h-3.5 mr-1" />
-                            Reschedule
+                            <Send className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
+                            <span className="hidden sm:inline">Reschedule</span>
                           </button>
                           <button
-                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-red-300 text-xs font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-red-300 text-xs font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50 whitespace-nowrap"
                             onClick={() => handleOpenCancel(viewing)}
                             disabled={isProcessing}
                             title="Cancel viewing"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            <X className="w-3.5 h-3.5 flex-shrink-0" />
                           </button>
                         </div>
                       </div>
@@ -1002,12 +1263,13 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                 {/* Table Header */}
                 <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                   <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+                    <div className="col-span-1">Select</div>
                     <div className="col-span-2">Property</div>
                     <div className="col-span-2">Date & Time</div>
                     <div className="col-span-1">Status</div>
                     <div className="col-span-2">Tenant Name</div>
                     <div className="col-span-2">Tenant Email</div>
-                    <div className="col-span-3 text-center">Actions</div>
+                    <div className="col-span-2 text-center whitespace-nowrap">Actions</div>
                   </div>
                 </div>
 
@@ -1016,6 +1278,20 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                   {filteredUpcomingViewings.map((viewing) => (
                     <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                       <div className="grid grid-cols-12 gap-4 items-center">
+                        {/* Checkbox */}
+                        <div className="col-span-1">
+                          <button
+                            onClick={() => handleToggleSelect(viewing.id)}
+                            className="flex items-center justify-center"
+                            title={selectedViewings.has(viewing.id) ? 'Deselect' : 'Select'}
+                          >
+                            {selectedViewings.has(viewing.id) ? (
+                              <CheckSquare className="w-5 h-5 text-orange-500" />
+                            ) : (
+                              <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
+                            )}
+                          </button>
+                        </div>
                         {/* Property */}
                         <div className="col-span-2">
                           <h3 className="text-sm font-semibold text-gray-900 truncate">
@@ -1074,35 +1350,145 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Actions */}
-                        <div className="col-span-3 flex items-center justify-center gap-2">
+                        <div className="col-span-2 flex items-center justify-center gap-1.5 flex-nowrap">
                           {viewing.status !== 'confirmed' && (
                             <button
-                              className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition disabled:opacity-50"
+                              className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition disabled:opacity-50 whitespace-nowrap"
                               onClick={() => handleConfirmViewing(viewing)}
                               disabled={isProcessing}
                               title="Confirm viewing"
                             >
-                              <CheckCircle className="w-3.5 h-3.5 mr-1" />
-                              Confirm
+                              <CheckCircle className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
+                              <span className="hidden sm:inline">Confirm</span>
                             </button>
                           )}
                           <button
-                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-blue-300 text-xs font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50"
+                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-blue-300 text-xs font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50 whitespace-nowrap"
                             onClick={() => handleOpenReschedule(viewing)}
                             disabled={isProcessing}
                             title="Reschedule viewing"
                           >
-                            <Send className="w-3.5 h-3.5 mr-1" />
-                            Reschedule
+                            <Send className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
+                            <span className="hidden sm:inline">Reschedule</span>
                           </button>
                           <button
-                            className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-red-300 text-xs font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-red-300 text-xs font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50 whitespace-nowrap"
                             onClick={() => handleOpenCancel(viewing)}
                             disabled={isProcessing}
                             title="Cancel viewing"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            <X className="w-3.5 h-3.5 flex-shrink-0" />
                           </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'completed' && (
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            {filteredCompletedViewings.length === 0 ? (
+              <div className="p-12 text-center">
+                <CheckCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-700 mb-2">
+                  {filterQuery ? 'No matching viewings' : 'No completed viewings'}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {filterQuery ? 'Try adjusting your search filters' : 'Completed viewings will appear here once viewings are finished.'}
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Table Header */}
+                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                  <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+                    <div className="col-span-1">Select</div>
+                    <div className="col-span-2">Property</div>
+                    <div className="col-span-2">Date & Time</div>
+                    <div className="col-span-1">Status</div>
+                    <div className="col-span-2">Tenant Name</div>
+                    <div className="col-span-2">Tenant Email</div>
+                    <div className="col-span-2">Notes</div>
+                  </div>
+                </div>
+
+                {/* Table Body */}
+                <div className="divide-y divide-gray-100">
+                  {filteredCompletedViewings.map((viewing) => (
+                    <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                      <div className="grid grid-cols-12 gap-4 items-center">
+                        {/* Checkbox */}
+                        <div className="col-span-1">
+                          <button
+                            onClick={() => handleToggleSelect(viewing.id)}
+                            className="flex items-center justify-center"
+                            title={selectedViewings.has(viewing.id) ? 'Deselect' : 'Select'}
+                          >
+                            {selectedViewings.has(viewing.id) ? (
+                              <CheckSquare className="w-5 h-5 text-orange-500" />
+                            ) : (
+                              <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
+                            )}
+                          </button>
+                        </div>
+                        {/* Property */}
+                        <div className="col-span-2">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate">
+                            {viewing.property.street}
+                          </h3>
+                          <p className="text-xs text-gray-500 truncate">
+                            {viewing.property.town}, {viewing.property.city}
+                          </p>
+                        </div>
+
+                        {/* Date & Time */}
+                        <div className="col-span-2">
+                          <div className="flex items-center text-xs text-gray-600 mb-1">
+                            <Calendar className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <span className="truncate">{formatDate(viewing.viewingDetails?.date || '')}</span>
+                          </div>
+                          <div className="flex items-center text-xs text-gray-600">
+                            <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <span>{formatTime(viewing.viewingDetails?.time || '')}</span>
+                          </div>
+                        </div>
+
+                        {/* Status */}
+                        <div className="col-span-1">
+                          <span className="inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-green-100 text-green-700">
+                            Completed
+                          </span>
+                        </div>
+
+                        {/* Tenant Name */}
+                        <div className="col-span-2">
+                          <div className="flex items-center text-sm text-gray-900">
+                            <User className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
+                            <span className="truncate">
+                              {viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Tenant Email */}
+                        <div className="col-span-2">
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Mail className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
+                            <span className="truncate">
+                              {viewing.viewingDetails?.userDetails?.email || 'Not provided'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div className="col-span-2">
+                          <span className="text-xs text-gray-500 truncate">
+                            {viewing.notes || viewing.agentNotes || '—'}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -1119,10 +1505,10 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
               <div className="p-12 text-center">
                 <Eye className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-700 mb-2">
-                  {filterQuery ? 'No matching viewings' : 'No past viewings'}
+                  {filterQuery ? 'No matching viewings' : 'No cancelled viewings'}
                 </h3>
                 <p className="text-sm text-gray-500">
-                  {filterQuery ? 'Try adjusting your search filters' : 'Completed and cancelled viewings will appear here.'}
+                  {filterQuery ? 'Try adjusting your search filters' : 'Cancelled viewings will appear here.'}
                 </p>
               </div>
             ) : (
@@ -1130,12 +1516,13 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                 {/* Table Header */}
                 <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                   <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+                    <div className="col-span-1">Select</div>
                     <div className="col-span-2">Property</div>
                     <div className="col-span-2">Date & Time</div>
                     <div className="col-span-1">Status</div>
                     <div className="col-span-2">Tenant Name</div>
                     <div className="col-span-2">Tenant Email</div>
-                    <div className="col-span-3">Notes</div>
+                    <div className="col-span-2">Notes</div>
                   </div>
                 </div>
 
@@ -1144,6 +1531,20 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                   {filteredPastViewings.map((viewing) => (
                     <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                       <div className="grid grid-cols-12 gap-4 items-center">
+                        {/* Checkbox */}
+                        <div className="col-span-1">
+                          <button
+                            onClick={() => handleToggleSelect(viewing.id)}
+                            className="flex items-center justify-center"
+                            title={selectedViewings.has(viewing.id) ? 'Deselect' : 'Select'}
+                          >
+                            {selectedViewings.has(viewing.id) ? (
+                              <CheckSquare className="w-5 h-5 text-orange-500" />
+                            ) : (
+                              <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
+                            )}
+                          </button>
+                        </div>
                         {/* Property */}
                         <div className="col-span-2">
                           <h3 className="text-sm font-semibold text-gray-900 truncate">
@@ -1202,7 +1603,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Notes */}
-                        <div className="col-span-3">
+                        <div className="col-span-2">
                           <span className="text-xs text-gray-500 truncate">
                             {viewing.notes || viewing.agentNotes || '—'}
                           </span>

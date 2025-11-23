@@ -264,7 +264,7 @@ function LocationInsights({ searchQuery, propertyCount }: { searchQuery: string;
   const location = locationMatch ? locationMatch[1].trim() : searchQuery;
 
   return (
-    <div className="mt-4 bg-white rounded-xl shadow-lg overflow-hidden">
+    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
       <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-[#136C9E] to-[#1a8cc9]">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -610,6 +610,41 @@ const SearchResults = () => {
   const markersRef = useRef<any[]>([]);
   const markersGeocodedRef = useRef<boolean>(false);
   const lastResultsKeyRef = useRef<string | null>(null);
+  const boundsFittedRef = useRef<boolean>(false); // Flag to prevent any resets after bounds are fitted
+  const boundsFittedTimeRef = useRef<number>(0); // Timestamp when bounds were fitted
+  
+  // Helper function to safely set map center - prevents resets after bounds are fitted
+  const safeSetMapCenter = (location: { lat: number; lng: number }, zoom?: number) => {
+    // Check if bounds were fitted recently (within last 5 seconds) or if markers are present
+    const timeSinceBoundsFitted = Date.now() - boundsFittedTimeRef.current;
+    if (boundsFittedRef.current || markersGeocodedRef.current || markersRef.current.length > 0 || timeSinceBoundsFitted < 5000) {
+      console.log('Preventing map center change - bounds already fitted or markers present', {
+        boundsFitted: boundsFittedRef.current,
+        markersGeocoded: markersGeocodedRef.current,
+        markerCount: markersRef.current.length,
+        timeSinceBoundsFitted
+      });
+      return false;
+    }
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.setCenter(location);
+      if (zoom !== undefined) {
+        mapInstanceRef.current.setZoom(zoom);
+      }
+      return true;
+    }
+    return false;
+  };
+  
+  // Helper function to safely set map zoom - allows zoom adjustments after bounds fitted
+  const safeSetMapZoom = (zoom: number) => {
+    // Always allow zoom changes - they don't reset the view like center changes do
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.setZoom(zoom);
+      return true;
+    }
+    return false;
+  };
 
   // Perform search when component mounts or search params change
   useEffect(() => {
@@ -680,6 +715,9 @@ const SearchResults = () => {
     loadGoogleMapsScript();
   }, []);
 
+  // Track if we've already centered on search location for this query
+  const searchLocationCenteredRef = useRef<string | null>(null);
+
   // Initialize map when showMap is true and script is loaded
   useEffect(() => {
     if (showMap && isMapLoaded && mapRef.current && window.google && window.google.maps) {
@@ -701,8 +739,10 @@ const SearchResults = () => {
         });
         console.log('Map initialized - showing UK view');
         
-        // Step 2: Extract and geocode search location, then zoom in
-        if (searchQuery && window.google.maps) {
+        // Step 2: Extract and geocode search location, then zoom in (only once per query)
+        // Skip if markers are already on the map or bounds are fitted
+        if (searchQuery && window.google.maps && searchLocationCenteredRef.current !== searchQuery && 
+            !boundsFittedRef.current && !markersGeocodedRef.current && markersRef.current.length === 0) {
           const geocoder = new window.google.maps.Geocoder();
           // Extract location from search query (e.g., "2 bedroom flats in London" -> "London")
           const locationMatch = searchQuery.match(/(?:in|at|near)\s+([A-Za-z\s]+)/i);
@@ -710,31 +750,54 @@ const SearchResults = () => {
           
           console.log('Geocoding search location:', locationToGeocode);
           
+          // Mark that we're centering for this query
+          searchLocationCenteredRef.current = searchQuery;
+          
           geocoder.geocode({ address: locationToGeocode }, (results, status) => {
+            // CRITICAL: Don't reset map if bounds have already been fitted to markers or markers are already on the map
+            if (boundsFittedRef.current || markersGeocodedRef.current || markersRef.current.length > 0) {
+              console.log('Map already has markers or bounds fitted, ignoring search location geocoding result');
+              return;
+            }
+            
             if (status === 'OK' && results && results[0] && mapInstanceRef.current) {
               const location = results[0].geometry.location;
               
-              // Step 3: Center and zoom on search location
-              mapInstanceRef.current.setCenter(location);
-              mapInstanceRef.current.setZoom(12); // Zoom into city level
-              console.log('Map centered and zoomed on search location:', locationToGeocode);
+              // Double-check before centering (race condition protection)
+              if (boundsFittedRef.current || markersGeocodedRef.current || markersRef.current.length > 0) {
+                console.log('Map state changed during geocoding, skipping search location centering');
+                return;
+              }
+              
+              // Step 3: Center and zoom on search location (only if markers aren't already placed)
+              // The property geocoding effect will handle final positioning
+              if (safeSetMapCenter(location, 12)) {
+                console.log('Map centered and zoomed on search location:', locationToGeocode);
+              }
             } else {
               console.warn('Failed to geocode search location:', locationToGeocode, status);
-              // Fallback: center on London if search location geocoding fails
-              mapInstanceRef.current.setCenter({ lat: 51.5074, lng: -0.1278 });
-              mapInstanceRef.current.setZoom(12);
+              // Fallback: center on London if search location geocoding fails (only if no markers and bounds not fitted)
+              safeSetMapCenter({ lat: 51.5074, lng: -0.1278 }, 12);
             }
           });
         } else {
           // No search query, just show UK
-          mapInstanceRef.current.setCenter({ lat: 54.0, lng: -2.0 });
-          mapInstanceRef.current.setZoom(6);
+          safeSetMapCenter({ lat: 54.0, lng: -2.0 }, 6);
         }
       } catch (error) {
         console.error('Error initializing map:', error);
       }
     }
-  }, [showMap, isMapLoaded, searchQuery]);
+  }, [showMap, isMapLoaded]); // Removed searchQuery from dependencies to prevent re-centering
+
+  // Reset search location centering ref when search query actually changes
+  useEffect(() => {
+    // Reset when query changes to a different value
+    if (searchLocationCenteredRef.current !== null && searchLocationCenteredRef.current !== searchQuery) {
+      console.log('Search query changed, resetting search location centering ref');
+      searchLocationCenteredRef.current = null;
+    }
+  }, [searchQuery]);
 
   // Geocode properties and add markers when results change
   // This runs AFTER the map is initialized and centered on search location
@@ -763,6 +826,7 @@ const SearchResults = () => {
           markersRef.current.forEach(marker => marker.setMap(null));
           markersRef.current = [];
           markersGeocodedRef.current = false;
+          boundsFittedRef.current = false; // Reset bounds fitted flag when starting new geocode
         
         // Filter properties with valid addresses
         const propertiesWithAddresses = results.filter(prop => prop.location && prop.location.trim());
@@ -816,6 +880,10 @@ const SearchResults = () => {
                         targetZoom = 14; // Very close together
                       }
                       
+                      // CRITICAL: Set flag and timestamp BEFORE fitting bounds to prevent any race conditions
+                      boundsFittedRef.current = true;
+                      boundsFittedTimeRef.current = Date.now();
+                      
                       // Fit bounds with padding
                       mapInstanceRef.current.fitBounds(bounds, {
                         top: 80,
@@ -831,18 +899,22 @@ const SearchResults = () => {
                         () => {
                           const currentZoom = mapInstanceRef.current.getZoom();
                           
-                          // Enforce zoom constraints
+                          // Enforce zoom constraints (allow zoom adjustments after bounds fitted)
                           if (currentZoom < 10) {
                             console.log(`Zoom too low (${currentZoom}), setting to 10`);
-                            mapInstanceRef.current.setZoom(10);
+                            safeSetMapZoom(10);
                           } else if (currentZoom > 15) {
                             console.log(`Zoom too high (${currentZoom}), setting to 15`);
-                            mapInstanceRef.current.setZoom(15);
+                            safeSetMapZoom(15);
                           }
                           
                           // Verify markers are still visible and attached to map
                           const visibleMarkers = markersRef.current.filter(m => m.getMap() !== null);
                           console.log(`Map idle - Zoom: ${mapInstanceRef.current.getZoom()}, Total markers: ${markersRef.current.length}, Visible on map: ${visibleMarkers.length}`);
+                          
+                          // Mark that bounds have been fitted - prevent any further automatic resets
+                          markersGeocodedRef.current = true;
+                          boundsFittedRef.current = true; // Ensure flag stays set
                         }
                       );
                       
@@ -857,12 +929,16 @@ const SearchResults = () => {
                       markersGeocodedRef.current = true;
                     } else if (successfulGeocodes === 1) {
                       // Single property - center on it
+                      boundsFittedRef.current = true; // Set flag before centering
+                      boundsFittedTimeRef.current = Date.now();
                       const singleMarker = markersRef.current[0];
                       if (singleMarker) {
                         const position = singleMarker.getPosition();
-                        mapInstanceRef.current.setCenter(position);
-                        mapInstanceRef.current.setZoom(14);
-                        console.log('Map centered on single property');
+                        if (mapInstanceRef.current) {
+                          mapInstanceRef.current.setCenter(position);
+                          mapInstanceRef.current.setZoom(14);
+                          console.log('Map centered on single property');
+                        }
                       }
                       markersGeocodedRef.current = true;
                     }
@@ -871,11 +947,15 @@ const SearchResults = () => {
                   console.error('Error fitting bounds:', error);
                   // Fallback: center on first marker if available
                   if (markersRef.current.length > 0) {
+                    boundsFittedRef.current = true; // Set flag before centering
+                    boundsFittedTimeRef.current = Date.now();
                     const firstMarker = markersRef.current[0];
                     const position = firstMarker.getPosition();
-                    mapInstanceRef.current.setCenter(position);
-                    mapInstanceRef.current.setZoom(12);
-                    console.log('Fallback: Map centered on first marker');
+                    if (mapInstanceRef.current) {
+                      mapInstanceRef.current.setCenter(position);
+                      mapInstanceRef.current.setZoom(12);
+                      console.log('Fallback: Map centered on first marker');
+                    }
                   }
                   markersGeocodedRef.current = true;
                 }
@@ -1030,6 +1110,8 @@ const SearchResults = () => {
     if (!showMap) {
       console.log('Map hidden - clearing all markers');
       markersGeocodedRef.current = false;
+      boundsFittedRef.current = false; // Reset bounds fitted flag
+      boundsFittedTimeRef.current = 0; // Reset timestamp
       lastResultsKeyRef.current = null;
       markersRef.current.forEach(marker => marker.setMap(null));
       markersRef.current = [];
@@ -1520,7 +1602,7 @@ const SearchResults = () => {
 
               {/* Map Container */}
               {showMap && (
-                <>
+                <div className="space-y-6">
                   <div id="map-container" className="bg-white rounded-xl shadow-lg overflow-hidden">
                     {!isMapLoaded ? (
                       <div 
@@ -1541,9 +1623,9 @@ const SearchResults = () => {
                     )}
                   </div>
 
-                  {/* Location Insights Section */}
+                  {/* Location Insights Section - Below Map */}
                   <LocationInsights searchQuery={searchQuery} propertyCount={results.length} />
-                </>
+                </div>
               )}
             </div>
           )}

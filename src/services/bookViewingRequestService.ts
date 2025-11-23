@@ -19,6 +19,7 @@ export interface BookViewingRequest {
   propertyId: string;
   landlordId?: string | null;
   agentId?: string | null;
+  agentEmail?: string | null; // OPTIMIZATION: Top-level field for fast queries
   property: {
     street: string;
     town: string;
@@ -63,6 +64,7 @@ class BookViewingRequestService {
         propertyId,
         landlordId: managerInfo?.landlordId ?? property.agent?.id ?? null,
         agentId: managerInfo?.agentId ?? property.agent?.id ?? null,
+        agentEmail: property.agent?.email?.toLowerCase().trim() || null, // OPTIMIZATION: Denormalize for fast queries
         property,
         status: 'requested',
         createdAt: serverTimestamp() as Timestamp,
@@ -98,15 +100,45 @@ class BookViewingRequestService {
     field: 'landlordId' | 'agentId',
     managerId: string
   ): Promise<BookViewingRequest[]> {
-    const q = query(
-      collection(db, this.collectionName),
-      where(field, '==', managerId),
-      orderBy('createdAt', 'desc')
-    );
-    const snap = await getDocs(q);
-    const out: BookViewingRequest[] = [];
-    snap.forEach(d => out.push(d.data() as BookViewingRequest));
-    return out;
+    try {
+      console.log(`🔍 Querying ${this.collectionName} by ${field} = ${managerId}`);
+      const q = query(
+        collection(db, this.collectionName),
+        where(field, '==', managerId),
+        orderBy('createdAt', 'desc')
+      );
+      const snap = await getDocs(q);
+      console.log(`📊 Found ${snap.size} requests for ${field} = ${managerId}`);
+      const out: BookViewingRequest[] = [];
+      snap.forEach(d => {
+        const data = d.data() as BookViewingRequest;
+        out.push(data);
+        console.log(`📋 Request found:`, {
+          id: data.id,
+          landlordId: data.landlordId,
+          agentId: data.agentId,
+          propertyStreet: data.property?.street
+        });
+      });
+      return out;
+    } catch (error: any) {
+      // Handle missing index error
+      if (error.code === 'failed-precondition' && error.message?.includes('index')) {
+        console.warn(`⚠️ Firestore index missing for ${field} query, trying without orderBy...`);
+        // Fallback: query without orderBy
+        const fallbackQ = query(
+          collection(db, this.collectionName),
+          where(field, '==', managerId)
+        );
+        const fallbackSnap = await getDocs(fallbackQ);
+        const out: BookViewingRequest[] = [];
+        fallbackSnap.forEach(d => out.push(d.data() as BookViewingRequest));
+        // Sort in memory
+        return out.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      }
+      console.error(`❌ Error querying ${field}:`, error);
+      throw error;
+    }
   }
 
   private mergeRequestsById(...lists: BookViewingRequest[][]): BookViewingRequest[] {
@@ -119,14 +151,45 @@ class BookViewingRequestService {
     return Array.from(map.values()).sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
   }
 
+  /**
+   * Get all viewing requests from bookViewingRequests collection for a specific landlord/manager
+   * Queries by both landlordId and agentId to catch all relevant requests
+   */
   async getManagerRequests(managerId: string): Promise<{ success: boolean; requests?: BookViewingRequest[]; error?: string }> {
     try {
+      console.log(`🔍 [bookViewingRequests] getManagerRequests called with managerId: ${managerId}`);
+      console.log(`🔍 [bookViewingRequests] Collection: ${this.collectionName}`);
+      console.log(`🔍 [bookViewingRequests] Querying by landlordId = ${managerId}`);
+      
+      // Query by landlordId first (primary query for bookViewingRequests)
       const landlordRequests = await this.getRequestsByManagerField('landlordId', managerId);
+      console.log(`✅ [bookViewingRequests] Found ${landlordRequests.length} requests by landlordId`);
+      
+      // Also query by agentId as fallback (some records might only have agentId set)
+      console.log(`🔍 [bookViewingRequests] Also querying by agentId = ${managerId}`);
       const agentRequests = await this.getRequestsByManagerField('agentId', managerId);
+      console.log(`✅ [bookViewingRequests] Found ${agentRequests.length} requests by agentId`);
+      
+      // Merge and deduplicate requests
       const requests = this.mergeRequestsById(landlordRequests, agentRequests);
+      console.log(`✅ [bookViewingRequests] Total merged requests: ${requests.length}`);
+      
+      if (requests.length > 0) {
+        console.log(`📋 [bookViewingRequests] Request details:`);
+        requests.forEach((req, index) => {
+          console.log(`  ${index + 1}. ID: ${req.id}, landlordId: ${req.landlordId}, agentId: ${req.agentId}, property: ${req.property?.street}`);
+        });
+      }
+      
       return { success: true, requests };
     } catch (error: any) {
-      console.error('Error getting manager viewing requests:', error);
+      console.error('❌ [bookViewingRequests] Error getting manager viewing requests:', error);
+      console.error('❌ [bookViewingRequests] Error details:', {
+        code: error.code,
+        message: error.message,
+        managerId,
+        collectionName: this.collectionName
+      });
       return { success: false, error: error?.message || 'Unknown error' };
     }
   }
@@ -141,20 +204,41 @@ class BookViewingRequestService {
       const normalizedEmail = agentEmail?.toLowerCase().trim();
       console.log('🔍 Getting viewing requests for agent email:', normalizedEmail);
       console.log('🔍 Collection name:', this.collectionName);
-      const q = query(
+      
+      // OPTIMIZATION: Try top-level agentEmail field first (much faster than nested field query)
+      let q = query(
         collection(db, this.collectionName),
-        where('property.agent.email', '==', normalizedEmail),
+        where('agentEmail', '==', normalizedEmail),
         orderBy('createdAt', 'desc')
       );
       
-      console.log('🔍 About to execute Firestore query...');
-      console.log('🔍 Query details:', {
-        collection: this.collectionName,
-        filter: 'property.agent.email == ' + normalizedEmail,
-        orderBy: 'createdAt desc'
-      });
+      let querySnapshot;
+      try {
+        querySnapshot = await getDocs(q);
+        // If no results with top-level field, try nested field query for backward compatibility
+        if (querySnapshot.empty) {
+          console.log('⚠️ No results with top-level agentEmail field, trying nested field query...');
+          const nestedQ = query(
+            collection(db, this.collectionName),
+            where('property.agent.email', '==', normalizedEmail),
+            orderBy('createdAt', 'desc')
+          );
+          querySnapshot = await getDocs(nestedQ);
+        }
+      } catch (indexError: any) {
+        // If index is missing, try fallback to nested field query
+        if (indexError.code === 'failed-precondition' && indexError.message?.includes('index')) {
+          console.warn('⚠️ Firestore index missing, falling back to nested field query');
+          const nestedQ = query(
+            collection(db, this.collectionName),
+            where('property.agent.email', '==', normalizedEmail)
+          );
+          querySnapshot = await getDocs(nestedQ);
+        } else {
+          throw indexError;
+        }
+      }
       
-      const querySnapshot = await getDocs(q);
       console.log('🔍 Query completed! Snapshot size:', querySnapshot.size);
       console.log('🔍 Query empty?', querySnapshot.empty);
       
@@ -162,20 +246,29 @@ class BookViewingRequestService {
       
       querySnapshot.forEach((doc) => {
         const data = doc.data() as BookViewingRequest;
-        requests.push(data);
-        console.log('📋 Found request:', {
-          id: data.id,
-          agentEmail: data.property?.agent?.email,
-          propertyStreet: data.property?.street
-        });
+        // Filter to ensure we only include matching requests (for backward compatibility)
+        if (data.agentEmail?.toLowerCase() === normalizedEmail || 
+            data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+          requests.push(data);
+          console.log('📋 Found request:', {
+            id: data.id,
+            agentEmail: data.agentEmail || data.property?.agent?.email,
+            propertyStreet: data.property?.street
+          });
+        }
       });
+      
+      // Sort by createdAt if not already sorted
+      if (requests.length > 0 && !requests[0].agentEmail) {
+        requests.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      }
       
       console.log(`✅✅✅ Retrieved ${requests.length} requests for email: ${normalizedEmail} ✅✅✅`);
       return { success: true, requests };
     } catch (error: any) {
-      // Fallback without orderBy if index is missing
+      // Final fallback: query without orderBy and sort in memory
       if (error.code === 'failed-precondition' && error.message?.includes('index')) {
-        console.warn('⚠️ Firestore index missing, falling back to query without orderBy');
+        console.warn('⚠️ Firestore index missing, trying final fallback without orderBy');
         const normalizedEmail = agentEmail?.toLowerCase().trim();
         const fallbackQuery = query(
           collection(db, this.collectionName),
@@ -185,12 +278,15 @@ class BookViewingRequestService {
         const requests: BookViewingRequest[] = [];
         fallbackSnapshot.forEach((doc) => {
           const data = doc.data() as BookViewingRequest;
-          requests.push(data);
-          console.log('📋 Found request (fallback):', {
-            id: data.id,
-            agentEmail: data.property?.agent?.email,
-            propertyStreet: data.property?.street
-          });
+          if (data.agentEmail?.toLowerCase() === normalizedEmail || 
+              data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+            requests.push(data);
+            console.log('📋 Found request (fallback):', {
+              id: data.id,
+              agentEmail: data.agentEmail || data.property?.agent?.email,
+              propertyStreet: data.property?.street
+            });
+          }
         });
         // Sort in memory
         const sorted = requests.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
@@ -305,35 +401,81 @@ class BookViewingRequestService {
   ): () => void {
     const normalizedEmail = agentEmail?.toLowerCase().trim();
     console.log('🔔 Subscribing to viewing requests for email:', normalizedEmail);
+    
+    let unsubscribeMain: (() => void) | null = null;
+    let unsubscribeFallback: (() => void) | null = null;
+    
+    // OPTIMIZATION: Try top-level agentEmail field first
     const q = query(
       collection(db, this.collectionName),
-      where('property.agent.email', '==', normalizedEmail),
+      where('agentEmail', '==', normalizedEmail),
       orderBy('createdAt', 'desc')
     );
 
-    return onSnapshot(
+    unsubscribeMain = onSnapshot(
       q,
       (querySnapshot) => {
         const requests: BookViewingRequest[] = [];
         querySnapshot.forEach((doc) => {
-          requests.push(doc.data() as BookViewingRequest);
+          const data = doc.data() as BookViewingRequest;
+          // Filter to ensure we only include matching requests
+          if (data.agentEmail?.toLowerCase() === normalizedEmail || 
+              data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+            requests.push(data);
+          }
         });
         console.log(`🔔 Subscription update: ${requests.length} requests for email: ${normalizedEmail}`);
         callback(requests);
       },
       (error) => {
-        console.error('❌ Error in viewing requests by email subscription:', error);
-        console.error('❌ Subscription error details:', {
-          code: error.code,
-          message: error.message,
-          collectionName: this.collectionName,
-          email: normalizedEmail
-        });
-        if (onError) {
-          onError(error);
+        // Fallback to nested field query if top-level field query fails
+        if (error.code === 'failed-precondition' || error.message?.includes('index')) {
+          console.warn('⚠️ Top-level agentEmail field query failed, falling back to nested field query');
+          const fallbackQ = query(
+            collection(db, this.collectionName),
+            where('property.agent.email', '==', normalizedEmail)
+          );
+          unsubscribeFallback = onSnapshot(
+            fallbackQ,
+            (querySnapshot) => {
+              const requests: BookViewingRequest[] = [];
+              querySnapshot.forEach((doc) => {
+                const data = doc.data() as BookViewingRequest;
+                if (data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+                  requests.push(data);
+                }
+              });
+              // Sort in memory since we can't use orderBy with nested field
+              const sorted = requests.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+              console.log(`🔔 Subscription update (fallback): ${sorted.length} requests for email: ${normalizedEmail}`);
+              callback(sorted);
+            },
+            (fallbackError) => {
+              console.error('❌ Error in viewing requests by email subscription (fallback):', fallbackError);
+              if (onError) {
+                onError(fallbackError);
+              }
+            }
+          );
+        } else {
+          console.error('❌ Error in viewing requests by email subscription:', error);
+          console.error('❌ Subscription error details:', {
+            code: error.code,
+            message: error.message,
+            collectionName: this.collectionName,
+            email: normalizedEmail
+          });
+          if (onError) {
+            onError(error);
+          }
         }
       }
     );
+
+    return () => {
+      if (unsubscribeMain) unsubscribeMain();
+      if (unsubscribeFallback) unsubscribeFallback();
+    };
   }
 
   async deleteRequest(requestId: string): Promise<{ success: boolean; error?: string }> {
