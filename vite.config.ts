@@ -23,9 +23,10 @@ function getManualChunks(id: string) {
     if (id.includes('react/') || id.includes('react-dom/')) {
       return 'react-vendor';
     }
-    // MUI and related
+    // MUI and Emotion packages - keep ALL together to avoid circular dependencies
+    // MUI depends on Emotion, so they must be in the same chunk
     if (id.includes('@mui/') || id.includes('@emotion/')) {
-      return 'mui-vendor';
+      return 'mui-emotion-vendor';
     }
     // PDF libraries
     if (id.includes('pdfjs-dist') || id.includes('pdf-lib') || id.includes('pdf2pic')) {
@@ -79,7 +80,11 @@ const envConfigs = {
     },
     rollupOptions: {
       output: {
-        manualChunks: getManualChunks
+        // Temporarily disabled manual chunks to fix circular dependency issue
+        // manualChunks: getManualChunks
+        assetFileNames: 'assets/[hash][extname]',
+        chunkFileNames: 'chunks/[hash].js',
+        entryFileNames: 'entries/[hash].js'
       }
     }
   },
@@ -95,7 +100,9 @@ const envConfigs = {
     },
     rollupOptions: {
       output: {
-        manualChunks: getManualChunks,
+        // Temporarily disabled manual chunks to fix circular dependency issue
+        // Let Vite handle chunking automatically to avoid circular deps
+        // manualChunks: getManualChunks,
         assetFileNames: 'assets/[hash][extname]',
         chunkFileNames: 'chunks/[hash].js',
         entryFileNames: 'entries/[hash].js'
