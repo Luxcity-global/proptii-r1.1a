@@ -2,7 +2,6 @@ import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
 import { MSALProviderWrapper } from './contexts/AuthContext';
-import { AuthProvider } from './context/AuthContext';
 import { SavedPropertiesProvider } from './contexts/SavedPropertiesContext';
 import { SignedContractsProvider } from './contexts/SignedContractsContext';
 import Home from './pages/Home';
@@ -38,9 +37,8 @@ export const App: React.FC = () => {
     <ErrorBoundary fallback={<div>Custom fallback UI</div>}>
       <CssBaseline />
       <MSALProviderWrapper>
-        <AuthProvider>
-          <SavedPropertiesProvider>
-            <SignedContractsProvider>
+        <SavedPropertiesProvider>
+          <SignedContractsProvider>
               <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
@@ -91,7 +89,6 @@ export const App: React.FC = () => {
               </Routes>
             </SignedContractsProvider>
           </SavedPropertiesProvider>
-        </AuthProvider>
       </MSALProviderWrapper>
     </ErrorBoundary>
   );

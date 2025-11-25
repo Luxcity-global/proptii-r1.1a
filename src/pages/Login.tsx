@@ -9,7 +9,7 @@ import {
   Alert,
   Paper
 } from '@mui/material';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();

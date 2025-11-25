@@ -26,7 +26,7 @@ import MobileStepper from './ui/MobileStepper';
 import FormContent from './ui/FormContent';
 import { FormSection } from '../../types/referencing';
 import { isAzureConfigured } from '../../config/azure';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import EmploymentSection from './sections/EmploymentSection';
 import IdentitySection from './sections/IdentitySection';
 import ResidentialSection from './sections/ResidentialSection';

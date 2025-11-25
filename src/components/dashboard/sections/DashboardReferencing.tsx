@@ -8,7 +8,7 @@ import {
   useTheme,
   useMediaQuery
 } from '@mui/material';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const DashboardReferencing: React.FC = () => {
   const { user } = useAuth();
