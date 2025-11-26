@@ -2,6 +2,38 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import type { Property } from '../types';
 
+const DEFAULT_LOCAL_SEARCH_URL = 'http://localhost:3001';
+const DEFAULT_RENDER_SEARCH_URL = 'https://proptii-r1-1a-search.onrender.com';
+
+const normalizeBackendUrl = (rawUrl: string | undefined): string => {
+  if (!rawUrl) {
+    return DEFAULT_LOCAL_SEARCH_URL;
+  }
+
+  const trimmed = rawUrl.trim();
+  if (!trimmed) {
+    return DEFAULT_LOCAL_SEARCH_URL;
+  }
+
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+};
+
+const resolveBackendUrl = (): string => {
+  const envUrl = import.meta.env.VITE_SEARCH_BACKEND_URL;
+  if (envUrl && envUrl.trim()) {
+    return normalizeBackendUrl(envUrl);
+  }
+
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname.toLowerCase();
+    if (hostname.includes('onrender.com') || hostname.includes('proptii.com')) {
+      return DEFAULT_RENDER_SEARCH_URL;
+    }
+  }
+
+  return DEFAULT_LOCAL_SEARCH_URL;
+};
+
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
 const cleanPropertyPrice = (price: string): string => {
   if (!price || typeof price !== 'string') {
@@ -861,9 +893,8 @@ function SearchResults() {
       
 
       
-      // Ensure we always use HTTP protocol for the backend
-      const backendBaseUrl = import.meta.env.VITE_SEARCH_BACKEND_URL || 'http://localhost:3001';
-      const backendUrl = backendBaseUrl.startsWith('http://') ? backendBaseUrl : `http://${backendBaseUrl.replace(/^https?:\/\//, '')}`;
+      const backendBaseUrl = resolveBackendUrl().replace(/\/$/, '');
+      const backendUrl = backendBaseUrl;
       
       let endpoint = `${backendUrl}/scrape-api`;
       
