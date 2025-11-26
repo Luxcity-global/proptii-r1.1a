@@ -1,7 +1,7 @@
 import puppeteer from 'puppeteer';
 import type { LaunchOptions } from 'puppeteer';
 import * as cheerio from 'cheerio';
-import { Property } from '../scraper';
+import { Property, getChromeExecutablePath } from '../scraper';
 
 /**
  * Scrapes property listings from Rightmove
@@ -22,9 +22,16 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
     console.log('Cleaned URL:', cleanUrl);
     
     console.log('Launching browser...');
+    // Get Chrome executable path dynamically
+    const chromeExecutablePath = await getChromeExecutablePath();
+    if (chromeExecutablePath) {
+      console.log('Using Chrome executable for Rightmove:', chromeExecutablePath);
+    }
+    
     // Launch browser with robust error handling
     const launchOptions: LaunchOptions = {
       headless: true,
+      executablePath: chromeExecutablePath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',

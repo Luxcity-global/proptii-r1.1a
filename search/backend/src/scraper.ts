@@ -3,6 +3,7 @@ import type { LaunchOptions, Browser } from 'puppeteer';
 import * as cheerio from 'cheerio';
 import * as os from 'os';
 import * as path from 'path';
+import * as fs from 'fs';
 
 export interface Property {
   title: string;
@@ -21,6 +22,107 @@ export interface Property {
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 
 import axios from 'axios';
+
+/**
+ * Helper function to get the Chrome/Chromium executable path
+ * Tries multiple methods to find the browser executable
+ */
+export async function getChromeExecutablePath(): Promise<string | undefined> {
+  // Method 1: Use Puppeteer's built-in executable path resolution
+  try {
+    const executablePath = puppeteer.executablePath();
+    if (executablePath && fs.existsSync(executablePath)) {
+      console.log('Found Chrome via Puppeteer executablePath:', executablePath);
+      return executablePath;
+    }
+  } catch (error) {
+    console.log('Puppeteer executablePath() failed, trying alternatives...');
+  }
+
+  // Method 2: Check environment variable
+  if (process.env.CHROME_BIN) {
+    const envPath = process.env.CHROME_BIN;
+    if (fs.existsSync(envPath)) {
+      console.log('Found Chrome via CHROME_BIN env var:', envPath);
+      return envPath;
+    }
+  }
+
+  // Method 3: Check common Puppeteer cache locations
+  const cacheDir = process.env.PUPPETEER_CACHE_DIR || path.join(os.homedir(), '.cache', 'puppeteer');
+  const possiblePaths = [
+    // Puppeteer v24+ structure
+    path.join(cacheDir, 'chrome', 'linux-*', 'chrome-linux64', 'chrome'),
+    path.join(cacheDir, 'chrome', 'linux-*', 'chrome-linux', 'chrome'),
+    // Older structures
+    path.join(cacheDir, 'chrome', 'chrome-linux64', 'chrome'),
+    path.join(cacheDir, 'chrome-linux64', 'chrome'),
+    path.join(cacheDir, 'chrome-linux', 'chrome'),
+    path.join(cacheDir, 'chrome', 'chrome'),
+    // Direct in cache dir
+    path.join(cacheDir, 'chrome'),
+  ];
+  
+  // Try to find any chrome executable in subdirectories
+  try {
+    if (fs.existsSync(cacheDir)) {
+      const entries = fs.readdirSync(cacheDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const chromePath = path.join(cacheDir, entry.name, 'chrome');
+          if (fs.existsSync(chromePath) && fs.statSync(chromePath).isFile()) {
+            console.log('Found Chrome by scanning cache directory:', chromePath);
+            return chromePath;
+          }
+          // Check nested directories
+          try {
+            const subEntries = fs.readdirSync(path.join(cacheDir, entry.name), { withFileTypes: true });
+            for (const subEntry of subEntries) {
+              if (subEntry.isDirectory()) {
+                const nestedChromePath = path.join(cacheDir, entry.name, subEntry.name, 'chrome');
+                if (fs.existsSync(nestedChromePath) && fs.statSync(nestedChromePath).isFile()) {
+                  console.log('Found Chrome in nested directory:', nestedChromePath);
+                  return nestedChromePath;
+                }
+              }
+            }
+          } catch {
+            // Continue if subdirectory scan fails
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.log('Error scanning cache directory:', error);
+  }
+
+  for (const possiblePath of possiblePaths) {
+    if (fs.existsSync(possiblePath)) {
+      console.log('Found Chrome in cache directory:', possiblePath);
+      return possiblePath;
+    }
+  }
+
+  // Method 4: Try to use Puppeteer's browsers API (if available)
+  try {
+    const browsers = await import('puppeteer/browsers');
+    if (browsers && typeof browsers.computeExecutablePath === 'function') {
+      const computedPath = browsers.computeExecutablePath({
+        browser: 'chrome',
+        cacheDir: cacheDir
+      });
+      if (fs.existsSync(computedPath)) {
+        console.log('Found Chrome via browsers API:', computedPath);
+        return computedPath;
+      }
+    }
+  } catch (error) {
+    console.log('Browsers API not available or failed');
+  }
+
+  console.warn('Could not find Chrome executable, Puppeteer will try to download it');
+  return undefined;
+}
 
 // Enhanced email prioritization function
 function prioritizeEmails(emails: string[]): string[] {
@@ -662,9 +764,16 @@ export async function scrapeInternet(query: string, apiKey: string): Promise<Pro
     let browser: Browser | undefined;
     
     try {
+      // Get Chrome executable path dynamically
+      const chromeExecutablePath = await getChromeExecutablePath();
+      if (chromeExecutablePath) {
+        console.log('Using Chrome executable for scrapeInternet:', chromeExecutablePath);
+      }
+      
       const launchOptions: LaunchOptions = {
         headless: true,
         timeout: 60000, // Increased timeout
+        executablePath: chromeExecutablePath,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -1159,11 +1268,19 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
     console.log('PUPPETEER_CACHE_DIR:', process.env.PUPPETEER_CACHE_DIR);
     console.log('Current working directory:', process.cwd());
     
+    // Get Chrome executable path dynamically
+    const chromeExecutablePath = await getChromeExecutablePath();
+    if (chromeExecutablePath) {
+      console.log('Using Chrome executable:', chromeExecutablePath);
+    } else {
+      console.log('No Chrome executable found, Puppeteer will use default');
+    }
+    
     // Launch browser with containerized environment optimizations
     const launchOptions: LaunchOptions = {
       headless: true,
       timeout: 60000,
-      executablePath: process.env.CHROME_BIN || undefined,
+      executablePath: chromeExecutablePath,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
