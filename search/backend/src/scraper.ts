@@ -105,6 +105,7 @@ export async function getChromeExecutablePath(): Promise<string | undefined> {
 
   // Method 4: Try to use Puppeteer's browsers API (if available)
   try {
+    // @ts-expect-error - puppeteer/browsers may not have type definitions in all versions
     const browsers = await import('puppeteer/browsers');
     if (browsers && typeof browsers.computeExecutablePath === 'function') {
       const computedPath = browsers.computeExecutablePath({
