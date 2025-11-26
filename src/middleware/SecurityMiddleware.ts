@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { SessionManager } from '../services/SessionManager';
 import { ApplicationInsights } from '@microsoft/applicationinsights-web';
 
+const DEFAULT_SEARCH_BACKEND_URL = 'https://proptii-r1-1a-search.onrender.com';
+
 interface CSRFToken {
     token: string;
     timestamp: number;
@@ -65,10 +67,37 @@ export class SecurityMiddleware {
         const apiUrl = import.meta.env.VITE_API_URL || '';
         // Remove /api from the end if it exists
         const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
-        
-        const connectSrc = isDevelopment 
-            ? "'self' https://proptii.b2clogin.com https://*.azure.com http://localhost:* https://proptii-r1-1a.onrender.com https://proptii-r1-1a-1.onrender.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.google.com wss://*.googleapis.com wss://*.firebaseio.com wss://*.firebaseapp.com"
-            : `'self' https://proptii.b2clogin.com https://*.azure.com ${baseUrl} https://proptii-r1-1a-1.onrender.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.google.com wss://*.googleapis.com wss://*.firebaseio.com wss://*.firebaseapp.com`;
+        const searchBackendOrigin = this.sanitizeOrigin(import.meta.env.VITE_SEARCH_BACKEND_URL) 
+            ?? this.sanitizeOrigin(DEFAULT_SEARCH_BACKEND_URL);
+
+        const connectSources = new Set<string>([
+            'https://proptii.b2clogin.com',
+            'https://*.azure.com',
+            'https://proptii-r1-1a-1.onrender.com',
+            'https://demo.docusign.net',
+            'https://www.docusign.net',
+            'https://*.docusign.net',
+            'https://*.googleapis.com',
+            'https://*.firebaseapp.com',
+            'https://*.firebaseio.com',
+            'https://*.google.com',
+            'wss://*.googleapis.com',
+            'wss://*.firebaseio.com',
+            'wss://*.firebaseapp.com'
+        ]);
+
+        if (searchBackendOrigin) {
+            connectSources.add(searchBackendOrigin);
+        }
+
+        if (isDevelopment) {
+            connectSources.add('http://localhost:*');
+            connectSources.add('https://proptii-r1-1a.onrender.com');
+        } else if (baseUrl) {
+            connectSources.add(baseUrl);
+        }
+
+        const connectSrc = ["'self'", ...connectSources].join(' ');
 
         return [
             "default-src 'self'",
@@ -83,6 +112,28 @@ export class SecurityMiddleware {
             "form-action 'self'",
             "upgrade-insecure-requests"
         ].join('; ');
+    }
+
+    private sanitizeOrigin(rawUrl?: string): string | null {
+        if (!rawUrl) {
+            return null;
+        }
+
+        const trimmed = rawUrl.trim();
+        if (!trimmed) {
+            return null;
+        }
+
+        const asUrl = (candidate: string) => {
+            try {
+                const parsed = new URL(candidate);
+                return `${parsed.protocol}//${parsed.host}`;
+            } catch {
+                return null;
+            }
+        };
+
+        return asUrl(trimmed) ?? asUrl(`https://${trimmed}`);
     }
 
     private createAxiosInstance(): AxiosInstance {
