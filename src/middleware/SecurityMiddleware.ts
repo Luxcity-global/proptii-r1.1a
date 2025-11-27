@@ -92,7 +92,7 @@ export class SecurityMiddleware {
 
         if (isDevelopment) {
             connectSources.add('http://localhost:*');
-            connectSources.add('https://proptii-r1-1a.onrender.com');
+            connectSources.add('https://proptii-r1-1a-new-backend.onrender.com');
         } else if (baseUrl) {
             connectSources.add(baseUrl);
         }

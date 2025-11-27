@@ -322,7 +322,7 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
       
       const API_BASE_URL = window.location.hostname === 'localhost'
         ? 'http://localhost:3000/api'
-        : 'https://proptii-r1-1a.onrender.com/api';
+        : 'https://proptii-r1-1a-new-backend.onrender.com/api';
       
       if (contractData.file) {
         // Convert file to base64 and send email with attachment

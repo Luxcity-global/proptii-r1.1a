@@ -65,7 +65,7 @@ const API_BASE_URL = (() => {
   }
   return window.location.hostname === 'localhost'
     ? 'http://localhost:3000/api'
-    : 'https://proptii-r1-1a.onrender.com/api';
+    : 'https://proptii-r1-1a-new-backend.onrender.com/api';
 })();
 
 class EmailService {
@@ -338,7 +338,7 @@ class EmailService {
       };
     } catch (error) {
       // If the primary endpoint fails (e.g., local backend not running), try fallback hosted API
-      const fallbackBase = 'https://proptii-r1-1a.onrender.com/api';
+      const fallbackBase = 'https://proptii-r1-1a-new-backend.onrender.com/api';
       try {
         if (axios.isAxiosError(error)) {
           console.error('Axios error details:', {

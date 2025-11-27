@@ -49,7 +49,7 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
       try {
         const API_BASE_URL = window.location.hostname === 'localhost' 
           ? 'http://localhost:3000/api' 
-          : 'https://proptii-r1-1a.onrender.com/api';
+          : 'https://proptii-r1-1a-new-backend.onrender.com/api';
         
         const response = await axios.get(`${API_BASE_URL}/azure-users`, {
           params: searchTerm ? { search: searchTerm } : {}

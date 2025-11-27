@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Get the API URL from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://proptii-r1-1a.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://proptii-r1-1a-new-backend.onrender.com/api';
 
 console.log('Review Service using API URL:', API_BASE_URL);
 

@@ -140,7 +140,7 @@ const HelpFormModal: React.FC<HelpFormModalProps> = ({ isOpen, onClose }) => {
             // This is the same one your working modals use
             const emailServerUrl = window.location.hostname === 'localhost' 
                 ? 'http://localhost:3002'
-                : 'https://proptii-r1-1a.onrender.com';
+                : 'https://proptii-r1-1a-new-backend.onrender.com';
             
             const emailEndpoint = `${emailServerUrl}/api/email/send`;
             console.log('Sending email to:', emailEndpoint);

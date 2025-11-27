@@ -12,7 +12,7 @@ services:
       - key: VITE_APP_ENV
         value: production
       - key: VITE_API_URL
-        value: https://proptii-r1-1a.onrender.com/api
+        value: https://proptii-r1-1a-new-backend.onrender.com/api
       - key: VITE_AZURE_OPENAI_API_KEY
         sync: false
       - key: VITE_AZURE_OPENAI_ENDPOINT
@@ -20,7 +20,7 @@ services:
       - key: VITE_AZURE_OPENAI_DEPLOYMENT_NAME
         sync: false
       - key: VITE_GOOGLE_SHEETS_API_ENDPOINT
-        value: https://proptii-r1-1a.onrender.com/api/sheets
+        value: https://proptii-r1-1a-new-backend.onrender.com/api/sheets
       - key: VITE_SEARCH_BACKEND_URL
         value: https://proptii-r1-1a-search.onrender.com
     headers:
@@ -35,7 +35,7 @@ services:
         value: "1; mode=block"
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; connect-src 'self' https://proptii-r1-1a.onrender.com/api/* https://proptii-r1-1a-1.onrender.com/api/* https://proptii-r1-1a-search.onrender.com https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com https://proptii-frontend.onrender.com https://*.cognitiveservices.azure.com https://*.onrender.com http://localhost:10000/api/*; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; frame-ancestors 'none';"
+        value: "default-src 'self'; connect-src 'self' https://proptii-r1-1a-new-backend.onrender.com/api/* https://proptii-r1-1a-1.onrender.com/api/* https://proptii-r1-1a-search.onrender.com https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com https://proptii-frontend.onrender.com https://*.cognitiveservices.azure.com https://*.onrender.com http://localhost:10000/api/*; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; frame-ancestors 'none';"
       - path: /*
         name: Cache-Control
         value: no-cache

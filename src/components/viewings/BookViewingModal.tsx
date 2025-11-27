@@ -232,6 +232,8 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     const userDetails = viewing?.userDetails;
 
     const isValid = property?.street &&
+      property?.city &&
+      property?.postcode &&
       property?.agent?.name &&
       property?.agent?.email &&
       viewing?.date &&
@@ -265,6 +267,8 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     const property = state.selectedProperty;
     return !!(
       property?.street &&
+      property?.city &&
+      property?.postcode &&
       property?.agent?.name &&
       property?.agent?.email
     );
@@ -290,6 +294,12 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
       const property = state.selectedProperty;
       if (!property?.street) {
         messages.push("Property address details");
+      }
+      if (!property?.city) {
+        messages.push("City / town");
+      }
+      if (!property?.postcode) {
+        messages.push("Postcode");
       }
       if (!property?.agent?.name || !property?.agent?.email) {
         messages.push("Agent contact information");
@@ -547,6 +557,12 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         const property = state.selectedProperty;
         if (!property?.street) {
           messages.push("Property address details");
+        }
+        if (!property?.city) {
+          messages.push("City / town");
+        }
+        if (!property?.postcode) {
+          messages.push("Postcode");
         }
         if (!property?.agent?.name || !property?.agent?.email) {
           messages.push("Agent contact information");

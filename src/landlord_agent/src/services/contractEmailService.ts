@@ -19,7 +19,7 @@ interface SendEmailResponse {
 
 const API_BASE_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:3000/api'
-  : 'https://proptii-r1-1a.onrender.com/api';
+  : 'https://proptii-r1-1a-new-backend.onrender.com/api';
 
 class ContractEmailService {
   private readonly API_URL = API_BASE_URL;

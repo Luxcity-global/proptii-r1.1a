@@ -19,7 +19,7 @@ interface ContractEmailResponse {
 const API_BASE_URL = (() => {
   // Prefer configured URL from Vite env
   const envBase = (import.meta as any)?.env?.VITE_API_URL as string | undefined;
-  const base = (envBase || (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://proptii-r1-1a.onrender.com'))
+  const base = (envBase || (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://proptii-r1-1a-new-backend.onrender.com'))
     .replace(/\/$/, '');
   return `${base}/api`;
 })();

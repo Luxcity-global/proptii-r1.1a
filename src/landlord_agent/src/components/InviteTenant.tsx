@@ -214,7 +214,7 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
       // Determine API base URL
       const API_BASE_URL = window.location.hostname === 'localhost'
         ? 'http://localhost:3000/api'
-        : 'https://proptii-r1-1a.onrender.com/api';
+        : 'https://proptii-r1-1a-new-backend.onrender.com/api';
 
       // Generate email HTML
       const emailHTML = generateInvitationEmailHTML(selectedProperty);

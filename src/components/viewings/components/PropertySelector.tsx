@@ -108,6 +108,7 @@ const PropertySelector: React.FC = () => {
           >
             <div>
               <TextField
+                required
                 fullWidth
                 label="First line of address"
                 value={state.selectedProperty?.street || ''}
@@ -116,6 +117,35 @@ const PropertySelector: React.FC = () => {
             </div>
           </Tooltip>
         </Box>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              required
+              fullWidth
+              label="City"
+              value={state.selectedProperty?.city || ''}
+              onChange={(e) => handlePropertyChange('city', e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Town / Area (optional)"
+              value={state.selectedProperty?.town || ''}
+              onChange={(e) => handlePropertyChange('town', e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              required
+              fullWidth
+              label="Postcode"
+              value={state.selectedProperty?.postcode || ''}
+              onChange={(e) => handlePropertyChange('postcode', e.target.value)}
+              inputProps={{ style: { textTransform: 'uppercase' } }}
+            />
+          </Grid>
+        </Grid>
       </Box>
 
       {/* Estate Agent Details Section */}
