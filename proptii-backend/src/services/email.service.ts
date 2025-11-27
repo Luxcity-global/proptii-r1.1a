@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import * as sgMail from '@sendgrid/mail';
+
+type SendGridAttachment = NonNullable<sgMail.MailDataRequired['attachments']>[number];
 
 interface EmailAttachment {
   filename: string;
@@ -39,6 +42,7 @@ export class EmailService {
   private transporter: nodemailer.Transporter | null = null;
   private isConfigured: boolean = false;
   private fromAddress: string;
+  private sendgridEnabled = false;
 
   constructor() {
     // Initialize SMTP with Nodemailer
@@ -69,6 +73,20 @@ export class EmailService {
       console.warn('⚠️ Email service not configured - SMTP credentials not set');
       console.warn('   Required: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS');
       this.isConfigured = false;
+    }
+
+    const sendgridKey = process.env.SENDGRID_API_KEY;
+    if (sendgridKey) {
+      try {
+        sgMail.setApiKey(sendgridKey);
+        this.sendgridEnabled = true;
+        console.log('✅ SendGrid email fallback enabled');
+      } catch (error) {
+        console.warn('⚠️ Failed to initialize SendGrid client:', error);
+        this.sendgridEnabled = false;
+      }
+    } else {
+      console.log('ℹ️ SendGrid API key not set - HTTP fallback disabled');
     }
   }
 
@@ -530,47 +548,114 @@ export class EmailService {
     }
   }
 
+  private formatSendGridAttachments(attachments: EmailAttachment[] = []): SendGridAttachment[] {
+    return attachments
+      .filter((attachment): attachment is EmailAttachment & { content: string | Buffer } => !!attachment?.content)
+      .map((attachment) => {
+        const buffer = typeof attachment.content === 'string'
+          ? Buffer.from(attachment.content)
+          : attachment.content;
+
+        return {
+          content: buffer.toString('base64'),
+          filename: attachment.filename || 'attachment',
+          type: attachment.contentType || 'application/octet-stream',
+          disposition: 'attachment'
+        } as SendGridAttachment;
+      });
+  }
+
+  private async sendViaSendGrid(emailData: EmailData, htmlContent: string) {
+    if (!this.sendgridEnabled) {
+      throw new Error('SendGrid is not configured');
+    }
+
+    const msg: sgMail.MailDataRequired = {
+      to: emailData.to,
+      from: this.fromAddress,
+      subject: emailData.subject,
+      html: htmlContent || emailData.text || 'No content provided',
+    };
+
+    if (emailData.text) {
+      msg.text = emailData.text;
+    }
+
+    const attachments = this.formatSendGridAttachments(emailData.attachments);
+    if (attachments.length) {
+      msg.attachments = attachments;
+    }
+
+    console.log(`📧 Sending email via SendGrid to: ${emailData.to}`);
+    const [response] = await sgMail.send(msg);
+    const messageId = response?.headers?.['x-message-id'] || response?.headers?.['x-sendgrid-message-id'];
+
+    return {
+      success: true,
+      messageId,
+    };
+  }
+
   async sendEmail(emailData: EmailData): Promise<any> {
-    try {
-      if (!this.isConfigured || !this.transporter) {
-        console.warn('⚠️ Email service not configured. Email not sent.');
+    let htmlContent = emailData.html;
+    if (!htmlContent && emailData.formData && emailData.emailType) {
+      htmlContent = this.generateEmailTemplate(emailData.formData, emailData.emailType);
+    }
+
+    const fallbackBody = htmlContent || emailData.text || 'No content provided';
+    let lastError: Error | null = null;
+
+    if (this.isConfigured && this.transporter) {
+      try {
+        const mailOptions = {
+          from: this.fromAddress,
+          to: emailData.to,
+          subject: emailData.subject,
+          html: fallbackBody,
+          text: emailData.text,
+          attachments: emailData.attachments || [],
+        };
+
+        console.log(`📧 Sending email via SMTP to: ${emailData.to}`);
+        const result = await this.transporter.sendMail(mailOptions);
+        console.log(`✅ Email sent successfully via SMTP to ${emailData.to}`);
+
+        return {
+          success: true,
+          messageId: result.messageId,
+        };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Failed to send email via SMTP');
+        console.error('❌ SMTP error while sending email:', error);
+        if (!this.sendgridEnabled) {
+          return {
+            success: false,
+            error: lastError.message,
+          };
+        }
+        console.warn('⚠️ Falling back to SendGrid after SMTP failure.');
+      }
+    } else {
+      console.warn('⚠️ SMTP email transport not configured. Checking SendGrid fallback.');
+    }
+
+    if (this.sendgridEnabled) {
+      try {
+        return await this.sendViaSendGrid(emailData, fallbackBody);
+      } catch (sendgridError) {
+        lastError = sendgridError instanceof Error ? sendgridError : new Error('Failed to send email via SendGrid');
+        console.error('❌ SendGrid error while sending email:', sendgridError);
         return {
           success: false,
-          error: 'Email service not configured'
+          error: lastError.message,
         };
       }
-
-      // Generate HTML content if not provided
-      let htmlContent = emailData.html;
-      if (!htmlContent && emailData.formData && emailData.emailType) {
-        htmlContent = this.generateEmailTemplate(emailData.formData, emailData.emailType);
-      }
-
-      const mailOptions = {
-        from: this.fromAddress,
-        to: emailData.to,
-        subject: emailData.subject,
-        html: htmlContent || emailData.text || 'No content provided',
-        text: emailData.text,
-        attachments: emailData.attachments || [],
-      };
-
-      console.log(`📧 Sending email to: ${emailData.to}`);
-      const result = await this.transporter.sendMail(mailOptions);
-
-      console.log(`✅ Email sent successfully to ${emailData.to}`);
-
-      return {
-        success: true,
-        messageId: result.messageId,
-      };
-    } catch (error) {
-      console.error('❌ Error sending email:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
     }
+
+    return {
+      success: false,
+      error: lastError?.message || 'Email service not configured',
+    };
   }
 
   async sendMultipleEmails(data: MultiEmailData): Promise<any> {

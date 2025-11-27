@@ -3,7 +3,6 @@ const isAllDataComplete = () => {
     const viewing = state.viewingDetails;
 
     return property?.street &&
-        property?.city &&
         property?.agent?.name &&
         property?.agent?.email &&
         viewing?.date &&

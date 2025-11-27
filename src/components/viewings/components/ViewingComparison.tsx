@@ -58,9 +58,7 @@ const ViewingComparison: React.FC = () => {
   const formatAddress = () => {
     const parts = [
       selectedProperty?.buildingName,
-      selectedProperty?.street,
-      selectedProperty?.city,
-      selectedProperty?.postcode
+      selectedProperty?.street
     ].filter(Boolean);
     return parts.join(', ');
   };

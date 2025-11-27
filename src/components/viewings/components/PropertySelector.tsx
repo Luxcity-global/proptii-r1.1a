@@ -5,9 +5,7 @@ import {
   Typography,
   styled,
   Paper,
-  Grid,
-  alpha,
-  Divider
+  alpha
 } from '@mui/material';
 import { useBookViewing } from '../context/BookViewingContext';
 import { Tooltip } from '../../Tooltip';
@@ -101,7 +99,7 @@ const PropertySelector: React.FC = () => {
         </Typography>
         <Box sx={{ position: 'relative', mb: 2 }}>
           <Tooltip
-            content="Copy the property and agent details from the listing and enter them into the form. We'll take it from there and help you contact the agent."
+            content="Copy the property address directly from the listing. We'll pull the remaining details automatically when available."
             position="top"
             trigger="hover"
             forcePosition={true}
@@ -117,35 +115,6 @@ const PropertySelector: React.FC = () => {
             </div>
           </Tooltip>
         </Box>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              required
-              fullWidth
-              label="City"
-              value={state.selectedProperty?.city || ''}
-              onChange={(e) => handlePropertyChange('city', e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Town / Area (optional)"
-              value={state.selectedProperty?.town || ''}
-              onChange={(e) => handlePropertyChange('town', e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <TextField
-              required
-              fullWidth
-              label="Postcode"
-              value={state.selectedProperty?.postcode || ''}
-              onChange={(e) => handlePropertyChange('postcode', e.target.value)}
-              inputProps={{ style: { textTransform: 'uppercase' } }}
-            />
-          </Grid>
-        </Grid>
       </Box>
 
       {/* Estate Agent Details Section */}

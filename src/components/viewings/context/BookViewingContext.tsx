@@ -12,9 +12,6 @@ interface Agent {
 interface PropertyDetails {
   id?: string;
   street: string;
-  town: string;
-  city: string;
-  postcode: string;
   agent: Agent;
 }
 
@@ -49,9 +46,6 @@ type ActionType =
 const initialState: BookViewingState = {
   selectedProperty: {
     street: '',
-    town: '',
-    city: '',
-    postcode: '',
     agent: {
       id: '',
       name: '',

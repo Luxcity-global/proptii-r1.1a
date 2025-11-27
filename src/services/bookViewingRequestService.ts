@@ -22,9 +22,9 @@ export interface BookViewingRequest {
   agentEmail?: string | null; // OPTIMIZATION: Top-level field for fast queries
   property: {
     street: string;
-    town: string;
-    city: string;
-    postcode: string;
+    town?: string;
+    city?: string;
+    postcode?: string;
     agent: {
       id: string;
       name: string;

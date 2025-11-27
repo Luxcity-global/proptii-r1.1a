@@ -173,7 +173,7 @@ export const generateUserEmailTemplate = (data: EmailTemplateData): string => {
           <p><strong>Here's a summary of what you submitted:</strong></p>
           <p>Date/time requested: ${viewingDate} at ${viewingTime}</p>
           <p>Agent: ${property.agent?.name || 'Not provided'}</p>
-          <p>Address: ${property.street}, ${property.city}, ${property.postcode}</p>
+          <p>Address: ${property.street || 'Not provided'}</p>
         </div>
 
         <div class="message">

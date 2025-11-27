@@ -16,9 +16,6 @@ import { Pagination, Navigation } from "swiper/modules";
 interface PropertyDetails {
   id?: string;
   street: string;
-  town: string;
-  city: string;
-  postcode: string;
   agent: {
     id: string;
     name: string;
@@ -95,7 +92,19 @@ const BookViewing = () => {
     if (prefilledData) {
       try {
         const parsedData = JSON.parse(prefilledData);
-        setPrefilledPropertyData(parsedData);
+        const agentDetails = parsedData.agent || {
+          id: '',
+          name: '',
+          email: '',
+          phone: '',
+          company: ''
+        };
+
+        setPrefilledPropertyData({
+          id: parsedData.id,
+          street: parsedData.street || '',
+          agent: agentDetails
+        });
         // Persist request to Firestore so Viewings page can source from it
         if (user?.id) {
           const writeDraftFallback = () => {
@@ -106,10 +115,7 @@ const BookViewing = () => {
                 propertyId: parsedData.id || 'unknown-property',
                 property: {
                   street: parsedData.street,
-                  town: parsedData.town,
-                  city: parsedData.city,
-                  postcode: parsedData.postcode,
-                  agent: parsedData.agent
+                  agent: agentDetails
                 },
                 viewingDetails: { date: '', time: '', preference: 'In-Person Viewing', userDetails: { fullName: '', email: '', phoneNumber: '' } },
                 status: 'pending'
@@ -131,10 +137,7 @@ const BookViewing = () => {
               parsedData.id || `property_${Date.now()}`,
               {
                 street: parsedData.street,
-                town: parsedData.town,
-                city: parsedData.city,
-                postcode: parsedData.postcode,
-                agent: parsedData.agent
+                agent: agentDetails
               },
               managerInfo
             )

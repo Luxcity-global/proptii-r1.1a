@@ -59,10 +59,7 @@ export const bookingService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           property: {
-            street: property.street,
-            city: property.city,
-            town: property.town || '',
-            postcode: property.postcode
+            street: property.street
           },
           agent: {
             name: property.agent.name,
