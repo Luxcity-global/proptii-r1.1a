@@ -54,13 +54,41 @@ export const bookingService = {
 
   scheduleViewing: async (property: PropertyDetails, viewingDetails: ViewingDetails): Promise<void> => {
     try {
+      // Extract city and postcode from property if available
+      // PropertyDetails may have city and postcode as optional fields
+      const propertyData: any = {
+        street: property.street
+      };
+      
+      // Try to get city and postcode from property object
+      let city = (property as any).city;
+      let postcode = (property as any).postcode;
+      
+      // If city/postcode not directly available, try to extract from street
+      if (!city && !postcode && property.street) {
+        // Try to parse address format: "Street, City, Postcode"
+        const parts = property.street.split(',').map(p => p.trim());
+        if (parts.length >= 2) {
+          city = parts[parts.length - 2];
+        }
+        if (parts.length >= 3) {
+          postcode = parts[parts.length - 1];
+        }
+      }
+      
+      // Only include city and postcode if they have values (since they're optional)
+      if (city) {
+        propertyData.city = city;
+      }
+      if (postcode) {
+        propertyData.postcode = postcode;
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/viewing-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          property: {
-            street: property.street
-          },
+          property: propertyData,
           agent: {
             name: property.agent.name,
             email: property.agent.email,
@@ -74,7 +102,10 @@ export const bookingService = {
         })
       });
 
-      if (!response.ok) throw new Error('Failed to schedule viewing');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to schedule viewing');
+      }
     } catch (error) {
       throw new Error('Error scheduling viewing: ' + (error as Error).message);
     }

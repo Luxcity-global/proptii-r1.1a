@@ -103,13 +103,13 @@ export class EmailService {
             servername: smtpHost
           },
           // Connection timeout (increased for cloud platforms due to network latency)
-          connectionTimeout: this.isCloudPlatform ? 60000 : 30000, // 60s on cloud, 30s local
+          connectionTimeout: this.isCloudPlatform ? 90000 : 30000, // 90s on cloud, 30s local
           // Socket timeout
-          socketTimeout: this.isCloudPlatform ? 60000 : 30000,
+          socketTimeout: this.isCloudPlatform ? 90000 : 30000, // 90s on cloud
           // Greeting timeout
-          greetingTimeout: this.isCloudPlatform ? 30000 : 10000, // Longer on cloud
+          greetingTimeout: this.isCloudPlatform ? 45000 : 10000, // 45s on cloud, 10s local
           // DNS timeout
-          dnsTimeout: this.isCloudPlatform ? 30000 : 30000,
+          dnsTimeout: this.isCloudPlatform ? 45000 : 30000, // 45s on cloud
           // Enable connection pooling for better performance
           pool: true,
           maxConnections: 5,
@@ -719,10 +719,10 @@ export class EmailService {
                   minVersion: 'TLSv1.2',
                   servername: smtpHost
                 },
-                connectionTimeout: this.isCloudPlatform ? 60000 : 30000,
-                socketTimeout: this.isCloudPlatform ? 60000 : 30000,
-                greetingTimeout: this.isCloudPlatform ? 30000 : 10000,
-                dnsTimeout: this.isCloudPlatform ? 30000 : 30000,
+                connectionTimeout: this.isCloudPlatform ? 90000 : 30000, // 90s on cloud
+                socketTimeout: this.isCloudPlatform ? 90000 : 30000, // 90s on cloud
+                greetingTimeout: this.isCloudPlatform ? 45000 : 10000, // 45s on cloud
+                dnsTimeout: this.isCloudPlatform ? 45000 : 30000, // 45s on cloud
                 pool: true,
                 maxConnections: 5,
                 maxMessages: 100,

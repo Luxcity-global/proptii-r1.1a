@@ -98,9 +98,24 @@ export class ViewingRequestService {
           : new Date(createViewingRequestDto.viewing_date);
         const viewingDate = viewingDateObj.toISOString().split('T')[0];
         
+        // Convert DTOs to plain objects for Firestore (Firestore can't serialize class instances)
         const viewingRequestData = {
-          ...createViewingRequestDto,
+          property: {
+            street: createViewingRequestDto.property.street,
+            city: createViewingRequestDto.property.city,
+            town: createViewingRequestDto.property.town,
+            postcode: createViewingRequestDto.property.postcode,
+          },
+          agent: {
+            name: createViewingRequestDto.agent.name,
+            email: createViewingRequestDto.agent.email,
+            phone: createViewingRequestDto.agent.phone,
+            company: createViewingRequestDto.agent.company,
+          },
           viewing_date: viewingDate, // Store as string in YYYY-MM-DD format
+          viewing_time: createViewingRequestDto.viewing_time,
+          preference: createViewingRequestDto.preference,
+          status: createViewingRequestDto.status,
           id: docRef.id,
           type: 'viewing-request',
           createdAt: new Date().toISOString(),
@@ -245,14 +260,19 @@ export class ViewingRequestService {
           throw new NotFoundException(`Viewing request with ID ${id} not found`);
         }
 
-        const updatedViewing = {
-          ...doc.data(),
-          ...updateViewingRequestDto,
+        // Convert update DTO to plain object for Firestore
+        const updateData: any = {
           updatedAt: new Date().toISOString()
         };
+        
+        // Only include fields that are being updated
+        if (updateViewingRequestDto.status) {
+          updateData.status = updateViewingRequestDto.status;
+        }
 
-        await docRef.update(updatedViewing);
-        return { id: doc.id, ...updatedViewing };
+        await docRef.update(updateData);
+        const updatedDoc = await docRef.get();
+        return { id: doc.id, ...updatedDoc.data() };
       }
       
       throw new BadRequestException('Viewing request service is not available. Database is not configured.');
