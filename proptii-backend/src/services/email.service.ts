@@ -43,9 +43,34 @@ export class EmailService {
   private isConfigured: boolean = false;
   private fromAddress: string;
   private sendgridEnabled = false;
+  private isCloudPlatform: boolean = false;
 
   constructor() {
-    // Initialize SMTP with Nodemailer
+    // Detect if we're on a cloud platform (Render, Heroku, etc.)
+    this.isCloudPlatform = !!(
+      process.env.RENDER ||
+      process.env.HEROKU_APP_NAME ||
+      process.env.VERCEL ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.K_SERVICE // Google Cloud Run
+    );
+
+    // Initialize SendGrid as fallback only (not preferred)
+    const sendgridKey = process.env.SENDGRID_API_KEY;
+    if (sendgridKey) {
+      try {
+        sgMail.setApiKey(sendgridKey);
+        this.sendgridEnabled = true;
+        console.log('✅ SendGrid email fallback enabled (SMTP is primary)');
+      } catch (error) {
+        console.warn('⚠️ Failed to initialize SendGrid client:', error);
+        this.sendgridEnabled = false;
+      }
+    } else {
+      console.log('ℹ️ SendGrid API key not set - SMTP only mode');
+    }
+
+    // Initialize SMTP with Nodemailer (primary method)
     const smtpHost = process.env.SMTP_HOST;
     const smtpPort = process.env.SMTP_PORT;
     const smtpUser = process.env.SMTP_USER;
@@ -54,11 +79,17 @@ export class EmailService {
 
     if (smtpHost && smtpPort && smtpUser && smtpPass) {
       try {
+        const port = parseInt(smtpPort);
+        // On cloud platforms, use port 587 with STARTTLS instead of 465 (465 is often blocked)
+        // Port 587 is more reliable on cloud hosting providers
+        const usePort = this.isCloudPlatform && port === 465 ? 587 : port;
+        const isSecure = usePort === 465;
+        
         this.transporter = nodemailer.createTransport({
           host: smtpHost,
-          port: parseInt(smtpPort),
-          secure: parseInt(smtpPort) === 465, // true for 465, false for other ports
-          requireTLS: parseInt(smtpPort) !== 465, // Require TLS for non-465 ports
+          port: usePort,
+          secure: isSecure, // true for 465, false for other ports
+          requireTLS: !isSecure, // Require TLS for non-465 ports
           auth: {
             user: smtpUser,
             pass: smtpPass,
@@ -67,20 +98,33 @@ export class EmailService {
             // Do not fail on invalid certificates
             rejectUnauthorized: false,
             // Explicitly set TLS version
-            minVersion: 'TLSv1.2'
+            minVersion: 'TLSv1.2',
+            // Enable SNI (Server Name Indication)
+            servername: smtpHost
           },
-          // Connection timeout
-          connectionTimeout: 30000, // 30 seconds (increased for Render's network)
+          // Connection timeout (increased for cloud platforms due to network latency)
+          connectionTimeout: this.isCloudPlatform ? 60000 : 30000, // 60s on cloud, 30s local
           // Socket timeout
-          socketTimeout: 30000, // 30 seconds
+          socketTimeout: this.isCloudPlatform ? 60000 : 30000,
           // Greeting timeout
-          greetingTimeout: 10000, // 10 seconds
+          greetingTimeout: this.isCloudPlatform ? 30000 : 10000, // Longer on cloud
+          // DNS timeout
+          dnsTimeout: this.isCloudPlatform ? 30000 : 30000,
+          // Enable connection pooling for better performance
+          pool: true,
+          maxConnections: 5,
+          maxMessages: 100,
           // Debug mode (can be removed in production)
           debug: process.env.NODE_ENV === 'development',
           logger: process.env.NODE_ENV === 'development'
         });
         this.isConfigured = true;
-        console.log(`✅ Email service initialized with SMTP (${smtpHost}:${smtpPort})`);
+        if (usePort !== port) {
+          console.log(`✅ Email service initialized with SMTP (${smtpHost}:${usePort}, auto-switched from ${port} for cloud compatibility)`);
+          console.log(`   Using STARTTLS on port ${usePort} (more reliable on cloud platforms)`);
+        } else {
+          console.log(`✅ Email service initialized with SMTP (${smtpHost}:${usePort})`);
+        }
       } catch (error) {
         console.warn('⚠️ Failed to initialize SMTP:', error);
         this.isConfigured = false;
@@ -89,20 +133,6 @@ export class EmailService {
       console.warn('⚠️ Email service not configured - SMTP credentials not set');
       console.warn('   Required: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS');
       this.isConfigured = false;
-    }
-
-    const sendgridKey = process.env.SENDGRID_API_KEY;
-    if (sendgridKey) {
-      try {
-        sgMail.setApiKey(sendgridKey);
-        this.sendgridEnabled = true;
-        console.log('✅ SendGrid email fallback enabled');
-      } catch (error) {
-        console.warn('⚠️ Failed to initialize SendGrid client:', error);
-        this.sendgridEnabled = false;
-      }
-    } else {
-      console.log('ℹ️ SendGrid API key not set - HTTP fallback disabled');
     }
   }
 
@@ -621,6 +651,7 @@ export class EmailService {
     const fallbackBody = htmlContent || emailData.text || 'No content provided';
     let lastError: Error | null = null;
 
+    // Try SMTP first (primary method)
     if (this.isConfigured && this.transporter) {
       for (let attempt = 1; attempt <= retries; attempt++) {
         try {
@@ -663,29 +694,38 @@ export class EmailService {
               // Ignore close errors
             }
             
-            // Recreate transporter
+            // Recreate transporter with improved settings
             const smtpHost = process.env.SMTP_HOST;
             const smtpPort = process.env.SMTP_PORT;
             const smtpUser = process.env.SMTP_USER;
             const smtpPass = process.env.SMTP_PASS;
             
             if (smtpHost && smtpPort && smtpUser && smtpPass) {
+              const port = parseInt(smtpPort);
+              const usePort = this.isCloudPlatform && port === 465 ? 587 : port;
+              const isSecure = usePort === 465;
+              
               this.transporter = nodemailer.createTransport({
                 host: smtpHost,
-                port: parseInt(smtpPort),
-                secure: parseInt(smtpPort) === 465,
-                requireTLS: parseInt(smtpPort) !== 465,
+                port: usePort,
+                secure: isSecure,
+                requireTLS: !isSecure,
                 auth: {
                   user: smtpUser,
                   pass: smtpPass,
                 },
                 tls: {
                   rejectUnauthorized: false,
-                  minVersion: 'TLSv1.2'
+                  minVersion: 'TLSv1.2',
+                  servername: smtpHost
                 },
-                connectionTimeout: 30000,
-                socketTimeout: 30000,
-                greetingTimeout: 10000,
+                connectionTimeout: this.isCloudPlatform ? 60000 : 30000,
+                socketTimeout: this.isCloudPlatform ? 60000 : 30000,
+                greetingTimeout: this.isCloudPlatform ? 30000 : 10000,
+                dnsTimeout: this.isCloudPlatform ? 30000 : 30000,
+                pool: true,
+                maxConnections: 5,
+                maxMessages: 100,
                 debug: process.env.NODE_ENV === 'development',
                 logger: process.env.NODE_ENV === 'development'
               });
