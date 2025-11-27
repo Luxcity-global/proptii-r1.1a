@@ -28,17 +28,21 @@ export class ViewingRequestService {
         throw new BadRequestException('Viewing request service is not available. Cosmos DB is not configured.');
       }
 
-      // Check for conflicting viewings
-      const { resources: conflictingViewings } = await this.container.items
-        .query({
-          query: 'SELECT * FROM c WHERE c.viewing_date = @date AND c.viewing_time = @time AND c.property.postcode = @postcode',
-          parameters: [
-            { name: '@date', value: createViewingRequestDto.viewing_date },
-            { name: '@time', value: createViewingRequestDto.viewing_time },
-            { name: '@postcode', value: createViewingRequestDto.property.postcode }
-          ]
-        })
-        .fetchAll();
+      // Check for conflicting viewings (only if postcode is provided)
+      let conflictingViewings: any[] = [];
+      if (createViewingRequestDto.property.postcode) {
+        const result = await this.container.items
+          .query({
+            query: 'SELECT * FROM c WHERE c.viewing_date = @date AND c.viewing_time = @time AND c.property.postcode = @postcode',
+            parameters: [
+              { name: '@date', value: createViewingRequestDto.viewing_date },
+              { name: '@time', value: createViewingRequestDto.viewing_time },
+              { name: '@postcode', value: createViewingRequestDto.property.postcode }
+            ]
+          })
+          .fetchAll();
+        conflictingViewings = result.resources;
+      }
 
       if (conflictingViewings.length > 0) {
         throw new BadRequestException('This viewing slot is already booked');

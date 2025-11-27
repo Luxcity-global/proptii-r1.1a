@@ -6,17 +6,17 @@ class PropertyDto {
   @IsString()
   street: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  city: string;
+  city?: string;
 
   @IsOptional()
   @IsString()
-  town: string;
+  town?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  postcode: string;
+  postcode?: string;
 }
 
 class AgentDto {

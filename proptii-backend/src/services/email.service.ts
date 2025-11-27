@@ -58,10 +58,26 @@ export class EmailService {
           host: smtpHost,
           port: parseInt(smtpPort),
           secure: parseInt(smtpPort) === 465, // true for 465, false for other ports
+          requireTLS: parseInt(smtpPort) !== 465, // Require TLS for non-465 ports
           auth: {
             user: smtpUser,
             pass: smtpPass,
           },
+          tls: {
+            // Do not fail on invalid certificates
+            rejectUnauthorized: false,
+            // Explicitly set TLS version
+            minVersion: 'TLSv1.2'
+          },
+          // Connection timeout
+          connectionTimeout: 30000, // 30 seconds (increased for Render's network)
+          // Socket timeout
+          socketTimeout: 30000, // 30 seconds
+          // Greeting timeout
+          greetingTimeout: 10000, // 10 seconds
+          // Debug mode (can be removed in production)
+          debug: process.env.NODE_ENV === 'development',
+          logger: process.env.NODE_ENV === 'development'
         });
         this.isConfigured = true;
         console.log(`✅ Email service initialized with SMTP (${smtpHost}:${smtpPort})`);
@@ -596,7 +612,7 @@ export class EmailService {
     };
   }
 
-  async sendEmail(emailData: EmailData): Promise<any> {
+  async sendEmail(emailData: EmailData, retries = 3): Promise<any> {
     let htmlContent = emailData.html;
     if (!htmlContent && emailData.formData && emailData.emailType) {
       htmlContent = this.generateEmailTemplate(emailData.formData, emailData.emailType);
@@ -606,35 +622,91 @@ export class EmailService {
     let lastError: Error | null = null;
 
     if (this.isConfigured && this.transporter) {
-      try {
-        const mailOptions = {
-          from: this.fromAddress,
-          to: emailData.to,
-          subject: emailData.subject,
-          html: fallbackBody,
-          text: emailData.text,
-          attachments: emailData.attachments || [],
-        };
-
-        console.log(`📧 Sending email via SMTP to: ${emailData.to}`);
-        const result = await this.transporter.sendMail(mailOptions);
-        console.log(`✅ Email sent successfully via SMTP to ${emailData.to}`);
-
-        return {
-          success: true,
-          messageId: result.messageId,
-        };
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error('Failed to send email via SMTP');
-        console.error('❌ SMTP error while sending email:', error);
-        if (!this.sendgridEnabled) {
-          return {
-            success: false,
-            error: lastError.message,
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          const mailOptions = {
+            from: this.fromAddress,
+            to: emailData.to,
+            subject: emailData.subject,
+            html: fallbackBody,
+            text: emailData.text,
+            attachments: emailData.attachments || [],
           };
+
+          console.log(`📧 Sending email via SMTP to: ${emailData.to} (attempt ${attempt}/${retries})`);
+          const result = await this.transporter.sendMail(mailOptions);
+          console.log(`✅ Email sent successfully via SMTP to ${emailData.to}`);
+
+          return {
+            success: true,
+            messageId: result.messageId,
+          };
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error('Failed to send email via SMTP');
+          console.error(`❌ SMTP error while sending email (attempt ${attempt}/${retries}):`, error);
+          
+          // Check if it's a retryable error
+          const isRetryable = (error as any)?.code === 'ECONNRESET' || 
+                             (error as any)?.code === 'ESOCKET' ||
+                             (error as any)?.code === 'ETIMEDOUT' ||
+                             (error as any)?.code === 'ECONNREFUSED';
+          
+          if (attempt < retries && isRetryable) {
+            const waitTime = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
+            console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            
+            // Try to recreate transporter on connection errors
+            try {
+              await this.transporter?.close();
+            } catch (closeError) {
+              // Ignore close errors
+            }
+            
+            // Recreate transporter
+            const smtpHost = process.env.SMTP_HOST;
+            const smtpPort = process.env.SMTP_PORT;
+            const smtpUser = process.env.SMTP_USER;
+            const smtpPass = process.env.SMTP_PASS;
+            
+            if (smtpHost && smtpPort && smtpUser && smtpPass) {
+              this.transporter = nodemailer.createTransport({
+                host: smtpHost,
+                port: parseInt(smtpPort),
+                secure: parseInt(smtpPort) === 465,
+                requireTLS: parseInt(smtpPort) !== 465,
+                auth: {
+                  user: smtpUser,
+                  pass: smtpPass,
+                },
+                tls: {
+                  rejectUnauthorized: false,
+                  minVersion: 'TLSv1.2'
+                },
+                connectionTimeout: 30000,
+                socketTimeout: 30000,
+                greetingTimeout: 10000,
+                debug: process.env.NODE_ENV === 'development',
+                logger: process.env.NODE_ENV === 'development'
+              });
+            }
+            
+            continue;
+          }
+          
+          // If all retries failed or it's not a retryable error, break and try SendGrid
+          break;
         }
-        console.warn('⚠️ Falling back to SendGrid after SMTP failure.');
       }
+      
+      // If we get here, all retries failed
+      if (!this.sendgridEnabled) {
+        return {
+          success: false,
+          error: lastError?.message || 'Failed to send email via SMTP',
+        };
+      }
+      console.warn('⚠️ Falling back to SendGrid after SMTP failure.');
     } else {
       console.warn('⚠️ SMTP email transport not configured. Checking SendGrid fallback.');
     }
