@@ -197,12 +197,12 @@ export class ViewingRequestService {
       
       const missingConfig = [];
       if (!process.env.COSMOS_DB_CONNECTION_STRING || !process.env.COSMOS_DB_KEY) {
-        missingConfig.push('Cosmos DB');
+        missingConfig.push('Cosmos DB (COSMOS_DB_CONNECTION_STRING, COSMOS_DB_KEY)');
       }
       if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY) {
-        missingConfig.push('Firestore');
+        missingConfig.push('Firestore (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY)');
       }
-      throw new NotFoundException(`Viewing request service is not available. Database is not configured. Missing: ${missingConfig.join(' or ')}.`);
+      throw new NotFoundException(`Viewing request service is not available. Database is not configured. Missing: ${missingConfig.join(' or ')}. Please configure at least one database in your environment variables.`);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
@@ -300,12 +300,12 @@ export class ViewingRequestService {
       
       const missingConfig = [];
       if (!process.env.COSMOS_DB_CONNECTION_STRING || !process.env.COSMOS_DB_KEY) {
-        missingConfig.push('Cosmos DB');
+        missingConfig.push('Cosmos DB (COSMOS_DB_CONNECTION_STRING, COSMOS_DB_KEY)');
       }
       if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY) {
-        missingConfig.push('Firestore');
+        missingConfig.push('Firestore (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY)');
       }
-      throw new BadRequestException(`Viewing request service is not available. Database is not configured. Missing: ${missingConfig.join(' or ')}.`);
+      throw new BadRequestException(`Viewing request service is not available. Database is not configured. Missing: ${missingConfig.join(' or ')}. Please configure at least one database in your environment variables.`);
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
@@ -335,12 +335,12 @@ export class ViewingRequestService {
       
       const missingConfig = [];
       if (!process.env.COSMOS_DB_CONNECTION_STRING || !process.env.COSMOS_DB_KEY) {
-        missingConfig.push('Cosmos DB');
+        missingConfig.push('Cosmos DB (COSMOS_DB_CONNECTION_STRING, COSMOS_DB_KEY)');
       }
       if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY) {
-        missingConfig.push('Firestore');
+        missingConfig.push('Firestore (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY)');
       }
-      throw new NotFoundException(`Viewing request service is not available. Database is not configured. Missing: ${missingConfig.join(' or ')}.`);
+      throw new NotFoundException(`Viewing request service is not available. Database is not configured. Missing: ${missingConfig.join(' or ')}. Please configure at least one database in your environment variables.`);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;

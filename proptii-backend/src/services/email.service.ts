@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
-import * as sgMail from '@sendgrid/mail';
-
-type SendGridAttachment = NonNullable<sgMail.MailDataRequired['attachments']>[number];
 
 interface EmailAttachment {
   filename: string;
@@ -42,7 +39,6 @@ export class EmailService {
   private transporter: nodemailer.Transporter | null = null;
   private isConfigured: boolean = false;
   private fromAddress: string;
-  private sendgridEnabled = false;
   private isCloudPlatform: boolean = false;
 
   constructor() {
@@ -55,22 +51,7 @@ export class EmailService {
       process.env.K_SERVICE // Google Cloud Run
     );
 
-    // Initialize SendGrid as fallback only (not preferred)
-    const sendgridKey = process.env.SENDGRID_API_KEY;
-    if (sendgridKey) {
-      try {
-        sgMail.setApiKey(sendgridKey);
-        this.sendgridEnabled = true;
-        console.log('✅ SendGrid email fallback enabled (SMTP is primary)');
-      } catch (error) {
-        console.warn('⚠️ Failed to initialize SendGrid client:', error);
-        this.sendgridEnabled = false;
-      }
-    } else {
-      console.log('ℹ️ SendGrid API key not set - SMTP only mode');
-    }
-
-    // Initialize SMTP with Nodemailer (primary method)
+    // Initialize SMTP with Nodemailer
     const smtpHost = process.env.SMTP_HOST;
     const smtpPort = process.env.SMTP_PORT;
     const smtpUser = process.env.SMTP_USER;
@@ -102,14 +83,14 @@ export class EmailService {
             // Enable SNI (Server Name Indication)
             servername: smtpHost
           },
-          // Connection timeout (increased for cloud platforms due to network latency)
-          connectionTimeout: this.isCloudPlatform ? 90000 : 30000, // 90s on cloud, 30s local
+          // Connection timeout (reduced for cloud platforms - many block SMTP)
+          connectionTimeout: this.isCloudPlatform ? 15000 : 30000, // 15s on cloud (fail fast), 30s local
           // Socket timeout
-          socketTimeout: this.isCloudPlatform ? 90000 : 30000, // 90s on cloud
+          socketTimeout: this.isCloudPlatform ? 15000 : 30000, // 15s on cloud, 30s local
           // Greeting timeout
-          greetingTimeout: this.isCloudPlatform ? 45000 : 10000, // 45s on cloud, 10s local
+          greetingTimeout: this.isCloudPlatform ? 10000 : 10000, // 10s on both
           // DNS timeout
-          dnsTimeout: this.isCloudPlatform ? 45000 : 30000, // 45s on cloud
+          dnsTimeout: this.isCloudPlatform ? 10000 : 30000, // 10s on cloud, 30s local
           // Enable connection pooling for better performance
           pool: true,
           maxConnections: 5,
@@ -594,54 +575,6 @@ export class EmailService {
     }
   }
 
-  private formatSendGridAttachments(attachments: EmailAttachment[] = []): SendGridAttachment[] {
-    return attachments
-      .filter((attachment): attachment is EmailAttachment & { content: string | Buffer } => !!attachment?.content)
-      .map((attachment) => {
-        const buffer = typeof attachment.content === 'string'
-          ? Buffer.from(attachment.content)
-          : attachment.content;
-
-        return {
-          content: buffer.toString('base64'),
-          filename: attachment.filename || 'attachment',
-          type: attachment.contentType || 'application/octet-stream',
-          disposition: 'attachment'
-        } as SendGridAttachment;
-      });
-  }
-
-  private async sendViaSendGrid(emailData: EmailData, htmlContent: string) {
-    if (!this.sendgridEnabled) {
-      throw new Error('SendGrid is not configured');
-    }
-
-    const msg: sgMail.MailDataRequired = {
-      to: emailData.to,
-      from: this.fromAddress,
-      subject: emailData.subject,
-      html: htmlContent || emailData.text || 'No content provided',
-    };
-
-    if (emailData.text) {
-      msg.text = emailData.text;
-    }
-
-    const attachments = this.formatSendGridAttachments(emailData.attachments);
-    if (attachments.length) {
-      msg.attachments = attachments;
-    }
-
-    console.log(`📧 Sending email via SendGrid to: ${emailData.to}`);
-    const [response] = await sgMail.send(msg);
-    const messageId = response?.headers?.['x-message-id'] || response?.headers?.['x-sendgrid-message-id'];
-
-    return {
-      success: true,
-      messageId,
-    };
-  }
-
   async sendEmail(emailData: EmailData, retries = 3): Promise<any> {
     let htmlContent = emailData.html;
     if (!htmlContent && emailData.formData && emailData.emailType) {
@@ -674,13 +607,25 @@ export class EmailService {
           };
         } catch (error) {
           lastError = error instanceof Error ? error : new Error('Failed to send email via SMTP');
+          const errorCode = (error as any)?.code;
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          
           console.error(`❌ SMTP error while sending email (attempt ${attempt}/${retries}):`, error);
+          console.error(`   Error code: ${errorCode || 'UNKNOWN'}`);
+          console.error(`   Error message: ${errorMessage}`);
+          
+          // On cloud platforms, connection timeouts often mean SMTP is blocked
+          if (this.isCloudPlatform && errorCode === 'ETIMEDOUT') {
+            console.warn('⚠️ SMTP connection timeout on cloud platform. This often indicates SMTP is blocked by the hosting provider.');
+            console.warn('   Consider using a different SMTP provider or email service API that works with cloud platforms.');
+          }
           
           // Check if it's a retryable error
-          const isRetryable = (error as any)?.code === 'ECONNRESET' || 
-                             (error as any)?.code === 'ESOCKET' ||
-                             (error as any)?.code === 'ETIMEDOUT' ||
-                             (error as any)?.code === 'ECONNREFUSED';
+          const isRetryable = errorCode === 'ECONNRESET' || 
+                             errorCode === 'ESOCKET' ||
+                             errorCode === 'ECONNREFUSED' ||
+                             // Only retry ETIMEDOUT on non-cloud platforms (cloud platforms often block SMTP)
+                             (errorCode === 'ETIMEDOUT' && !this.isCloudPlatform);
           
           if (attempt < retries && isRetryable) {
             const waitTime = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
@@ -719,10 +664,10 @@ export class EmailService {
                   minVersion: 'TLSv1.2',
                   servername: smtpHost
                 },
-                connectionTimeout: this.isCloudPlatform ? 90000 : 30000, // 90s on cloud
-                socketTimeout: this.isCloudPlatform ? 90000 : 30000, // 90s on cloud
-                greetingTimeout: this.isCloudPlatform ? 45000 : 10000, // 45s on cloud
-                dnsTimeout: this.isCloudPlatform ? 45000 : 30000, // 45s on cloud
+                connectionTimeout: this.isCloudPlatform ? 15000 : 30000, // 15s on cloud (fail fast)
+                socketTimeout: this.isCloudPlatform ? 15000 : 30000, // 15s on cloud
+                greetingTimeout: this.isCloudPlatform ? 10000 : 10000, // 10s on both
+                dnsTimeout: this.isCloudPlatform ? 10000 : 30000, // 10s on cloud
                 pool: true,
                 maxConnections: 5,
                 maxMessages: 100,
@@ -734,34 +679,23 @@ export class EmailService {
             continue;
           }
           
-          // If all retries failed or it's not a retryable error, break and try SendGrid
+          // If all retries failed or it's not a retryable error, break
           break;
         }
       }
       
       // If we get here, all retries failed
-      if (!this.sendgridEnabled) {
-        return {
-          success: false,
-          error: lastError?.message || 'Failed to send email via SMTP',
-        };
+      const errorMsg = lastError?.message || 'Failed to send email via SMTP';
+      if (this.isCloudPlatform) {
+        console.error('❌ SMTP failed on cloud platform. SMTP connections are often blocked by cloud hosting providers.');
+        console.error('   Solution: Use an SMTP provider that works with cloud platforms, or configure a proxy.');
       }
-      console.warn('⚠️ Falling back to SendGrid after SMTP failure.');
+      return {
+        success: false,
+        error: errorMsg,
+      };
     } else {
-      console.warn('⚠️ SMTP email transport not configured. Checking SendGrid fallback.');
-    }
-
-    if (this.sendgridEnabled) {
-      try {
-        return await this.sendViaSendGrid(emailData, fallbackBody);
-      } catch (sendgridError) {
-        lastError = sendgridError instanceof Error ? sendgridError : new Error('Failed to send email via SendGrid');
-        console.error('❌ SendGrid error while sending email:', sendgridError);
-        return {
-          success: false,
-          error: lastError.message,
-        };
-      }
+      console.warn('⚠️ SMTP email transport not configured.');
     }
 
     return {
