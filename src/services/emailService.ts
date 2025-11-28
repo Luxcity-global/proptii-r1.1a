@@ -1,5 +1,6 @@
 import axios from 'axios';
 import JSZip from 'jszip';
+import { API_BASE_CANDIDATES, buildApiUrl, PRIMARY_API_BASE_URL } from '../utils/apiEndpoints';
 
 interface EmailAttachment {
   filename: string;
@@ -56,20 +57,18 @@ interface MultiEmailResult {
   error?: string;
 }
 
+const DEFAULT_BROWSER_FALLBACK = window.location.hostname === 'localhost'
+  ? 'http://localhost:3000/api'
+  : 'https://proptii-r1-1a-new-backend.onrender.com/api';
+
+const API_BASE_URLS = API_BASE_CANDIDATES.length > 0 ? API_BASE_CANDIDATES : [DEFAULT_BROWSER_FALLBACK];
+
 // Use VITE_API_URL if available, otherwise fallback to defaults
-const API_BASE_URL = (() => {
-  const envApiUrl = import.meta.env.VITE_API_URL || '';
-  if (envApiUrl) {
-    const baseUrl = envApiUrl.replace(/\/$/, ''); // Remove trailing slash
-    return baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
-  }
-  return window.location.hostname === 'localhost'
-    ? 'http://localhost:3000/api'
-    : 'https://proptii-r1-1a-new-backend.onrender.com/api';
-})();
+const API_BASE_URL = PRIMARY_API_BASE_URL || API_BASE_URLS[0];
 
 class EmailService {
   private readonly API_URL = API_BASE_URL;
+  private readonly apiBases = API_BASE_URLS;
 
   private generateEmailTemplate(formData: any): string {
     const identity = formData.identity || {};
@@ -251,14 +250,19 @@ class EmailService {
         emailType: emailContent.emailType || 'agent'
       });
 
-      // Create FormData to handle file uploads
-      const formData = new FormData();
+      const buildFormData = (zipFile: File | null) => {
+        const payload = new FormData();
+        payload.append('to', emailContent.to);
+        payload.append('subject', emailContent.subject);
+        payload.append('formData', JSON.stringify(emailContent.formData));
+        payload.append('emailType', emailContent.emailType || 'agent');
+        if (zipFile) {
+          payload.append('attachments', zipFile);
+        }
+        return payload;
+      };
 
-      // Add email metadata
-      formData.append('to', emailContent.to);
-      formData.append('subject', emailContent.subject);
-      formData.append('formData', JSON.stringify(emailContent.formData));
-      formData.append('emailType', emailContent.emailType || 'agent');
+      let zipAttachment: File | null = null;
 
       // Only create zip file for referencing agent emails
       if (emailContent.emailType === 'agent' && emailContent.attachments?.length > 0) {
@@ -311,73 +315,59 @@ class EmailService {
           { type: 'application/zip' }
         );
 
-        // Add zip file to FormData
-        formData.append('attachments', zipFile);
+        zipAttachment = zipFile;
       }
 
-      // Send to backend (primary API URL)
-      const primaryUrl = `${this.API_URL}/referencing/send-email`;
-      let response = await axios.post(primaryUrl, formData, {
+      const axiosConfig = {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 60000, // Increased timeout for larger files
-        maxContentLength: 100 * 1024 * 1024, // 100MB max
-        maxBodyLength: 100 * 1024 * 1024 // 100MB max
-      });
-
-      console.log('Server response:', response.data);
-
-      if (!response.data.success) {
-        throw new Error(response.data.error || 'Failed to send email');
-      }
-
-      return {
-        success: true,
-        messageId: response.data.messageId
+        timeout: 60000,
+        maxContentLength: 100 * 1024 * 1024,
+        maxBodyLength: 100 * 1024 * 1024
       };
-    } catch (error) {
-      // If the primary endpoint fails (e.g., local backend not running), try fallback hosted API
-      const fallbackBase = 'https://proptii-r1-1a-new-backend.onrender.com/api';
-      try {
-        if (axios.isAxiosError(error)) {
-          console.error('Axios error details:', {
-            status: error.response?.status,
-            data: error.response?.data,
-            message: error.message
-          });
+
+      const errorLog: string[] = [];
+
+      for (const base of this.apiBases) {
+        const targetUrl = buildApiUrl(base, '/referencing/send-email');
+        try {
+          console.info(`[EmailService] Sending referencing email via ${targetUrl}`);
+          const response = await axios.post(targetUrl, buildFormData(zipAttachment), axiosConfig);
+
+          if (!response.data.success) {
+            throw new Error(response.data.error || 'Failed to send email');
+          }
+
+          console.log('Server response:', response.data);
+          return {
+            success: true,
+            messageId: response.data.messageId
+          };
+        } catch (error) {
+          const shouldRetry = axios.isAxiosError(error) ? !error.response : false;
+          const errMessage = axios.isAxiosError(error)
+            ? `${error.message}${error.code ? ` (${error.code})` : ''}`
+            : (error instanceof Error ? error.message : 'Unknown error');
+          errorLog.push(`[${targetUrl}] ${errMessage}`);
+
+          if (!shouldRetry) {
+            throw new Error(`Email submission failed: ${errorLog.join(' | ')}`);
+          }
+
+          console.warn(`[EmailService] Retrying with next API base due to network error at ${targetUrl}`);
         }
-
-        const fallbackUrl = `${fallbackBase}/referencing/send-email`;
-        console.warn(`Primary API failed. Retrying with fallback: ${fallbackUrl}`);
-
-        const formData = new FormData();
-        formData.append('to', emailContent.to);
-        formData.append('subject', emailContent.subject);
-        formData.append('formData', JSON.stringify(emailContent.formData));
-        formData.append('emailType', emailContent.emailType || 'agent');
-
-        const response = await axios.post(fallbackUrl, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 60000,
-          maxContentLength: 100 * 1024 * 1024,
-          maxBodyLength: 100 * 1024 * 1024
-        });
-
-        if (!response.data.success) {
-          throw new Error(response.data.error || 'Failed to send email (fallback)');
-        }
-
-        return { success: true, messageId: response.data.messageId };
-      } catch (fallbackError) {
-        console.error('Error sending email (fallback):', fallbackError);
-        return {
-          success: false,
-          error: axios.isAxiosError(fallbackError)
-            ? fallbackError.message
-            : (fallbackError instanceof Error ? fallbackError.message : 'Unknown error occurred')
-        };
       }
+
+      throw new Error(`Email submission failed for all API bases: ${errorLog.join(' | ')}`);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      return {
+        success: false,
+        error: axios.isAxiosError(error)
+          ? error.message
+          : (error instanceof Error ? error.message : 'Unknown error occurred')
+      };
     }
   }
 

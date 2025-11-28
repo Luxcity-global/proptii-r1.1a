@@ -1,12 +1,13 @@
 import { PropertyDetails, ViewingDetails } from '../context/BookViewingContext';
+import { fetchWithApiFallback } from '../../../utils/apiEndpoints';
 
-// API base URL - use Vite environment variable
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+const VIEWINGS_PATH = '/api/viewing-requests';
+const SEARCH_PATH = '/api/search';
 
 export const bookingService = {
   searchProperty: async (query: string): Promise<PropertyDetails> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/search`, {
+      const { response } = await fetchWithApiFallback(SEARCH_PATH, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -30,7 +31,7 @@ export const bookingService = {
 
   searchPropertyListings: async (propertyUrl: string): Promise<PropertyDetails[]> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/search`, {
+      const { response } = await fetchWithApiFallback(SEARCH_PATH, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -84,7 +85,7 @@ export const bookingService = {
         propertyData.postcode = postcode;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/viewing-requests`, {
+      const init: RequestInit = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -100,11 +101,17 @@ export const bookingService = {
           preference: viewingDetails.preference,
           status: 'PENDING'
         })
-      });
+      };
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to schedule viewing');
+      try {
+        const { response } = await fetchWithApiFallback(VIEWINGS_PATH, init);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to schedule viewing');
+        }
+      } catch (networkError) {
+        console.error('All viewing request endpoints failed:', networkError);
+        throw networkError;
       }
     } catch (error) {
       throw new Error('Error scheduling viewing: ' + (error as Error).message);
