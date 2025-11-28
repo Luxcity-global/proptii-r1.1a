@@ -22,15 +22,21 @@ export async function initializeFirestore(): Promise<Firestore | null> {
       return null;
     }
 
+    // Check if all required credentials are provided
+    if (!clientEmail || !privateKey) {
+      logger.warn('⚠️ Firestore not configured - FIREBASE_CLIENT_EMAIL or FIREBASE_PRIVATE_KEY not set');
+      logger.warn('   The application will work without Firestore persistence');
+      logger.warn('   To enable Firestore, set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY in your environment variables');
+      return null;
+    }
+
     // Initialize Firebase Admin with credentials
     if (!admin.apps.length) {
-      const credential = clientEmail && privateKey
-        ? admin.credential.cert({
-            projectId,
-            clientEmail,
-            privateKey: privateKey.replace(/\\n/g, '\n'), // Handle escaped newlines
-          })
-        : admin.credential.applicationDefault(); // Use default credentials if available
+      const credential = admin.credential.cert({
+        projectId,
+        clientEmail,
+        privateKey: privateKey.replace(/\\n/g, '\n'), // Handle escaped newlines
+      });
 
       admin.initializeApp({
         credential,
