@@ -88,21 +88,35 @@ export async function initializeFirestore(): Promise<Firestore | null> {
       // The user must provide FIREBASE_CLIENT_EMAIL from their service account JSON file
       
       // Option 3: Try application default credentials (for GCP environments)
+      // IMPORTANT: When using application default credentials, projectId MUST be explicitly set
+      // Otherwise Firestore will fail with "Unable to detect a Project Id" when trying to use it
       if (!credential) {
-        try {
-          credential = admin.credential.applicationDefault();
-          initializedWith = 'application default credentials';
-          logger.log('ℹ️ Using application default credentials');
-        } catch (error) {
-          logger.warn(`⚠️ Application default credentials not available: ${error.message}`);
+        if (projectId && projectId.trim() !== '') {
+          try {
+            credential = admin.credential.applicationDefault();
+            initializedWith = 'application default credentials';
+            logger.log('ℹ️ Using application default credentials');
+          } catch (error) {
+            logger.warn(`⚠️ Application default credentials not available: ${error.message}`);
+          }
+        } else {
+          logger.warn('⚠️ Cannot use application default credentials: FIREBASE_PROJECT_ID is required');
         }
       }
 
       // If we have a credential, initialize the app
       if (credential) {
         const initOptions: any = { credential };
-        if (projectId) {
+        
+        // CRITICAL: projectId MUST be set when using application default credentials
+        // Otherwise Firestore operations will fail with "Unable to detect a Project Id"
+        if (projectId && projectId.trim() !== '') {
           initOptions.projectId = projectId.trim();
+        } else {
+          // If we're using application default credentials but no projectId, we can't proceed
+          logger.error('❌ FIREBASE_PROJECT_ID is required when using application default credentials');
+          logger.warn('   Firestore cannot be initialized without a project ID');
+          return null;
         }
         
         admin.initializeApp(initOptions);

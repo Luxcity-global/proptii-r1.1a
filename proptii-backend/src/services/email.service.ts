@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 interface EmailAttachment {
   filename: string;
@@ -37,6 +38,7 @@ interface MultiEmailData {
 @Injectable()
 export class EmailService {
   private transporter: nodemailer.Transporter | null = null;
+  private resend: Resend | null = null;
   private isConfigured: boolean = false;
   private fromAddress: string;
   private isCloudPlatform: boolean = false;
@@ -114,6 +116,22 @@ export class EmailService {
       console.warn('⚠️ Email service not configured - SMTP credentials not set');
       console.warn('   Required: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS');
       this.isConfigured = false;
+    }
+
+    // Initialize Resend for cloud platforms (Render, etc.) - only if on cloud platform
+    if (this.isCloudPlatform) {
+      const resendApiKey = process.env.RESEND_API_KEY;
+      if (resendApiKey) {
+        try {
+          this.resend = new Resend(resendApiKey);
+          console.log('✅ Resend initialized for cloud platform (will be used instead of SMTP)');
+        } catch (error) {
+          console.warn('⚠️ Failed to initialize Resend:', error);
+        }
+      } else {
+        console.warn('⚠️ RESEND_API_KEY not set. On cloud platforms, SMTP may be blocked.');
+        console.warn('   Set RESEND_API_KEY for reliable email delivery on Render.');
+      }
     }
   }
 
@@ -584,7 +602,19 @@ export class EmailService {
     const fallbackBody = htmlContent || emailData.text || 'No content provided';
     let lastError: Error | null = null;
 
-    // Try SMTP first (primary method)
+    // On cloud platforms (Render), use Resend API instead of SMTP
+    if (this.isCloudPlatform && this.resend) {
+      try {
+        console.log(`📧 Sending email via Resend API to: ${emailData.to} (cloud platform)`);
+        return await this.sendEmailViaResend(emailData);
+      } catch (resendError) {
+        console.error('❌ Resend API failed, falling back to SMTP:', resendError);
+        // Fall through to try SMTP as backup (though it will likely fail on cloud)
+        lastError = resendError instanceof Error ? resendError : new Error(String(resendError));
+      }
+    }
+
+    // Try SMTP (primary method for local, backup for cloud)
     if (this.isConfigured && this.transporter) {
       for (let attempt = 1; attempt <= retries; attempt++) {
         try {
@@ -686,22 +716,86 @@ export class EmailService {
       
       // If we get here, all retries failed
       const errorMsg = lastError?.message || 'Failed to send email via SMTP';
+      
+      // On cloud platforms, if we got here, both Resend and SMTP failed
       if (this.isCloudPlatform) {
-        console.error('❌ SMTP failed on cloud platform. SMTP connections are often blocked by cloud hosting providers.');
-        console.error('   Solution: Use an SMTP provider that works with cloud platforms, or configure a proxy.');
+        console.error('❌ Both Resend API and SMTP failed on cloud platform.');
+        console.error('   SMTP connections are often blocked by cloud hosting providers.');
+        return {
+          success: false,
+          error: errorMsg,
+        };
       }
+      
+      // On local, just return SMTP error
       return {
         success: false,
         error: errorMsg,
       };
     } else {
-      console.warn('⚠️ SMTP email transport not configured.');
+      // SMTP not configured
+      if (this.isCloudPlatform && this.resend) {
+        // On cloud, try Resend if SMTP not configured
+        try {
+          return await this.sendEmailViaResend(emailData);
+        } catch (resendError) {
+          console.error('❌ Resend API failed:', resendError);
+          return {
+            success: false,
+            error: resendError instanceof Error ? resendError.message : String(resendError),
+          };
+        }
+      }
+      
+      console.warn('⚠️ Email service not configured.');
+      if (this.isCloudPlatform) {
+        console.warn('   Set RESEND_API_KEY for email delivery on Render.');
+      } else {
+        console.warn('   Set SMTP credentials (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS) for local development.');
+      }
+      return {
+        success: false,
+        error: 'Email service not configured',
+      };
+    }
+  }
+
+  private async sendEmailViaResend(emailData: EmailData): Promise<any> {
+    if (!this.resend) {
+      throw new Error('Resend client not initialized');
     }
 
-    return {
-      success: false,
-      error: lastError?.message || 'Email service not configured',
-    };
+    const htmlContent = emailData.html || emailData.text || 'No content provided';
+    const textContent = emailData.text || this.stripHtml(htmlContent);
+
+    try {
+      console.log(`📧 Sending email via Resend API to: ${emailData.to}`);
+      
+      const result = await this.resend.emails.send({
+        from: this.fromAddress,
+        to: emailData.to,
+        subject: emailData.subject,
+        html: htmlContent,
+        text: textContent,
+        // Note: Resend API has limited attachment support, would need to convert attachments
+        // For now, we'll skip attachments when using Resend
+      });
+      
+      console.log(`✅ Email sent successfully via Resend API to ${emailData.to}`);
+      
+      return {
+        success: true,
+        messageId: result.data?.id || 'resend-email-sent',
+      };
+    } catch (error: any) {
+      console.error('❌ Resend API error:', error);
+      throw new Error(error.message || 'Failed to send email via Resend');
+    }
+  }
+
+  private stripHtml(html: string): string {
+    // Simple HTML stripping - remove tags
+    return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
   }
 
   async sendMultipleEmails(data: MultiEmailData): Promise<any> {

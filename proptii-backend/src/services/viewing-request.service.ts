@@ -70,64 +70,72 @@ export class ViewingRequestService {
       
       // Fallback to Firestore if Cosmos DB is not available
       if (this.firestore) {
-        // Check for conflicting viewings in Firestore (only if postcode is provided)
-        if (createViewingRequestDto.property.postcode) {
-          const viewingDateStr = typeof createViewingRequestDto.viewing_date === 'string' 
-            ? createViewingRequestDto.viewing_date 
-            : new Date(createViewingRequestDto.viewing_date).toISOString().split('T')[0];
-          
-          const conflictingQuery = this.firestore.collection(this.collectionName)
-            .where('viewing_date', '==', viewingDateStr)
-            .where('viewing_time', '==', createViewingRequestDto.viewing_time)
-            .where('property.postcode', '==', createViewingRequestDto.property.postcode)
-            .where('status', 'in', ['PENDING', 'CONFIRMED']);
-          
-          const conflictingSnapshot = await conflictingQuery.get();
-          
-          if (!conflictingSnapshot.empty) {
-            throw new BadRequestException('This viewing slot is already booked');
+        try {
+          // Check for conflicting viewings in Firestore (only if postcode is provided)
+          if (createViewingRequestDto.property.postcode) {
+            const viewingDateStr = typeof createViewingRequestDto.viewing_date === 'string' 
+              ? createViewingRequestDto.viewing_date 
+              : new Date(createViewingRequestDto.viewing_date).toISOString().split('T')[0];
+            
+            const conflictingQuery = this.firestore.collection(this.collectionName)
+              .where('viewing_date', '==', viewingDateStr)
+              .where('viewing_time', '==', createViewingRequestDto.viewing_time)
+              .where('property.postcode', '==', createViewingRequestDto.property.postcode)
+              .where('status', 'in', ['PENDING', 'CONFIRMED']);
+            
+            const conflictingSnapshot = await conflictingQuery.get();
+            
+            if (!conflictingSnapshot.empty) {
+              throw new BadRequestException('This viewing slot is already booked');
+            }
           }
+
+          // Create the viewing request in Firestore
+          const docRef = this.firestore.collection(this.collectionName).doc();
+          
+          // Convert viewing_date to string format for Firestore (YYYY-MM-DD)
+          const viewingDateObj = createViewingRequestDto.viewing_date instanceof Date
+            ? createViewingRequestDto.viewing_date
+            : new Date(createViewingRequestDto.viewing_date);
+          const viewingDate = viewingDateObj.toISOString().split('T')[0];
+          
+          // Convert DTOs to plain objects for Firestore (Firestore can't serialize class instances)
+          const viewingRequestData = {
+            property: {
+              street: createViewingRequestDto.property.street,
+              city: createViewingRequestDto.property.city,
+              town: createViewingRequestDto.property.town,
+              postcode: createViewingRequestDto.property.postcode,
+            },
+            agent: {
+              name: createViewingRequestDto.agent.name,
+              email: createViewingRequestDto.agent.email,
+              phone: createViewingRequestDto.agent.phone,
+              company: createViewingRequestDto.agent.company,
+            },
+            viewing_date: viewingDate, // Store as string in YYYY-MM-DD format
+            viewing_time: createViewingRequestDto.viewing_time,
+            preference: createViewingRequestDto.preference,
+            status: createViewingRequestDto.status,
+            id: docRef.id,
+            type: 'viewing-request',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+
+          await docRef.set(viewingRequestData);
+
+          return {
+            id: docRef.id,
+            ...viewingRequestData
+          };
+        } catch (firestoreError: any) {
+          // If Firestore fails (e.g., project ID not set, authentication issues), fall back gracefully
+          console.warn('⚠️ Firestore operation failed, falling back to frontend-only mode:', firestoreError.message);
+          console.warn('   This usually means Firestore is not properly configured on the backend.');
+          console.warn('   The frontend will handle saving the viewing request directly to Firestore.');
+          // Fall through to the fallback below
         }
-
-        // Create the viewing request in Firestore
-        const docRef = this.firestore.collection(this.collectionName).doc();
-        
-        // Convert viewing_date to string format for Firestore (YYYY-MM-DD)
-        const viewingDateObj = createViewingRequestDto.viewing_date instanceof Date
-          ? createViewingRequestDto.viewing_date
-          : new Date(createViewingRequestDto.viewing_date);
-        const viewingDate = viewingDateObj.toISOString().split('T')[0];
-        
-        // Convert DTOs to plain objects for Firestore (Firestore can't serialize class instances)
-        const viewingRequestData = {
-          property: {
-            street: createViewingRequestDto.property.street,
-            city: createViewingRequestDto.property.city,
-            town: createViewingRequestDto.property.town,
-            postcode: createViewingRequestDto.property.postcode,
-          },
-          agent: {
-            name: createViewingRequestDto.agent.name,
-            email: createViewingRequestDto.agent.email,
-            phone: createViewingRequestDto.agent.phone,
-            company: createViewingRequestDto.agent.company,
-          },
-          viewing_date: viewingDate, // Store as string in YYYY-MM-DD format
-          viewing_time: createViewingRequestDto.viewing_time,
-          preference: createViewingRequestDto.preference,
-          status: createViewingRequestDto.status,
-          id: docRef.id,
-          type: 'viewing-request',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-
-        await docRef.set(viewingRequestData);
-
-        return {
-          id: docRef.id,
-          ...viewingRequestData
-        };
       }
 
       // Neither database is available
