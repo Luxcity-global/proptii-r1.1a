@@ -1,8 +1,8 @@
 import { PropertyDetails, ViewingDetails } from '../context/BookViewingContext';
 import { fetchWithApiFallback } from '../../../utils/apiEndpoints';
 
-const VIEWINGS_PATH = '/api/viewing-requests';
-const SEARCH_PATH = '/api/search';
+const VIEWINGS_PATH = '/viewing-requests';
+const SEARCH_PATH = '/search';
 
 export const bookingService = {
   searchProperty: async (query: string): Promise<PropertyDetails> => {
