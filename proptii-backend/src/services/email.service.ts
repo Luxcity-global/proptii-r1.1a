@@ -125,6 +125,20 @@ export class EmailService {
         try {
           this.resend = new Resend(resendApiKey);
           console.log('✅ Resend initialized for cloud platform (will be used instead of SMTP)');
+          
+          // If using Resend, check if we should use the default domain
+          // Resend's default domain is onboarding@resend.dev (no verification needed)
+          // If EMAIL_FROM_ADDRESS is not set or doesn't end with a verified domain, use default
+          if (!process.env.EMAIL_FROM_ADDRESS || 
+              (!this.fromAddress.endsWith('@resend.dev') && !this.fromAddress.includes('@'))) {
+            this.fromAddress = 'onboarding@resend.dev';
+            console.log('📧 Using Resend default from address: onboarding@resend.dev');
+            console.warn('⚠️  Note: For better deliverability, verify your domain in Resend dashboard');
+            console.warn('   and set EMAIL_FROM_ADDRESS to your verified domain (e.g., noreply@yourdomain.com)');
+          } else {
+            console.log(`📧 Using from address: ${this.fromAddress}`);
+            console.warn('⚠️  Make sure this domain is verified in your Resend dashboard');
+          }
         } catch (error) {
           console.warn('⚠️ Failed to initialize Resend:', error);
         }
@@ -768,11 +782,23 @@ export class EmailService {
     const htmlContent = emailData.html || emailData.text || 'No content provided';
     const textContent = emailData.text || this.stripHtml(htmlContent);
 
+    // Ensure we're using a valid Resend from address
+    // If the from address doesn't look like a verified domain, use Resend's default
+    let fromAddress = this.fromAddress;
+    if (!fromAddress.endsWith('@resend.dev') && 
+        !fromAddress.includes('@') || 
+        fromAddress === 'noreply@proptii.com') {
+      fromAddress = 'onboarding@resend.dev';
+      console.log(`📧 Using Resend default from address: ${fromAddress} (original was: ${this.fromAddress})`);
+    }
+
     try {
       console.log(`📧 Sending email via Resend API to: ${emailData.to}`);
+      console.log(`   From: ${fromAddress}`);
+      console.log(`   Subject: ${emailData.subject}`);
       
       const result = await this.resend.emails.send({
-        from: this.fromAddress,
+        from: fromAddress,
         to: emailData.to,
         subject: emailData.subject,
         html: htmlContent,
@@ -781,14 +807,46 @@ export class EmailService {
         // For now, we'll skip attachments when using Resend
       });
       
-      console.log(`✅ Email sent successfully via Resend API to ${emailData.to}`);
+      // Log the full response for debugging
+      console.log(`📧 Resend API response:`, JSON.stringify(result, null, 2));
+      
+      // Check if there's an error in the response
+      if (result.error) {
+        console.error('❌ Resend API returned an error:', result.error);
+        throw new Error(result.error.message || 'Resend API returned an error');
+      }
+      
+      // Extract message ID from Resend response structure
+      // Resend v4 returns: { data: { id: string }, error: null }
+      const messageId = result.data?.id;
+      
+      if (!messageId) {
+        console.warn('⚠️ Resend API response missing message ID. Full response:', JSON.stringify(result, null, 2));
+        console.warn('   This might indicate the email was not actually sent. Check Resend dashboard for details.');
+      }
+      
+      console.log(`✅ Email sent successfully via Resend API to ${emailData.to}${messageId ? ` (ID: ${messageId})` : ' (no ID returned)'}`);
       
       return {
         success: true,
-        messageId: result.data?.id || 'resend-email-sent',
+        messageId: messageId || 'resend-email-sent',
       };
     } catch (error: any) {
       console.error('❌ Resend API error:', error);
+      console.error('   Error details:', {
+        message: error.message,
+        name: error.name,
+        code: error.code,
+        response: error.response?.data || error.response,
+        stack: error.stack
+      });
+      
+      // If it's a Resend API error with more details, include them
+      if (error.response?.data) {
+        console.error('   Resend API error response:', JSON.stringify(error.response.data, null, 2));
+        throw new Error(error.response.data.message || error.message || 'Failed to send email via Resend');
+      }
+      
       throw new Error(error.message || 'Failed to send email via Resend');
     }
   }
