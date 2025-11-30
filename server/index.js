@@ -563,6 +563,15 @@ app.get('/debug/config', (req, res) => {
     }
 });
 
+// Detect if we're on a cloud platform (Render, Heroku, etc.)
+const isCloudPlatform = !!(
+    process.env.RENDER ||
+    process.env.HEROKU_APP_NAME ||
+    process.env.VERCEL ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    process.env.K_SERVICE // Google Cloud Run
+);
+
 // Verify SMTP configuration
 const requiredEnvVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL'];
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
@@ -572,27 +581,75 @@ if (missingVars.length > 0) {
     process.exit(1);
 }
 
-// Configure email transporter
+// Configure email transporter with cloud-optimized settings
+const smtpHost = process.env.SMTP_HOST;
+const smtpPort = process.env.SMTP_PORT;
+const smtpUser = process.env.SMTP_USER;
+const smtpPass = process.env.SMTP_PASS;
+
+// On cloud platforms, use port 587 with STARTTLS instead of 465 (465 is often blocked)
+// Port 587 is more reliable on cloud hosting providers
+const port = parseInt(smtpPort);
+const usePort = isCloudPlatform && port === 465 ? 587 : port;
+const isSecure = usePort === 465;
+
+if (usePort !== port) {
+    console.log(`📧 Auto-switching SMTP port from ${port} to ${usePort} for cloud compatibility`);
+    console.log(`   Using STARTTLS on port ${usePort} (more reliable on cloud platforms)`);
+}
+
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    secure: process.env.SMTP_PORT === '465',
+    host: smtpHost,
+    port: usePort,
+    secure: isSecure, // true for 465, false for other ports
+    requireTLS: !isSecure, // Require TLS for non-465 ports
     auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: smtpUser,
+        pass: smtpPass,
     },
-    debug: true, // Enable debug output
-    logger: true // Log information into console
+    tls: {
+        // Do not fail on invalid certificates
+        rejectUnauthorized: false,
+        // Explicitly set TLS version
+        minVersion: 'TLSv1.2',
+        // Enable SNI (Server Name Indication)
+        servername: smtpHost
+    },
+    // Connection timeout (increased for cloud platforms)
+    connectionTimeout: isCloudPlatform ? 30000 : 30000, // 30s
+    // Socket timeout
+    socketTimeout: isCloudPlatform ? 30000 : 30000, // 30s
+    // Greeting timeout
+    greetingTimeout: isCloudPlatform ? 15000 : 10000, // 15s on cloud, 10s local
+    // DNS timeout
+    dnsTimeout: isCloudPlatform ? 20000 : 30000, // 20s on cloud, 30s local
+    // Enable connection pooling for better performance
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
+    // Debug mode (only in development)
+    debug: process.env.NODE_ENV === 'development',
+    logger: process.env.NODE_ENV === 'development'
 });
 
-// Verify email configuration on startup
-try {
-    await transporter.verify();
-    console.log('SMTP connection verified successfully');
-} catch (error) {
-    console.error('SMTP connection verification failed:', error);
-    process.exit(1);
-}
+// Verify email configuration on startup (non-blocking - don't exit on failure)
+// This allows the server to start even if SMTP verification fails initially
+// The server will still attempt to send emails and handle errors gracefully
+(async () => {
+    try {
+        await transporter.verify();
+        console.log(`✅ SMTP connection verified successfully (${smtpHost}:${usePort})`);
+    } catch (error) {
+        console.error('⚠️ SMTP connection verification failed:', error.message);
+        console.error('   The server will continue to start, but email sending may fail.');
+        console.error('   Common fixes:');
+        console.error('   - Ensure SMTP credentials are correct');
+        console.error('   - Check if port 465 is blocked (use 587 on cloud platforms)');
+        console.error('   - Verify firewall/network allows outbound SMTP connections');
+        console.error('   - For cloud platforms, consider using port 587 with STARTTLS');
+        // Don't exit - allow server to start and handle errors at send time
+    }
+})();
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -27,6 +27,17 @@ export async function initializeFirestore(): Promise<Firestore | null> {
           // Handle private key formatting - replace escaped newlines and ensure proper format
           let formattedPrivateKey = privateKey.trim();
           
+          // CRITICAL: Detect if this is actually a Firebase API key, not a private key
+          // API keys start with "AIza" and are ~39 characters long
+          // Private keys start with "-----BEGIN PRIVATE KEY-----" and are much longer
+          if (formattedPrivateKey.startsWith('AIza') && formattedPrivateKey.length < 100) {
+            throw new Error(
+              'FIREBASE_PRIVATE_KEY appears to be a Firebase API key, not a private key. ' +
+              'You need the private key from your Firebase service account JSON file. ' +
+              'Get it from: Firebase Console → Project Settings → Service Accounts → Generate new private key'
+            );
+          }
+          
           // Remove surrounding quotes if present (both single and double quotes)
           while (
             (formattedPrivateKey.startsWith('"') && formattedPrivateKey.endsWith('"')) ||
@@ -63,7 +74,11 @@ export async function initializeFirestore(): Promise<Firestore | null> {
           
           // Validate the key format before using it
           if (!formattedPrivateKey.includes('BEGIN PRIVATE KEY') || !formattedPrivateKey.includes('END PRIVATE KEY')) {
-            throw new Error('Private key is missing BEGIN or END markers. Expected format: -----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----');
+            throw new Error(
+              'Private key is missing BEGIN or END markers. ' +
+              'Expected format: -----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n' +
+              'Get the correct private key from: Firebase Console → Project Settings → Service Accounts → Generate new private key'
+            );
           }
           
           logger.log(`ℹ️ Attempting to initialize Firebase with project: ${projectId}, client: ${clientEmail.substring(0, 30)}...`);

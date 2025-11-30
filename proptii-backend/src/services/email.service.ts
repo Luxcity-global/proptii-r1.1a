@@ -85,14 +85,14 @@ export class EmailService {
             // Enable SNI (Server Name Indication)
             servername: smtpHost
           },
-          // Connection timeout (reduced for cloud platforms - many block SMTP)
-          connectionTimeout: this.isCloudPlatform ? 15000 : 30000, // 15s on cloud (fail fast), 30s local
+          // Connection timeout (increased for cloud platforms - SMTP works on Render)
+          connectionTimeout: this.isCloudPlatform ? 30000 : 30000, // 30s on both (SMTP works on Render)
           // Socket timeout
-          socketTimeout: this.isCloudPlatform ? 15000 : 30000, // 15s on cloud, 30s local
+          socketTimeout: this.isCloudPlatform ? 30000 : 30000, // 30s on both
           // Greeting timeout
-          greetingTimeout: this.isCloudPlatform ? 10000 : 10000, // 10s on both
+          greetingTimeout: this.isCloudPlatform ? 15000 : 10000, // 15s on cloud, 10s local
           // DNS timeout
-          dnsTimeout: this.isCloudPlatform ? 10000 : 30000, // 10s on cloud, 30s local
+          dnsTimeout: this.isCloudPlatform ? 20000 : 30000, // 20s on cloud, 30s local
           // Enable connection pooling for better performance
           pool: true,
           maxConnections: 5,
@@ -124,7 +124,7 @@ export class EmailService {
       if (resendApiKey) {
         try {
           this.resend = new Resend(resendApiKey);
-          console.log('✅ Resend initialized for cloud platform (will be used instead of SMTP)');
+          console.log('✅ Resend initialized for cloud platform (will be used as fallback if SMTP fails)');
           
           // If using Resend, check if we should use the default domain
           // Resend's default domain is onboarding@resend.dev (no verification needed)
@@ -616,19 +616,8 @@ export class EmailService {
     const fallbackBody = htmlContent || emailData.text || 'No content provided';
     let lastError: Error | null = null;
 
-    // On cloud platforms (Render), use Resend API instead of SMTP
-    if (this.isCloudPlatform && this.resend) {
-      try {
-        console.log(`📧 Sending email via Resend API to: ${emailData.to} (cloud platform)`);
-        return await this.sendEmailViaResend(emailData);
-      } catch (resendError) {
-        console.error('❌ Resend API failed, falling back to SMTP:', resendError);
-        // Fall through to try SMTP as backup (though it will likely fail on cloud)
-        lastError = resendError instanceof Error ? resendError : new Error(String(resendError));
-      }
-    }
-
-    // Try SMTP (primary method for local, backup for cloud)
+    // Try SMTP first (it worked well in previous versions on Render)
+    // Use Resend as fallback if SMTP fails
     if (this.isConfigured && this.transporter) {
       for (let attempt = 1; attempt <= retries; attempt++) {
         try {
@@ -658,18 +647,17 @@ export class EmailService {
           console.error(`   Error code: ${errorCode || 'UNKNOWN'}`);
           console.error(`   Error message: ${errorMessage}`);
           
-          // On cloud platforms, connection timeouts often mean SMTP is blocked
+          // On cloud platforms, log timeout but don't assume SMTP is blocked (it works on Render)
           if (this.isCloudPlatform && errorCode === 'ETIMEDOUT') {
-            console.warn('⚠️ SMTP connection timeout on cloud platform. This often indicates SMTP is blocked by the hosting provider.');
-            console.warn('   Consider using a different SMTP provider or email service API that works with cloud platforms.');
+            console.warn('⚠️ SMTP connection timeout on cloud platform. Retrying...');
           }
           
           // Check if it's a retryable error
           const isRetryable = errorCode === 'ECONNRESET' || 
                              errorCode === 'ESOCKET' ||
                              errorCode === 'ECONNREFUSED' ||
-                             // Only retry ETIMEDOUT on non-cloud platforms (cloud platforms often block SMTP)
-                             (errorCode === 'ETIMEDOUT' && !this.isCloudPlatform);
+                             // Retry ETIMEDOUT on all platforms (SMTP works on Render)
+                             errorCode === 'ETIMEDOUT';
           
           if (attempt < retries && isRetryable) {
             const waitTime = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
@@ -708,10 +696,10 @@ export class EmailService {
                   minVersion: 'TLSv1.2',
                   servername: smtpHost
                 },
-                connectionTimeout: this.isCloudPlatform ? 15000 : 30000, // 15s on cloud (fail fast)
-                socketTimeout: this.isCloudPlatform ? 15000 : 30000, // 15s on cloud
-                greetingTimeout: this.isCloudPlatform ? 10000 : 10000, // 10s on both
-                dnsTimeout: this.isCloudPlatform ? 10000 : 30000, // 10s on cloud
+                connectionTimeout: this.isCloudPlatform ? 30000 : 30000, // 30s on both
+                socketTimeout: this.isCloudPlatform ? 30000 : 30000, // 30s on both
+                greetingTimeout: this.isCloudPlatform ? 15000 : 10000, // 15s on cloud, 10s local
+                dnsTimeout: this.isCloudPlatform ? 20000 : 30000, // 20s on cloud, 30s local
                 pool: true,
                 maxConnections: 5,
                 maxMessages: 100,
@@ -728,20 +716,24 @@ export class EmailService {
         }
       }
       
-      // If we get here, all retries failed
+      // If we get here, all SMTP retries failed
       const errorMsg = lastError?.message || 'Failed to send email via SMTP';
       
-      // On cloud platforms, if we got here, both Resend and SMTP failed
-      if (this.isCloudPlatform) {
-        console.error('❌ Both Resend API and SMTP failed on cloud platform.');
-        console.error('   SMTP connections are often blocked by cloud hosting providers.');
-        return {
-          success: false,
-          error: errorMsg,
-        };
+      // On cloud platforms, try Resend as fallback if SMTP failed
+      if (this.isCloudPlatform && this.resend) {
+        console.warn('⚠️ SMTP failed, trying Resend API as fallback...');
+        try {
+          return await this.sendEmailViaResend(emailData);
+        } catch (resendError) {
+          console.error('❌ Both SMTP and Resend API failed on cloud platform.');
+          return {
+            success: false,
+            error: `SMTP failed: ${errorMsg}. Resend also failed: ${resendError instanceof Error ? resendError.message : String(resendError)}`,
+          };
+        }
       }
       
-      // On local, just return SMTP error
+      // On local or if Resend not available, just return SMTP error
       return {
         success: false,
         error: errorMsg,
@@ -813,7 +805,27 @@ export class EmailService {
       // Check if there's an error in the response
       if (result.error) {
         console.error('❌ Resend API returned an error:', result.error);
-        throw new Error(result.error.message || 'Resend API returned an error');
+        
+        // Provide helpful guidance for common errors
+        // Type-safe check: Resend error can have statusCode or name
+        const error = result.error as any;
+        if (error.statusCode === 403 || error.name === 'validation_error') {
+          const errorMsg = error.message || '';
+          if (errorMsg.includes('only send testing emails to your own email address')) {
+            console.error('');
+            console.error('⚠️  RESEND DOMAIN VERIFICATION REQUIRED');
+            console.error('   Resend is limiting emails to your verified email address only.');
+            console.error('   To send emails to other recipients:');
+            console.error('   1. Go to https://resend.com/domains');
+            console.error('   2. Verify your domain (e.g., theluxcity.co.uk)');
+            console.error('   3. Set EMAIL_FROM_ADDRESS environment variable to use your verified domain');
+            console.error('      Example: EMAIL_FROM_ADDRESS=noreply@theluxcity.co.uk');
+            console.error('   4. Restart your backend service');
+            console.error('');
+          }
+        }
+        
+        throw new Error(error.message || 'Resend API returned an error');
       }
       
       // Extract message ID from Resend response structure
