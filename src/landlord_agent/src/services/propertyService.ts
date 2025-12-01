@@ -24,7 +24,8 @@ class PropertyService {
    */
   async createProperty(
     propertyData: Omit<Property, 'id' | 'createdAt' | 'tenant'>,
-    ownerUserId: string
+    ownerUserId: string,
+    ownerEmail?: string
   ): Promise<string> {
     try {
       console.log('Creating property with photos:', propertyData.photos?.length || 0, 'photos');
@@ -46,7 +47,7 @@ class PropertyService {
         return cleanPhoto;
       });
 
-      const propertyDoc = {
+      const propertyDoc: any = {
         ...clean,
         userId: ownerUserId,
         photos: cleanedPhotos,
@@ -54,6 +55,20 @@ class PropertyService {
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       };
+      
+      // Ensure status is always set (default to 'vacant' if missing)
+      if (!propertyDoc.status) {
+        propertyDoc.status = 'vacant';
+        console.log('✅ PropertyService: Setting default status to "vacant"');
+      }
+      
+      // Store owner email if provided (for Proptii search to find agent/landlord email)
+      if (ownerEmail) {
+        propertyDoc.ownerEmail = ownerEmail.toLowerCase().trim();
+        console.log('✅ PropertyService: Storing ownerEmail in property:', ownerEmail);
+      }
+      
+      console.log('✅ PropertyService: Property status:', propertyDoc.status);
 
       console.log('✅ PropertyService: Creating property with userId:', ownerUserId);
       console.log('Property document to save:', {

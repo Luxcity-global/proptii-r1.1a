@@ -100,6 +100,14 @@ const BookViewing = () => {
           company: ''
         };
 
+        // Log the agent details to debug email issue
+        console.log('📧 [BookViewing] Received prefilled property data:', {
+          agentEmail: agentDetails.email,
+          agentName: agentDetails.name,
+          agentId: agentDetails.id,
+          fullAgent: agentDetails
+        });
+
         setPrefilledPropertyData({
           id: parsedData.id,
           street: parsedData.street || '',

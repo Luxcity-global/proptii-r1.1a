@@ -83,13 +83,21 @@ export interface Property {
   };
   source?: string;
   description?: string;
+  // Extended fields for BookViewing compatibility
+  street?: string;
+  city?: string;
+  town?: string;
+  postcode?: string;
+  amenities?: string[];
+  bathrooms?: string;
+  squareFootage?: string;
 }
 
 export interface SearchResponse {
   properties: Property[];
   total: number;
   query: string;
-  searchType: 'onthemarket' | 'internet';
+  searchType: 'onthemarket' | 'internet' | 'proptii';
 }
 
 export const useSearchBackend = () => {
@@ -97,7 +105,7 @@ export const useSearchBackend = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<Property[]>([]);
-  const [searchType, setSearchType] = useState<'onthemarket' | 'internet'>('onthemarket');
+  const [searchType, setSearchType] = useState<'onthemarket' | 'internet' | 'proptii'>('onthemarket');
 
   const searchBackendUrl = resolveSearchBackendUrl();
 
@@ -136,7 +144,7 @@ export const useSearchBackend = () => {
     }
   }, []);
 
-  const searchProperties = useCallback(async (searchQuery: string, type: 'onthemarket' | 'internet' = 'onthemarket') => {
+  const searchProperties = useCallback(async (searchQuery: string, type: 'onthemarket' | 'internet' | 'proptii' = 'onthemarket') => {
     if (!searchQuery.trim()) {
       setError('Please enter a search query');
       return [];
@@ -148,6 +156,31 @@ export const useSearchBackend = () => {
     setSearchType(type);
 
     try {
+      // Handle Proptii search (fetch from Firestore)
+      if (type === 'proptii') {
+        const { searchProptiiProperties } = await import('../services/proptiiPropertyService');
+        const proptiiResults = await searchProptiiProperties(searchQuery);
+        
+        // Clean the pricing for all properties
+        const cleanedResults = proptiiResults.map(property => ({
+          ...property,
+          price: cleanPropertyPrice(property.price)
+        }));
+        
+        setResults(cleanedResults);
+        
+        // Cache the results in sessionStorage
+        const cacheData = {
+          results: cleanedResults,
+          query: searchQuery,
+          searchType: 'proptii',
+          timestamp: Date.now()
+        };
+        sessionStorage.setItem('searchResults', JSON.stringify(cacheData));
+        
+        return cleanedResults;
+      }
+
       let endpoint: string;
       let requestBody: any;
 

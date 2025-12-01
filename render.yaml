@@ -89,10 +89,8 @@ services:
   # Search Backend (Express)
   - type: web
     name: proptii-search-backend
-    env: node
-    plan: free
-    buildCommand: cd search/backend && npm install && echo "Installing browsers..." && npx puppeteer browsers install chrome && npx playwright install chromium && echo "Building TypeScript..." && npm run build
-    startCommand: cd search/backend && npm start
+    env: docker
+    dockerfilePath: ./search/backend/Dockerfile
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
@@ -101,11 +99,3 @@ services:
         value: production
       - key: PORT
         value: 3001
-      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-        value: "false"
-      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
-        value: "false"
-      - key: PUPPETEER_CACHE_DIR
-        value: "/opt/render/.cache/puppeteer"
-      - key: PLAYWRIGHT_BROWSERS_PATH
-        value: "/opt/render/.cache/ms-playwright"

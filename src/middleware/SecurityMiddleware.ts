@@ -73,7 +73,9 @@ export class SecurityMiddleware {
         const connectSources = new Set<string>([
             'https://proptii.b2clogin.com',
             'https://*.azure.com',
+            // Always include all backend URLs (both old and new)
             'https://proptii-r1-1a-1.onrender.com',
+            'https://proptii-r1-1a-new-backend.onrender.com',
             'https://demo.docusign.net',
             'https://www.docusign.net',
             'https://*.docusign.net',
@@ -90,10 +92,13 @@ export class SecurityMiddleware {
             connectSources.add(searchBackendOrigin);
         }
 
+        // Add localhost for development
         if (isDevelopment) {
             connectSources.add('http://localhost:*');
-            connectSources.add('https://proptii-r1-1a-new-backend.onrender.com');
-        } else if (baseUrl) {
+        }
+        
+        // Always add baseUrl if provided (for custom API URLs)
+        if (baseUrl) {
             connectSources.add(baseUrl);
         }
 

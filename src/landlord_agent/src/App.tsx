@@ -1612,7 +1612,9 @@ export default function App() {
       })();
       
       console.log('📝 About to create property with userId:', currentUserId);
-      const propertyId = await propertyService.createProperty(safeProperty, currentUserId);
+      // Get owner email from userProfile for storing in property document
+      const ownerEmail = userProfile?.email || (typeof (window as any).getUserInfo === 'function' ? (window as any).getUserInfo()?.email : undefined);
+      const propertyId = await propertyService.createProperty(safeProperty, currentUserId, ownerEmail);
       
       // Fetch the created property to get full data with timestamps
       const newProperty = await propertyService.getProperty(propertyId);

@@ -18,7 +18,7 @@ export const SearchInput = ({
 }: SearchInputProps) => {
   const [query, setQuery] = useState(value);
   const [loading, setLoading] = useState(false);
-  const [searchType, setSearchType] = useState<'onthemarket' | 'internet'>('onthemarket');
+  const [searchType, setSearchType] = useState<'onthemarket' | 'internet' | 'proptii'>('onthemarket');
   const [showPlatformDropdown, setShowPlatformDropdown] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [error, setError] = useState('');
@@ -131,7 +131,7 @@ export const SearchInput = ({
     }
   };
 
-  const handlePlatformSelect = (platform: 'onthemarket' | 'internet') => {
+  const handlePlatformSelect = (platform: 'onthemarket' | 'internet' | 'proptii') => {
     setSearchType(platform);
     setShowPlatformDropdown(false);
   };
@@ -142,6 +142,8 @@ export const SearchInput = ({
         return 'On the Market';
       case 'internet':
         return 'Internet Search';
+      case 'proptii':
+        return 'Proptii';
       default:
         return 'Select Platform';
     }
@@ -292,6 +294,21 @@ export const SearchInput = ({
                       <div>
                         <div className="font-medium" style={{ fontSize: '14px' }}>Internet Search</div>
                         <div className="text-xs" style={{ color: '#888' }}>Search across web</div>
+                      </div>
+                    </button>
+
+                    {/* Proptii Option */}
+                    <button
+                      onClick={() => handlePlatformSelect('proptii')}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                      style={{ color: searchType === 'proptii' ? '#E65D24' : '#23272f' }}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      <div>
+                        <div className="font-medium" style={{ fontSize: '14px' }}>Proptii</div>
+                        <div className="text-xs" style={{ color: '#888' }}>Properties from landlords & agents</div>
                       </div>
                     </button>
                   </div>

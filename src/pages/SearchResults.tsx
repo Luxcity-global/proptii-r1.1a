@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSearchBackend, type Property } from '../hooks/useSearchBackend';
 import { useSavedProperties } from '../contexts/SavedPropertiesContext';
 import Footer from '../components/Footer';
+import { getAmenityIcon } from '../utils/amenityIcons';
 
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
@@ -191,21 +192,69 @@ function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNav
               <div className="text-sm text-gray-600">Status</div>
             </div>
           </div>
+
+          {/* Additional Property Details (if available) */}
+          {(property.bathrooms || property.squareFootage) && (
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              {property.bathrooms && (
+                <div className="text-center">
+                  <div className="text-lg font-semibold text-gray-900">{property.bathrooms}</div>
+                  <div className="text-sm text-gray-600">Bathrooms</div>
+                </div>
+              )}
+              {property.squareFootage && (
+                <div className="text-center">
+                  <div className="text-lg font-semibold text-gray-900">{property.squareFootage} sq ft</div>
+                  <div className="text-sm text-gray-600">Size</div>
+                </div>
+              )}
+            </div>
+          )}
           
           {/* Property Description */}
           <div className="mb-6">
             <h4 className="text-lg font-semibold text-gray-900 mb-2">Description</h4>
             <p className="text-gray-600 leading-relaxed">
-              This beautiful {property.propertyType} offers {property.bedrooms} bedrooms and is located in the desirable area of {property.location}. 
-              The property features modern amenities and is perfect for families or professionals looking for a comfortable home.
+              {property.description || `This beautiful ${property.propertyType} offers ${property.bedrooms} bedrooms and is located in the desirable area of ${property.location}. The property features modern amenities and is perfect for families or professionals looking for a comfortable home.`}
             </p>
           </div>
+
+          {/* Amenities Section */}
+          {property.amenities && Array.isArray(property.amenities) && property.amenities.length > 0 && (
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Amenities</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {property.amenities.map((amenity, index) => {
+                  const icon = getAmenityIcon(amenity);
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
+                    >
+                      <div className="text-[#E65D24] flex-shrink-0">
+                        {icon}
+                      </div>
+                      <span className="text-sm text-gray-700 font-medium capitalize">
+                        {amenity}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Listed By Section */}
           <div className="border-t border-gray-200 pt-6">
             <h4 className="text-lg font-semibold text-gray-900 mb-3">Listed By</h4>
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="font-medium text-gray-900 mb-2">{property.agent?.name || 'Agent Information'}</p>
+              <p className="font-medium text-gray-900 mb-1">{property.agent?.name || 'Agent Information'}</p>
+              {property.agent?.company && (
+                <p className="text-sm text-gray-600 mb-2">{property.agent.company}</p>
+              )}
+              {property.agent?.phone && (
+                <p className="text-sm text-gray-600 mb-2">Phone: {property.agent.phone}</p>
+              )}
               {property.agent?.website && (
                 <a 
                   href={property.agent.website} 
@@ -595,6 +644,7 @@ const SearchResults = () => {
   const navigate = useNavigate();
   const searchQuery = searchParams.get('q') || '';
   const searchTypeParam = searchParams.get('type') || 'internet';
+  const searchType = searchTypeParam as 'onthemarket' | 'internet' | 'proptii';
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [isNavigatingToBooking, setIsNavigatingToBooking] = useState(false);
@@ -656,15 +706,15 @@ const SearchResults = () => {
           const parsed = JSON.parse(cachedData);
           // Only perform new search if the query or search type has changed
           if (parsed.query !== searchQuery || parsed.searchType !== searchTypeParam) {
-            searchProperties(searchQuery, searchTypeParam as 'onthemarket' | 'internet');
+            searchProperties(searchQuery, searchType);
           }
         } catch (error) {
           // If cache is corrupted, perform new search
-          searchProperties(searchQuery, searchTypeParam as 'onthemarket' | 'internet');
+          searchProperties(searchQuery, searchType);
         }
       } else {
         // No cache, perform new search
-        searchProperties(searchQuery, searchTypeParam as 'onthemarket' | 'internet');
+        searchProperties(searchQuery, searchType);
       }
     }
   }, [searchQuery, searchTypeParam, searchProperties]);
@@ -1141,21 +1191,37 @@ const SearchResults = () => {
   const handleMessageClick = async (property: Property) => {
     setIsNavigatingToBooking(true);
     
+    // Log the property data to debug email issue
+    console.log('📧 [SearchResults] Property agent data:', {
+      agent: property.agent,
+      email: property.agent?.email,
+      name: property.agent?.name,
+      source: property.source
+    });
+    
     // Prepare property data for BookViewing page
+    // Use extended fields if available (from Proptii properties), otherwise parse from location
     const propertyData = {
       id: property.title || `property-${Date.now()}`, // Generate ID if not available
-      street: property.location || '',
-      town: property.location?.split(',')[1]?.trim() || '',
-      city: property.location?.split(',')[0]?.trim() || '',
-      postcode: property.location?.split(',')[2]?.trim() || '',
+      street: property.street || property.location?.split(',')[0]?.trim() || property.location || '',
+      town: property.town || property.location?.split(',')[1]?.trim() || '',
+      city: property.city || property.location?.split(',')[0]?.trim() || property.location || '',
+      postcode: property.postcode || property.location?.split(',')[2]?.trim() || '',
       agent: {
-        id: property.agent?.name || `agent-${Date.now()}`,
+        id: property.agent?.id || property.agent?.name || `agent-${Date.now()}`,
         name: property.agent?.name || property.source || 'Estate Agent',
         email: property.agent?.email || '',
-        phone: '',
-        company: property.source || 'Estate Agency'
+        phone: property.agent?.phone || '',
+        company: property.agent?.company || property.source || 'Estate Agency'
       }
     };
+    
+    // Log the prepared property data
+    console.log('📧 [SearchResults] Prepared property data for BookViewing:', {
+      agentEmail: propertyData.agent.email,
+      agentName: propertyData.agent.name,
+      agentId: propertyData.agent.id
+    });
     
     // Store in sessionStorage for BookViewing page
     sessionStorage.setItem('prefilledProperty', JSON.stringify(propertyData));
@@ -1311,7 +1377,11 @@ const SearchResults = () => {
                   </div>
                   <div className="flex items-center">
                     <span className="text-gray-500 font-medium w-20">Platform:</span>
-                    <span className="text-gray-900">{searchTypeParam === 'onthemarket' ? 'On the Market' : 'Internet Search'}</span>
+                    <span className="text-gray-900">
+                      {searchTypeParam === 'onthemarket' ? 'On the Market' : 
+                       searchTypeParam === 'proptii' ? 'Proptii' : 
+                       'Internet Search'}
+                    </span>
                   </div>
                   <div className="flex items-center">
                     <span className="text-gray-500 font-medium w-20">Results:</span>
@@ -1347,7 +1417,7 @@ const SearchResults = () => {
                   {showMap ? 'Hide Map' : 'Show Map'}
                 </button>
                 <button
-                  onClick={() => searchProperties(searchQuery, searchTypeParam as 'onthemarket' | 'internet')}
+                  onClick={() => searchProperties(searchQuery, searchType)}
                   className="flex items-center px-6 py-3 bg-gradient-to-r from-[#136C9E] to-[#0F5A8A] text-white rounded-lg hover:from-[#0F5A8A] hover:to-[#0D4A7A] transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

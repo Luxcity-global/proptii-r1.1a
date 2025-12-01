@@ -48,7 +48,16 @@ export async function getChromeExecutablePath(): Promise<string | undefined> {
     }
   }
 
-  // Method 3: Check common Puppeteer cache locations
+  // Method 3: Check Puppeteer environment variable
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    const puppeteerEnvPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    if (fs.existsSync(puppeteerEnvPath)) {
+      console.log('Found Chrome via PUPPETEER_EXECUTABLE_PATH env var:', puppeteerEnvPath);
+      return puppeteerEnvPath;
+    }
+  }
+
+  // Method 4: Check common Puppeteer cache locations
   const cacheDir = process.env.PUPPETEER_CACHE_DIR || path.join(os.homedir(), '.cache', 'puppeteer');
   const possiblePaths = [
     // Puppeteer v24+ structure
@@ -103,7 +112,7 @@ export async function getChromeExecutablePath(): Promise<string | undefined> {
     }
   }
 
-  // Method 4: Try to use Puppeteer's browsers API (if available)
+  // Method 5: Try to use Puppeteer's browsers API (if available)
   try {
     // @ts-expect-error - puppeteer/browsers may not have type definitions in all versions
     const browsers = await import('puppeteer/browsers');
@@ -119,6 +128,35 @@ export async function getChromeExecutablePath(): Promise<string | undefined> {
     }
   } catch (error) {
     console.log('Browsers API not available or failed');
+  }
+
+  // Method 6: Check Playwright's chromium installation as fallback
+  console.log('Checking for Playwright chromium as fallback...');
+  const playwrightPath = process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(os.homedir(), '.cache', 'ms-playwright');
+  
+  try {
+    if (fs.existsSync(playwrightPath)) {
+      const playwrightEntries = fs.readdirSync(playwrightPath, { withFileTypes: true });
+      for (const entry of playwrightEntries) {
+        if (entry.isDirectory() && entry.name.startsWith('chromium')) {
+          // Try common chromium executable paths
+          const chromiumPaths = [
+            path.join(playwrightPath, entry.name, 'chrome-linux', 'chrome'),
+            path.join(playwrightPath, entry.name, 'chrome-linux', 'headless_shell'),
+            path.join(playwrightPath, entry.name, 'chrome'),
+          ];
+          
+          for (const chromiumPath of chromiumPaths) {
+            if (fs.existsSync(chromiumPath)) {
+              console.log('Found Playwright Chromium:', chromiumPath);
+              return chromiumPath;
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.log('Error checking Playwright browsers:', error);
   }
 
   console.warn('Could not find Chrome executable, Puppeteer will try to download it');

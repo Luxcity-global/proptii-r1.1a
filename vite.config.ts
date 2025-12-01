@@ -190,9 +190,12 @@ export default defineConfig(({ mode = 'development' }) => {
         'react',
         'react-dom',
         '@mui/material',
+        '@mui/icons-material',
         '@emotion/react',
         '@emotion/styled',
       ],
+      // Force re-optimization when dependencies change
+      force: false, // Set to true if you need to force re-bundling
     },
   };
 });

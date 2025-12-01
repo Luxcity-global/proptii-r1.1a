@@ -83,30 +83,52 @@ export class EmailService {
             // Explicitly set TLS version
             minVersion: 'TLSv1.2',
             // Enable SNI (Server Name Indication)
-            servername: smtpHost
+            servername: smtpHost,
+            // Add cipher list to improve compatibility
+            ciphers: 'SSLv3'
           },
-          // Connection timeout (increased for cloud platforms - SMTP works on Render)
-          connectionTimeout: this.isCloudPlatform ? 30000 : 30000, // 30s on both (SMTP works on Render)
+          // Connection timeout - increased for cloud platforms
+          connectionTimeout: 60000, // 60s (increased from 30s)
           // Socket timeout
-          socketTimeout: this.isCloudPlatform ? 30000 : 30000, // 30s on both
+          socketTimeout: 60000, // 60s (increased from 30s)
           // Greeting timeout
-          greetingTimeout: this.isCloudPlatform ? 15000 : 10000, // 15s on cloud, 10s local
-          // DNS timeout
-          dnsTimeout: this.isCloudPlatform ? 20000 : 30000, // 20s on cloud, 30s local
-          // Enable connection pooling for better performance
-          pool: true,
-          maxConnections: 5,
-          maxMessages: 100,
+          greetingTimeout: 30000, // 30s (increased from 15s)
+          // Disable connection pooling for cloud platforms (more reliable)
+          pool: !this.isCloudPlatform, // false on cloud, true on local
+          maxConnections: 1, // Use single connection on cloud
+          maxMessages: this.isCloudPlatform ? 10 : 100, // Fewer messages per connection on cloud
+          // Rate limiting - prevent Gmail from blocking
+          rateLimit: this.isCloudPlatform ? 1 : false, // 1 email per second on cloud
           // Debug mode (can be removed in production)
-          debug: process.env.NODE_ENV === 'development',
-          logger: process.env.NODE_ENV === 'development'
-        });
+          debug: process.env.NODE_ENV === 'development' || this.isCloudPlatform,
+          logger: process.env.NODE_ENV === 'development' || this.isCloudPlatform
+        } as any);
         this.isConfigured = true;
         if (usePort !== port) {
           console.log(`✅ Email service initialized with SMTP (${smtpHost}:${usePort}, auto-switched from ${port} for cloud compatibility)`);
           console.log(`   Using STARTTLS on port ${usePort} (more reliable on cloud platforms)`);
         } else {
           console.log(`✅ Email service initialized with SMTP (${smtpHost}:${usePort})`);
+        }
+        console.log(`   Connection pooling: ${!this.isCloudPlatform ? 'enabled' : 'disabled (cloud platform)'}`);
+        console.log(`   Timeouts: connection=${60000}ms, socket=${60000}ms, greeting=${30000}ms, dns=${30000}ms`);
+        
+        // Verify SMTP connection on startup (optional, with timeout)
+        if (this.isCloudPlatform) {
+          console.log('🔍 Verifying SMTP connection to Gmail...');
+          this.transporter.verify((error, success) => {
+            if (error) {
+              console.error('❌ SMTP verification failed:', error.message);
+              console.error('   This might be due to:');
+              console.error('   1. Invalid SMTP credentials (check SMTP_USER and SMTP_PASS)');
+              console.error('   2. Gmail App Password expired or revoked');
+              console.error('   3. Network/firewall blocking Gmail SMTP');
+              console.error('   4. Gmail account security settings changed');
+              console.error('   → Emails will fall back to Resend API if configured');
+            } else {
+              console.log('✅ SMTP connection verified successfully');
+            }
+          });
         }
       } catch (error) {
         console.warn('⚠️ Failed to initialize SMTP:', error);
@@ -694,18 +716,19 @@ export class EmailService {
                 tls: {
                   rejectUnauthorized: false,
                   minVersion: 'TLSv1.2',
-                  servername: smtpHost
+                  servername: smtpHost,
+                  ciphers: 'SSLv3'
                 },
-                connectionTimeout: this.isCloudPlatform ? 30000 : 30000, // 30s on both
-                socketTimeout: this.isCloudPlatform ? 30000 : 30000, // 30s on both
-                greetingTimeout: this.isCloudPlatform ? 15000 : 10000, // 15s on cloud, 10s local
-                dnsTimeout: this.isCloudPlatform ? 20000 : 30000, // 20s on cloud, 30s local
-                pool: true,
-                maxConnections: 5,
-                maxMessages: 100,
-                debug: process.env.NODE_ENV === 'development',
-                logger: process.env.NODE_ENV === 'development'
-              });
+                connectionTimeout: 60000, // 60s
+                socketTimeout: 60000, // 60s
+                greetingTimeout: 30000, // 30s
+                pool: !this.isCloudPlatform, // false on cloud, true on local
+                maxConnections: 1,
+                maxMessages: this.isCloudPlatform ? 10 : 100,
+                rateLimit: this.isCloudPlatform ? 1 : false,
+                debug: process.env.NODE_ENV === 'development' || this.isCloudPlatform,
+                logger: process.env.NODE_ENV === 'development' || this.isCloudPlatform
+              } as any);
             }
             
             continue;
@@ -742,6 +765,7 @@ export class EmailService {
       // SMTP not configured
       if (this.isCloudPlatform && this.resend) {
         // On cloud, try Resend if SMTP not configured
+        console.log('📧 SMTP not configured on cloud platform. Using Resend API...');
         try {
           return await this.sendEmailViaResend(emailData);
         } catch (resendError) {
