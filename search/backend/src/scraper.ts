@@ -256,7 +256,15 @@ function isValidEmail(email: string): boolean {
     /example@/i,
     /user@/i,
     /email@/i,
-    /contact@/i
+    /contact@/i,
+    /\.png$/i,
+    /\.jpg$/i,
+    /\.jpeg$/i,
+    /\.gif$/i,
+    /\.svg$/i,
+    /\.webp$/i,
+    /\.bmp$/i,
+    /@2x\.png$/i
   ];
   
   return !invalidPatterns.some(pattern => pattern.test(email));
@@ -1591,15 +1599,39 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
           if (priceMatch) price = priceMatch[0];
         }
 
-        // Extract location
+        // Extract location - improved strategy
         let location = $el.find('.address').text().trim() ||
                        $el.find('.location').text().trim() ||
                        $el.find('[class*="address"]').text().trim();
         
         if (!location) {
-           // Try to find address-like text
-           const addressMatch = $el.text().match(/([A-Z][a-z0-9\s]+(?:Road|Street|Lane|Avenue|Close|Way|Drive|Gardens|Place|Court|Terrace|Hill|Walk)|[A-Z][a-z\s]+, [A-Z][a-z\s]+)/);
-           if (addressMatch) location = addressMatch[0].trim();
+           // Try to find address-like text by iterating all elements
+           const addressKeywords = ['Road', 'Street', 'Lane', 'Avenue', 'Close', 'Way', 'Drive', 'Gardens', 'Place', 'Court', 'Terrace', 'Hill', 'Walk', 'Square', 'Crescent', 'Apartment', 'Flat', 'House', 'Leeds', 'London', 'Manchester', 'Birmingham'];
+           const ukPostcodeRegex = /[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}/i;
+           
+           // traverse all elements to find one that contains address but isn't the full card text
+           const candidates: string[] = [];
+           $el.find('*').each((_, child) => {
+             // Get direct text of this element (not children)
+             const directText = $(child).clone().children().remove().end().text().trim();
+             if (directText.length > 5 && directText.length < 100) {
+               if (ukPostcodeRegex.test(directText) || addressKeywords.some(kw => directText.includes(kw))) {
+                 // Filter out price/bed info and common UI text
+                 if (!directText.toLowerCase().includes('pcm') && 
+                     !directText.toLowerCase().includes('bedroom') && 
+                     !directText.toLowerCase().includes('tenancy info') &&
+                     !directText.includes('3D tour')) {
+                    candidates.push(directText);
+                 }
+               }
+             }
+           });
+           
+           if (candidates.length > 0) {
+             // Prioritize candidates that have commas (common in addresses)
+             const withComma = candidates.find(c => c.includes(','));
+             location = withComma || candidates[0]; 
+           }
         }
         
         // If title is missing but we have location/price, construct a title
@@ -1699,7 +1731,7 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
                    !urlLower.includes('placeholder');
           });
         
-        // Extract agent information
+        // Extract agent information - improved strategy
         let agentName = $el.find('.otm-PropertyCardAgent').text().trim();
         
         // If no specific agent class, try to find agent-like text or image alt
@@ -1707,13 +1739,39 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
            const agentImg = $el.find('.agent-logo img, img[alt*="agent"], img[alt*="Agent"]');
            if (agentImg.length > 0) {
              agentName = agentImg.attr('alt') || '';
+           } else {
+             // Try to find any image that looks like a logo (small, in footer)
+             const possibleLogos = $el.find('img').filter((_, img) => {
+                const src = $(img).attr('src') || '';
+                const alt = $(img).attr('alt') || '';
+                return (src.includes('logo') || src.includes('agency') || src.includes('branch')) && 
+                       alt.length > 2 && !alt.includes('bedroom');
+             });
+             if (possibleLogos.length > 0) {
+               agentName = possibleLogos.first().attr('alt') || '';
+             }
            }
         }
         
-        // Fallback extraction from text if we see "Marketed by"
+        // Fallback extraction from text if we see "Marketed by" or "Added" context
         if (!agentName) {
-           const marketedMatch = $el.text().match(/Marketed by\s+([^-]+)/i);
-           if (marketedMatch) agentName = marketedMatch[1].trim();
+           const text = $el.text();
+           const marketedMatch = text.match(/Marketed by\s+([^-]+?)(?:\s*-\s*|\s*Added|$)/i);
+           if (marketedMatch) {
+             agentName = marketedMatch[1].trim();
+           } else {
+             // Look for text next to "Added < x days" which usually contains agent name in OTM
+             // Structure seen: "Added < 7 daysCBRE - LondonAdded < 7 days"
+             const addedRegex = /Added\s*<\s*\d+\s*days\s*([^-]+?)(?:\s*-\s*|\s*Added|\d{3}|$)/i;
+             const addedMatch = text.match(addedRegex);
+             if (addedMatch) {
+                const possibleAgent = addedMatch[1].trim();
+                // heuristic to check if it looks like a name
+                if (possibleAgent.length > 2 && possibleAgent.length < 50 && !/\d/.test(possibleAgent)) {
+                  agentName = possibleAgent;
+                }
+             }
+           }
         }
         
         // Extract company name from agent text (look for "Marketed by" pattern)
