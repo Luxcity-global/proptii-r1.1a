@@ -390,16 +390,10 @@ async function scrapeEmailsFromWebsite(url: string, browser: Browser): Promise<s
 }
 
 async function searchCompanyWebsiteWithBraveAPI(companyName: string, apiKey: string): Promise<string | null> {
-  // More specific search queries to find the actual company website
+  // Optimized: Only use the most effective query to save time
   const searchQueries = [
-    `${companyName} UK real estate agency website`,
-    `${companyName} UK estate agents website`,
-    `${companyName} UK letting agents website`,
-    `${companyName} UK property agency website`,
-    `${companyName} estate agents UK website`,
-    `${companyName} lettings UK website`,
-    `${companyName} property management UK website`,
-    `${companyName} real estate UK website`
+    `"${companyName}" UK estate agents website`,
+    `${companyName} UK letting agents`
   ];
   
   for (const query of searchQueries) {
@@ -407,12 +401,13 @@ async function searchCompanyWebsiteWithBraveAPI(companyName: string, apiKey: str
       const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
         params: {
           q: query,
-          count: 10
+          count: 5 // Reduced from 10 to 5 for speed
         },
         headers: {
           'Accept': 'application/json',
           'X-Subscription-Token': apiKey
-        }
+        },
+        timeout: 10000 // 10 second timeout
       });
 
       if (response.data.web && response.data.web.results && response.data.web.results.length > 0) {
@@ -482,10 +477,25 @@ async function searchCompanyWebsiteWithBraveAPI(companyName: string, apiKey: str
             return link;
           }
         }
+        
+        // If we found any results but no high-confidence match, return the first one
+        if (response.data.web.results.length > 0) {
+          const firstResult = response.data.web.results[0];
+          const link = firstResult.url;
+          const skipDomains = ['onthemarket.com', 'rightmove.co.uk', 'zoopla.co.uk', 'primelocation.com', 
+                             'spareroom.co.uk', 'openrent.com', 'facebook.com', 'linkedin.com', 'twitter.com',
+                             'instagram.com', 'google.com', 'bing.com', 'trustpilot.com', 'yell.com',
+                             'zoopla.com', 'primelocation.co.uk', 'gumtree.com', 'shpock.com'];
+          
+          if (!skipDomains.some(domain => link.includes(domain))) {
+            console.log(`Returning best-guess website for ${companyName}: ${link}`);
+            return link;
+          }
+        }
       }
       
-      // Add a longer delay between requests to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Reduced delay between requests for speed
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
     } catch (error: any) {
       console.error(`Error searching for company website with query "${query}":`, error.message);
@@ -508,28 +518,20 @@ async function searchCompanyWebsiteWithBraveAPI(companyName: string, apiKey: str
 async function searchEmailWithInternet(companyName: string, apiKey: string): Promise<string[]> {
   console.log(`Searching for email via internet search: ${companyName}`);
   
-  // More targeted search queries for real estate emails
+  // Optimized: Only use most effective queries to save time and API calls
   const searchQueries = [
-    `${companyName} UK real estate contact email`,
-    `${companyName} UK estate agents contact email`,
-    `${companyName} UK letting agents contact email`,
-    `${companyName} UK property agency contact email`,
-    `${companyName} UK real estate enquiries email`,
-    `${companyName} UK real estate info email`,
-    `${companyName} UK real estate office email`,
-    `${companyName} UK real estate lettings email`,
-    `${companyName} UK real estate rental email`,
-    `${companyName} UK real estate property email`,
-    // Add more specific queries
-    `"${companyName}" "contact us" email UK real estate`,
-    `"${companyName}" "enquiries" email UK property`,
-    `"${companyName}" "info@" UK real estate`,
-    `"${companyName}" "contact@" UK property agency`
+    `"${companyName}" contact email UK estate agents`,
+    `"${companyName}" lettings email UK`,
+    `${companyName} UK real estate contact email`
   ];
   
   const allEmails: string[] = [];
+  let queriesAttempted = 0;
+  const maxQueries = 3; // Limit to 3 queries to save time
   
   for (const query of searchQueries) {
+    if (queriesAttempted >= maxQueries) break;
+    
     try {
       const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
         params: {
@@ -539,8 +541,11 @@ async function searchEmailWithInternet(companyName: string, apiKey: string): Pro
         headers: {
           'Accept': 'application/json',
           'X-Subscription-Token': apiKey
-        }
+        },
+        timeout: 10000 // 10 second timeout
       });
+      
+      queriesAttempted++;
       
       let results = '';
       
@@ -551,10 +556,15 @@ async function searchEmailWithInternet(companyName: string, apiKey: string): Pro
       const emails = results.match(EMAIL_REGEX);
       if (emails) {
         allEmails.push(...emails);
+        // If we found emails, no need to continue searching
+        if (allEmails.length > 0) {
+          console.log(`Found ${allEmails.length} emails after ${queriesAttempted} queries`);
+          break;
+        }
       }
       
-      // Add delay between requests to be respectful to the API
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Reduced delay between requests for speed
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
     } catch (error: any) {
       console.error(`Error searching for query "${query}":`, error.message);
@@ -564,73 +574,8 @@ async function searchEmailWithInternet(companyName: string, apiKey: string): Pro
         console.log('Rate limit hit, waiting 5 seconds...');
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
+      // For timeouts or other errors, just continue to next query
     }
-  }
-  
-  // Additional search: Look for company directory listings
-  try {
-    const directoryQueries = [
-      `${companyName} UK real estate directory`,
-      `${companyName} UK estate agents directory`,
-      `${companyName} UK property agency listing`,
-      `${companyName} UK real estate company profile`
-    ];
-    
-    for (const query of directoryQueries) {
-      try {
-        const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
-          params: {
-            q: query,
-            count: 5
-          },
-          headers: {
-            'Accept': 'application/json',
-            'X-Subscription-Token': apiKey
-          }
-        });
-        
-        if (response.data.web && response.data.web.results) {
-          // Look for directory sites that might contain contact info
-          const directorySites = response.data.web.results.filter((r: any) => 
-            r.url && (
-              r.url.includes('yell.com') ||
-              r.url.includes('thomsonlocal.com') ||
-              r.url.includes('192.com') ||
-              r.url.includes('cylex-uk.co.uk') ||
-              r.url.includes('hotfrog.co.uk') ||
-              r.url.includes('brownbook.net') ||
-              r.url.includes('touchlocal.com')
-            )
-          );
-          
-          for (const site of directorySites) {
-            try {
-              // Try to scrape emails from directory sites
-              const siteResponse = await axios.get(site.url, {
-                timeout: 10000,
-                headers: {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                }
-              });
-              
-              const siteEmails = siteResponse.data.match(EMAIL_REGEX);
-              if (siteEmails) {
-                allEmails.push(...siteEmails);
-              }
-            } catch (siteError) {
-              console.log(`Failed to scrape directory site ${site.url}:`, siteError);
-            }
-          }
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-      } catch (error: any) {
-        console.error(`Error searching directory for "${query}":`, error.message);
-      }
-    }
-  } catch (error) {
-    console.error('Directory search failed:', error);
   }
   
   // Remove duplicates and filter for valid emails
@@ -681,78 +626,62 @@ async function findEmailForAgent(agentName: string, website: string | undefined,
   // Clean up company name for better search results
   companyName = cleanCompanyName(companyName);
   
-  console.log(`Looking for email for company: ${companyName} UK real estate contact email`);
+  console.log(`Looking for email for company: ${companyName}`);
 
-  // 1. Try website (if available)
-  if (website) {
-    // Check if it's an OnTheMarket internal link - if so, skip direct scraping
-    const isOTM = website.includes('onthemarket.com');
-    
-    if (!isOTM) {
-      console.log(`Trying website: ${website}`);
-      let emails = await scrapeEmailsFromWebsite(website, browser);
-      if (emails.length > 0) {
-        console.log(`Found emails on website: ${emails[0]}`);
-        return { email: emails[0], website };
-      }
-      // Try various contact-related paths
-      for (const path of ['/contact', '/about', '/contact-us', '/about-us', '/enquiries', '/enquiry', '/lettings', '/rentals']) {
-        try {
-          // Add a small delay between requests to be polite and allow cleanup
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          const url = website.endsWith('/') ? website + path.slice(1) : website + path;
-          emails = await scrapeEmailsFromWebsite(url, browser);
-          if (emails.length > 0) {
-            console.log(`Found emails on ${path}: ${emails[0]}`);
-            return { email: emails[0], website };
-          }
-        } catch {}
-      }
-    } else {
-      console.log(`Skipping direct scraping of OTM link: ${website}, prioritizing external search`);
-    }
-  }
-
-  // 2. Search for company website using Brave API
-  console.log(`Searching for company website: ${companyName} UK real estate`);
-  const companyWebsite = await searchCompanyWebsiteWithBraveAPI(companyName, apiKey);
-  if (companyWebsite) {
-    console.log(`Found company website: ${companyWebsite}`);
-    let emails = await scrapeEmailsFromWebsite(companyWebsite, browser);
-    if (emails.length > 0) {
-      console.log(`Found emails on company website: ${emails[0]}`);
-      return { email: emails[0], website: companyWebsite };
-    }
-    // Try various contact-related paths on company website
-    for (const path of ['/contact', '/about', '/contact-us', '/about-us', '/enquiries', '/enquiry', '/lettings', '/rentals']) {
-      try {
-        // Add a small delay between requests
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const url = companyWebsite.endsWith('/') ? companyWebsite + path.slice(1) : companyWebsite + path;
-        emails = await scrapeEmailsFromWebsite(url, browser);
-        if (emails.length > 0) {
-          console.log(`Found emails on company website ${path}: ${emails[0]}`);
-          return { email: emails[0], website: companyWebsite };
-        }
-      } catch {}
-    }
-  }
-
-  // 3. Fallback to internet search for emails
-  console.log(`No email found on websites, trying internet search for: ${companyName}`);
+  // STRATEGY: Prioritize fast internet search over slow website scraping
+  // This avoids timeout issues and is more reliable
+  
+  // 1. First, try internet search (fastest and most reliable)
+  console.log(`Searching internet for contact email: ${companyName}`);
   try {
     const internetEmails = await searchEmailWithInternet(companyName, apiKey);
     if (internetEmails.length > 0) {
       console.log(`Found email via internet search: ${internetEmails[0]}`);
+      // Still try to get the official website for reference
+      const companyWebsite = await searchCompanyWebsiteWithBraveAPI(companyName, apiKey);
       return { email: internetEmails[0], website: companyWebsite || website || undefined };
     }
   } catch (error) {
     console.error(`Internet email search failed for ${companyName}:`, error);
   }
+
+  // 2. If internet search fails, try the provided website (if not OTM)
+  if (website && !website.includes('onthemarket.com')) {
+    console.log(`Trying provided website: ${website}`);
+    // Only try homepage and /contact to save time
+    const quickPaths = ['', '/contact'];
+    for (const path of quickPaths) {
+      try {
+        const url = path ? (website.endsWith('/') ? website + path.slice(1) : website + path) : website;
+        const emails = await scrapeEmailsFromWebsite(url, browser);
+        if (emails.length > 0) {
+          console.log(`Found emails on website ${path || '/'}: ${emails[0]}`);
+          return { email: emails[0], website };
+        }
+      } catch {}
+    }
+  }
+
+  // 3. Search for company website and try scraping
+  console.log(`Searching for company website: ${companyName}`);
+  const companyWebsite = await searchCompanyWebsiteWithBraveAPI(companyName, apiKey);
+  if (companyWebsite) {
+    console.log(`Found company website: ${companyWebsite}`);
+    // Only try homepage and /contact to save time
+    const quickPaths = ['', '/contact'];
+    for (const path of quickPaths) {
+      try {
+        const url = path ? (companyWebsite.endsWith('/') ? companyWebsite + path.slice(1) : companyWebsite + path) : companyWebsite;
+        const emails = await scrapeEmailsFromWebsite(url, browser);
+        if (emails.length > 0) {
+          console.log(`Found emails on company website ${path || '/'}: ${emails[0]}`);
+          return { email: emails[0], website: companyWebsite };
+        }
+      } catch {}
+    }
+  }
   
-  console.log(`No email found for: ${companyName} UK real estate contact email`);
+  console.log(`No email found for: ${companyName}`);
   return { email: null, website: companyWebsite || website || undefined };
 }
 
