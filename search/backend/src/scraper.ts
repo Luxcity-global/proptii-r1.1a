@@ -1326,10 +1326,11 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
       headless: true,
       timeout: 60000,
       executablePath: chromeExecutablePath,
+      ignoreDefaultArgs: ['--enable-automation'], // Sometimes helps with detection
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
+        '--disable-dev-shm-usage', // Crucial for Docker/Render environments
         '--disable-accelerated-2d-canvas',
         '--disable-gpu',
         '--disable-gpu-sandbox',
@@ -1337,7 +1338,7 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
         '--disable-background-timer-throttling',
         '--disable-backgrounding-occluded-windows',
         '--disable-renderer-backgrounding',
-        '--disable-features=TranslateUI',
+        '--disable-features=TranslateUI,VizDisplayCompositor',
         '--disable-ipc-flooding-protection',
         '--disable-background-networking',
         '--disable-client-side-phishing-detection',
@@ -1345,10 +1346,11 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
         '--disable-default-apps',
         '--disable-extensions',
         '--disable-plugins',
-        '--disable-images',
+        '--disable-images', // Reduce memory usage
         '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
         '--window-size=1920x1080',
+        '--single-process', // Try single process mode for stability in restricted envs
+        // Data paths (use /tmp for writable space)
         '--data-path=/tmp/puppeteer_data',
         '--homedir=/tmp',
         '--disk-cache-dir=/tmp/puppeteer_cache',
@@ -1356,7 +1358,8 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
         '--aggressive-cache-discard',
         '--memory-pressure-off',
         '--max_old_space_size=4096'
-      ]
+      ],
+      pipe: true // Use pipe instead of WebSocket to avoid WS timeout issues
     };
 
     // Try to launch browser with retry logic

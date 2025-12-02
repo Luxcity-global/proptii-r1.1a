@@ -10,7 +10,18 @@ import { scrapeOpenRent, buildOpenRentUrl, parseOpenRentQuery } from './scrapers
 const app = express();
 const port = process.env.PORT || 3001;
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://proptii-r1-1a-new.onrender.com',
+    'https://proptii-frontend.onrender.com',
+    'http://localhost:5173',
+    'http://localhost:4173',
+    /\.onrender\.com$/
+  ],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Health check endpoint
@@ -316,6 +327,13 @@ app.post('/scrape', async (req, res) => {
         res.json(results);
       } catch (onTheMarketError) {
         console.error('OnTheMarket scraping failed:', onTheMarketError);
+        
+        // Only fallback if it's NOT a timeout error
+        const errorMessage = onTheMarketError instanceof Error ? onTheMarketError.message : '';
+        if (errorMessage.includes('TimeoutError') || errorMessage.includes('timed out')) {
+          console.log('Timeout error detected, NOT falling back to other providers to avoid irrelevant results.');
+          throw onTheMarketError;
+        }
         
         // Try to extract search parameters from the URL for fallback
         try {
