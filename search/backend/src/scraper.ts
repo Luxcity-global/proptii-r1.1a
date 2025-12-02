@@ -318,21 +318,56 @@ async function scrapeEmailsFromWebsite(url: string, browser: Browser): Promise<s
     
     page = await browser.newPage();
     
+    // Set a shorter default timeout
+    page.setDefaultNavigationTimeout(15000);
+    page.setDefaultTimeout(15000);
+    
     // Block resources to save memory and improve stability
     await page.setRequestInterception(true);
     page.on('request', (req) => {
-      const resourceType = req.resourceType();
-      if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
-        req.abort();
-      } else {
-        req.continue();
+      try {
+        const resourceType = req.resourceType();
+        if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+          req.abort().catch(() => {});
+        } else {
+          req.continue().catch(() => {});
+        }
+      } catch (e) {
+        // Ignore errors during request interception to prevent crashes
       }
     });
 
+    // Handle dialogs automatically (alerts, prompts)
+    page.on('dialog', async dialog => {
+      try {
+        await dialog.dismiss();
+      } catch (e) {}
+    });
+
     console.log(`Navigating to ${url} for email scraping...`);
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    try {
+      const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      
+      // Check for non-HTML content
+      if (response) {
+        const contentType = response.headers()['content-type'];
+        if (contentType && !contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
+          console.log(`Skipping non-HTML content: ${contentType}`);
+          return [];
+        }
+      }
+    } catch (navError) {
+      console.log(`Navigation to ${url} failed or timed out:`, navError);
+      return [];
+    }
+
+    // Quick check for content
     const content = await page.content();
-    const emails = content.match(EMAIL_REGEX);
+    
+    // Limit content size to avoid Regex DOS or memory issues on huge pages
+    const truncatedContent = content.length > 1000000 ? content.substring(0, 1000000) : content;
+    
+    const emails = truncatedContent.match(EMAIL_REGEX);
     const emailList = emails ? Array.from(new Set(emails)) : [];
     
     // Filter out invalid emails and use enhanced prioritization
@@ -344,7 +379,9 @@ async function scrapeEmailsFromWebsite(url: string, browser: Browser): Promise<s
   } finally {
     if (page) {
       try {
-        await page.close();
+        // Navigate to about:blank to free resources before closing
+        await page.goto('about:blank').catch(() => {});
+        await page.close().catch(() => {});
       } catch (e) {
         // Ignore error on close
       }
@@ -661,6 +698,9 @@ async function findEmailForAgent(agentName: string, website: string | undefined,
       // Try various contact-related paths
       for (const path of ['/contact', '/about', '/contact-us', '/about-us', '/enquiries', '/enquiry', '/lettings', '/rentals']) {
         try {
+          // Add a small delay between requests to be polite and allow cleanup
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
           const url = website.endsWith('/') ? website + path.slice(1) : website + path;
           emails = await scrapeEmailsFromWebsite(url, browser);
           if (emails.length > 0) {
@@ -687,6 +727,9 @@ async function findEmailForAgent(agentName: string, website: string | undefined,
     // Try various contact-related paths on company website
     for (const path of ['/contact', '/about', '/contact-us', '/about-us', '/enquiries', '/enquiry', '/lettings', '/rentals']) {
       try {
+        // Add a small delay between requests
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         const url = companyWebsite.endsWith('/') ? companyWebsite + path.slice(1) : companyWebsite + path;
         emails = await scrapeEmailsFromWebsite(url, browser);
         if (emails.length > 0) {
@@ -1465,10 +1508,20 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
     // Try to handle cookie consent if present
     try {
       console.log('Checking for cookie consent...');
-      const acceptButton = await page.$('button:has-text("Accept All")');
-      if (acceptButton) {
+      // Use evaluate for more robust text matching across different Puppeteer versions
+      const clicked = await page.evaluate(() => {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const acceptBtn = buttons.find(b => b.textContent && b.textContent.includes('Accept All'));
+        if (acceptBtn) {
+          // cast to HTMLElement to access click
+          (acceptBtn as HTMLElement).click();
+          return true;
+        }
+        return false;
+      });
+      
+      if (clicked) {
         console.log('Clicking Accept All cookies...');
-        await acceptButton.click();
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     } catch (e) {
