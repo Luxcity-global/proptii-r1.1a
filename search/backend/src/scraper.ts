@@ -133,12 +133,15 @@ export async function getChromeExecutablePath(): Promise<string | undefined> {
   // Method 6: Check Playwright's chromium installation as fallback
   console.log('Checking for Playwright chromium as fallback...');
   const playwrightPath = process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(os.homedir(), '.cache', 'ms-playwright');
+  console.log(`Checking Playwright path: ${playwrightPath}`);
   
   try {
     if (fs.existsSync(playwrightPath)) {
       const playwrightEntries = fs.readdirSync(playwrightPath, { withFileTypes: true });
+      console.log(`Found ${playwrightEntries.length} entries in Playwright path`);
       for (const entry of playwrightEntries) {
         if (entry.isDirectory() && entry.name.startsWith('chromium')) {
+          console.log(`Checking chromium entry: ${entry.name}`);
           // Try common chromium executable paths
           const chromiumPaths = [
             path.join(playwrightPath, entry.name, 'chrome-linux', 'chrome'),
@@ -147,6 +150,7 @@ export async function getChromeExecutablePath(): Promise<string | undefined> {
           ];
           
           for (const chromiumPath of chromiumPaths) {
+            console.log(`Checking path: ${chromiumPath}`);
             if (fs.existsSync(chromiumPath)) {
               console.log('Found Playwright Chromium:', chromiumPath);
               return chromiumPath;
@@ -154,6 +158,8 @@ export async function getChromeExecutablePath(): Promise<string | undefined> {
           }
         }
       }
+    } else {
+      console.log('Playwright path does not exist');
     }
   } catch (error) {
     console.log('Error checking Playwright browsers:', error);

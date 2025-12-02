@@ -524,4 +524,54 @@ app.listen(port, () => {
     task: process.env.APIFY_RIGHTMOVE_TASK_ID || '(none)',
     directResolver: process.env.APIFY_RIGHTMOVE_LOCATION_RESOLVER_URL || '(none)'
   });
+
+  // Check for browser installation and install if missing (mostly for Render native environment)
+  const checkAndInstallBrowsers = async () => {
+    try {
+      console.log('Checking for browser installations...');
+      const fs = await import('fs');
+      const path = await import('path');
+      const os = await import('os');
+      const { exec } = await import('child_process');
+      const util = await import('util');
+      const execAsync = util.promisify(exec);
+
+      // Check Puppeteer Cache
+      const puppeteerCacheDir = process.env.PUPPETEER_CACHE_DIR || path.join(os.homedir(), '.cache', 'puppeteer');
+      console.log(`Puppeteer cache dir: ${puppeteerCacheDir}`);
+      
+      if (!fs.existsSync(puppeteerCacheDir) || fs.readdirSync(puppeteerCacheDir).length === 0) {
+        console.log('Puppeteer cache missing or empty. Installing Chrome...');
+        try {
+          await execAsync('npx puppeteer browsers install chrome');
+          console.log('Puppeteer Chrome installed successfully');
+        } catch (e) {
+          console.error('Failed to install Puppeteer Chrome:', e);
+        }
+      } else {
+        console.log('Puppeteer cache exists.');
+      }
+
+      // Check Playwright Browsers
+      const playwrightBrowsersPath = process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(os.homedir(), '.cache', 'ms-playwright');
+      console.log(`Playwright browsers path: ${playwrightBrowsersPath}`);
+
+      if (!fs.existsSync(playwrightBrowsersPath) || fs.readdirSync(playwrightBrowsersPath).length === 0) {
+        console.log('Playwright browsers missing or empty. Installing Chromium...');
+        try {
+          await execAsync('npx playwright install chromium');
+          console.log('Playwright Chromium installed successfully');
+        } catch (e) {
+          console.error('Failed to install Playwright Chromium:', e);
+        }
+      } else {
+        console.log('Playwright browsers exist.');
+      }
+    } catch (error) {
+      console.error('Error checking/installing browsers:', error);
+    }
+  };
+
+  // Run the check asynchronously without blocking startup
+  checkAndInstallBrowsers();
 }); 
