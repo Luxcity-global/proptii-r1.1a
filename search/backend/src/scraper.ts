@@ -264,7 +264,12 @@ function isValidEmail(email: string): boolean {
     /\.svg$/i,
     /\.webp$/i,
     /\.bmp$/i,
-    /@2x\.png$/i
+    /@2x\.png$/i,
+    /@2x\.json$/i,
+    /\.json$/i,
+    /\.xml$/i,
+    /\.js$/i,
+    /\.css$/i
   ];
   
   return !invalidPatterns.some(pattern => pattern.test(email));
@@ -617,22 +622,29 @@ async function findEmailForAgent(agentName: string, website: string | undefined,
 
   // 1. Try website (if available)
   if (website) {
-    console.log(`Trying website: ${website}`);
-    let emails = await scrapeEmailsFromWebsite(website, browser);
-    if (emails.length > 0) {
-      console.log(`Found emails on website: ${emails[0]}`);
-      return { email: emails[0], website };
-    }
-    // Try various contact-related paths
-    for (const path of ['/contact', '/about', '/contact-us', '/about-us', '/enquiries', '/enquiry', '/lettings', '/rentals']) {
-      try {
-        const url = website.endsWith('/') ? website + path.slice(1) : website + path;
-        emails = await scrapeEmailsFromWebsite(url, browser);
-        if (emails.length > 0) {
-          console.log(`Found emails on ${path}: ${emails[0]}`);
-          return { email: emails[0], website };
-        }
-      } catch {}
+    // Check if it's an OnTheMarket internal link - if so, skip direct scraping
+    const isOTM = website.includes('onthemarket.com');
+    
+    if (!isOTM) {
+      console.log(`Trying website: ${website}`);
+      let emails = await scrapeEmailsFromWebsite(website, browser);
+      if (emails.length > 0) {
+        console.log(`Found emails on website: ${emails[0]}`);
+        return { email: emails[0], website };
+      }
+      // Try various contact-related paths
+      for (const path of ['/contact', '/about', '/contact-us', '/about-us', '/enquiries', '/enquiry', '/lettings', '/rentals']) {
+        try {
+          const url = website.endsWith('/') ? website + path.slice(1) : website + path;
+          emails = await scrapeEmailsFromWebsite(url, browser);
+          if (emails.length > 0) {
+            console.log(`Found emails on ${path}: ${emails[0]}`);
+            return { email: emails[0], website };
+          }
+        } catch {}
+      }
+    } else {
+      console.log(`Skipping direct scraping of OTM link: ${website}, prioritizing external search`);
     }
   }
 
@@ -1767,9 +1779,27 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
              if (addedMatch) {
                 const possibleAgent = addedMatch[1].trim();
                 // heuristic to check if it looks like a name
-                if (possibleAgent.length > 2 && possibleAgent.length < 50 && !/\d/.test(possibleAgent)) {
+                // Filter out "London", "Leeds" etc if they appear alone
+                const cityNames = ['London', 'Leeds', 'Manchester', 'Birmingham', 'Liverpool', 'Bristol', 'Sheffield', 'Nottingham'];
+                
+                if (possibleAgent.length > 2 && possibleAgent.length < 50 && !/\d/.test(possibleAgent) && 
+                    !cityNames.includes(possibleAgent)) {
                   agentName = possibleAgent;
                 }
+             }
+           }
+        }
+        
+        // Refine agent name if it looks like "CBRE - London" -> "CBRE"
+        if (agentName && agentName.includes(' - ')) {
+           const parts = agentName.split(' - ');
+           if (parts.length > 0) {
+             // If the second part is a city name, take the first part
+             const cityNames = ['London', 'Leeds', 'Manchester', 'Birmingham', 'Liverpool', 'Bristol', 'Sheffield', 'Nottingham', 'Nationwide'];
+             if (cityNames.some(city => parts[1].includes(city))) {
+               agentName = parts[0].trim();
+             } else {
+               agentName = parts[0].trim(); // Default to first part anyway usually
              }
            }
         }
@@ -1784,11 +1814,18 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
         const cleanAgentName = companyMatch ? companyMatch[1].trim() : (agentName || 'OnTheMarket Agent');
         
         // Extract website/link
-        let agentWebsite = undefined;
+        let agentWebsite: string | undefined = undefined;
         const link = $el.find('a').first().attr('href');
         if (link) {
-           if (link.startsWith('http')) agentWebsite = link;
-           else agentWebsite = `https://www.onthemarket.com${link}`;
+           // OTM internal links usually start with /details/ or /agents/
+           // We don't want to use these as the "company website" for scraping contact info
+           // unless we can't find anything else.
+           if (link.startsWith('http')) {
+             agentWebsite = link;
+           } else {
+             // Store the OTM link but mark it as internal so we know to prioritize external search
+             agentWebsite = `https://www.onthemarket.com${link}`;
+           }
         }
 
             if (price) {
