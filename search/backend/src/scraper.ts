@@ -1412,8 +1412,34 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
     // Wait for either property cards or a no-results message
     await Promise.race([
       page.waitForSelector('.otm-PropertyCard', { timeout: 60000 }).catch(() => null),
+      page.waitForSelector('article', { timeout: 60000 }).catch(() => null),
       page.waitForSelector('.otm-ResultCount, .no-results-message', { timeout: 60000 }).catch(() => null)
     ]);
+
+    // Try to handle cookie consent if present
+    try {
+      console.log('Checking for cookie consent...');
+      const acceptButton = await page.$('button:has-text("Accept All")');
+      if (acceptButton) {
+        console.log('Clicking Accept All cookies...');
+        await acceptButton.click();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } catch (e) {
+      console.log('Cookie consent handling failed (non-fatal):', e);
+    }
+
+    // Try to handle generic modals (like "Sign in to continue" or "Alerts")
+    try {
+      const closeButton = await page.$('button[aria-label="Close"], button[class*="close"], .modal-close');
+      if (closeButton) {
+        console.log('Closing modal...');
+        await closeButton.click();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } catch (e) {
+      // Ignore
+    }
 
     console.log('Scrolling to load all images...');
     // Scroll down to trigger lazy loading of images
@@ -1512,11 +1538,26 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
     console.log('Page title:', $('title').text());
 
     // Find all property cards
-    const propertyCards = $('.otm-PropertyCard');
+    let propertyCards = $('.otm-PropertyCard');
+    
+    // Fallback to generic article selector if specific class not found
+    if (propertyCards.length === 0) {
+      console.log('No .otm-PropertyCard found, trying article tag...');
+      propertyCards = $('article');
+    }
+    
+    // Fallback to data-testid or list items
+    if (propertyCards.length === 0) {
+      console.log('No article found, trying list items...');
+      propertyCards = $('li:has(a[href*="/details/"])');
+    }
+
     console.log(`Found ${propertyCards.length} property cards`);
 
     if (propertyCards.length === 0) {
       console.log('No property cards found. Returning empty array.');
+      // Debug: log a bit of page content to see what's there
+      console.log('Page HTML excerpt:', $('body').html()?.substring(0, 500));
       return [];
     }
 
@@ -1524,20 +1565,56 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
           try {
             const $el = $(el);
             
-        const title = $el.find('.otm-PropertyCardInfo .title').text().trim();
-        const price = $el.find('.otm-Price').text().trim();
-        const location = $el.find('.address').text().trim();
+        // Extract title - try multiple selectors
+        let title = $el.find('.otm-PropertyCardInfo .title').text().trim() ||
+                    $el.find('.title').text().trim() ||
+                    $el.find('h2').text().trim() ||
+                    $el.find('h3').text().trim() ||
+                    $el.find('.property-title').text().trim() ||
+                    $el.find('a[href*="/details/"]').first().text().trim() ||
+                    $el.find('a').first().text().trim();
         
+        // Clean title (sometimes it includes "View details for...")
+        if (title && title.includes('View the details for')) {
+          title = title.replace('View the details for', '').trim();
+        }
+        
+        // Extract price - try multiple selectors and patterns
+        let price = $el.find('.otm-Price').text().trim() ||
+                    $el.find('.price').text().trim() ||
+                    $el.find('[class*="price"]').text().trim();
+        
+        if (!price) {
+          // Fallback: search text for price pattern
+          const text = $el.text();
+          const priceMatch = text.match(/£[\d,]+(?:\s*(?:pcm|pw|per month|per week))?/i);
+          if (priceMatch) price = priceMatch[0];
+        }
+
+        // Extract location
+        let location = $el.find('.address').text().trim() ||
+                       $el.find('.location').text().trim() ||
+                       $el.find('[class*="address"]').text().trim();
+        
+        if (!location) {
+           // Try to find address-like text
+           const addressMatch = $el.text().match(/([A-Z][a-z0-9\s]+(?:Road|Street|Lane|Avenue|Close|Way|Drive|Gardens|Place|Court|Terrace|Hill|Walk)|[A-Z][a-z\s]+, [A-Z][a-z\s]+)/);
+           if (addressMatch) location = addressMatch[0].trim();
+        }
+        
+        // If title is missing but we have location/price, construct a title
+        if (!title && location && price) {
+           title = `Property in ${location}`;
+        }
+
         // Extract bedrooms more accurately
         let bedrooms = 'Not specified';
         const bedBathText = $el.find('.otm-BedBathCount').text().trim();
-        const titleText = title.toLowerCase();
-        const allText = (title + ' ' + bedBathText).toLowerCase();
+        const titleText = title ? title.toLowerCase() : '';
+        const allText = (titleText + ' ' + bedBathText + ' ' + $el.text()).toLowerCase();
         
         // Debug logging
-        console.log('Raw bedBathText:', bedBathText);
-        console.log('Title text:', titleText);
-        console.log('All text for bedroom extraction:', allText);
+        // console.log('Raw bedBathText:', bedBathText);
         
         // Try multiple patterns to extract bedroom count
         const bedroomPatterns = [
@@ -1563,9 +1640,10 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
           bedrooms = 'Studio';
         }
         
-        console.log('Extracted bedrooms:', bedrooms);
+        // console.log('Extracted bedrooms:', bedrooms);
         
-        const propertyType = $el.find('.otm-PropertyCardInfo .property-type').text().trim();
+        const propertyType = $el.find('.otm-PropertyCardInfo .property-type').text().trim() || 'Property';
+        
         // Extract multiple images for each property
         const imageUrls: string[] = [];
         
@@ -1621,33 +1699,50 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
                    !urlLower.includes('placeholder');
           });
         
-        // Extract agent information - look for the full agent text
-        const agentText = $el.find('.otm-PropertyCardAgent').text().trim();
-        console.log('Raw agent text:', agentText);
+        // Extract agent information
+        let agentName = $el.find('.otm-PropertyCardAgent').text().trim();
+        
+        // If no specific agent class, try to find agent-like text or image alt
+        if (!agentName) {
+           const agentImg = $el.find('.agent-logo img, img[alt*="agent"], img[alt*="Agent"]');
+           if (agentImg.length > 0) {
+             agentName = agentImg.attr('alt') || '';
+           }
+        }
+        
+        // Fallback extraction from text if we see "Marketed by"
+        if (!agentName) {
+           const marketedMatch = $el.text().match(/Marketed by\s+([^-]+)/i);
+           if (marketedMatch) agentName = marketedMatch[1].trim();
+        }
         
         // Extract company name from agent text (look for "Marketed by" pattern)
         // Format: "Marketed by Company Name - Location Phone Email"
-        let companyMatch = agentText.match(/Marketed by\s+([^-]+?)(?:\s*-\s*|$)/i);
+        let companyMatch = agentName.match(/Marketed by\s+([^-]+?)(?:\s*-\s*|$)/i);
         if (!companyMatch) {
           // Fallback: try to extract any text that looks like a company name
-          companyMatch = agentText.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
+          companyMatch = agentName.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
         }
-        const agentName = companyMatch ? companyMatch[1].trim() : agentText;
+        const cleanAgentName = companyMatch ? companyMatch[1].trim() : (agentName || 'OnTheMarket Agent');
         
-        // Don't extract website from property cards as they're internal links
-        // We'll find the actual company website using Serp API later
+        // Extract website/link
         let agentWebsite = undefined;
+        const link = $el.find('a').first().attr('href');
+        if (link) {
+           if (link.startsWith('http')) agentWebsite = link;
+           else agentWebsite = `https://www.onthemarket.com${link}`;
+        }
 
-            if (title || price) {
+            if (price) {
               properties.push({
-                title: title || 'No Title Available',
+                title: title || 'Property Listing',
                 price: price || 'Price on Application',
                 location: location || 'Location not specified',
                 bedrooms: bedrooms || 'Not specified',
-                propertyType: propertyType || 'Property',
+                propertyType: propertyType,
                 imageUrls: validImageUrls,
                 agent: {
-                  name: agentName || 'Agent information not available',
+                  name: cleanAgentName,
                   email: '', // Will fill later
                   website: agentWebsite
                 }
@@ -1655,9 +1750,7 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
               console.log('Added property:', {
             title,
             price,
-            location,
-            bedrooms,
-            imageUrls: validImageUrls.length > 0 ? `Found ${validImageUrls.length} images` : 'No images found'
+            location
               });
             }
           } catch (itemError) {
