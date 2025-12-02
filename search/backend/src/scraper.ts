@@ -308,8 +308,28 @@ function cleanCompanyName(companyName: string): string {
 }
 
 async function scrapeEmailsFromWebsite(url: string, browser: Browser): Promise<string[]> {
-  const page = await browser.newPage();
+  let page;
   try {
+    // Basic check if browser is connected
+    if (!browser.isConnected()) {
+      console.error('Browser is disconnected, cannot scrape emails');
+      return [];
+    }
+    
+    page = await browser.newPage();
+    
+    // Block resources to save memory and improve stability
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      const resourceType = req.resourceType();
+      if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
+
+    console.log(`Navigating to ${url} for email scraping...`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     const content = await page.content();
     const emails = content.match(EMAIL_REGEX);
@@ -322,7 +342,13 @@ async function scrapeEmailsFromWebsite(url: string, browser: Browser): Promise<s
     console.error(`Error scraping emails from ${url}:`, e);
     return [];
   } finally {
-    await page.close();
+    if (page) {
+      try {
+        await page.close();
+      } catch (e) {
+        // Ignore error on close
+      }
+    }
   }
 }
 
@@ -1877,8 +1903,19 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
     for (const [key, { name, website }] of sortedAgents) {
       console.log(`Processing agent: ${name}`);
       if (browser) {
-        const result = await findEmailForAgent(name, website, browser, apiKey);
-        agentEmailCache[key] = { email: result.email, website: result.website };
+        try {
+          // Check if browser is still healthy
+          if (!browser.isConnected()) {
+             console.log('Browser disconnected, stopping email scraping');
+             break;
+          }
+          const result = await findEmailForAgent(name, website, browser, apiKey);
+          agentEmailCache[key] = { email: result.email, website: result.website };
+        } catch (agentError) {
+          console.error(`Error processing agent ${name}:`, agentError);
+          // Continue to next agent instead of failing everything
+          agentEmailCache[key] = { email: null, website: null };
+        }
       } else {
         agentEmailCache[key] = { email: null, website: null };
       }
