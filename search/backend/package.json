@@ -8,7 +8,8 @@
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:browsers": "node test-browsers.js",
-    "install:browsers": "npx playwright install --with-deps chromium && npx puppeteer browsers install chrome"
+    "install:browsers": "npx playwright install chromium && npx puppeteer browsers install chrome",
+    "postinstall": "npm run install:browsers"
   },
   "keywords": [],
   "author": "",
