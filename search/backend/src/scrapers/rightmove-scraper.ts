@@ -38,7 +38,31 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--disable-gpu',
-        '--window-size=1920x1080'
+        '--disable-gpu-sandbox',
+        '--disable-software-rasterizer',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-features=TranslateUI,VizDisplayCompositor',
+        '--disable-ipc-flooding-protection',
+        '--disable-background-networking',
+        '--disable-client-side-phishing-detection',
+        '--disable-sync',
+        '--disable-default-apps',
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-images',
+        '--disable-web-security',
+        '--disable-speech-api',
+        '--disable-notifications',
+        '--window-size=1920x1080',
+        '--single-process',
+        '--data-path=/tmp/puppeteer_data_rm',
+        '--homedir=/tmp',
+        '--disk-cache-dir=/tmp/puppeteer_cache_rm',
+        '--media-cache-dir=/tmp/puppeteer_media_cache_rm',
+        '--aggressive-cache-discard',
+        '--memory-pressure-off'
       ]
     };
 

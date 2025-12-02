@@ -45,8 +45,7 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
         '--disk-cache-dir=/tmp/playwright_cache',
         '--media-cache-dir=/tmp/playwright_media_cache',
         '--aggressive-cache-discard',
-        '--memory-pressure-off',
-        '--max_old_space_size=4096'
+        '--memory-pressure-off'
       ]
     });
 

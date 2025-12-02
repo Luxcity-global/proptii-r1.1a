@@ -19,7 +19,12 @@ export async function scrapeOpenRent(url: string, apiKey: string): Promise<Prope
     console.log('Launching browser...');
     browser = await chromium.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox', 
+        '--disable-dev-shm-usage',
+        '--disable-blink-features=AutomationControlled'
+      ]
     });
     console.log('Browser launched successfully');
 

@@ -1348,6 +1348,8 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
         '--disable-plugins',
         '--disable-images', // Reduce memory usage
         '--disable-web-security',
+        '--disable-speech-api',
+        '--disable-notifications',
         '--window-size=1920x1080',
         '--single-process', // Try single process mode for stability in restricted envs
         // Data paths (use /tmp for writable space)
@@ -1356,8 +1358,7 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
         '--disk-cache-dir=/tmp/puppeteer_cache',
         '--media-cache-dir=/tmp/puppeteer_media_cache',
         '--aggressive-cache-discard',
-        '--memory-pressure-off',
-        '--max_old_space_size=4096'
+        '--memory-pressure-off'
       ],
       pipe: true // Use pipe instead of WebSocket to avoid WS timeout issues
     };
@@ -1395,8 +1396,8 @@ export async function scrape(url: string, apiKey: string): Promise<Property[]> {
     while (retries > 0) {
       try {
         await page.goto(cleanUrl, {
-          waitUntil: 'networkidle0',
-          timeout: 60000
+          waitUntil: 'domcontentloaded',
+          timeout: 30000
         });
         break;
       } catch (error) {

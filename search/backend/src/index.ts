@@ -10,17 +10,52 @@ import { scrapeOpenRent, buildOpenRentUrl, parseOpenRentQuery } from './scrapers
 const app = express();
 const port = process.env.PORT || 3001;
 
+// Global error handlers to prevent crashes
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err);
+  // Don't exit the process in production if possible, or let Render restart it
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('UNHANDLED REJECTION:', reason);
+});
+
+// Log memory usage
+const logMemory = () => {
+  const used = process.memoryUsage();
+  console.log(`Memory usage: rss=${Math.round(used.rss / 1024 / 1024)}MB, heapTotal=${Math.round(used.heapTotal / 1024 / 1024)}MB, heapUsed=${Math.round(used.heapUsed / 1024 / 1024)}MB`);
+};
+setInterval(logMemory, 30000); // Log every 30s
+
+// Enable pre-flight requests for all routes
+app.options('*', cors());
+
 app.use(cors({
-  origin: [
-    'https://proptii-r1-1a-new.onrender.com',
-    'https://proptii-frontend.onrender.com',
-    'http://localhost:5173',
-    'http://localhost:4173',
-    /\.onrender\.com$/
-  ],
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'https://proptii-r1-1a-new.onrender.com',
+      'https://proptii-frontend.onrender.com',
+      'http://localhost:5173',
+      'http://localhost:4173'
+    ];
+    
+    // Check if origin is allowed directly or matches .onrender.com pattern
+    if (allowedOrigins.indexOf(origin) !== -1 || /\.onrender\.com$/.test(origin)) {
+      callback(null, true);
+    } else {
+      console.log(`Blocked by CORS: ${origin}`);
+      // For debugging, you might want to allow it anyway temporarily:
+      // callback(null, true); 
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
 app.use(express.json());
 
