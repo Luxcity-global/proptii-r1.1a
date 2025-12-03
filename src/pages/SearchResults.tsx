@@ -771,10 +771,19 @@ const SearchResults = () => {
   // Initialize map when showMap is true and script is loaded
   useEffect(() => {
     if (showMap && isMapLoaded && mapRef.current && window.google && window.google.maps) {
-      // Clear existing map instance if any
+      // Check if map is already initialized on the SAME div
       if (mapInstanceRef.current) {
-        console.log('Map already initialized, skipping re-initialization');
-        return; // Map already initialized
+        // The Google Maps type definitions might not expose getDiv() on the Map type easily if typed as 'any',
+        // but it exists on the instance.
+        const mapDiv = mapInstanceRef.current.getDiv ? mapInstanceRef.current.getDiv() : null;
+        
+        if (mapDiv === mapRef.current) {
+          console.log('Map already initialized, skipping re-initialization');
+          return; // Map already initialized on correct div
+        }
+        
+        console.log('Map instance exists but attached to different div (or div recreated). Re-initializing.');
+        // We'll proceed to re-initialize which will overwrite mapInstanceRef.current
       }
 
       // Step 1: Initialize map centered on UK (country view)
@@ -1165,6 +1174,7 @@ const SearchResults = () => {
       lastResultsKeyRef.current = null;
       markersRef.current.forEach(marker => marker.setMap(null));
       markersRef.current = [];
+      mapInstanceRef.current = null; // Reset map instance to force re-initialization when shown again
     }
   }, [showMap]);
   
