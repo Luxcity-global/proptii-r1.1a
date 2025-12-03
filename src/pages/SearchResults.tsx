@@ -655,7 +655,8 @@ const SearchResults = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [showMap, setShowMap] = useState(false);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const mapRef = useRef<HTMLDivElement>(null);
+  // Use state for map node to detect DOM updates/remounts
+  const [mapNode, setMapNode] = useState<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const markersGeocodedRef = useRef<boolean>(false);
@@ -770,25 +771,32 @@ const SearchResults = () => {
 
   // Initialize map when showMap is true and script is loaded
   useEffect(() => {
-    if (showMap && isMapLoaded && mapRef.current && window.google && window.google.maps) {
+    if (showMap && isMapLoaded && mapNode && window.google && window.google.maps) {
       // Check if map is already initialized on the SAME div
       if (mapInstanceRef.current) {
         // The Google Maps type definitions might not expose getDiv() on the Map type easily if typed as 'any',
         // but it exists on the instance.
         const mapDiv = mapInstanceRef.current.getDiv ? mapInstanceRef.current.getDiv() : null;
         
-        if (mapDiv === mapRef.current) {
-          console.log('Map already initialized, skipping re-initialization');
+        if (mapDiv === mapNode) {
+          console.log('Map already initialized on correct div');
           return; // Map already initialized on correct div
         }
         
-        console.log('Map instance exists but attached to different div (or div recreated). Re-initializing.');
-        // We'll proceed to re-initialize which will overwrite mapInstanceRef.current
+        console.log('Map instance exists but attached to different div. Re-initializing and resetting state.');
+        // Reset all flags to force geocoding/marker logic to re-run
+        markersGeocodedRef.current = false;
+        boundsFittedRef.current = false;
+        boundsFittedTimeRef.current = 0;
+        lastResultsKeyRef.current = null;
+        searchLocationCenteredRef.current = null;
+        // Clear markers ref
+        markersRef.current = [];
       }
 
       // Step 1: Initialize map centered on UK (country view)
       try {
-        mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
+        mapInstanceRef.current = new window.google.maps.Map(mapNode, {
           center: { lat: 54.0, lng: -2.0 }, // Center of UK
           zoom: 6, // Show entire UK
           mapTypeControl: true,
@@ -847,7 +855,7 @@ const SearchResults = () => {
         console.error('Error initializing map:', error);
       }
     }
-  }, [showMap, isMapLoaded]); // Removed searchQuery from dependencies to prevent re-centering
+  }, [showMap, isMapLoaded, mapNode]); // Re-run if map node changes (e.g. re-render)
 
   // Reset search location centering ref when search query actually changes
   useEffect(() => {
@@ -1162,7 +1170,7 @@ const SearchResults = () => {
         };
       }
     }
-  }, [showMap, isMapLoaded, results]);
+  }, [showMap, isMapLoaded, results, mapNode]);
   
   // Reset geocoded flag when map is hidden
   useEffect(() => {
@@ -1696,7 +1704,7 @@ const SearchResults = () => {
                       </div>
                     ) : (
                       <div 
-                        ref={mapRef}
+                        ref={setMapNode}
                         className="w-full"
                         style={{ height: 'calc(100vh - 300px)', minHeight: '600px' }}
                       ></div>
