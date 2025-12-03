@@ -6,12 +6,14 @@ import FAQSection from '../components/FAQSection';
 import { SearchInput } from '../components/SearchInput';
 import ErrorBoundary from '../components/ErrorBoundary';
 import RefereeGuarantorResponseModal from '../components/referencing/RefereeGuarantorResponseModal';
+import { useAuth } from '../contexts/AuthContext';
 
 import { useState, useEffect } from 'react';
 
 const Home = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { isAuthenticated, login } = useAuth();
 
   const [searchInputHeight, setSearchInputHeight] = useState(50);
   const [isResponseModalOpen, setIsResponseModalOpen] = useState(false);
@@ -84,6 +86,26 @@ const Home = () => {
     setIsResponseModalOpen(false);
   };
 
+  const handleAgentToggle = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      console.log('User not authenticated. Prompting login...');
+      try {
+        await login();
+        // After successful login, navigate to Agent page
+        navigate('/Agent');
+      } catch (error) {
+        console.error('Login failed:', error);
+        // User cancelled or login failed, stay on current page
+      }
+    } else {
+      // User is already authenticated, navigate directly
+      navigate('/Agent');
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col font-nunito">
       <Navbar />
@@ -123,12 +145,12 @@ const Home = () => {
               <button className="px-6 md:px-8 py-3 rounded-full bg-primary text-white font-semibold transition-all text-sm md:text-base">
                 Tenant
               </button>
-              <Link
-                to="/Agent"
+              <button
+                onClick={handleAgentToggle}
                 className="px-6 md:px-8 py-3 rounded-full text-gray-700 hover:bg-gray-50 font-semibold transition-all text-sm md:text-base"
               >
                 Agent
-              </Link>
+              </button>
             </div>
           </div>
 

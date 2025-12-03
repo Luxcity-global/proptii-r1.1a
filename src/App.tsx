@@ -52,8 +52,16 @@ export const App: React.FC = () => {
             <Route path="/faq" element={<FAQ />} />
 
             {/* Protected Routes */}
-            <Route path="/agent" element={<AgentHome />} />
-            <Route path="/Agent" element={<AgentHome />} />
+            <Route path="/agent" element={
+              <ProtectedRoute>
+                <AgentHome />
+              </ProtectedRoute>
+            } />
+            <Route path="/Agent" element={
+              <ProtectedRoute>
+                <AgentHome />
+              </ProtectedRoute>
+            } />
             <Route path="/landlord" element={<LandlordDemo />} />
             <Route path="/landlord-demo" element={<LandlordDemo />} />
 
