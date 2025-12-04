@@ -7,9 +7,10 @@ interface RoleSelectionPopupProps {
   isOpen: boolean;
   onRoleSelected: (role: UserRole) => void;
   onContinue?: (role: UserRole) => void;
+  onClose?: () => void;
 }
 
-const RoleSelectionPopup: React.FC<RoleSelectionPopupProps> = ({ isOpen, onRoleSelected, onContinue }) => {
+const RoleSelectionPopup: React.FC<RoleSelectionPopupProps> = ({ isOpen, onRoleSelected, onContinue, onClose }) => {
   const [selectedRole, setSelectedRole] = useState<UserRole>('landlord');
   const [currentPage, setCurrentPage] = useState<'welcome' | 'role-selection'>('welcome');
 
@@ -93,7 +94,7 @@ const RoleSelectionPopup: React.FC<RoleSelectionPopupProps> = ({ isOpen, onRoleS
 
   // Render welcome page first
   if (currentPage === 'welcome') {
-    return <WelcomePage onGetStarted={handleGetStarted} />;
+    return <WelcomePage onGetStarted={handleGetStarted} onClose={onClose} />;
   }
 
   // Render role selection page
@@ -119,8 +120,44 @@ const RoleSelectionPopup: React.FC<RoleSelectionPopupProps> = ({ isOpen, onRoleS
         width: '100%',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
         maxHeight: '90vh',
-        overflowY: 'auto'
+        overflowY: 'auto',
+        position: 'relative'
       }}>
+        {/* Close Button */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: '1.5rem',
+              right: '1.5rem',
+              width: '2.5rem',
+              height: '2.5rem',
+              borderRadius: '50%',
+              backgroundColor: '#F3F4F6',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              zIndex: 10
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#E5E7EB';
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#F3F4F6';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            aria-label="Close"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M18 6L6 18M6 6L18 18" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           {/* Back Button */}
           <div style={{ textAlign: 'left', marginBottom: '1rem' }}>

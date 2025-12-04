@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 
 interface WelcomePageProps {
   onGetStarted: () => void;
+  onClose?: () => void;
 }
 
-const WelcomePage: React.FC<WelcomePageProps> = ({ onGetStarted }) => {
+const WelcomePage: React.FC<WelcomePageProps> = ({ onGetStarted, onClose }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   
   const slides = [
@@ -69,8 +70,44 @@ const WelcomePage: React.FC<WelcomePageProps> = ({ onGetStarted }) => {
         width: '100%',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
         maxHeight: '90vh',
-        overflowY: 'auto'
+        overflowY: 'auto',
+        position: 'relative'
       }}>
+         {/* Close Button */}
+         {onClose && (
+           <button
+             onClick={onClose}
+             style={{
+               position: 'absolute',
+               top: '1.5rem',
+               right: '1.5rem',
+               width: '2.5rem',
+               height: '2.5rem',
+               borderRadius: '50%',
+               backgroundColor: '#F3F4F6',
+               border: 'none',
+               cursor: 'pointer',
+               display: 'flex',
+               alignItems: 'center',
+               justifyContent: 'center',
+               transition: 'all 0.2s',
+               zIndex: 10
+             }}
+             onMouseEnter={(e) => {
+               e.currentTarget.style.backgroundColor = '#E5E7EB';
+               e.currentTarget.style.transform = 'scale(1.1)';
+             }}
+             onMouseLeave={(e) => {
+               e.currentTarget.style.backgroundColor = '#F3F4F6';
+               e.currentTarget.style.transform = 'scale(1)';
+             }}
+             aria-label="Close"
+           >
+             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+               <path d="M18 6L6 18M6 6L18 18" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+             </svg>
+           </button>
+         )}
          {/* Header Section */}
          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
            {/* Title */}

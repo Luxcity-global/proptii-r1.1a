@@ -111,6 +111,12 @@ const AgentHome = () => {
     window.location.href = '/landlord/index.html?start=company-profile-setup';
   };
 
+  const handleClosePopup = () => {
+    setShowRolePopup(false);
+    // Navigate back to home page
+    navigate('/');
+  };
+
   return (
     <div className="min-h-screen font-archivo">
       <AgentNavbar isAgent={true} />
@@ -296,6 +302,7 @@ const AgentHome = () => {
         isOpen={showRolePopup} 
         onRoleSelected={handleRoleSelected}
         onContinue={handleRoleContinue}
+        onClose={handleClosePopup}
       />
     </div>
   );
