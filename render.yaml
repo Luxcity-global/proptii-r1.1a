@@ -47,14 +47,17 @@ services:
         value: public, max-age=31536000, immutable
     routes:
       - type: rewrite
-        source: /*
-        destination: /index.html
-      - type: rewrite
         source: /assets/*
         destination: /assets/:splat
       - type: rewrite
         source: /static/*
         destination: /static/:splat
+      - type: rewrite
+        source: /landlord/*
+        destination: /landlord/index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
 
   # Backend (NestJS)
   - type: web
