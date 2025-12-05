@@ -96,89 +96,8 @@ export function Dashboard({
   >([]);
   const [currentChartIndex, setCurrentChartIndex] = useState(0);
 
-  // Mock data for demonstration
-  const mockProperties: Property[] =
-    properties.length === 0
-      ? [
-          {
-            id: "1",
-            address: "123 Regent Street, London W1B 4EA",
-            type: "Flat/Apartment",
-            bedrooms: 2,
-            rent: 2500,
-            status: "occupied",
-            amenities: [
-              "Parking",
-              "Central Heating",
-              "Furnished",
-            ],
-            notes: "Recently renovated with modern fixtures",
-            photos: [
-              {
-                id: "1",
-                url: "https://images.unsplash.com/photo-1662454419622-a41092ecd245?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBhcGFydG1lbnQlMjBsaXZpbmclMjByb29tfGVufDF8fHx8MTc1NzM5Njc5N3ww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-                filename: "living-room.jpg",
-                room: "Living Room",
-                isCover: true,
-              },
-            ],
-            documents: [
-              {
-                id: "1",
-                name: "Gas Safety Certificate",
-                type: "gas-cert",
-                url: "#",
-                issueDate: new Date("2024-01-15"),
-                expiryDate: new Date("2025-01-15"),
-                status: "valid",
-              },
-              {
-                id: "2",
-                name: "EPC Certificate",
-                type: "epc",
-                url: "#",
-                issueDate: new Date("2023-06-01"),
-                expiryDate: new Date("2025-01-01"),
-                status: "expiring-soon",
-              },
-            ],
-            createdAt: new Date("2024-01-01"),
-          },
-          {
-            id: "2",
-            address: "45 Victoria Park Road, London E9 7JN",
-            type: "House",
-            bedrooms: 3,
-            rent: 3200,
-            status: "vacant",
-            amenities: ["Garden", "Parking", "Pet-friendly"],
-            notes: "Victorian terrace with garden",
-            photos: [
-              {
-                id: "2",
-                url: "https://images.unsplash.com/photo-1565480401286-ea5dceac02a8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwcm9wZXJ0eSUyMGJ1aWxkaW5nJTIwZXh0ZXJpb3J8ZW58MXx8fHwxNzU3Mzk2ODAyfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-                filename: "exterior.jpg",
-                room: "Exterior",
-                isCover: true,
-              },
-            ],
-            documents: [
-              {
-                id: "3",
-                name: "Insurance Policy",
-                type: "insurance",
-                url: "#",
-                issueDate: new Date("2024-03-01"),
-                expiryDate: new Date("2025-03-01"),
-                status: "valid",
-              },
-            ],
-            createdAt: new Date("2024-02-15"),
-          },
-        ]
-      : (
-        properties
-      );
+  // Use actual properties - start with empty array when no properties exist
+  const mockProperties: Property[] = properties;
 
   const displayProperties = mockProperties.filter(
     (property) => {
@@ -283,26 +202,60 @@ export function Dashboard({
   };
 
   const getRevenueData = () => {
-    if (totalRent === 0) {
-      return Array.from({ length: 6 }, (_, i) => ({
-        month: new Date(new Date().setMonth(new Date().getMonth() - (5 - i))).toLocaleDateString('en-GB', { month: 'short' }),
-        revenue: 0
-      }));
-    }
-    
     const monthlyData: { month: string; revenue: number }[] = [];
     const currentDate = new Date();
+    
+    // Calculate revenue for each of the last 6 months
     for (let i = 5; i >= 0; i--) {
-      const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-      const monthName = date.toLocaleDateString('en-GB', { month: 'short' });
-      // Mock revenue data with some variation
-      const baseRevenue = totalRent;
-      const variation = (Math.sin(i) * 0.1 + 1); // Add some realistic variation
+      const targetMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      const monthStart = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
+      const monthEnd = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0, 23, 59, 59);
+      const monthName = monthStart.toLocaleDateString('en-GB', { month: 'short' });
+      
+      // Calculate revenue for this month based on properties with active leases
+      let monthlyRevenue = 0;
+      
+      mockProperties.forEach((property) => {
+        // Only count revenue if the property was added before or during this month
+        const propertyAddedDate = property.createdAt;
+        if (propertyAddedDate > monthEnd) {
+          // Property was added after this month, so no revenue for this month
+          return;
+        }
+        
+        // Check if property has a tenant with lease dates
+        if (property.tenant) {
+          const leaseStart = property.tenant.leaseStart;
+          const leaseEnd = property.tenant.leaseEnd;
+          
+          // Only count if lease was active during this month AND property was already added
+          // Lease is active if monthStart is before leaseEnd and monthEnd is after leaseStart
+          if (leaseStart <= monthEnd && leaseEnd >= monthStart && propertyAddedDate <= monthEnd) {
+            // Also check if tenant was added during or before this month
+            // Only count from when the tenant's lease actually started or when property was added, whichever is later
+            const revenueStartDate = leaseStart > propertyAddedDate ? leaseStart : propertyAddedDate;
+            
+            // If revenue started during or before this month, count it
+            if (revenueStartDate <= monthEnd) {
+              monthlyRevenue += property.rent;
+            }
+          }
+        } else if (property.status === 'occupied') {
+          // Property is marked as occupied but no tenant data available
+          // Only count from when the property was added to the system
+          if (propertyAddedDate <= monthEnd) {
+            monthlyRevenue += property.rent;
+          }
+        }
+        // Skip vacant/under-renovation properties without tenant info
+      });
+      
       monthlyData.push({
         month: monthName,
-        revenue: Math.round(baseRevenue * variation)
+        revenue: monthlyRevenue
       });
     }
+    
     return monthlyData;
   };
 
@@ -990,20 +943,43 @@ export function Dashboard({
                     
                     {/* Line Chart */}
                     {currentChart.type === "line" && (
-                      <LineChart data={currentChart.data}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis />
-                        <Tooltip formatter={(value) => [`£${value}`, 'Revenue']} />
-                        <Line 
-                          type="monotone" 
-                          dataKey="revenue" 
-                                    stroke="#22c55e"
-                          strokeWidth={3}
-                          dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }}
-                          activeDot={{ r: 6, stroke: '#22c55e', strokeWidth: 2 }}
-                        />
-                      </LineChart>
+                      <>
+                        <LineChart data={currentChart.data}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="month" />
+                          <YAxis />
+                          <Tooltip formatter={(value) => [`£${value}`, 'Revenue']} />
+                          <Line 
+                            type="monotone" 
+                            dataKey="revenue" 
+                                      stroke="#22c55e"
+                            strokeWidth={3}
+                            dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }}
+                            activeDot={{ r: 6, stroke: '#22c55e', strokeWidth: 2 }}
+                          />
+                        </LineChart>
+                        {currentChart.title === "Revenue Trend" && (() => {
+                          const nonZeroMonths = currentChart.data.filter((d: any) => d.revenue > 0).length;
+                          const allZero = currentChart.data.every((d: any) => d.revenue === 0);
+                          
+                          if (allZero || nonZeroMonths < 2) {
+                            return (
+                              <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded">
+                                <div className="text-center px-4">
+                                  <TrendingUp className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                                  <p className="text-sm font-medium text-gray-700 mb-1">Building Your Revenue History</p>
+                                  <p className="text-xs text-gray-500">
+                                    {allZero 
+                                      ? "Add properties and tenants to start tracking revenue"
+                                      : "This graph will show meaningful trends after 2+ months of usage"}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </>
                     )}
                   </ResponsiveContainer>
                 ) : (

@@ -280,6 +280,7 @@ function AppContent() {
   const [vacancyAlerts, setVacancyAlerts] = useState<VacancyRiskAlert[]>([]);
   const [arrearsAlerts, setArrearsAlerts] = useState<ArrearsAlert[]>([]);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
   
   // Property setup state
   const [propertySetupData, setPropertySetupData] = useState<PropertySetupData>({
@@ -471,7 +472,9 @@ function AppContent() {
         }
       }
     ];
-    setTenants(mockTenants);
+    // DISABLED: Mock tenants - use real Firestore data
+    // setTenants(mockTenants);
+    console.log('🚫 Mock tenants disabled - using Firestore data scoped to user');
 
     // Mock properties with tenant relationships
     const mockProperties: Property[] = [
@@ -688,7 +691,9 @@ function AppContent() {
         createdAt: new Date('2023-06-15')
       }
     ];
-    setProperties(mockProperties);
+    // DISABLED: Mock properties - use real Firestore data
+    // setProperties(mockProperties);
+    console.log('🚫 Mock properties disabled - using Firestore data scoped to user');
 
     // Mock market insights
     const mockInsights: MarketInsight[] = [
@@ -712,7 +717,10 @@ function AppContent() {
         date: new Date('2024-06-15')
       }
     ];
-    setMarketInsights(mockInsights);
+    // DISABLED: Mock insights - use real Firestore data
+    // setMarketInsights(mockInsights);
+    setMarketInsights([]);
+    console.log('🚫 Mock market insights disabled - using Firestore data');
 
     // Mock vacancy alerts
     const mockVacancyAlerts: VacancyRiskAlert[] = [
@@ -737,7 +745,10 @@ function AppContent() {
         status: 'new'
       }
     ];
-    setVacancyAlerts(mockVacancyAlerts);
+    // DISABLED: Mock vacancy alerts - use real Firestore data
+    // setVacancyAlerts(mockVacancyAlerts);
+    setVacancyAlerts([]);
+    console.log('🚫 Mock vacancy alerts disabled - using Firestore data');
 
     // Mock arrears alerts
     const mockArrearsAlerts: ArrearsAlert[] = [
@@ -753,7 +764,10 @@ function AppContent() {
         status: 'new'
       }
     ];
-    setArrearsAlerts(mockArrearsAlerts);
+    // DISABLED: Mock arrears alerts - use real Firestore data
+    // setArrearsAlerts(mockArrearsAlerts);
+    setArrearsAlerts([]);
+    console.log('🚫 Mock arrears alerts disabled - using Firestore data');
   }, []);
 
   const navigateToScreen = (screen: Screen) => {
@@ -1518,6 +1532,10 @@ function AppContent() {
               setSelectedProperty(createdProperty);
               navigateToScreen('property-details');
             }}
+            onAddTenant={() => {
+              setPreviousScreen('property-preview');
+              navigateToScreen('add-tenant');
+            }}
           />
         );
       
@@ -1540,10 +1558,23 @@ function AppContent() {
             properties={properties}
             onSave={(tenant) => {
               addTenant(tenant);
-              navigateToScreen('main-app');
-              setNavigationScreen('clients');
+              // Navigate back to where we came from
+              if (previousScreen === 'property-preview') {
+                setPreviousScreen(null);
+                navigateToScreen('property-preview');
+              } else {
+                navigateToScreen('main-app');
+                setNavigationScreen('clients');
+              }
             }}
-            onBack={() => navigateToScreen('tenant-selection')}
+            onBack={() => {
+              if (previousScreen === 'property-preview') {
+                setPreviousScreen(null);
+                navigateToScreen('property-preview');
+              } else {
+                navigateToScreen('tenant-selection');
+              }
+            }}
           />
         );
 

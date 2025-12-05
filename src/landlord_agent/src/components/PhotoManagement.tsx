@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -16,7 +16,8 @@ import {
   Star,
   Eye,
   Download,
-  Edit3
+  Edit3,
+  Save
 } from 'lucide-react';
 import { Property, PropertyPhoto } from '../App';
 import { Input } from './ui/input';
@@ -33,7 +34,26 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
   const [searchTerm, setSearchTerm] = useState('');
   const [roomFilter, setRoomFilter] = useState('all');
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [localPhotos, setLocalPhotos] = useState<PropertyPhoto[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const skipSyncRef = useRef(false);
+
+  // Sync local photos with property photos when property changes
+  // Only sync when property ID changes (new property selected) or when we don't have unsaved changes
+  useEffect(() => {
+    if (property) {
+      if (!skipSyncRef.current) {
+        // Only sync if we don't have unsaved changes (to preserve user's work)
+        if (!hasUnsavedChanges) {
+          setLocalPhotos(property.photos);
+        }
+      } else {
+        // If we just saved, reset the skip flag
+        skipSyncRef.current = false;
+      }
+    }
+  }, [property?.id]); // Reset when property ID changes (new property selected)
 
   if (!property) {
     return (
@@ -59,19 +79,21 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
   ];
 
   const handleFileSelect = (files: FileList | null) => {
-    if (!files) return;
+    if (!files || !property) return;
 
     Array.from(files).forEach((file, index) => {
       if (file.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onload = (e) => {
-          const newPhoto: Omit<PropertyPhoto, 'id'> = {
+          const newPhoto: PropertyPhoto = {
+            id: `temp-${Date.now()}-${index}`,
             url: e.target?.result as string,
             filename: file.name,
-            isCover: property.photos.length === 0 && index === 0,
+            isCover: localPhotos.length === 0 && index === 0,
             room: undefined
           };
-          onPhotoAdd(property.id, newPhoto);
+          setLocalPhotos(prev => [...prev, newPhoto]);
+          setHasUnsavedChanges(true);
         };
         reader.readAsDataURL(file);
       }
@@ -90,49 +112,81 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
   };
 
   const removePhoto = (photoId: string) => {
-    const updatedPhotos = property.photos.filter(p => p.id !== photoId);
+    const updatedPhotos = localPhotos.filter(p => p.id !== photoId);
     // If we removed the cover photo, make the first remaining photo the cover
     if (updatedPhotos.length > 0 && !updatedPhotos.some(p => p.isCover)) {
       updatedPhotos[0].isCover = true;
     }
-    updateProperty(property.id, { photos: updatedPhotos });
+    setLocalPhotos(updatedPhotos);
+    setHasUnsavedChanges(true);
   };
 
   const updatePhotoRoom = (photoId: string, room: string) => {
-    const updatedPhotos = property.photos.map(p => 
+    const updatedPhotos = localPhotos.map(p => 
       p.id === photoId ? { ...p, room: room === 'none' ? undefined : room } : p
     );
-    updateProperty(property.id, { photos: updatedPhotos });
+    setLocalPhotos(updatedPhotos);
+    setHasUnsavedChanges(true);
   };
 
   const setCoverPhoto = (photoId: string) => {
-    const updatedPhotos = property.photos.map(p => 
+    const updatedPhotos = localPhotos.map(p => 
       ({ ...p, isCover: p.id === photoId })
     );
-    updateProperty(property.id, { photos: updatedPhotos });
+    setLocalPhotos(updatedPhotos);
+    setHasUnsavedChanges(true);
   };
 
   const reorderPhotos = (fromIndex: number, toIndex: number) => {
-    const newPhotos = [...property.photos];
+    const newPhotos = [...localPhotos];
     const [movedPhoto] = newPhotos.splice(fromIndex, 1);
     newPhotos.splice(toIndex, 0, movedPhoto);
-    updateProperty(property.id, { photos: newPhotos });
+    setLocalPhotos(newPhotos);
+    setHasUnsavedChanges(true);
   };
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
+  const handleSave = () => {
+    if (!property) return;
+    
+    // Process photos: replace temp IDs with proper IDs for new photos
+    let timestamp = Date.now();
+    const photosToSave = localPhotos.map(photo => {
+      if (photo.id.startsWith('temp-')) {
+        // For new photos, generate a proper ID (matching the parent's pattern)
+        // Use timestamp and increment to ensure uniqueness
+        return {
+          ...photo,
+          id: (timestamp++).toString()
+        };
+      }
+      return photo;
+    });
+    
+    // Update all photos at once (including new photos, updates, and reordering)
+    updateProperty(property.id, { photos: photosToSave });
+    
+    // Update local state with the new IDs and mark as saved
+    setLocalPhotos(photosToSave);
+    setHasUnsavedChanges(false);
+    skipSyncRef.current = true; // Prevent immediate sync that would overwrite our changes
+  };
+
+  const handleDragStart = (e: React.DragEvent, photoId: string) => {
+    const index = localPhotos.findIndex(p => p.id === photoId);
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragEnter = (e: React.DragEvent, index: number) => {
+  const handleDragEnter = (e: React.DragEvent, photoId: string) => {
     e.preventDefault();
-    if (draggedIndex !== null && draggedIndex !== index) {
-      reorderPhotos(draggedIndex, index);
-      setDraggedIndex(index);
+    const targetIndex = localPhotos.findIndex(p => p.id === photoId);
+    if (draggedIndex !== null && draggedIndex !== targetIndex && draggedIndex >= 0 && targetIndex >= 0) {
+      reorderPhotos(draggedIndex, targetIndex);
+      setDraggedIndex(targetIndex);
     }
   };
 
-  const filteredPhotos = property.photos.filter(photo => {
+  const filteredPhotos = localPhotos.filter(photo => {
     const matchesSearch = photo.filename.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (photo.room && photo.room.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesRoom = roomFilter === 'all' || 
@@ -146,7 +200,7 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
     const counts: Record<string, number> = { untagged: 0 };
     roomTypes.forEach(room => counts[room] = 0);
     
-    property.photos.forEach(photo => {
+    localPhotos.forEach(photo => {
       if (photo.room) {
         counts[photo.room] = (counts[photo.room] || 0) + 1;
       } else {
@@ -190,7 +244,7 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-muted-foreground mb-1">Total Photos</p>
-                <p className="text-2xl font-semibold">{property.photos.length}</p>
+                <p className="text-2xl font-semibold">{localPhotos.length}</p>
               </div>
               <ImageIcon className="w-8 h-8 text-muted-foreground" />
             </div>
@@ -201,7 +255,7 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
               <div>
                 <p className="text-muted-foreground mb-1">Tagged</p>
                 <p className="text-2xl font-semibold text-green-600">
-                  {property.photos.filter(p => p.room).length}
+                  {localPhotos.filter(p => p.room).length}
                 </p>
               </div>
               <Badge className="bg-green-100 text-green-800">Organized</Badge>
@@ -225,7 +279,7 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
               <div>
                 <p className="text-muted-foreground mb-1">Cover Photo</p>
                 <p className="text-2xl font-semibold">
-                  {property.photos.some(p => p.isCover) ? '1' : '0'}
+                  {localPhotos.some(p => p.isCover) ? '1' : '0'}
                 </p>
               </div>
               <Star className="w-8 h-8 text-yellow-500" />
@@ -292,7 +346,7 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
                   <SelectValue placeholder="All Rooms" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Photos ({property.photos.length})</SelectItem>
+                  <SelectItem value="all">All Photos ({localPhotos.length})</SelectItem>
                   <SelectItem value="untagged">Untagged ({roomCounts.untagged})</SelectItem>
                   {roomTypes.map(room => (
                     roomCounts[room] > 0 && (
@@ -312,13 +366,13 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
           <Card className="p-12 text-center">
             <ImageIcon className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="mb-2">
-              {property.photos.length === 0 
+              {localPhotos.length === 0 
                 ? 'No photos uploaded' 
                 : 'No photos match your filters'
               }
             </h3>
             <p className="text-muted-foreground mb-6">
-              {property.photos.length === 0
+              {localPhotos.length === 0
                 ? 'Add photos to showcase your property and attract more tenants'
                 : 'Try adjusting your search or filters'
               }
@@ -330,13 +384,13 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredPhotos.map((photo, index) => (
+            {filteredPhotos.map((photo) => (
               <Card
                 key={photo.id}
                 className="overflow-hidden group cursor-move"
                 draggable
-                onDragStart={(e) => handleDragStart(e, index)}
-                onDragEnter={(e) => handleDragEnter(e, index)}
+                onDragStart={(e) => handleDragStart(e, photo.id)}
+                onDragEnter={(e) => handleDragEnter(e, photo.id)}
                 onDragEnd={() => setDraggedIndex(null)}
               >
                 <div className="aspect-video relative">
@@ -465,6 +519,29 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Save Changes Section */}
+        {hasUnsavedChanges && (
+          <Card className="p-6 mt-8 border-orange-200 bg-orange-50/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
+                  Unsaved changes
+                </Badge>
+                <p className="text-sm text-muted-foreground">
+                  You have unsaved changes to your photos. Click "Save Changes" to apply them.
+                </p>
+              </div>
+              <Button 
+                onClick={handleSave}
+                className="bg-primary hover:bg-primary/90"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Save Changes
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {/* Tips */}
         <Card className="p-6 mt-8 bg-muted/50">

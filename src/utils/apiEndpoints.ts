@@ -16,10 +16,14 @@ const LOCAL_FALLBACKS = [
 
 const buildCandidateList = () => {
   const envUrl = (import.meta as any)?.env?.VITE_API_URL?.trim?.() || '';
+  const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+  
+  // Prioritize local URLs when running on localhost
   const candidates = [
     envUrl,
+    ...(isLocalhost ? LOCAL_FALLBACKS : []),
     ...REMOTE_FALLBACKS,
-    ...((import.meta as any)?.env?.DEV ? LOCAL_FALLBACKS : [])
+    ...(isLocalhost ? [] : (import.meta as any)?.env?.DEV ? LOCAL_FALLBACKS : [])
   ]
     .filter(Boolean)
     .map(normalizeBaseUrl);

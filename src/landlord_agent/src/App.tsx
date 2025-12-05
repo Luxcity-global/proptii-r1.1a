@@ -311,6 +311,7 @@ export default function App() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editingPropertyId, setEditingPropertyId] = useState<string | null>(null);
+  const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
 
   const resolveManagerId = useCallback((): string | null => {
     try {
@@ -3071,6 +3072,10 @@ export default function App() {
                 alert(`Failed to publish property: ${error instanceof Error ? error.message : 'Unknown error'}`);
               }
             }}
+            onAddTenant={() => {
+              setPreviousScreen('property-preview');
+              navigateToScreen('tenant-selection');
+            }}
           />
         );
       
@@ -3085,8 +3090,13 @@ export default function App() {
             onInviteEmail={() => navigateToScreen('invite-tenant')}
             onSelectExisting={() => navigateToScreen('select-existing-tenant')}
             onBack={() => {
-              navigateToScreen('main-app');
-              setNavigationScreen('clients');
+              if (previousScreen === 'property-preview') {
+                setPreviousScreen(null);
+                navigateToScreen('property-preview');
+              } else {
+                navigateToScreen('main-app');
+                setNavigationScreen('clients');
+              }
             }}
           />
         );
@@ -3104,7 +3114,12 @@ export default function App() {
             onBackToSelection={() => {
               setSelectedTenant(null);
               editingTenantRef.current = null;
-              navigateToScreen('tenant-selection');
+              if (previousScreen === 'property-preview') {
+                setPreviousScreen(null);
+                navigateToScreen('property-preview');
+              } else {
+                navigateToScreen('tenant-selection');
+              }
             }}
             onSave={async (tenant) => {
               const tenantId = editingTenantRef.current?.id || selectedTenant?.id;
@@ -3135,7 +3150,10 @@ export default function App() {
               // setNavigationScreen('clients');
             }}
             onBack={() => {
-              if (editingTenantRef.current) {
+              if (previousScreen === 'property-preview') {
+                setPreviousScreen(null);
+                navigateToScreen('property-preview');
+              } else if (editingTenantRef.current) {
                 const tenantToShow = editingTenantRef.current;
                 editingTenantRef.current = null;
                 setSelectedTenant(tenantToShow);
@@ -3157,8 +3175,13 @@ export default function App() {
             properties={properties}
             onBack={() => navigateToScreen('tenant-selection')}
             onSuccess={() => {
-              navigateToScreen('main-app');
-              setNavigationScreen('clients');
+              if (previousScreen === 'property-preview') {
+                setPreviousScreen(null);
+                navigateToScreen('property-preview');
+              } else {
+                navigateToScreen('main-app');
+                setNavigationScreen('clients');
+              }
             }}
           />
         );
@@ -3170,8 +3193,13 @@ export default function App() {
             existingTenants={tenants}
             onBack={() => navigateToScreen('tenant-selection')}
             onSuccess={() => {
-              navigateToScreen('main-app');
-              setNavigationScreen('clients');
+              if (previousScreen === 'property-preview') {
+                setPreviousScreen(null);
+                navigateToScreen('property-preview');
+              } else {
+                navigateToScreen('main-app');
+                setNavigationScreen('clients');
+              }
             }}
           />
         );

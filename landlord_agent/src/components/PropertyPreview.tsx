@@ -19,6 +19,7 @@ import {
   MoreHorizontal,
   BarChart3,
   User,
+  UserPlus,
   Mail,
   Phone,
   Eye
@@ -38,6 +39,7 @@ interface PropertyPreviewProps {
   updateProperty: (propertyId: string, updates: Partial<Property>) => void;
   onViewTenant?: (tenantId: string) => void;
   onPublishProperty?: () => void;
+  onAddTenant?: () => void;
 }
 
 export function PropertyPreview({
@@ -49,7 +51,8 @@ export function PropertyPreview({
   onViewInsights,
   updateProperty,
   onViewTenant,
-  onPublishProperty
+  onPublishProperty,
+  onAddTenant
 }: PropertyPreviewProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   
@@ -534,13 +537,26 @@ export function PropertyPreview({
               <Card className="p-6">
                 <h3 className="mb-4">Property Status</h3>
                 <div className="text-center py-6">
-                  <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
-                    <User className="w-6 h-6 text-muted-foreground" />
+                  <div 
+                    className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 cursor-pointer transition-all duration-300 hover:scale-110"
+                    style={{ backgroundColor: '#DC5F12' }}
+                    onClick={onAddTenant}
+                    title="Add Tenant"
+                  >
+                    <UserPlus className="w-6 h-6 text-white" />
                   </div>
                   <p className="text-muted-foreground mb-2">Property is vacant</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground mb-4">
                     Ready for new tenant
                   </p>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={onAddTenant}
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Add Tenant
+                  </Button>
                 </div>
               </Card>
             )}
