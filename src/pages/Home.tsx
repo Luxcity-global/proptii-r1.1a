@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -8,7 +7,6 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import RefereeGuarantorResponseModal from '../components/referencing/RefereeGuarantorResponseModal';
 import { Marquee } from '../components/magic-ui/marquee';
 import { MagicCard } from '../components/magic-ui/magic-card';
-import { TextHighlighter } from '../components/magic-ui/text-highlighter';
 import { TextAnimate } from '../components/magic-ui/text-animate';
 
 import { useState, useEffect } from 'react';
@@ -23,6 +21,8 @@ const Home = () => {
   const [applicantName, setApplicantName] = useState('');
   const [prefilledEmail, setPrefilledEmail] = useState('');
   const [tenantEmail, setTenantEmail] = useState('');
+  const [userType, setUserType] = useState('Tenant');
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Check for query parameters to open the response modal
   useEffect(() => {
@@ -88,6 +88,22 @@ const Home = () => {
     setIsResponseModalOpen(false);
   };
 
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  const handleOptionClick = (option: string) => {
+    setUserType(option);
+    setIsExpanded(false);
+    
+    if (option === 'Agent') {
+      navigate('/Agent');
+    } else if (option === 'Homeowner') {
+      navigate('/Homeowner');
+    }
+    // Tenant stays on home page, no navigation needed
+  };
+
   return (
     <div className="min-h-screen flex flex-col font-nunito">
       <Navbar />
@@ -122,29 +138,118 @@ const Home = () => {
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full py-8 md:py-0">
           {/* User Type Selection */}
-          <div className="mt-16 md:mt-20 mb-8 md:mb-12">
-            <div className="inline-flex rounded-full bg-white p-1 shadow-lg">
-              <button className="px-6 md:px-8 py-3 rounded-full bg-primary text-white font-semibold transition-all text-sm md:text-base">
-                Tenant
-              </button>
-              <Link
-                to="/Agent"
-                className="px-6 md:px-8 py-3 rounded-full text-gray-700 hover:bg-gray-50 font-semibold transition-all text-sm md:text-base"
+          <div className="mt-16 md:mt-20 mb-8 md:mb-12 flex justify-center">
+            <div className="group relative inline-block">
+              {/* Main container - expands symmetrically */}
+              <div 
+                className={`relative rounded-full border-2 border-white bg-black/40 text-white font-semibold text-sm md:text-base cursor-pointer outline-none focus:ring-2 focus:ring-[#8FCDFF] focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-500 ease-out flex items-center ${
+                  isExpanded ? 'px-4 md:px-3' : 'pl-6 pr-4 md:pl-8 md:pr-6'
+                } py-3`}
+                style={{
+                  width: isExpanded ? 'auto' : 'auto',
+                  minWidth: isExpanded ? '400px' : 'auto',
+                  transformOrigin: 'center'
+                }}
+                onClick={toggleExpanded}
               >
-                Agent
-              </Link>
-              <Link
-                to="/Homeowner"
-                className="px-6 md:px-8 py-3 rounded-full text-gray-700 hover:bg-gray-50 font-semibold transition-all text-sm md:text-base"
-              >
-                Homeowner
-              </Link>
+                {isExpanded ? (
+                  <>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOptionClick('Tenant');
+                      }}
+                      className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
+                        userType === 'Tenant' 
+                          ? 'bg-[#DC5F12] text-white rounded-full' 
+                          : 'hover:text-[#DC5F12] rounded-l-full'
+                      }`}
+                    >
+                      Tenant
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOptionClick('Agent');
+                      }}
+                      className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
+                        userType === 'Agent' 
+                          ? 'bg-[#DC5F12] text-white rounded-full' 
+                          : 'hover:text-[#DC5F12]'
+                      }`}
+                    >
+                      Agent/Landlord
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOptionClick('Homeowner');
+                      }}
+                      className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
+                        userType === 'Homeowner' 
+                          ? 'bg-[#DC5F12] text-white rounded-full' 
+                          : 'hover:text-[#DC5F12] rounded-r-full'
+                      }`}
+                    >
+                      Home Owner
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpanded();
+                      }}
+                      className="ml-3 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all duration-500 ease-out flex-shrink-0"
+                    >
+                      <svg
+                        className="w-4 h-4 text-white transition-all duration-500 ease-out"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        style={{ transform: 'scaleX(-1)' }}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="hover:text-[#DC5F12] transition-colors duration-300 ease-out">{userType}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpanded();
+                      }}
+                      className="ml-3 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all duration-500 ease-out flex-shrink-0"
+                    >
+                      <svg
+                        className="w-4 h-4 text-white transition-all duration-500 ease-out"
+                        style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Main Heading */}
           <h3 className="text-2xl md:text-6xl font-bold mb-4 md:mb-6 font-archive leading-tight">
-            Find Your <TextHighlighter underlineColor="#FEDFA0">Dream Home</TextHighlighter>
+            Find Your Dream Home
           </h3>
 
           {/* Subheading */}

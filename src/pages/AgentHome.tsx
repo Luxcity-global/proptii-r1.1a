@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Link } from 'react-router-dom';
 import AgentNavbar from '../components/AgentNavbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
@@ -25,6 +24,8 @@ const AgentHome = () => {
   const { user } = useAuth();
   const [showRolePopup, setShowRolePopup] = useState(true);
   const [selectedRole, setSelectedRole] = useState<UserRole>('landlord');
+  const [userType, setUserType] = useState('Agent');
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Preload hero image when component mounts
   useEffect(() => {
@@ -111,6 +112,22 @@ const AgentHome = () => {
     window.location.href = '/landlord/index.html?start=company-profile-setup';
   };
 
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  const handleOptionClick = (option: string) => {
+    setUserType(option);
+    setIsExpanded(false);
+    
+    if (option === 'Tenant') {
+      navigate('/');
+    } else if (option === 'Homeowner') {
+      navigate('/Homeowner');
+    }
+    // Agent stays on agent page, no navigation needed
+  };
+
   return (
     <div className="min-h-screen font-archivo">
       <AgentNavbar isAgent={true} />
@@ -133,23 +150,112 @@ const AgentHome = () => {
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full">
           {/* User Type Selection */}
-          <div className="mb-12">
-            <div className="inline-flex rounded-full bg-white p-1 shadow-lg">
-              <Link
-                to="/"
-                className="px-8 py-3 rounded-full text-gray-700 hover:bg-gray-50 font-semibold transition-all"
+          <div className="mb-12 flex justify-center">
+            <div className="group relative inline-block">
+              {/* Main container - expands symmetrically */}
+              <div 
+                className={`relative rounded-full border-2 border-white bg-black/40 text-white font-semibold text-sm md:text-base cursor-pointer outline-none focus:ring-2 focus:ring-[#8FCDFF] focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-500 ease-out flex items-center ${
+                  isExpanded ? 'px-4 md:px-3' : 'pl-6 pr-4 md:pl-8 md:pr-6'
+                } py-3`}
+                style={{
+                  width: isExpanded ? 'auto' : 'auto',
+                  minWidth: isExpanded ? '400px' : 'auto',
+                  transformOrigin: 'center'
+                }}
+                onClick={toggleExpanded}
               >
-                Tenant
-              </Link>
-              <button className="px-8 py-3 rounded-full bg-[#FFEFD4] text-black font-semibold transition-all">
-                Agent
-              </button>
-              <Link
-                to="/Homeowner"
-                className="px-8 py-3 rounded-full text-gray-700 hover:bg-gray-50 font-semibold transition-all"
-              >
-                Homeowner
-              </Link>
+                {isExpanded ? (
+                  <>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOptionClick('Tenant');
+                      }}
+                      className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
+                        userType === 'Tenant' 
+                          ? 'bg-[#DC5F12] text-white rounded-full' 
+                          : 'hover:text-[#DC5F12] rounded-l-full'
+                      }`}
+                    >
+                      Tenant
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOptionClick('Agent');
+                      }}
+                      className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
+                        userType === 'Agent' 
+                          ? 'bg-[#DC5F12] text-white rounded-full' 
+                          : 'hover:text-[#DC5F12]'
+                      }`}
+                    >
+                      Agent/Landlord
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOptionClick('Homeowner');
+                      }}
+                      className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
+                        userType === 'Homeowner' 
+                          ? 'bg-[#DC5F12] text-white rounded-full' 
+                          : 'hover:text-[#DC5F12] rounded-r-full'
+                      }`}
+                    >
+                      Home Owner
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpanded();
+                      }}
+                      className="ml-3 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all duration-500 ease-out flex-shrink-0"
+                    >
+                      <svg
+                        className="w-4 h-4 text-white transition-all duration-500 ease-out"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        style={{ transform: 'scaleX(-1)' }}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="hover:text-[#DC5F12] transition-colors duration-300 ease-out">{userType}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpanded();
+                      }}
+                      className="ml-3 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all duration-500 ease-out flex-shrink-0"
+                    >
+                      <svg
+                        className="w-4 h-4 text-white transition-all duration-500 ease-out"
+                        style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
