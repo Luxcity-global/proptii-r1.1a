@@ -1,6 +1,7 @@
 import React from 'react';
 import { Phone, Mail, Sparkles } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { AuroraText } from '../../magic-ui/aurora-text';
 
 interface DashboardHeaderProps {
   userName: string;
@@ -33,7 +34,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName, userEmail, 
                 fontFamily: 'Archivo, sans-serif'
               }}
             >
-              Welcome <span style={{ color: '#136C9E' }}>{userName}</span>
+              Welcome <AuroraText colors={["#136C9E", "#E65D24", "#ffaa40", "#136C9E"]}>{userName}</AuroraText>
             </h1>
             <p 
               className="text-sm"

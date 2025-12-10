@@ -20,6 +20,8 @@ import TenantContracts from './components/dashboard/sections/TenantContracts-new
 import FileTable from './components/dashboard/sections/YourFiles-new';
 import TenantReferencing from './components/dashboard/sections/TenantReferencing-new';
 import AgentHome from './pages/AgentHome';
+import HomeownerHome from './pages/HomeownerHome';
+import { HomeownerDashboard } from './components/homeowner/HomeownerDashboard';
 import Listings from './pages/Listings';
 import NewListingPage from './pages/listings/new';
 import LandlordDemo from './pages/LandlordDemo';
@@ -56,6 +58,10 @@ export const App: React.FC = () => {
             {/* Protected Routes */}
             <Route path="/agent" element={<AgentHome />} />
             <Route path="/Agent" element={<AgentHome />} />
+            <Route path="/homeowner" element={<HomeownerHome />} />
+            <Route path="/Homeowner" element={<HomeownerHome />} />
+            <Route path="/homeowner/dashboard" element={<HomeownerDashboard />} />
+            <Route path="/Homeowner/dashboard" element={<HomeownerDashboard />} />
             <Route path="/landlord" element={<LandlordDemo />} />
             <Route path="/landlord-demo" element={<LandlordDemo />} />
 

@@ -1,51 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { AnimatedList } from './magic-ui/animated-list';
 
 interface WelcomePageProps {
   onGetStarted: () => void;
 }
 
 const WelcomePage: React.FC<WelcomePageProps> = ({ onGetStarted }) => {
-  const [currentSlide, setCurrentSlide] = useState(0);
-  
-  const slides = [
-    {
-      id: 1,
-      image: '/images/feature1.png'
-    },
-    {
-      id: 2,
-      image: '/images/feature2.png'
-    },
-    {
-      id: 3,
-      image: '/images/feature3.png'
-    },
-    {
-      id: 4,
-      image: '/images/feature4.png'
-    }
+  const images = [
+    '/images/magli1.png',
+    '/images/magli2.png'
   ];
-
-  // Auto-advance slideshow
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % slides.length);
-    }, 4000); // Change slide every 4 seconds
-
-    return () => clearInterval(interval);
-  }, [slides.length]);
-
-  const goToSlide = (index: number) => {
-    setCurrentSlide(index);
-  };
-
-  const goToPrevious = () => {
-    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
-  };
-
-  const goToNext = () => {
-    setCurrentSlide((prev) => (prev + 1) % slides.length);
-  };
 
   return (
     <div style={{
@@ -89,7 +53,7 @@ const WelcomePage: React.FC<WelcomePageProps> = ({ onGetStarted }) => {
             fontSize: '1.25rem',
             color: '#6B7280',
             maxWidth: '42rem',
-            margin: '0 auto 3rem auto',
+            margin: '0 auto 1.5rem auto',
             lineHeight: '1.6'
           }}>
             The complete property management solution for modern landlords and agents. 
@@ -97,103 +61,35 @@ const WelcomePage: React.FC<WelcomePageProps> = ({ onGetStarted }) => {
           </p>
         </div>
 
-         {/* Modern Slideshow */}
+         {/* Magic UI Animated List */}
          <div style={{
            position: 'relative',
-           marginBottom: '3rem',
+           marginBottom: '1.5rem',
            borderRadius: '1rem',
            overflow: 'hidden',
-           backgroundColor: 'transparent'
+           backgroundColor: 'transparent',
+           display: 'flex',
+           justifyContent: 'center',
+           alignItems: 'center',
+           minHeight: '400px'
          }}>
-          {/* Carousel Container */}
-          <div style={{
-            position: 'relative',
-            height: '300px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0',
-            padding: '2rem 0',
-          }}>
-            {/* Left Card (Previous) */}
-            <div style={{
-              width: '350px',
-              height: '260px',
-              opacity: 0.5,
-              transform: 'scale(0.8)',
-              transition: 'all 0.5s ease-in-out',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
+          <AnimatedList delay={1500} className="w-full max-w-2xl gap-8">
+            {images.map((image, index) => (
               <img
-                src={slides[(currentSlide - 1 + slides.length) % slides.length].image}
-                alt={`Feature ${slides[(currentSlide - 1 + slides.length) % slides.length].id}`}
+                key={index}
+                src={image}
+                alt={`Feature ${index + 1}`}
                 style={{
                   width: '100%',
-                  height: '100%',
+                  maxWidth: '600px',
+                  height: 'auto',
                   objectFit: 'contain',
-                  filter: 'blur(1px)'
+                  display: 'block',
+                  margin: '0 auto'
                 }}
               />
-            </div>
-
-            {/* Center Card (Current) */}
-            <div style={{
-              width: '400px',
-              height: '300px',
-              opacity: 1,
-              transform: 'scale(1)',
-              transition: 'all 0.5s ease-in-out',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 2
-            }}>
-              <img
-                src={slides[currentSlide].image}
-                alt={`Feature ${slides[currentSlide].id}`}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  transition: 'transform 0.3s ease',
-                  boxShadow: 'none'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.05)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}
-              />
-            </div>
-
-            {/* Right Card (Next) */}
-            <div style={{
-              width: '350px',
-              height: '260px',
-              opacity: 0.5,
-              transform: 'scale(0.8)',
-              transition: 'all 0.5s ease-in-out',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <img
-                src={slides[(currentSlide + 1) % slides.length].image}
-                alt={`Feature ${slides[(currentSlide + 1) % slides.length].id}`}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  filter: 'blur(1px)'
-                }}
-              />
-            </div>
-          </div>
-
-
+            ))}
+          </AnimatedList>
         </div>
 
         {/* Call to Action */}

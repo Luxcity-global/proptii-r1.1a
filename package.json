@@ -102,6 +102,8 @@
     "@fortawesome/free-solid-svg-icons": "^6.5.1",
     "@fortawesome/react-fontawesome": "^0.2.0",
     "@google-cloud/local-auth": "^3.0.1",
+    "@heroui/react": "^3.0.0-beta.2",
+    "@heroui/styles": "^3.0.0-beta.2",
     "@hookform/resolvers": "^3.3.4",
     "@microsoft/applicationinsights-web": "^3.3.6",
     "@mui/icons-material": "^5.15.10",

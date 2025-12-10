@@ -144,6 +144,12 @@ const AgentHome = () => {
               <button className="px-8 py-3 rounded-full bg-[#FFEFD4] text-black font-semibold transition-all">
                 Agent
               </button>
+              <Link
+                to="/Homeowner"
+                className="px-8 py-3 rounded-full text-gray-700 hover:bg-gray-50 font-semibold transition-all"
+              >
+                Homeowner
+              </Link>
             </div>
           </div>
 

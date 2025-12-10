@@ -6,6 +6,10 @@ import FAQSection from '../components/FAQSection';
 import { SearchInput } from '../components/SearchInput';
 import ErrorBoundary from '../components/ErrorBoundary';
 import RefereeGuarantorResponseModal from '../components/referencing/RefereeGuarantorResponseModal';
+import { Marquee } from '../components/magic-ui/marquee';
+import { MagicCard } from '../components/magic-ui/magic-card';
+import { TextHighlighter } from '../components/magic-ui/text-highlighter';
+import { TextAnimate } from '../components/magic-ui/text-animate';
 
 import { useState, useEffect } from 'react';
 
@@ -129,18 +133,30 @@ const Home = () => {
               >
                 Agent
               </Link>
+              <Link
+                to="/Homeowner"
+                className="px-6 md:px-8 py-3 rounded-full text-gray-700 hover:bg-gray-50 font-semibold transition-all text-sm md:text-base"
+              >
+                Homeowner
+              </Link>
             </div>
           </div>
 
           {/* Main Heading */}
           <h3 className="text-2xl md:text-6xl font-bold mb-4 md:mb-6 font-archive leading-tight">
-            Find Your Dream Home
+            Find Your <TextHighlighter underlineColor="#FEDFA0">Dream Home</TextHighlighter>
           </h3>
 
           {/* Subheading */}
-          <p className="text-lg md:text-2xl mb-8 md:mb-12 max-w-2xl mx-auto font-light px-4">
+          <TextAnimate
+            className="text-lg md:text-2xl mb-8 md:mb-12 max-w-2xl mx-auto font-light px-4"
+            by="word"
+            animation="fadeIn"
+            startOnView={true}
+            once={true}
+          >
             We make finding and securing your home easy, every step of the way.
-          </p>
+          </TextAnimate>
 
           {/* Search Bar */}
           <div className="max-w-3xl mx-auto px-4 md:px-0">
@@ -166,7 +182,7 @@ const Home = () => {
         <div className="max-w-7xl mx-auto px-4 relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             {/* Book Viewing Card */}
-            <div className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
+            <MagicCard className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
               <div className="mb-5 md:mb-6">
                 <img
                   src="/images/viewing-room.jpg"
@@ -185,7 +201,7 @@ const Home = () => {
                 className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
                 Learn More
               </button>
-            </div>
+            </MagicCard>
 
             {/* Referencing Card */}
             <div className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
@@ -235,6 +251,67 @@ const Home = () => {
       </section>
 
       {/**End of the new services section */}
+
+      {/* Marquee Section - Testimonials */}
+      <section className="py-16 bg-white overflow-hidden">
+        {/* First Marquee - Moving Left */}
+        <Marquee pauseOnHover className="[--duration:40s] mb-4">
+          {[
+            { name: "Jill", handle: "@jill", text: "I don't know what to say. I'm speechless. This is amazing.", gradient: "from-purple-500 to-blue-600" },
+            { name: "John", handle: "@john", text: "I'm at a loss for words. This is amazing. I love it.", gradient: "from-yellow-400 to-green-500" },
+            { name: "Jane", handle: "@jane", text: "I'm at a loss for words. This is amazing. I love it.", gradient: "from-pink-400 to-orange-400" },
+            { name: "Jenny", handle: "@jenny", text: "I'm at a loss for words. This is amazing. I love it.", gradient: "from-orange-500 to-green-500" },
+            { name: "James", handle: "@james", text: "I'm at a loss for words. This is amazing. I love it.", gradient: "from-blue-400 to-green-400" },
+            { name: "Sarah", handle: "@sarah", text: "This platform has made finding a home so much easier!", gradient: "from-purple-400 to-pink-500" },
+            { name: "Mike", handle: "@mike", text: "The referencing process was smooth and quick. Highly recommend!", gradient: "from-blue-500 to-cyan-500" },
+          ].map((testimonial, idx) => (
+            <div
+              key={idx}
+              className="flex-shrink-0 w-[350px] mx-3 bg-white rounded-xl shadow-lg p-6 border border-gray-100"
+            >
+              <div className="flex items-start gap-4">
+                <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${testimonial.gradient} flex-shrink-0`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h4 className="font-semibold text-gray-800 text-sm">{testimonial.name}</h4>
+                    <span className="text-gray-500 text-sm">{testimonial.handle}</span>
+                  </div>
+                  <p className="text-gray-600 text-sm leading-relaxed">{testimonial.text}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </Marquee>
+
+        {/* Second Marquee - Moving Right (Reversed) */}
+        <Marquee pauseOnHover reverse className="[--duration:35s]">
+          {[
+            { name: "Emma", handle: "@emma", text: "The contract signing was seamless. Great experience!", gradient: "from-indigo-500 to-purple-600" },
+            { name: "David", handle: "@david", text: "Best property platform I've used. Everything in one place!", gradient: "from-red-400 to-pink-500" },
+            { name: "Lisa", handle: "@lisa", text: "Found my perfect home in just a week. Amazing service!", gradient: "from-teal-400 to-blue-500" },
+            { name: "Tom", handle: "@tom", text: "The booking system is so convenient. Love it!", gradient: "from-amber-400 to-orange-500" },
+            { name: "Anna", handle: "@anna", text: "Professional, fast, and reliable. Couldn't ask for more!", gradient: "from-violet-500 to-purple-600" },
+            { name: "Chris", handle: "@chris", text: "Made my move so much easier. Thank you Proptii!", gradient: "from-emerald-400 to-teal-500" },
+            { name: "Maria", handle: "@maria", text: "The referencing was quick and the team was helpful.", gradient: "from-rose-400 to-pink-500" },
+          ].map((testimonial, idx) => (
+            <div
+              key={idx}
+              className="flex-shrink-0 w-[350px] mx-3 bg-white rounded-xl shadow-lg p-6 border border-gray-100"
+            >
+              <div className="flex items-start gap-4">
+                <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${testimonial.gradient} flex-shrink-0`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h4 className="font-semibold text-gray-800 text-sm">{testimonial.name}</h4>
+                    <span className="text-gray-500 text-sm">{testimonial.handle}</span>
+                  </div>
+                  <p className="text-gray-600 text-sm leading-relaxed">{testimonial.text}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </Marquee>
+      </section>
 
       <FAQSection />
       <Footer />
