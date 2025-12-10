@@ -248,8 +248,16 @@ const Home = () => {
           </div>
 
           {/* Main Heading */}
-          <h3 className="text-2xl md:text-6xl font-bold mb-4 md:mb-6 font-archive leading-tight">
-            Find Your Dream Home
+          <h3 className="text-2xl md:text-6xl font-bold mb-4 md:mb-6 font-archivo leading-tight">
+            <TextAnimate
+              className="text-2xl md:text-6xl font-bold font-archivo leading-tight"
+              by="word"
+              animation="fadeIn"
+              startOnView={true}
+              once={true}
+            >
+              Find Your Dream Home
+            </TextAnimate>
           </h3>
 
           {/* Subheading */}

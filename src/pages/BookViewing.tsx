@@ -140,7 +140,7 @@ const BookViewing = () => {
             alt="Family enjoying dinner together"
             className="w-full h-full object-cover"
             loading="eager"
-            fetchPriority="high"
+            fetchpriority="high"
             sizes="100vw"
           />
           {/* Overlay to ensure text readability */}
@@ -150,15 +150,28 @@ const BookViewing = () => {
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center w-full">
           {/* Main Heading */}
           <h3 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight text-white">
-            Skip the Hassle and Book Property<br />
-            Viewings with Proptii AI
+            <TextAnimate
+              className="text-3xl md:text-6xl font-bold font-archive leading-tight text-white block"
+              by="word"
+              animation="fadeIn"
+              startOnView={true}
+              once={true}
+            >
+              Skip the Hassle and Book Property Viewings with Proptii AI
+            </TextAnimate>
           </h3>
 
 
           {/* Subheading */}
-          <p className="text-xl md:text-2xl mb-12 max-w-3xl mx-auto font-light text-white">
-            We make finding and securing your home easy,every step of the way,
-          </p>
+          <TextAnimate
+            className="text-xl md:text-2xl mb-12 max-w-3xl mx-auto font-light text-white"
+            by="word"
+            animation="fadeIn"
+            startOnView={true}
+            once={true}
+          >
+            We make finding and securing your home easy, every step of the way,
+          </TextAnimate>
 
           <InteractiveHoverButton
             onClick={handleGetStarted}

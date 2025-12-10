@@ -127,6 +127,10 @@ export default defineConfig(({ mode = 'development' }) => {
         },
       }
     ],
+    server: {
+      port: 5173,
+      strictPort: false, // Allow Vite to try next available port if 5173 is taken
+    },
     // Temporarily disabled CSP for development
     // server: {
     //   headers: {

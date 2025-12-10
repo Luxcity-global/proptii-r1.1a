@@ -6,6 +6,7 @@ import FAQSection from '../components/FAQSection';
 import { RoleSelectionPopup } from '../components/RoleSelectionPopup';
 import landlordUserService from '../services/landlordUserService';
 import { useAuth } from '../contexts/AuthContext';
+import { TextAnimate } from '../components/magic-ui/text-animate';
 
 type UserRole = 'landlord' | 'agent';
 
@@ -261,13 +262,27 @@ const AgentHome = () => {
 
           {/* Main Heading */}
           <h1 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight">
-            List Your Properties
+            <TextAnimate
+              className="text-3xl md:text-6xl font-bold font-archive leading-tight"
+              by="word"
+              animation="fadeIn"
+              startOnView={true}
+              once={true}
+            >
+              List Your Properties
+            </TextAnimate>
           </h1>
 
           {/* Subheading */}
-          <p className="text-xl md:text-2xl mb-12 max-w-2xl mx-auto font-light">
+          <TextAnimate
+            className="text-xl md:text-2xl mb-12 max-w-2xl mx-auto font-light"
+            by="word"
+            animation="fadeIn"
+            startOnView={true}
+            once={true}
+          >
             Streamline your property listings and reach more potential tenants.
-          </p>
+          </TextAnimate>
 
           {/* Go to Dashboard Button */}
           <button

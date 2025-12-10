@@ -5,6 +5,7 @@ import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import { RoleSelectionPopup } from '../components/RoleSelectionPopup';
 import { useAuth } from '../contexts/AuthContext';
+import { TextAnimate } from '../components/magic-ui/text-animate';
 
 type UserRole = 'homeowner';
 
@@ -212,13 +213,27 @@ const HomeownerHome = () => {
 
           {/* Main Heading */}
           <h1 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight">
-            Manage Your Home
+            <TextAnimate
+              className="text-3xl md:text-6xl font-bold font-archive leading-tight"
+              by="word"
+              animation="fadeIn"
+              startOnView={true}
+              once={true}
+            >
+              Manage Your Home
+            </TextAnimate>
           </h1>
 
           {/* Subheading */}
-          <p className="text-xl md:text-2xl mb-12 max-w-2xl mx-auto font-light">
+          <TextAnimate
+            className="text-xl md:text-2xl mb-12 max-w-2xl mx-auto font-light"
+            by="word"
+            animation="fadeIn"
+            startOnView={true}
+            once={true}
+          >
             Everything you need to maintain, improve, and protect your home in one place.
-          </p>
+          </TextAnimate>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
