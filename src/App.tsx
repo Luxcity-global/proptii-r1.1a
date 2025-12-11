@@ -1,6 +1,5 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import CssBaseline from '@mui/material/CssBaseline';
 import { MSALProviderWrapper } from './contexts/AuthContext';
 import { AuthProvider } from './context/AuthContext';
 import { SavedPropertiesProvider } from './contexts/SavedPropertiesContext';
@@ -36,9 +35,9 @@ import FAQ from './pages/FAQ';
 import SearchResults from './pages/SearchResults';
 
 export const App: React.FC = () => {
+  console.log('✅ App component rendering...');
   return (
     <ErrorBoundary fallback={<div>Custom fallback UI</div>}>
-      <CssBaseline />
       <MSALProviderWrapper>
         <AuthProvider>
           <SavedPropertiesProvider>

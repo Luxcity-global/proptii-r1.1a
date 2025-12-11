@@ -3,19 +3,25 @@ import { captureException, init } from '@sentry/react';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { AppError, ErrorContext, ErrorResponse } from '../types/error';
 
-// Initialize Sentry for error tracking
-init({
-    dsn: import.meta.env.VITE_SENTRY_DSN,
-    environment: import.meta.env.VITE_ENVIRONMENT,
-    tracesSampleRate: 1.0,
-    beforeSend(event) {
-        // Don't send events in development
-        if (import.meta.env.DEV) {
-            return null;
-        }
-        return event;
-    },
-});
+// Initialize Sentry for error tracking (only if DSN is provided)
+try {
+    if (import.meta.env.VITE_SENTRY_DSN) {
+        init({
+            dsn: import.meta.env.VITE_SENTRY_DSN,
+            environment: import.meta.env.VITE_ENVIRONMENT,
+            tracesSampleRate: 1.0,
+            beforeSend(event) {
+                // Don't send events in development
+                if (import.meta.env.DEV) {
+                    return null;
+                }
+                return event;
+            },
+        });
+    }
+} catch (error) {
+    console.warn('Failed to initialize Sentry:', error);
+}
 
 // Retry configuration
 const MAX_RETRIES = 3;
