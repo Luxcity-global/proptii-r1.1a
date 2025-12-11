@@ -512,20 +512,21 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>Your Tenants</h1>
-          <p className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
+      <div className="flex items-center justify-between gap-3 sm:gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg sm:text-2xl md:text-3xl" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>Your Tenants</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
             Manage your tenants and landlords
           </p>
         </div>
         <Button 
           onClick={onAddTenant} 
-          className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto" 
+          className="flex items-center space-x-0 px-5 sm:px-8 md:px-12 py-2.5 sm:py-3 md:py-3.5 min-h-[2.75rem] sm:min-h-[3.25rem] md:min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 text-sm sm:text-base" 
           style={{ 
             backgroundColor: '#DC5F12', 
             borderColor: '#DC5F12', 
-            minWidth: '180px',
+            minWidth: 'auto',
+            width: 'auto',
             background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
             boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
           }}
@@ -540,13 +541,13 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
             e.currentTarget.style.transform = 'translateY(0px)';
           }}
         >
-          <Plus className="w-4 h-4" strokeWidth={2.5} />
-          <span>Add Tenant</span>
+          <Plus className="w-4 h-4 sm:w-4 sm:h-4" strokeWidth={2.5} />
+          <span className="ml-1.5 sm:ml-2">Add Tenant</span>
         </Button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -729,24 +730,24 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
 
           {/* Bulk Actions Bar */}
           {showBulkActions && selectedTenants.length > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 overflow-x-hidden">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div className="flex items-center flex-wrap gap-2 sm:space-x-4">
                   <span className="text-sm font-medium text-blue-900">
                     {selectedTenants.length} tenant{selectedTenants.length > 1 ? 's' : ''} selected
                   </span>
-                  <Button variant="outline" size="sm" onClick={clearSelection}>
+                  <Button variant="outline" size="sm" onClick={clearSelection} className="flex-shrink-0">
                     Clear Selection
                   </Button>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" onClick={handleBulkArchiveTenants}>
+                <div className="flex items-center flex-wrap gap-2 sm:space-x-2">
+                  <Button variant="outline" size="sm" onClick={handleBulkArchiveTenants} className="flex-shrink-0">
                     <Archive className="h-4 w-4 mr-1" />
                     Archive
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" className="flex-shrink-0">
                         <Download className="h-4 w-4 mr-1" />
                         Export
                         <ChevronDown className="h-4 w-4 ml-1" />
@@ -767,7 +768,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Button variant="destructive" size="sm" onClick={handleBulkDeleteTenants}>
+                  <Button variant="destructive" size="sm" onClick={handleBulkDeleteTenants} className="flex-shrink-0">
                     <Trash2 className="h-4 w-4 mr-1" />
                     Delete
                   </Button>
@@ -1068,24 +1069,24 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
 
           {/* Bulk Actions Bar for Landlords */}
           {showBulkActions && selectedLandlords.length > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 overflow-x-hidden">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div className="flex items-center flex-wrap gap-2 sm:space-x-4">
                   <span className="text-sm font-medium text-blue-900">
                     {selectedLandlords.length} landlord{selectedLandlords.length > 1 ? 's' : ''} selected
                   </span>
-                  <Button variant="outline" size="sm" onClick={clearSelection}>
+                  <Button variant="outline" size="sm" onClick={clearSelection} className="flex-shrink-0">
                     Clear Selection
                   </Button>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" onClick={handleBulkArchiveLandlords}>
+                <div className="flex items-center flex-wrap gap-2 sm:space-x-2">
+                  <Button variant="outline" size="sm" onClick={handleBulkArchiveLandlords} className="flex-shrink-0">
                     <Archive className="h-4 w-4 mr-1" />
                     Archive
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" className="flex-shrink-0">
                         <Download className="h-4 w-4 mr-1" />
                         Export
                         <ChevronDown className="h-4 w-4 ml-1" />
@@ -1106,7 +1107,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Button variant="destructive" size="sm" onClick={handleBulkDeleteLandlords}>
+                  <Button variant="destructive" size="sm" onClick={handleBulkDeleteLandlords} className="flex-shrink-0">
                     <Trash2 className="h-4 w-4 mr-1" />
                     Delete
                   </Button>
@@ -1293,24 +1294,24 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
 
           {/* Bulk Actions Bar */}
           {showBulkActions && selectedTenants.length > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 overflow-x-hidden">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div className="flex items-center flex-wrap gap-2 sm:space-x-4">
                   <span className="text-sm font-medium text-blue-900">
                     {selectedTenants.length} tenant{selectedTenants.length > 1 ? 's' : ''} selected
                   </span>
-                  <Button variant="outline" size="sm" onClick={clearSelection}>
+                  <Button variant="outline" size="sm" onClick={clearSelection} className="flex-shrink-0">
                     Clear Selection
                   </Button>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" onClick={handleBulkArchiveTenants}>
+                <div className="flex items-center flex-wrap gap-2 sm:space-x-2">
+                  <Button variant="outline" size="sm" onClick={handleBulkArchiveTenants} className="flex-shrink-0">
                     <Archive className="h-4 w-4 mr-1" />
                     Archive
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" className="flex-shrink-0">
                         <Download className="h-4 w-4 mr-1" />
                         Export
                         <ChevronDown className="h-4 w-4 ml-1" />
@@ -1331,7 +1332,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Button variant="destructive" size="sm" onClick={handleBulkDeleteTenants}>
+                  <Button variant="destructive" size="sm" onClick={handleBulkDeleteTenants} className="flex-shrink-0">
                     <Trash2 className="h-4 w-4 mr-1" />
                     Delete
                   </Button>

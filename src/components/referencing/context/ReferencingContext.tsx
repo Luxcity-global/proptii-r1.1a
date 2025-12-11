@@ -444,93 +444,8 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
     }
   }, [state.applicationId, useApi]);
 
-  // Submit application
-  const submitApplication = useCallback(async (): Promise<boolean> => {
-    try {
-      dispatch({ type: 'SET_IS_SUBMITTING', payload: true });
-      dispatch({ type: 'CLEAR_ALL_ERRORS' });
-
-      // Save current step first
-      await saveFormData();
-      
-      if (useApi && state.applicationId) {
-        // Submit to API
-        const response = await referencingService.submitApplication(state.applicationId);
-        
-        if (!response.success) {
-          throw new Error(response.error || 'Failed to submit application');
-        }
-        
-        return true;
-      } else {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return true;
-      }
-    } catch (error) {
-      console.error('Error submitting application:', error);
-      
-      dispatch({
-        type: 'SET_ERROR',
-        payload: {
-          section: 'creditCheck',
-          error: error instanceof Error ? error.message : 'Failed to submit. Please try again.'
-        }
-      });
-      
-      return false;
-    } finally {
-      dispatch({ type: 'SET_IS_SUBMITTING', payload: false });
-    }
-  }, [saveFormData, state.applicationId, useApi]);
-
-  // Navigate to the next step
-  const nextStep = useCallback(() => {
-    dispatch({ type: 'NEXT_STEP' });
-  }, []);
-
-  // Navigate to the previous step
-  const prevStep = useCallback(() => {
-    dispatch({ type: 'PREV_STEP' });
-  }, []);
-
-  // Set the current step directly
-  const setCurrentStep = useCallback((step: FormSection | number) => {
-    dispatch({ type: 'SET_CURRENT_STEP', payload: step });
-  }, []);
-
-  // Save as draft
-  const saveAsDraft = useCallback(async (name: string): Promise<boolean> => {
-    try {
-      if (useApi && state.applicationId) {
-        // Save to API
-        const apiData = convertFormDataToApiFormat(state.formData);
-        
-        const response = await referencingService.saveDraft(
-          state.applicationId,
-          name,
-          apiData
-        );
-        
-        return response.success;
-      } else {
-        // Save to localStorage
-        saveLocalDraft(name);
-        return true;
-      }
-    } catch (error) {
-      console.error('Error saving draft:', error);
-      return false;
-    }
-  }, [saveLocalDraft, state.applicationId, state.formData, useApi]);
-
-  // Set property ID
-  const setPropertyId = useCallback((id: string) => {
-    dispatch({ type: 'SET_PROPERTY_ID', payload: id });
-  }, []);
-
   // Helper function to convert FormData to API format
-  const convertFormDataToApiFormat = (formData: FormData): ReferencingFormData => {
+  const convertFormDataToApiFormat = useCallback((formData: FormData): ReferencingFormData => {
     // Create a deep copy to avoid modifying the original
     const apiData: ReferencingFormData = {
       propertyId: state.propertyId || '',
@@ -586,7 +501,108 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
     }
     
     return apiData;
-  };
+  }, [state.propertyId]);
+
+  // Submit application
+  const submitApplication = useCallback(async (userId?: string): Promise<boolean> => {
+    try {
+      dispatch({ type: 'SET_IS_SUBMITTING', payload: true });
+      dispatch({ type: 'CLEAR_ALL_ERRORS' });
+
+      // Save current step first
+      await saveFormData();
+      
+      if (useApi) {
+        // Get userId - use provided userId, or applicationId, or 'anonymous'
+        const userIdToUse = userId || state.applicationId || 'anonymous';
+        
+        // Convert form data to API format
+        const apiData = convertFormDataToApiFormat(state.formData);
+        
+        console.log('Submitting referencing application:', {
+          userId: userIdToUse,
+          hasFormData: !!state.formData,
+          propertyId: state.propertyId,
+          formDataKeys: Object.keys(state.formData)
+        });
+        
+        // Submit to API
+        const response = await referencingService.submitApplication(userIdToUse, { formData: apiData });
+        
+        console.log('Submit application response:', response);
+        
+        if (!response || (response.success === false)) {
+          throw new Error(response?.error || 'Failed to submit application');
+        }
+        
+        return true;
+      } else {
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return true;
+      }
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      
+      dispatch({
+        type: 'SET_ERROR',
+        payload: {
+          section: 'creditCheck',
+          error: error instanceof Error ? error.message : 'Failed to submit. Please try again.'
+        }
+      });
+      
+      return false;
+    } finally {
+      dispatch({ type: 'SET_IS_SUBMITTING', payload: false });
+    }
+  }, [saveFormData, state.applicationId, state.formData, state.propertyId, useApi, convertFormDataToApiFormat]);
+
+  // Navigate to the next step
+  const nextStep = useCallback(() => {
+    dispatch({ type: 'NEXT_STEP' });
+  }, []);
+
+  // Navigate to the previous step
+  const prevStep = useCallback(() => {
+    dispatch({ type: 'PREV_STEP' });
+  }, []);
+
+  // Set the current step directly
+  const setCurrentStep = useCallback((step: FormSection | number) => {
+    dispatch({ type: 'SET_CURRENT_STEP', payload: step });
+  }, []);
+
+  // Save as draft
+  const saveAsDraft = useCallback(async (name: string): Promise<boolean> => {
+    try {
+      if (useApi && state.applicationId) {
+        // Save to API
+        const apiData = convertFormDataToApiFormat(state.formData);
+        
+        const response = await referencingService.saveDraft(
+          state.applicationId,
+          name,
+          apiData
+        );
+        
+        return response.success;
+      } else {
+        // Save to localStorage
+        saveLocalDraft(name);
+        return true;
+      }
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      return false;
+    }
+  }, [saveLocalDraft, state.applicationId, state.formData, useApi, convertFormDataToApiFormat]);
+
+  // Set property ID
+  const setPropertyId = useCallback((id: string) => {
+    dispatch({ type: 'SET_PROPERTY_ID', payload: id });
+  }, []);
+
 
   // Helper function to convert a form section to API format
   const convertFormSectionToApiFormat = (section: FormSection, sectionData: any): any => {

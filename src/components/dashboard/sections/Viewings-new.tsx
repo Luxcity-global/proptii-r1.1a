@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, Clock, MapPin, User, Mail, CheckCircle, Eye, X, Heart, MessageCircle, Send, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Mail, CheckCircle, Eye, X, Heart, MessageCircle, Send, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { viewingService, ViewingBooking, ViewingStats } from '../../../services/viewingService';
 import { bookViewingRequestService, BookViewingRequest } from '../../../services/bookViewingRequestService';
 import { propertySelectionService, PropertySelection, PropertySelectionStats } from '../../../services/propertySelectionService';
 import { useAuth } from '../../../contexts/AuthContext';
 import BookViewingModal from '../../viewings/BookViewingModal';
 import emailService from '../../../services/emailService';
+import { useIsMobile } from '../ui/use-mobile';
 
 /**
  * Viewings section - redesigned to follow style guide
  */
 const Viewings: React.FC = () => {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('upcoming');
   const [viewingStats, setViewingStats] = useState<ViewingStats>({
     upcoming: 0,
@@ -42,6 +44,12 @@ const Viewings: React.FC = () => {
   const [rescheduleMessage, setRescheduleMessage] = useState('');
   const [cancelMessage, setCancelMessage] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  
+  // Pagination state
+  const [currentUpcomingPage, setCurrentUpcomingPage] = useState<number>(1);
+  const [currentPastPage, setCurrentPastPage] = useState<number>(1);
+  
+  const ITEMS_PER_PAGE = 10;
 
   const selectionImageByPropertyId = useMemo(() => {
     const map = new Map<string, string>();
@@ -351,6 +359,129 @@ const Viewings: React.FC = () => {
   const currentViewings = activeTab === 'upcoming' ? upcomingViewings : pastViewings;
   const currentSelections = propertySelections;
 
+  // Pagination calculations
+  const totalUpcomingPages = Math.ceil(upcomingViewings.length / ITEMS_PER_PAGE);
+  const upcomingStartIndex = (currentUpcomingPage - 1) * ITEMS_PER_PAGE;
+  const upcomingEndIndex = upcomingStartIndex + ITEMS_PER_PAGE;
+  const paginatedUpcomingViewings = useMemo(() => {
+    return upcomingViewings.slice(upcomingStartIndex, upcomingEndIndex);
+  }, [upcomingViewings, upcomingStartIndex, upcomingEndIndex]);
+
+  const totalPastPages = Math.ceil(pastViewings.length / ITEMS_PER_PAGE);
+  const pastStartIndex = (currentPastPage - 1) * ITEMS_PER_PAGE;
+  const pastEndIndex = pastStartIndex + ITEMS_PER_PAGE;
+  const paginatedPastViewings = useMemo(() => {
+    return pastViewings.slice(pastStartIndex, pastEndIndex);
+  }, [pastViewings, pastStartIndex, pastEndIndex]);
+
+  // Reset pagination when switching tabs
+  useEffect(() => {
+    setCurrentUpcomingPage(1);
+    setCurrentPastPage(1);
+  }, [activeTab]);
+
+  // Get current paginated viewings based on active tab
+  const paginatedViewings = activeTab === 'upcoming' ? paginatedUpcomingViewings : paginatedPastViewings;
+  const currentPage = activeTab === 'upcoming' ? currentUpcomingPage : currentPastPage;
+  const totalPages = activeTab === 'upcoming' ? totalUpcomingPages : totalPastPages;
+  const startIndex = activeTab === 'upcoming' ? upcomingStartIndex : pastStartIndex;
+  const endIndex = activeTab === 'upcoming' ? upcomingEndIndex : pastEndIndex;
+  const totalItems = activeTab === 'upcoming' ? upcomingViewings.length : pastViewings.length;
+
+  // Pagination component
+  const PaginationControls = () => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} items-center justify-between gap-4 bg-white border border-gray-200 rounded-lg p-4 mt-4`}>
+        <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600`} style={{ fontFamily: 'Archivo, sans-serif' }}>
+          Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} viewings
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              if (activeTab === 'upcoming') {
+                setCurrentUpcomingPage(Math.max(1, currentUpcomingPage - 1));
+              } else {
+                setCurrentPastPage(Math.max(1, currentPastPage - 1));
+              }
+            }}
+            disabled={currentPage === 1}
+            className={`${isMobile ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 ${
+              currentPage === 1 
+                ? 'text-gray-400 bg-gray-50' 
+                : 'text-gray-700 bg-white hover:bg-gray-50'
+            }`}
+            style={{ fontFamily: 'Archivo, sans-serif' }}
+          >
+            <ChevronLeft className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
+            <span className={isMobile ? '' : 'hidden sm:inline'}>Previous</span>
+          </button>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+              // Show first page, last page, current page, and pages around current
+              if (
+                page === 1 ||
+                page === totalPages ||
+                (page >= currentPage - 1 && page <= currentPage + 1)
+              ) {
+                return (
+                  <button
+                    key={page}
+                    onClick={() => {
+                      if (activeTab === 'upcoming') {
+                        setCurrentUpcomingPage(page);
+                      } else {
+                        setCurrentPastPage(page);
+                      }
+                    }}
+                    className={`${isMobile ? 'min-w-[32px] px-1.5 py-1 text-xs' : 'min-w-[40px] px-2 py-1.5 text-sm'} rounded-lg font-medium transition-colors ${
+                      currentPage === page
+                        ? 'bg-orange-500 text-white'
+                        : 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
+                    }`}
+                    style={{ fontFamily: 'Archivo, sans-serif' }}
+                  >
+                    {page}
+                  </button>
+                );
+              } else if (
+                page === currentPage - 2 ||
+                page === currentPage + 2
+              ) {
+                return (
+                  <span key={page} className={`${isMobile ? 'px-1 text-xs' : 'px-2 text-sm'} text-gray-400`}>
+                    ...
+                  </span>
+                );
+              }
+              return null;
+            })}
+          </div>
+          <button
+            onClick={() => {
+              if (activeTab === 'upcoming') {
+                setCurrentUpcomingPage(Math.min(totalUpcomingPages, currentUpcomingPage + 1));
+              } else {
+                setCurrentPastPage(Math.min(totalPastPages, currentPastPage + 1));
+              }
+            }}
+            disabled={currentPage === totalPages}
+            className={`${isMobile ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 ${
+              currentPage === totalPages
+                ? 'text-gray-400 bg-gray-50'
+                : 'text-gray-700 bg-white hover:bg-gray-50'
+            }`}
+            style={{ fontFamily: 'Archivo, sans-serif' }}
+          >
+            <span className={isMobile ? '' : 'hidden sm:inline'}>Next</span>
+            <ChevronRight className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const formatDate = (dateString: string) => {
     if (!dateString) return 'TBD';
     try {
@@ -629,25 +760,24 @@ const Viewings: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 pb-8" style={{ fontFamily: 'Archivo, sans-serif' }}>
+    <div className={`space-y-4 sm:space-y-6 pb-8 px-4 sm:px-0`} style={{ fontFamily: 'Archivo, sans-serif' }}>
       {/* Header */}
-      <div className="mt-8">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-        <h1 className="text-2xl font-semibold" style={{ color: '#374957' }}>
+      <div className={`${isMobile ? 'mt-4' : 'mt-8'}`}>
+        <div className={`flex ${isMobile ? 'flex-row items-start justify-between gap-3' : 'items-center justify-between'} mb-2`}>
+          <div className="flex-1 min-w-0">
+        <h1 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-semibold`} style={{ color: '#374957' }}>
           Property Viewings
         </h1>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mt-1`}>
               Manage and track all your property viewings
             </p>
           </div>
         <button 
-            className="px-12 py-3 text-white rounded-full text-sm font-medium transition-all duration-300 hover:-translate-y-0.5"
+            className={`${isMobile ? 'px-4 py-2 text-xs whitespace-nowrap flex-shrink-0' : 'px-12 py-3 text-sm'} text-white rounded-full font-medium transition-all duration-300 hover:-translate-y-0.5`}
             style={{
               background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
               border: '1px solid #DC5F12',
-              minHeight: '3.5rem',
-              minWidth: '180px',
+              minHeight: isMobile ? '2.5rem' : '3.5rem',
               boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
             }}
             onMouseEnter={(e) => {
@@ -667,87 +797,87 @@ const Viewings: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {/* Upcoming Viewings Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
+        <div className="bg-white p-4 sm:p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Upcoming Viewings</h3>
-            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-blue-600" />
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Upcoming Viewings</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0`}>
+              <Calendar className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-blue-600`} />
             </div>
           </div>
           <div className="mb-3">
-              <p className="text-2xl font-bold" style={{ color: '#374957' }}>
+              <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
               {upcomingViewings.length}
               </p>
             </div>
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>As of 8/10/2025</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>As of 8/10/2025</p>
           </div>
         </div>
 
         {/* Completed Viewings Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
+        <div className="bg-white p-4 sm:p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Completed Viewings</h3>
-            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-green-600" />
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Completed Viewings</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0`}>
+              <CheckCircle className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-green-600`} />
             </div>
           </div>
           <div className="mb-3">
-              <p className="text-2xl font-bold" style={{ color: '#374957' }}>
+              <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
               {viewingStats.completed}
               </p>
             </div>
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>Total Completed</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Total Completed</p>
           </div>
         </div>
 
         {/* Rescheduled Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
+        <div className="bg-white p-4 sm:p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Rescheduled</h3>
-            <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-5 h-5 text-yellow-600" />
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Rescheduled</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0`}>
+              <Clock className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-yellow-600`} />
             </div>
           </div>
           <div className="mb-3">
-            <p className="text-2xl font-bold" style={{ color: '#374957' }}>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
               {viewingStats.rescheduled}
             </p>
           </div>
             <div>
-            <p className="text-sm" style={{ color: '#717182' }}>Past 30 days</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Past 30 days</p>
           </div>
         </div>
 
         {/* Total Viewings Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
+        <div className="bg-white p-4 sm:p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Total Viewings</h3>
-            <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Eye className="w-5 h-5 text-purple-600" />
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Total Viewings</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0`}>
+              <Eye className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-purple-600`} />
             </div>
           </div>
           <div className="mb-3">
-              <p className="text-2xl font-bold" style={{ color: '#374957' }}>
+              <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
               {viewingStats.total}
               </p>
             </div>
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>Total Viewings</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Total Viewings</p>
             </div>
           </div>
       </div>
 
       {/* Tabs Section */}
       <div>
-        <div className="mb-6">
-          <div className="bg-white rounded-full border border-gray-100 p-1 inline-flex">
+        <div className={`${isMobile ? 'mb-4' : 'mb-6'}`}>
+          <div className="bg-white rounded-full border border-gray-100 p-1 inline-flex w-full sm:w-auto overflow-x-auto">
             <button
               onClick={() => setActiveTab('upcoming')}
-              className={`px-4 py-2 text-sm font-medium transition-colors rounded-l-full ${
+              className={`${isMobile ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} font-medium transition-colors rounded-l-full whitespace-nowrap ${
                 activeTab === 'upcoming'
                   ? 'text-white'
                   : 'text-gray-600'
@@ -760,7 +890,7 @@ const Viewings: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('past')}
-              className={`px-4 py-2 text-sm font-medium transition-colors rounded-r-full ${
+              className={`${isMobile ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} font-medium transition-colors rounded-r-full whitespace-nowrap ${
                 activeTab === 'past'
                   ? 'text-white'
                   : 'text-gray-600'
@@ -775,21 +905,21 @@ const Viewings: React.FC = () => {
       </div>
 
         {/* Viewings List */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className={`grid grid-cols-1 ${isMobile ? '' : 'lg:grid-cols-2 xl:grid-cols-3'} gap-4 sm:gap-6`}>
           {currentViewings.length === 0 ? (
-              <div className="col-span-full text-center py-12">
+              <div className="col-span-full text-center py-8 sm:py-12">
                 <div className="text-gray-400 mb-4">
-                  <Calendar className="w-12 h-12 mx-auto" />
+                  <Calendar className={`${isMobile ? 'w-8 h-8' : 'w-12 h-12'} mx-auto`} />
                 </div>
-                <h3 className="text-lg font-medium text-gray-600 mb-2">
+                <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-medium text-gray-600 mb-2`}>
                   No viewings scheduled
                 </h3>
-                <p className="text-gray-500">
+                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>
                   Viewings you've requested will appear here.
                 </p>
               </div>
             ) : (
-              currentViewings.map((viewing) => (
+              paginatedViewings.map((viewing) => (
             <div key={viewing.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
               {/* Property Image */}
               <div className="relative aspect-video overflow-hidden">
@@ -801,33 +931,33 @@ const Viewings: React.FC = () => {
         </div>
         
               {/* Property Details */}
-              <div className="p-4">
+              <div className={`${isMobile ? 'p-3' : 'p-4'}`}>
                 {/* Address */}
-                <h3 className="text-base font-bold text-gray-800 mb-1 truncate">
+                <h3 className={`${isMobile ? 'text-sm' : 'text-base'} font-bold text-gray-800 mb-1 truncate`}>
                     {viewing.property.street}
                     </h3>
                 
                 {/* Location */}
-                <p className="text-xs text-gray-600 mb-3 flex items-center">
-                  <MapPin className="w-3 h-3 mr-1" />
-                    {viewing.property.town}, {viewing.property.city} {viewing.property.postcode}
+                <p className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-gray-600 mb-3 flex items-center`}>
+                  <MapPin className={`${isMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'} mr-1 flex-shrink-0`} />
+                    <span className="truncate">{viewing.property.town}, {viewing.property.city} {viewing.property.postcode}</span>
                 </p>
                 
                 {/* Date and Time */}
-                <div className="flex items-center gap-4 text-xs text-gray-600 mb-3">
+                <div className={`flex ${isMobile ? 'flex-col gap-1' : 'items-center gap-4'} ${isMobile ? 'text-[10px]' : 'text-xs'} text-gray-600 mb-3`}>
                   <div className="flex items-center">
-                    <Calendar className="w-3 h-3 mr-1" />
+                    <Calendar className={`${isMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'} mr-1 flex-shrink-0`} />
                       {formatDate(viewing.viewingDetails.date)}
                     </div>
                   <div className="flex items-center">
-                    <Clock className="w-3 h-3 mr-1" />
+                    <Clock className={`${isMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'} mr-1 flex-shrink-0`} />
                       {formatTime(viewing.viewingDetails.time)}
                     </div>
                   </div>
 
                   {/* Status Badge */}
                   <div className="mb-3">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                    <span className={`inline-flex items-center ${isMobile ? 'px-1.5 py-0.5' : 'px-2 py-1'} rounded-full ${isMobile ? 'text-[10px]' : 'text-xs'} font-medium ${
                       viewing.status === 'pending' 
                         ? 'bg-yellow-100 text-yellow-800' 
                         : viewing.status === 'confirmed'
@@ -845,15 +975,15 @@ const Viewings: React.FC = () => {
                   </div>
 
                 {/* Estate Agent Details */}
-                <div className="mb-4">
-                  <h4 className="text-xs font-medium text-gray-600 mb-2">Estate Agent Details</h4>
-                  <div className="flex items-center text-xs text-gray-600 mb-1">
-                    <User className="w-3 h-3 mr-1" />
-                      {viewing.property.agent.name}
+                <div className={`${isMobile ? 'mb-3' : 'mb-4'}`}>
+                  <h4 className={`${isMobile ? 'text-[10px]' : 'text-xs'} font-medium text-gray-600 mb-2`}>Estate Agent Details</h4>
+                  <div className={`flex items-center ${isMobile ? 'text-[10px]' : 'text-xs'} text-gray-600 mb-1`}>
+                    <User className={`${isMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'} mr-1 flex-shrink-0`} />
+                      <span className="truncate">{viewing.property.agent.name}</span>
                     </div>
-                  <div className="flex items-center text-xs text-gray-600">
-                    <Mail className="w-3 h-3 mr-1" />
-                      {viewing.property.agent.email}
+                  <div className={`flex items-center ${isMobile ? 'text-[10px]' : 'text-xs'} text-gray-600`}>
+                    <Mail className={`${isMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'} mr-1 flex-shrink-0`} />
+                      <span className="truncate">{viewing.property.agent.email}</span>
                   </div>
                 </div>
 
@@ -863,34 +993,36 @@ const Viewings: React.FC = () => {
                     <>
                         <button 
                           onClick={() => handleReschedule(viewing.id)}
-                          className="flex-1 inline-flex items-center justify-center px-3 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-colors" 
+                          className={`flex-1 inline-flex items-center justify-center ${isMobile ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'} text-white rounded-lg font-medium hover:opacity-90 transition-colors`} 
                           style={{ backgroundColor: '#136C9E' }}
                         >
                         Reschedule
                       </button>
                         <button 
                           onClick={() => handleCancel(viewing.id)}
-                          className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-red-300 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
+                          className={`flex-1 inline-flex items-center justify-center ${isMobile ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'} border border-red-300 text-red-600 rounded-lg font-medium hover:bg-red-50 transition-colors`}
                         >
-                        <X className="w-4 h-4 mr-2" />
-                        Cancel Viewing
+                        <X className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} ${isMobile ? '' : 'mr-2'}`} />
+                        {!isMobile && 'Cancel Viewing'}
+                        {isMobile && 'Cancel'}
                       </button>
                     </>
                   ) : (
                     <>
                         <button 
                           onClick={() => handleBookAgain(viewing.id)}
-                          className="flex-1 inline-flex items-center justify-center px-3 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-colors" 
+                          className={`flex-1 inline-flex items-center justify-center ${isMobile ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'} text-white rounded-lg font-medium hover:opacity-90 transition-colors`} 
                           style={{ backgroundColor: '#DC5F12' }}
                         >
                         Book Again
                       </button>
                         <button 
                           onClick={() => handleViewProperty(viewing.id)}
-                          className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                          className={`flex-1 inline-flex items-center justify-center ${isMobile ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors`}
                         >
-                        <Eye className="w-4 h-4 mr-2" />
-                        View Property
+                        <Eye className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} ${isMobile ? '' : 'mr-2'}`} />
+                        {!isMobile && 'View Property'}
+                        {isMobile && 'View'}
                       </button>
                     </>
                   )}
@@ -900,6 +1032,9 @@ const Viewings: React.FC = () => {
             ))
           )}
         </div>
+        
+        {/* Pagination Controls */}
+        {currentViewings.length > 0 && <PaginationControls />}
       </div>
       <BookViewingModal
         open={isBookViewingOpen}
@@ -912,59 +1047,59 @@ const Viewings: React.FC = () => {
 
       {/* Reschedule Modal */}
       {isRescheduleModalOpen && selectedViewing && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
-            <div className="p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className={`${isMobile ? 'p-4' : 'p-6'}`}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Reschedule Viewing</h3>
+                <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-gray-900`}>Reschedule Viewing</h3>
                 <button
                   onClick={() => {
                     setIsRescheduleModalOpen(false);
                     setRescheduleMessage('');
                     setSelectedViewing(null);
                   }}
-                  className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                  className={`${isMobile ? 'w-7 h-7' : 'w-8 h-8'} rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors flex-shrink-0`}
                 >
-                  <X className="w-4 h-4" />
+                  <X className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
                 </button>
               </div>
               
               <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-2">
+                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mb-2`}>
                   Property: <strong>{selectedViewing.property.street}, {selectedViewing.property.town}</strong>
                 </p>
-                <p className="text-sm text-gray-600 mb-2">
+                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mb-2`}>
                   Current Date: <strong>{selectedViewing.viewingDetails.date}</strong>
                 </p>
-                <p className="text-sm text-gray-600 mb-4">
+                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mb-4`}>
                   Current Time: <strong>{selectedViewing.viewingDetails.time}</strong>
                 </p>
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className={`block ${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-700 mb-2`}>
                   Message to Agent/Landlord <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={rescheduleMessage}
                   onChange={(e) => setRescheduleMessage(e.target.value)}
                   placeholder="Please explain why you need to reschedule and suggest alternative dates/times..."
-                  rows={6}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  rows={isMobile ? 4 : 6}
+                  className={`w-full ${isMobile ? 'px-2.5 py-2 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none`}
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-gray-500 mt-1`}>
                   This message will be sent via email to {selectedViewing.property.agent.email}
                 </p>
               </div>
 
-              <div className="flex items-center justify-end space-x-3">
+              <div className={`flex ${isMobile ? 'flex-col-reverse' : 'items-center justify-end'} ${isMobile ? 'gap-2' : 'space-x-3'}`}>
                 <button
                   onClick={() => {
                     setIsRescheduleModalOpen(false);
                     setRescheduleMessage('');
                     setSelectedViewing(null);
                   }}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  className={`${isMobile ? 'w-full' : ''} ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-2'} text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors`}
                   disabled={isSendingEmail}
                 >
                   Cancel
@@ -972,7 +1107,7 @@ const Viewings: React.FC = () => {
                 <button
                   onClick={sendRescheduleEmail}
                   disabled={isSendingEmail || !rescheduleMessage.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className={`${isMobile ? 'w-full' : ''} ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-2'} bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
                 >
                   {isSendingEmail ? (
                     <>
@@ -981,7 +1116,7 @@ const Viewings: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <Send className="w-4 h-4" />
+                      <Send className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
                       <span>Send Request</span>
                     </>
                   )}
@@ -994,59 +1129,59 @@ const Viewings: React.FC = () => {
 
       {/* Cancel Modal */}
       {isCancelModalOpen && selectedViewing && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
-            <div className="p-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <AlertCircle className="w-5 h-5 text-red-600" />
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className={`${isMobile ? 'p-4' : 'p-6'}`}>
+              <div className={`flex ${isMobile ? 'items-start' : 'items-center'} ${isMobile ? 'gap-2' : 'space-x-3'} mb-4`}>
+                <div className={`${isMobile ? 'w-8 h-8' : 'w-10 h-10'} bg-red-100 rounded-full flex items-center justify-center flex-shrink-0`}>
+                  <AlertCircle className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-red-600`} />
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Cancel Viewing</h3>
-                  <p className="text-sm text-gray-500">This action cannot be undone</p>
+                <div className="flex-1 min-w-0">
+                  <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-gray-900`}>Cancel Viewing</h3>
+                  <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-500`}>This action cannot be undone</p>
                 </div>
               </div>
               
               <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-2">
+                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mb-2`}>
                   Property: <strong>{selectedViewing.property.street}, {selectedViewing.property.town}</strong>
                 </p>
-                <p className="text-sm text-gray-600 mb-2">
+                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mb-2`}>
                   Date: <strong>{selectedViewing.viewingDetails.date}</strong>
                 </p>
-                <p className="text-sm text-gray-600 mb-4">
+                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mb-4`}>
                   Time: <strong>{selectedViewing.viewingDetails.time}</strong>
                 </p>
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className={`block ${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-700 mb-2`}>
                   Optional Message to Agent/Landlord
                 </label>
                 <textarea
                   value={cancelMessage}
                   onChange={(e) => setCancelMessage(e.target.value)}
                   placeholder="Let them know why you're cancelling (optional)..."
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  rows={isMobile ? 3 : 4}
+                  className={`w-full ${isMobile ? 'px-2.5 py-2 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none`}
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-gray-500 mt-1`}>
                   This message will be sent via email to {selectedViewing.property.agent.email}
                 </p>
               </div>
 
-              <p className="text-gray-700 mb-6 text-sm">
+              <p className={`text-gray-700 ${isMobile ? 'mb-4' : 'mb-6'} ${isMobile ? 'text-xs' : 'text-sm'}`}>
                 Are you sure you want to cancel this viewing? An email notification will be sent to the agent/landlord.
               </p>
 
-              <div className="flex items-center justify-end space-x-3">
+              <div className={`flex ${isMobile ? 'flex-col-reverse' : 'items-center justify-end'} ${isMobile ? 'gap-2' : 'space-x-3'}`}>
                 <button
                   onClick={() => {
                     setIsCancelModalOpen(false);
                     setCancelMessage('');
                     setSelectedViewing(null);
                   }}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  className={`${isMobile ? 'w-full' : ''} ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-2'} text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors`}
                   disabled={isSendingEmail}
                 >
                   Keep Viewing
@@ -1054,7 +1189,7 @@ const Viewings: React.FC = () => {
                 <button
                   onClick={sendCancelEmail}
                   disabled={isSendingEmail}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className={`${isMobile ? 'w-full' : ''} ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-2'} bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
                 >
                   {isSendingEmail ? (
                     <>
@@ -1063,7 +1198,7 @@ const Viewings: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <X className="w-4 h-4" />
+                      <X className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
                       <span>Cancel Viewing</span>
                     </>
                   )}

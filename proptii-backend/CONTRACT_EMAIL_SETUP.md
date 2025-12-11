@@ -11,7 +11,7 @@ SMTP_HOST=your-smtp-server.com
 SMTP_PORT=587
 SMTP_USER=your-smtp-username
 SMTP_PASS=your-smtp-password
-SMTP_FROM_EMAIL=noreply@proptii.com
+SMTP_FROM_EMAIL=noreply@proptii.co
 ```
 
 ## Email Provider Examples
@@ -42,7 +42,7 @@ SMTP_HOST=smtp.sendgrid.net
 SMTP_PORT=587
 SMTP_USER=apikey
 SMTP_PASS=your-sendgrid-api-key
-SMTP_FROM_EMAIL=noreply@proptii.com
+SMTP_FROM_EMAIL=noreply@proptii.co
 ```
 
 ### Mailgun SMTP
@@ -51,7 +51,7 @@ SMTP_HOST=smtp.mailgun.org
 SMTP_PORT=587
 SMTP_USER=your-mailgun-username
 SMTP_PASS=your-mailgun-password
-SMTP_FROM_EMAIL=noreply@proptii.com
+SMTP_FROM_EMAIL=noreply@proptii.co
 ```
 
 ## How It Works

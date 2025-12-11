@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { ArrowLeft, Wifi, Car, Dog, Dumbbell, Waves, TreePine, Shield, Utensils, WashingMachine, Check } from 'lucide-react';
+import { ArrowLeft, Wifi, Car, Dog, Dumbbell, Waves, TreePine, Shield, Utensils, WashingMachine, Check, Menu } from 'lucide-react';
 import { ProgressTracker } from './ProgressTracker';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 
 interface AmenitiesSelectionProps {
   selectedAmenities?: string[];
@@ -62,16 +68,17 @@ export function AmenitiesSelection({ selectedAmenities: propSelectedAmenities, o
         {/* Main Content Area */}
         <div className="w-full py-8">
           {/* Header */}
-          <div className="flex items-center justify-between mb-12 px-4">
+          <div className="flex items-center justify-between mb-4 md:mb-12 px-4">
             <div className="flex items-center space-x-4">
               <img 
                 src="/images/proptii-logo.png" 
                 alt="Proptii Logo" 
-                className="h-8 w-auto cursor-pointer hover:opacity-80 transition-opacity"
+                className="h-10 md:h-12 w-auto cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={onHome}
               />
             </div>
-            <div className="flex items-center space-x-3">
+            {/* Desktop buttons */}
+            <div className="hidden md:flex items-center space-x-3">
               <Button variant="outline" className="rounded-full px-4 py-2">
                 Questions?
               </Button>
@@ -90,20 +97,35 @@ export function AmenitiesSelection({ selectedAmenities: propSelectedAmenities, o
                 Property Setup
               </Button>
             </div>
-          </div>
-
-          {/* Horizontal Progress Tracker */}
-          <div className="mb-6 w-full" style={{ marginTop: '80px' }}>
-            <ProgressTracker 
-              steps={progressSteps}
-              currentStep={3}
-              totalSteps={5}
-            />
+            {/* Mobile hamburger menu */}
+            <div className="md:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="rounded-full p-2">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem className="cursor-pointer">
+                    Questions?
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer">
+                    Save & exit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className="cursor-pointer"
+                    onClick={onPropertySetup}
+                  >
+                    Property Setup
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           {/* Amenities Section Header */}
-          <div className="text-left mb-8 px-4 py-6" style={{ 
-            backgroundImage: 'url("./add_prp_slide/property_amenities background.png")',
+          <div className="text-left mb-6 px-4 py-6" style={{ 
+            backgroundImage: 'url("/assets/add_prp_slide/property_amenities background.png")',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
@@ -114,11 +136,30 @@ export function AmenitiesSelection({ selectedAmenities: propSelectedAmenities, o
             <p style={{ color: '#374957' }}>Select the amenities available at your property</p>
           </div>
 
+          {/* Step Counter - Mobile: Simple text, Desktop: Full Progress Tracker */}
+          <div className="mb-6 w-full px-4">
+            {/* Mobile: Simple step counter */}
+            <div className="md:hidden">
+              <div className="text-sm">
+                <span className="text-blue-600 font-semibold">Step {3}</span>
+                <span className="text-gray-500"> of {5}</span>
+              </div>
+            </div>
+            {/* Desktop: Full Progress Tracker */}
+            <div className="hidden md:block">
+              <ProgressTracker 
+                steps={progressSteps}
+                currentStep={3}
+                totalSteps={5}
+              />
+            </div>
+          </div>
+
           {/* Main Content */}
           <div className="max-w-6xl mx-auto">
             
             {/* Amenities Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {amenities.map((amenity) => {
               const IconComponent = amenity.icon;
               const isSelected = selectedAmenities.includes(amenity.id);
@@ -166,21 +207,22 @@ export function AmenitiesSelection({ selectedAmenities: propSelectedAmenities, o
       </div>
 
       {/* Footer - Fixed to Bottom */}
-      <div className="max-w-6xl mx-auto w-full px-4 py-8">
-        <div className="flex items-center justify-between" style={{ minHeight: '60px' }}>
+      <div className="max-w-6xl mx-auto w-full px-4 py-4 md:py-8">
+        <div className="flex items-center justify-between gap-4" style={{ minHeight: '60px' }}>
           <Button 
             variant="ghost" 
             onClick={onBack}
-            className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+            className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 flex-1 md:flex-none"
             style={{ height: '48px', minHeight: '48px' }}
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Review Property Details</span>
+            <span className="hidden md:inline">Review Property Details</span>
+            <span className="md:hidden">Review</span>
           </Button>
 
           <Button 
             onClick={onNext}
-            className="px-6 py-3 rounded-full text-white transition-all duration-300"
+            className="px-6 py-3 rounded-full text-white transition-all duration-300 flex-1 md:flex-none"
             style={{ 
               backgroundColor: '#DC5F12',
               background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
@@ -199,7 +241,8 @@ export function AmenitiesSelection({ selectedAmenities: propSelectedAmenities, o
               e.currentTarget.style.transform = 'translateY(0px)';
             }}
           >
-            Proceed to Images & Notes
+            <span className="hidden md:inline">Proceed to Images & Notes</span>
+            <span className="md:hidden">Proceed</span>
           </Button>
         </div>
       </div>

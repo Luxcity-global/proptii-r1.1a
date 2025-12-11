@@ -160,7 +160,7 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
     setIsUploading(true);
 
     try {
-      // Upload file to backend (which handles Firebase Storage upload without CORS issues)
+      // Upload file to backend (which handles Azure Storage upload)
         const API_BASE_URL = window.location.hostname === 'localhost'
           ? 'http://localhost:3000/api'
           : 'https://proptii-r1-1a-new-backend.onrender.com/api';
@@ -183,7 +183,7 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
         const newDocument: Omit<PropertyDocument, 'id'> = {
           name: docForm.name,
           type: docForm.type as PropertyDocument['type'],
-          url: uploadResponse.data.document.url, // Store Firebase Storage URL
+          url: uploadResponse.data.document.url, // Store Azure Storage URL
           issueDate: new Date(docForm.issueDate),
           expiryDate: docForm.expiryDate ? new Date(docForm.expiryDate) : undefined,
           status: 'valid'
@@ -207,9 +207,10 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
       setIsUploadOpen(false);
       
       alert(`Uploaded ${uploadedCount} document${uploadedCount > 1 ? 's' : ''} successfully!`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading document:', error);
-      alert('Failed to upload document. Please try again.');
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to upload document. Please try again.';
+      alert(`Failed to upload document: ${errorMessage}`);
     } finally {
       setIsUploading(false);
     }
@@ -575,7 +576,17 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
                       {getStatusBadge(status)}
 
                       <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            if (document.url) {
+                              window.open(document.url, '_blank');
+                            } else {
+                              alert('Document URL not available');
+                            }
+                          }}
+                        >
                           <Download className="w-4 h-4" />
                         </Button>
                         <Button variant="outline" size="sm">

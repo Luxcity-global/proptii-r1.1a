@@ -804,12 +804,23 @@ function AppContent() {
   };
 
   const updateProperty = (propertyId: string, updates: Partial<Property>) => {
+    console.log('📝 updateProperty called:', { 
+      propertyId, 
+      hasPhotos: !!updates.photos,
+      photoCount: updates.photos?.length,
+      coverPhoto: updates.photos?.find(p => p.isCover)?.filename
+    });
+    
     setProperties(prev => 
       prev.map(p => p.id === propertyId ? { ...p, ...updates } : p)
     );
+    
     if (selectedProperty && selectedProperty.id === propertyId) {
+      console.log('📝 Also updating selectedProperty');
       setSelectedProperty(prev => prev ? { ...prev, ...updates } : null);
     }
+    
+    console.log('✅ updateProperty complete');
   };
 
   const selectProperty = (property: Property) => {

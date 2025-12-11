@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../../../contexts/AuthContext';
 import { firestoreService } from '../../../services/firestoreService';
 import ReferencingModal from '../../ReferencingModal.OLD';
+import { useIsMobile } from '../ui/use-mobile';
 
 // Interface for form data structure - matches the actual Firestore data
 interface FormData {
@@ -77,6 +78,7 @@ interface FormData {
  */
 const TenantReferencing: React.FC = () => {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [formData, setFormData] = useState<FormData | null>(null);
   const [stepStatus, setStepStatus] = useState<{ [key: number]: 'empty' | 'partial' | 'complete' }>({});
   const [loading, setLoading] = useState(true);
@@ -200,23 +202,24 @@ const TenantReferencing: React.FC = () => {
   return (
     <div className="space-y-6 pb-8" style={{ fontFamily: 'Archivo, sans-serif' }}>
       {/* Header Section */}
-      <div className="flex items-center justify-between mt-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2" style={{ color: '#374957' }}>
+      <div className="flex flex-row items-start gap-3 flex-nowrap mt-8">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl md:text-2xl font-bold mb-1" style={{ color: '#374957' }}>
             Tenant Referencing
           </h1>
-          <p className="text-base" style={{ color: '#717182' }}>
+          <p className="text-sm md:text-base leading-relaxed pr-2" style={{ color: '#717182' }}>
             Complete your referencing to proceed with your tenancy application
           </p>
         </div>
         <button 
-          className="px-12 py-3 text-white rounded-full text-sm font-medium transition-all duration-300 hover:-translate-y-0.5"
+          className="flex-shrink-0 self-start px-5 py-2.5 text-white rounded-full text-xs md:text-sm font-medium transition-all duration-300 whitespace-nowrap hover:-translate-y-0.5"
           style={{
             background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
             border: '1px solid #DC5F12',
-            minHeight: '3.5rem',
-            minWidth: '180px',
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+            minHeight: '2.75rem',
+            minWidth: '120px',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+            alignSelf: 'center'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
@@ -233,78 +236,78 @@ const TenantReferencing: React.FC = () => {
       </div>
 
       {/* Progress Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'} gap-4 ${isMobile ? 'md:gap-6' : 'gap-6'}`}>
         {/* Overall Progress Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Overall Progress</h3>
-            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-blue-600" />
+        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100`}>
+          <div className={`flex items-center justify-between ${isMobile ? 'mb-3' : 'mb-4'}`}>
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Overall Progress</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-blue-100 rounded-lg flex items-center justify-center`}>
+              <Calendar className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-blue-600`} />
             </div>
           </div>
-          <div className="mb-3">
-            <p className="text-2xl font-bold" style={{ color: '#374957' }}>{progress.overall}%</p>
+          <div className={isMobile ? 'mb-2' : 'mb-3'}>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>{progress.overall}%</p>
           </div>
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>{progress.completed} of 6 sections</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>{progress.completed} of 6 sections</p>
           </div>
         </div>
 
         {/* Completed Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Completed</h3>
-            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-green-600" />
+        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100`}>
+          <div className={`flex items-center justify-between ${isMobile ? 'mb-3' : 'mb-4'}`}>
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Completed</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-green-100 rounded-lg flex items-center justify-center`}>
+              <CheckCircle className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-green-600`} />
             </div>
           </div>
-          <div className="mb-3">
-            <p className="text-2xl font-bold" style={{ color: '#374957' }}>{progress.completed}</p>
+          <div className={isMobile ? 'mb-2' : 'mb-3'}>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>{progress.completed}</p>
           </div>
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>Sections verified</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Sections verified</p>
           </div>
         </div>
 
         {/* Pending Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Pending</h3>
-            <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Clock className="w-5 h-5 text-yellow-600" />
+        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100`}>
+          <div className={`flex items-center justify-between ${isMobile ? 'mb-3' : 'mb-4'}`}>
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Pending</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-yellow-100 rounded-lg flex items-center justify-center`}>
+              <Clock className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-yellow-600`} />
             </div>
           </div>
-          <div className="mb-3">
-            <p className="text-2xl font-bold" style={{ color: '#374957' }}>{progress.pending}</p>
+          <div className={isMobile ? 'mb-2' : 'mb-3'}>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>{progress.pending}</p>
           </div>
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>Awaiting completion</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Awaiting completion</p>
           </div>
         </div>
 
         {/* Documents Uploaded Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Documents Uploaded</h3>
-            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-              <FileText className="w-5 h-5 text-blue-600" />
+        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100`}>
+          <div className={`flex items-center justify-between ${isMobile ? 'mb-3' : 'mb-4'}`}>
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Documents Uploaded</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-blue-100 rounded-lg flex items-center justify-center`}>
+              <FileText className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-blue-600`} />
             </div>
           </div>
-          <div className="mb-3">
-            <p className="text-2xl font-bold" style={{ color: '#374957' }}>{progress.documents}</p>
+          <div className={isMobile ? 'mb-2' : 'mb-3'}>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>{progress.documents}</p>
           </div>
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>Total files</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Total files</p>
           </div>
         </div>
       </div>
 
       {/* Progress Bar Section */}
-      <div className="bg-white p-6 rounded-xl border border-gray-100">
-        <div className="flex items-center gap-6">
+      <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100`}>
+        <div className={`flex items-center ${isMobile ? 'gap-3' : 'gap-6'}`}>
           {/* Circular Progress - Made bigger */}
-          <div className="relative w-32 h-32">
-            <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
+          <div className={`relative ${isMobile ? 'w-16 h-16 flex-shrink-0' : 'w-32 h-32'}`}>
+            <svg className={`${isMobile ? 'w-16 h-16' : 'w-32 h-32'} transform -rotate-90`} viewBox="0 0 100 100">
               {/* Background circle */}
               <circle
                 cx="50"
@@ -328,34 +331,42 @@ const TenantReferencing: React.FC = () => {
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-lg font-bold" style={{ color: '#374957' }}>{progress.overall}%</span>
-              <span className="text-xs font-medium" style={{ color: '#717182' }}>Complete</span>
+              <span className={`${isMobile ? 'text-xs' : 'text-lg'} font-bold`} style={{ color: '#374957' }}>{progress.overall}%</span>
+              {!isMobile && <span className="text-xs font-medium" style={{ color: '#717182' }}>Complete</span>}
             </div>
           </div>
 
-          {/* Progress Text and Bar */}
-          <div className="flex-1">
-            <p className="text-base mb-4" style={{ color: '#374957' }}>
-              You have completed {progress.completed} out of 6 referencing sections. Complete all sections to finalize your application.
+          {/* Progress Text and Bar - Keep on row with button */}
+          <div className="flex-1 min-w-0">
+            <p className={`${isMobile ? 'text-xs' : 'text-base'} ${isMobile ? 'mb-1' : 'mb-4'}`} style={{ color: '#374957' }}>
+              {isMobile ? (
+                <>Completed {progress.completed} of 6 sections</>
+              ) : (
+                <>You have completed {progress.completed} out of 6 referencing sections. Complete all sections to finalize your application.</>
+              )}
             </p>
             
-            {/* Horizontal Progress Bar */}
-            <div className="flex items-center gap-4 mb-2">
-              <div className="flex-1 bg-gray-200 rounded-full h-2">
+            {/* Horizontal Progress Bar and Button Row */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 bg-gray-200 rounded-full h-2 min-w-0">
                 <div className="h-2 rounded-full" style={{ width: `${progress.overall}%`, backgroundColor: '#136C9E' }}></div>
               </div>
-              <span className="text-sm font-medium" style={{ color: '#374957' }}>{progress.completed} completed</span>
+              {!isMobile && (
+                <span className="text-sm font-medium whitespace-nowrap flex-shrink-0" style={{ color: '#374957' }}>
+                  {progress.completed} completed
+                </span>
+              )}
+              
+              {/* Resume Button - Inline with progress bar */}
+              <button 
+                className={`${isMobile ? 'px-3 py-1.5 text-xs' : 'px-6 py-3 text-base'} rounded-lg font-medium text-white transition-colors whitespace-nowrap flex-shrink-0`}
+                style={{ backgroundColor: '#DC5F12' }}
+                onClick={() => openReferencingModal(1)}
+              >
+                {isMobile ? 'Resume' : 'Resume Process'}
+              </button>
             </div>
           </div>
-
-          {/* Resume Button */}
-          <button 
-            className="px-6 py-3 rounded-lg text-base font-medium text-white transition-colors"
-            style={{ backgroundColor: '#DC5F12' }}
-            onClick={() => openReferencingModal(1)}
-          >
-            Resume Process
-          </button>
         </div>
       </div>
 
@@ -460,7 +471,8 @@ const TenantReferencing: React.FC = () => {
               return {
                 background: 'linear-gradient(to bottom, #FFF7ED, #FFEDD5)',
                 border: '1px solid #FB923C',
-                height: '320px',
+                height: isMobile ? 'auto' : '320px',
+                minHeight: isMobile ? '280px' : '320px',
                 borderRadius: '20px'
               };
             } else if (title === "Guarantor" || title === "Agent Details") {
@@ -468,7 +480,8 @@ const TenantReferencing: React.FC = () => {
               return {
                 background: 'linear-gradient(to bottom, #FFFBEB, #FEF3C7)',
                 border: '1px solid #F59E0B',
-                height: '320px',
+                height: isMobile ? 'auto' : '320px',
+                minHeight: isMobile ? '280px' : '320px',
                 borderRadius: '20px'
               };
             } else {
@@ -476,7 +489,8 @@ const TenantReferencing: React.FC = () => {
               return {
                 background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)',
                 border: '1px solid #80B2FF',
-                height: '320px',
+                height: isMobile ? 'auto' : '320px',
+                minHeight: isMobile ? '280px' : '320px',
                 borderRadius: '20px'
               };
             }
@@ -488,10 +502,10 @@ const TenantReferencing: React.FC = () => {
             className="shadow-sm overflow-hidden"
             style={getCardStyle(card.title)}
           >
-            <div className="flex h-full">
+            <div className={`flex ${isMobile ? 'flex-col' : 'h-full'}`}>
               {/* Left Panel */}
               <div
-                className="p-6 flex flex-col items-start min-w-[200px]"
+                className={`${isMobile ? 'p-4 flex-row items-center justify-between' : 'p-6 flex-col items-start min-w-[200px]'} flex`}
                 style={{
                   background: card.title === "Residential" || card.title === "Financial" 
                     ? 'linear-gradient(to bottom, #FFF7ED, #FFEDD5)'
@@ -501,16 +515,19 @@ const TenantReferencing: React.FC = () => {
                   color: '#374957'
                 }}
               >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mr-3">
                     {card.icon}
                   </div>
-                  <h2 className="text-lg font-semibold">{card.title}</h2>
+                  <h2 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}>{card.title}</h2>
                 </div>
-                <div className="mt-auto">
+                {!isMobile && <div className="flex-1"></div>}
+                <div className={isMobile ? '' : 'mt-auto'}>
                   <div 
-                    className="text-4xl font-bold"
+                    className={`font-bold block mb-1 ${isMobile ? 'text-2xl' : 'text-4xl'}`}
                     style={{
+                      fontSize: isMobile ? '24px' : undefined,
+                      lineHeight: '1',
                       color: card.title === "Residential" || card.title === "Financial" 
                         ? '#C2410C'
                         : card.title === "Guarantor" || card.title === "Agent Details"
@@ -533,10 +550,10 @@ const TenantReferencing: React.FC = () => {
 
               {/* Right White Panel */}
               <div
-                className="flex-1 p-4 bg-white"
+                className={`flex-1 p-4 bg-white relative z-10 overflow-hidden flex flex-col ${isMobile ? 'rounded-b-xl' : ''}`}
                 style={{
-                  borderRadius: '20px',
-                  boxShadow: '-4px 0 24px rgba(70, 95, 194, 0.4)',
+                  borderRadius: isMobile ? '0 0 20px 20px' : '20px',
+                  boxShadow: isMobile ? 'none' : '-4px 0 24px rgba(70, 95, 194, 0.4)',
                   overflow: 'hidden'
                 }}
               >
@@ -549,8 +566,9 @@ const TenantReferencing: React.FC = () => {
                   </button>
                 </div>
                 <div 
-                  className="space-y-3 max-h-56 overflow-y-auto thin-scrollbar pb-4"
+                  className={`space-y-3 overflow-y-auto flex-1 pr-2 ${isMobile ? '' : ''}`}
                   style={{
+                    maxHeight: isMobile && card.items.length > 2 ? '250px' : isMobile ? 'auto' : undefined,
                     scrollbarWidth: 'thin',
                     scrollbarColor: '#cbd5e1 transparent'
                   }}

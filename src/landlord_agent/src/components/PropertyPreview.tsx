@@ -22,7 +22,8 @@ import {
   UserPlus,
   Mail,
   Phone,
-  Eye
+  Eye,
+  Menu
 } from 'lucide-react';
 import { Property } from '../App';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -41,6 +42,8 @@ interface PropertyPreviewProps {
   onViewTenant?: (tenantId: string) => void;
   onPublishProperty?: () => void;
   onAddTenant?: () => void;
+  onHome?: () => void;
+  onPropertySetup?: () => void;
 }
 
 export function PropertyPreview({
@@ -54,7 +57,9 @@ export function PropertyPreview({
   updateProperty,
   onViewTenant,
   onPublishProperty,
-  onAddTenant
+  onAddTenant,
+  onHome,
+  onPropertySetup
 }: PropertyPreviewProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   
@@ -175,21 +180,91 @@ export function PropertyPreview({
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* Wizard Header - Only show if onHome and onPropertySetup are provided */}
+      {onHome && onPropertySetup && (
+        <div className="border-b bg-card/50">
+          <div className="max-w-6xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-4">
+                <img 
+                  src="/images/proptii-logo.png" 
+                  alt="Proptii Logo" 
+                  className="h-10 md:h-12 w-auto cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={onHome}
+                />
+              </div>
+              {/* Desktop buttons */}
+              <div className="hidden md:flex items-center space-x-3">
+                <Button variant="outline" className="rounded-full px-4 py-2">
+                  Questions?
+                </Button>
+                <Button variant="outline" className="rounded-full px-4 py-2">
+                  Save & exit
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={onPropertySetup}
+                  className="rounded-full px-4 py-2 transition-all duration-300"
+                  style={{ 
+                    borderColor: '#DC5F12',
+                    color: '#DC5F12'
+                  }}
+                >
+                  Property Setup
+                </Button>
+              </div>
+              {/* Mobile hamburger menu */}
+              <div className="md:hidden">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="rounded-full p-2">
+                      <Menu className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem className="cursor-pointer">
+                      Questions?
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="cursor-pointer">
+                      Save & exit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      className="cursor-pointer"
+                      onClick={onPropertySetup}
+                    >
+                      Property Setup
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+            
+            {/* Step Counter - Mobile: Simple text */}
+            <div className="md:hidden mb-4">
+              <div className="text-sm">
+                <span className="text-blue-600 font-semibold">Step {5}</span>
+                <span className="text-gray-500"> of {5}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Property Header */}
       <div className="border-b bg-card/50">
-        <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="max-w-6xl mx-auto px-4 py-4 md:py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <Button variant="ghost" onClick={onBack} className="p-2">
                 <ArrowLeft className="w-4 h-4" />
               </Button>
               <div>
-                <h1 className="mb-1">{property.address}</h1>
-                <div className="flex items-center space-x-3">
+                <h1 className="mb-1 text-lg md:text-xl">{property.address}</h1>
+                <div className="flex items-center space-x-3 flex-wrap">
                   <Badge className={`${getStatusColor(property.status)} text-white border-0`}>
                     {getStatusText(property.status)}
                   </Badge>
-                  <span className="text-muted-foreground">
+                  <span className="text-muted-foreground text-sm">
                     {property.type} • {property.bedrooms} bed{property.bedrooms !== 1 ? 's' : ''}
                   </span>
                 </div>
@@ -197,7 +272,7 @@ export function PropertyPreview({
             </div>
 
             <div className="flex items-center space-x-2">
-              <Button variant="outline" onClick={() => onEdit(property)}>
+              <Button variant="outline" onClick={() => onEdit(property)} className="hidden md:flex">
                 <Edit3 className="w-4 h-4 mr-2" />
                 Edit
               </Button>
@@ -209,6 +284,10 @@ export function PropertyPreview({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onEdit(property)} className="md:hidden">
+                    <Edit3 className="w-4 h-4 mr-2" />
+                    Edit
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={archiveProperty}>
                     <Archive className="w-4 h-4 mr-2" />
                     Archive Property
@@ -276,10 +355,10 @@ export function PropertyPreview({
 
             {/* Property Information */}
             <Tabs defaultValue="details" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <TabsList>
-                  <TabsTrigger value="details">Details</TabsTrigger>
-                  <TabsTrigger value="documents">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <TabsList className="w-full md:w-auto overflow-x-auto flex-shrink-0">
+                  <TabsTrigger value="details" className="whitespace-nowrap">Details</TabsTrigger>
+                  <TabsTrigger value="documents" className="whitespace-nowrap">
                     Documents
                     {property.documents.some(d => d.status === 'expiring-soon' || d.status === 'expired') && (
                       <Badge variant="destructive" className="ml-2 px-1 text-xs">
@@ -287,37 +366,70 @@ export function PropertyPreview({
                       </Badge>
                     )}
                   </TabsTrigger>
-                  <TabsTrigger value="photos">Photos ({property.photos.length})</TabsTrigger>
-                  <TabsTrigger value="insights">Insights</TabsTrigger>
+                  <TabsTrigger value="photos" className="whitespace-nowrap">Photos ({property.photos.length})</TabsTrigger>
+                  <TabsTrigger value="insights" className="whitespace-nowrap">Insights</TabsTrigger>
                 </TabsList>
                 
                 <Button 
-                  onClick={() => {
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Publish button clicked');
                     if (onPublishProperty) {
                       onPublishProperty();
                     } else {
                       console.log('Publishing property...');
                     }
                   }}
-                  className="px-6 py-2 rounded-full transition-all duration-300" 
+                  className="px-4 md:px-6 py-2 rounded-full transition-all duration-300 text-sm md:text-base flex-shrink-0 relative z-10" 
                   style={{ 
                     backgroundColor: '#DC5F12', 
                     borderColor: '#DC5F12', 
                     background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
-                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                    minHeight: '44px',
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                    userSelect: 'none',
+                    pointerEvents: 'auto'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-                    e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    if (window.innerWidth >= 768) {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
+                      e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
                     e.currentTarget.style.transform = 'translateY(0px)';
                   }}
+                  onTouchStart={(e) => {
+                    e.stopPropagation();
+                    e.currentTarget.style.opacity = '0.8';
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.currentTarget.style.opacity = '1';
+                    console.log('Publish button touched');
+                    if (onPublishProperty) {
+                      onPublishProperty();
+                    } else {
+                      console.log('Publishing property...');
+                    }
+                  }}
                 >
-                  {isEditing ? 'Save changes' : 'Publish Property'}
+                  {isEditing ? (
+                    <span className="hidden md:inline">Save changes</span>
+                  ) : (
+                    <>
+                      <span className="hidden md:inline">Publish Property</span>
+                      <span className="md:hidden">Publish</span>
+                    </>
+                  )}
                 </Button>
               </div>
 
@@ -535,7 +647,92 @@ export function PropertyPreview({
             </Card>
 
 
-            {property.status === 'vacant' && (
+            {/* Pending Tenant Information */}
+            {property.tenant && (
+              <Card className="p-6">
+                <h3 className="mb-4">Tenant Information</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={property.tenant.avatar} />
+                      <AvatarFallback>
+                        {property.tenant.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{property.tenant.name}</p>
+                      <p className="text-sm text-muted-foreground truncate">{property.tenant.email}</p>
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center text-sm">
+                      <Phone className="w-4 h-4 mr-2 text-muted-foreground" />
+                      <span className="text-muted-foreground">{property.tenant.phone}</span>
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <PoundSterling className="w-4 h-4 mr-2 text-muted-foreground" />
+                      <span className="text-muted-foreground">£{property.tenant.rentAmount.toLocaleString()}/month</span>
+                    </div>
+                    {property.tenant.leaseStart && (
+                      <div className="flex items-center text-sm">
+                        <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
+                        <span className="text-muted-foreground">
+                          Lease: {property.tenant.leaseStart.toLocaleDateString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })} - {property.tenant.leaseEnd ? property.tenant.leaseEnd.toLocaleDateString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          }) : 'N/A'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {property.tenant.emergencyContact && (
+                    <>
+                      <Separator />
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Emergency Contact</p>
+                        <p className="text-sm">{property.tenant.emergencyContact.name}</p>
+                        <p className="text-xs text-muted-foreground">{property.tenant.emergencyContact.phone}</p>
+                        <p className="text-xs text-muted-foreground">{property.tenant.emergencyContact.relationship}</p>
+                      </div>
+                    </>
+                  )}
+                  
+                  <Separator />
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Status</span>
+                    <Badge variant="secondary" className="capitalize">
+                      {property.tenant.status}
+                    </Badge>
+                  </div>
+                  
+                  {onAddTenant && (
+                    <>
+                      <Separator />
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={onAddTenant}
+                      >
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Add Another Tenant
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </Card>
+            )}
+
+            {property.status === 'vacant' && !property.tenant && (
               <Card className="p-6">
                 <h3 className="mb-4">Property Status</h3>
                 <div className="text-center py-6">

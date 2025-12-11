@@ -281,6 +281,8 @@ interface PropertySetupData {
   images: string[]; // Blob URLs for preview
   imageFiles: File[]; // Actual File objects for upload
   additionalNotes: string;
+  status?: 'vacant' | 'occupied' | 'under-renovation'; // Preserve status when editing
+  pendingTenants?: Omit<Tenant, 'id'>[]; // Tenants added before property is published
 }
 
 export default function App() {
@@ -360,7 +362,8 @@ export default function App() {
     amenities: [],
     images: [], // Blob URLs for preview
     imageFiles: [], // File objects for upload
-    additionalNotes: ''
+    additionalNotes: '',
+    pendingTenants: [] // Tenants added before property is published
   });
 
   // Helper functions to update property setup data
@@ -635,7 +638,7 @@ export default function App() {
 
   // Convert property setup data to Property object
   const createPropertyFromSetupData = (): Property => {
-    const { propertyType, propertyDetails, amenities, images, additionalNotes } = propertySetupData;
+    const { propertyType, propertyDetails, amenities, images, additionalNotes, pendingTenants } = propertySetupData;
     
     // Convert images to PropertyPhoto format
     const photos: PropertyPhoto[] = images.map((imageUrl, index) => ({
@@ -662,19 +665,39 @@ export default function App() {
     const squareFootage = parseInt(propertyDetails.squareFootage);
     const rent = parseInt(propertyDetails.monthlyRent) || 0;
 
+    // Preserve original property status when editing, otherwise default to 'vacant'
+    // First try propertySetupData.status (most reliable), then selectedProperty, then default to 'vacant'
+    const preservedStatus = propertySetupData.status 
+      || (isEditing && selectedProperty ? selectedProperty.status : undefined)
+      || 'vacant';
+
+    // Convert pending tenants to Tenant format with temporary IDs for preview
+    const tenantForPreview = pendingTenants && pendingTenants.length > 0 
+      ? {
+          ...pendingTenants[0],
+          id: 'pending-tenant',
+          propertyId: 'setup-property'
+        } as Tenant
+      : undefined;
+
     const propertyData: any = {
       id: 'setup-property',
       address: propertyDetails.address,
       type: propertyType || 'Property',
       bedrooms,
       rent,
-      status: 'vacant',
+      status: preservedStatus,
       amenities: amenities,
       notes: additionalNotes,
       photos: photos,
       documents: documents,
       createdAt: new Date()
     };
+
+    // Include tenant if there are pending tenants
+    if (tenantForPreview) {
+      propertyData.tenant = tenantForPreview;
+    }
 
     // Only include optional fields if they have valid values
     if (!isNaN(bathrooms)) {
@@ -1991,7 +2014,8 @@ export default function App() {
                 amenities: property.amenities || [],
                 images: (property.photos || []).map(p => p.url),
                 imageFiles: [],
-                additionalNotes: property.notes || ''
+                additionalNotes: property.notes || '',
+                status: property.status // Preserve the original status
               });
               navigateToScreen('property-setup-step1');
             }}
@@ -2596,6 +2620,7 @@ export default function App() {
       case 'property-details':
         return (
           <PropertyDetails
+            key={selectedProperty?.id || 'property-details'}
             property={selectedProperty}
             tenants={tenants}
             onBack={() => navigateToScreen('main-app')}
@@ -2617,7 +2642,8 @@ export default function App() {
                 amenities: property.amenities || [],
                 images: (property.photos || []).map(p => p.url),
                 imageFiles: [],
-                additionalNotes: property.notes || ''
+                additionalNotes: property.notes || '',
+                status: property.status // Preserve the original status
               });
               navigateToScreen('property-setup-step1');
             }}
@@ -2984,6 +3010,8 @@ export default function App() {
             onManagePhotos={() => {}}
             onViewInsights={() => {}}
             updateProperty={() => {}}
+            onHome={() => navigateToScreen('main-app')}
+            onPropertySetup={() => navigateToScreen('property-setup-step1')}
             onPublishProperty={async () => {
               try {
                 console.log(isEditing ? '💾 Saving property changes...' : '📤 Publishing property...');
@@ -3029,22 +3057,84 @@ export default function App() {
                 }
                 
                 if (isEditing && editingPropertyId) {
-                  // Update existing property
-                  await updateProperty(editingPropertyId, {
+                  // Fetch the original property to preserve status and other important fields
+                  const originalProperty = await propertyService.getProperty(editingPropertyId);
+                  const preservedStatus = originalProperty?.status || selectedProperty?.status || 'vacant';
+                  
+                  // Prepare updates object with all changes, preserving status
+                  const updates = {
                     address: newProperty.address,
                     type: newProperty.type,
                     bedrooms: newProperty.bedrooms,
-                  bathrooms: newProperty.bathrooms,
-                  squareFootage: newProperty.squareFootage,
+                    bathrooms: newProperty.bathrooms,
+                    squareFootage: newProperty.squareFootage,
                     rent: newProperty.rent,
                     amenities: newProperty.amenities,
                     notes: newProperty.notes,
-                  });
-                  // Optionally handle photos update here later
+                    status: preservedStatus, // Preserve the original status from database
+                  };
+                  
+                  // Update in Firebase directly (bypass updateProperty to avoid double state updates)
+                  const { id, createdAt, tenant, photos, documents, ...firebaseUpdates } = updates as any;
+                  
+                  // Filter out undefined values - Firestore doesn't accept undefined
+                  const cleanUpdates = Object.fromEntries(
+                    Object.entries(firebaseUpdates).filter(([_, value]) => value !== undefined)
+                  ) as any;
+                  
+                  await propertyService.updateProperty(editingPropertyId, cleanUpdates);
+                  
+                  // Fetch the updated property from Firebase to get the latest data with proper mapping
                   const updated = await propertyService.getProperty(editingPropertyId);
                   if (updated) {
-                    setSelectedProperty(updated);
+                    // Enrich property with tenant data if tenant exists (similar to selectProperty)
+                    const tenantForProperty = tenants.find(t => t.propertyId === editingPropertyId || t.id === updated.tenantId);
+                    
+                    // Determine the correct status:
+                    // 1. If property has a tenant, it should be 'occupied'
+                    // 2. Otherwise, use the preserved status from the original property
+                    let finalStatus = preservedStatus;
+                    if (tenantForProperty) {
+                      finalStatus = 'occupied';
+                    } else if (updated.status) {
+                      // Use the status from the database if no tenant
+                      finalStatus = updated.status;
+                    }
+                    
+                    // Build the complete property object with tenant and correct status
+                    const propertyWithPreservedStatus = {
+                      ...updated,
+                      status: finalStatus,
+                      tenant: tenantForProperty || updated.tenant,
+                      tenantId: tenantForProperty?.id || updated.tenantId
+                    };
+                    
+                    // Update both selectedProperty and properties array with fetched data
+                    // This ensures we have the complete, properly mapped property object
+                    setSelectedProperty(propertyWithPreservedStatus);
+                    setProperties(prev => 
+                      prev.map(p => p.id === editingPropertyId ? propertyWithPreservedStatus : p)
+                    );
+                    
+                    console.log('✅ Property updated successfully:', {
+                      id: editingPropertyId,
+                      status: propertyWithPreservedStatus.status,
+                      address: propertyWithPreservedStatus.address,
+                      hasTenant: !!tenantForProperty
+                    });
+                    
+                    // Trigger alert regeneration after property update
+                    const currentUserId = getCurrentUserId();
+                    if (currentUserId) {
+                      console.log('🔄 Triggering alert regeneration after property update');
+                      alertService.generateAlerts(currentUserId).catch(error => {
+                        console.warn('⚠️ Failed to regenerate alerts after property update:', error);
+                      });
+                    }
+                  } else {
+                    console.error('❌ Failed to fetch updated property after save');
                   }
+                  
                   setIsEditing(false);
                   setEditingPropertyId(null);
                   navigateToScreen('property-details');
@@ -3056,7 +3146,38 @@ export default function App() {
                   const propertyId = await addProperty(newProperty);
                   console.log('Property created with ID:', propertyId);
                   
-                  // 5. Fetch created property to get full data
+                  // 5. Update pending tenants with the correct propertyId
+                  if (propertySetupData.pendingTenants && propertySetupData.pendingTenants.length > 0) {
+                    console.log(`Updating ${propertySetupData.pendingTenants.length} pending tenant(s) with propertyId:`, propertyId);
+                    try {
+                      const { tenantService } = await import('./services/tenantService');
+                      // Find tenants that were saved but need propertyId update
+                      // Note: This assumes tenants were saved with a temporary propertyId or address match
+                      const currentUserId = getCurrentUserId();
+                      if (currentUserId) {
+                        // Get all tenants for this user and update those matching the property address
+                        const allTenants = await tenantService.getTenants(currentUserId);
+                        const propertyAddress = newProperty.address;
+                        const tenantsToUpdate = allTenants.filter(t => 
+                          t.propertyAddress === propertyAddress && 
+                          (!t.propertyId || t.propertyId === 'setup-property' || t.propertyId === 'pending')
+                        );
+                        
+                        for (const tenant of tenantsToUpdate) {
+                          await tenantService.updateTenant(tenant.id, {
+                            propertyId: propertyId,
+                            propertyAddress: propertyAddress
+                          } as Partial<Tenant>);
+                          console.log(`✅ Updated tenant ${tenant.id} with propertyId ${propertyId}`);
+                        }
+                      }
+                    } catch (error) {
+                      console.error('Error updating pending tenants:', error);
+                      // Don't block property creation if tenant update fails
+                    }
+                  }
+                  
+                  // 6. Fetch created property to get full data
                   const createdProperty = await propertyService.getProperty(propertyId);
                   
                   if (createdProperty) {
@@ -3143,7 +3264,16 @@ export default function App() {
                 }
               } else {
                 // Add new tenant
-              addTenant(tenant);
+                addTenant(tenant);
+                
+                // If coming from property-preview, also store tenant in propertySetupData for preview
+                if (previousScreen === 'property-preview') {
+                  setPropertySetupData(prev => ({
+                    ...prev,
+                    pendingTenants: [...(prev.pendingTenants || []), tenant]
+                  }));
+                  console.log('✅ Stored tenant in propertySetupData.pendingTenants for preview');
+                }
               }
               // Don't clear selectedTenant here - let the Done button handle navigation
               // navigateToScreen('main-app');

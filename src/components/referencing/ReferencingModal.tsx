@@ -121,8 +121,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      await submitApplication();
-      onClose();
+      const userId = user?.id || user?.email || 'anonymous';
+      console.log('Submitting referencing form with userId:', userId);
+      const success = await submitApplication(userId);
+      if (success) {
+        onClose();
+      } else {
+        console.error('Submission failed - check errors');
+      }
     } catch (error) {
       console.error('Error submitting application:', error);
     } finally {

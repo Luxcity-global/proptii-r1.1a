@@ -13,7 +13,9 @@ import {
   Filter,
   Trash2,
   CheckSquare,
-  Square
+  Square,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import viewingService, { ViewingBooking, ViewingStats } from '../../../services/viewingService';
 import {
@@ -22,6 +24,8 @@ import {
 } from '../../../services/bookViewingRequestService';
 import emailService from '../../../services/emailService';
 import landlordUserService from '../../../services/landlordUserService';
+import { useIsMobile } from './ui/use-mobile';
+import { Button } from './ui/button';
 
 // ViewingsPage component for managing property viewings and requests
 
@@ -113,6 +117,15 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   const [filterType, setFilterType] = useState<'all' | 'name' | 'email' | 'date' | 'status'>('all');
   const [selectedViewings, setSelectedViewings] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
+  const isMobile = useIsMobile();
+  
+  // Pagination state for each tab
+  const [currentRequestsPage, setCurrentRequestsPage] = useState<number>(1);
+  const [currentUpcomingPage, setCurrentUpcomingPage] = useState<number>(1);
+  const [currentCompletedPage, setCurrentCompletedPage] = useState<number>(1);
+  const [currentPastPage, setCurrentPastPage] = useState<number>(1);
+  
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     let unsubscribeBookings: (() => void) | undefined;
@@ -520,6 +533,140 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   const filteredCompletedViewings = useMemo(() => filterItems(completedViewings), [completedViewings, filterQuery, filterType]);
   const filteredPastViewings = useMemo(() => filterItems(pastViewings), [pastViewings, filterQuery, filterType]);
 
+  // Pagination for requests tab (combines requests and pending viewings)
+  const allRequestsCount = requests.length + filteredPendingViewings.length;
+  const totalRequestsPages = Math.ceil(allRequestsCount / ITEMS_PER_PAGE);
+  const requestsStartIndex = (currentRequestsPage - 1) * ITEMS_PER_PAGE;
+  const requestsEndIndex = requestsStartIndex + ITEMS_PER_PAGE;
+  
+  // Paginate requests and pending viewings separately but show together
+  const paginatedRequests = useMemo(() => {
+    if (requestsStartIndex < requests.length) {
+      const requestsEnd = Math.min(requests.length, requestsEndIndex);
+      const requestsSlice = requests.slice(requestsStartIndex, requestsEnd);
+      const remainingSlots = ITEMS_PER_PAGE - requestsSlice.length;
+      
+      if (remainingSlots > 0 && requestsEndIndex > requests.length) {
+        const pendingStart = Math.max(0, requestsStartIndex - requests.length);
+        const pendingEnd = Math.min(filteredPendingViewings.length, pendingStart + remainingSlots);
+        const pendingSlice = filteredPendingViewings.slice(pendingStart, pendingEnd);
+        return { requests: requestsSlice, pendingViewings: pendingSlice };
+      }
+      return { requests: requestsSlice, pendingViewings: [] };
+    } else {
+      const pendingStart = requestsStartIndex - requests.length;
+      const pendingEnd = Math.min(filteredPendingViewings.length, requestsEndIndex - requests.length);
+      const pendingSlice = filteredPendingViewings.slice(pendingStart, pendingEnd);
+      return { requests: [], pendingViewings: pendingSlice };
+    }
+  }, [requests, filteredPendingViewings, requestsStartIndex, requestsEndIndex]);
+
+  const totalUpcomingPages = Math.ceil(filteredUpcomingViewings.length / ITEMS_PER_PAGE);
+  const upcomingStartIndex = (currentUpcomingPage - 1) * ITEMS_PER_PAGE;
+  const upcomingEndIndex = upcomingStartIndex + ITEMS_PER_PAGE;
+  const paginatedUpcomingViewings = filteredUpcomingViewings.slice(upcomingStartIndex, upcomingEndIndex);
+
+  const totalCompletedPages = Math.ceil(filteredCompletedViewings.length / ITEMS_PER_PAGE);
+  const completedStartIndex = (currentCompletedPage - 1) * ITEMS_PER_PAGE;
+  const completedEndIndex = completedStartIndex + ITEMS_PER_PAGE;
+  const paginatedCompletedViewings = filteredCompletedViewings.slice(completedStartIndex, completedEndIndex);
+
+  const totalPastPages = Math.ceil(filteredPastViewings.length / ITEMS_PER_PAGE);
+  const pastStartIndex = (currentPastPage - 1) * ITEMS_PER_PAGE;
+  const pastEndIndex = pastStartIndex + ITEMS_PER_PAGE;
+  const paginatedPastViewings = filteredPastViewings.slice(pastStartIndex, pastEndIndex);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentRequestsPage(1);
+    setCurrentUpcomingPage(1);
+    setCurrentCompletedPage(1);
+    setCurrentPastPage(1);
+  }, [filterQuery, filterType, activeTab]);
+
+  // Pagination component helper
+  const PaginationControls = ({ 
+    currentPage, 
+    totalPages, 
+    onPageChange, 
+    startIndex, 
+    endIndex, 
+    totalItems,
+    itemName = 'items'
+  }: {
+    currentPage: number;
+    totalPages: number;
+    onPageChange: (page: number) => void;
+    startIndex: number;
+    endIndex: number;
+    totalItems: number;
+    itemName?: string;
+  }) => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white border border-[#f3f3f3] rounded-lg p-4 mt-4">
+        <div className="text-sm text-muted-foreground">
+          Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} {itemName}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="flex items-center gap-1"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Previous</span>
+          </Button>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+              // Show first page, last page, current page, and pages around current
+              if (
+                page === 1 ||
+                page === totalPages ||
+                (page >= currentPage - 1 && page <= currentPage + 1)
+              ) {
+                return (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => onPageChange(page)}
+                    className="min-w-[40px]"
+                  >
+                    {page}
+                  </Button>
+                );
+              } else if (
+                page === currentPage - 2 ||
+                page === currentPage + 2
+              ) {
+                return (
+                  <span key={page} className="text-muted-foreground px-2">
+                    ...
+                  </span>
+                );
+              }
+              return null;
+            })}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+            className="flex items-center gap-1"
+          >
+            <span className="hidden sm:inline">Next</span>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   const handleScheduleRequest = (request: BookViewingRequest) => {
     setSelectedRequest(request);
     setScheduleForm({
@@ -886,14 +1033,12 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6" style={{ fontFamily: 'Archivo, sans-serif' }}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Viewings & Requests</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Manage incoming requests, schedule property viewings, and keep tenants informed.
-          </p>
-        </div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6 overflow-x-hidden w-full" style={{ fontFamily: 'Archivo, sans-serif' }}>
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900">Viewings & Requests</h1>
+        <p className="text-sm text-gray-600 mt-1">
+          Manage incoming requests, schedule property viewings, and keep tenants informed.
+        </p>
       </div>
 
       {feedback && (
@@ -908,32 +1053,32 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
         {summaryCards.map((card) => (
           <div
             key={card.title}
-            className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow"
+            className="bg-white p-4 sm:p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow"
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-gray-700">{card.title}</h3>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.accent}`}>
+              <h3 className="text-xs sm:text-sm font-medium text-gray-700">{card.title}</h3>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.accent} flex-shrink-0`}>
                 {card.icon}
               </div>
             </div>
-            <p className="text-2xl font-bold text-gray-900">{card.value}</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900">{card.value}</p>
           </div>
         ))}
       </div>
 
       {/* Selection Bar */}
       {selectedViewings.size > 0 && (
-        <div className="mb-6 flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-lg">
+        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
           <div className="flex items-center space-x-3">
             <span className="text-sm font-medium text-orange-800" style={{ fontFamily: 'Archivo, sans-serif' }}>
               {selectedViewings.size} viewing{selectedViewings.size !== 1 ? 's' : ''} selected
             </span>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center flex-wrap gap-2">
             <button
               className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition disabled:opacity-50 text-sm font-medium"
               onClick={handleClearSelection}
@@ -951,12 +1096,13 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
               {isDeleting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Deleting...
+                  <span className="hidden sm:inline">Deleting...</span>
                 </>
               ) : (
                 <>
                   <Trash2 className="w-4 h-4" />
-                  Delete Selected
+                  <span className="hidden sm:inline">Delete Selected</span>
+                  <span className="sm:hidden">Delete</span>
                 </>
               )}
             </button>
@@ -965,15 +1111,15 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
       )}
 
       <div>
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-col gap-4">
           {/* Tabs */}
-          <div className="inline-flex rounded-full border border-gray-200 p-1 bg-white">
+          <div className="inline-flex rounded-full border border-gray-200 p-1 bg-white overflow-x-auto">
             <button
               onClick={() => {
                 setActiveTab('requests');
                 setSelectedViewings(new Set()); // Clear selection when switching tabs
               }}
-              className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-full transition-colors whitespace-nowrap ${
                 activeTab === 'requests' ? 'bg-orange-500 text-white' : 'text-gray-600'
               }`}
             >
@@ -984,7 +1130,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                 setActiveTab('upcoming');
                 setSelectedViewings(new Set()); // Clear selection when switching tabs
               }}
-              className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-full transition-colors whitespace-nowrap ${
                 activeTab === 'upcoming' ? 'bg-orange-500 text-white' : 'text-gray-600'
               }`}
             >
@@ -995,7 +1141,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                 setActiveTab('completed');
                 setSelectedViewings(new Set()); // Clear selection when switching tabs
               }}
-              className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-full transition-colors whitespace-nowrap ${
                 activeTab === 'completed' ? 'bg-orange-500 text-white' : 'text-gray-600'
               }`}
             >
@@ -1006,7 +1152,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                 setActiveTab('past');
                 setSelectedViewings(new Set()); // Clear selection when switching tabs
               }}
-              className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-full transition-colors whitespace-nowrap ${
                 activeTab === 'past' ? 'bg-orange-500 text-white' : 'text-gray-600'
               }`}
             >
@@ -1015,22 +1161,22 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
           </div>
 
           {/* Filter Controls */}
-          <div className="flex items-center gap-3">
-            <div className="relative">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-white border border-[#f3f3f3] rounded-lg p-4 w-full">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search viewings..."
                 value={filterQuery}
                 onChange={(e) => setFilterQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full"
               />
             </div>
             <div className="relative">
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value as 'all' | 'name' | 'email' | 'date' | 'status')}
-                className="pl-4 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white cursor-pointer"
+                className="pl-4 pr-10 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white cursor-pointer w-full sm:w-[140px] min-w-[120px]"
               >
                 <option value="all">All Fields</option>
                 <option value="name">Name</option>
@@ -1045,7 +1191,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
         {activeTab === 'requests' && (
           <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-            {requests.length === 0 && filteredPendingViewings.length === 0 ? (
+            {allRequestsCount === 0 ? (
               <div className="p-12 text-center">
                 <Mail className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-700 mb-2">No pending requests</h3>
@@ -1053,23 +1199,26 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
               </div>
             ) : (
               <>
-                {/* Table Header */}
-                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                  <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
-                    <div className="col-span-1">Select</div>
-                    <div className="col-span-2">Property</div>
-                    <div className="col-span-2">Date & Time</div>
-                    <div className="col-span-1">Status</div>
-                    <div className="col-span-2">Tenant Name</div>
-                    <div className="col-span-2">Tenant Email</div>
-                    <div className="col-span-2 text-center whitespace-nowrap">Actions</div>
-                  </div>
-                </div>
+                {/* Desktop Table View */}
+                {!isMobile && (
+                  <>
+                    {/* Table Header */}
+                    <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                      <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+                        <div className="col-span-1">Select</div>
+                        <div className="col-span-2">Property</div>
+                        <div className="col-span-2">Date & Time</div>
+                        <div className="col-span-1">Status</div>
+                        <div className="col-span-2">Tenant Name</div>
+                        <div className="col-span-2">Tenant Email</div>
+                        <div className="col-span-2 text-center whitespace-nowrap">Actions</div>
+                      </div>
+                    </div>
 
-                {/* Table Body */}
-                <div className="divide-y divide-gray-100">
+                    {/* Table Body */}
+                    <div className="divide-y divide-gray-100">
                   {/* Unscheduled Requests */}
-                  {requests.map((request) => (
+                  {paginatedRequests.requests.map((request) => (
                     <div key={request.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                       <div className="grid grid-cols-12 gap-4 items-center">
                         {/* Checkbox */}
@@ -1142,7 +1291,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                   ))}
 
                   {/* Pending Viewings (Scheduled but not confirmed) */}
-                  {filteredPendingViewings.map((viewing) => (
+                  {paginatedRequests.pendingViewings.map((viewing) => (
                     <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                       <div className="grid grid-cols-12 gap-4 items-center">
                         {/* Checkbox */}
@@ -1240,9 +1389,172 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                       </div>
                     </div>
                   ))}
-                </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Mobile Card View */}
+                {isMobile && (
+                  <div className="space-y-4 p-4">
+                    {/* Unscheduled Requests */}
+                    {paginatedRequests.requests.map((request) => (
+                      <div 
+                        key={request.id} 
+                        className={`bg-white border rounded-lg p-4 ${selectedViewings.has(request.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <button
+                              onClick={() => handleToggleSelect(request.id)}
+                              className="mt-1 flex-shrink-0"
+                            >
+                              {selectedViewings.has(request.id) ? (
+                                <CheckSquare className="w-5 h-5 text-orange-500" />
+                              ) : (
+                                <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
+                              )}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                                {request.property.street}
+                              </h3>
+                              <p className="text-xs text-gray-500 mb-2">
+                                {request.property.town}, {request.property.city}
+                              </p>
+                              <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                New Request
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 mb-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Date & Time:</span>
+                            <p className="text-gray-500 italic">Not scheduled yet</p>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Tenant:</span>
+                            <p className="text-gray-500 italic">Not provided</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-3 border-t">
+                          <button
+                            className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
+                            onClick={() => handleScheduleRequest(request)}
+                          >
+                            <Send className="w-4 h-4 mr-2" />
+                            Schedule
+                          </button>
+                          <button
+                            className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                            onClick={() => handleDeclineRequest(request)}
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Pending Viewings */}
+                    {paginatedRequests.pendingViewings.map((viewing) => (
+                      <div 
+                        key={viewing.id} 
+                        className={`bg-white border rounded-lg p-4 ${selectedViewings.has(viewing.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <button
+                              onClick={() => handleToggleSelect(viewing.id)}
+                              className="mt-1 flex-shrink-0"
+                            >
+                              {selectedViewings.has(viewing.id) ? (
+                                <CheckSquare className="w-5 h-5 text-orange-500" />
+                              ) : (
+                                <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
+                              )}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                                {viewing.property.street}
+                              </h3>
+                              <p className="text-xs text-gray-500 mb-2">
+                                {viewing.property.town}, {viewing.property.city}
+                              </p>
+                              <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                                Pending
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 mb-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Date & Time:</span>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              <p className="font-medium">{formatDate(viewing.viewingDetails?.date || '')}</p>
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Clock className="h-3 w-3 text-muted-foreground" />
+                              <p className="font-medium">{formatTime(viewing.viewingDetails?.time || '')}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Tenant:</span>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <User className="h-3 w-3 text-muted-foreground" />
+                              <p className="font-medium">{viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}</p>
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Mail className="h-3 w-3 text-muted-foreground" />
+                              <p className="text-sm text-gray-600 truncate">{viewing.viewingDetails?.userDetails?.email || 'Not provided'}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-3 border-t">
+                          <button
+                            className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition disabled:opacity-50"
+                            onClick={() => handleConfirmViewing(viewing)}
+                            disabled={isProcessing}
+                          >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Confirm
+                          </button>
+                          <button
+                            className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-blue-300 text-sm font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50"
+                            onClick={() => handleOpenReschedule(viewing)}
+                            disabled={isProcessing}
+                          >
+                            <Send className="w-4 h-4" />
+                          </button>
+                          <button
+                            className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-red-300 text-sm font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                            onClick={() => handleOpenCancel(viewing)}
+                            disabled={isProcessing}
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
+            
+            {/* Pagination Controls for Requests Tab */}
+            <PaginationControls
+              currentPage={currentRequestsPage}
+              totalPages={totalRequestsPages}
+              onPageChange={setCurrentRequestsPage}
+              startIndex={requestsStartIndex}
+              endIndex={requestsEndIndex}
+              totalItems={allRequestsCount}
+              itemName="requests"
+            />
           </div>
         )}
 
@@ -1260,22 +1572,25 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
               </div>
             ) : (
               <>
-                {/* Table Header */}
-                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                  <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
-                    <div className="col-span-1">Select</div>
-                    <div className="col-span-2">Property</div>
-                    <div className="col-span-2">Date & Time</div>
-                    <div className="col-span-1">Status</div>
-                    <div className="col-span-2">Tenant Name</div>
-                    <div className="col-span-2">Tenant Email</div>
-                    <div className="col-span-2 text-center whitespace-nowrap">Actions</div>
-                  </div>
-                </div>
+                {/* Desktop Table View */}
+                {!isMobile && (
+                  <>
+                    {/* Table Header */}
+                    <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                      <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+                        <div className="col-span-1">Select</div>
+                        <div className="col-span-2">Property</div>
+                        <div className="col-span-2">Date & Time</div>
+                        <div className="col-span-1">Status</div>
+                        <div className="col-span-2">Tenant Name</div>
+                        <div className="col-span-2">Tenant Email</div>
+                        <div className="col-span-2 text-center whitespace-nowrap">Actions</div>
+                      </div>
+                    </div>
 
-                {/* Table Body */}
-                <div className="divide-y divide-gray-100">
-                  {filteredUpcomingViewings.map((viewing) => (
+                    {/* Table Body */}
+                    <div className="divide-y divide-gray-100">
+                  {paginatedUpcomingViewings.map((viewing) => (
                     <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                       <div className="grid grid-cols-12 gap-4 items-center">
                         {/* Checkbox */}
@@ -1383,9 +1698,120 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                       </div>
                     </div>
                   ))}
-                </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Mobile Card View */}
+                {isMobile && (
+                  <div className="space-y-4 p-4">
+                    {paginatedUpcomingViewings.map((viewing) => (
+                      <div 
+                        key={viewing.id} 
+                        className={`bg-white border rounded-lg p-4 ${selectedViewings.has(viewing.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <button
+                              onClick={() => handleToggleSelect(viewing.id)}
+                              className="mt-1 flex-shrink-0"
+                            >
+                              {selectedViewings.has(viewing.id) ? (
+                                <CheckSquare className="w-5 h-5 text-orange-500" />
+                              ) : (
+                                <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
+                              )}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                                {viewing.property.street}
+                              </h3>
+                              <p className="text-xs text-gray-500 mb-2">
+                                {viewing.property.town}, {viewing.property.city}
+                              </p>
+                              <span
+                                className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                                  viewing.status === 'confirmed'
+                                    ? 'bg-green-100 text-green-700'
+                                    : viewing.status === 'rescheduled'
+                                    ? 'bg-yellow-100 text-yellow-700'
+                                    : 'bg-orange-100 text-orange-700'
+                                }`}
+                              >
+                                {viewing.status.charAt(0).toUpperCase() + viewing.status.slice(1)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 mb-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Date & Time:</span>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              <p className="font-medium">{formatDate(viewing.viewingDetails?.date || '')}</p>
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Clock className="h-3 w-3 text-muted-foreground" />
+                              <p className="font-medium">{formatTime(viewing.viewingDetails?.time || '')}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Tenant:</span>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <User className="h-3 w-3 text-muted-foreground" />
+                              <p className="font-medium">{viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}</p>
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Mail className="h-3 w-3 text-muted-foreground" />
+                              <p className="text-sm text-gray-600 truncate">{viewing.viewingDetails?.userDetails?.email || 'Not provided'}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-3 border-t">
+                          {viewing.status !== 'confirmed' && (
+                            <button
+                              className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition disabled:opacity-50"
+                              onClick={() => handleConfirmViewing(viewing)}
+                              disabled={isProcessing}
+                            >
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Confirm
+                            </button>
+                          )}
+                          <button
+                            className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-blue-300 text-sm font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50"
+                            onClick={() => handleOpenReschedule(viewing)}
+                            disabled={isProcessing}
+                          >
+                            <Send className="w-4 h-4" />
+                          </button>
+                          <button
+                            className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-red-300 text-sm font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                            onClick={() => handleOpenCancel(viewing)}
+                            disabled={isProcessing}
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
+            
+            {/* Pagination Controls for Upcoming Tab */}
+            <PaginationControls
+              currentPage={currentUpcomingPage}
+              totalPages={totalUpcomingPages}
+              onPageChange={setCurrentUpcomingPage}
+              startIndex={upcomingStartIndex}
+              endIndex={upcomingEndIndex}
+              totalItems={filteredUpcomingViewings.length}
+              itemName="viewings"
+            />
           </div>
         )}
 
@@ -1403,22 +1829,25 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
               </div>
             ) : (
               <>
-                {/* Table Header */}
-                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                  <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
-                    <div className="col-span-1">Select</div>
-                    <div className="col-span-2">Property</div>
-                    <div className="col-span-2">Date & Time</div>
-                    <div className="col-span-1">Status</div>
-                    <div className="col-span-2">Tenant Name</div>
-                    <div className="col-span-2">Tenant Email</div>
-                    <div className="col-span-2">Notes</div>
-                  </div>
-                </div>
+                {/* Desktop Table View */}
+                {!isMobile && (
+                  <>
+                    {/* Table Header */}
+                    <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                      <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+                        <div className="col-span-1">Select</div>
+                        <div className="col-span-2">Property</div>
+                        <div className="col-span-2">Date & Time</div>
+                        <div className="col-span-1">Status</div>
+                        <div className="col-span-2">Tenant Name</div>
+                        <div className="col-span-2">Tenant Email</div>
+                        <div className="col-span-2">Notes</div>
+                      </div>
+                    </div>
 
-                {/* Table Body */}
-                <div className="divide-y divide-gray-100">
-                  {filteredCompletedViewings.map((viewing) => (
+                    {/* Table Body */}
+                    <div className="divide-y divide-gray-100">
+                  {paginatedCompletedViewings.map((viewing) => (
                     <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                       <div className="grid grid-cols-12 gap-4 items-center">
                         {/* Checkbox */}
@@ -1493,9 +1922,91 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                       </div>
                     </div>
                   ))}
-                </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Mobile Card View */}
+                {isMobile && (
+                  <div className="space-y-4 p-4">
+                    {paginatedCompletedViewings.map((viewing) => (
+                      <div 
+                        key={viewing.id} 
+                        className={`bg-white border rounded-lg p-4 ${selectedViewings.has(viewing.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <button
+                              onClick={() => handleToggleSelect(viewing.id)}
+                              className="mt-1 flex-shrink-0"
+                            >
+                              {selectedViewings.has(viewing.id) ? (
+                                <CheckSquare className="w-5 h-5 text-orange-500" />
+                              ) : (
+                                <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
+                              )}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                                {viewing.property.street}
+                              </h3>
+                              <p className="text-xs text-gray-500 mb-2">
+                                {viewing.property.town}, {viewing.property.city}
+                              </p>
+                              <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                Completed
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 mb-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Date & Time:</span>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              <p className="font-medium">{formatDate(viewing.viewingDetails?.date || '')}</p>
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Clock className="h-3 w-3 text-muted-foreground" />
+                              <p className="font-medium">{formatTime(viewing.viewingDetails?.time || '')}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Tenant:</span>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <User className="h-3 w-3 text-muted-foreground" />
+                              <p className="font-medium">{viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}</p>
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Mail className="h-3 w-3 text-muted-foreground" />
+                              <p className="text-sm text-gray-600 truncate">{viewing.viewingDetails?.userDetails?.email || 'Not provided'}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Notes:</span>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {viewing.notes || viewing.agentNotes || '—'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
+            
+            {/* Pagination Controls for Completed Tab */}
+            <PaginationControls
+              currentPage={currentCompletedPage}
+              totalPages={totalCompletedPages}
+              onPageChange={setCurrentCompletedPage}
+              startIndex={completedStartIndex}
+              endIndex={completedEndIndex}
+              totalItems={filteredCompletedViewings.length}
+              itemName="viewings"
+            />
           </div>
         )}
 
@@ -1513,22 +2024,25 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
               </div>
             ) : (
               <>
-                {/* Table Header */}
-                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                  <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
-                    <div className="col-span-1">Select</div>
-                    <div className="col-span-2">Property</div>
-                    <div className="col-span-2">Date & Time</div>
-                    <div className="col-span-1">Status</div>
-                    <div className="col-span-2">Tenant Name</div>
-                    <div className="col-span-2">Tenant Email</div>
-                    <div className="col-span-2">Notes</div>
-                  </div>
-                </div>
+                {/* Desktop Table View */}
+                {!isMobile && (
+                  <>
+                    {/* Table Header */}
+                    <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                      <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
+                        <div className="col-span-1">Select</div>
+                        <div className="col-span-2">Property</div>
+                        <div className="col-span-2">Date & Time</div>
+                        <div className="col-span-1">Status</div>
+                        <div className="col-span-2">Tenant Name</div>
+                        <div className="col-span-2">Tenant Email</div>
+                        <div className="col-span-2">Notes</div>
+                      </div>
+                    </div>
 
-                {/* Table Body */}
-                <div className="divide-y divide-gray-100">
-                  {filteredPastViewings.map((viewing) => (
+                    {/* Table Body */}
+                    <div className="divide-y divide-gray-100">
+                  {paginatedPastViewings.map((viewing) => (
                     <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                       <div className="grid grid-cols-12 gap-4 items-center">
                         {/* Checkbox */}
@@ -1611,17 +2125,107 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                       </div>
                     </div>
                   ))}
-                </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Mobile Card View */}
+                {isMobile && (
+                  <div className="space-y-4 p-4">
+                    {paginatedPastViewings.map((viewing) => (
+                      <div 
+                        key={viewing.id} 
+                        className={`bg-white border rounded-lg p-4 ${selectedViewings.has(viewing.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <button
+                              onClick={() => handleToggleSelect(viewing.id)}
+                              className="mt-1 flex-shrink-0"
+                            >
+                              {selectedViewings.has(viewing.id) ? (
+                                <CheckSquare className="w-5 h-5 text-orange-500" />
+                              ) : (
+                                <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
+                              )}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                                {viewing.property.street}
+                              </h3>
+                              <p className="text-xs text-gray-500 mb-2">
+                                {viewing.property.town}, {viewing.property.city}
+                              </p>
+                              <span
+                                className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                                  viewing.status === 'completed'
+                                    ? 'bg-green-100 text-green-700'
+                                    : viewing.status === 'cancelled'
+                                    ? 'bg-red-100 text-red-700'
+                                    : 'bg-gray-100 text-gray-700'
+                                }`}
+                              >
+                                {viewing.status.charAt(0).toUpperCase() + viewing.status.slice(1)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 mb-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Date & Time:</span>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              <p className="font-medium">{formatDate(viewing.viewingDetails?.date || '')}</p>
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Clock className="h-3 w-3 text-muted-foreground" />
+                              <p className="font-medium">{formatTime(viewing.viewingDetails?.time || '')}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Tenant:</span>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <User className="h-3 w-3 text-muted-foreground" />
+                              <p className="font-medium">{viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}</p>
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Mail className="h-3 w-3 text-muted-foreground" />
+                              <p className="text-sm text-gray-600 truncate">{viewing.viewingDetails?.userDetails?.email || 'Not provided'}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Notes:</span>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {viewing.notes || viewing.agentNotes || '—'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
+            
+            {/* Pagination Controls for Past Tab */}
+            <PaginationControls
+              currentPage={currentPastPage}
+              totalPages={totalPastPages}
+              onPageChange={setCurrentPastPage}
+              startIndex={pastStartIndex}
+              endIndex={pastEndIndex}
+              totalItems={filteredPastViewings.length}
+              itemName="viewings"
+            />
           </div>
         )}
       </div>
 
       {/* Schedule Modal */}
       {isScheduleModalOpen && selectedRequest && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Schedule Viewing</h3>
               <button
@@ -1725,8 +2329,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
       {/* Reschedule Modal */}
       {isRescheduleModalOpen && selectedViewing && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Reschedule Viewing</h3>
               <button
@@ -1798,8 +2402,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
       {/* Cancel Modal */}
       {isCancelModalOpen && selectedViewing && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 p-6">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Cancel Viewing</h3>
               <button
@@ -1855,4 +2459,3 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 };
 
 export default ViewingsPage;
-

@@ -18,17 +18,40 @@ export class StorageService {
       this.logger.warn(
         'Azure Storage configuration is incomplete. Property document uploads will be disabled.',
       );
+      this.logger.warn(`Account: ${accountName ? 'SET' : 'MISSING'}, Container: ${containerName ? 'SET' : 'MISSING'}, SAS Token: ${sasToken ? 'SET' : 'MISSING'}`);
       this.isConfigured = false;
       return;
     }
 
-    // Initialize the Blob service client with SAS token
-    this.blobServiceClient = new BlobServiceClient(
-      `https://${accountName}.blob.core.windows.net?${sasToken}`,
-    );
+    try {
+      // Initialize the Blob service client with SAS token
+      // SAS token can start with '?', 'sp=', 'sv=', 'st=', etc. - normalize it
+      let normalizedSasToken = sasToken.trim();
+      // If it doesn't start with '?', add it (SAS tokens need '?' prefix in URLs)
+      if (!normalizedSasToken.startsWith('?')) {
+        normalizedSasToken = `?${normalizedSasToken}`;
+      }
 
-    this.containerClient = this.blobServiceClient.getContainerClient(containerName);
-    this.isConfigured = true;
+      const accountUrl = `https://${accountName}.blob.core.windows.net${normalizedSasToken}`;
+      this.logger.log(`Initializing Azure Storage with account: ${accountName}, container: ${containerName}`);
+      this.logger.debug(`SAS token format: ${normalizedSasToken.substring(0, 20)}...`);
+
+      this.blobServiceClient = new BlobServiceClient(accountUrl);
+      this.containerClient = this.blobServiceClient.getContainerClient(containerName);
+      
+      // Ensure container exists (only if SAS token has create permissions)
+      this.ensureContainerExists(containerName).catch((error) => {
+        this.logger.warn(`Could not verify/create container: ${error.message}`);
+        // Continue anyway - container might already exist or SAS might not have create permissions
+      });
+      
+      this.isConfigured = true;
+      this.logger.log('✅ Azure Storage initialized successfully');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to initialize Azure Storage: ${message}`);
+      this.isConfigured = false;
+    }
   }
 
   async uploadFile(
@@ -45,18 +68,30 @@ export class StorageService {
       const blobName = `${folder}/${Date.now()}-${safeFileName}`;
       const blockBlobClient = this.containerClient.getBlockBlobClient(blobName);
 
-      await blockBlobClient.upload(file.buffer, file.size);
+      // Upload with proper content type
+      await blockBlobClient.upload(file.buffer, file.size, {
+        blobHTTPHeaders: {
+          blobContentType: file.mimetype || 'application/octet-stream',
+        },
+      });
+
+      // Get the URL - if using SAS token, the URL should already include it
+      const blobUrl = blockBlobClient.url;
+
+      this.logger.log(`Successfully uploaded file: ${blobName} (${file.size} bytes)`);
 
       return {
-        url: blockBlobClient.url,
+        url: blobUrl,
         path: blobName,
-        contentType: file.mimetype,
+        contentType: file.mimetype || 'application/octet-stream',
         size: file.size,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
+      const errorDetails = error instanceof Error ? error.stack : String(error);
       this.logger.error(`Error uploading file: ${message}`);
-      throw new Error('Failed to upload file to Azure Storage');
+      this.logger.error(`Error details: ${errorDetails}`);
+      throw new Error(`Failed to upload file to Azure Storage: ${message}`);
     }
   }
 
@@ -74,6 +109,30 @@ export class StorageService {
   private getBlobNameFromUrl(blobUrl: string): string {
     const url = new URL(blobUrl);
     return url.pathname.substring(url.pathname.indexOf('/', 1) + 1);
+  }
+
+  private async ensureContainerExists(containerName: string): Promise<void> {
+    try {
+      const exists = await this.containerClient.exists();
+      if (!exists) {
+        this.logger.log(`Container '${containerName}' does not exist, attempting to create...`);
+        await this.containerClient.create({
+          access: 'blob', // Public read access for blobs
+        });
+        this.logger.log(`✅ Container '${containerName}' created successfully`);
+      } else {
+        this.logger.log(`✅ Container '${containerName}' already exists`);
+      }
+    } catch (error) {
+      // If creation fails due to permissions, that's okay - container might already exist
+      // or SAS token might not have create permissions (which is fine if container exists)
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      if (message.includes('ContainerAlreadyExists') || message.includes('already exists')) {
+        this.logger.log(`Container '${containerName}' already exists`);
+      } else {
+        throw error;
+      }
+    }
   }
 
   private getSafeFileName(originalName?: string): string {

@@ -1133,21 +1133,29 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       // Don't save current step - data is already auto-saved
       // Don't show multiple progress updates - just submit directly
 
-      // Save final form data to Firestore before submission
       const propertyId = 'demo-property-123'; // Using demo property ID as in DashboardHome
-      const firestoreSaveResult = await firestoreService.saveReferencingForm(
+      
+      // Save final form data to Firestore before submission (non-blocking - don't wait for it)
+      // Firestore save is optional - API submission is the primary action
+      firestoreService.saveReferencingForm(
         userId,
         propertyId,
         formData,
         currentStep,
         stepStatus
-      );
+      ).catch((error) => {
+        console.warn('Failed to save to Firestore before submission (non-blocking):', error);
+        // Don't block submission if Firestore fails
+      });
 
-      if (!firestoreSaveResult.success) {
-        console.warn('Failed to save to Firestore before submission:', firestoreSaveResult.error);
-      }
+      // Submit to backend API immediately (this is the primary action)
+      console.log('🚀 Submitting referencing application to backend API...', {
+        userId,
+        propertyId,
+        hasFormData: !!formData,
+        agentEmail: formData.agentDetails?.email
+      });
 
-      // Submit immediately with timeout for faster response
       const submitWithTimeout = Promise.race([
         referencingService.submitApplication(userId, {
           formData,
@@ -1159,13 +1167,15 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       ]);
 
       const result = await submitWithTimeout as any;
+      
+      console.log('✅ Backend API submission result:', result);
 
-      // Mark as submitted in Firestore
+      // Mark as submitted in Firestore (non-blocking - don't wait for it)
       if (result.success) {
-        const submitResult = await firestoreService.submitReferencingForm(userId, propertyId);
-        if (!submitResult.success) {
-          console.warn('Failed to mark as submitted in Firestore:', submitResult.error);
-        }
+        firestoreService.submitReferencingForm(userId, propertyId).catch((error) => {
+          console.warn('Failed to mark as submitted in Firestore (non-blocking):', error);
+          // Don't block success flow if Firestore fails
+        });
       }
 
       if (!result.success) {

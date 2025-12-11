@@ -53,120 +53,131 @@ export class EmailService {
       process.env.K_SERVICE // Google Cloud Run
     );
 
-    // Initialize SMTP with Nodemailer
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = process.env.SMTP_PORT;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-    this.fromAddress = process.env.EMAIL_FROM_ADDRESS || process.env.SMTP_USER || 'noreply@proptii.com';
+    // Set from address - prioritize EMAIL_FROM_ADDRESS, fallback to SMTP_USER or default
+    this.fromAddress = process.env.EMAIL_FROM_ADDRESS || process.env.SMTP_USER || 'noreply@proptii.co';
 
-    if (smtpHost && smtpPort && smtpUser && smtpPass) {
+    // Initialize Resend first (if API key is provided) - primary email service
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (resendApiKey) {
       try {
-        const port = parseInt(smtpPort);
-        // On cloud platforms, use port 587 with STARTTLS instead of 465 (465 is often blocked)
-        // Port 587 is more reliable on cloud hosting providers
-        const usePort = this.isCloudPlatform && port === 465 ? 587 : port;
-        const isSecure = usePort === 465;
-        
-        this.transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: usePort,
-          secure: isSecure, // true for 465, false for other ports
-          requireTLS: !isSecure, // Require TLS for non-465 ports
-          auth: {
-            user: smtpUser,
-            pass: smtpPass,
-          },
-          tls: {
-            // Do not fail on invalid certificates
-            rejectUnauthorized: false,
-            // Explicitly set TLS version
-            minVersion: 'TLSv1.2',
-            // Enable SNI (Server Name Indication)
-            servername: smtpHost,
-            // Add cipher list to improve compatibility
-            ciphers: 'SSLv3'
-          },
-          // Connection timeout - increased for cloud platforms
-          connectionTimeout: 60000, // 60s (increased from 30s)
-          // Socket timeout
-          socketTimeout: 60000, // 60s (increased from 30s)
-          // Greeting timeout
-          greetingTimeout: 30000, // 30s (increased from 15s)
-          // Disable connection pooling for cloud platforms (more reliable)
-          pool: !this.isCloudPlatform, // false on cloud, true on local
-          maxConnections: 1, // Use single connection on cloud
-          maxMessages: this.isCloudPlatform ? 10 : 100, // Fewer messages per connection on cloud
-          // Rate limiting - prevent Gmail from blocking
-          rateLimit: this.isCloudPlatform ? 1 : false, // 1 email per second on cloud
-          // Debug mode (can be removed in production)
-          debug: process.env.NODE_ENV === 'development' || this.isCloudPlatform,
-          logger: process.env.NODE_ENV === 'development' || this.isCloudPlatform
-        } as any);
+        this.resend = new Resend(resendApiKey);
         this.isConfigured = true;
-        if (usePort !== port) {
-          console.log(`✅ Email service initialized with SMTP (${smtpHost}:${usePort}, auto-switched from ${port} for cloud compatibility)`);
-          console.log(`   Using STARTTLS on port ${usePort} (more reliable on cloud platforms)`);
-        } else {
-          console.log(`✅ Email service initialized with SMTP (${smtpHost}:${usePort})`);
-        }
-        console.log(`   Connection pooling: ${!this.isCloudPlatform ? 'enabled' : 'disabled (cloud platform)'}`);
-        console.log(`   Timeouts: connection=${60000}ms, socket=${60000}ms, greeting=${30000}ms, dns=${30000}ms`);
+        console.log('✅ Email service initialized with Resend API');
         
-        // Verify SMTP connection on startup (optional, with timeout)
-        if (this.isCloudPlatform) {
-          console.log('🔍 Verifying SMTP connection to Gmail...');
-          this.transporter.verify((error, success) => {
-            if (error) {
-              console.error('❌ SMTP verification failed:', error.message);
-              console.error('   This might be due to:');
-              console.error('   1. Invalid SMTP credentials (check SMTP_USER and SMTP_PASS)');
-              console.error('   2. Gmail App Password expired or revoked');
-              console.error('   3. Network/firewall blocking Gmail SMTP');
-              console.error('   4. Gmail account security settings changed');
-              console.error('   → Emails will fall back to Resend API if configured');
-            } else {
-              console.log('✅ SMTP connection verified successfully');
-            }
-          });
+        // If using Resend, determine the best from address
+        // Priority: EMAIL_FROM_ADDRESS > verified domain > Resend default
+        if (process.env.EMAIL_FROM_ADDRESS && 
+            process.env.EMAIL_FROM_ADDRESS.includes('@') && 
+            !process.env.EMAIL_FROM_ADDRESS.endsWith('@resend.dev')) {
+          // User has explicitly set EMAIL_FROM_ADDRESS with a custom domain
+          this.fromAddress = process.env.EMAIL_FROM_ADDRESS;
+          console.log(`📧 Using from address: ${this.fromAddress}`);
+          console.log('✅ Make sure this domain is verified in your Resend dashboard');
+        } else if (process.env.EMAIL_FROM_ADDRESS) {
+          // EMAIL_FROM_ADDRESS is set but might be using resend.dev default
+          this.fromAddress = process.env.EMAIL_FROM_ADDRESS;
+          console.log(`📧 Using from address: ${this.fromAddress}`);
+        } else {
+          // Use Resend default domain for testing (can only send to verified email)
+          this.fromAddress = 'onboarding@resend.dev';
+          console.log('📧 Using Resend default from address: onboarding@resend.dev');
+          console.warn('⚠️  Note: Default address can only send to your verified email address');
+          console.warn('   For production, verify your domain in Resend and set:');
+          console.warn('   EMAIL_FROM_ADDRESS=noreply@proptii.co');
         }
       } catch (error) {
-        console.warn('⚠️ Failed to initialize SMTP:', error);
-        this.isConfigured = false;
+        console.warn('⚠️ Failed to initialize Resend:', error);
+        this.resend = null;
       }
-    } else {
-      console.warn('⚠️ Email service not configured - SMTP credentials not set');
-      console.warn('   Required: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS');
-      this.isConfigured = false;
     }
 
-    // Initialize Resend for cloud platforms (Render, etc.) - only if on cloud platform
-    if (this.isCloudPlatform) {
-      const resendApiKey = process.env.RESEND_API_KEY;
-      if (resendApiKey) {
+    // Initialize SMTP as fallback (only if Resend is not configured)
+    if (!this.resend) {
+      const smtpHost = process.env.SMTP_HOST;
+      const smtpPort = process.env.SMTP_PORT;
+      const smtpUser = process.env.SMTP_USER;
+      const smtpPass = process.env.SMTP_PASS;
+
+      if (smtpHost && smtpPort && smtpUser && smtpPass) {
         try {
-          this.resend = new Resend(resendApiKey);
-          console.log('✅ Resend initialized for cloud platform (will be used as fallback if SMTP fails)');
+          const port = parseInt(smtpPort);
+          // On cloud platforms, use port 587 with STARTTLS instead of 465 (465 is often blocked)
+          // Port 587 is more reliable on cloud hosting providers
+          const usePort = this.isCloudPlatform && port === 465 ? 587 : port;
+          const isSecure = usePort === 465;
           
-          // If using Resend, check if we should use the default domain
-          // Resend's default domain is onboarding@resend.dev (no verification needed)
-          // If EMAIL_FROM_ADDRESS is not set or doesn't end with a verified domain, use default
-          if (!process.env.EMAIL_FROM_ADDRESS || 
-              (!this.fromAddress.endsWith('@resend.dev') && !this.fromAddress.includes('@'))) {
-            this.fromAddress = 'onboarding@resend.dev';
-            console.log('📧 Using Resend default from address: onboarding@resend.dev');
-            console.warn('⚠️  Note: For better deliverability, verify your domain in Resend dashboard');
-            console.warn('   and set EMAIL_FROM_ADDRESS to your verified domain (e.g., noreply@yourdomain.com)');
+          this.transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: usePort,
+            secure: isSecure, // true for 465, false for other ports
+            requireTLS: !isSecure, // Require TLS for non-465 ports
+            auth: {
+              user: smtpUser,
+              pass: smtpPass,
+            },
+            tls: {
+              // Do not fail on invalid certificates
+              rejectUnauthorized: false,
+              // Explicitly set TLS version
+              minVersion: 'TLSv1.2',
+              // Enable SNI (Server Name Indication)
+              servername: smtpHost,
+              // Add cipher list to improve compatibility
+              ciphers: 'SSLv3'
+            },
+            // Connection timeout - increased for cloud platforms
+            connectionTimeout: 60000, // 60s (increased from 30s)
+            // Socket timeout
+            socketTimeout: 60000, // 60s (increased from 30s)
+            // Greeting timeout
+            greetingTimeout: 30000, // 30s (increased from 15s)
+            // Disable connection pooling for cloud platforms (more reliable)
+            pool: !this.isCloudPlatform, // false on cloud, true on local
+            maxConnections: 1, // Use single connection on cloud
+            maxMessages: this.isCloudPlatform ? 10 : 100, // Fewer messages per connection on cloud
+            // Rate limiting - prevent Gmail from blocking
+            rateLimit: this.isCloudPlatform ? 1 : false, // 1 email per second on cloud
+            // Debug mode (can be removed in production)
+            debug: process.env.NODE_ENV === 'development' || this.isCloudPlatform,
+            logger: process.env.NODE_ENV === 'development' || this.isCloudPlatform
+          } as any);
+          this.isConfigured = true;
+          if (usePort !== port) {
+            console.log(`✅ Email service initialized with SMTP (${smtpHost}:${usePort}, auto-switched from ${port} for cloud compatibility)`);
+            console.log(`   Using STARTTLS on port ${usePort} (more reliable on cloud platforms)`);
           } else {
-            console.log(`📧 Using from address: ${this.fromAddress}`);
-            console.warn('⚠️  Make sure this domain is verified in your Resend dashboard');
+            console.log(`✅ Email service initialized with SMTP (${smtpHost}:${usePort})`);
+          }
+          console.log(`   Connection pooling: ${!this.isCloudPlatform ? 'enabled' : 'disabled (cloud platform)'}`);
+          console.log(`   Timeouts: connection=${60000}ms, socket=${60000}ms, greeting=${30000}ms, dns=${30000}ms`);
+          
+          // Verify SMTP connection on startup (optional, with timeout)
+          if (this.isCloudPlatform) {
+            console.log('🔍 Verifying SMTP connection...');
+            this.transporter.verify((error, success) => {
+              if (error) {
+                console.error('❌ SMTP verification failed:', error.message);
+                console.error('   This might be due to:');
+                console.error('   1. Invalid SMTP credentials (check SMTP_USER and SMTP_PASS)');
+                console.error('   2. Gmail App Password expired or revoked');
+                console.error('   3. Network/firewall blocking SMTP');
+                console.error('   4. Email account security settings changed');
+              } else {
+                console.log('✅ SMTP connection verified successfully');
+              }
+            });
           }
         } catch (error) {
-          console.warn('⚠️ Failed to initialize Resend:', error);
+          console.warn('⚠️ Failed to initialize SMTP:', error);
+          this.isConfigured = false;
         }
       } else {
-        console.warn('⚠️ RESEND_API_KEY not set. On cloud platforms, SMTP may be blocked.');
-        console.warn('   Set RESEND_API_KEY for reliable email delivery on Render.');
+        if (!resendApiKey) {
+          console.warn('⚠️ Email service not configured - No RESEND_API_KEY or SMTP credentials set');
+          console.warn('   Set RESEND_API_KEY for Resend API (recommended)');
+          console.warn('   OR set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS for SMTP');
+          this.isConfigured = false;
+        }
       }
     }
   }
@@ -638,8 +649,26 @@ export class EmailService {
     const fallbackBody = htmlContent || emailData.text || 'No content provided';
     let lastError: Error | null = null;
 
-    // Try SMTP first (it worked well in previous versions on Render)
-    // Use Resend as fallback if SMTP fails
+    // Prioritize Resend if configured (primary email service)
+    if (this.isConfigured && this.resend) {
+      try {
+        return await this.sendEmailViaResend(emailData);
+      } catch (resendError) {
+        console.error('❌ Resend API failed:', resendError);
+        // If Resend fails and SMTP is available, try SMTP as fallback
+        if (this.transporter) {
+          console.warn('⚠️ Resend failed, trying SMTP as fallback...');
+          // Continue to SMTP fallback below
+        } else {
+          return {
+            success: false,
+            error: resendError instanceof Error ? resendError.message : String(resendError),
+          };
+        }
+      }
+    }
+
+    // Use SMTP as fallback (or primary if Resend not configured)
     if (this.isConfigured && this.transporter) {
       for (let attempt = 1; attempt <= retries; attempt++) {
         try {
@@ -742,47 +771,15 @@ export class EmailService {
       // If we get here, all SMTP retries failed
       const errorMsg = lastError?.message || 'Failed to send email via SMTP';
       
-      // On cloud platforms, try Resend as fallback if SMTP failed
-      if (this.isCloudPlatform && this.resend) {
-        console.warn('⚠️ SMTP failed, trying Resend API as fallback...');
-        try {
-          return await this.sendEmailViaResend(emailData);
-        } catch (resendError) {
-          console.error('❌ Both SMTP and Resend API failed on cloud platform.');
-          return {
-            success: false,
-            error: `SMTP failed: ${errorMsg}. Resend also failed: ${resendError instanceof Error ? resendError.message : String(resendError)}`,
-          };
-        }
-      }
-      
-      // On local or if Resend not available, just return SMTP error
       return {
         success: false,
         error: errorMsg,
       };
     } else {
-      // SMTP not configured
-      if (this.isCloudPlatform && this.resend) {
-        // On cloud, try Resend if SMTP not configured
-        console.log('📧 SMTP not configured on cloud platform. Using Resend API...');
-        try {
-          return await this.sendEmailViaResend(emailData);
-        } catch (resendError) {
-          console.error('❌ Resend API failed:', resendError);
-          return {
-            success: false,
-            error: resendError instanceof Error ? resendError.message : String(resendError),
-          };
-        }
-      }
-      
+      // Neither Resend nor SMTP configured
       console.warn('⚠️ Email service not configured.');
-      if (this.isCloudPlatform) {
-        console.warn('   Set RESEND_API_KEY for email delivery on Render.');
-      } else {
-        console.warn('   Set SMTP credentials (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS) for local development.');
-      }
+      console.warn('   Set RESEND_API_KEY for Resend API (recommended)');
+      console.warn('   OR set SMTP credentials (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS) for SMTP');
       return {
         success: false,
         error: 'Email service not configured',
@@ -798,30 +795,57 @@ export class EmailService {
     const htmlContent = emailData.html || emailData.text || 'No content provided';
     const textContent = emailData.text || this.stripHtml(htmlContent);
 
-    // Ensure we're using a valid Resend from address
-    // If the from address doesn't look like a verified domain, use Resend's default
-    let fromAddress = this.fromAddress;
-    if (!fromAddress.endsWith('@resend.dev') && 
-        !fromAddress.includes('@') || 
-        fromAddress === 'noreply@proptii.com') {
-      fromAddress = 'onboarding@resend.dev';
-      console.log(`📧 Using Resend default from address: ${fromAddress} (original was: ${this.fromAddress})`);
-    }
+    // Use the configured from address (should already be set correctly in constructor)
+    const fromAddress = this.fromAddress;
 
     try {
       console.log(`📧 Sending email via Resend API to: ${emailData.to}`);
       console.log(`   From: ${fromAddress}`);
       console.log(`   Subject: ${emailData.subject}`);
       
-      const result = await this.resend.emails.send({
+      // Convert attachments to Resend format if present
+      const attachments = emailData.attachments?.map(att => {
+        // Resend expects attachments as base64 strings or file paths
+        if (att.content) {
+          // If content is a Buffer, convert to base64
+          if (Buffer.isBuffer(att.content)) {
+            return {
+              filename: att.filename,
+              content: att.content.toString('base64'),
+            };
+          }
+          // If content is already a string (base64), use it directly
+          if (typeof att.content === 'string') {
+            return {
+              filename: att.filename,
+              content: att.content,
+            };
+          }
+        }
+        // If path is provided, Resend can handle file paths (for local files)
+        if (att.path) {
+          return {
+            filename: att.filename,
+            path: att.path,
+          };
+        }
+        return null;
+      }).filter(Boolean) || [];
+
+      const emailPayload: any = {
         from: fromAddress,
         to: emailData.to,
         subject: emailData.subject,
         html: htmlContent,
         text: textContent,
-        // Note: Resend API has limited attachment support, would need to convert attachments
-        // For now, we'll skip attachments when using Resend
-      });
+      };
+
+      if (attachments.length > 0) {
+        emailPayload.attachments = attachments;
+        console.log(`   Attachments: ${attachments.length} file(s)`);
+      }
+      
+      const result = await this.resend.emails.send(emailPayload);
       
       // Log the full response for debugging
       console.log(`📧 Resend API response:`, JSON.stringify(result, null, 2));

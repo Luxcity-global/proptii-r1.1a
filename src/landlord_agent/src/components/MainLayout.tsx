@@ -1,5 +1,5 @@
-import React from 'react';
-import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature, CalendarDays } from 'lucide-react';
+import React, { useState } from 'react';
+import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature, CalendarDays, Menu } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -16,6 +16,8 @@ import {
 } from './ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { UserProfile } from '../App';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
+import { useIsMobile } from './ui/use-mobile';
 
 // Import logos
 const proptiiLogoLarge = '/images/proptii-logo.png'; // Full logo for expanded sidebar
@@ -262,7 +264,128 @@ function CustomSidebar({
   );
 }
 
+// Mobile Sidebar Component
+function MobileSidebar({ 
+  navigationItems, 
+  currentScreen, 
+  onNavigate, 
+  userProfile,
+  open,
+  onOpenChange
+}: {
+  navigationItems: Array<{
+    id: NavigationScreen;
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    hasNotification?: boolean;
+  }>;
+  currentScreen: NavigationScreen;
+  onNavigate: (screen: NavigationScreen) => void;
+  userProfile: UserProfile | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const handleNavigate = (screen: NavigationScreen) => {
+    onNavigate(screen);
+    onOpenChange(false);
+  };
+
+  const handleLogoClick = () => {
+    window.location.href = '/';
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="left" className="w-[280px] p-0">
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <SheetHeader className="border-b border-sidebar-border p-4">
+            <div className="flex items-center">
+              <img 
+                src="/images/proptii-logo.png" 
+                alt="Proptii Logo" 
+                className="h-8 object-contain cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={handleLogoClick}
+              />
+            </div>
+          </SheetHeader>
+          
+          {/* Navigation */}
+          <div className="flex-1 overflow-auto pt-4 px-4">
+            <div className="space-y-3">
+              {navigationItems.map((item) => {
+                const isActive = currentScreen === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleNavigate(item.id)}
+                    className="w-full flex items-center h-10 px-3 rounded-md text-sm font-medium transition-colors justify-start"
+                    style={{ 
+                      color: isActive ? '#136C9E' : '#374957',
+                      backgroundColor: isActive ? '#E6F3FF' : 'transparent'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = '#F3F4F6';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    <div className="relative flex-shrink-0">
+                      <item.icon className="w-5 h-5" />
+                      {item.hasNotification && (
+                        <div className="absolute top-0 left-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white z-10 transform -translate-x-1 -translate-y-1"></div>
+                      )}
+                    </div>
+                    <span className="ml-2 truncate">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          
+          {/* User Profile */}
+          {userProfile && (
+            <div className="border-t border-sidebar-border pt-4 pb-4 px-4">
+              <div className="flex items-center">
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  {userProfile.logo && <AvatarImage src={userProfile.logo} alt={userProfile.name} />}
+                  <AvatarFallback>
+                    <User className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="ml-2 min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold" style={{ color: '#374957' }}>{userProfile.name}</div>
+                  <div className="truncate text-xs opacity-70" style={{ color: '#374957' }}>{userProfile.email}</div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Proptii Home Button */}
+          <div className="border-t border-sidebar-border pt-4 pb-4 px-4">
+            <button 
+              onClick={handleLogoClick}
+              className="w-full flex items-center justify-center h-10 px-4 rounded-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 transition-colors text-sm font-medium"
+            >
+              <Home className="h-4 w-4 mr-2" />
+              Proptii Home
+            </button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 export function MainLayout({ currentScreen, onNavigate, userProfile, children }: MainLayoutProps) {
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const isMobile = useIsMobile();
+  
   const navigationItems = [
     {
       id: 'dashboard' as NavigationScreen,
@@ -317,7 +440,29 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
           '--sidebar-width-collapsed': '56px'
         } as React.CSSProperties}
       >
-        {/* Custom Sidebar with Collapse Support */}
+        {/* Mobile Header */}
+        {isMobile && (
+          <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-sidebar-border md:hidden">
+            <div className="flex items-center justify-between h-16 px-4">
+              <button
+                onClick={() => setMobileSidebarOpen(true)}
+                className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                aria-label="Open menu"
+              >
+                <Menu className="w-6 h-6" style={{ color: '#374957' }} />
+              </button>
+              <img 
+                src="/images/proptii-logo.png" 
+                alt="Proptii Logo" 
+                className="h-14 object-contain cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => window.location.href = '/'}
+              />
+              <div className="w-10" /> {/* Spacer for centering */}
+            </div>
+          </div>
+        )}
+
+        {/* Custom Sidebar with Collapse Support - Desktop Only */}
         <CustomSidebar 
           navigationItems={navigationItems}
           currentScreen={currentScreen}
@@ -325,8 +470,19 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
           userProfile={userProfile}
         />
 
+        {/* Mobile Sidebar */}
+        <MobileSidebar
+          navigationItems={navigationItems}
+          currentScreen={currentScreen}
+          onNavigate={onNavigate}
+          userProfile={userProfile}
+          open={mobileSidebarOpen}
+          onOpenChange={setMobileSidebarOpen}
+        />
+
         {/* Main Content */}
         <main className="flex-1" style={{ backgroundColor: '#F7F7F7' }}>
+          {isMobile && <div className="h-16" />} {/* Spacer for mobile header */}
           {children}
         </main>
       </div>

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 interface SendSignedContractParams {
   to: string;
@@ -18,44 +19,98 @@ interface SendSignedContractParams {
 
 @Injectable()
 export class ContractEmailService {
-  private transporter: nodemailer.Transporter;
+  private transporter: nodemailer.Transporter | null = null;
+  private resend: Resend | null = null;
+  private isConfigured: boolean = false;
+  private fromAddress: string;
 
   constructor() {
-    // Verify required environment variables
-    const requiredEnvVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL'];
-    const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+    // Set from address - prioritize EMAIL_FROM_ADDRESS, fallback to SMTP_FROM_EMAIL or default
+    this.fromAddress = process.env.EMAIL_FROM_ADDRESS || process.env.SMTP_FROM_EMAIL || 'noreply@proptii.co';
 
-    if (missingVars.length > 0) {
-      console.error('Missing required environment variables:', missingVars);
-      throw new Error('Missing required SMTP configuration');
+    // Initialize Resend first (if API key is provided) - primary email service
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (resendApiKey) {
+      try {
+        this.resend = new Resend(resendApiKey);
+        this.isConfigured = true;
+        console.log('✅ Contract email service initialized with Resend API');
+        
+        // If using Resend, determine the best from address
+        // Priority: EMAIL_FROM_ADDRESS > verified domain > Resend default
+        if (process.env.EMAIL_FROM_ADDRESS && 
+            process.env.EMAIL_FROM_ADDRESS.includes('@') && 
+            !process.env.EMAIL_FROM_ADDRESS.endsWith('@resend.dev')) {
+          // User has explicitly set EMAIL_FROM_ADDRESS with a custom domain
+          this.fromAddress = process.env.EMAIL_FROM_ADDRESS;
+          console.log(`📧 Using from address: ${this.fromAddress}`);
+          console.log('✅ Make sure this domain is verified in your Resend dashboard');
+        } else if (process.env.EMAIL_FROM_ADDRESS) {
+          // EMAIL_FROM_ADDRESS is set but might be using resend.dev default
+          this.fromAddress = process.env.EMAIL_FROM_ADDRESS;
+          console.log(`📧 Using from address: ${this.fromAddress}`);
+        } else {
+          // Use Resend default domain for testing (can only send to verified email)
+          this.fromAddress = 'onboarding@resend.dev';
+          console.log('📧 Using Resend default from address: onboarding@resend.dev');
+          console.warn('⚠️  Note: For better deliverability, verify your domain in Resend dashboard');
+          console.warn('   and set EMAIL_FROM_ADDRESS to your verified domain (e.g., noreply@proptii.co)');
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to initialize Resend:', error);
+        this.resend = null;
+      }
     }
 
-    // Create nodemailer transporter with improved TLS configuration
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
-      secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
-      requireTLS: process.env.SMTP_PORT !== '465', // Require TLS for non-465 ports
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      },
-      tls: {
-        // Do not fail on invalid certificates
-        rejectUnauthorized: false,
-        // Explicitly set TLS version
-        minVersion: 'TLSv1.2'
-      },
-      // Connection timeout
-      connectionTimeout: 10000, // 10 seconds
-      // Socket timeout
-      socketTimeout: 10000, // 10 seconds
-      // Greeting timeout
-      greetingTimeout: 5000, // 5 seconds
-      // Debug mode (can be removed in production)
-      debug: process.env.NODE_ENV === 'development',
-      logger: process.env.NODE_ENV === 'development'
-    });
+    // Initialize SMTP as fallback (only if Resend is not configured)
+    if (!this.resend) {
+      // Verify required environment variables for SMTP
+      const requiredEnvVars = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'];
+      const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+      if (missingVars.length > 0) {
+        if (!resendApiKey) {
+          console.error('Missing required environment variables:', missingVars);
+          console.error('Set RESEND_API_KEY for Resend API (recommended)');
+          console.error('OR set SMTP credentials (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS) for SMTP');
+          throw new Error('Missing required email configuration');
+        }
+      } else {
+        // Create nodemailer transporter with improved TLS configuration
+        try {
+          this.transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: Number(process.env.SMTP_PORT),
+            secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
+            requireTLS: process.env.SMTP_PORT !== '465', // Require TLS for non-465 ports
+            auth: {
+              user: process.env.SMTP_USER,
+              pass: process.env.SMTP_PASS
+            },
+            tls: {
+              // Do not fail on invalid certificates
+              rejectUnauthorized: false,
+              // Explicitly set TLS version
+              minVersion: 'TLSv1.2'
+            },
+            // Connection timeout
+            connectionTimeout: 10000, // 10 seconds
+            // Socket timeout
+            socketTimeout: 10000, // 10 seconds
+            // Greeting timeout
+            greetingTimeout: 5000, // 5 seconds
+            // Debug mode (can be removed in production)
+            debug: process.env.NODE_ENV === 'development',
+            logger: process.env.NODE_ENV === 'development'
+          });
+          this.isConfigured = true;
+          console.log('✅ Contract email service initialized with SMTP');
+        } catch (error) {
+          console.warn('⚠️ Failed to initialize SMTP:', error);
+          this.isConfigured = false;
+        }
+      }
+    }
   }
 
   async verifyConnection() {
@@ -70,108 +125,183 @@ export class ContractEmailService {
   }
 
   async sendSignedContractEmail(params: SendSignedContractParams, retries = 3) {
-    let lastError: Error | null = null;
-    
-    for (let attempt = 1; attempt <= retries; attempt++) {
+    console.log(`📧 Preparing to send signed contract email:`, {
+      to: params.to,
+      subject: params.subject,
+      contractName: params.contractName,
+      recipientName: params.recipientName,
+      attachmentSize: params.attachment.content.length
+    });
+
+    // Prioritize Resend if configured (primary email service)
+    if (this.isConfigured && this.resend) {
       try {
-        console.log(`📧 Preparing to send signed contract email (attempt ${attempt}/${retries}):`, {
-          to: params.to,
-          subject: params.subject,
-          contractName: params.contractName,
-          recipientName: params.recipientName,
-          attachmentSize: params.attachment.content.length
-        });
-
-        // Prepare email attachments
-        const attachments = [{
-          filename: params.attachment.filename,
-          content: params.attachment.content,
-          contentType: params.attachment.contentType
-        }];
-
-        // Send email with timeout
-        const result = await Promise.race([
-          this.transporter.sendMail({
-            from: process.env.SMTP_FROM_EMAIL,
-            to: params.to,
-            subject: params.subject,
-            html: params.htmlContent,
-            attachments: attachments
-          }),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Email send timeout after 30 seconds')), 30000)
-          )
-        ]) as any;
-
-        console.log('📧 Signed contract email sent successfully:', {
-          messageId: result.messageId,
-          to: params.to,
-          subject: params.subject,
-          contractName: params.contractName
-        });
-
-        return {
-          success: true,
-          messageId: result.messageId
-        };
-
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        console.error(`❌ Failed to send signed contract email (attempt ${attempt}/${retries}):`, {
-          error: lastError.message,
-          code: (error as any)?.code,
-          errno: (error as any)?.errno,
-          syscall: (error as any)?.syscall
-        });
-
-        // If it's a connection error and we have retries left, wait and retry
-        if (attempt < retries && (
-          (error as any)?.code === 'ECONNRESET' || 
-          (error as any)?.code === 'ESOCKET' ||
-          (error as any)?.code === 'ETIMEDOUT' ||
-          (error as any)?.code === 'ECONNREFUSED'
-        )) {
-          const waitTime = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
-          console.log(`⏳ Waiting ${waitTime}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-          
-          // Try to recreate transporter on connection errors
-          try {
-            await this.transporter.close();
-          } catch (closeError) {
-            // Ignore close errors
-          }
-          
-          // Recreate transporter
-          this.transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST,
-            port: Number(process.env.SMTP_PORT),
-            secure: process.env.SMTP_PORT === '465',
-            requireTLS: process.env.SMTP_PORT !== '465',
-            auth: {
-              user: process.env.SMTP_USER,
-              pass: process.env.SMTP_PASS
-            },
-            tls: {
-              rejectUnauthorized: false,
-              minVersion: 'TLSv1.2'
-            },
-            connectionTimeout: 10000,
-            socketTimeout: 10000,
-            greetingTimeout: 5000,
-            debug: process.env.NODE_ENV === 'development',
-            logger: process.env.NODE_ENV === 'development'
-          });
-          
-          continue;
+        return await this.sendSignedContractViaResend(params);
+      } catch (resendError) {
+        console.error('❌ Resend API failed:', resendError);
+        // If Resend fails and SMTP is available, try SMTP as fallback
+        if (this.transporter) {
+          console.warn('⚠️ Resend failed, trying SMTP as fallback...');
+          // Continue to SMTP fallback below
+        } else {
+          throw resendError;
         }
-        
-        // If all retries failed or it's not a retryable error, throw
-        throw lastError;
       }
     }
 
-    throw lastError || new Error('Failed to send email after all retries');
+    // Use SMTP as fallback (or primary if Resend not configured)
+    if (this.isConfigured && this.transporter) {
+      let lastError: Error | null = null;
+      
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          // Prepare email attachments
+          const attachments = [{
+            filename: params.attachment.filename,
+            content: params.attachment.content,
+            contentType: params.attachment.contentType
+          }];
+
+          // Send email with timeout
+          const result = await Promise.race([
+            this.transporter.sendMail({
+              from: this.fromAddress,
+              to: params.to,
+              subject: params.subject,
+              html: params.htmlContent,
+              attachments: attachments
+            }),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Email send timeout after 30 seconds')), 30000)
+            )
+          ]) as any;
+
+          console.log('📧 Signed contract email sent successfully via SMTP:', {
+            messageId: result.messageId,
+            to: params.to,
+            subject: params.subject,
+            contractName: params.contractName
+          });
+
+          return {
+            success: true,
+            messageId: result.messageId
+          };
+
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          console.error(`❌ Failed to send signed contract email via SMTP (attempt ${attempt}/${retries}):`, {
+            error: lastError.message,
+            code: (error as any)?.code,
+            errno: (error as any)?.errno,
+            syscall: (error as any)?.syscall
+          });
+
+          // If it's a connection error and we have retries left, wait and retry
+          if (attempt < retries && (
+            (error as any)?.code === 'ECONNRESET' || 
+            (error as any)?.code === 'ESOCKET' ||
+            (error as any)?.code === 'ETIMEDOUT' ||
+            (error as any)?.code === 'ECONNREFUSED'
+          )) {
+            const waitTime = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
+            console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            
+            // Try to recreate transporter on connection errors
+            try {
+              await this.transporter?.close();
+            } catch (closeError) {
+              // Ignore close errors
+            }
+            
+            // Recreate transporter
+            if (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS) {
+              this.transporter = nodemailer.createTransport({
+                host: process.env.SMTP_HOST,
+                port: Number(process.env.SMTP_PORT),
+                secure: process.env.SMTP_PORT === '465',
+                requireTLS: process.env.SMTP_PORT !== '465',
+                auth: {
+                  user: process.env.SMTP_USER,
+                  pass: process.env.SMTP_PASS
+                },
+                tls: {
+                  rejectUnauthorized: false,
+                  minVersion: 'TLSv1.2'
+                },
+                connectionTimeout: 10000,
+                socketTimeout: 10000,
+                greetingTimeout: 5000,
+                debug: process.env.NODE_ENV === 'development',
+                logger: process.env.NODE_ENV === 'development'
+              });
+            }
+            
+            continue;
+          }
+          
+          // If all retries failed or it's not a retryable error, throw
+          throw lastError;
+        }
+      }
+
+      throw lastError || new Error('Failed to send email after all retries');
+    } else {
+      throw new Error('Email service not configured. Set RESEND_API_KEY or SMTP credentials.');
+    }
+  }
+
+  private async sendSignedContractViaResend(params: SendSignedContractParams): Promise<any> {
+    if (!this.resend) {
+      throw new Error('Resend client not initialized');
+    }
+
+    // Use the configured from address (should already be set correctly in constructor)
+    const fromAddress = this.fromAddress;
+
+    try {
+      console.log(`📧 Sending signed contract email via Resend API to: ${params.to}`);
+      console.log(`   From: ${fromAddress}`);
+      console.log(`   Subject: ${params.subject}`);
+      console.log(`   Attachment: ${params.attachment.filename} (${params.attachment.content.length} bytes)`);
+
+      // Convert attachment to base64 for Resend
+      const attachmentBase64 = params.attachment.content.toString('base64');
+
+      const result = await this.resend.emails.send({
+        from: fromAddress,
+        to: params.to,
+        subject: params.subject,
+        html: params.htmlContent,
+        attachments: [{
+          filename: params.attachment.filename,
+          content: attachmentBase64,
+        }],
+      });
+
+      // Check if there's an error in the response
+      if (result.error) {
+        const error = result.error as any;
+        console.error('❌ Resend API returned an error:', result.error);
+        throw new Error(error.message || 'Resend API returned an error');
+      }
+
+      const messageId = result.data?.id;
+      if (!messageId) {
+        console.warn('⚠️ Resend API response missing message ID');
+      }
+
+      console.log(`✅ Signed contract email sent successfully via Resend API to ${params.to}${messageId ? ` (ID: ${messageId})` : ''}`);
+
+      return {
+        success: true,
+        messageId: messageId || 'resend-email-sent',
+      };
+    } catch (error: any) {
+      console.error('❌ Resend API error:', error);
+      throw new Error(error.message || 'Failed to send email via Resend');
+    }
   }
 
   // Method to send contract to multiple recipients

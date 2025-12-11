@@ -3,7 +3,7 @@ import nodemailer from 'nodemailer';
 export class EmailClient {
   constructor() {
     this.baseUrl = process.env.APP_URL || 'https://proptii.com';
-    this.fromAddress = process.env.EMAIL_FROM_ADDRESS || process.env.SMTP_USER || 'noreply@proptii.com';
+    this.fromAddress = process.env.EMAIL_FROM_ADDRESS || process.env.SMTP_USER || 'noreply@proptii.co';
     
     // Configure SMTP transport
     const port = parseInt(process.env.SMTP_PORT || '465');

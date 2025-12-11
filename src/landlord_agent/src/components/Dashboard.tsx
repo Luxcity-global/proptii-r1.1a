@@ -36,6 +36,7 @@ import {
   Mail,
   CheckCircle2,
 } from "lucide-react";
+import { useIsMobile } from "./ui/use-mobile";
 import { Property, UserProfile, MarketInsight, Tenant } from "../App";
 import {
   DropdownMenu,
@@ -97,6 +98,7 @@ export function Dashboard({
     string[]
   >([]);
   const [currentChartIndex, setCurrentChartIndex] = useState(0);
+  const isMobile = useIsMobile();
 
   const uniqueVacancyAlerts = React.useMemo(() => {
     if (!vacancyAlerts) return [];
@@ -487,11 +489,64 @@ export function Dashboard({
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7' }}>
       {/* Clean Header */}
-      <div className="max-w-7xl mx-auto mt-8">
+      <div className="max-w-7xl mx-auto mt-4 md:mt-8 px-4 md:px-0">
         <div 
-          className="bg-white shadow-lg rounded-xl px-8 py-6"
+          className="bg-white shadow-lg rounded-xl px-4 md:px-8 py-4 md:py-6"
           style={{ fontFamily: 'Archivo, sans-serif' }}
         >
+          {isMobile ? (
+            // Mobile Header - Streamlined
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium text-base mr-3">
+                    {(userProfile?.name || "Tosin Lanipekun").charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h1 
+                      className="text-lg font-semibold"
+                      style={{ 
+                        color: '#374957',
+                        fontFamily: 'Archivo, sans-serif'
+                      }}
+                    >
+                      Welcome <span style={{ color: '#136C9E' }}>{userProfile?.name || "Tosin Lanipekun"}</span>
+                    </h1>
+                    <span className="inline-flex items-center">
+                      <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                      <span className="text-xs font-normal text-green-600">Verified</span>
+                    </span>
+                  </div>
+                </div>
+                <Button 
+                  onClick={onAddProperty} 
+                  className="flex items-center space-x-1 px-4 py-2 rounded-lg" 
+                  style={{ 
+                    backgroundColor: '#DC5F12', 
+                    borderColor: '#DC5F12'
+                  }}
+                >
+                  <Plus className="w-4 h-4" strokeWidth={2.5} />
+                  <span className="text-sm">Add</span>
+                </Button>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div
+                  className="bg-white rounded-lg border border-gray-200 px-4 py-2 cursor-pointer transition-all duration-300 flex items-center justify-center flex-1"
+                  onClick={onViewInsights}
+                  style={{
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                  }}
+                >
+                  <div className="flex items-center space-x-2">
+                    <BarChart3 className="w-4 h-4" style={{ color: '#136C9E' }} />
+                    <span className="text-sm font-medium" style={{ color: '#374957' }}>Portfolio Insights</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Desktop Header
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Left Column - Welcome Message */}
             <div className="flex items-center">
@@ -604,6 +659,7 @@ export function Dashboard({
               </Button>
             </div>
           </div>
+          )}
         </div>
       </div>
 
@@ -616,7 +672,7 @@ export function Dashboard({
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
           <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -695,30 +751,35 @@ export function Dashboard({
           </Card>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8 mb-8">
+        <div className={`grid ${isMobile ? 'grid-cols-1' : 'lg:grid-cols-2'} gap-4 md:gap-8 mb-8`}>
           {/* Left Column - Priority Alerts */}
           <div>
             {/* Priority Alerts Section - Redesigned */}
             <div className="shadow-sm overflow-hidden" style={{ 
               background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', 
               border: '1px solid #80B2FF', 
-              height: '320px',
+              height: isMobile ? 'auto' : '320px',
+              minHeight: isMobile ? '280px' : '320px',
               borderRadius: '20px'
             }}>
-              <div className="flex h-full">
+              <div className={`flex ${isMobile ? 'flex-col' : 'h-full'}`}>
                 {/* Left Blue Panel */}
-                <div className="p-6 flex flex-col items-start min-w-[200px] rounded-l-xl" style={{ 
+                <div className={`${isMobile ? 'p-4 flex-row items-center justify-between' : 'p-6 flex-col items-start min-w-[200px] rounded-l-xl'} flex`} style={{ 
                   background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', 
                   color: '#374957', 
                   fontFamily: 'Archivo, sans-serif'
                 }}>
-                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mb-3">
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mr-3">
                     <AlertTriangle className="w-5 h-5" style={{ color: '#374957' }} />
                   </div>
-                  <h2 className="text-lg font-semibold">Priority<br />Alerts</h2>
-                  <div className="flex-1"></div>
-                  <div className="mt-auto">
-                    <div className="font-bold block mb-1" style={{ fontSize: '32px', lineHeight: '1' }}>
+                    <h2 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}>
+                      {isMobile ? 'Priority Alerts' : <>Priority<br />Alerts</>}
+                    </h2>
+                  </div>
+                  {!isMobile && <div className="flex-1"></div>}
+                  <div className={isMobile ? '' : 'mt-auto'}>
+                    <div className={`font-bold block mb-1 ${isMobile ? 'text-2xl' : ''}`} style={{ fontSize: isMobile ? '24px' : '32px', lineHeight: '1' }}>
                       {totalPriorityAlerts}
                     </div>
                     <div className="text-sm opacity-90 mb-2 block">Alerts</div>
@@ -733,7 +794,7 @@ export function Dashboard({
                 </div>
 
                 {/* Right White Panel */}
-                <div className="flex-1 p-4 bg-white relative z-10 overflow-hidden flex flex-col" style={{ borderRadius: '20px', boxShadow: '-4px 0 24px rgba(70, 95, 194, 0.4)' }}>
+                <div className={`flex-1 p-4 bg-white relative z-10 overflow-hidden flex flex-col ${isMobile ? 'rounded-b-xl' : ''}`} style={{ borderRadius: isMobile ? '0 0 20px 20px' : '20px', boxShadow: isMobile ? 'none' : '-4px 0 24px rgba(70, 95, 194, 0.4)' }}>
                   {totalPriorityAlerts === 0 ? (
                     // Empty State
                     <div className="flex items-center justify-center h-full">
@@ -750,7 +811,12 @@ export function Dashboard({
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-3 overflow-y-auto flex-1 pr-2" style={{ maxHeight: '100%' }}>
+                    <div 
+                      className={`space-y-3 overflow-y-auto flex-1 pr-2 ${isMobile ? '' : ''}`} 
+                      style={{ 
+                        maxHeight: isMobile && combinedAlerts.length > 2 ? '250px' : '100%'
+                      }}
+                    >
                   {combinedAlerts.map((item, index) => {
                     const isVacancy = item.type === "vacancy";
                     const alert = item.alert;
@@ -864,19 +930,24 @@ export function Dashboard({
             <div className="shadow-sm overflow-hidden" style={{ 
               background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', 
               border: '1px solid #80B2FF', 
-              height: '320px',
+              height: isMobile ? 'auto' : '320px',
+              minHeight: isMobile ? '280px' : '320px',
               borderRadius: '20px'
             }}>
-              <div className="flex h-full">
+              <div className={`flex ${isMobile ? 'flex-col' : 'h-full'}`}>
                 {/* Left Blue Panel */}
-                <div className="px-6 py-4 flex flex-col items-start min-w-[200px] rounded-l-xl" style={{ background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
-                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mb-3">
+                <div className={`${isMobile ? 'p-4 flex-row items-center justify-between' : 'px-6 py-4 flex-col items-start min-w-[200px] rounded-l-xl'} flex`} style={{ background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center mr-3">
                     <BarChart3 className="w-5 h-5" style={{ color: '#374957' }} />
                   </div>
-                  <h2 className="text-lg font-semibold">Quick<br />Stats</h2>
-                  <div className="flex-1"></div>
-                  <div className="mt-auto">
-                    <div className="font-bold block mb-1" style={{ fontSize: '32px', lineHeight: '1' }}>
+                    <h2 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}>
+                      {isMobile ? 'Quick Stats' : <>Quick<br />Stats</>}
+                    </h2>
+                  </div>
+                  {!isMobile && <div className="flex-1"></div>}
+                  <div className={isMobile ? '' : 'mt-auto'}>
+                    <div className={`font-bold block mb-1 ${isMobile ? 'text-2xl' : ''}`} style={{ fontSize: isMobile ? '24px' : '32px', lineHeight: '1' }}>
                       {chartData.length}
                     </div>
                     <div className="text-sm opacity-90 mb-2 block">Charts</div>
@@ -891,7 +962,7 @@ export function Dashboard({
                 </div>
 
                 {/* Right White Panel */}
-                <div className="flex-1 p-4 flex flex-col bg-white relative z-10" style={{ borderRadius: '20px', boxShadow: '-4px 0 24px rgba(70, 95, 194, 0.4)', fontFamily: 'Archivo, sans-serif' }}>
+                <div className={`flex-1 p-4 flex flex-col bg-white relative z-10 ${isMobile ? 'rounded-b-xl' : ''}`} style={{ borderRadius: isMobile ? '0 0 20px 20px' : '20px', boxShadow: isMobile ? 'none' : '-4px 0 24px rgba(70, 95, 194, 0.4)', fontFamily: 'Archivo, sans-serif' }}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-[16px] font-normal text-[#374957]">
                   {currentChart.title}
@@ -1025,9 +1096,71 @@ export function Dashboard({
             </div>
 
 
-      <div className="max-w-7xl mx-auto px-3 pb-6">
+      <div className="max-w-7xl mx-auto px-3 md:px-3 pb-6">
         {/* Filters */}
-        <Card className="p-6 mb-6">
+        <Card className="p-4 md:p-6 mb-6">
+          {isMobile ? (
+            <div className="flex flex-col gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search properties..."
+                  className="pl-10 focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none"
+                  style={{
+                    '--tw-ring-color': '#8FCDFF',
+                    '--tw-ring-opacity': '0.5'
+                  } as React.CSSProperties}
+                  value={searchTerm}
+                  onChange={(e) =>
+                    setSearchTerm(e.target.value)
+                  }
+                />
+              </div>
+              <div className="flex gap-3">
+                <Select
+                  value={statusFilter}
+                  onValueChange={setStatusFilter}
+                >
+                  <SelectTrigger className="flex-1">
+                    <Filter className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      All Status
+                    </SelectItem>
+                    <SelectItem value="occupied">
+                      Occupied
+                    </SelectItem>
+                    <SelectItem value="vacant">Vacant</SelectItem>
+                    <SelectItem value="under-renovation">
+                      Under Renovation
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={complianceFilter}
+                  onValueChange={setComplianceFilter}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="All Properties" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      All Properties
+                    </SelectItem>
+                    <SelectItem value="expiring">
+                      Expiring Soon
+                    </SelectItem>
+                    <SelectItem value="expired">
+                      Expired
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : (
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
@@ -1091,6 +1224,7 @@ export function Dashboard({
               </Select>
             </div>
           </div>
+          )}
         </Card>
 
         {/* Properties Grid */}

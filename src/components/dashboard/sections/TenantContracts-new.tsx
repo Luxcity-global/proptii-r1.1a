@@ -1,16 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Download, Eye, Calendar, CheckCircle, Clock, AlertTriangle, User, Mail, Phone, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { FileText, Download, Eye, Calendar, CheckCircle, Clock, AlertTriangle, User, Mail, Phone, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import ContractModal from '../../contract/ContractModal';
 import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useIsMobile } from '../ui/use-mobile';
 
 const TenantContracts: React.FC = () => {
   const { signedContracts, isLoading, clearAllContracts, addSignedContract, removeSignedContract } = useSignedContracts();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [firestoreContracts, setFirestoreContracts] = useState<any[]>([]);
   const [isLoadingFirestore, setIsLoadingFirestore] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const ITEMS_PER_PAGE = 10;
 
   // Use Firestore contracts as the primary source, fallback to context contracts
   // Normalize contract data to ensure consistent structure
@@ -112,6 +118,19 @@ const TenantContracts: React.FC = () => {
   // Always show signed contracts
   const currentContracts = displaySignedContracts;
 
+  // Pagination logic
+  const totalPages = Math.ceil(currentContracts.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedContracts = useMemo(() => {
+    return currentContracts.slice(startIndex, endIndex);
+  }, [currentContracts, startIndex, endIndex]);
+
+  // Reset pagination when contracts change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [currentContracts.length]);
+
   // Get contract date based on tab
   const getContractDate = (contract: any) => {
     return contract.signedDate; // Always return signedDate
@@ -173,6 +192,71 @@ const TenantContracts: React.FC = () => {
     }
   };
 
+  // Pagination component
+  const PaginationControls = () => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} items-center justify-between gap-4 bg-white border border-gray-200 rounded-lg ${isMobile ? 'p-3' : 'p-4'} mt-4`}>
+        <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600`}>
+          Showing {startIndex + 1} to {Math.min(endIndex, currentContracts.length)} of {currentContracts.length} contracts
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className={`flex items-center gap-1 ${isMobile ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'} transition-colors`}
+          >
+            <ChevronLeft className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
+            <span className={isMobile ? '' : 'hidden sm:inline'}>Previous</span>
+          </button>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+              // Show first page, last page, current page, and pages around current
+              if (
+                page === 1 ||
+                page === totalPages ||
+                (page >= currentPage - 1 && page <= currentPage + 1)
+              ) {
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`${isMobile ? 'min-w-[32px] h-8 text-xs' : 'min-w-[40px] h-9 text-sm'} px-2 border rounded-lg transition-colors ${
+                      currentPage === page
+                        ? 'bg-orange-600 text-white border-orange-600'
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              } else if (
+                page === currentPage - 2 ||
+                page === currentPage + 2
+              ) {
+                return (
+                  <span key={page} className={`${isMobile ? 'px-1' : 'px-2'} text-gray-500`}>
+                    ...
+                  </span>
+                );
+              }
+              return null;
+            })}
+          </div>
+          <button
+            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+            className={`flex items-center gap-1 ${isMobile ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'} transition-colors`}
+          >
+            <span className={isMobile ? '' : 'hidden sm:inline'}>Next</span>
+            <ChevronRight className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   // Handle contract deletion
   const handleDeleteContract = async (contractId: string) => {
     try {
@@ -204,9 +288,9 @@ const TenantContracts: React.FC = () => {
 
   if (isLoading || isLoadingFirestore) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-        <span className="ml-2 text-gray-600">
+      <div className={`flex items-center justify-center ${isMobile ? 'h-48' : 'h-64'}`}>
+        <div className={`animate-spin rounded-full ${isMobile ? 'h-6 w-6' : 'h-8 w-8'} border-b-2 border-gray-900`}></div>
+        <span className={`${isMobile ? 'ml-2 text-sm' : 'ml-2'} text-gray-600`}>
           {isLoadingFirestore ? 'Loading contracts from database...' : 'Loading...'}
         </span>
       </div>
@@ -214,56 +298,56 @@ const TenantContracts: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${isMobile ? 'pb-4 px-4' : 'pb-8'}`}>
       {/* Header */}
-      <div className="flex items-center justify-between pt-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Contracts</h2>
-          <p className="text-gray-600">Manage your property contracts and agreements</p>
+      <div className={`flex items-start ${isMobile ? 'gap-3' : 'justify-between'} ${isMobile ? 'pt-4' : 'pt-6'}`}>
+        <div className={`${isMobile ? 'flex-1 min-w-0' : ''}`}>
+          <h2 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-gray-900`}>Contracts</h2>
+          <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 ${isMobile ? 'mt-1 break-words' : ''}`}>Manage your property contracts and agreements</p>
         </div>
         <button
           onClick={() => setIsContractModalOpen(true)}
-          className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+          className={`${isMobile ? 'px-3 py-2 text-xs whitespace-nowrap flex-shrink-0' : 'px-4 py-2'} bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors ${isMobile ? 'min-h-[2.5rem]' : ''}`}
         >
-          Go To Contract Page
+          {isMobile ? 'Go To Contract' : 'Go To Contract Page'}
         </button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-4'} ${isMobile ? 'gap-4' : 'gap-6'}`}>
         {/* Total Contracts */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Total Contracts</h3>
-            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-              <FileText className="w-5 h-5 text-blue-600" />
+        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow`}>
+          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Total Contracts</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-blue-100 rounded-lg flex items-center justify-center`}>
+              <FileText className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-blue-600`} />
             </div>
           </div>
-          <div className="mb-3">
-            <p className="text-2xl font-bold" style={{ color: '#374957' }}>
+          <div className={isMobile ? 'mb-2' : 'mb-3'}>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
               {contractStats.total}
             </p>
           </div>
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>All contracts</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>All contracts</p>
           </div>
         </div>
 
         {/* Signed Contracts */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Signed</h3>
-            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-green-600" />
+        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow`}>
+          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Signed</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-green-100 rounded-lg flex items-center justify-center`}>
+              <CheckCircle className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-green-600`} />
             </div>
           </div>
-          <div className="mb-3">
-            <p className="text-2xl font-bold" style={{ color: '#374957' }}>
+          <div className={isMobile ? 'mb-2' : 'mb-3'}>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
               {contractStats.signed}
             </p>
           </div>
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>Completed</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Completed</p>
           </div>
         </div>
 
@@ -288,20 +372,20 @@ const TenantContracts: React.FC = () => {
         )}
 
         {/* Expiring Soon */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Expiring Soon</h3>
-            <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
+        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow`}>
+          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Expiring Soon</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-red-100 rounded-lg flex items-center justify-center`}>
+              <AlertTriangle className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-red-600`} />
             </div>
           </div>
-          <div className="mb-3">
-            <p className="text-2xl font-bold" style={{ color: '#374957' }}>
+          <div className={isMobile ? 'mb-2' : 'mb-3'}>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
               {contractStats.expiring}
             </p>
           </div>
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>Within 30 days</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Within 30 days</p>
           </div>
         </div>
       </div>
@@ -328,10 +412,10 @@ const TenantContracts: React.FC = () => {
 
       {/* Tabs Section - requested tab disabled */}
       <div>
-        <div className="mb-6">
-          <div className="bg-white rounded-full border border-gray-100 p-1 inline-flex">
+        <div className={isMobile ? 'mb-4' : 'mb-6'}>
+          <div className={`bg-white rounded-full border border-gray-100 p-1 ${isMobile ? 'w-full' : 'inline-flex'}`}>
             <button
-              className={`px-4 py-2 text-sm font-medium transition-colors rounded-full text-white`}
+              className={`${isMobile ? 'w-full px-3 py-2 text-xs' : 'px-4 py-2 text-sm'} font-medium transition-colors rounded-full text-white`}
               style={{ backgroundColor: '#DC5F12' }}
               disabled
             >
@@ -340,87 +424,178 @@ const TenantContracts: React.FC = () => {
           </div>
         </div>
 
-        {/* Contracts Table */}
-        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          {/* Table Header */}
-          <div className="px-6 py-4 border-b border-gray-200" style={{ backgroundColor: '#E7F2FF' }}>
-            <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-600">
-              <div>Name</div>
-              <div>Agent</div>
-              <div>Email</div>
-              <div>Signed Date</div>
-              <div>Actions</div>
+        {/* Desktop Table View */}
+        {!isMobile && (
+          <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+            {/* Table Header */}
+            <div className="px-6 py-4 border-b border-gray-200" style={{ backgroundColor: '#E7F2FF' }}>
+              <div className="grid grid-cols-5 gap-4 text-sm font-medium text-gray-600">
+                <div>Name</div>
+                <div>Agent</div>
+                <div>Email</div>
+                <div>Signed Date</div>
+                <div>Actions</div>
+              </div>
             </div>
-          </div>
 
-          {/* Table Body */}
-          <div className="divide-y divide-gray-100">
-            {currentContracts.map((contract, index) => (
-              <div key={contract.id || index} className="grid grid-cols-5 gap-4 items-start px-6 py-4 hover:bg-gray-50 transition-colors">
-                {/* Name (Contract File Name) */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-5 h-5 text-gray-600" />
+            {/* Table Body */}
+            <div className="divide-y divide-gray-100">
+              {paginatedContracts.map((contract, index) => (
+                <div key={contract.id || index} className="grid grid-cols-5 gap-4 items-start px-6 py-4 hover:bg-gray-50 transition-colors">
+                  {/* Name (Contract File Name) */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-5 h-5 text-gray-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 break-words overflow-wrap-anywhere">
+                        {contract.documentName || contract.propertyName || 'Contract Document'}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 break-words overflow-wrap-anywhere">
-                      {contract.documentName || contract.propertyName || 'Contract Document'}
+
+                  {/* Agent */}
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {contract.agentName || 'Agent Name'}
                     </p>
                   </div>
-                </div>
 
-                {/* Agent */}
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    {contract.agentName || 'Agent Name'}
-                  </p>
-                </div>
+                  {/* Email */}
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-700">{contract.email || contract.tenantEmail || contract.agentEmail || 'No email'}</span>
+                  </div>
 
-                {/* Email */}
-                <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm text-gray-700">{contract.email || contract.tenantEmail || contract.agentEmail || 'No email'}</span>
-                </div>
+                  {/* Signed Date */}
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm text-gray-700">
+                      {getContractDate(contract) ? new Date(getContractDate(contract)).toLocaleDateString() : 'N/A'}
+                    </span>
+                  </div>
 
-                {/* Signed Date */}
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm text-gray-700">
-                    {getContractDate(contract) ? new Date(getContractDate(contract)).toLocaleDateString() : 'N/A'}
-                  </span>
+                  {/* Actions */}
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => handleViewContract(contract)}
+                      className="inline-flex items-center p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                      aria-label="View"
+                      title="View"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleDownloadContract(contract)}
+                      className="inline-flex items-center p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                      aria-label="Download"
+                      title="Download"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => contract.id && handleDeleteContract(String(contract.id))}
+                      className="inline-flex items-center p-2 border border-red-300 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                      aria-label="Delete"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={() => handleViewContract(contract)}
-                    className="inline-flex items-center p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                    aria-label="View"
-                    title="View"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => handleDownloadContract(contract)}
-                    className="inline-flex items-center p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                    aria-label="Download"
-                    title="Download"
-                  >
-                    <Download className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={() => contract.id && handleDeleteContract(String(contract.id))}
-                    className="inline-flex items-center p-2 border border-red-300 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
-                    aria-label="Delete"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Pagination Controls for Desktop */}
+        {!isMobile && <PaginationControls />}
+
+        {/* Mobile Card View */}
+        {isMobile && (
+          <div className="space-y-4">
+            {paginatedContracts.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-100 p-8 text-center">
+                <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-base font-semibold text-gray-900 mb-2">No Contracts</h3>
+                <p className="text-sm text-gray-600">You don't have any signed contracts yet.</p>
+              </div>
+            ) : (
+              paginatedContracts.map((contract, index) => (
+                <div 
+                  key={contract.id || index} 
+                  className="bg-white border border-gray-200 rounded-lg p-4"
+                >
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-5 h-5 text-gray-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-semibold text-gray-900 mb-1 truncate">
+                        {contract.documentName || contract.propertyName || 'Contract Document'}
+                      </h3>
+                      <div className="flex items-center gap-1 mb-2">
+                        <User className="w-3 h-3 text-gray-400" />
+                        <p className="text-xs text-gray-600 truncate">
+                          {contract.agentName || 'Agent Name'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mb-3 text-sm">
+                    <div>
+                      <span className="text-xs text-gray-500">Email:</span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <Mail className="h-3 w-3 text-gray-400" />
+                        <p className="text-xs text-gray-700 truncate">
+                          {contract.email || contract.tenantEmail || contract.agentEmail || 'No email'}
+                        </p>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500">Signed Date:</span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <Calendar className="h-3 w-3 text-gray-400" />
+                        <p className="text-xs font-medium text-gray-900">
+                          {getContractDate(contract) ? new Date(getContractDate(contract)).toLocaleDateString() : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-3 border-t">
+                    <button
+                      onClick={() => handleViewContract(contract)}
+                      className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      View
+                    </button>
+                    <button
+                      onClick={() => handleDownloadContract(contract)}
+                      className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </button>
+                    <button
+                      onClick={() => contract.id && handleDeleteContract(String(contract.id))}
+                      className="inline-flex items-center justify-center p-2 border border-red-300 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                      aria-label="Delete"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Pagination Controls for Mobile */}
+        {isMobile && <PaginationControls />}
       </div>
     </div>
   );

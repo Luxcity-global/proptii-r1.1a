@@ -124,21 +124,22 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
   };
 
   return (
-    <div className="min-h-screen py-8 px-4" style={{ backgroundColor: '#F7F7F7' }}>
+    <div className="min-h-screen py-4 md:py-8 px-4" style={{ backgroundColor: '#F7F7F7' }}>
       <div className="max-w-3xl mx-auto">
         {/* Back Button */}
-        <div className="mb-6">
+        <div className="mb-4 md:mb-6">
           <Button
             variant="outline"
             onClick={onBack}
-            className="flex items-center space-x-1 rounded-full border-gray-300 hover:border-gray-400 transition-colors bg-transparent hover:bg-gray-50 px-8 py-2"
+            className="flex items-center space-x-1 rounded-full border-gray-300 hover:border-gray-400 transition-colors bg-transparent hover:bg-gray-50 px-4 md:px-8 py-2"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back</span>
           </Button>
         </div>
 
-        <div className="text-left mb-8 p-8 rounded-xl" style={{ 
+        {/* Header with background image - hidden on mobile */}
+        <div className="hidden md:block text-left mb-8 p-8 rounded-xl" style={{ 
           backgroundImage: 'url(/src/assets/add_property_background.png)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
@@ -150,8 +151,16 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
           </p>
         </div>
 
-        <Card className="p-8">
-          <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Mobile header without background image */}
+        <div className="md:hidden text-left mb-6">
+          <h1 className="mb-2 font-bold text-xl" style={{ color: '#374957' }}>{property ? 'Edit Property' : 'Add Your First Property'}</h1>
+          <p className="text-sm text-muted-foreground">
+            Let's get your property portfolio started with some basic information
+          </p>
+        </div>
+
+        <Card className="p-4 md:p-8">
+          <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
             {/* Property Address */}
             <div className="space-y-2">
               <Label htmlFor="address" style={{ color: '#374957' }}>Property Address *</Label>
@@ -174,7 +183,7 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
             </div>
 
             {/* Property Type & Bedrooms */}
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="type" style={{ color: '#374957' }}>Property Type *</Label>
                 <Select 
@@ -220,7 +229,7 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
             </div>
 
             {/* Rent & Status */}
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="rent" style={{ color: '#374957' }}>Monthly Rent (£) *</Label>
                 <div className="relative">
@@ -277,7 +286,7 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
             {/* Amenities */}
             <div className="space-y-4">
               <Label style={{ color: '#374957' }}>Amenities (Optional)</Label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {availableAmenities.map(amenity => (
                   <div key={amenity} className="flex items-center space-x-2">
                     <Checkbox
@@ -339,14 +348,14 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
             )}
 
             {/* Form Actions */}
-            <div className="flex justify-between items-center pt-6 border-t">
-              <div className="flex items-center space-x-4">
+            <div className="flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-4 pt-6 border-t">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={saveDraft}
                   disabled={isDraft}
-                  className="flex items-center space-x-2"
+                  className="flex items-center justify-center space-x-2 w-full sm:w-auto"
                 >
                   <Save className="w-4 h-4" />
                   <span>{isDraft ? 'Saved!' : 'Save Draft'}</span>
@@ -355,6 +364,7 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
                   type="button"
                   variant="ghost"
                   onClick={onSkip}
+                  className="w-full sm:w-auto"
                 >
                   Skip for now
                 </Button>
@@ -364,7 +374,7 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
                 type="submit" 
                 size="lg"
                 disabled={isSubmitting}
-                className="transition-all duration-300"
+                className="transition-all duration-300 w-full sm:w-auto"
                 style={{ 
                   backgroundColor: '#DC5F12', 
                   borderColor: '#DC5F12',
@@ -398,11 +408,11 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
           </form>
         </Card>
 
-        <div className="mt-6 p-4 rounded-xl" style={{ backgroundColor: '#EEF9FF', border: '1px solid #AACBFF' }}>
+        <div className="mt-4 md:mt-6 p-3 md:p-4 rounded-xl" style={{ backgroundColor: '#EEF9FF', border: '1px solid #AACBFF' }}>
           <div className="flex items-start space-x-3">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#136C9E' }} />
+            <AlertCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0 mt-0.5" style={{ color: '#136C9E' }} />
             <div>
-              <p className="text-sm" style={{ color: 'rgba(55, 73, 87, 0.8)' }}>
+              <p className="text-xs md:text-sm" style={{ color: 'rgba(55, 73, 87, 0.8)' }}>
                 <strong style={{ color: '#136C9E' }}>Don't worry!</strong><br />
                 You can always edit these details later and add photos, documents, and tenant information as you go.
               </p>

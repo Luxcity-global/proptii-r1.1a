@@ -4,9 +4,14 @@
   "description": "Email server for Proptii",
   "main": "index.js",
   "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
   "dependencies": {
     "@azure/identity": "^4.13.0",
     "@azure/msal-node": "^3.8.2",
+    "@azure/storage-blob": "^12.29.1",
     "@types/nodemailer": "^6.4.17",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

@@ -4,6 +4,7 @@ import { fileService, FileItem } from '../../../services/fileService';
 import { useAuth } from '../../../contexts/AuthContext';
 import { firestoreService, ReferencingFormData } from '../../../services/firestoreService';
 import { contractService, ContractTemplate } from '../../../services/contractService';
+import { useIsMobile } from '../ui/use-mobile';
 import FileUploadModal from './FileUploadModal';
 import FilePreviewModal from './FilePreviewModal';
 
@@ -12,6 +13,7 @@ import FilePreviewModal from './FilePreviewModal';
  */
 const YourFiles: React.FC = () => {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [selectedFilter, setSelectedFilter] = useState('All Files');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,7 +26,11 @@ const YourFiles: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const ITEMS_PER_PAGE = 10;
+  const ACCENT_BLUE = '#136C9E';
 
   // Load files on component mount
   useEffect(() => {
@@ -319,6 +325,76 @@ const YourFiles: React.FC = () => {
     return matchesCategory && matchesSearch;
   });
 
+  // Pagination helpers
+  const totalPages = Math.ceil(filteredFiles.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedFiles = filteredFiles.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedFilter, searchQuery, allFiles.length]);
+
+  const PaginationControls = () => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white border border-gray-100 rounded-lg p-4 mt-4">
+        <div className="text-sm text-gray-600">
+          Showing {filteredFiles.length === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, filteredFiles.length)} of {filteredFiles.length} files
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="inline-flex items-center px-3 py-2 text-sm border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+          >
+            <ChevronDown className="rotate-90 w-4 h-4 mr-1" />
+            <span className="hidden sm:inline">Previous</span>
+          </button>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+              if (
+                page === 1 ||
+                page === totalPages ||
+                (page >= currentPage - 1 && page <= currentPage + 1)
+              ) {
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`min-w-[36px] px-2 py-1.5 text-sm rounded-lg border ${
+                      currentPage === page ? 'text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                    style={currentPage === page ? { backgroundColor: ACCENT_BLUE, borderColor: ACCENT_BLUE } : {}}
+                  >
+                    {page}
+                  </button>
+                );
+              }
+              if (page === currentPage - 2 || page === currentPage + 2) {
+                return (
+                  <span key={page} className="px-2 text-gray-400">
+                    ...
+                  </span>
+                );
+              }
+              return null;
+            })}
+          </div>
+          <button
+            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+            className="inline-flex items-center px-3 py-2 text-sm border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+          >
+            <span className="hidden sm:inline">Next</span>
+            <ChevronDown className="-rotate-90 w-4 h-4 ml-1" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   // Get file statistics
   const stats = fileService.getFileStats(filteredFiles);
 
@@ -370,7 +446,7 @@ const YourFiles: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
         {/* Total Files Card */}
         <div className="bg-white p-6 rounded-xl border border-gray-100">
           <div className="flex items-center justify-between mb-4">
@@ -489,102 +565,194 @@ const YourFiles: React.FC = () => {
 
       {/* Files Table */}
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        {/* Table Header */}
-        <div className="px-6 py-4 border-b border-gray-200" style={{ backgroundColor: '#E7F2FF' }}>
-          <div className="grid grid-cols-6 gap-4 text-sm font-medium text-black">
-            <div>File Name</div>
-            <div>Category</div>
-            <div>Type</div>
-            <div>Size (KB)</div>
-            <div>Uploaded At</div>
-            <div></div>
-          </div>
-        </div>
-
-        {/* Table Body */}
-        <div className="divide-y divide-gray-100">
-          {loading ? (
-            <div className="px-6 py-8 text-center">
-              <Loader className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
-              <p className="text-gray-600">Loading files...</p>
-            </div>
-          ) : filteredFiles.length === 0 ? (
-            <div className="px-6 py-8 text-center">
-              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No files found</p>
-              <p className="text-sm text-gray-500 mt-1">
-                {searchQuery || selectedFilter !== 'All Files' 
-                  ? 'Try adjusting your search or filter' 
-                  : 'Upload your first file to get started'
-                }
-              </p>
-            </div>
-          ) : (
-            filteredFiles.map((file, index) => (
-            <div key={file.id} className={`px-6 py-4 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-              <div className="grid grid-cols-6 gap-4 items-center">
-                {/* File Name */}
-                <div className="flex items-center gap-3">
-                    {getFileTypeIcon(file.name, file.type)}
-                    <span className="text-sm font-medium text-gray-900 truncate">
-                    {file.name}
-                  </span>
-                </div>
-                
-                {/* Category */}
-                <div className="flex items-center gap-2">
-                  {getCategoryIcon(file.category)}
-                  <span className={`text-sm font-medium ${getCategoryColor(file.category)}`}>
-                    {file.category}
-                  </span>
-                </div>
-                
-                {/* Type */}
-                <div className="text-sm text-gray-700">
-                    {file.type.split('/')[1]?.toUpperCase() || 'FILE'}
-                </div>
-                
-                {/* Size */}
-                <div className="text-sm text-gray-700">
-                    {formatFileSize(file.size)}
-                </div>
-                
-                {/* Uploaded At */}
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm text-gray-700">{file.uploadDate}</span>
-                </div>
-                
-                {/* Actions */}
-                <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => handleView(file)}
-                      className="p-1 hover:bg-gray-100 rounded transition-colors"
-                      title="View file"
-                    >
-                    <Eye className="w-4 h-4 text-gray-600" />
-                  </button>
-                    <button 
-                      onClick={() => handleDownload(file)}
-                      className="p-1 hover:bg-gray-100 rounded transition-colors"
-                      title="Download file"
-                    >
-                    <Download className="w-4 h-4 text-gray-600" />
-                    </button>
-                    <button 
-                      onClick={() => setDeleteConfirm(file.id)}
-                      className="p-1 hover:bg-red-100 rounded transition-colors"
-                      title="Delete file"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-600" />
-                    </button>
-                  </div>
-                </div>
+        {!isMobile && (
+          <>
+            {/* Table Header */}
+            <div className="px-6 py-4 border-b border-gray-200" style={{ backgroundColor: '#E7F2FF' }}>
+              <div className="grid grid-cols-6 gap-4 text-sm font-medium text-black">
+                <div>File Name</div>
+                <div>Category</div>
+                <div>Type</div>
+                <div>Size</div>
+                <div>Uploaded At</div>
+                <div></div>
               </div>
-            ))
-          )}
-        </div>
+            </div>
+
+            {/* Table Body */}
+            <div className="divide-y divide-gray-100">
+              {loading ? (
+                <div className="px-6 py-8 text-center">
+                  <Loader className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
+                  <p className="text-gray-600">Loading files...</p>
+                </div>
+              ) : filteredFiles.length === 0 ? (
+                <div className="px-6 py-8 text-center">
+                  <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">No files found</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {searchQuery || selectedFilter !== 'All Files' 
+                      ? 'Try adjusting your search or filter' 
+                      : 'Upload your first file to get started'
+                    }
+                  </p>
+                </div>
+              ) : (
+                paginatedFiles.map((file, index) => (
+                  <div key={file.id} className={`px-6 py-4 hover:bg-gray-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                    <div className="grid grid-cols-6 gap-4 items-center">
+                      {/* File Name */}
+                      <div className="flex items-center gap-3">
+                        {getFileTypeIcon(file.name, file.type)}
+                        <span className="text-sm font-medium text-gray-900 truncate">
+                          {file.name}
+                        </span>
+                      </div>
+                      
+                      {/* Category */}
+                      <div className="flex items-center gap-2">
+                        {getCategoryIcon(file.category)}
+                        <span className={`text-sm font-medium ${getCategoryColor(file.category)}`}>
+                          {file.category}
+                        </span>
+                      </div>
+                      
+                      {/* Type */}
+                      <div className="text-sm text-gray-700">
+                        {file.type.split('/')[1]?.toUpperCase() || 'FILE'}
+                      </div>
+                      
+                      {/* Size */}
+                      <div className="text-sm text-gray-700">
+                        {formatFileSize(file.size)}
+                      </div>
+                      
+                      {/* Uploaded At */}
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-700">{file.uploadDate}</span>
+                      </div>
+                      
+                      {/* Actions */}
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handleView(file)}
+                          className="p-1 hover:bg-gray-100 rounded transition-colors"
+                          title="View file"
+                        >
+                          <Eye className="w-4 h-4 text-gray-600" />
+                        </button>
+                        <button 
+                          onClick={() => handleDownload(file)}
+                          className="p-1 hover:bg-gray-100 rounded transition-colors"
+                          title="Download file"
+                        >
+                          <Download className="w-4 h-4 text-gray-600" />
+                        </button>
+                        <button 
+                          onClick={() => setDeleteConfirm(file.id)}
+                          className="p-1 hover:bg-red-100 rounded transition-colors"
+                          title="Delete file"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-600" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
+
+        {isMobile && (
+          <div className="p-4">
+            {loading ? (
+              <div className="text-center py-8">
+                <Loader className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
+                <p className="text-gray-600">Loading files...</p>
+              </div>
+            ) : filteredFiles.length === 0 ? (
+              <div className="text-center py-8">
+                <FileText className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-700">No files found</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {searchQuery || selectedFilter !== 'All Files' 
+                    ? 'Try adjusting your search or filter' 
+                    : 'Upload your first file to get started'
+                  }
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {paginatedFiles.map((file) => (
+                  <div key={file.id} className="border border-gray-200 rounded-lg p-3 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2 flex-1 min-w-0">
+                        <div className="mt-0.5">
+                          {getFileTypeIcon(file.name, file.type)}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate">{file.name}</h3>
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${getCategoryColor(file.category)} bg-gray-50`}>
+                              {file.category}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handleView(file)}
+                          className="p-1.5 rounded-full border border-gray-200 hover:bg-gray-50"
+                          title="View file"
+                        >
+                          <Eye className="w-4 h-4 text-gray-600" />
+                        </button>
+                        <button 
+                          onClick={() => handleDownload(file)}
+                          className="p-1.5 rounded-full border border-gray-200 hover:bg-gray-50"
+                          title="Download file"
+                        >
+                          <Download className="w-4 h-4 text-gray-600" />
+                        </button>
+                        <button 
+                          onClick={() => setDeleteConfirm(file.id)}
+                          className="p-1.5 rounded-full border border-red-200 hover:bg-red-50"
+                          title="Delete file"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-600" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mt-3">
+                      <div className="flex items-center gap-1">
+                        <FileText className="w-3 h-3 text-gray-400" />
+                        <span className="truncate">{file.type.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Download className="w-3 h-3 text-gray-400" />
+                        <span>{formatFileSize(file.size)}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-gray-400" />
+                        <span className="truncate">{file.uploadDate}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Search className="w-3 h-3 text-gray-400" />
+                        <span className="truncate">{file.category}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {!loading && <PaginationControls />}
 
       {/* Error Message */}
       {error && (

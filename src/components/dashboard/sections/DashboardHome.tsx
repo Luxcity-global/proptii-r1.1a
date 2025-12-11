@@ -33,6 +33,7 @@ import { contractService } from '../../../services/contractService';
 import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
 import { viewingService, ViewingStats } from '../../../services/viewingService';
 import FilePreviewModal from './FilePreviewModal';
+import { useIsMobile } from '../ui/use-mobile';
 
 /**
  * Main dashboard home page component following the style guide
@@ -41,6 +42,7 @@ const DashboardHome: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { savedProperties } = useSavedProperties();
+  const isMobile = useIsMobile();
   
   // State for referencing modal
   const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
@@ -665,109 +667,109 @@ const DashboardHome: React.FC = () => {
   const pieSegments = calculatePieChartSegments();
 
   return (
-    <div className="space-y-6 pb-8" style={{ fontFamily: 'Archivo, sans-serif' }}>
+    <div className={`space-y-6 ${isMobile ? 'pb-4 px-4' : 'pb-8'}`} style={{ fontFamily: 'Archivo, sans-serif' }}>
       {/* Overview Section */}
-      <div className="mt-8">
+      <div className={isMobile ? 'mt-4' : 'mt-8'}>
         <h2 
-          className="text-lg font-semibold mb-6"
+          className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold mb-6`}
           style={{ color: '#374957' }}
         >
           Overview
         </h2>
         
         {/* Summary Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'} gap-4 md:gap-6`}>
         {/* Saved Listings Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
+        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow`}>
           {/* Row 1: Title and Icon */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Saved Listings</h3>
-            <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-orange-600" />
+          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Saved Listings</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-orange-100 rounded-lg flex items-center justify-center`}>
+              <Building2 className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-orange-600`} />
             </div>
           </div>
           
           {/* Row 2: Number */}
-          <div className="mb-3">
-            <p className="text-2xl font-bold" style={{ color: '#374957' }}>
+          <div className={isMobile ? 'mb-2' : 'mb-3'}>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
               {savedProperties.length}
             </p>
           </div>
           
           {/* Row 3: Subtitle */}
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>
               {savedProperties.length === 1 ? 'Saved property' : 'Saved properties'}
             </p>
           </div>
         </div>
 
       {/* Viewings Card */}
-        <Link to="/dashboard/viewings" className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow cursor-pointer">
+        <Link to="/dashboard/viewings" className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow cursor-pointer`}>
           {/* Row 1: Title and Icon */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Viewings</h3>
-            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Eye className="w-5 h-5 text-blue-600" />
+          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Viewings</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-blue-100 rounded-lg flex items-center justify-center`}>
+              <Eye className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-blue-600`} />
             </div>
           </div>
           
           {/* Row 2: Number */}
-          <div className="mb-3">
-            <p className="text-2xl font-bold" style={{ color: '#374957' }}>
+          <div className={isMobile ? 'mb-2' : 'mb-3'}>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
               {viewingStats.total || 0}
             </p>
           </div>
           
           {/* Row 3: Subtitle */}
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>Total booked</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Total booked</p>
           </div>
         </Link>
 
       {/* Referencing Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
+        <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow`}>
           {/* Row 1: Title and Icon */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Referencing</h3>
-            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-              <FileText className="w-5 h-5 text-blue-600" />
+          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Referencing</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-blue-100 rounded-lg flex items-center justify-center`}>
+              <FileText className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-blue-600`} />
             </div>
           </div>
           
           {/* Row 2: Number */}
-          <div className="mb-3">
-            <p className="text-2xl font-bold" style={{ color: '#374957' }}>
+          <div className={isMobile ? 'mb-2' : 'mb-3'}>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
               {dashboardSummary?.referencing.completedSteps || 6}/{dashboardSummary?.referencing.totalSteps || 6}
             </p>
           </div>
           
           {/* Row 3: Subtitle */}
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>Complete</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Complete</p>
           </div>
         </div>
 
         {/* Contracts Card */}
-        <Link to="/dashboard/tenant-contracts" className="bg-white p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow cursor-pointer">
+        <Link to="/dashboard/tenant-contracts" className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow cursor-pointer`}>
           {/* Row 1: Title and Icon */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium" style={{ color: '#374957' }}>Contracts</h3>
-            <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-yellow-600" />
+          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`} style={{ color: '#374957' }}>Contracts</h3>
+            <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-yellow-100 rounded-lg flex items-center justify-center`}>
+              <Users className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-yellow-600`} />
             </div>
           </div>
           
           {/* Row 2: Number */}
-          <div className="mb-3">
-            <p className="text-2xl font-bold" style={{ color: '#374957' }}>
+          <div className={isMobile ? 'mb-2' : 'mb-3'}>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
               {signedContractsCount || 0}
             </p>
           </div>
           
           {/* Row 3: Subtitle */}
           <div>
-            <p className="text-sm" style={{ color: '#717182' }}>Signed Contracts</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Signed Contracts</p>
           </div>
         </Link>
         </div>
@@ -775,50 +777,54 @@ const DashboardHome: React.FC = () => {
 
       {/* Tenant Insights Section */}
       <div>
-        <div className="flex items-center gap-2 mb-6">
-          <TrendingUp className="w-5 h-5" style={{ color: '#374957' }} />
+        <div className={`flex items-center gap-2 ${isMobile ? 'mb-4' : 'mb-6'}`}>
+          <TrendingUp className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'}`} style={{ color: '#374957' }} />
           <h2 
-            className="text-lg font-semibold"
+            className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}
             style={{ color: '#374957' }}
           >
             Tenant Insights
           </h2>
         </div>
         
-        <div className="grid grid-cols-2 gap-8 mb-8">
+        <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} ${isMobile ? 'gap-4' : 'gap-8'} ${isMobile ? 'mb-6' : 'mb-8'}`}>
         {/* Referencing Card */}
         <div
           className="shadow-sm overflow-hidden"
           style={{
             background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)',
             border: '1px solid #80B2FF',
-            height: '320px',
+            height: isMobile ? 'auto' : '320px',
+            minHeight: isMobile ? '280px' : '320px',
             borderRadius: '20px'
           }}
         >
-          <div className="flex h-full">
+          <div className={`flex ${isMobile ? 'flex-col' : 'h-full'}`}>
             {/* Left Blue Panel */}
             <div
-              className="p-6 flex flex-col items-start min-w-[200px]"
+              className={`${isMobile ? 'p-4 flex-row items-center justify-between' : 'p-6 flex-col items-start min-w-[200px]'} flex`}
               style={{
                 background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)',
                 color: '#374957'
               }}
             >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-blue-600" />
+              <div className="flex items-center gap-3">
+                <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-white rounded-full flex items-center justify-center`}>
+                  <FileText className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-blue-600`} />
                 </div>
-                <h2 className="text-lg font-semibold">Referencing</h2>
+                <h2 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}>
+                  {isMobile ? 'Referencing' : 'Referencing'}
+                </h2>
               </div>
-              <div className="mt-auto">
-                <div className="text-4xl font-bold text-blue-800">
+              {!isMobile && <div className="mt-auto"></div>}
+              <div className={isMobile ? '' : 'mt-auto'}>
+                <div className={`${isMobile ? 'text-2xl' : 'text-4xl'} font-bold text-blue-800`}>
                   {allCompleted ? 6 : remainingCount}
                 </div>
-                <div className="text-sm opacity-90">
+                <div className={`${isMobile ? 'text-xs' : 'text-sm'} opacity-90`}>
                   {allCompleted ? 'Success' : 'Alerts'}
                 </div>
-                <div className="text-xs opacity-75">
+                <div className={`${isMobile ? 'text-xs' : 'text-xs'} opacity-75`}>
                   {allCompleted 
                     ? 'All forms completed!' 
                     : 'Between 25 Nov - 2 Dec 2024'
@@ -829,48 +835,48 @@ const DashboardHome: React.FC = () => {
 
             {/* Right White Panel */}
             <div
-              className="flex-1 p-4 bg-white"
+              className={`flex-1 p-4 bg-white ${isMobile ? 'rounded-b-xl' : ''}`}
               style={{
-                borderRadius: '20px',
-                boxShadow: '-4px 0 24px rgba(70, 95, 194, 0.4)',
+                borderRadius: isMobile ? '0 0 20px 20px' : '20px',
+                boxShadow: isMobile ? 'none' : '-4px 0 24px rgba(70, 95, 194, 0.4)',
                 overflow: 'hidden'
               }}
             >
-              <div className="flex justify-end mb-4">
-                <Link to="/dashboard/tenant-referencing" className="text-sm font-medium text-blue-600 hover:underline">
-                  Go to Referencing →
+              <div className={`flex justify-end ${isMobile ? 'mb-3' : 'mb-4'}`}>
+                <Link to="/dashboard/tenant-referencing" className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-blue-600 hover:underline`}>
+                  {isMobile ? 'Go to Referencing →' : 'Go to Referencing →'}
                 </Link>
               </div>
               <div 
-                className="space-y-3 max-h-56 overflow-y-auto thin-scrollbar pb-4"
+                className={`space-y-3 ${isMobile ? 'max-h-64' : 'max-h-56'} overflow-y-auto thin-scrollbar pb-4`}
                 style={{
                   scrollbarWidth: 'thin',
                   scrollbarColor: '#cbd5e1 transparent'
                 }}
               >
                 {/* Identity */}
-                <div className="p-4 border-0 bg-white hover:shadow-md transition-shadow cursor-pointer">
+                <div className={`${isMobile ? 'p-3' : 'p-4'} border-0 bg-white hover:shadow-md transition-shadow cursor-pointer`}>
                   <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-3 flex-1">
+                    <div className={`flex items-start ${isMobile ? 'space-x-2' : 'space-x-3'} flex-1`}>
                       {completedSections.has('identity') ? (
-                        <CheckCircle className="w-4 h-4 text-green-600 mt-1" />
+                        <CheckCircle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-green-600 mt-1`} />
                       ) : (
-                        <AlertTriangle className="w-4 h-4 text-orange-600 mt-1" />
+                        <AlertTriangle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-orange-600 mt-1`} />
                       )}
                       <div className="flex-1 min-w-0">
-                        <h4 className={`font-medium mb-1 text-sm ${
+                        <h4 className={`font-medium ${isMobile ? 'mb-0.5' : 'mb-1'} ${isMobile ? 'text-xs' : 'text-sm'} ${
                           completedSections.has('identity') ? 'text-green-600' : 'text-orange-600'
                         }`}>
                           Identity
                         </h4>
-                        <p className="text-xs text-gray-700 mb-2">
+                        <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-700 ${isMobile ? 'mb-1' : 'mb-2'}`}>
                           {completedSections.has('identity') 
                             ? 'Identity verification completed' 
                             : 'Upload your identity documents'}
                         </p>
                         {!completedSections.has('identity') && (
                           <div className="flex items-baseline space-x-3">
-                            <span className="text-xs font-bold text-orange-600">
+                            <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-orange-600`}>
                               5 days past due date
                             </span>
                           </div>
@@ -879,44 +885,44 @@ const DashboardHome: React.FC = () => {
                     </div>
                     <button 
                       onClick={() => openReferencingModal(1)}
-                      className={`border rounded px-3 py-1 transition-colors ${
+                      className={`border rounded ${isMobile ? 'px-2 py-0.5' : 'px-3 py-1'} transition-colors ${
                         completedSections.has('identity')
                           ? 'border-green-300 hover:bg-green-50'
                           : 'border-orange-300 hover:bg-orange-50'
                       }`}
                     >
-                      <span className={`text-xs font-bold ${
+                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold ${
                         completedSections.has('identity') ? 'text-green-600' : 'text-orange-600'
                       }`}>
-                        {completedSections.has('identity') ? 'Edit' : 'View More'}
+                        {isMobile ? (completedSections.has('identity') ? 'Edit' : 'View') : (completedSections.has('identity') ? 'Edit' : 'View More')}
                       </span>
                     </button>
                   </div>
                 </div>
 
                 {/* Employment Reference */}
-                <div className="p-4 border-0 bg-white hover:shadow-md transition-shadow cursor-pointer">
+                <div className={`${isMobile ? 'p-3' : 'p-4'} border-0 bg-white hover:shadow-md transition-shadow cursor-pointer`}>
                   <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-3 flex-1">
+                    <div className={`flex items-start ${isMobile ? 'space-x-2' : 'space-x-3'} flex-1`}>
                       {completedSections.has('employment') ? (
-                        <CheckCircle className="w-4 h-4 text-green-600 mt-1" />
+                        <CheckCircle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-green-600 mt-1`} />
                       ) : (
-                        <AlertTriangle className="w-4 h-4 text-orange-600 mt-1" />
+                        <AlertTriangle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-orange-600 mt-1`} />
                       )}
                       <div className="flex-1 min-w-0">
-                        <h4 className={`font-medium mb-1 text-sm ${
+                        <h4 className={`font-medium ${isMobile ? 'mb-0.5' : 'mb-1'} ${isMobile ? 'text-xs' : 'text-sm'} ${
                           completedSections.has('employment') ? 'text-green-600' : 'text-orange-600'
                         }`}>
                           Employment
                         </h4>
-                        <p className="text-xs text-gray-700 mb-2">
+                        <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-700 ${isMobile ? 'mb-1' : 'mb-2'}`}>
                           {completedSections.has('employment') 
                             ? 'Employment details completed' 
                             : 'Fill in your employment details'}
                         </p>
                         {!completedSections.has('employment') && (
                           <div className="flex items-baseline space-x-3">
-                            <span className="text-xs font-bold text-orange-600">
+                            <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-orange-600`}>
                               14 days past due date
                             </span>
                           </div>
@@ -925,44 +931,44 @@ const DashboardHome: React.FC = () => {
                     </div>
                     <button 
                       onClick={() => openReferencingModal(2)}
-                      className={`border rounded px-3 py-1 transition-colors ${
+                      className={`border rounded ${isMobile ? 'px-2 py-0.5' : 'px-3 py-1'} transition-colors ${
                         completedSections.has('employment')
                           ? 'border-green-300 hover:bg-green-50'
                           : 'border-orange-300 hover:bg-orange-50'
                       }`}
                     >
-                      <span className={`text-xs font-bold ${
+                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold ${
                         completedSections.has('employment') ? 'text-green-600' : 'text-orange-600'
                       }`}>
-                        {completedSections.has('employment') ? 'Edit' : 'View More'}
+                        {isMobile ? (completedSections.has('employment') ? 'Edit' : 'View') : (completedSections.has('employment') ? 'Edit' : 'View More')}
                       </span>
                     </button>
                   </div>
                 </div>
 
                 {/* Guarantor Information */}
-                <div className="p-4 border-0 bg-white hover:shadow-md transition-shadow cursor-pointer">
+                <div className={`${isMobile ? 'p-3' : 'p-4'} border-0 bg-white hover:shadow-md transition-shadow cursor-pointer`}>
                   <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-3 flex-1">
+                    <div className={`flex items-start ${isMobile ? 'space-x-2' : 'space-x-3'} flex-1`}>
                       {completedSections.has('guarantor') ? (
-                        <CheckCircle className="w-4 h-4 text-green-600 mt-1" />
+                        <CheckCircle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-green-600 mt-1`} />
                       ) : (
-                        <AlertTriangle className="w-4 h-4 text-red-600 mt-1" />
+                        <AlertTriangle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-red-600 mt-1`} />
                       )}
                       <div className="flex-1 min-w-0">
-                        <h4 className={`font-medium mb-1 text-sm ${
+                        <h4 className={`font-medium ${isMobile ? 'mb-0.5' : 'mb-1'} ${isMobile ? 'text-xs' : 'text-sm'} ${
                           completedSections.has('guarantor') ? 'text-green-600' : 'text-red-600'
                         }`}>
                           Guarantor
                         </h4>
-                        <p className="text-xs text-gray-700 mb-2">
+                        <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-700 ${isMobile ? 'mb-1' : 'mb-2'}`}>
                           {completedSections.has('guarantor') 
                             ? 'Guarantor information completed' 
                             : 'Additional steps required'}
                         </p>
                         {!completedSections.has('guarantor') && (
                           <div className="flex items-baseline space-x-3">
-                            <span className="text-xs font-bold text-red-600">
+                            <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-red-600`}>
                               12 days past due date
                             </span>
                           </div>
@@ -971,44 +977,44 @@ const DashboardHome: React.FC = () => {
                     </div>
                     <button 
                       onClick={() => openReferencingModal(5)}
-                      className={`border rounded px-3 py-1 transition-colors ${
+                      className={`border rounded ${isMobile ? 'px-2 py-0.5' : 'px-3 py-1'} transition-colors ${
                         completedSections.has('guarantor')
                           ? 'border-green-300 hover:bg-green-50'
                           : 'border-red-300 hover:bg-red-50'
                       }`}
                     >
-                      <span className={`text-xs font-bold ${
+                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold ${
                         completedSections.has('guarantor') ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {completedSections.has('guarantor') ? 'Edit' : 'View More'}
+                        {isMobile ? (completedSections.has('guarantor') ? 'Edit' : 'View') : (completedSections.has('guarantor') ? 'Edit' : 'View More')}
                       </span>
                     </button>
                   </div>
                 </div>
 
                 {/* Residential */}
-                <div className="p-4 border-0 bg-white hover:shadow-md transition-shadow cursor-pointer">
+                <div className={`${isMobile ? 'p-3' : 'p-4'} border-0 bg-white hover:shadow-md transition-shadow cursor-pointer`}>
                   <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-3 flex-1">
+                    <div className={`flex items-start ${isMobile ? 'space-x-2' : 'space-x-3'} flex-1`}>
                       {completedSections.has('residential') ? (
-                        <CheckCircle className="w-4 h-4 text-green-600 mt-1" />
+                        <CheckCircle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-green-600 mt-1`} />
                       ) : (
-                        <AlertTriangle className="w-4 h-4 text-yellow-600 mt-1" />
+                        <AlertTriangle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-yellow-600 mt-1`} />
                       )}
                       <div className="flex-1 min-w-0">
-                        <h4 className={`font-medium mb-1 text-sm ${
+                        <h4 className={`font-medium ${isMobile ? 'mb-0.5' : 'mb-1'} ${isMobile ? 'text-xs' : 'text-sm'} ${
                           completedSections.has('residential') ? 'text-green-600' : 'text-yellow-600'
                         }`}>
                           Residential
                         </h4>
-                        <p className="text-xs text-gray-700 mb-2">
+                        <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-700 ${isMobile ? 'mb-1' : 'mb-2'}`}>
                           {completedSections.has('residential') 
                             ? 'Residential history completed' 
                             : 'Provide residential history'}
                         </p>
                         {!completedSections.has('residential') && (
                           <div className="flex items-baseline space-x-3">
-                            <span className="text-xs font-bold text-yellow-600">
+                            <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-yellow-600`}>
                               8 days past due date
                             </span>
                           </div>
@@ -1017,44 +1023,44 @@ const DashboardHome: React.FC = () => {
                     </div>
                     <button 
                       onClick={() => openReferencingModal(3)}
-                      className={`border rounded px-3 py-1 transition-colors ${
+                      className={`border rounded ${isMobile ? 'px-2 py-0.5' : 'px-3 py-1'} transition-colors ${
                         completedSections.has('residential')
                           ? 'border-green-300 hover:bg-green-50'
                           : 'border-yellow-300 hover:bg-yellow-50'
                       }`}
                     >
-                      <span className={`text-xs font-bold ${
+                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold ${
                         completedSections.has('residential') ? 'text-green-600' : 'text-yellow-600'
                       }`}>
-                        {completedSections.has('residential') ? 'Edit' : 'View More'}
+                        {isMobile ? (completedSections.has('residential') ? 'Edit' : 'View') : (completedSections.has('residential') ? 'Edit' : 'View More')}
                       </span>
                     </button>
                   </div>
                 </div>
 
                 {/* Financial */}
-                <div className="p-4 border-0 bg-white hover:shadow-md transition-shadow cursor-pointer">
+                <div className={`${isMobile ? 'p-3' : 'p-4'} border-0 bg-white hover:shadow-md transition-shadow cursor-pointer`}>
                   <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-3 flex-1">
+                    <div className={`flex items-start ${isMobile ? 'space-x-2' : 'space-x-3'} flex-1`}>
                       {completedSections.has('financial') ? (
-                        <CheckCircle className="w-4 h-4 text-green-600 mt-1" />
+                        <CheckCircle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-green-600 mt-1`} />
                       ) : (
-                        <AlertTriangle className="w-4 h-4 text-blue-600 mt-1" />
+                        <AlertTriangle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-blue-600 mt-1`} />
                       )}
                       <div className="flex-1 min-w-0">
-                        <h4 className={`font-medium mb-1 text-sm ${
+                        <h4 className={`font-medium ${isMobile ? 'mb-0.5' : 'mb-1'} ${isMobile ? 'text-xs' : 'text-sm'} ${
                           completedSections.has('financial') ? 'text-green-600' : 'text-blue-600'
                         }`}>
                           Financial
                         </h4>
-                        <p className="text-xs text-gray-700 mb-2">
+                        <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-700 ${isMobile ? 'mb-1' : 'mb-2'}`}>
                           {completedSections.has('financial') 
                             ? 'Financial documents completed' 
                             : 'Submit financial documents'}
                         </p>
                         {!completedSections.has('financial') && (
                           <div className="flex items-baseline space-x-3">
-                            <span className="text-xs font-bold text-blue-600">
+                            <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-blue-600`}>
                               3 days past due date
                             </span>
                           </div>
@@ -1063,44 +1069,44 @@ const DashboardHome: React.FC = () => {
                     </div>
                     <button 
                       onClick={() => openReferencingModal(4)}
-                      className={`border rounded px-3 py-1 transition-colors ${
+                      className={`border rounded ${isMobile ? 'px-2 py-0.5' : 'px-3 py-1'} transition-colors ${
                         completedSections.has('financial')
                           ? 'border-green-300 hover:bg-green-50'
                           : 'border-blue-300 hover:bg-blue-50'
                       }`}
                     >
-                      <span className={`text-xs font-bold ${
+                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold ${
                         completedSections.has('financial') ? 'text-green-600' : 'text-blue-600'
                       }`}>
-                        {completedSections.has('financial') ? 'Edit' : 'View More'}
+                        {isMobile ? (completedSections.has('financial') ? 'Edit' : 'View') : (completedSections.has('financial') ? 'Edit' : 'View More')}
                       </span>
                     </button>
                   </div>
                 </div>
 
                 {/* Agent Details */}
-                <div className="p-4 border-0 bg-white hover:shadow-md transition-shadow cursor-pointer">
+                <div className={`${isMobile ? 'p-3' : 'p-4'} border-0 bg-white hover:shadow-md transition-shadow cursor-pointer`}>
                   <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-3 flex-1">
+                    <div className={`flex items-start ${isMobile ? 'space-x-2' : 'space-x-3'} flex-1`}>
                       {completedSections.has('agentDetails') ? (
-                        <CheckCircle className="w-4 h-4 text-green-600 mt-1" />
+                        <CheckCircle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-green-600 mt-1`} />
                       ) : (
-                        <AlertTriangle className="w-4 h-4 text-purple-600 mt-1" />
+                        <AlertTriangle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-purple-600 mt-1`} />
                       )}
                       <div className="flex-1 min-w-0">
-                        <h4 className={`font-medium mb-1 text-sm ${
+                        <h4 className={`font-medium ${isMobile ? 'mb-0.5' : 'mb-1'} ${isMobile ? 'text-xs' : 'text-sm'} ${
                           completedSections.has('agentDetails') ? 'text-green-600' : 'text-purple-600'
                         }`}>
                           Agent Details
                         </h4>
-                        <p className="text-xs text-gray-700 mb-2">
+                        <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-700 ${isMobile ? 'mb-1' : 'mb-2'}`}>
                           {completedSections.has('agentDetails') 
                             ? 'Agent details completed' 
                             : 'Complete agent details'}
                         </p>
                         {!completedSections.has('agentDetails') && (
                           <div className="flex items-baseline space-x-3">
-                            <span className="text-xs font-bold text-purple-600">
+                            <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-purple-600`}>
                               1 day past due date
                             </span>
                           </div>
@@ -1109,16 +1115,16 @@ const DashboardHome: React.FC = () => {
                     </div>
                     <button 
                       onClick={() => openReferencingModal(7)}
-                      className={`border rounded px-3 py-1 transition-colors ${
+                      className={`border rounded ${isMobile ? 'px-2 py-0.5' : 'px-3 py-1'} transition-colors ${
                         completedSections.has('agentDetails')
                           ? 'border-green-300 hover:bg-green-50'
                           : 'border-purple-300 hover:bg-purple-50'
                       }`}
                     >
-                      <span className={`text-xs font-bold ${
+                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold ${
                         completedSections.has('agentDetails') ? 'text-green-600' : 'text-purple-600'
                       }`}>
-                        {completedSections.has('agentDetails') ? 'Edit' : 'View More'}
+                        {isMobile ? (completedSections.has('agentDetails') ? 'Edit' : 'View') : (completedSections.has('agentDetails') ? 'Edit' : 'View More')}
                       </span>
                     </button>
                   </div>
@@ -1134,55 +1140,57 @@ const DashboardHome: React.FC = () => {
           style={{
             background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)',
             border: '1px solid #80B2FF',
-            height: '320px',
+            height: isMobile ? 'auto' : '320px',
+            minHeight: isMobile ? '280px' : '320px',
             borderRadius: '20px'
           }}
         >
-          <div className="flex h-full">
+          <div className={`flex ${isMobile ? 'flex-col' : 'h-full'}`}>
             {/* Left Blue Panel */}
             <div
-              className="p-6 flex flex-col items-start min-w-[200px]"
+              className={`${isMobile ? 'p-4 flex-row items-center justify-between' : 'p-6 flex-col items-start min-w-[200px]'} flex`}
               style={{
                 background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)',
                 color: '#374957'
               }}
             >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-                  <Eye className="w-5 h-5 text-blue-600" />
+              <div className="flex items-center gap-3">
+                <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-white rounded-full flex items-center justify-center`}>
+                  <Eye className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-blue-600`} />
                 </div>
-                <h2 className="text-lg font-semibold">Viewing</h2>
+                <h2 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}>Viewing</h2>
               </div>
-              <div className="mt-auto">
-                <div className="text-4xl font-bold text-blue-800">{viewingStats.total || 0}</div>
-                <div className="text-sm opacity-90">Summary</div>
-                <div className="text-xs opacity-75">{viewingStats.upcoming || 0} upcoming, {viewingStats.completed || 0} completed</div>
+              {!isMobile && <div className="mt-auto"></div>}
+              <div className={isMobile ? '' : 'mt-auto'}>
+                <div className={`${isMobile ? 'text-2xl' : 'text-4xl'} font-bold text-blue-800`}>{viewingStats.total || 0}</div>
+                <div className={`${isMobile ? 'text-xs' : 'text-sm'} opacity-90`}>Summary</div>
+                <div className={`${isMobile ? 'text-xs' : 'text-xs'} opacity-75`}>{viewingStats.upcoming || 0} upcoming, {viewingStats.completed || 0} completed</div>
               </div>
             </div>
 
             {/* Right White Panel */}
             <div
-              className="flex-1 p-4 bg-white relative"
-      style={{
-                borderRadius: '20px',
-                boxShadow: '-4px 0 24px rgba(70, 95, 194, 0.4)'
+              className={`flex-1 p-4 bg-white relative ${isMobile ? 'rounded-b-xl' : ''}`}
+              style={{
+                borderRadius: isMobile ? '0 0 20px 20px' : '20px',
+                boxShadow: isMobile ? 'none' : '-4px 0 24px rgba(70, 95, 194, 0.4)'
               }}
             >
-              <div className="absolute top-4 right-4 z-10">
+              <div className={`absolute ${isMobile ? 'top-3 right-3' : 'top-4 right-4'} z-10`}>
                 <Link 
                   to="/dashboard/viewings" 
-                  className="text-sm font-medium text-blue-600 hover:underline cursor-pointer"
+                  className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-blue-600 hover:underline cursor-pointer`}
                 >
-                  Go to viewings →
+                  {isMobile ? 'Go to viewings →' : 'Go to viewings →'}
                 </Link>
               </div>
-                    <div className="flex items-center justify-center h-full">
+                    <div className={`flex items-center justify-center ${isMobile ? 'h-48' : 'h-full'}`}>
                       <div className="relative w-full h-full flex items-center justify-center">
                         {/* Animated Pie Chart */}
-                        <div className="relative w-40 h-40">
-                          <div className="relative w-48 h-48" style={{ zIndex: 10 }}>
+                        <div className={`relative ${isMobile ? 'w-32 h-32' : 'w-40 h-40'}`}>
+                          <div className={`relative ${isMobile ? 'w-40 h-40' : 'w-48 h-48'}`} style={{ zIndex: 10 }}>
                             {viewingStats.total > 0 ? (
-                              <svg className="w-48 h-48" viewBox="0 0 200 200" style={{ zIndex: 10 }}>
+                              <svg className={`${isMobile ? 'w-40 h-40' : 'w-48 h-48'}`} viewBox="0 0 200 200" style={{ zIndex: 10 }}>
                                 {/* Pie chart segments - Upcoming viewings */}
                                 {viewingStats.upcoming > 0 && (
                                   <path
@@ -1218,23 +1226,27 @@ const DashboardHome: React.FC = () => {
                                 )}
                               </svg>
                             ) : (
-                              <svg className="w-48 h-48" viewBox="0 0 200 200">
+                              <svg className={`${isMobile ? 'w-40 h-40' : 'w-48 h-48'}`} viewBox="0 0 200 200">
                                 <circle cx="100" cy="100" r="60" fill="#e5e7eb" />
-                                <text x="100" y="110" textAnchor="middle" className="text-sm fill-gray-500">No data</text>
+                                <text x="100" y="110" textAnchor="middle" className={`${isMobile ? 'text-xs' : 'text-sm'} fill-gray-500`}>No data</text>
                               </svg>
                             )}
                             
                             {/* Labels positioned outside the SVG */}
-                            <div className="absolute top-2 right-2" style={{ zIndex: 20 }}>
-                              <span className="text-xs font-medium text-blue-600">
-                                Upcoming: {viewingStats.upcoming || 0} ←
-                              </span>
-                            </div>
-                            <div className="absolute bottom-2 left-2" style={{ zIndex: 20 }}>
-                              <span className="text-xs font-medium text-green-600">
-                                Completed: {viewingStats.completed || 0} →
-                              </span>
-                            </div>
+                            {!isMobile && (
+                              <>
+                                <div className="absolute top-2 right-2" style={{ zIndex: 20 }}>
+                                  <span className="text-xs font-medium text-blue-600">
+                                    Upcoming: {viewingStats.upcoming || 0} ←
+                                  </span>
+                                </div>
+                                <div className="absolute bottom-2 left-2" style={{ zIndex: 20 }}>
+                                  <span className="text-xs font-medium text-green-600">
+                                    Completed: {viewingStats.completed || 0} →
+                                  </span>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1246,23 +1258,23 @@ const DashboardHome: React.FC = () => {
       </div>
 
       {/* Saved Searches Section */}
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className={isMobile ? 'p-4' : 'p-6'}>
+        <div className={`flex items-center justify-between ${isMobile ? 'mb-4' : 'mb-6'}`}>
           <h2 
-            className="text-lg font-semibold"
+            className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}
             style={{ color: '#374957' }}
           >
             Saved Searches
           </h2>
           <Link 
             to="/dashboard/saved-searches" 
-            className="text-sm font-medium text-blue-600 hover:underline"
+            className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-blue-600 hover:underline`}
           >
-            Go to saved searches →
+            {isMobile ? 'View all →' : 'Go to saved searches →'}
           </Link>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'} ${isMobile ? 'gap-4' : 'gap-6'}`}>
           {savedSearches.length === 0 ? (
             <div className="col-span-full text-center py-12">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1378,52 +1390,52 @@ const DashboardHome: React.FC = () => {
       </div> */}
 
       {/* Contracts and Documents Section */}
-      <div className="grid lg:grid-cols-2 gap-8">
+      <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'} ${isMobile ? 'gap-4' : 'gap-8'}`}>
         {/* Contracts Overview */}
-        <div className="p-6 border border-gray-200 rounded-xl">
-          <div className="flex items-center justify-between mb-6">
+        <div className={`${isMobile ? 'p-4' : 'p-6'} border border-gray-200 rounded-xl`}>
+          <div className={`flex items-center justify-between ${isMobile ? 'mb-4' : 'mb-6'}`}>
             <h2 
-              className="text-lg font-semibold"
+              className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}
               style={{ color: '#374957' }}
             >
               Contracts
             </h2>
             <Link 
               to="/dashboard/contracts" 
-              className="text-sm font-medium text-blue-600 hover:underline"
+              className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-blue-600 hover:underline`}
             >
-              Go to Contracts →
+              {isMobile ? 'View all →' : 'Go to Contracts →'}
             </Link>
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`grid grid-cols-2 ${isMobile ? 'gap-3' : 'gap-4'}`}>
             {/* Requested Contracts */}
-            <div className="p-4 bg-white rounded-lg border border-gray-200">
-              <div className="text-3xl font-bold text-gray-800 mb-2">
+            <div className={`${isMobile ? 'p-3' : 'p-4'} bg-white rounded-lg border border-gray-200`}>
+              <div className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-gray-800 ${isMobile ? 'mb-1' : 'mb-2'}`}>
                 {dashboardSummary?.contracts.requested || 0}
               </div>
-              <div className="text-sm text-gray-600 mb-3">
+              <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 ${isMobile ? 'mb-2' : 'mb-3'}`}>
                 Requested Contracts
               </div>
               <Link 
                 to="/dashboard/tenant-contracts?status=requested" 
-                className="text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 hover:text-gray-800 transition-colors`}
               >
                 View Requested
               </Link>
             </div>
             
             {/* Signed Contracts */}
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="text-3xl font-bold text-gray-800 mb-2">
+            <div className={`${isMobile ? 'p-3' : 'p-4'} bg-blue-50 rounded-lg border border-blue-200`}>
+              <div className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-gray-800 ${isMobile ? 'mb-1' : 'mb-2'}`}>
                 {signedContractsCount || 0}
               </div>
-              <div className="text-sm text-gray-600 mb-3">
+              <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 ${isMobile ? 'mb-2' : 'mb-3'}`}>
                 Signed Contracts
               </div>
               <Link 
                 to="/dashboard/tenant-contracts" 
-                className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-600 hover:text-blue-800 transition-colors`}
               >
                 View Signed
               </Link>
@@ -1432,23 +1444,23 @@ const DashboardHome: React.FC = () => {
         </div>
 
         {/* Documents */}
-        <div className="p-6 border border-gray-200 rounded-xl">
-          <div className="flex items-center justify-between mb-6">
+        <div className={`${isMobile ? 'p-4' : 'p-6'} border border-gray-200 rounded-xl`}>
+          <div className={`flex items-center justify-between ${isMobile ? 'mb-4' : 'mb-6'}`}>
             <h2 
-              className="text-lg font-semibold"
+              className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold`}
               style={{ color: '#374957' }}
             >
               Documents
             </h2>
             <Link 
               to="/dashboard/your-files" 
-              className="text-sm font-medium text-blue-600 hover:underline"
+              className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-blue-600 hover:underline`}
             >
-              Go to Documents →
+              {isMobile ? 'View all →' : 'Go to Documents →'}
             </Link>
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`grid grid-cols-2 ${isMobile ? 'gap-3' : 'gap-4'}`}>
             {filesLoading ? (
               <div className="col-span-2 text-center py-8">
                 <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
@@ -1464,30 +1476,30 @@ const DashboardHome: React.FC = () => {
               recentFiles.map((file) => (
                 <div
                   key={file.id}
-                  className="p-4 bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow"
+                  className={`${isMobile ? 'p-3' : 'p-4'} bg-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow`}
                 >
-                  <div className="flex items-start space-x-3 mb-3">
-                    <div className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center">
+                  <div className={`flex items-start space-x-3 ${isMobile ? 'mb-2' : 'mb-3'}`}>
+                    <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} bg-gray-100 rounded-md flex items-center justify-center`}>
                       {getFileTypeIcon(file.name, file.type)}
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-sm font-medium text-gray-800 mb-1 truncate">
+                      <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-800 ${isMobile ? 'mb-1' : 'mb-1'} truncate`}>
                         {file.name}
                       </h3>
-                      <p className="text-xs text-orange-600 font-medium mb-1">
+                      <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-orange-600 font-medium ${isMobile ? 'mb-1' : 'mb-1'}`}>
                         {formatFileSize(file.size)}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500`}>
                         Uploaded {file.uploadDate}
                       </p>
                     </div>
                   </div>
                   <button 
-                    className="w-full flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    className={`w-full flex items-center justify-center ${isMobile ? 'px-2 py-1.5' : 'px-3 py-2'} border border-gray-300 rounded-lg ${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-700 hover:bg-gray-50 transition-colors`}
                     onClick={() => handleView(file)}
                   >
-                    <Eye className="w-4 h-4 mr-2" />
-                    View
+                    <Eye className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} ${isMobile ? '' : 'mr-2'}`} />
+                    {!isMobile && <span>View</span>}
                   </button>
                 </div>
               ))

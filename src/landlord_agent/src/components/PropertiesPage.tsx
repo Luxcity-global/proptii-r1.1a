@@ -355,7 +355,7 @@ export function PropertiesPage({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-3 md:px-6 py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 style={{ color: '#374957' }}>Properties</h1>
@@ -390,7 +390,7 @@ export function PropertiesPage({
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
         <Card className="p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-6 flex-1">
@@ -489,22 +489,22 @@ export function PropertiesPage({
 
       {/* Bulk Actions Bar */}
       {showBulkActions && (
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <span className="text-sm font-medium text-orange-800">
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 overflow-x-auto">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 min-w-0">
+            <div className="flex items-center gap-4 flex-shrink-0">
+              <span className="text-sm font-medium text-orange-800 whitespace-nowrap">
                 {selectedProperties.size} property{selectedProperties.size !== 1 ? 'ies' : ''} selected
               </span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={clearSelection}
-                className="text-orange-600 hover:text-orange-800"
+                className="text-orange-600 hover:text-orange-800 whitespace-nowrap"
               >
                 Clear selection
               </Button>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap flex-shrink-0">
               <Button
                 variant="outline"
                 size="sm"
@@ -574,22 +574,22 @@ export function PropertiesPage({
       {/* Filters and Search */}
       <div className="space-y-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="sm"
               onClick={selectAllProperties}
-              className="p-2"
+              className="p-1.5 h-auto"
             >
               {isAllSelected ? (
-                <CheckSquare className="h-4 w-4" />
+                <CheckSquare className="h-3.5 w-3.5" />
               ) : isPartiallySelected ? (
-                <CheckSquare className="h-4 w-4 opacity-50" />
+                <CheckSquare className="h-3.5 w-3.5 opacity-50" />
               ) : (
-                <Square className="h-4 w-4" />
+                <Square className="h-3.5 w-3.5" />
               )}
             </Button>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               {isAllSelected ? 'Deselect All' : 'Select All'}
             </span>
           </div>
@@ -657,36 +657,38 @@ export function PropertiesPage({
             </label>
           </div>
 
-          <Select value={leaseExpiryFilter} onValueChange={setLeaseExpiryFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Lease Expiry" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Leases</SelectItem>
-              <SelectItem value="expired">Expired</SelectItem>
-              <SelectItem value="30-days">Expiring within 30 days</SelectItem>
-              <SelectItem value="60-days">Expiring within 60 days</SelectItem>
-              <SelectItem value="90-days">Expiring within 90 days</SelectItem>
-              <SelectItem value="no-lease">No Lease (Vacant)</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <Select value={leaseExpiryFilter} onValueChange={setLeaseExpiryFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Lease Expiry" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Leases</SelectItem>
+                <SelectItem value="expired">Expired</SelectItem>
+                <SelectItem value="30-days">Expiring within 30 days</SelectItem>
+                <SelectItem value="60-days">Expiring within 60 days</SelectItem>
+                <SelectItem value="90-days">Expiring within 90 days</SelectItem>
+                <SelectItem value="no-lease">No Lease (Vacant)</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="default">Default</SelectItem>
-              <SelectItem value="rent-asc">Rent: Low to High</SelectItem>
-              <SelectItem value="rent-desc">Rent: High to Low</SelectItem>
-              <SelectItem value="lease-expiry-asc">Lease Expiry: Soonest First</SelectItem>
-              <SelectItem value="lease-expiry-desc">Lease Expiry: Latest First</SelectItem>
-              <SelectItem value="address-asc">Address: A to Z</SelectItem>
-              <SelectItem value="address-desc">Address: Z to A</SelectItem>
-              <SelectItem value="overdue-desc">Overdue Amount: Highest First</SelectItem>
-              <SelectItem value="overdue-asc">Overdue Amount: Lowest First</SelectItem>
-            </SelectContent>
-          </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Default</SelectItem>
+                <SelectItem value="rent-asc">Rent: Low to High</SelectItem>
+                <SelectItem value="rent-desc">Rent: High to Low</SelectItem>
+                <SelectItem value="lease-expiry-asc">Lease Expiry: Soonest First</SelectItem>
+                <SelectItem value="lease-expiry-desc">Lease Expiry: Latest First</SelectItem>
+                <SelectItem value="address-asc">Address: A to Z</SelectItem>
+                <SelectItem value="address-desc">Address: Z to A</SelectItem>
+                <SelectItem value="overdue-desc">Overdue Amount: Highest First</SelectItem>
+                <SelectItem value="overdue-asc">Overdue Amount: Lowest First</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 

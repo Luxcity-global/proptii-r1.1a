@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import DashboardSidebar from './ui/DashboardSidebar';
 import DashboardHeader from './ui/DashboardHeader';
 import { useAuth } from '../../contexts/AuthContext';
+import { useIsMobile } from './ui/use-mobile';
+import { Menu, X, Home, User } from 'lucide-react';
 
 // Define color constants (matching ReferencingModal)
 export const BLUE_COLOR = '#136C9E';
@@ -127,9 +129,12 @@ interface DashboardSidebarProps {
 
 const Dashboard: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { user, isLoading } = useAuth();
+  const isMobile = useIsMobile();
 
   // Update activeSection based on the current route
   useEffect(() => {
@@ -153,34 +158,180 @@ const Dashboard: React.FC = () => {
 
   const handleSectionChange = (sectionId: string) => {
     setActiveSection(sectionId);
+    if (isMobile) {
+      setMobileSidebarOpen(false);
+    }
   };
 
   const handleToggleCollapse = () => {
     setIsCollapsed(!isCollapsed);
   };
 
+  const handleNavClick = (sectionId: string, path: string) => {
+    handleSectionChange(sectionId);
+    navigate(path);
+  };
+
+  const handleLogoClick = () => {
+    window.location.href = '/';
+  };
+
   return (
     <div 
-      className="flex h-screen overflow-hidden"
+      className="flex min-h-screen w-full"
       style={{ 
         backgroundColor: '#F7F7F7',
         fontFamily: 'Archivo, sans-serif'
       }}
     >
-        {/* Sidebar */}
+      {/* Mobile Header */}
+      {isMobile && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b md:hidden" style={{ borderColor: '#ebebeb' }}>
+          <div className="flex items-center justify-between h-16 px-4">
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+              aria-label="Open menu"
+            >
+              <Menu className="w-6 h-6" style={{ color: '#374957' }} />
+            </button>
+            <img 
+              src="/images/proptii-logo.png" 
+              alt="Proptii Logo" 
+              className="h-14 object-contain cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={handleLogoClick}
+            />
+            <div className="w-10" /> {/* Spacer for centering */}
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Sidebar */}
+      {!isMobile && (
         <DashboardSidebar
           activeSection={activeSection}
           onSectionChange={handleSectionChange}
-        isCollapsed={isCollapsed}
-        onToggleCollapse={handleToggleCollapse}
-      />
+          isCollapsed={isCollapsed}
+          onToggleCollapse={handleToggleCollapse}
+        />
+      )}
 
-        {/* Main content */}
+      {/* Mobile Sidebar */}
+      {isMobile && (
+        <>
+          {/* Overlay */}
+          {mobileSidebarOpen && (
+            <div 
+              className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+              onClick={() => setMobileSidebarOpen(false)}
+            />
+          )}
+          
+          {/* Sidebar */}
+          <div 
+            className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-white border-r transition-transform duration-300 ease-out md:hidden ${
+              mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            }`}
+            style={{ borderColor: '#ebebeb' }}
+          >
+            <div className="flex flex-col h-full">
+              {/* Header */}
+              <div className="border-b p-4" style={{ borderColor: '#ebebeb' }}>
+                <div className="flex items-center justify-between">
+                  <img 
+                    src="/images/proptii-logo.png" 
+                    alt="Proptii Logo" 
+                    className="h-8 object-contain cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={handleLogoClick}
+                  />
+                  <button
+                    onClick={() => setMobileSidebarOpen(false)}
+                    className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                  >
+                    <X className="w-5 h-5" style={{ color: '#374957' }} />
+                  </button>
+                </div>
+              </div>
+              
+              {/* Navigation */}
+              <div className="flex-1 overflow-auto pt-4 px-4">
+                <div className="space-y-3">
+                  {DASHBOARD_SECTIONS.map((section) => {
+                    const isActive = activeSection === section?.id;
+                    return (
+                      <button
+                        key={section?.id ?? ''}
+                        onClick={() => section && handleNavClick(section.id, section.path)}
+                        className="w-full flex items-center h-10 px-3 rounded-md text-sm font-medium transition-colors justify-start"
+                        style={{ 
+                          color: isActive ? '#136C9E' : '#374957',
+                          backgroundColor: isActive ? '#E6F3FF' : 'transparent'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.backgroundColor = '#F3F4F6';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }
+                        }}
+                      >
+                        <div className="relative flex-shrink-0">
+                          {section?.icon?.(isActive)}
+                        </div>
+                        <span className="ml-2 truncate">{section?.label ?? ''}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              {/* User Profile */}
+              {user && (
+                <div className="border-t pt-4 pb-4 px-4" style={{ borderColor: '#ebebeb' }}>
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                      <User className="h-4 w-4" style={{ color: '#374957' }} />
+                    </div>
+                    <div className="ml-2 min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold" style={{ color: '#374957' }}>
+                        {user.name || user.givenName || 'User'}
+                      </div>
+                      <div className="truncate text-xs opacity-70" style={{ color: '#374957' }}>
+                        {user.email || ''}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Proptii Home Button */}
+              <div className="border-t pt-4 pb-4 px-4" style={{ borderColor: '#ebebeb' }}>
+                <button 
+                  onClick={handleLogoClick}
+                  className="w-full flex items-center justify-center h-10 px-4 rounded-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 transition-colors text-sm font-medium"
+                >
+                  <Home className="h-4 w-4 mr-2" />
+                  Proptii Home
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Main content */}
       <main 
-        className="flex-1 overflow-auto"
-        style={{ marginLeft: isCollapsed ? '56px' : '220px' }}
+        className="flex-1"
+        style={{ 
+          backgroundColor: '#F7F7F7',
+          marginLeft: !isMobile ? (isCollapsed ? '56px' : '200px') : '0'
+        }}
       >
-        <div className="mt-8 max-w-7xl mx-auto px-3">
+        {isMobile && <div className="h-16" />} {/* Spacer for mobile header */}
+        <div className={`${isMobile ? 'mt-4' : 'mt-8'} max-w-7xl mx-auto ${isMobile ? 'px-4' : 'px-3'}`}>
           <DashboardHeader 
             userName={
               isLoading 
@@ -192,8 +343,8 @@ const Dashboard: React.FC = () => {
           />
         </div>
 
-        <div className="max-w-7xl mx-auto px-3 pb-8">
-            <Outlet />
+        <div className={`max-w-7xl mx-auto ${isMobile ? 'px-4' : 'px-3'} ${isMobile ? 'pb-4' : 'pb-8'}`}>
+          <Outlet />
         </div>
       </main>
     </div>

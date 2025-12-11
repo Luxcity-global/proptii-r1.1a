@@ -73,18 +73,9 @@ export function PropertyTypeSelection({ selectedType: propSelectedType, onTypeSe
             </div>
           </div>
 
-          {/* Horizontal Progress Tracker */}
-          <div className="mb-6 w-full" style={{ marginTop: '80px' }}>
-            <ProgressTracker 
-              steps={progressSteps}
-              currentStep={1}
-              totalSteps={5}
-            />
-          </div>
-
           {/* Property Type Section Header */}
-          <div className="text-left mb-8 px-4 py-6" style={{ 
-            backgroundImage: 'url("./add_prp_slide/property_type background.png")',
+          <div className="text-left mb-6 px-4 py-6" style={{ 
+            backgroundImage: 'url("/assets/add_prp_slide/property_type background.png")',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
@@ -93,6 +84,23 @@ export function PropertyTypeSelection({ selectedType: propSelectedType, onTypeSe
           }}>
             <h2 className="text-2xl font-bold mb-2" style={{ color: '#374957' }}>Property Type</h2>
             <p style={{ color: '#374957' }}>Choose the type of property you're adding to your portfolio</p>
+          </div>
+
+          {/* Horizontal Progress Tracker - Hidden on mobile */}
+          <div className="mb-6 w-full hidden md:block">
+            <ProgressTracker 
+              steps={progressSteps}
+              currentStep={1}
+              totalSteps={5}
+            />
+          </div>
+          
+          {/* Mobile: Simple step counter */}
+          <div className="mb-6 w-full px-4 md:hidden">
+            <div className="text-sm">
+              <span className="text-blue-600 font-semibold">Step {1}</span>
+              <span className="text-gray-500"> of {5}</span>
+            </div>
           </div>
 
 
@@ -168,22 +176,23 @@ export function PropertyTypeSelection({ selectedType: propSelectedType, onTypeSe
       </div>
 
       {/* Footer - Fixed to Bottom */}
-      <div className="max-w-6xl mx-auto w-full px-4 py-8">
-        <div className="flex items-center justify-between" style={{ minHeight: '60px' }}>
+      <div className="max-w-6xl mx-auto w-full px-4 py-4 md:py-8">
+        <div className="flex items-center justify-between gap-4" style={{ minHeight: '60px' }}>
           <Button 
             variant="ghost" 
             onClick={onBack}
-            className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+            className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 flex-1 md:flex-none"
             style={{ height: '48px', minHeight: '48px' }}
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Review Property Setup</span>
+            <span className="hidden md:inline">Review Property Setup</span>
+            <span className="md:hidden">Review</span>
           </Button>
 
           <Button 
             onClick={onNext}
             disabled={!selectedType}
-            className={`px-6 py-3 rounded-full transition-all duration-300 ${
+            className={`px-6 py-3 rounded-full transition-all duration-300 flex-1 md:flex-none ${
               selectedType 
                 ? 'text-white' 
                 : 'bg-transparent text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400'
@@ -209,7 +218,8 @@ export function PropertyTypeSelection({ selectedType: propSelectedType, onTypeSe
               e.currentTarget.style.transform = 'translateY(0px)';
             } : undefined}
           >
-            Proceed to Property Details
+            <span className="hidden md:inline">Proceed to Property Details</span>
+            <span className="md:hidden">Proceed</span>
           </Button>
         </div>
       </div>

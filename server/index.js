@@ -8,6 +8,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { initializeApp, cert, applicationDefault, getApps } from 'firebase-admin/app';
 import { getStorage } from 'firebase-admin/storage';
+import { BlobServiceClient } from '@azure/storage-blob';
 // Import will be done after env vars are loaded
 let azureGraphService;
 
@@ -18,12 +19,15 @@ const __dirname = path.dirname(__filename);
 // Load environment variables - try multiple methods
 const rootEnvPath = path.join(__dirname, '..', '.env');
 const serverEnvPath = path.join(__dirname, '.env');
+const landlordAgentEnvPath = path.join(__dirname, '..', 'src', 'landlord_agent', '.env');
 
 console.log('📁 Attempting to load .env files...');
 console.log('   Root .env path:', rootEnvPath);
 console.log('   Root .env exists:', fs.existsSync(rootEnvPath));
 console.log('   Server .env path:', serverEnvPath);
 console.log('   Server .env exists:', fs.existsSync(serverEnvPath));
+console.log('   Landlord Agent .env path:', landlordAgentEnvPath);
+console.log('   Landlord Agent .env exists:', fs.existsSync(landlordAgentEnvPath));
 
 // Method 1: Try dotenv from root
 if (fs.existsSync(rootEnvPath)) {
@@ -35,7 +39,17 @@ if (fs.existsSync(rootEnvPath)) {
   }
 }
 
-// Method 2: Try dotenv from server directory
+// Method 2: Try dotenv from landlord_agent directory
+if (fs.existsSync(landlordAgentEnvPath)) {
+  const result = dotenv.config({ path: landlordAgentEnvPath, override: false });
+  if (result.error) {
+    console.error('❌ Error loading landlord_agent .env:', result.error);
+  } else {
+    console.log('✅ Landlord Agent .env loaded via dotenv');
+  }
+}
+
+// Method 3: Try dotenv from server directory
 if (fs.existsSync(serverEnvPath)) {
   const result = dotenv.config({ path: serverEnvPath, override: false });
   if (result.error) {
@@ -45,11 +59,11 @@ if (fs.existsSync(serverEnvPath)) {
   }
 }
 
-// Method 3: Manual parsing as fallback if variables still missing
+// Method 4: Manual parsing as fallback if variables still missing
 if (!process.env.AZURE_AD_B2C_CLIENT_ID) {
   console.log('⚠️ Variables still missing, trying manual file read...');
-  const envFile = fs.existsSync(serverEnvPath) ? serverEnvPath : rootEnvPath;
-  if (fs.existsSync(envFile)) {
+  const envFiles = [landlordAgentEnvPath, serverEnvPath, rootEnvPath].filter(f => fs.existsSync(f));
+  for (const envFile of envFiles) {
     try {
       const envContent = fs.readFileSync(envFile, 'utf8');
       const lines = envContent.split('\n');
@@ -58,14 +72,16 @@ if (!process.env.AZURE_AD_B2C_CLIENT_ID) {
         if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
           const [key, ...valueParts] = trimmed.split('=');
           const value = valueParts.join('=').trim();
-          if (key.startsWith('AZURE_AD_B2C_')) {
-            process.env[key.trim()] = value;
-            console.log(`   ✅ Manually set: ${key.trim()}`);
+          if (key.startsWith('AZURE_AD_B2C_') || key.startsWith('AZURE_STORAGE_')) {
+            if (!process.env[key.trim()]) {
+              process.env[key.trim()] = value;
+              console.log(`   ✅ Manually set: ${key.trim()}`);
+            }
           }
         }
       }
     } catch (error) {
-      console.error('❌ Error manually reading .env:', error);
+      console.error(`❌ Error manually reading .env (${envFile}):`, error);
     }
   }
 }
@@ -75,6 +91,9 @@ console.log('🔍 Environment variables check after loading:');
 console.log('  AZURE_AD_B2C_CLIENT_ID:', process.env.AZURE_AD_B2C_CLIENT_ID ? `SET (${process.env.AZURE_AD_B2C_CLIENT_ID.substring(0, 8)}...)` : 'MISSING');
 console.log('  AZURE_AD_B2C_CLIENT_SECRET:', process.env.AZURE_AD_B2C_CLIENT_SECRET ? 'SET (***)' : 'MISSING');
 console.log('  AZURE_AD_B2C_TENANT_ID:', process.env.AZURE_AD_B2C_TENANT_ID ? `SET (${process.env.AZURE_AD_B2C_TENANT_ID.substring(0, 8)}...)` : 'MISSING');
+console.log('  AZURE_STORAGE_ACCOUNT_NAME:', process.env.AZURE_STORAGE_ACCOUNT_NAME ? `SET (${process.env.AZURE_STORAGE_ACCOUNT_NAME})` : 'MISSING');
+console.log('  AZURE_STORAGE_CONTAINER_NAME:', process.env.AZURE_STORAGE_CONTAINER_NAME ? `SET (${process.env.AZURE_STORAGE_CONTAINER_NAME})` : 'MISSING');
+console.log('  AZURE_STORAGE_SAS_TOKEN:', process.env.AZURE_STORAGE_SAS_TOKEN ? `SET (${process.env.AZURE_STORAGE_SAS_TOKEN.substring(0, 20)}...)` : 'MISSING');
 
 // Import and create the service AFTER env vars are loaded
 let azureGraphServiceModule;
@@ -97,6 +116,42 @@ try {
 const app = express();
 
 let firebaseBucket = null;
+let azureBlobServiceClient = null;
+
+// Initialize Azure Storage
+const initializeAzureStorage = () => {
+    if (azureBlobServiceClient) {
+        return azureBlobServiceClient;
+    }
+
+    const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+    const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME;
+    const sasToken = process.env.AZURE_STORAGE_SAS_TOKEN;
+
+    if (!accountName || !containerName || !sasToken) {
+        console.warn('Azure Storage credentials not provided; property document uploads will be disabled.');
+        console.warn('Required: AZURE_STORAGE_ACCOUNT_NAME, AZURE_STORAGE_CONTAINER_NAME, AZURE_STORAGE_SAS_TOKEN');
+        return null;
+    }
+
+    try {
+        // Construct the account URL
+        const accountUrl = `https://${accountName}.blob.core.windows.net`;
+        
+        // Ensure SAS token starts with '?'
+        const normalizedSasToken = sasToken.startsWith('?') ? sasToken : `?${sasToken}`;
+        
+        // Create BlobServiceClient with account URL and SAS token
+        azureBlobServiceClient = new BlobServiceClient(`${accountUrl}${normalizedSasToken}`);
+        console.log('✅ Azure Storage initialized successfully');
+        console.log(`   Account: ${accountName}`);
+        console.log(`   Container: ${containerName}`);
+        return azureBlobServiceClient;
+    } catch (error) {
+        console.error('❌ Error initializing Azure Storage:', error);
+        return null;
+    }
+};
 
 const initializeFirebaseStorage = () => {
     if (firebaseBucket) {
@@ -175,6 +230,8 @@ const initializeFirebaseStorage = () => {
 };
 
 initializeFirebaseStorage();
+// Initialize Azure Storage on server start
+initializeAzureStorage();
 
 // Enable CORS for all routes with proper configuration for file uploads
 app.use(cors({
@@ -330,75 +387,153 @@ app.post('/api/property/upload-document', upload.single('document'), async (req,
         });
     }
 
-    const bucket = firebaseBucket || initializeFirebaseStorage();
+    // Try Azure Storage first, fallback to Firebase if not configured
+    const blobServiceClient = azureBlobServiceClient || initializeAzureStorage();
+    const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'documents';
 
-    if (!bucket) {
-        return res.status(503).json({
-            success: false,
-            error: 'Document storage service is not configured',
-        });
-    }
-
-    const originalName = req.file.originalname || 'document';
-    const normalizedName = originalName
-        .toLowerCase()
-        .replace(/[^a-z0-9.\-_]/g, '-');
-    const sanitizedName = normalizedName.replace(/-+/g, '-').replace(/^-+|-+$/g, '');
-    const originalExtension = originalName.includes('.') ? originalName.substring(originalName.lastIndexOf('.')).toLowerCase() : '';
-    const fallbackName = originalExtension ? `document${originalExtension}` : 'document.bin';
-    const safeName = sanitizedName || fallbackName;
-    const timestamp = Date.now();
-    const destinationPath = `property-documents/${timestamp}-${safeName}`;
-
-    try {
-        const file = bucket.file(destinationPath);
-
-        await file.save(req.file.buffer, {
-            resumable: false,
-            metadata: {
-                contentType: req.file.mimetype || 'application/octet-stream',
-                metadata: {
-                    originalName,
-                    uploadedAt: new Date().toISOString(),
-                },
-            },
-        });
-
-        let publicUrl = null;
+    if (blobServiceClient) {
+        // Use Azure Storage
+        const originalName = req.file.originalname || 'document';
+        const normalizedName = originalName
+            .toLowerCase()
+            .replace(/[^a-z0-9.\-_]/g, '-');
+        const sanitizedName = normalizedName.replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+        const originalExtension = originalName.includes('.') ? originalName.substring(originalName.lastIndexOf('.')).toLowerCase() : '';
+        const fallbackName = originalExtension ? `document${originalExtension}` : 'document.bin';
+        const safeName = sanitizedName || fallbackName;
+        const timestamp = Date.now();
+        const blobName = `property-documents/${timestamp}-${safeName}`;
 
         try {
-            await file.makePublic();
-            publicUrl = file.publicUrl();
-        } catch (makePublicError) {
-            console.warn('makePublic failed, falling back to signed URL:', makePublicError.message);
-        }
+            const containerClient = blobServiceClient.getContainerClient(containerName);
+            
+            // Ensure container exists (only if we have create permissions)
+            try {
+                const exists = await containerClient.exists();
+                if (!exists) {
+                    try {
+                        await containerClient.create({ access: 'blob' });
+                        console.log(`Container '${containerName}' created successfully`);
+                    } catch (createError) {
+                        // Container creation might fail if SAS token doesn't have create permissions
+                        // This is okay if the container already exists or was created manually
+                        console.warn(`Could not create container (may already exist or lack permissions): ${createError.message}`);
+                    }
+                }
+            } catch (checkError) {
+                // If we can't check existence, try to proceed anyway
+                console.warn(`Could not check container existence: ${checkError.message}`);
+            }
 
-        if (!publicUrl) {
-            const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-            const [signedUrl] = await file.getSignedUrl({
-                action: 'read',
-                expires: expiresAt,
+            const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+
+            // Upload the file
+            await blockBlobClient.upload(req.file.buffer, req.file.size, {
+                blobHTTPHeaders: {
+                    blobContentType: req.file.mimetype || 'application/octet-stream',
+                },
+                metadata: {
+                    originalName: originalName,
+                    uploadedAt: new Date().toISOString(),
+                },
             });
-            publicUrl = signedUrl;
+
+            // Get the blob URL
+            const blobUrl = blockBlobClient.url;
+
+            console.log('Document uploaded successfully to Azure Storage:', blobUrl);
+
+            res.json({
+                success: true,
+                document: {
+                    url: blobUrl,
+                    path: blobName,
+                    name: originalName,
+                    type: req.file.mimetype,
+                    size: req.file.size,
+                },
+            });
+        } catch (error) {
+            console.error('Error uploading property document to Azure Storage:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to upload document to Azure Storage',
+                details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+            });
+        }
+    } else {
+        // Fallback to Firebase Storage if Azure is not configured
+        console.log('Azure Storage not configured, falling back to Firebase Storage');
+        const bucket = firebaseBucket || initializeFirebaseStorage();
+
+        if (!bucket) {
+            return res.status(503).json({
+                success: false,
+                error: 'Document storage service is not configured. Please configure Azure Storage or Firebase Storage.',
+            });
         }
 
-        res.json({
-            success: true,
-            document: {
-                url: publicUrl,
-                path: destinationPath,
-                name: originalName,
-                type: req.file.mimetype,
-                size: req.file.size,
-            },
-        });
-    } catch (error) {
-        console.error('Error uploading property document:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to upload document',
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-        });
+        const originalName = req.file.originalname || 'document';
+        const normalizedName = originalName
+            .toLowerCase()
+            .replace(/[^a-z0-9.\-_]/g, '-');
+        const sanitizedName = normalizedName.replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+        const originalExtension = originalName.includes('.') ? originalName.substring(originalName.lastIndexOf('.')).toLowerCase() : '';
+        const fallbackName = originalExtension ? `document${originalExtension}` : 'document.bin';
+        const safeName = sanitizedName || fallbackName;
+        const timestamp = Date.now();
+        const destinationPath = `property-documents/${timestamp}-${safeName}`;
+
+        try {
+            const file = bucket.file(destinationPath);
+
+            await file.save(req.file.buffer, {
+                resumable: false,
+                metadata: {
+                    contentType: req.file.mimetype || 'application/octet-stream',
+                    metadata: {
+                        originalName,
+                        uploadedAt: new Date().toISOString(),
+                    },
+                },
+            });
+
+            let publicUrl = null;
+
+            try {
+                await file.makePublic();
+                publicUrl = file.publicUrl();
+            } catch (makePublicError) {
+                console.warn('makePublic failed, falling back to signed URL:', makePublicError.message);
+            }
+
+            if (!publicUrl) {
+                const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+                const [signedUrl] = await file.getSignedUrl({
+                    action: 'read',
+                    expires: expiresAt,
+                });
+                publicUrl = signedUrl;
+            }
+
+            res.json({
+                success: true,
+                document: {
+                    url: publicUrl,
+                    path: destinationPath,
+                    name: originalName,
+                    type: req.file.mimetype,
+                    size: req.file.size,
+                },
+            });
+        } catch (error) {
+            console.error('Error uploading property document:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to upload document',
+                details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+            });
+        }
     }
 });
 

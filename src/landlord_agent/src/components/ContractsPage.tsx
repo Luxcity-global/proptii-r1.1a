@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -23,8 +23,11 @@ import {
   Search,
   Trash2,
   CheckSquare,
-  Square
+  Square,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+import { useIsMobile } from './ui/use-mobile';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,6 +71,14 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContracts, setSelectedContracts] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
+  const isMobile = useIsMobile();
+  
+  // Pagination state for each tab
+  const [currentSentPage, setCurrentSentPage] = useState<number>(1);
+  const [currentUnsignedPage, setCurrentUnsignedPage] = useState<number>(1);
+  const [currentSignedPage, setCurrentSignedPage] = useState<number>(1);
+  
+  const ITEMS_PER_PAGE = 10;
 
   // Get landlord email and userId from localStorage/auth on component mount
   useEffect(() => {
@@ -177,9 +188,32 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
     );
   };
 
-  const sentContracts = filterContractsBySearch(contracts.filter(c => c.status === 'sent'));
-  const unsignedContracts = filterContractsBySearch(contracts.filter(c => c.status === 'unsigned'));
-  const signedContracts = filterContractsBySearch(contracts.filter(c => c.status === 'signed'));
+  const sentContracts = useMemo(() => filterContractsBySearch(contracts.filter(c => c.status === 'sent')), [contracts, searchQuery]);
+  const unsignedContracts = useMemo(() => filterContractsBySearch(contracts.filter(c => c.status === 'unsigned')), [contracts, searchQuery]);
+  const signedContracts = useMemo(() => filterContractsBySearch(contracts.filter(c => c.status === 'signed')), [contracts, searchQuery]);
+
+  // Pagination logic for each tab
+  const totalSentPages = Math.ceil(sentContracts.length / ITEMS_PER_PAGE);
+  const sentStartIndex = (currentSentPage - 1) * ITEMS_PER_PAGE;
+  const sentEndIndex = sentStartIndex + ITEMS_PER_PAGE;
+  const paginatedSentContracts = sentContracts.slice(sentStartIndex, sentEndIndex);
+
+  const totalUnsignedPages = Math.ceil(unsignedContracts.length / ITEMS_PER_PAGE);
+  const unsignedStartIndex = (currentUnsignedPage - 1) * ITEMS_PER_PAGE;
+  const unsignedEndIndex = unsignedStartIndex + ITEMS_PER_PAGE;
+  const paginatedUnsignedContracts = unsignedContracts.slice(unsignedStartIndex, unsignedEndIndex);
+
+  const totalSignedPages = Math.ceil(signedContracts.length / ITEMS_PER_PAGE);
+  const signedStartIndex = (currentSignedPage - 1) * ITEMS_PER_PAGE;
+  const signedEndIndex = signedStartIndex + ITEMS_PER_PAGE;
+  const paginatedSignedContracts = signedContracts.slice(signedStartIndex, signedEndIndex);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentSentPage(1);
+    setCurrentUnsignedPage(1);
+    setCurrentSignedPage(1);
+  }, [searchQuery, activeTab]);
 
   // Calculate overview metrics
   const totalSent = sentContracts.length;
@@ -677,141 +711,365 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
     }
   };
 
+  // Pagination component helper
+  const PaginationControls = ({ 
+    currentPage, 
+    totalPages, 
+    onPageChange, 
+    startIndex, 
+    endIndex, 
+    totalItems,
+    itemName = 'contracts'
+  }: {
+    currentPage: number;
+    totalPages: number;
+    onPageChange: (page: number) => void;
+    startIndex: number;
+    endIndex: number;
+    totalItems: number;
+    itemName?: string;
+  }) => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white border border-[#f3f3f3] rounded-lg p-4 mt-4">
+        <div className="text-sm text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
+          Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} {itemName}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="flex items-center gap-1"
+            style={{ fontFamily: 'Archivo, sans-serif' }}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Previous</span>
+          </Button>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+              // Show first page, last page, current page, and pages around current
+              if (
+                page === 1 ||
+                page === totalPages ||
+                (page >= currentPage - 1 && page <= currentPage + 1)
+              ) {
+                return (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => onPageChange(page)}
+                    className="min-w-[40px]"
+                    style={{ fontFamily: 'Archivo, sans-serif' }}
+                  >
+                    {page}
+                  </Button>
+                );
+              } else if (
+                page === currentPage - 2 ||
+                page === currentPage + 2
+              ) {
+                return (
+                  <span key={page} className="text-muted-foreground px-2">
+                    ...
+                  </span>
+                );
+              }
+              return null;
+            })}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+            className="flex items-center gap-1"
+            style={{ fontFamily: 'Archivo, sans-serif' }}
+          >
+            <span className="hidden sm:inline">Next</span>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   const ContractTable = ({ contracts }: { contracts: Contract[] }) => {
     const allSelected = contracts.length > 0 && contracts.every(c => selectedContracts.has(c.id));
     const someSelected = contracts.some(c => selectedContracts.has(c.id));
 
     return (
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead style={{ fontFamily: 'Archivo, sans-serif', width: '50px' }}>Select</TableHead>
-              <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Contract</TableHead>
-              <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Property</TableHead>
-              <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Tenant</TableHead>
-              <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Status</TableHead>
-              <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Sent Date</TableHead>
-              <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Expiry</TableHead>
-              <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {contracts.map((contract) => (
-              <TableRow key={contract.id} className="transition-colors duration-150">
-                <TableCell>
-                  <button
-                    onClick={() => handleToggleSelect(contract.id)}
-                    className="flex items-center justify-center"
-                    title={selectedContracts.has(contract.id) ? 'Deselect' : 'Select'}
-                  >
-                    {selectedContracts.has(contract.id) ? (
-                      <CheckSquare className="w-5 h-5 text-orange-500" />
+      <>
+        {/* Desktop Table View */}
+        {!isMobile && (
+          <div className="border rounded-lg overflow-x-auto w-full">
+            <div className="min-w-full">
+              <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead style={{ fontFamily: 'Archivo, sans-serif', width: '50px' }}>Select</TableHead>
+                  <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Contract</TableHead>
+                  <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Property</TableHead>
+                  <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Tenant</TableHead>
+                  <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Status</TableHead>
+                  <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Sent Date</TableHead>
+                  <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Expiry</TableHead>
+                  <TableHead style={{ fontFamily: 'Archivo, sans-serif' }}>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {contracts.map((contract) => (
+                  <TableRow key={contract.id} className="transition-colors duration-150">
+                    <TableCell>
+                      <button
+                        onClick={() => handleToggleSelect(contract.id)}
+                        className="flex items-center justify-center"
+                        title={selectedContracts.has(contract.id) ? 'Deselect' : 'Select'}
+                      >
+                        {selectedContracts.has(contract.id) ? (
+                          <CheckSquare className="w-5 h-5 text-orange-500" />
+                        ) : (
+                          <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
+                        )}
+                      </button>
+                    </TableCell>
+                    <TableCell>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                        {getContractTypeIcon(contract.contractType)}
+                      </div>
+                      <div>
+                        <div className="font-medium" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                          {contract.title}
+                        </div>
+                        <div className="text-sm text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                          {contract.fileName}
+                        </div>
+                        {/* Show badge if contract was synced from tenant app */}
+                        {contract.additionalInfo && contract.additionalInfo.includes('Signed contract sent from tenant app') && (
+                          <Badge className="mt-1 bg-green-100 text-green-800 border-0 text-xs">
+                            Received from Tenant
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center space-x-2">
+                      <Building2 className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                        {contract.propertyAddress}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center space-x-2">
+                      <User className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <div className="font-medium text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                          {contract.tenantName}
+                        </div>
+                        <div className="text-xs text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                          {contract.tenantEmail}
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={`${getStatusColor(contract.status)} text-white border-0`}>
+                      {getStatusText(contract.status)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                        {contract.sentDate.toLocaleDateString()}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {contract.expiryDate ? (
+                      <div className="flex items-center space-x-2">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                          {contract.expiryDate.toLocaleDateString()}
+                        </span>
+                      </div>
                     ) : (
-                      <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
+                      <span className="text-sm text-gray-400" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                        -
+                      </span>
                     )}
-                  </button>
-                </TableCell>
-                <TableCell>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    {getContractTypeIcon(contract.contractType)}
-                  </div>
-                  <div>
-                    <div className="font-medium" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
-                      {contract.title}
-                    </div>
-                    <div className="text-sm text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                      {contract.fileName}
-                    </div>
-                    {/* Show badge if contract was synced from tenant app */}
-                    {contract.additionalInfo && contract.additionalInfo.includes('Signed contract sent from tenant app') && (
-                      <Badge className="mt-1 bg-green-100 text-green-800 border-0 text-xs">
-                        Received from Tenant
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="p-2">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleViewContract(contract)}>
+                          <Eye className="w-4 h-4 mr-2" />
+                          View Contract
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDownloadContract(contract)}>
+                          <Download className="w-4 h-4 mr-2" />
+                          Download
+                        </DropdownMenuItem>
+                        {contract.status === 'unsigned' && (
+                          <DropdownMenuItem onClick={() => handleMarkAsSigned(contract.id)}>
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Mark as Signed
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+            </div>
+        </div>
+        )}
+
+        {/* Mobile Card View */}
+        {isMobile && (
+          <div className="space-y-4 p-4 w-full">
+            {contracts.map((contract) => (
+              <div 
+                key={contract.id} 
+                className={`bg-white border rounded-lg p-4 ${selectedContracts.has(contract.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <button
+                      onClick={() => handleToggleSelect(contract.id)}
+                      className="mt-1 flex-shrink-0"
+                    >
+                      {selectedContracts.has(contract.id) ? (
+                        <CheckSquare className="w-5 h-5 text-orange-500" />
+                      ) : (
+                        <Square className="w-5 h-5 text-gray-400 border-2 border-gray-400 rounded" />
+                      )}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          {getContractTypeIcon(contract.contractType)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                            {contract.title}
+                          </h3>
+                          <p className="text-xs text-gray-500 truncate" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                            {contract.fileName}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge className={`${getStatusColor(contract.status)} text-white border-0 text-xs`}>
+                        {getStatusText(contract.status)}
                       </Badge>
-                    )}
+                      {contract.additionalInfo && contract.additionalInfo.includes('Signed contract sent from tenant app') && (
+                        <Badge className="mt-1 ml-2 bg-green-100 text-green-800 border-0 text-xs">
+                          Received from Tenant
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center space-x-2">
-                  <Building2 className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                    {contract.propertyAddress}
-                  </span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center space-x-2">
-                  <User className="w-4 h-4 text-gray-400" />
+
+                <div className="space-y-2 mb-3 text-sm">
                   <div>
-                    <div className="font-medium text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                      {contract.tenantName}
-                    </div>
-                    <div className="text-xs text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                      {contract.tenantEmail}
+                    <span className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Property:</span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Building2 className="h-3 w-3 text-muted-foreground" />
+                      <p className="font-medium text-gray-900" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                        {contract.propertyAddress || 'N/A'}
+                      </p>
                     </div>
                   </div>
-                </div>
-              </TableCell>
-              <TableCell>
-                <Badge className={`${getStatusColor(contract.status)} text-white border-0`}>
-                  {getStatusText(contract.status)}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center space-x-2">
-                  <Calendar className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                    {contract.sentDate.toLocaleDateString()}
-                  </span>
-                </div>
-              </TableCell>
-              <TableCell>
-                {contract.expiryDate ? (
-                  <div className="flex items-center space-x-2">
-                    <Clock className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                      {contract.expiryDate.toLocaleDateString()}
-                    </span>
+                  <div>
+                    <span className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Tenant:</span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <User className="h-3 w-3 text-muted-foreground" />
+                      <p className="font-medium text-gray-900" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                        {contract.tenantName}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="text-xs text-gray-600 truncate" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                        {contract.tenantEmail}
+                      </span>
+                    </div>
                   </div>
-                ) : (
-                  <span className="text-sm text-gray-400" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                    -
-                  </span>
-                )}
-              </TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="p-2">
-                      <MoreHorizontal className="w-4 h-4" />
+                  <div>
+                    <span className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Sent Date:</span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Calendar className="h-3 w-3 text-muted-foreground" />
+                      <p className="font-medium text-gray-900" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                        {contract.sentDate.toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  {contract.expiryDate && (
+                    <div>
+                      <span className="text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Expiry:</span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        <p className="font-medium text-gray-900" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                          {contract.expiryDate.toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 pt-3 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewContract(contract)}
+                    className="flex-1"
+                    style={{ fontFamily: 'Archivo, sans-serif' }}
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    View
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadContract(contract)}
+                    className="flex-1"
+                    style={{ fontFamily: 'Archivo, sans-serif' }}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
+                  {contract.status === 'unsigned' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleMarkAsSigned(contract.id)}
+                      className="flex-1"
+                      style={{ fontFamily: 'Archivo, sans-serif' }}
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Sign
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleViewContract(contract)}>
-                      <Eye className="w-4 h-4 mr-2" />
-                      View Contract
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDownloadContract(contract)}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </DropdownMenuItem>
-                    {contract.status === 'unsigned' && (
-                      <DropdownMenuItem onClick={() => handleMarkAsSigned(contract.id)}>
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Mark as Signed
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </>
+    );
   };
 
   // Show success screen
@@ -863,8 +1121,8 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7' }}>
-      <div className="max-w-7xl mx-auto px-6 py-6">
+    <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#F7F7F7' }}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -902,7 +1160,7 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
         </div>
 
         {/* Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
           <Card className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -1076,7 +1334,18 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
                 </p>
               </Card>
             ) : (
-              <ContractTable contracts={sentContracts} />
+              <>
+                <ContractTable contracts={paginatedSentContracts} />
+                <PaginationControls
+                  currentPage={currentSentPage}
+                  totalPages={totalSentPages}
+                  onPageChange={setCurrentSentPage}
+                  startIndex={sentStartIndex}
+                  endIndex={sentEndIndex}
+                  totalItems={sentContracts.length}
+                  itemName="contracts"
+                />
+              </>
             )}
           </TabsContent>
 
@@ -1099,7 +1368,18 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
                 </p>
               </Card>
             ) : (
-              <ContractTable contracts={unsignedContracts} />
+              <>
+                <ContractTable contracts={paginatedUnsignedContracts} />
+                <PaginationControls
+                  currentPage={currentUnsignedPage}
+                  totalPages={totalUnsignedPages}
+                  onPageChange={setCurrentUnsignedPage}
+                  startIndex={unsignedStartIndex}
+                  endIndex={unsignedEndIndex}
+                  totalItems={unsignedContracts.length}
+                  itemName="contracts"
+                />
+              </>
             )}
           </TabsContent>
 
@@ -1122,7 +1402,18 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
                 </p>
               </Card>
             ) : (
-              <ContractTable contracts={signedContracts} />
+              <>
+                <ContractTable contracts={paginatedSignedContracts} />
+                <PaginationControls
+                  currentPage={currentSignedPage}
+                  totalPages={totalSignedPages}
+                  onPageChange={setCurrentSignedPage}
+                  startIndex={signedStartIndex}
+                  endIndex={signedEndIndex}
+                  totalItems={signedContracts.length}
+                  itemName="contracts"
+                />
+              </>
             )}
           </TabsContent>
         </Tabs>
