@@ -129,3 +129,4 @@ const WelcomePage: React.FC<WelcomePageProps> = ({ onGetStarted, onClose }) => {
 };
 
 export { WelcomePage };
+
