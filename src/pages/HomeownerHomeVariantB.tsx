@@ -9,8 +9,8 @@ import { TextAnimate } from '../components/magic-ui/text-animate';
 
 type UserRole = 'homeowner';
 
-// Add preload link for the hero image
-const heroImageUrl = '/images/cheerful-kids-their-parents-casualwear-relaxing-couch-living-room 1.png';
+// Add preload link for the hero image - Variant B: Signing document
+const heroImageUrl = '/images/young-caucasian-woman-smiling-while-signing-document-handed-by-middle-aged-man 1.png';
 const preloadHeroImage = () => {
   const link = document.createElement('link');
   link.rel = 'preload';
@@ -19,7 +19,7 @@ const preloadHeroImage = () => {
   document.head.appendChild(link);
 };
 
-const HomeownerHome = () => {
+const HomeownerHomeVariantB = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [showRolePopup, setShowRolePopup] = useState(false);
@@ -86,11 +86,11 @@ const HomeownerHome = () => {
 
       {/* Hero Section */}
       <section className="h-[80vh] relative flex items-center">
-        {/* Background Image */}
+        {/* Background Image - Variant B: Signing Document */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           <img
             src={heroImageUrl}
-            alt="Cheerful family relaxing in living room"
+            alt="Woman signing document with professional assistance"
             className="w-full h-full object-cover object-top"
             style={{ objectPosition: 'center 20%' }}
             loading="eager"
@@ -466,5 +466,8 @@ const HomeownerHome = () => {
   );
 };
 
-export default HomeownerHome;
+export default HomeownerHomeVariantB;
+
+
+
 

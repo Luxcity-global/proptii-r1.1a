@@ -21,6 +21,7 @@ import FileTable from './components/dashboard/sections/YourFiles-new';
 import TenantReferencing from './components/dashboard/sections/TenantReferencing-new';
 import AgentHome from './pages/AgentHome';
 import HomeownerHome from './pages/HomeownerHome';
+import HomeownerHomeVariantB from './pages/HomeownerHomeVariantB';
 import { HomeownerDashboard } from './components/homeowner/HomeownerDashboard';
 import Listings from './pages/Listings';
 import NewListingPage from './pages/listings/new';
@@ -60,6 +61,8 @@ export const App: React.FC = () => {
             <Route path="/Agent" element={<AgentHome />} />
             <Route path="/homeowner" element={<HomeownerHome />} />
             <Route path="/Homeowner" element={<HomeownerHome />} />
+            <Route path="/homeowner/variant-b" element={<HomeownerHomeVariantB />} />
+            <Route path="/Homeowner/variant-b" element={<HomeownerHomeVariantB />} />
             <Route path="/homeowner/dashboard" element={<HomeownerDashboard />} />
             <Route path="/Homeowner/dashboard" element={<HomeownerDashboard />} />
             <Route path="/landlord" element={<LandlordDemo />} />

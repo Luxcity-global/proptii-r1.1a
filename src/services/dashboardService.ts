@@ -58,7 +58,6 @@ class MockDashboardService implements DashboardServiceInterface {
 class RealDashboardService implements DashboardServiceInterface {
   async getDashboardSummary(): Promise<ApiResponse<DashboardSummary>> {
     // TODO: Replace with actual API call
-    console.log('Using real API for getDashboardSummary');
     return { success: false, error: 'Real API not implemented yet' };
   }
 

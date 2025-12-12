@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { UserCircle, ChevronDown, Settings, LogOut, Menu, X } from 'lucide-react';
+import { UserCircle, ChevronDown, Settings, LogOut, Menu, X, RefreshCw } from 'lucide-react';
 
 interface HomeownerNavbarProps {
   isHomeowner?: boolean;
@@ -9,11 +9,26 @@ interface HomeownerNavbarProps {
 
 const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, user, login, logout, editProfile, isLoading } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [loginInProgress, setLoginInProgress] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+
+  // Check if we're on variant B page
+  const isVariantB = location.pathname.includes('/variant-b');
+  
+  // Handle switching between variants
+  const handleSwitchVariant = () => {
+    setIsDropdownOpen(false);
+    setIsMobileMenuOpen(false);
+    if (isVariantB) {
+      navigate('/Homeowner');
+    } else {
+      navigate('/Homeowner/variant-b');
+    }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -198,6 +213,13 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
                       Dashboard
                     </button>
                     <button
+                      onClick={handleSwitchVariant}
+                      className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 w-full text-left"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Switch
+                    </button>
+                    <button
                       onClick={handleEditProfile}
                       disabled={isLoading}
                       className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 w-full text-left disabled:opacity-50 disabled:cursor-not-allowed"
@@ -270,6 +292,13 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
                         <path d="M10 14H3V21H10V14Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                       Dashboard
+                    </button>
+                    <button
+                      onClick={handleSwitchVariant}
+                      className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 w-full text-left"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Switch
                     </button>
                     <button
                       onClick={handleEditProfile}

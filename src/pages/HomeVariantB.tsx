@@ -11,7 +11,7 @@ import { TextAnimate } from '../components/magic-ui/text-animate';
 
 import { useState, useEffect } from 'react';
 
-const Home = () => {
+const HomeVariantB = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -43,32 +43,6 @@ const Home = () => {
     }
   }, [searchParams, setSearchParams]);
 
-  // useEffect(() => {
-  //   const checkBackend = async () => {
-  //     try {
-  //       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-  //       // Remove /api from the end if it exists
-  //       const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
-  //       const response = await fetch(`${baseUrl}/api/health`);
-  //       setIsBackendAvailable(response.ok);
-  //     } catch (error) {
-  //       console.error('Backend health check failed:', error);
-  //       setIsBackendAvailable(false);
-  //     }
-  //   };
-
-  //   checkBackend();
-  // }, []);
-
-  // Progress bar component (simplified since loadingProgress is not available)
-  // const ProgressBar = () => (
-  //   <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden mt-4">
-  //     <div className="h-full bg-orange-500 transition-all duration-300 ease-out animate-pulse w-full" />
-  //   </div>
-  // );
-
-
-
   const handleSearchInputHeightChange = (height: number) => {
     setSearchInputHeight(height);
   };
@@ -79,10 +53,6 @@ const Home = () => {
     const extraHeight = Math.max(0, searchInputHeight - baseHeight);
     return extraHeight * 0.5; // Adjust multiplier as needed
   };
-
-
-
-
 
   const handleCloseResponseModal = () => {
     setIsResponseModalOpen(false);
@@ -123,11 +93,11 @@ const Home = () => {
         className={`h-[95vh] pt-32 relative flex items-center md:pt-0 z-10`}
         style={{ paddingBottom: `${getDynamicPadding()}px` }}
       >
-        {/* Background Image */}
+        {/* Background Image - Variant B: Signing Document */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           <img
-            src="/images/01_Lady_Child_Family_BG.jpg"
-            alt="Hero background"
+            src="/images/young-caucasian-woman-smiling-while-signing-document-handed-by-middle-aged-man 1.png"
+            alt="Woman signing document with professional assistance"
             loading="eager"
             fetchpriority="high"
             className="w-full h-full object-cover"
@@ -146,16 +116,16 @@ const Home = () => {
                   isExpanded ? 'px-4 md:px-3' : 'pl-6 pr-4 md:pl-8 md:pr-6'
                 } py-3`}
                 style={{
-                  borderColor: 'rgba(255, 255, 255, 1)',
+                  borderColor: '#2F7DB0',
                   width: isExpanded ? 'auto' : 'auto',
                   minWidth: isExpanded ? '400px' : 'auto',
                   transformOrigin: 'center'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 1)';
+                  e.currentTarget.style.borderColor = '#5AA0D0';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 1)';
+                  e.currentTarget.style.borderColor = '#2F7DB0';
                 }}
                 onClick={toggleExpanded}
               >
@@ -169,9 +139,9 @@ const Home = () => {
                       className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
                         userType === 'Tenant' 
                           ? 'text-white rounded-full' 
-                          : 'hover:text-[#DC5F12] rounded-l-full'
+                          : 'hover:text-[#4E97CC] rounded-l-full'
                       }`}
-                      style={userType === 'Tenant' ? { backgroundColor: '#DC5F12' } : {}}
+                      style={userType === 'Tenant' ? { backgroundColor: '#2F7DB0' } : {}}
                     >
                       Tenant
                     </button>
@@ -183,9 +153,9 @@ const Home = () => {
                       className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
                         userType === 'Agent' 
                           ? 'text-white rounded-full' 
-                          : 'hover:text-[#DC5F12]'
+                          : 'hover:text-[#4E97CC]'
                       }`}
-                      style={userType === 'Agent' ? { backgroundColor: '#DC5F12' } : {}}
+                      style={userType === 'Agent' ? { backgroundColor: '#2F7DB0' } : {}}
                     >
                       Agent/Landlord
                     </button>
@@ -197,9 +167,9 @@ const Home = () => {
                       className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
                         userType === 'Homeowner' 
                           ? 'text-white rounded-full' 
-                          : 'hover:text-[#DC5F12] rounded-r-full'
+                          : 'hover:text-[#4E97CC] rounded-r-full'
                       }`}
-                      style={userType === 'Homeowner' ? { backgroundColor: '#DC5F12' } : {}}
+                      style={userType === 'Homeowner' ? { backgroundColor: '#2F7DB0' } : {}}
                     >
                       Home Owner
                     </button>
@@ -235,7 +205,7 @@ const Home = () => {
                   </>
                 ) : (
                   <>
-                    <span className="hover:text-[#DC5F12] transition-colors duration-300 ease-out">{userType}</span>
+                    <span className="hover:text-[#4E97CC] transition-colors duration-300 ease-out">{userType}</span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -303,8 +273,6 @@ const Home = () => {
           </div>
         </div>
       </section>
-
-
 
       {/**The new services section */}
       <section className="relative py-16 md:py-20 bg-[#f9f5f0] z-20">
@@ -457,4 +425,8 @@ const Home = () => {
   );
 };
 
-export default Home;
+export default HomeVariantB;
+
+
+
+

@@ -155,13 +155,20 @@ const AgentHome = () => {
             <div className="group relative inline-block">
               {/* Main container - expands symmetrically */}
               <div 
-                className={`relative rounded-full border-2 border-white bg-black/40 text-white font-semibold text-sm md:text-base cursor-pointer outline-none focus:ring-2 focus:ring-[#8FCDFF] focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-500 ease-out flex items-center ${
+                className={`relative rounded-full border-2 bg-black/40 text-white font-semibold text-sm md:text-base cursor-pointer outline-none focus:ring-2 focus:ring-[#8FCDFF] focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-500 ease-out flex items-center ${
                   isExpanded ? 'px-4 md:px-3' : 'pl-6 pr-4 md:pl-8 md:pr-6'
                 } py-3`}
                 style={{
+                  borderColor: '#2F7DB0',
                   width: isExpanded ? 'auto' : 'auto',
                   minWidth: isExpanded ? '400px' : 'auto',
                   transformOrigin: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#5AA0D0';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#2F7DB0';
                 }}
                 onClick={toggleExpanded}
               >
@@ -174,9 +181,10 @@ const AgentHome = () => {
                       }}
                       className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
                         userType === 'Tenant' 
-                          ? 'bg-[#DC5F12] text-white rounded-full' 
-                          : 'hover:text-[#DC5F12] rounded-l-full'
+                          ? 'text-white rounded-full' 
+                          : 'hover:text-[#4E97CC] rounded-l-full'
                       }`}
+                      style={userType === 'Tenant' ? { backgroundColor: '#2F7DB0' } : {}}
                     >
                       Tenant
                     </button>
@@ -187,9 +195,10 @@ const AgentHome = () => {
                       }}
                       className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
                         userType === 'Agent' 
-                          ? 'bg-[#DC5F12] text-white rounded-full' 
-                          : 'hover:text-[#DC5F12]'
+                          ? 'text-white rounded-full' 
+                          : 'hover:text-[#4E97CC]'
                       }`}
+                      style={userType === 'Agent' ? { backgroundColor: '#2F7DB0' } : {}}
                     >
                       Agent/Landlord
                     </button>
@@ -200,9 +209,10 @@ const AgentHome = () => {
                       }}
                       className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
                         userType === 'Homeowner' 
-                          ? 'bg-[#DC5F12] text-white rounded-full' 
-                          : 'hover:text-[#DC5F12] rounded-r-full'
+                          ? 'text-white rounded-full' 
+                          : 'hover:text-[#4E97CC] rounded-r-full'
                       }`}
+                      style={userType === 'Homeowner' ? { backgroundColor: '#2F7DB0' } : {}}
                     >
                       Home Owner
                     </button>
@@ -211,7 +221,14 @@ const AgentHome = () => {
                         e.stopPropagation();
                         toggleExpanded();
                       }}
-                      className="ml-3 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all duration-500 ease-out flex-shrink-0"
+                      className="ml-3 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ease-out flex-shrink-0"
+                      style={{ backgroundColor: '#2F7DB0' }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#5AA0D0';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#2F7DB0';
+                      }}
                     >
                       <svg
                         className="w-4 h-4 text-white transition-all duration-500 ease-out"
@@ -231,13 +248,20 @@ const AgentHome = () => {
                   </>
                 ) : (
                   <>
-                    <span className="hover:text-[#DC5F12] transition-colors duration-300 ease-out">{userType}</span>
+                    <span className="hover:text-[#4E97CC] transition-colors duration-300 ease-out">{userType}</span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleExpanded();
                       }}
-                      className="ml-3 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all duration-500 ease-out flex-shrink-0"
+                      className="ml-3 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ease-out flex-shrink-0"
+                      style={{ backgroundColor: '#2F7DB0' }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#5AA0D0';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#2F7DB0';
+                      }}
                     >
                       <svg
                         className="w-4 h-4 text-white transition-all duration-500 ease-out"

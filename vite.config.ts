@@ -162,6 +162,7 @@ export default defineConfig(({ mode = 'development' }) => {
         'types': path.resolve(__dirname, './src/types'),
         'assets': path.resolve(__dirname, './src/assets'),
         'config': path.resolve(__dirname, './src/config'),
+        'data': path.resolve(__dirname, './src/data'),
       },
     },
     build: {

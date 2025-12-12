@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  Wrench, 
-  Plus, 
-  Search, 
-  Filter, 
-  Calendar, 
+import {
+  Wrench,
+  Plus,
+  Search,
+  Filter,
+  Calendar,
   AlertCircle,
   CheckCircle2,
   Clock,
@@ -13,9 +13,17 @@ import {
   DollarSign,
   User,
   FileText,
-  X
+  X,
+  BookOpen,
+  Phone,
+  Sparkles
 } from 'lucide-react';
 import { MaintenanceTaskFormModal } from './MaintenanceTaskFormModal';
+import { MaintenanceTemplatesBrowser } from './MaintenanceTemplatesBrowser';
+import { DIYGuideViewer } from './DIYGuideViewer';
+import { VendorSearch } from './VendorSearch';
+import { MaintenanceTemplate } from './data/maintenanceTemplates';
+import { getGuidesByCategory } from './data/diyGuides';
 
 export interface MaintenanceTask {
   id: string;
@@ -67,8 +75,15 @@ export function MaintenanceManagement({
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<MaintenanceTask | null>(null);
 
+  // New feature states
+  const [isTemplatesBrowserOpen, setIsTemplatesBrowserOpen] = useState(false);
+  const [isDIYGuideOpen, setIsDIYGuideOpen] = useState(false);
+  const [currentGuideId, setCurrentGuideId] = useState<string | null>(null);
+  const [isVendorSearchOpen, setIsVendorSearchOpen] = useState(false);
+  const [vendorSearchCategory, setVendorSearchCategory] = useState<string>('other');
+
   // Mock data - will be replaced with Firebase data
-  const [tasks] = useState<MaintenanceTask[]>([
+  const [tasks, setTasks] = useState<MaintenanceTask[]>([
     {
       id: '1',
       title: 'HVAC Annual Service',
@@ -126,13 +141,13 @@ export function MaintenanceManagement({
   ]);
 
   const filteredTasks = tasks.filter(task => {
-    const matchesSearch = 
+    const matchesSearch =
       task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
     const matchesCategory = categoryFilter === 'all' || task.category === categoryFilter;
     const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
-    
+
     return matchesSearch && matchesStatus && matchesCategory && matchesPriority;
   });
 
@@ -187,15 +202,88 @@ export function MaintenanceManagement({
           <h1 className="text-3xl font-bold text-[#374957] mb-2">Maintenance Management</h1>
           <p className="text-gray-600">Track and manage all your home maintenance tasks</p>
         </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsTemplatesBrowserOpen(true)}
+            className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-5 py-2.5 rounded-lg font-semibold hover:from-purple-700 hover:to-purple-800 transition-all flex items-center gap-2 shadow-md hover:shadow-lg"
+          >
+            <Sparkles className="w-4 h-4" />
+            Browse Templates
+          </button>
+          <button
+            onClick={() => {
+              setEditingTask(null);
+              setIsFormModalOpen(true);
+            }}
+            className="bg-[#DC5F12] text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-[#c54f0f] transition-all flex items-center gap-2 shadow-md hover:shadow-lg"
+          >
+            <Plus className="w-4 h-4" />
+            Add Task
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Access Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Maintenance Scheduler Card */}
+        <button
+          onClick={() => setIsTemplatesBrowserOpen(true)}
+          className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-purple-500 hover:shadow-lg transition-all text-left group"
+        >
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-purple-200 transition-colors">
+              <Calendar className="w-6 h-6 text-purple-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-[#374957] mb-2">Maintenance Scheduler</h3>
+              <p className="text-sm text-gray-600">
+                Quickly browse 30+ pre-built maintenance tasks and add them to your schedule with one click.
+              </p>
+            </div>
+          </div>
+        </button>
+
+        {/* DIY Guides Card */}
         <button
           onClick={() => {
-            setEditingTask(null);
-            setIsFormModalOpen(true);
+            // Open first available DIY guide as demo
+            const allGuides = getGuidesByCategory('hvac' as any);
+            if (allGuides && allGuides.length > 0) {
+              setCurrentGuideId(allGuides[0].id);
+              setIsDIYGuideOpen(true);
+            }
           }}
-          className="bg-[#DC5F12] text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-[#c54f0f] transition-all flex items-center gap-2 shadow-md hover:shadow-lg"
+          className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-blue-500 hover:shadow-lg transition-all text-left group"
         >
-          <Plus className="w-4 h-4" />
-          Add Task
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
+              <BookOpen className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-[#374957] mb-2">DIY Guides</h3>
+              <p className="text-sm text-gray-600">
+                Get step-by-step instructions for common home maintenance tasks with safety tips and tool lists.
+              </p>
+            </div>
+          </div>
+        </button>
+
+        {/* Vendor Finder Card */}
+        <button
+          onClick={() => setIsVendorSearchOpen(true)}
+          className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-green-500 hover:shadow-lg transition-all text-left group"
+        >
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-green-200 transition-colors">
+              <Phone className="w-6 h-6 text-green-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-[#374957] mb-2">Vendor Finder</h3>
+              <p className="text-sm text-gray-600">
+                Find trusted local tradespeople through our curated directory of UK trade platforms.
+              </p>
+            </div>
+          </div>
         </button>
       </div>
 
@@ -272,22 +360,22 @@ export function MaintenanceManagement({
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3 flex-wrap">
-                      <h3 className="text-lg font-bold text-[#374957] group-hover:text-[#DC5F12] transition-colors">{task.title}</h3>
-                      <span className={`px-2.5 py-1 text-xs font-semibold rounded-md ${getStatusColor(task.status)}`}>
-                        {task.status.replace('-', ' ')}
+                  <div className="flex items-center gap-3 mb-3 flex-wrap">
+                    <h3 className="text-lg font-bold text-[#374957] group-hover:text-[#DC5F12] transition-colors">{task.title}</h3>
+                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-md ${getStatusColor(task.status)}`}>
+                      {task.status.replace('-', ' ')}
+                    </span>
+                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-md ${getPriorityColor(task.priority)}`}>
+                      {task.priority}
+                    </span>
+                    {isOverdue(task.dueDate, task.status) && (
+                      <span className="px-2.5 py-1 text-xs font-semibold rounded-md bg-red-50 text-red-700 border border-red-200 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        Overdue
                       </span>
-                      <span className={`px-2.5 py-1 text-xs font-semibold rounded-md ${getPriorityColor(task.priority)}`}>
-                        {task.priority}
-                      </span>
-                      {isOverdue(task.dueDate, task.status) && (
-                        <span className="px-2.5 py-1 text-xs font-semibold rounded-md bg-red-50 text-red-700 border border-red-200 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
-                          Overdue
-                        </span>
-                      )}
-                    </div>
-                  
+                    )}
+                  </div>
+
                   {task.description && (
                     <p className="text-gray-600 mb-3">{task.description}</p>
                   )}
@@ -297,7 +385,7 @@ export function MaintenanceManagement({
                       <Calendar className="w-4 h-4" />
                       <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
                     </div>
-                    
+
                     <span className="px-2 py-1 text-xs bg-gray-100 rounded">
                       {getCategoryLabel(task.category)}
                     </span>
@@ -333,6 +421,37 @@ export function MaintenanceManagement({
                 </div>
 
                 <div className="flex items-center gap-2 ml-4">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setVendorSearchCategory(task.category);
+                      setIsVendorSearchOpen(true);
+                    }}
+                    className="p-2 hover:bg-green-50 rounded-lg transition-colors text-green-600 hover:text-green-700"
+                    aria-label="Find a pro"
+                    title="Find a professional"
+                  >
+                    <Phone className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Find a DIY guide for this category
+                      const guides = getGuidesByCategory(task.category as any);
+                      if (guides && guides.length > 0) {
+                        setCurrentGuideId(guides[0].id);
+                        setIsDIYGuideOpen(true);
+                      } else {
+                        // Fallback: show a generic guide or message
+                        alert('No DIY guide available for this task category yet.');
+                      }
+                    }}
+                    className="p-2 hover:bg-purple-50 rounded-lg transition-colors text-purple-600 hover:text-purple-700"
+                    aria-label="Get help"
+                    title="DIY Guide"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -378,6 +497,78 @@ export function MaintenanceManagement({
           }
         }}
         initialTask={editingTask}
+      />
+
+      {/* Maintenance Templates Browser */}
+      <MaintenanceTemplatesBrowser
+        isOpen={isTemplatesBrowserOpen}
+        onClose={() => setIsTemplatesBrowserOpen(false)}
+        onSelectTemplate={(template: MaintenanceTemplate) => {
+          // Convert template to task format
+          const today = new Date();
+          const dueDate = new Date(today);
+
+          // Calculate due date based on frequency
+          if (template.frequency === 'monthly') {
+            dueDate.setMonth(dueDate.getMonth() + 1);
+          } else if (template.frequency === 'quarterly') {
+            dueDate.setMonth(dueDate.getMonth() + 3);
+          } else if (template.frequency === 'biannual') {
+            dueDate.setMonth(dueDate.getMonth() + 6);
+          } else if (template.frequency === 'yearly') {
+            dueDate.setFullYear(dueDate.getFullYear() + 1);
+          } else {
+            dueDate.setMonth(dueDate.getMonth() + 1);
+          }
+
+          // Create new task from template
+          const newTask: MaintenanceTask = {
+            id: `task-${Date.now()}`, // Generate unique ID
+            title: template.title,
+            description: template.description,
+            category: template.category,
+            priority: template.priority,
+            status: 'pending',
+            dueDate: dueDate.toISOString().split('T')[0],
+            cost: template.estimatedCost.min,
+            recurring: template.frequency !== 'once' ? {
+              frequency: template.frequency === 'biannual' ? 'custom' : template.frequency as 'monthly' | 'quarterly' | 'yearly',
+              nextDue: dueDate.toISOString().split('T')[0]
+            } : undefined
+          };
+
+          // Add task to the list
+          setTasks(prevTasks => [...prevTasks, newTask]);
+
+          // Close the template browser
+          setIsTemplatesBrowserOpen(false);
+
+          // Show success message (optional)
+          console.log('Task created from template:', newTask);
+        }}
+      />
+
+      {/* DIY Guide Viewer */}
+      {currentGuideId && (
+        <DIYGuideViewer
+          guideId={currentGuideId}
+          isOpen={isDIYGuideOpen}
+          onClose={() => {
+            setIsDIYGuideOpen(false);
+            setCurrentGuideId(null);
+          }}
+          onFindPro={() => {
+            setIsDIYGuideOpen(false);
+            setIsVendorSearchOpen(true);
+          }}
+        />
+      )}
+
+      {/* Vendor Search */}
+      <VendorSearch
+        isOpen={isVendorSearchOpen}
+        onClose={() => setIsVendorSearchOpen(false)}
+        category={vendorSearchCategory}
       />
     </div>
   );

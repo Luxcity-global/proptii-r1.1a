@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+        .error {
+            border-left-color: #f44336;
+        }
+        .warning {
+            border-left-color: #ff9800;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Network Debugging Tool</h1>
+    
+    <div class="test-section">
+        <h2>1. Basic JavaScript Test</h2>
+        <p id="js-test">Testing...</p>
+        <script>
+            document.getElementById('js-test').textContent = '✅ JavaScript is working!';
+            document.getElementById('js-test').style.color = 'green';
+        </script>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Vite Dev Server Connection</h2>
+        <p id="vite-test">Testing Vite connection...</p>
+        <button onclick="testViteConnection()">Test Vite Connection</button>
+        <pre id="vite-result"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Main.tsx File Check</h2>
+        <p id="main-test">Testing main.tsx load...</p>
+        <button onclick="testMainTsx()">Test main.tsx</button>
+        <pre id="main-result"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Network Request Test</h2>
+        <button onclick="testNetworkRequests()">Test All Network Requests</button>
+        <pre id="network-result"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>5. CSP Check</h2>
+        <p id="csp-test">Checking CSP...</p>
+        <pre id="csp-result"></pre>
+    </div>
+
+    <script>
+        async function testViteConnection() {
+            const resultEl = document.getElementById('vite-result');
+            resultEl.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch('http://localhost:5173/');
+                resultEl.textContent = `Status: ${response.status}\nHeaders: ${JSON.stringify([...response.headers.entries()], null, 2)}`;
+                resultEl.parentElement.className = response.ok ? 'test-section' : 'test-section error';
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                resultEl.parentElement.className = 'test-section error';
+            }
+        }
+
+        async function testMainTsx() {
+            const resultEl = document.getElementById('main-result');
+            resultEl.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch('http://localhost:5173/src/main.tsx');
+                const text = await response.text();
+                resultEl.textContent = `Status: ${response.status}\n\nFirst 500 chars:\n${text.substring(0, 500)}...`;
+                resultEl.parentElement.className = response.ok ? 'test-section' : 'test-section error';
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                resultEl.parentElement.className = 'test-section error';
+            }
+        }
+
+        async function testNetworkRequests() {
+            const resultEl = document.getElementById('network-result');
+            resultEl.textContent = 'Testing network requests...\n\n';
+            
+            const urls = [
+                '/',
+                '/src/main.tsx',
+                '/index.html',
+                '/src/index.css',
+                '/@vite/client'
+            ];
+            
+            let results = [];
+            for (const url of urls) {
+                try {
+                    const response = await fetch(`http://localhost:5173${url}`);
+                    results.push(`${url}: ${response.status} ${response.statusText}`);
+                } catch (error) {
+                    results.push(`${url}: ERROR - ${error.message}`);
+                }
+            }
+            
+            resultEl.textContent = results.join('\n');
+        }
+
+        // Check CSP
+        function checkCSP() {
+            const cspResult = document.getElementById('csp-result');
+            const metaTags = document.querySelectorAll('meta[http-equiv="Content-Security-Policy"]');
+            const headers = [];
+            
+            if (metaTags.length > 0) {
+                metaTags.forEach(tag => {
+                    headers.push(`Meta Tag: ${tag.getAttribute('content')}`);
+                });
+            } else {
+                headers.push('No CSP meta tags found');
+            }
+            
+            // Try to detect CSP from headers (if accessible)
+            headers.push('\nNote: Check Network tab → Headers to see server-sent CSP headers');
+            
+            cspResult.textContent = headers.join('\n');
+        }
+
+        // Run CSP check on load
+        checkCSP();
+    </script>
+</body>
+</html>
+
+
+
+

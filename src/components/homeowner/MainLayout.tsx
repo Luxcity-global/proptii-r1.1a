@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Home, Wrench, FolderKanban, FileText, TrendingUp, MessageSquare, Settings, ChevronLeft, ChevronRight, User } from 'lucide-react';
+import { Home, Wrench, FolderKanban, Settings, ChevronLeft, ChevronRight, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export type HomeownerNavigationScreen = 
@@ -44,22 +44,6 @@ export function MainLayout({ currentScreen, onNavigate, children }: MainLayoutPr
       id: 'projects',
       icon: FolderKanban,
       label: 'Projects',
-    },
-    {
-      id: 'documents',
-      icon: FileText,
-      label: 'Documents',
-    },
-    {
-      id: 'home-value',
-      icon: TrendingUp,
-      label: 'Home Value',
-    },
-    {
-      id: 'communication',
-      icon: MessageSquare,
-      label: 'Messages',
-      hasNotification: false, // TODO: Dynamic based on unread messages
     },
     {
       id: 'settings',

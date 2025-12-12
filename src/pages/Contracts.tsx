@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import ContractModal from '../components/contract/ContractModal';
+import { BentoGrid, BentoCard } from '../components/magic-ui/bento-grid';
 import '../styles/typing.css';
 
 // Add preload link for the hero image
@@ -122,6 +123,22 @@ const ContractsPage = () => {
                 sizes="(max-width: 768px) 100vw, 50vw"
               />
             </div>
+          </div>
+
+          {/* Bento Grid Section */}
+          <div className="mt-20">
+            <BentoGrid className="grid-cols-1 md:grid-cols-3 lg:grid-cols-5">
+              {[...Array(5)].map((_, index) => (
+                <BentoCard
+                  key={index}
+                  className="!bg-[#F0F0F0] !border-2 !border-white"
+                  style={{
+                    backgroundColor: '#F0F0F0',
+                    border: '2px solid white',
+                  }}
+                />
+              ))}
+            </BentoGrid>
           </div>
         </div>
       </section>
