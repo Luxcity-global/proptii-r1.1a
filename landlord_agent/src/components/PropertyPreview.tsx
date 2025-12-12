@@ -35,7 +35,6 @@ interface PropertyPreviewProps {
   onEdit: (property: Property) => void;
   onManageDocuments: () => void;
   onManagePhotos: () => void;
-  onViewInsights: () => void;
   updateProperty: (propertyId: string, updates: Partial<Property>) => void;
   onViewTenant?: (tenantId: string) => void;
   onPublishProperty?: () => void;
@@ -48,7 +47,6 @@ export function PropertyPreview({
   onEdit,
   onManageDocuments,
   onManagePhotos,
-  onViewInsights,
   updateProperty,
   onViewTenant,
   onPublishProperty,
@@ -478,13 +476,9 @@ export function PropertyPreview({
                       <BarChart3 className="w-8 h-8 text-white" />
                     </div>
                     <h3 className="mb-2">AI-Powered Property Insights</h3>
-                    <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                      Get detailed market analysis, demographic insights, and AI recommendations for this property
+                    <p className="text-muted-foreground max-w-md mx-auto">
+                      Detailed market analysis, demographic insights, and AI recommendations will be available soon
                     </p>
-                    <Button onClick={onViewInsights} size="lg">
-                      <BarChart3 className="w-4 h-4 mr-2" />
-                      View Detailed Insights
-                    </Button>
                   </div>
                 </Card>
               </TabsContent>
@@ -520,14 +514,6 @@ export function PropertyPreview({
                 >
                   <ImageIcon className="w-4 h-4 mr-2" />
                   Manage Photos
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={onViewInsights}
-                >
-                  <BarChart3 className="w-4 h-4 mr-2" />
-                  View Insights
                 </Button>
               </div>
             </Card>

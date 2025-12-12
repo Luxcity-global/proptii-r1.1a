@@ -1388,7 +1388,6 @@ function AppContent() {
             }}
             onManageDocuments={() => navigateToScreen('document-management')}
             onManagePhotos={() => navigateToScreen('photo-management')}
-            onViewInsights={() => navigateToScreen('property-insights')}
             updateProperty={updateProperty}
             onViewTenant={(tenantId) => {
               const tenant = tenants.find(t => t.id === tenantId);
@@ -1532,7 +1531,6 @@ function AppContent() {
             onEdit={() => navigateToScreen('property-type-selection')}
             onManageDocuments={() => {}}
             onManagePhotos={() => {}}
-            onViewInsights={() => {}}
             updateProperty={() => {}}
             onPublishProperty={() => {
               // Convert setup data to property and add to properties list

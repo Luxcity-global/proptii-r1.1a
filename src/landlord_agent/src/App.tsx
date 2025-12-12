@@ -2649,8 +2649,6 @@ export default function App() {
             }}
             onManageDocuments={() => navigateToScreen('document-management')}
             onManagePhotos={() => navigateToScreen('photo-management')}
-            // COMMENTED OUT FOR THIS RELEASE - Insights page not in scope
-            onViewInsights={() => {/* navigateToScreen('property-insights') */}}
             updateProperty={updateProperty}
             onViewTenant={(tenantId) => {
               const tenant = tenants.find(t => t.id === tenantId);
@@ -3008,7 +3006,6 @@ export default function App() {
             onEdit={() => navigateToScreen('property-type-selection')}
             onManageDocuments={() => {}}
             onManagePhotos={() => {}}
-            onViewInsights={() => {}}
             updateProperty={() => {}}
             onHome={() => navigateToScreen('main-app')}
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
