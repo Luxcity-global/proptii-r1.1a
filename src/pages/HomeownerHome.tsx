@@ -110,16 +110,16 @@ const HomeownerHome = () => {
                   isExpanded ? 'px-4 md:px-3' : 'pl-6 pr-4 md:pl-8 md:pr-6'
                 } py-3`}
                 style={{
-                  borderColor: '#2F7DB0',
+                  borderColor: 'rgba(255, 255, 255, 1)',
                   width: isExpanded ? 'auto' : 'auto',
                   minWidth: isExpanded ? '400px' : 'auto',
                   transformOrigin: 'center'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#5AA0D0';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 1)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#2F7DB0';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 1)';
                 }}
                 onClick={toggleExpanded}
               >
@@ -133,9 +133,9 @@ const HomeownerHome = () => {
                       className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
                         userType === 'Tenant' 
                           ? 'text-white rounded-full' 
-                          : 'hover:text-[#4E97CC] rounded-l-full'
+                          : 'hover:text-[#DC5F12] rounded-l-full'
                       }`}
-                      style={userType === 'Tenant' ? { backgroundColor: '#2F7DB0' } : {}}
+                      style={userType === 'Tenant' ? { backgroundColor: '#DC5F12' } : {}}
                     >
                       Tenant
                     </button>
@@ -147,9 +147,9 @@ const HomeownerHome = () => {
                       className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
                         userType === 'Agent' 
                           ? 'text-white rounded-full' 
-                          : 'hover:text-[#4E97CC]'
+                          : 'hover:text-[#DC5F12]'
                       }`}
-                      style={userType === 'Agent' ? { backgroundColor: '#2F7DB0' } : {}}
+                      style={userType === 'Agent' ? { backgroundColor: '#DC5F12' } : {}}
                     >
                       Agent/Landlord
                     </button>
@@ -161,9 +161,9 @@ const HomeownerHome = () => {
                       className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
                         userType === 'Homeowner' 
                           ? 'text-white rounded-full' 
-                          : 'hover:text-[#4E97CC] rounded-r-full'
+                          : 'hover:text-[#DC5F12] rounded-r-full'
                       }`}
-                      style={userType === 'Homeowner' ? { backgroundColor: '#2F7DB0' } : {}}
+                      style={userType === 'Homeowner' ? { backgroundColor: '#DC5F12' } : {}}
                     >
                       Home Owner
                     </button>
@@ -199,7 +199,7 @@ const HomeownerHome = () => {
                   </>
                 ) : (
                   <>
-                    <span className="hover:text-[#4E97CC] transition-colors duration-300 ease-out">{userType}</span>
+                    <span className="hover:text-[#DC5F12] transition-colors duration-300 ease-out">{userType}</span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
