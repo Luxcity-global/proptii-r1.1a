@@ -23,7 +23,7 @@ import { MaintenanceTemplatesBrowser } from './MaintenanceTemplatesBrowser';
 import { DIYGuideViewer } from './DIYGuideViewer';
 import { VendorSearch } from './VendorSearch';
 import { MaintenanceTemplate } from './data/maintenanceTemplates';
-import { getGuidesByCategory } from './data/diyGuides';
+import { diyGuides, getGuidesByCategory } from './data/diyGuides';
 
 export interface MaintenanceTask {
   id: string;
@@ -81,6 +81,11 @@ export function MaintenanceManagement({
   const [currentGuideId, setCurrentGuideId] = useState<string | null>(null);
   const [isVendorSearchOpen, setIsVendorSearchOpen] = useState(false);
   const [vendorSearchCategory, setVendorSearchCategory] = useState<string>('other');
+  const [showDIYGuidesGrid, setShowDIYGuidesGrid] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
 
   // Mock data - will be replaced with Firebase data
   const [tasks, setTasks] = useState<MaintenanceTask[]>([
@@ -151,6 +156,17 @@ export function MaintenanceManagement({
     return matchesSearch && matchesStatus && matchesCategory && matchesPriority;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filteredTasks.length / pageSize));
+  const paginatedTasks = filteredTasks.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  const handleChangePage = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
+
   const getStatusColor = (status: MaintenanceTask['status']) => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
@@ -185,6 +201,11 @@ export function MaintenanceManagement({
   const isOverdue = (dueDate: string, status: MaintenanceTask['status']) => {
     if (status === 'completed' || status === 'cancelled') return false;
     return new Date(dueDate) < new Date();
+  };
+
+  const handleOpenGuide = (guideId: string) => {
+    setCurrentGuideId(guideId);
+    setIsDIYGuideOpen(true);
   };
 
   return (
@@ -227,7 +248,11 @@ export function MaintenanceManagement({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Maintenance Scheduler Card */}
         <button
-          onClick={() => setIsTemplatesBrowserOpen(true)}
+          onClick={() => {
+            // Ensure we're on the scheduled tasks view and open the scheduler popup
+            setShowDIYGuidesGrid(false);
+            setIsTemplatesBrowserOpen(true);
+          }}
           className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-purple-500 hover:shadow-lg transition-all text-left group"
         >
           <div className="flex items-start gap-4">
@@ -246,12 +271,8 @@ export function MaintenanceManagement({
         {/* DIY Guides Card */}
         <button
           onClick={() => {
-            // Open first available DIY guide as demo
-            const allGuides = getGuidesByCategory('hvac' as any);
-            if (allGuides && allGuides.length > 0) {
-              setCurrentGuideId(allGuides[0].id);
-              setIsDIYGuideOpen(true);
-            }
+            // Show DIY guides grid in place of the tasks table
+            setShowDIYGuidesGrid(true);
           }}
           className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-blue-500 hover:shadow-lg transition-all text-left group"
         >
@@ -290,15 +311,20 @@ export function MaintenanceManagement({
       {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="md:col-span-2 relative">
-            <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search tasks..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC5F12] focus:border-transparent transition-all"
-            />
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Search
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search tasks..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC5F12] focus:border-transparent transition-all"
+              />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">Status</label>
@@ -334,15 +360,59 @@ export function MaintenanceManagement({
         </div>
       </div>
 
-      {/* Tasks List */}
-      <div className="space-y-4">
-        {filteredTasks.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+      {/* Tasks Table / DIY Guides Grid */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        {showDIYGuidesGrid ? (
+          <div className="p-6">
+            <div className="mb-4">
+              <h2 className="text-xl font-bold text-[#374957]">
+                DIY Maintenance Guides
+              </h2>
+              <p className="text-sm text-gray-600">
+                Browse step-by-step guides for common home maintenance tasks.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {diyGuides.map((guide) => (
+                <button
+                  key={guide.id}
+                  onClick={() => handleOpenGuide(guide.id)}
+                  className="text-left bg-gray-50 border border-gray-200 rounded-xl p-4 hover:border-blue-500 hover:shadow-md transition-all flex flex-col gap-3"
+                >
+                  <div>
+                    <h3 className="text-base font-bold text-[#374957] mb-1">
+                      {guide.title}
+                    </h3>
+                    <p className="text-xs text-gray-600 line-clamp-3">
+                      {guide.description}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 mt-auto">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-[11px] text-gray-700">
+                      <Wrench className="w-3 h-3" />
+                      {getCategoryLabel(guide.category as any)}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-[11px] text-gray-700">
+                      <Clock className="w-3 h-3" />
+                      {guide.estimatedTime}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-[11px] text-gray-700 capitalize">
+                      {guide.difficulty} DIY
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : filteredTasks.length === 0 ? (
+          <div className="p-12 text-center">
             <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
               <Wrench className="w-8 h-8 text-gray-400" />
             </div>
             <p className="text-gray-600 font-medium mb-2">No tasks found</p>
-            <p className="text-sm text-gray-500 mb-4">Try adjusting your filters or create a new task</p>
+            <p className="text-sm text-gray-500 mb-4">
+              Try adjusting your filters or create a new task
+            </p>
             <button
               onClick={onCreateTask}
               className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors flex items-center gap-2 mx-auto shadow-sm"
@@ -352,131 +422,208 @@ export function MaintenanceManagement({
             </button>
           </div>
         ) : (
-          filteredTasks.map((task) => (
-            <div
-              key={task.id}
-              className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-all duration-200 cursor-pointer group"
-              onClick={() => onViewTask(task)}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3 flex-wrap">
-                    <h3 className="text-lg font-bold text-[#374957] group-hover:text-[#DC5F12] transition-colors">{task.title}</h3>
-                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-md ${getStatusColor(task.status)}`}>
-                      {task.status.replace('-', ' ')}
-                    </span>
-                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-md ${getPriorityColor(task.priority)}`}>
-                      {task.priority}
-                    </span>
-                    {isOverdue(task.dueDate, task.status) && (
-                      <span className="px-2.5 py-1 text-xs font-semibold rounded-md bg-red-50 text-red-700 border border-red-200 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        Overdue
-                      </span>
-                    )}
-                  </div>
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Task
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Priority
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Due Date
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Category
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Cost
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Vendor
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {paginatedTasks.map((task) => (
+                    <tr
+                      key={task.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => onViewTask(task)}
+                    >
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        <div className="font-semibold text-[#374957] flex items-center gap-2">
+                          {task.title}
+                          {isOverdue(task.dueDate, task.status) && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[10px] font-semibold border border-red-200">
+                              <AlertCircle className="w-3 h-3" />
+                              Overdue
+                            </span>
+                          )}
+                        </div>
+                        {task.description && (
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {task.description}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <span
+                          className={`px-2.5 py-1 text-xs font-semibold rounded-md ${getStatusColor(
+                            task.status
+                          )}`}
+                        >
+                          {task.status.replace('-', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <span
+                          className={`px-2.5 py-1 text-xs font-semibold rounded-md ${getPriorityColor(
+                            task.priority
+                          )}`}
+                        >
+                          {task.priority}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4 text-gray-400" />
+                          {new Date(task.dueDate).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <span className="px-2 py-1 text-xs bg-gray-100 rounded">
+                          {getCategoryLabel(task.category)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {task.cost && (
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="w-4 h-4 text-gray-400" />
+                            <span>£{task.cost}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {task.vendor && (
+                          <div className="flex items-center gap-1">
+                            <User className="w-4 h-4 text-gray-400" />
+                            <span>{task.vendor.name}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td
+                        className="px-4 py-3 text-sm text-gray-700"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => {
+                              setVendorSearchCategory(task.category);
+                              setIsVendorSearchOpen(true);
+                            }}
+                            className="p-2 hover:bg-green-50 rounded-lg transition-colors text-green-600 hover:text-green-700"
+                            aria-label="Find a pro"
+                            title="Find a professional"
+                          >
+                            <Phone className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              const guides = getGuidesByCategory(
+                                task.category as any
+                              );
+                              if (guides && guides.length > 0) {
+                                setCurrentGuideId(guides[0].id);
+                                setIsDIYGuideOpen(true);
+                              } else {
+                                alert(
+                                  'No DIY guide available for this task category yet.'
+                                );
+                              }
+                            }}
+                            className="p-2 hover:bg-purple-50 rounded-lg transition-colors text-purple-600 hover:text-purple-700"
+                            aria-label="Get help"
+                            title="DIY Guide"
+                          >
+                            <BookOpen className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingTask(task);
+                              setIsFormModalOpen(true);
+                            }}
+                            className="p-2 hover:bg-blue-50 rounded-lg transition-colors text-blue-600 hover:text-blue-700"
+                            aria-label="Edit task"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              onDeleteTask(task.id);
+                            }}
+                            className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600 hover:text-red-700"
+                            aria-label="Delete task"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-                  {task.description && (
-                    <p className="text-gray-600 mb-3">{task.description}</p>
-                  )}
-
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
-                    </div>
-
-                    <span className="px-2 py-1 text-xs bg-gray-100 rounded">
-                      {getCategoryLabel(task.category)}
-                    </span>
-
-                    {task.cost && (
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="w-4 h-4" />
-                        <span>£{task.cost}</span>
-                      </div>
-                    )}
-
-                    {task.vendor && (
-                      <div className="flex items-center gap-1">
-                        <User className="w-4 h-4" />
-                        <span>{task.vendor.name}</span>
-                      </div>
-                    )}
-
-                    {task.recurring && (
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        <span>Recurring ({task.recurring.frequency})</span>
-                      </div>
-                    )}
-
-                    {task.attachments && task.attachments.length > 0 && (
-                      <div className="flex items-center gap-1">
-                        <FileText className="w-4 h-4" />
-                        <span>{task.attachments.length} attachment(s)</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 ml-4">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setVendorSearchCategory(task.category);
-                      setIsVendorSearchOpen(true);
-                    }}
-                    className="p-2 hover:bg-green-50 rounded-lg transition-colors text-green-600 hover:text-green-700"
-                    aria-label="Find a pro"
-                    title="Find a professional"
-                  >
-                    <Phone className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Find a DIY guide for this category
-                      const guides = getGuidesByCategory(task.category as any);
-                      if (guides && guides.length > 0) {
-                        setCurrentGuideId(guides[0].id);
-                        setIsDIYGuideOpen(true);
-                      } else {
-                        // Fallback: show a generic guide or message
-                        alert('No DIY guide available for this task category yet.');
-                      }
-                    }}
-                    className="p-2 hover:bg-purple-50 rounded-lg transition-colors text-purple-600 hover:text-purple-700"
-                    aria-label="Get help"
-                    title="DIY Guide"
-                  >
-                    <BookOpen className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingTask(task);
-                      setIsFormModalOpen(true);
-                    }}
-                    className="p-2 hover:bg-blue-50 rounded-lg transition-colors text-blue-600 hover:text-blue-700"
-                    aria-label="Edit task"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteTask(task.id);
-                    }}
-                    className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600 hover:text-red-700"
-                    aria-label="Delete task"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+            {/* Pagination */}
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
+              <p className="text-xs text-gray-500">
+                Showing{' '}
+                <span className="font-semibold">
+                  {filteredTasks.length === 0
+                    ? 0
+                    : (currentPage - 1) * pageSize + 1}
+                </span>{' '}
+                to{' '}
+                <span className="font-semibold">
+                  {Math.min(currentPage * pageSize, filteredTasks.length)}
+                </span>{' '}
+                of{' '}
+                <span className="font-semibold">{filteredTasks.length}</span>{' '}
+                tasks
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleChangePage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-xs rounded-md border border-gray-300 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white"
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-gray-600">
+                  Page{' '}
+                  <span className="font-semibold">{currentPage}</span> of{' '}
+                  <span className="font-semibold">{totalPages}</span>
+                </span>
+                <button
+                  onClick={() => handleChangePage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-xs rounded-md border border-gray-300 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white"
+                >
+                  Next
+                </button>
               </div>
             </div>
-          ))
+          </>
         )}
       </div>
 

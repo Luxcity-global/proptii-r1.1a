@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     X,
     Search,
@@ -6,11 +6,8 @@ import {
     Phone,
     Globe,
     Star,
-    ExternalLink,
-    Navigation,
     AlertCircle,
-    Loader2,
-    ChevronRight
+    Loader2
 } from 'lucide-react';
 
 interface VendorSearchResult {
@@ -32,45 +29,13 @@ interface VendorSearchProps {
     postcode?: string;
 }
 
-// UK Trade Directory Links
-const ukTradeDirectories = [
-    {
-        name: 'Checkatrade',
-        url: 'https://www.checkatrade.com',
-        description: 'Find vetted and reviewed tradespeople',
-        logo: '🔍'
-    },
-    {
-        name: 'TrustATrader',
-        url: 'https://www.trustatrader.com',
-        description: 'Government-endorsed trader directory',
-        logo: '✓'
-    },
-    {
-        name: 'MyBuilder',
-        url: 'https://www.mybuilder.com',
-        description: 'Post your job and get quotes',
-        logo: '🔨'
-    },
-    {
-        name: 'Rated People',
-        url: 'https://www.ratedpeople.com',
-        description: 'Compare local tradespeople',
-        logo: '⭐'
-    },
-    {
-        name: 'Which? Trusted Traders',
-        url: 'https://www.which.co.uk/trusted-traders',
-        description: 'Endorsed by consumer champion Which?',
-        logo: '🛡️'
-    },
-    {
-        name: 'Local Heroes',
-        url: 'https://www.localheroes.com',
-        description: 'Find local tradespeople',
-        logo: '🦸'
-    }
-];
+interface RecentSearch {
+    id: string;
+    label: string;
+    postcode: string;
+    searchTerm: string;
+    timestamp: number;
+}
 
 const categorySearchTerms: Record<string, string> = {
     hvac: 'heating engineer',
@@ -89,14 +54,42 @@ export function VendorSearch({
     postcode: initialPostcode = ''
 }: VendorSearchProps) {
     const [postcode, setPostcode] = useState(initialPostcode);
+    const [searchTerm, setSearchTerm] = useState(
+        categorySearchTerms[category] || 'handyman'
+    );
     const [searchResults, setSearchResults] = useState<VendorSearchResult[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [hasSearched, setHasSearched] = useState(false);
+    const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
+
+    // Load recent searches from localStorage
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem('vendorRecentSearches');
+            if (stored) {
+                const parsed = JSON.parse(stored) as RecentSearch[];
+                setRecentSearches(parsed);
+            }
+        } catch (e) {
+            console.error('Failed to load recent vendor searches', e);
+        }
+    }, []);
+
+    // Reset default search term when category or dialog changes
+    useEffect(() => {
+        setSearchTerm(categorySearchTerms[category] || 'handyman');
+    }, [category, isOpen]);
 
     if (!isOpen) return null;
 
-    const searchTerm = categorySearchTerms[category] || 'handyman';
+    const suggestedTerms = Array.from(
+        new Set([
+            categorySearchTerms[category] || 'handyman',
+            'home maintenance services',
+            'property maintenance'
+        ])
+    );
 
     // Note: This is a placeholder for Google Places API integration
     // You'll need to implement the actual API call in your backend
@@ -145,10 +138,35 @@ export function VendorSearch({
             const data = await response.json();
             console.log('Search results:', data);
             setSearchResults(data.results || []);
+
+            // Save recent search
+            const label = `${searchTerm} in ${formattedPostcode}`;
+            const newSearch: RecentSearch = {
+                id: `${searchTerm}-${formattedPostcode}`,
+                label,
+                postcode: formattedPostcode,
+                searchTerm,
+                timestamp: Date.now()
+            };
+
+            setRecentSearches(prev => {
+                const filtered = prev.filter(item => item.id !== newSearch.id);
+                const updated = [newSearch, ...filtered]
+                    .sort((a, b) => b.timestamp - a.timestamp)
+                    .slice(0, 6);
+
+                try {
+                    localStorage.setItem('vendorRecentSearches', JSON.stringify(updated));
+                } catch (e) {
+                    console.error('Failed to save recent vendor searches', e);
+                }
+
+                return updated;
+            });
         } catch (err) {
             console.error('Vendor search error:', err);
             console.error('Error details:', err.message);
-            setError('Unable to search at this time. Please try the directories below.');
+            setError('Unable to search at this time. Please try again in a few minutes.');
             setSearchResults([]);
         } finally {
             setIsLoading(false);
@@ -181,36 +199,65 @@ export function VendorSearch({
                         </button>
                     </div>
 
-                    {/* Search Bar */}
-                    <div className="flex gap-3">
-                        <div className="flex-1 relative">
-                            <MapPin className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-                            <input
-                                type="text"
-                                placeholder="Enter your postcode (e.g., SW1A 1AA)"
-                                value={postcode}
-                                onChange={(e) => setPostcode(e.target.value.toUpperCase())}
-                                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                                className="w-full pl-11 pr-4 py-3 border-2 border-white/20 bg-white/10 text-white placeholder-white/60 rounded-lg focus:outline-none focus:border-white/40 transition-all"
-                            />
+                    {/* Search Bar & Term */}
+                    <div className="space-y-3">
+                        <div className="flex flex-col md:flex-row gap-3">
+                            <div className="flex-1 relative">
+                                <MapPin className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    placeholder="Enter your postcode (e.g., SW1A 1AA)"
+                                    value={postcode}
+                                    onChange={(e) => setPostcode(e.target.value.toUpperCase())}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                    className="w-full pl-11 pr-4 py-3 border-2 border-white/20 bg-white/10 text-white placeholder-white/60 rounded-lg focus:outline-none focus:border-white/40 transition-all"
+                                />
+                            </div>
+                            <button
+                                onClick={handleSearch}
+                                disabled={isLoading}
+                                className="px-6 py-3 bg-[#DC5F12] text-white rounded-lg font-semibold hover:bg-[#c54f0f] transition-all flex items-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        Searching...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Search className="w-5 h-5" />
+                                        Search
+                                    </>
+                                )}
+                            </button>
                         </div>
-                        <button
-                            onClick={handleSearch}
-                            disabled={isLoading}
-                            className="px-6 py-3 bg-[#DC5F12] text-white rounded-lg font-semibold hover:bg-[#c54f0f] transition-all flex items-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isLoading ? (
-                                <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    Searching...
-                                </>
-                            ) : (
-                                <>
-                                    <Search className="w-5 h-5" />
-                                    Search
-                                </>
-                            )}
-                        </button>
+
+                        <div className="flex flex-col md:flex-row md:items-center gap-2 text-sm">
+                            <span className="text-white/80 md:w-28">Search for</span>
+                            <div className="flex-1 flex flex-wrap gap-2">
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="e.g. handyman, home maintenance services"
+                                    className="min-w-[200px] flex-1 px-3 py-2 rounded-md bg-white/10 border border-white/20 text-white placeholder-white/60 focus:outline-none focus:border-white/40 text-sm"
+                                />
+                                {suggestedTerms.map((term) => (
+                                    <button
+                                        key={term}
+                                        type="button"
+                                        onClick={() => setSearchTerm(term)}
+                                        className={`px-3 py-1 rounded-full border text-xs font-medium transition-all ${
+                                            term === searchTerm
+                                                ? 'bg-white text-[#374957] border-white'
+                                                : 'border-white/30 text-white/80 hover:bg-white/10'
+                                        }`}
+                                    >
+                                        {term}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -305,39 +352,43 @@ export function VendorSearch({
                         </div>
                     )}
 
-                    {/* UK Trade Directories */}
+                    {/* Recent Searches */}
                     <div>
                         <div className="flex items-center gap-2 mb-4">
                             <div className="h-px bg-gray-300 flex-1" />
-                            <h3 className="text-sm font-bold text-gray-600 uppercase">Trusted UK Trade Directories</h3>
+                            <h3 className="text-sm font-bold text-gray-600 uppercase">Recent searches</h3>
                             <div className="h-px bg-gray-300 flex-1" />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {ukTradeDirectories.map((directory) => (
-                                <a
-                                    key={directory.name}
-                                    href={directory.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="bg-gradient-to-br from-gray-50 to-white border-2 border-gray-200 rounded-xl p-5 hover:border-[#DC5F12] hover:shadow-lg transition-all group"
-                                >
-                                    <div className="flex items-start gap-4">
-                                        <div className="text-4xl">{directory.logo}</div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <h4 className="font-bold text-[#374957] group-hover:text-[#DC5F12] transition-colors">
-                                                    {directory.name}
-                                                </h4>
-                                                <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-[#DC5F12] transition-colors" />
-                                            </div>
-                                            <p className="text-sm text-gray-600">{directory.description}</p>
+                        {recentSearches.length === 0 ? (
+                            <p className="text-xs text-gray-500">
+                                Your recent vendor searches will appear here so you can quickly run them again.
+                            </p>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {recentSearches.map((item) => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => {
+                                            setPostcode(item.postcode);
+                                            // Run search again with this postcode
+                                            handleSearch();
+                                        }}
+                                        className="flex items-start gap-3 bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl p-4 text-left hover:border-[#DC5F12] hover:shadow-md transition-all"
+                                    >
+                                        <div className="mt-1">
+                                            <Search className="w-4 h-4 text-[#DC5F12]" />
                                         </div>
-                                        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#DC5F12] group-hover:translate-x-1 transition-all flex-shrink-0" />
-                                    </div>
-                                </a>
-                            ))}
-                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-sm font-semibold text-[#374957]">{item.label}</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">
+                                                Click to search again for this area.
+                                            </p>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {/* Info Box */}
