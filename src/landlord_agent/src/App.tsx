@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { RoleSelection } from './components/RoleSelection';
 import { ProfileSetup } from './components/ProfileSetup';
@@ -285,15 +286,57 @@ interface PropertySetupData {
   pendingTenants?: Omit<Tenant, 'id'>[]; // Tenants added before property is published
 }
 
-export default function App() {
+// Main App Content Component (wrapped by Routes)
+function AppContent() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [currentScreen, setCurrentScreen] = useState<Screen>('main-app');
   const [navigationScreen, setNavigationScreen] = useState<NavigationScreen>('dashboard');
   
-  // Wrapper function to log navigation changes
+  // Sync URL to navigation state
+  useEffect(() => {
+    const pathToScreen: Record<string, NavigationScreen> = {
+      '/': 'dashboard',
+      '/dashboard': 'dashboard',
+      '/viewings': 'viewings',
+      '/properties': 'properties',
+      '/documents': 'documents',
+      '/contracts': 'contracts',
+      '/clients': 'clients',
+    };
+    
+    const path = location.pathname;
+    const targetScreen = pathToScreen[path] || 'dashboard';
+    
+    if (targetScreen !== navigationScreen) {
+      console.log('🧭 URL changed, updating navigationScreen to:', targetScreen);
+      setNavigationScreen(targetScreen);
+      setCurrentScreen('main-app');
+    }
+  }, [location.pathname, navigationScreen]);
+  
+  // Wrapper function to log navigation changes and update URL
   const handleNavigation = (screen: NavigationScreen) => {
     console.log('🧭 Navigation triggered to:', screen);
     console.log('🧭 Current navigationScreen before change:', navigationScreen);
     setNavigationScreen(screen);
+    
+    // Update URL
+    const screenToPath: Record<NavigationScreen, string> = {
+      'dashboard': '/dashboard',
+      'viewings': '/viewings',
+      'properties': '/properties',
+      'documents': '/documents',
+      'contracts': '/contracts',
+      'clients': '/clients',
+      'insights': '/insights',
+      'inbox': '/inbox',
+    };
+    
+    const path = screenToPath[screen] || '/dashboard';
+    if (location.pathname !== path) {
+      navigate(path);
+    }
   };
   const [userRole, setUserRole] = useState<UserRole>('landlord');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -410,10 +453,12 @@ export default function App() {
     };
   }, []);
 
-  // Listen for AUTH_STATE messages from the embedding tenant app (bridge)
+  // Listen for AUTH_STATE and NAVIGATE messages from the embedding tenant app (bridge)
   React.useEffect(() => {
-    const handleAuthMessage = (event: MessageEvent) => {
+    const handleMessage = (event: MessageEvent) => {
       const data: any = (event as any).data;
+      
+      // Handle AUTH_STATE messages
       if (data && data.type === 'AUTH_STATE' && data.payload) {
         const { isAuthenticated, user } = data.payload;
         if (isAuthenticated && user) {
@@ -427,9 +472,34 @@ export default function App() {
           console.log('✅ Received AUTH_STATE from parent, updated userProfile:', user);
         }
       }
+      
+      // Handle NAVIGATE messages
+      if (data && data.type === 'NAVIGATE' && data.payload) {
+        const { path } = data.payload;
+        console.log('🧭 Received NAVIGATE message with path:', path);
+        
+        // Map URL paths to navigation screens
+        const pathToScreen: Record<string, NavigationScreen> = {
+          '/': 'dashboard',
+          '/dashboard': 'dashboard',
+          '/viewings': 'viewings',
+          '/properties': 'properties',
+          '/documents': 'documents',
+          '/contracts': 'contracts',
+          '/clients': 'clients',
+        };
+        
+        // Remove leading slash and get the screen
+        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+        const targetScreen = pathToScreen[normalizedPath] || 'dashboard';
+        
+        console.log('🧭 Navigating to screen:', targetScreen);
+        setCurrentScreen('main-app');
+        setNavigationScreen(targetScreen);
+      }
     };
 
-    window.addEventListener('message', handleAuthMessage);
+    window.addEventListener('message', handleMessage);
 
     // Fallback: read cached auth state if present
     try {
@@ -453,7 +523,7 @@ export default function App() {
     }
 
     return () => {
-      window.removeEventListener('message', handleAuthMessage);
+      window.removeEventListener('message', handleMessage);
     };
   }, []);
 
@@ -466,6 +536,68 @@ export default function App() {
       localStorage.removeItem('userRole');
     }
   }, []);
+
+  // Handle URL hash navigation (from iframe src hash) and initial path
+  React.useEffect(() => {
+    const handleHashNavigation = () => {
+      const hash = window.location.hash.slice(1); // Remove the '#'
+      if (hash) {
+        console.log('🧭 Detected hash in URL:', hash);
+        
+        // Map URL paths to navigation screens
+        const pathToScreen: Record<string, NavigationScreen> = {
+          '/': 'dashboard',
+          '/dashboard': 'dashboard',
+          '/viewings': 'viewings',
+          '/properties': 'properties',
+          '/documents': 'documents',
+          '/contracts': 'contracts',
+          '/clients': 'clients',
+        };
+        
+        // Normalize the hash path
+        const normalizedPath = hash.startsWith('/') ? hash : `/${hash}`;
+        const targetScreen = pathToScreen[normalizedPath] || 'dashboard';
+        
+        console.log('🧭 Navigating to screen from hash:', targetScreen);
+        setCurrentScreen('main-app');
+        setNavigationScreen(targetScreen);
+      }
+    };
+
+    // Also check the actual pathname (for direct navigation)
+    const handlePathnameNavigation = () => {
+      const pathToScreen: Record<string, NavigationScreen> = {
+        '/': 'dashboard',
+        '/dashboard': 'dashboard',
+        '/viewings': 'viewings',
+        '/properties': 'properties',
+        '/documents': 'documents',
+        '/contracts': 'contracts',
+        '/clients': 'clients',
+      };
+      
+      const path = location.pathname;
+      const targetScreen = pathToScreen[path] || 'dashboard';
+      
+      if (targetScreen !== navigationScreen) {
+        console.log('🧭 Navigating to screen from pathname:', targetScreen);
+        setCurrentScreen('main-app');
+        setNavigationScreen(targetScreen);
+      }
+    };
+
+    // Check both hash and pathname on initial load
+    handleHashNavigation();
+    handlePathnameNavigation();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashNavigation);
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashNavigation);
+    };
+  }, [location.pathname, navigationScreen]);
 
   // Optional deep-link: start directly at specific flows when requested
   React.useEffect(() => {
@@ -3370,5 +3502,14 @@ export default function App() {
         {renderScreen()}
       </div>
     </div>
+  );
+}
+
+// Main App Component with Routes
+export default function App() {
+  return (
+    <Routes>
+      <Route path="*" element={<AppContent />} />
+    </Routes>
   );
 }

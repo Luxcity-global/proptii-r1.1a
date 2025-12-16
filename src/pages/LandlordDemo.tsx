@@ -20,6 +20,10 @@ const LandlordDemo: React.FC = () => {
   }
 
   if (!isAuthenticated) {
+    // Store the current path for redirect after login
+    const currentPath = window.location.pathname + window.location.search;
+    sessionStorage.setItem('redirectAfterLogin', currentPath);
+    
     return (
       <div className="min-h-screen font-nunito">
         <Navbar />
@@ -32,7 +36,11 @@ const LandlordDemo: React.FC = () => {
               Please sign in to access the landlord application.
             </p>
             <button
-              onClick={() => window.location.href = '/login'}
+              onClick={() => {
+                // Preserve the redirect path
+                const redirectPath = encodeURIComponent(currentPath);
+                window.location.href = `/login?redirect=${redirectPath}`;
+              }}
               className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all"
             >
               Sign In

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
   Box,
@@ -13,18 +13,56 @@ import { useAuth } from '../contexts/AuthContext';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const location = useLocation();
+  const { login, isAuthenticated } = useAuth();
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Get the intended destination from location state (set by ProtectedRoute) or sessionStorage
+  const getRedirectPath = () => {
+    const statePath = (location.state as any)?.from?.pathname;
+    const storedPath = sessionStorage.getItem('redirectAfterLogin');
+    const queryRedirect = new URLSearchParams(window.location.search).get('redirect');
+    
+    // Priority: query param > state > sessionStorage > default
+    return queryRedirect || statePath || storedPath || '/';
+  };
+  
+  const from = getRedirectPath();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Clear stored redirect path
+      sessionStorage.removeItem('redirectAfterLogin');
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, from]);
+
+  // Listen for auth state changes (for MSAL popup login) as a backup
+  // The main redirect is handled by the useEffect above that watches isAuthenticated
+  useEffect(() => {
+    const handleAuthStateChange = () => {
+      // Small delay to allow auth context to update
+      setTimeout(() => {
+        // The isAuthenticated useEffect above will handle the redirect
+        // This is just a backup trigger
+      }, 100);
+    };
+
+    window.addEventListener('auth-state-changed', handleAuthStateChange);
+    return () => {
+      window.removeEventListener('auth-state-changed', handleAuthStateChange);
+    };
+  }, []);
+
+  const handleLogin = async () => {
     try {
-      await login(email, password);
-      navigate('/');
-    } catch (error) {
-      setError('Invalid email or password');
+      setError('');
+      await login();
+      // Note: MSAL popup login will trigger auth-state-changed event
+      // The useEffect above will handle the redirect
+    } catch (error: any) {
+      setError(error?.message || 'Login failed. Please try again.');
     }
   };
 
@@ -47,38 +85,14 @@ export const LoginPage: React.FC = () => {
               {error}
             </Alert>
           )}
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Email Address"
-              name="email"
-              autoComplete="email"
-              autoFocus
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+          <Box sx={{ mt: 1 }}>
             <Button
-              type="submit"
               fullWidth
               variant="contained"
               sx={{ mt: 3, mb: 2 }}
+              onClick={handleLogin}
             >
-              Sign In
+              Sign In with Microsoft
             </Button>
             <Button
               fullWidth

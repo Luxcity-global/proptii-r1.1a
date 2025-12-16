@@ -30,6 +30,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import FAQ from './pages/FAQ';
 // import AgentContractLanding from './pages/AgentContractLanding';
+import { AuthRedirectHandler } from './components/common/AuthRedirectHandler';
 import SearchResults from './pages/SearchResults';
 
 export const App: React.FC = () => {
@@ -39,6 +40,7 @@ export const App: React.FC = () => {
       <MSALProviderWrapper>
         <SavedPropertiesProvider>
           <SignedContractsProvider>
+              <AuthRedirectHandler />
               <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
@@ -62,7 +64,16 @@ export const App: React.FC = () => {
                 <AgentHome />
               </ProtectedRoute>
             } />
-            <Route path="/landlord" element={<LandlordDemo />} />
+            <Route path="/landlord" element={
+              <ProtectedRoute>
+                <LandlordDemo />
+              </ProtectedRoute>
+            } />
+            <Route path="/landlord/*" element={
+              <ProtectedRoute>
+                <LandlordDemo />
+              </ProtectedRoute>
+            } />
             <Route path="/landlord-demo" element={<LandlordDemo />} />
 
             <Route path="/referencing" element={<Referencing />} />
@@ -80,7 +91,11 @@ export const App: React.FC = () => {
             } />
 
             {/* Dashboard Routes */}
-            <Route path="/dashboard" element={<Dashboard />}>
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }>
               <Route index element={<DashboardHome />} />
               <Route path="saved-searches" element={<SavedProperties />} />
               <Route path="viewings" element={<Viewings />} />

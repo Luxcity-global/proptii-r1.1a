@@ -126,10 +126,30 @@ router.post('/send-email', upload.array('attachments'), async (req, res) => {
       to: req.body.to,
       subject: req.body.subject,
       attachmentsCount: req.files?.length || 0,
-      emailType: req.body.emailType || 'agent'
+      emailType: req.body.emailType || 'agent',
+      hasFormData: !!req.body.formData
     });
 
-    const formData = JSON.parse(req.body.formData);
+    // Parse formData with error handling
+    let formData = {};
+    if (req.body.formData) {
+      try {
+        formData = typeof req.body.formData === 'string' 
+          ? JSON.parse(req.body.formData) 
+          : req.body.formData;
+        console.log('Parsed formData structure:', {
+          hasProperty: !!formData.property,
+          hasViewing: !!formData.viewing,
+          hasUser: !!formData.user,
+          emailType: req.body.emailType
+        });
+      } catch (parseError) {
+        console.error('Error parsing formData:', parseError);
+        console.error('Raw formData:', req.body.formData);
+        // Continue with empty formData - template generation will handle it
+      }
+    }
+
     const attachments = req.files?.map(file => ({
       filename: file.originalname,
       content: file.buffer
@@ -150,6 +170,7 @@ router.post('/send-email', upload.array('attachments'), async (req, res) => {
     });
   } catch (err) {
     console.error('Error sending email:', err);
+    console.error('Error stack:', err.stack);
     res.status(500).json({
       success: false,
       error: err.message || 'Failed to send email'

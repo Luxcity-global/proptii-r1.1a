@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LandlordAppBridgeProps {
@@ -8,7 +9,18 @@ interface LandlordAppBridgeProps {
 
 const LandlordAppBridge: React.FC<LandlordAppBridgeProps> = ({ className, style }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const location = useLocation();
   const { isAuthenticated, user, isLoading } = useAuth();
+
+  // Extract the path after /landlord (e.g., /viewings from /landlord/viewings)
+  const getLandlordPath = () => {
+    const path = location.pathname;
+    if (path.startsWith('/landlord')) {
+      const landlordPath = path.substring('/landlord'.length) || '/';
+      return landlordPath;
+    }
+    return '/';
+  };
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -16,6 +28,8 @@ const LandlordAppBridge: React.FC<LandlordAppBridgeProps> = ({ className, style 
 
     // Wait for iframe to load
     const handleIframeLoad = () => {
+      const landlordPath = getLandlordPath();
+      
       // Send authentication state to landlord app
       const authState = {
         isAuthenticated,
@@ -28,7 +42,13 @@ const LandlordAppBridge: React.FC<LandlordAppBridgeProps> = ({ className, style 
         payload: authState
       }, '*');
 
-      console.log('Sent auth state to landlord app:', authState);
+      // Send navigation path to landlord app
+      iframe.contentWindow?.postMessage({
+        type: 'NAVIGATE',
+        payload: { path: landlordPath }
+      }, '*');
+
+      console.log('Sent auth state and navigation to landlord app:', { authState, path: landlordPath });
     };
 
     iframe.addEventListener('load', handleIframeLoad);
@@ -41,12 +61,15 @@ const LandlordAppBridge: React.FC<LandlordAppBridgeProps> = ({ className, style 
     return () => {
       iframe.removeEventListener('load', handleIframeLoad);
     };
-  }, [isAuthenticated, user, isLoading]);
+  }, [isAuthenticated, user, isLoading, location.pathname]);
+
+  // Update iframe src to include the path as a hash or query parameter for initial load
+  const iframeSrc = `/landlord/index.html${getLandlordPath() !== '/' ? `#${getLandlordPath()}` : ''}`;
 
   return (
     <iframe
       ref={iframeRef}
-      src="/landlord/index.html"
+      src={iframeSrc}
       className={className}
       style={{
         width: '100%',

@@ -191,7 +191,27 @@ export class EmailService {
     const agentDetails = formData.agentDetails || {};
 
     // Get the base URL for links in the email
-    const baseUrl = process.env.APP_URL || 'https://proptii.com';
+    // In development, use localhost. In production, use mail.proptii.co
+    const getBaseUrl = (): string => {
+      // If APP_URL is explicitly set, use it (allows override)
+      if (process.env.APP_URL) {
+        return process.env.APP_URL;
+      }
+      
+      // Check if we're in development mode
+      const isDevelopment = process.env.NODE_ENV === 'development' || 
+                           process.env.NODE_ENV !== 'production';
+      
+      if (isDevelopment) {
+        // Default to localhost:5173 (Vite default) or localhost:3000
+        return process.env.FRONTEND_URL || 'http://localhost:5173';
+      }
+      
+      // Production: use mail.proptii.co
+      return 'https://mail.proptii.co';
+    };
+    
+    const baseUrl = getBaseUrl();
 
     const baseStyles = `
       body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background: #f5f7fa; padding: 24px 0; margin: 0; }
@@ -643,11 +663,33 @@ export class EmailService {
   async sendEmail(emailData: EmailData, retries = 3): Promise<any> {
     let htmlContent = emailData.html;
     if (!htmlContent && emailData.formData && emailData.emailType) {
-      htmlContent = this.generateEmailTemplate(emailData.formData, emailData.emailType);
+      try {
+        console.log(`[EmailService] Generating template for emailType: ${emailData.emailType}`);
+        console.log(`[EmailService] FormData keys:`, Object.keys(emailData.formData || {}));
+        htmlContent = this.generateEmailTemplate(emailData.formData, emailData.emailType);
+        if (!htmlContent || htmlContent.trim() === '') {
+          console.warn(`[EmailService] Template generation returned empty content for ${emailData.emailType}`);
+        } else {
+          console.log(`[EmailService] Template generated successfully (${htmlContent.length} chars)`);
+        }
+      } catch (templateError) {
+        console.error(`[EmailService] Error generating email template:`, templateError);
+        console.error(`[EmailService] Template error stack:`, templateError instanceof Error ? templateError.stack : 'No stack trace');
+        // Continue with fallback - don't throw, let it use the fallback body
+      }
+    } else {
+      if (!htmlContent) {
+        console.warn(`[EmailService] No HTML content and missing formData or emailType. formData: ${!!emailData.formData}, emailType: ${emailData.emailType}`);
+      }
     }
 
     const fallbackBody = htmlContent || emailData.text || 'No content provided';
     let lastError: Error | null = null;
+
+    // Update emailData with generated HTML content so sendEmailViaResend can use it
+    if (htmlContent && !emailData.html) {
+      emailData.html = htmlContent;
+    }
 
     // Prioritize Resend if configured (primary email service)
     if (this.isConfigured && this.resend) {

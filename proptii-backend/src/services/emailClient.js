@@ -2,7 +2,28 @@ import nodemailer from 'nodemailer';
 
 export class EmailClient {
   constructor() {
-    this.baseUrl = process.env.APP_URL || 'https://proptii.com';
+    // Get the base URL for links in the email
+    // In development, use localhost. In production, use mail.proptii.co
+    const getBaseUrl = () => {
+      // If APP_URL is explicitly set, use it (allows override)
+      if (process.env.APP_URL) {
+        return process.env.APP_URL;
+      }
+      
+      // Check if we're in development mode
+      const isDevelopment = process.env.NODE_ENV === 'development' || 
+                           process.env.NODE_ENV !== 'production';
+      
+      if (isDevelopment) {
+        // Default to localhost:5173 (Vite default) or localhost:3000
+        return process.env.FRONTEND_URL || 'http://localhost:5173';
+      }
+      
+      // Production: use mail.proptii.co
+      return 'https://mail.proptii.co';
+    };
+    
+    this.baseUrl = getBaseUrl();
     this.fromAddress = process.env.EMAIL_FROM_ADDRESS || process.env.SMTP_USER || 'noreply@proptii.co';
     
     // Configure SMTP transport

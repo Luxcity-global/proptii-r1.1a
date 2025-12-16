@@ -433,6 +433,150 @@ async function transformProperty(firestoreProperty: FirestoreProperty): Promise<
 }
 
 /**
+ * Parse natural language query to extract structured search criteria
+ */
+interface SearchCriteria {
+  location?: string;
+  bedrooms?: number;
+  minPrice?: number;
+  maxPrice?: number;
+  propertyType?: string;
+  keywords: string[];
+}
+
+function parseNaturalLanguageQuery(query: string): SearchCriteria {
+  const normalizedQuery = query.toLowerCase();
+  const criteria: SearchCriteria = { keywords: [] };
+
+  // Extract location - multiple patterns
+  const locationPatterns = [
+    /(?:in|at|near|around|within)\s+([a-z\s,]+?)(?:\s+(?:for|under|below|max|up\s+to|£|\d|pcm|bedroom|bed|flat|house|apartment|studio)|$)/i,
+    /(?:in|at|near|around|within)\s+([a-z\s,]+)/i,
+    /\b(london|manchester|birmingham|liverpool|leeds|bristol|sheffield|edinburgh|glasgow|cardiff|birmingham|newcastle|nottingham|leicester|southampton|portsmouth|brighton|reading|northampton|luton|bolton|bournemouth|norwich|swansea|swindon|crawley|ipswich|wigan|croydon|walsall|mansfield|oxford|cambridge|peterborough|doncaster|york|poole|gloucester|burnley|watford|blackpool|southend|middlesbrough|slough|derby|plymouth|stoke|wolverhampton|southampton|salford|aberdeen|westminster|southwark|tower\s+hamlets|greenwich|camden|islington|hackney|hammersmith|kensington|chelsea|fulham|wandsworth|lambeth|southwark|lewisham|greenwich|bexley|havering|barking|redbridge|newham|waltham\s+forest|haringey|enfield|barnet|harrow|hillingdon|hounslow|richmond|kingston|merton|sutton|croydon|bromley)\b/i
+  ];
+
+  for (const pattern of locationPatterns) {
+    const match = normalizedQuery.match(pattern);
+    if (match) {
+      criteria.location = match[1].trim().toLowerCase();
+      // Clean up location (remove common words that might have been captured)
+      criteria.location = criteria.location
+        .replace(/\s+(for|under|below|max|up\s+to|£|\d+|pcm|bedroom|bed|flat|house|apartment|studio).*$/i, '')
+        .trim();
+      if (criteria.location.length > 1) {
+        break;
+      }
+    }
+  }
+
+  // Extract bedrooms - multiple patterns
+  const bedroomPatterns = [
+    /(\d+)\s*(?:bedroom|bed|br|beds?)/i,
+    /(?:studio|bedsit)/i,
+    /(?:one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:bedroom|bed|br)/i
+  ];
+
+  for (const pattern of bedroomPatterns) {
+    const match = normalizedQuery.match(pattern);
+    if (match) {
+      if (match[1]) {
+        criteria.bedrooms = parseInt(match[1]);
+      } else if (normalizedQuery.includes('studio') || normalizedQuery.includes('bedsit')) {
+        criteria.bedrooms = 0;
+      } else {
+        // Handle word numbers
+        const wordNumbers: { [key: string]: number } = {
+          'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+          'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
+        };
+        const wordMatch = normalizedQuery.match(/(one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:bedroom|bed|br)/i);
+        if (wordMatch && wordMatch[1]) {
+          criteria.bedrooms = wordNumbers[wordMatch[1].toLowerCase()];
+        }
+      }
+      if (criteria.bedrooms !== undefined) {
+        break;
+      }
+    }
+  }
+
+  // Extract price - multiple patterns
+  const pricePatterns = [
+    /(?:under|below|max|up\s+to|maximum|less\s+than)\s*£?\s*(\d+)(?:k|,000)?/i,
+    /£\s*(\d+)(?:k|,000)?(?:\s*(?:pcm|per\s+month|monthly|pw|per\s+week|weekly))?/i,
+    /(\d+)(?:k|,000)?\s*(?:pcm|per\s+month|monthly|pw|per\s+week|weekly|pound)/i,
+    /(\d+)(?:k|,000)?(?:pcm|per\s+month|monthly|pw|per\s+week|weekly)/i, // No space between number and unit (e.g., "2000pcm")
+    /(\d+)\s*(?:pcm|per\s+month|monthly)/i,
+    /for\s+(\d+)(?:pcm|pound)/i // "for 2000pcm" pattern
+  ];
+
+  for (const pattern of pricePatterns) {
+    const match = normalizedQuery.match(pattern);
+    if (match) {
+      let price = parseInt(match[1].replace(/,/g, ''));
+      if (normalizedQuery.includes('k') || normalizedQuery.includes(',000')) {
+        price = price * 1000;
+      }
+      // If price is less than 500, assume it's weekly and convert to monthly
+      if (price < 500 && (normalizedQuery.includes('pw') || normalizedQuery.includes('per week') || normalizedQuery.includes('weekly'))) {
+        price = price * 4.33; // Convert weekly to monthly
+      }
+      criteria.maxPrice = price;
+      // Allow some flexibility - set min price to 70% of max
+      criteria.minPrice = Math.floor(price * 0.7);
+      break;
+    }
+  }
+
+  // Extract property type (handle plural forms)
+  const propertyTypePatterns = [
+    /\b(flats?|apartments?|houses?|studios?|bedsits?|bungalows?|cottages?|maisonettes?|penthouses?|townhouses?|terraced|semi-detached|detached|mansions?|villas?)\b/i
+  ];
+
+  for (const pattern of propertyTypePatterns) {
+    const match = normalizedQuery.match(pattern);
+    if (match) {
+      let propertyType = match[1].toLowerCase();
+      // Normalize plural forms to singular
+      if (propertyType.endsWith('s') && propertyType !== 'house' && propertyType !== 'terraced') {
+        propertyType = propertyType.slice(0, -1);
+      }
+      criteria.propertyType = propertyType;
+      break;
+    }
+  }
+
+  // Extract keywords (non-criteria words) - remove stop words and already extracted criteria
+  const stopWords = new Set(['in', 'at', 'near', 'for', 'to', 'rent', 'the', 'a', 'an', 'and', 'or', 'but', 'with', 'under', 'below', 'max', 'up', 'to', 'pcm', 'per', 'month', 'week', 'bedroom', 'bed', 'br', 'flat', 'house', 'apartment', 'studio', 'bedsit', 'bungalow', 'cottage', 'pound', 'pounds', '£']);
+  let words = normalizedQuery.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
+  
+  // Remove location words if location was extracted
+  if (criteria.location) {
+    const locationWords = criteria.location.split(/\s+/);
+    words = words.filter(w => !locationWords.includes(w));
+  }
+  
+  // Remove property type if it was extracted
+  if (criteria.propertyType) {
+    words = words.filter(w => w !== criteria.propertyType);
+  }
+  
+  // Remove bedroom numbers
+  words = words.filter(w => !/^\d+$/.test(w) || parseInt(w) !== criteria.bedrooms);
+  
+  // Remove price numbers
+  if (criteria.maxPrice) {
+    const priceStr = String(criteria.maxPrice);
+    words = words.filter(w => !priceStr.includes(w) && !w.includes(priceStr));
+  }
+  
+  criteria.keywords = words;
+
+  console.log('🔍 [ProptiiProperty] Parsed search criteria:', criteria);
+  return criteria;
+}
+
+/**
  * Search properties in Firestore based on query
  */
 export async function searchProptiiProperties(searchQuery: string): Promise<Property[]> {
@@ -499,73 +643,116 @@ export async function searchProptiiProperties(searchQuery: string): Promise<Prop
       return transformedProperties;
     }
 
-    // Filter properties based on search query
+    // Parse natural language query to extract structured criteria
+    const criteria = parseNaturalLanguageQuery(searchQuery);
     const queryLower = searchQuery.toLowerCase();
     console.log(`🔍 [ProptiiProperty] Filtering ${properties.length} properties with query: "${searchQuery}"`);
     
     const filteredProperties = properties.filter((property) => {
-      // Search in address
-      if (property.address.toLowerCase().includes(queryLower)) {
-        return true;
-      }
-      
-      // Search in type
-      if (property.type?.toLowerCase().includes(queryLower)) {
-        return true;
-      }
-      
-      // Search in notes
-      if (property.notes?.toLowerCase().includes(queryLower)) {
-        return true;
-      }
-      
-      // Search in amenities
-      if (property.amenities?.some(amenity => amenity.toLowerCase().includes(queryLower))) {
-        return true;
-      }
-      
-      // Search for bedroom count
-      const bedroomMatch = searchQuery.match(/(\d+)\s*bed/i);
-      if (bedroomMatch) {
-        const requestedBedrooms = parseInt(bedroomMatch[1]);
-        if (property.bedrooms === requestedBedrooms) {
-          return true;
+      // Use AND logic: ALL specified criteria must match
+      let passesAllCriteria = true;
+
+      // Location matching (REQUIRED if specified)
+      if (criteria.location) {
+        const addressLower = property.address.toLowerCase();
+        const searchLocation = criteria.location.toLowerCase().trim();
+        
+        // Special handling for major cities to avoid false matches
+        // e.g., "London" should not match "London, Kent" or properties in Kent
+        if (searchLocation === 'london') {
+          // For London, check if address contains "london" but NOT other cities/counties
+          const londonMatch = addressLower.includes('london');
+          const otherCities = ['kent', 'manchester', 'birmingham', 'liverpool', 'leeds', 'bristol', 'sheffield', 'edinburgh', 'glasgow', 'cardiff', 'norwich', 'cambridge', 'oxford', 'brighton', 'portsmouth', 'southampton'];
+          const hasOtherCity = otherCities.some(city => addressLower.includes(city) && !addressLower.includes('london'));
+          
+          if (!londonMatch || hasOtherCity) {
+            return false;
+          }
+        } else {
+          // For other locations, check if the location words appear in the address
+          const locationWords = searchLocation.split(/\s+/).filter(w => w.length > 2);
+          
+          // All significant location words should appear in the address
+          const locationMatches = locationWords.every(word => addressLower.includes(word));
+          
+          if (!locationMatches) {
+            return false;
+          }
         }
       }
-      
-      // Search for price range (more flexible matching)
-      const priceMatch = searchQuery.match(/(\d+)(?:k|pcm|\s*pound)/i);
-      if (priceMatch) {
-        const requestedPrice = parseInt(priceMatch[1]);
-        // Convert k to thousands if needed
-        const requestedPriceValue = searchQuery.toLowerCase().includes('k') ? requestedPrice * 1000 : requestedPrice;
-        // Allow 30% variance in price (increased from 20% for better matching)
-        const priceVariance = property.rent * 0.3;
-        if (Math.abs(property.rent - requestedPriceValue) <= priceVariance || 
-            Math.abs(property.rent - requestedPrice) <= priceVariance) {
-          return true;
+
+      // Bedroom matching (REQUIRED if specified - exact match only)
+      if (criteria.bedrooms !== undefined) {
+        // Studio (0 bedrooms) should only match if explicitly searched for
+        if (criteria.bedrooms === 0) {
+          // If searching for studio, property must be studio (0 bedrooms)
+          if (property.bedrooms !== 0) {
+            return false;
+          }
+        } else {
+          // For other bedroom counts, require exact match
+          if (property.bedrooms !== criteria.bedrooms) {
+            return false;
+          }
         }
       }
-      
-      // Search for location (extract location from query) - more flexible
-      const locationMatch = searchQuery.match(/(?:in|at|near|for)\s+([A-Za-z\s,]+?)(?:\s+for|\s+\d|$)/i);
-      if (locationMatch) {
-        const location = locationMatch[1].trim().toLowerCase();
-        if (property.address.toLowerCase().includes(location)) {
-          return true;
+
+      // Price matching (REQUIRED if specified - within reasonable range)
+      if (criteria.maxPrice !== undefined) {
+        const priceVariance = criteria.maxPrice * 0.2; // 20% variance (stricter)
+        const minPrice = criteria.minPrice || Math.max(0, criteria.maxPrice - priceVariance);
+        const maxPrice = criteria.maxPrice + priceVariance;
+        
+        // Property must be within price range
+        if (property.rent < minPrice || property.rent > maxPrice) {
+          return false;
         }
       }
-      
-      // If query contains multiple keywords, try partial matching
-      const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
-      const propertyText = `${property.address} ${property.type || ''} ${property.notes || ''}`.toLowerCase();
-      const matchingWords = queryWords.filter(word => propertyText.includes(word));
-      // If at least 50% of query words match, include the property
-      if (matchingWords.length >= Math.ceil(queryWords.length * 0.5)) {
-        return true;
+
+      // Property type matching (REQUIRED if specified)
+      if (criteria.propertyType) {
+        const propertyTypeLower = property.type?.toLowerCase() || '';
+        const searchTypeLower = criteria.propertyType.toLowerCase();
+        
+        // Normalize plural forms
+        const searchTypeSingular = searchTypeLower.endsWith('s') && searchTypeLower !== 'house' ? searchTypeLower.slice(0, -1) : searchTypeLower;
+        const propertyTypeSingular = propertyTypeLower.endsWith('s') && propertyTypeLower !== 'house' ? propertyTypeLower.slice(0, -1) : propertyTypeLower;
+        
+        // Check for type match (handle variations like flat/apartment)
+        const typeMatches = 
+          propertyTypeLower.includes(searchTypeLower) || 
+          searchTypeLower.includes(propertyTypeLower) ||
+          propertyTypeSingular === searchTypeSingular ||
+          (searchTypeSingular === 'flat' && (propertyTypeSingular === 'apartment' || propertyTypeLower.includes('apartment'))) ||
+          (searchTypeSingular === 'apartment' && (propertyTypeSingular === 'flat' || propertyTypeLower.includes('flat')));
+        
+        if (!typeMatches) {
+          return false;
+        }
       }
-      
-      return false;
+
+      // Keyword matching (if keywords are specified, at least one must match)
+      if (criteria.keywords.length > 0) {
+        const propertyText = `${property.address} ${property.type || ''} ${property.notes || ''} ${(property.amenities || []).join(' ')}`.toLowerCase();
+        const keywordMatches = criteria.keywords.some(keyword => propertyText.includes(keyword));
+        
+        // If we have keywords but no other criteria, require keyword match
+        // If we have other criteria, keywords are optional but helpful
+        const hasOtherCriteria = criteria.location || criteria.bedrooms !== undefined || criteria.maxPrice !== undefined || criteria.propertyType;
+        if (!hasOtherCriteria && !keywordMatches) {
+          return false;
+        }
+      }
+
+      // If no structured criteria at all, fall back to direct text search
+      const hasStructuredCriteria = criteria.location || criteria.bedrooms !== undefined || criteria.maxPrice !== undefined || criteria.propertyType || criteria.keywords.length > 0;
+      if (!hasStructuredCriteria) {
+        const propertyText = `${property.address} ${property.type || ''} ${property.notes || ''}`.toLowerCase();
+        return propertyText.includes(queryLower);
+      }
+
+      // If we get here, all specified criteria matched
+      return passesAllCriteria;
     });
     
     console.log(`📊 [ProptiiProperty] Query filtering: ${filteredProperties.length} properties match search query`);
@@ -605,97 +792,10 @@ export async function searchProptiiProperties(searchQuery: string): Promise<Prop
       console.warn(`⚠️ [ProptiiProperty] ${failedCount} properties failed transformation and were excluded`);
     }
 
-    // If very few matches found (less than 5), try a more lenient search
-    if (transformedProperties.length < 5 && transformedProperties.length > 0) {
-      console.log(`⚠️ [ProptiiProperty] Only ${transformedProperties.length} properties matched strict query, trying lenient matching...`);
-      
-      // Try lenient matching: extract key terms (bedrooms, location, price) and match on those
-      const bedroomMatch = searchQuery.match(/(\d+)\s*bed/i);
-      const locationMatch = searchQuery.match(/(?:in|at|near|for)\s+([A-Za-z\s,]+?)(?:\s+for|\s+\d|$)/i);
-      const priceMatch = searchQuery.match(/(\d+)(?:k|pcm|\s*pound)/i);
-      
-      const lenientFiltered = properties.filter((property) => {
-        let matches = 0;
-        
-        // Match on bedrooms if specified
-        if (bedroomMatch) {
-          const requestedBedrooms = parseInt(bedroomMatch[1]);
-          if (property.bedrooms === requestedBedrooms) {
-            matches++;
-          }
-        }
-        
-        // Match on location if specified
-        if (locationMatch) {
-          const location = locationMatch[1].trim().toLowerCase();
-          if (property.address.toLowerCase().includes(location)) {
-            matches++;
-          }
-        }
-        
-        // Match on price if specified (with wider variance)
-        if (priceMatch) {
-          const requestedPrice = parseInt(priceMatch[1]);
-          const requestedPriceValue = searchQuery.toLowerCase().includes('k') ? requestedPrice * 1000 : requestedPrice;
-          const priceVariance = property.rent * 0.5; // 50% variance for lenient matching
-          if (Math.abs(property.rent - requestedPriceValue) <= priceVariance || 
-              Math.abs(property.rent - requestedPrice) <= priceVariance) {
-            matches++;
-          }
-        }
-        
-        // Include if at least one criteria matches
-        return matches > 0;
-      });
-      
-      // Transform lenient matches
-      const lenientTransformationResults = await Promise.allSettled(
-        lenientFiltered.map(transformProperty)
-      );
-      const lenientTransformedProperties = lenientTransformationResults
-        .map((result, index) => {
-          if (result.status === 'fulfilled') {
-            return result.value;
-          } else {
-            console.error(`❌ [ProptiiProperty] Failed to transform lenient property at index ${index}:`, result.reason);
-            return null;
-          }
-        })
-        .filter((property): property is Property => property !== null);
-      
-      // Remove duplicates and combine
-      const combined = [...transformedProperties];
-      const existingIds = new Set(transformedProperties.map(p => p.title));
-      lenientTransformedProperties.forEach(prop => {
-        if (!existingIds.has(prop.title)) {
-          combined.push(prop);
-        }
-      });
-      
-      if (combined.length > transformedProperties.length) {
-        console.log(`✅ [ProptiiProperty] Lenient matching found ${combined.length} total properties (added ${combined.length - transformedProperties.length} more)`);
-        return combined;
-      }
-    }
-    
-    // If no matches found, return all available properties (user can browse)
+    // If no matches found, return empty array (don't return all properties)
     if (transformedProperties.length === 0) {
-      console.log('⚠️ [ProptiiProperty] No properties matched search query, returning all available properties');
-      const allTransformationResults = await Promise.allSettled(
-        properties.map(transformProperty)
-      );
-      const allTransformedProperties = allTransformationResults
-        .map((result, index) => {
-          if (result.status === 'fulfilled') {
-            return result.value;
-          } else {
-            console.error(`❌ [ProptiiProperty] Failed to transform property at index ${index}:`, result.reason);
-            return null;
-          }
-        })
-        .filter((property): property is Property => property !== null);
-      console.log(`✅ [ProptiiProperty] Returning ${allTransformedProperties.length} total properties (all available)`);
-      return allTransformedProperties;
+      console.log('⚠️ [ProptiiProperty] No properties matched search query, returning empty results');
+      return [];
     }
 
     console.log(`✅ [ProptiiProperty] Returning ${transformedProperties.length} properties matching search query`);

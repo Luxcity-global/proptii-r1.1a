@@ -390,7 +390,27 @@ export class ContractEmailService {
     const { recipientName, contractName, senderName } = params;
     
     // Get the base URL for links in the email
-    const baseUrl = process.env.APP_URL || 'https://proptii.com';
+    // In development, use localhost. In production, use mail.proptii.co
+    const getBaseUrl = (): string => {
+      // If APP_URL is explicitly set, use it (allows override)
+      if (process.env.APP_URL) {
+        return process.env.APP_URL;
+      }
+      
+      // Check if we're in development mode
+      const isDevelopment = process.env.NODE_ENV === 'development' || 
+                           process.env.NODE_ENV !== 'production';
+      
+      if (isDevelopment) {
+        // Default to localhost:5173 (Vite default) or localhost:3000
+        return process.env.FRONTEND_URL || 'http://localhost:5173';
+      }
+      
+      // Production: use mail.proptii.co
+      return 'https://mail.proptii.co';
+    };
+    
+    const baseUrl = getBaseUrl();
     
     // Unified base styles matching email.service.ts
     const baseStyles = `

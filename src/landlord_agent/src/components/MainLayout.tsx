@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature, CalendarDays, Menu } from 'lucide-react';
 import {
   Sidebar,
@@ -83,16 +84,37 @@ function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
 }) {
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Map navigation screens to paths
+  const screenToPath: Record<NavigationScreen, string> = {
+    'dashboard': '/dashboard',
+    'viewings': '/viewings',
+    'properties': '/properties',
+    'documents': '/documents',
+    'contracts': '/contracts',
+    'clients': '/clients',
+    'insights': '/insights',
+    'inbox': '/inbox',
+  };
+
+  const handleNavigation = (screen: NavigationScreen) => {
+    const path = screenToPath[screen] || '/dashboard';
+    navigate(path);
+    onNavigate(screen);
+  };
 
   return (
     <div className="pt-2 pb-2 pl-4 pr-2">
       <div className="space-y-3">
         {navigationItems.map((item) => {
-          const isActive = currentScreen === item.id;
+          const path = screenToPath[item.id] || '/dashboard';
+          const isActive = location.pathname === path || currentScreen === item.id;
           return (
             <button
               key={item.id}
-              onClick={() => onNavigate(item.id)}
+              onClick={() => handleNavigation(item.id)}
               className={`
                 w-full flex items-center h-10 px-3 rounded-md text-sm font-medium transition-colors
                 ${isCollapsed ? 'justify-center' : 'justify-start'}
@@ -285,7 +307,24 @@ function MobileSidebar({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Map navigation screens to paths
+  const screenToPath: Record<NavigationScreen, string> = {
+    'dashboard': '/dashboard',
+    'viewings': '/viewings',
+    'properties': '/properties',
+    'documents': '/documents',
+    'contracts': '/contracts',
+    'clients': '/clients',
+    'insights': '/insights',
+    'inbox': '/inbox',
+  };
+
   const handleNavigate = (screen: NavigationScreen) => {
+    const path = screenToPath[screen] || '/dashboard';
+    navigate(path);
     onNavigate(screen);
     onOpenChange(false);
   };
@@ -314,7 +353,8 @@ function MobileSidebar({
           <div className="flex-1 overflow-auto pt-4 px-4">
             <div className="space-y-3">
               {navigationItems.map((item) => {
-                const isActive = currentScreen === item.id;
+                const path = screenToPath[item.id] || '/dashboard';
+                const isActive = location.pathname === path || currentScreen === item.id;
                 return (
                   <button
                     key={item.id}
