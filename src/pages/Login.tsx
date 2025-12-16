@@ -97,7 +97,10 @@ export const LoginPage: React.FC = () => {
             <Button
               fullWidth
               variant="text"
-              onClick={() => navigate('/register')}
+              onClick={() => {
+                const search = location.search;
+                navigate(`/register${search}`);
+              }}
             >
               Don't have an account? Sign Up
             </Button>

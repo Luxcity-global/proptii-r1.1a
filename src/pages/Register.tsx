@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
   Box,
@@ -14,7 +14,8 @@ import { useAuth } from '../contexts/AuthContext';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const location = useLocation();
+  const { login, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -23,6 +24,28 @@ export const RegisterPage: React.FC = () => {
     confirmPassword: ''
   });
   const [error, setError] = useState('');
+
+  // Get the intended destination from location state or sessionStorage
+  // This logic mirrors LoginPage to ensure consistency
+  const getRedirectPath = () => {
+    const statePath = (location.state as any)?.from?.pathname;
+    const storedPath = sessionStorage.getItem('redirectAfterLogin');
+    const queryRedirect = new URLSearchParams(window.location.search).get('redirect');
+    
+    // Priority: query param > state > sessionStorage > default
+    return queryRedirect || statePath || storedPath || '/';
+  };
+  
+  const from = getRedirectPath();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Clear stored redirect path
+      sessionStorage.removeItem('redirectAfterLogin');
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, from]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -40,8 +63,8 @@ export const RegisterPage: React.FC = () => {
 
     try {
       // TODO: Implement actual registration
-      await login(formData.email, formData.password);
-      navigate('/');
+      await login();
+      // The useEffect above will handle the redirect once isAuthenticated becomes true
     } catch (error) {
       setError('Registration failed. Please try again.');
     }
@@ -141,7 +164,10 @@ export const RegisterPage: React.FC = () => {
             <Button
               fullWidth
               variant="text"
-              onClick={() => navigate('/login')}
+              onClick={() => {
+                const search = location.search;
+                navigate(`/login${search}`);
+              }}
             >
               Already have an account? Sign in
             </Button>
