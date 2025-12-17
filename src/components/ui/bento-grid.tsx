@@ -14,9 +14,10 @@ interface BentoCardProps extends ComponentPropsWithoutRef<"div"> {
   className: string
   background: ReactNode
   Icon: React.ElementType
-  description: string
+  description: ReactNode
   href: string
   cta: string
+  iconClassName?: string
 }
 
 const BentoGrid = ({ children, className, ...props }: BentoGridProps) => {
@@ -41,6 +42,7 @@ const BentoCard = ({
   description,
   href,
   cta,
+  iconClassName,
   ...props
 }: BentoCardProps) => (
   <div
@@ -51,6 +53,8 @@ const BentoCard = ({
       "bg-background [box-shadow:0_0_0_1px_rgba(0,0,0,.03),0_2px_4px_rgba(0,0,0,.05),0_12px_24px_rgba(0,0,0,.05)]",
       // dark styles
       "dark:bg-background transform-gpu dark:[box-shadow:0_-20px_80px_-20px_#ffffff1f_inset] dark:[border:1px_solid_rgba(255,255,255,.1)]",
+      // show pointer cursor when clickable
+      props.onClick && "cursor-pointer",
       className
     )}
     {...props}
@@ -58,11 +62,16 @@ const BentoCard = ({
     <div>{background}</div>
     <div className="p-4">
       <div className="pointer-events-none z-10 flex transform-gpu flex-col gap-1 transition-all duration-300 lg:group-hover:-translate-y-10">
-        <Icon className="h-12 w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75" />
-        <h3 className="text-xl font-semibold text-neutral-700 dark:text-neutral-300">
+        <Icon
+          className={cn(
+            "h-12 w-12 origin-left transform-gpu text-neutral-700 transition-all duration-300 ease-in-out group-hover:scale-75",
+            iconClassName
+          )}
+        />
+        <h3 className="text-xl font-semibold text-[#374957]">
           {name}
         </h3>
-        <p className="max-w-lg text-neutral-400">{description}</p>
+        <p className="max-w-lg text-[#5B768B]">{description}</p>
       </div>
 
       <div
@@ -76,7 +85,17 @@ const BentoCard = ({
           size="sm"
           className="pointer-events-auto p-0"
         >
-          <a href={href}>
+          <a
+            href={href}
+            onClick={(e) => {
+              // prevent page jump and trigger card click handler instead
+              e.preventDefault()
+              if (props.onClick) {
+                // call the same onClick handler as the card
+                ;(props.onClick as any)(e)
+              }
+            }}
+          >
             {cta}
             <ArrowRightIcon className="ms-2 h-4 w-4 rtl:rotate-180" />
           </a>
@@ -95,7 +114,15 @@ const BentoCard = ({
         size="sm"
         className="pointer-events-auto p-0"
       >
-        <a href={href}>
+        <a
+          href={href}
+          onClick={(e) => {
+            e.preventDefault()
+            if (props.onClick) {
+              ;(props.onClick as any)(e)
+            }
+          }}
+        >
           {cta}
           <ArrowRightIcon className="ms-2 h-4 w-4 rtl:rotate-180" />
         </a>

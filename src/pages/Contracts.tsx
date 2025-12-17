@@ -5,6 +5,8 @@ import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import ContractModal from '../components/contract/ContractModal';
 import { InteractiveHoverButton } from '../components/magic-ui/interactive-hover-button';
+import { AnimatedList } from '../components/magic-ui/animated-list';
+import { TextAnimate } from '../components/magic-ui/text-animate';
 import { BentoGrid, BentoCard } from '../components/ui/bento-grid';
 import { FileText, Shield, Share2, Zap, CheckCircle, Lock, Clock, FileCheck, Users } from 'lucide-react';
 import '../styles/typing.css';
@@ -38,7 +40,7 @@ const ContractsPage = () => {
   };
 
   return (
-    <div className="min-h-screen font-nunito">
+    <div className="min-h-screen font-archive">
       <Navbar />
 
       {/* Hero Section */}
@@ -61,13 +63,27 @@ const ContractsPage = () => {
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center w-full">
           {/* Main Heading */}
           <h3 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight text-white">
-            Rental Agreements Made Simple.<br />
+            <TextAnimate
+              className="text-3xl md:text-6xl font-bold font-archive leading-tight text-white"
+              by="word"
+              animation="fadeIn"
+              startOnView={true}
+              once={true}
+            >
+              Rental Agreements Made Simple.
+            </TextAnimate>
           </h3>
 
           {/* Subheading */}
-          <p className="text-xl md:text-2xl mb-12 max-w-3xl mx-auto font-light text-white">
+          <TextAnimate
+            className="text-xl md:text-2xl mb-12 max-w-3xl mx-auto font-light text-white"
+            by="word"
+            animation="fadeIn"
+            startOnView={true}
+            once={true}
+          >
             Fast digital signing, safe storage, and effortless sharing.
-          </p>
+          </TextAnimate>
 
           <InteractiveHoverButton
             onClick={handleGetStarted}
@@ -104,52 +120,71 @@ const ContractsPage = () => {
         </div> */}
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 md:pl-14">
-          <div className="flex flex-col md:flex-row items-center justify-between space-y-8 md:space-y-0 md:space-x-8">
-            <div className="md:w-full text-left space-y-14">
-              <h2 className="text-4xl md:text-5xl font-bold font-archive text-[#136C9E]">Securely store rental documents.</h2>
-              <p className="text-lg text-gray-600">
-                Our platform lets tenants sign contracts digitally, store them safely, and share instantly with landlords or agents—no more printing, scanning, or searching.
-              </p>
-              <button
-                onClick={handleGetStarted}
-                className="bg-[#E76F51] text-white px-6 py-3 rounded-md hover:bg-opacity-90 transition-all text-lg font-medium"
-              >
-                Get started
-              </button>
-            </div>
+          {/* Text Section */}
+          <div className="mb-12 max-w-3xl">
+            <h2 className="text-4xl md:text-5xl font-bold font-archive text-[#136C9E]">
+              Securely store rental documents.
+            </h2>
+            <p className="mt-6 text-lg text-gray-600">
+              Our platform lets tenants sign contracts digitally, store them safely, and share instantly with
+              <br />
+              landlords or agents—no more printing, scanning, or searching.
+            </p>
           </div>
 
           {/* Bento Grid Section */}
-          <div className="mt-20">
+          <div className="mb-12">
             <BentoGrid className="max-w-7xl mx-auto">
               <BentoCard
                 name="Secure Digital Storage"
-                className="col-span-2 cursor-pointer"
+                className="col-span-2 cursor-pointer border-2 border-white bg-[#E3F2FD]"
                 background={
                   <>
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5" />
-                    {/* File previews in background */}
-                    <div className="absolute right-4 top-4 opacity-20">
-                      <div className="bg-white/50 rounded-lg p-2 mb-2 text-xs">
-                        <div className="font-semibold">rental_agreement.pdf</div>
-                        <div className="text-gray-500">Encrypted & secure</div>
-                      </div>
-                      <div className="bg-white/50 rounded-lg p-2 text-xs">
-                        <div className="font-semibold">lease_contract.pdf</div>
-                        <div className="text-gray-500">Safely stored</div>
-                      </div>
+                    {/* Magic UI Animated List with secure storage images */}
+                    <div className="absolute top-4 right-4 w-40 md:w-64 opacity-80">
+                      <AnimatedList delay={1500} className="w-full -space-y-3">
+                        <img
+                          key="secure-digital-1"
+                          src="/images/Secure digital1.png"
+                          alt="Secure digital storage illustration 1"
+                          className="w-full h-auto object-contain"
+                          loading="lazy"
+                        />
+                        <img
+                          key="secure-digital-2"
+                          src="/images/Secure digital2.png"
+                          alt="Secure digital storage illustration 2"
+                          className="w-full h-auto object-contain"
+                          loading="lazy"
+                        />
+                        <img
+                          key="secure-digital-3"
+                          src="/images/Secure digital3.png"
+                          alt="Secure digital storage illustration 3"
+                          className="w-full h-auto object-contain"
+                          loading="lazy"
+                        />
+                        <img
+                          key="secure-digital-4"
+                          src="/images/Secure digital4.png"
+                          alt="Secure digital storage illustration 4"
+                          className="w-full h-auto object-contain"
+                          loading="lazy"
+                        />
+                      </AnimatedList>
                     </div>
                   </>
                 }
                 Icon={Lock}
+                iconClassName="text-[#136C9E]"
                 description="All your rental documents are automatically saved and encrypted. Access them securely from anywhere, anytime—no more lost paperwork."
                 href="#"
-                cta="View documents"
+                cta="Get started"
                 onClick={handleGetStarted}
               />
               <BentoCard
                 name="Instant Notifications"
-                className="col-span-1"
+                className="col-span-1 border-2 border-white"
                 background={
                   <>
                     <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-blue-500/5" />
@@ -171,31 +206,16 @@ const ContractsPage = () => {
                   </>
                 }
                 Icon={Zap}
+                iconClassName="text-blue-600"
                 description="Stay updated in real-time. Get instant alerts when contracts are signed, documents are ready, or actions are needed."
                 href="#"
-                cta="View all"
-              />
-              <BentoCard
-                name="Fast Digital Signing"
-                className="col-span-1"
-                background={
-                  <>
-                    <div className="absolute inset-0 bg-gradient-to-br from-green-500/20 to-green-500/5" />
-                    {/* Signing visual */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-3 opacity-40">
-                      <FileCheck className="w-8 h-8 text-green-600" />
-                      <Clock className="w-6 h-6 text-green-500" />
-                    </div>
-                  </>
-                }
-                Icon={FileCheck}
-                description="Sign contracts in minutes, not days. No printing, scanning, or mailing required. Complete agreements instantly from any device."
-                href="#"
                 cta="Get started"
+                onClick={handleGetStarted}
               />
+              {/* Swapped contents of Fast Digital Signing and Easy Collaboration cards */}
               <BentoCard
                 name="Easy Collaboration"
-                className="col-span-2"
+                className="col-span-1 border-2 border-white"
                 background={
                   <>
                     <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-purple-500/5" />
@@ -211,11 +231,55 @@ const ContractsPage = () => {
                   </>
                 }
                 Icon={Users}
+                iconClassName="text-purple-600"
                 description="Share contracts instantly with tenants, landlords, and agents. Everyone stays in sync with real-time updates and seamless collaboration."
                 href="#"
-                cta="Start sharing"
+                cta="Get started"
+                onClick={handleGetStarted}
+              />
+              <BentoCard
+                name="Fast Digital Signing"
+                className="col-span-2 border-2 border-white"
+                background={
+                  <>
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-500/20 to-green-500/5" />
+                    {/* Signed document image in lower-right, clipped by card */}
+                    <div className="absolute -bottom-6 -right-6 w-80 md:w-96 opacity-90">
+                      <img
+                        src="/images/Signdocumentimg.png"
+                        alt="Signed document illustration"
+                        className="w-full h-auto object-contain"
+                        loading="lazy"
+                      />
+                    </div>
+                  </>
+                }
+                Icon={FileCheck}
+                iconClassName="text-green-600"
+                description={
+                  <>
+                    Sign contracts in minutes, not days. No printing, scanning,
+                    <br />
+                    or mailing required. Complete agreements instantly from
+                    <br />
+                    any device.
+                  </>
+                }
+                href="#"
+                cta="Get started"
+                onClick={handleGetStarted}
               />
             </BentoGrid>
+          </div>
+
+          {/* Call-to-action button beneath Bento Grid */}
+          <div>
+            <button
+              onClick={handleGetStarted}
+              className="bg-[#E76F51] text-white px-6 py-3 rounded-md hover:bg-opacity-90 transition-all text-lg font-medium"
+            >
+              Get started
+            </button>
           </div>
         </div>
       </section>

@@ -7,7 +7,9 @@ import {
     Globe,
     Star,
     AlertCircle,
-    Loader2
+    Loader2,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react';
 
 interface VendorSearchResult {
@@ -20,6 +22,9 @@ interface VendorSearchResult {
     website?: string;
     openNow?: boolean;
     types: string[];
+    description?: string;
+    matchesInDescription?: boolean;
+    relevanceScore?: number;
 }
 
 interface VendorSearchProps {
@@ -62,6 +67,15 @@ export function VendorSearch({
     const [error, setError] = useState<string | null>(null);
     const [hasSearched, setHasSearched] = useState(false);
     const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pagination, setPagination] = useState<{
+        currentPage: number;
+        pageSize: number;
+        totalResults: number;
+        totalPages: number;
+        hasNextPage: boolean;
+        hasPreviousPage: boolean;
+    } | null>(null);
 
     // Load recent searches from localStorage
     useEffect(() => {
@@ -93,8 +107,11 @@ export function VendorSearch({
 
     // Note: This is a placeholder for Google Places API integration
     // You'll need to implement the actual API call in your backend
-    const handleSearch = async () => {
-        if (!postcode.trim()) {
+    const handleSearch = async (page: number = 1, overridePostcode?: string, overrideSearchTerm?: string) => {
+        const searchPostcode = overridePostcode || postcode;
+        const searchTermValue = overrideSearchTerm || searchTerm;
+        
+        if (!searchPostcode.trim()) {
             setError('Please enter a postcode');
             return;
         }
@@ -102,27 +119,30 @@ export function VendorSearch({
         setIsLoading(true);
         setError(null);
         setHasSearched(true);
+        setCurrentPage(page);
 
         try {
             // Format UK postcode properly (add space if missing)
-            let formattedPostcode = postcode.trim().toUpperCase().replace(/\s+/g, '');
+            let formattedPostcode = searchPostcode.trim().toUpperCase().replace(/\s+/g, '');
             if (formattedPostcode.length >= 5) {
                 // Insert space before last 3 characters (UK postcode format)
                 formattedPostcode = formattedPostcode.slice(0, -3) + ' ' + formattedPostcode.slice(-3);
             }
 
-            console.log('Searching with postcode:', formattedPostcode);
+            console.log('Searching with postcode:', formattedPostcode, 'search term:', searchTermValue, 'page:', page);
 
-            // Call the backend API server
+            // Call the backend API server with pagination
             const response = await fetch(`http://localhost:3001/api/vendors/search`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    query: `${searchTerm} near ${formattedPostcode}`,
+                    query: `${searchTermValue} near ${formattedPostcode}`,
                     location: formattedPostcode,
-                    type: searchTerm
+                    type: searchTermValue,
+                    page: page,
+                    pageSize: 10
                 }),
             });
 
@@ -137,15 +157,23 @@ export function VendorSearch({
 
             const data = await response.json();
             console.log('Search results:', data);
+            console.log('First result details:', data.results?.[0]);
+            console.log('Has description field?', data.results?.[0]?.description);
+            console.log('Has matchesInDescription?', data.results?.[0]?.matchesInDescription);
             setSearchResults(data.results || []);
+            
+            // Store pagination info
+            if (data.pagination) {
+                setPagination(data.pagination);
+            }
 
             // Save recent search
-            const label = `${searchTerm} in ${formattedPostcode}`;
+            const label = `${searchTermValue} in ${formattedPostcode}`;
             const newSearch: RecentSearch = {
-                id: `${searchTerm}-${formattedPostcode}`,
+                id: `${searchTermValue}-${formattedPostcode}`,
                 label,
                 postcode: formattedPostcode,
-                searchTerm,
+                searchTerm: searchTermValue,
                 timestamp: Date.now()
             };
 
@@ -187,7 +215,7 @@ export function VendorSearch({
                         <div className="flex-1">
                             <h2 className="text-2xl font-bold mb-2">Find a Professional</h2>
                             <p className="text-white/90 text-sm">
-                                Search for {searchTerm}s in your area or browse trusted UK trade directories
+                                Search for trades people in your area
                             </p>
                         </div>
                         <button
@@ -209,12 +237,12 @@ export function VendorSearch({
                                     placeholder="Enter your postcode (e.g., SW1A 1AA)"
                                     value={postcode}
                                     onChange={(e) => setPostcode(e.target.value.toUpperCase())}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSearch(1)}
                                     className="w-full pl-11 pr-4 py-3 border-2 border-white/20 bg-white/10 text-white placeholder-white/60 rounded-lg focus:outline-none focus:border-white/40 transition-all"
                                 />
                             </div>
                             <button
-                                onClick={handleSearch}
+                                onClick={() => handleSearch(1)}
                                 disabled={isLoading}
                                 className="px-6 py-3 bg-[#DC5F12] text-white rounded-lg font-semibold hover:bg-[#c54f0f] transition-all flex items-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -279,9 +307,20 @@ export function VendorSearch({
                     {/* Search Results */}
                     {hasSearched && !isLoading && searchResults.length > 0 && (
                         <div>
-                            <h3 className="text-lg font-bold text-[#374957] mb-4">
-                                Found {searchResults.length} {searchTerm}s near {postcode}
-                            </h3>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-bold text-[#374957]">
+                                    {pagination ? (
+                                        <>
+                                            Showing {((pagination.currentPage - 1) * pagination.pageSize) + 1}-
+                                            {Math.min(pagination.currentPage * pagination.pageSize, pagination.totalResults)} of {pagination.totalResults} {searchTerm}s near {postcode}
+                                        </>
+                                    ) : (
+                                        <>
+                                            Found {searchResults.length} {searchTerm}s near {postcode}
+                                        </>
+                                    )}
+                                </h3>
+                            </div>
                             <div className="space-y-3">
                                 {searchResults.map((vendor) => (
                                     <div
@@ -290,11 +329,28 @@ export function VendorSearch({
                                     >
                                         <div className="flex items-start justify-between mb-3">
                                             <div className="flex-1">
-                                                <h4 className="text-lg font-bold text-[#374957] mb-1">{vendor.name}</h4>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <h4 className="text-lg font-bold text-[#374957]">{vendor.name}</h4>
+                                                    {vendor.matchesInDescription && (
+                                                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                                                            Matches in description
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <p className="text-sm text-gray-600 flex items-center gap-1">
                                                     <MapPin className="w-4 h-4" />
                                                     {vendor.address}
                                                 </p>
+                                                {vendor.description && (
+                                                    <div className="mt-2">
+                                                        <p className="text-sm text-gray-500 italic line-clamp-2">
+                                                            {vendor.description}
+                                                        </p>
+                                                        {vendor.matchesInDescription && (
+                                                            <p className="text-xs text-blue-600 mt-1">✓ Found match in business description</p>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                             {vendor.rating && (
                                                 <div className="flex items-center gap-1 bg-yellow-50 px-3 py-1 rounded-lg">
@@ -338,6 +394,47 @@ export function VendorSearch({
                                     </div>
                                 ))}
                             </div>
+                            
+                            {/* Pagination Controls */}
+                            {pagination && pagination.totalPages > 1 && (
+                                <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-4">
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => handleSearch(pagination.currentPage - 1)}
+                                            disabled={!pagination.hasPreviousPage || isLoading}
+                                            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                                                !pagination.hasPreviousPage || isLoading
+                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                            }`}
+                                        >
+                                            <ChevronLeft className="w-4 h-4" />
+                                            Previous
+                                        </button>
+                                        
+                                        <span className="text-sm text-gray-600 px-4">
+                                            Page {pagination.currentPage} of {pagination.totalPages}
+                                        </span>
+                                        
+                                        <button
+                                            onClick={() => handleSearch(pagination.currentPage + 1)}
+                                            disabled={!pagination.hasNextPage || isLoading}
+                                            className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                                                !pagination.hasNextPage || isLoading
+                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                            }`}
+                                        >
+                                            Next
+                                            <ChevronRight className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="text-sm text-gray-500">
+                                        {pagination.totalResults} total results
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -371,8 +468,9 @@ export function VendorSearch({
                                         key={item.id}
                                         onClick={() => {
                                             setPostcode(item.postcode);
-                                            // Run search again with this postcode
-                                            handleSearch();
+                                            setSearchTerm(item.searchTerm);
+                                            // Run search again with this postcode and search term, starting at page 1
+                                            handleSearch(1, item.postcode, item.searchTerm);
                                         }}
                                         className="flex items-start gap-3 bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl p-4 text-left hover:border-[#DC5F12] hover:shadow-md transition-all"
                                     >
