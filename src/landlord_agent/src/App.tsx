@@ -2432,7 +2432,12 @@ function AppContent() {
         console.log('🔴 userProfile:', userProfile);
         console.log('🔴 userProfile?.email:', userProfile?.email);
         console.log('🔴 resolveManagerId():', resolveManagerId());
-        const managerEmailValue = userProfile?.email;
+        
+        // Get email from URL query params as fallback
+        const params = new URLSearchParams(window.location.search);
+        const emailFromQuery = params.get('email');
+        
+        const managerEmailValue = userProfile?.email || emailFromQuery;
         console.log('🔴 managerEmailValue being passed:', managerEmailValue);
         return (
           <ViewingsPage

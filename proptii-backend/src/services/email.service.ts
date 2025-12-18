@@ -480,7 +480,7 @@ export class EmailService {
             <p>Please send your response to <strong>${user.email}</strong>.</p>
             
             <div class="cta">
-              <a href="${baseUrl}/landlord/viewings" class="button">👉 Manage Viewing Requests on Proptii</a>
+              <a href="${baseUrl}/landlord/viewings?email=${encodeURIComponent(property.agent?.email || '')}" class="button">👉 Manage Viewing Requests on Proptii</a>
             </div>
           `
         );
