@@ -22,6 +22,11 @@ const Home = () => {
   const [prefilledEmail, setPrefilledEmail] = useState('');
   const [tenantEmail, setTenantEmail] = useState('');
 
+  // Allow other pages (e.g. Search Results) to send the user back to Home with their query prefilled
+  const prefilledSearchQuery = searchParams.get('q') || '';
+  const prefilledSearchType: 'onthemarket' | 'proptii' =
+    searchParams.get('type') === 'proptii' ? 'proptii' : 'onthemarket';
+
   // Check for query parameters to open the response modal
   useEffect(() => {
     const responseTypeParam = searchParams.get('responseType');
@@ -168,6 +173,8 @@ const Home = () => {
           <div className="max-w-3xl mx-auto px-4 md:px-0">
             <SearchInput
               onHeightChange={handleSearchInputHeightChange}
+              value={prefilledSearchQuery}
+              initialSearchType={prefilledSearchType}
             />
           </div>
         </div>

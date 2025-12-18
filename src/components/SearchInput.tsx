@@ -1,12 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+type SearchPlatform = 'onthemarket' | 'proptii';
+
 interface SearchInputProps {
   onSearch?: (query: string) => void;
   value?: string;
   onChange?: (value: string) => void;
   hasResults?: boolean;
   onHeightChange?: (height: number) => void;
+  placeholder?: string;
+  className?: string;
+  initialSearchType?: SearchPlatform;
 }
 
 export const SearchInput = ({ 
@@ -14,31 +19,18 @@ export const SearchInput = ({
   value = '', 
   onChange, 
   hasResults = true,
-  onHeightChange 
+  onHeightChange,
+  placeholder = 'AI-assisted property search...',
+  className = '',
+  initialSearchType = 'onthemarket',
 }: SearchInputProps) => {
   const [query, setQuery] = useState(value);
   const [loading, setLoading] = useState(false);
-  const [searchType, setSearchType] = useState<'onthemarket' | 'internet' | 'proptii'>('onthemarket');
-  const [showPlatformDropdown, setShowPlatformDropdown] = useState(false);
+  const [searchType, setSearchType] = useState<SearchPlatform>(initialSearchType);
   const [isFocused, setIsFocused] = useState(false);
   const [error, setError] = useState('');
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowPlatformDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
   // Update internal query when value prop changes
   useEffect(() => {
@@ -115,7 +107,12 @@ export const SearchInput = ({
     setLoading(true);
     
     try {
-      // Always navigate to search results page with the query and search type
+      if (onSearch) {
+        await Promise.resolve(onSearch(query));
+        return;
+      }
+
+      // Navigate to search results page with the query and search type
       navigate(`/search?q=${encodeURIComponent(query)}&type=${searchType}`);
     } catch (err) {
       setError('Search failed. Please try again.');
@@ -131,22 +128,8 @@ export const SearchInput = ({
     }
   };
 
-  const handlePlatformSelect = (platform: 'onthemarket' | 'internet' | 'proptii') => {
+  const handlePlatformSelect = (platform: SearchPlatform) => {
     setSearchType(platform);
-    setShowPlatformDropdown(false);
-  };
-
-  const getPlatformName = (platform: string) => {
-    switch (platform) {
-      case 'onthemarket':
-        return 'On the Market';
-      case 'internet':
-        return 'Internet Search';
-      case 'proptii':
-        return 'Proptii';
-      default:
-        return 'Select Platform';
-    }
   };
 
   const handleQueryChange = (newQuery: string) => {
@@ -159,7 +142,7 @@ export const SearchInput = ({
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-2 md:px-0">
+    <div className={`max-w-3xl mx-auto px-2 md:px-0 ${className}`}>
       <div className="relative w-full">
         <div className="bg-white rounded-3xl p-2 shadow-xl">
           {/* Input Field */}
@@ -171,7 +154,7 @@ export const SearchInput = ({
               onKeyDown={handleKeyPress}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder="AI-assisted property search..."
+              placeholder={placeholder}
               className={`w-full text-lg rounded-2xl border-0 focus:outline-none focus:ring-0 resize-none transition-all duration-150 ${
                 error ? 'border-red-500' : ''
               }`}
@@ -243,76 +226,45 @@ export const SearchInput = ({
                 </svg>
               </button>
 
-              {/* Platform Selector with Plus Icon */}
-              <div className="relative" ref={dropdownRef}>
-                <button 
-                  onClick={() => setShowPlatformDropdown(!showPlatformDropdown)}
-                  className="p-2 rounded-lg transition-all hover:bg-gray-50 flex items-center gap-2"
-                  style={{ color: '#888' }}
+              {/* Platform Lineup (icons) */}
+              <div className="flex items-center gap-2 rounded-xl bg-gray-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => handlePlatformSelect('proptii')}
+                  aria-label="Proptii"
+                  aria-pressed={searchType === 'proptii'}
+                  title="Proptii"
+                  className={`h-10 px-2 rounded-lg flex items-center justify-center transition-all border ${
+                    searchType === 'proptii'
+                      ? 'bg-white border-[#E65D24] shadow-sm'
+                      : 'bg-transparent border-transparent hover:bg-white hover:border-gray-200'
+                  }`}
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  <span className="text-sm" style={{ fontSize: '14px' }}>
-                    {getPlatformName(searchType)}
-                  </span>
+                  <img
+                    src="/images/proptii-logo.png"
+                    alt="Proptii"
+                    className="h-7 w-auto object-contain"
+                  />
                 </button>
 
-                {/* Platform Dropdown */}
-                {showPlatformDropdown && (
-                  <div 
-                    className="absolute bottom-full left-0 mb-2 bg-white rounded-xl shadow-lg border py-2 min-w-48 z-50"
-                    style={{ 
-                      borderColor: '#e5e7eb',
-                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-                    }}
-                  >
-                    {/* On the Market Option */}
-                    <button
-                      onClick={() => handlePlatformSelect('onthemarket')}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                      style={{ color: searchType === 'onthemarket' ? '#E65D24' : '#23272f' }}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                      </svg>
-                      <div>
-                        <div className="font-medium" style={{ fontSize: '14px' }}>On the Market</div>
-                        <div className="text-xs" style={{ color: '#888' }}>Official property portal</div>
-                      </div>
-                    </button>
-
-                    {/* Internet Search Option */}
-                    <button
-                      onClick={() => handlePlatformSelect('internet')}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                      style={{ color: searchType === 'internet' ? '#E65D24' : '#23272f' }}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9m0 9c-5 0-9-4-9-9s4-9 9-9" />
-                      </svg>
-                      <div>
-                        <div className="font-medium" style={{ fontSize: '14px' }}>Internet Search</div>
-                        <div className="text-xs" style={{ color: '#888' }}>Search across web</div>
-                      </div>
-                    </button>
-
-                    {/* Proptii Option */}
-                    <button
-                      onClick={() => handlePlatformSelect('proptii')}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                      style={{ color: searchType === 'proptii' ? '#E65D24' : '#23272f' }}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                      </svg>
-                      <div>
-                        <div className="font-medium" style={{ fontSize: '14px' }}>Proptii</div>
-                        <div className="text-xs" style={{ color: '#888' }}>Properties from landlords & agents</div>
-                      </div>
-                    </button>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => handlePlatformSelect('onthemarket')}
+                  aria-label="On the Market"
+                  aria-pressed={searchType === 'onthemarket'}
+                  title="On the Market"
+                  className={`h-10 px-2 rounded-lg flex items-center justify-center transition-all border ${
+                    searchType === 'onthemarket'
+                      ? 'bg-white border-[#E65D24] shadow-sm'
+                      : 'bg-transparent border-transparent hover:bg-white hover:border-gray-200'
+                  }`}
+                >
+                  <img
+                    src="/images/OTM-logo_final_full-col.png"
+                    alt="On the Market"
+                    className="h-7 w-auto object-contain"
+                  />
+                </button>
               </div>
             </div>
 
@@ -384,13 +336,6 @@ export const SearchInput = ({
               {q}
             </button>
           ))}
-        </div>
-        
-        {/* Helpful tip for connectivity issues */}
-        <div className="mt-4 text-center">
-          <p className="text-sm" style={{ color: '#666' }}>
-            💡 <strong>Tip:</strong> If searches fail, try switching to "Internet Search" mode for better reliability
-          </p>
         </div>
       </div>
     </div>

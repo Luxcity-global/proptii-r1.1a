@@ -1,2 +1,7 @@
-/*  /index.html  200
+# Redirects for Single Page Apps on Render
 
+# Landlord App
+/landlord/*  /landlord/index.html  200
+
+# Main App (Catch-all)
+/*  /index.html  200

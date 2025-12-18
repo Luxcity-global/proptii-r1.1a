@@ -1,188 +1,92 @@
 import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SearchInput } from '../SearchInput';
-import { useSearch } from '../../hooks/useSearch';
 
-// Mock the useSearch hook
-jest.mock('../../hooks/useSearch');
-const mockUseSearch = useSearch as jest.MockedFunction<typeof useSearch>;
+let mockNavigate: ReturnType<typeof vi.fn>;
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<any>('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
 
 describe('SearchInput', () => {
-  const mockOnSearch = jest.fn();
-  const mockOnChange = jest.fn();
-
   beforeEach(() => {
-    jest.clearAllMocks();
-    mockUseSearch.mockReturnValue({
-      suggestions: [],
-      isLoading: false,
-      error: null,
-      isOffline: false,
-      getSuggestions: jest.fn().mockResolvedValue([]),
-      searchProperties: jest.fn().mockResolvedValue([])
-    });
+    mockNavigate = vi.fn();
   });
 
-  it('renders with default props', () => {
-    render(<SearchInput onSearch={mockOnSearch} />);
-    expect(screen.getByPlaceholderText('Search properties...')).toBeInTheDocument();
+  it('renders with default placeholder', () => {
+    render(<SearchInput />);
+    expect(screen.getByPlaceholderText('AI-assisted property search...')).toBeInTheDocument();
   });
 
   it('renders with custom placeholder', () => {
-    render(<SearchInput onSearch={mockOnSearch} placeholder="Custom placeholder" />);
+    render(<SearchInput placeholder="Custom placeholder" />);
     expect(screen.getByPlaceholderText('Custom placeholder')).toBeInTheDocument();
   });
 
-  it('calls onSearch when form is submitted', async () => {
-    render(<SearchInput onSearch={mockOnSearch} />);
-    const input = screen.getByPlaceholderText('Search properties...');
-    const searchButton = screen.getByRole('button', { name: /search/i });
-
-    await userEvent.type(input, 'test query');
-    fireEvent.click(searchButton);
-
-    expect(mockOnSearch).toHaveBeenCalledWith('test query');
-  });
-
   it('shows error message when submitting empty query', async () => {
-    render(<SearchInput onSearch={mockOnSearch} />);
-    const searchButton = screen.getByRole('button', { name: /search/i });
+    render(<SearchInput />);
+    const searchButton = screen.getByRole('button', { name: 'Search' });
 
     fireEvent.click(searchButton);
 
     expect(await screen.findByText('Please enter a search query')).toBeInTheDocument();
-    expect(mockOnSearch).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('displays loading state', () => {
-    mockUseSearch.mockReturnValue({
-      suggestions: [],
-      isLoading: true,
-      error: null,
-      isOffline: false,
-      getSuggestions: jest.fn(),
-      searchProperties: jest.fn()
-    });
+  it('navigates to search results with default platform (On the Market)', async () => {
+    render(<SearchInput />);
 
-    render(<SearchInput onSearch={mockOnSearch} />);
-    expect(screen.getByRole('button', { name: /search/i })).toBeDisabled();
-  });
+    const textarea = screen.getByPlaceholderText('AI-assisted property search...');
+    const searchButton = screen.getByRole('button', { name: 'Search' });
 
-  it('displays error message', () => {
-    const errorMessage = 'Search failed';
-    mockUseSearch.mockReturnValue({
-      suggestions: [],
-      isLoading: false,
-      error: new Error(errorMessage),
-      isOffline: false,
-      getSuggestions: jest.fn(),
-      searchProperties: jest.fn()
-    });
-
-    render(<SearchInput onSearch={mockOnSearch} />);
-    expect(screen.getByText(errorMessage)).toBeInTheDocument();
-  });
-
-  it('displays offline indicator', () => {
-    mockUseSearch.mockReturnValue({
-      suggestions: [],
-      isLoading: false,
-      error: null,
-      isOffline: true,
-      getSuggestions: jest.fn(),
-      searchProperties: jest.fn()
-    });
-
-    render(<SearchInput onSearch={mockOnSearch} />);
-    expect(screen.getByText('Offline')).toBeInTheDocument();
-  });
-
-  it('displays suggestions when input is focused', async () => {
-    const suggestions = ['suggestion 1', 'suggestion 2'];
-    mockUseSearch.mockReturnValue({
-      suggestions,
-      isLoading: false,
-      error: null,
-      isOffline: false,
-      getSuggestions: jest.fn().mockResolvedValue(suggestions),
-      searchProperties: jest.fn()
-    });
-
-    render(<SearchInput onSearch={mockOnSearch} />);
-    const input = screen.getByPlaceholderText('Search properties...');
-    
-    await userEvent.type(input, 'test');
-    fireEvent.focus(input);
+    await userEvent.type(textarea, '2 bed flats in Leeds');
+    fireEvent.click(searchButton);
 
     await waitFor(() => {
-      suggestions.forEach(suggestion => {
-        expect(screen.getByText(suggestion)).toBeInTheDocument();
-      });
+      expect(mockNavigate).toHaveBeenCalledWith(
+        `/search?q=${encodeURIComponent('2 bed flats in Leeds')}&type=onthemarket`
+      );
     });
   });
 
-  it('calls onSearch when suggestion is clicked', async () => {
-    const suggestions = ['suggestion 1'];
-    mockUseSearch.mockReturnValue({
-      suggestions,
-      isLoading: false,
-      error: null,
-      isOffline: false,
-      getSuggestions: jest.fn().mockResolvedValue(suggestions),
-      searchProperties: jest.fn()
+  it('switches platform to Proptii via icon button and navigates with type=proptii', async () => {
+    render(<SearchInput />);
+
+    const proptiiButton = screen.getByRole('button', { name: 'Proptii' });
+    fireEvent.click(proptiiButton);
+
+    const textarea = screen.getByPlaceholderText('AI-assisted property search...');
+    const searchButton = screen.getByRole('button', { name: 'Search' });
+
+    await userEvent.type(textarea, 'studio in London');
+    fireEvent.click(searchButton);
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith(
+        `/search?q=${encodeURIComponent('studio in London')}&type=proptii`
+      );
     });
-
-    render(<SearchInput onSearch={mockOnSearch} />);
-    const input = screen.getByPlaceholderText('Search properties...');
-    
-    await userEvent.type(input, 'test');
-    fireEvent.focus(input);
-
-    const suggestion = await screen.findByText('suggestion 1');
-    fireEvent.click(suggestion);
-
-    expect(mockOnSearch).toHaveBeenCalledWith('suggestion 1');
   });
 
-  it('clears input when clear button is clicked', async () => {
-    render(<SearchInput onSearch={mockOnSearch} />);
-    const input = screen.getByPlaceholderText('Search properties...');
-    
-    await userEvent.type(input, 'test query');
-    const clearButton = screen.getByRole('button', { name: /clear search/i });
-    fireEvent.click(clearButton);
+  it('calls onSearch when provided (and does not navigate)', async () => {
+    const onSearch = vi.fn();
+    render(<SearchInput onSearch={onSearch} />);
 
-    expect(input).toHaveValue('');
-  });
+    const textarea = screen.getByPlaceholderText('AI-assisted property search...');
+    const searchButton = screen.getByRole('button', { name: 'Search' });
 
-  it('handles controlled input value', () => {
-    const value = 'controlled value';
-    render(<SearchInput onSearch={mockOnSearch} value={value} onChange={mockOnChange} />);
-    const input = screen.getByPlaceholderText('Search properties...');
-    
-    expect(input).toHaveValue(value);
-    
-    fireEvent.change(input, { target: { value: 'new value' } });
-    expect(mockOnChange).toHaveBeenCalledWith('new value');
-  });
+    await userEvent.type(textarea, 'test query');
+    fireEvent.click(searchButton);
 
-  it('displays no results state', () => {
-    render(<SearchInput onSearch={mockOnSearch} hasResults={false} value="test query" />);
-    expect(screen.getByText('No properties found')).toBeInTheDocument();
-  });
-
-  it('hides camera and mic buttons on mobile', () => {
-    // Mock window.innerWidth
-    Object.defineProperty(window, 'innerWidth', {
-      writable: true,
-      configurable: true,
-      value: 500
+    await waitFor(() => {
+      expect(onSearch).toHaveBeenCalledWith('test query');
     });
-
-    render(<SearchInput onSearch={mockOnSearch} />);
-    
-    expect(screen.queryByRole('button', { name: /search by image/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /search by voice/i })).not.toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
-}); 
+});

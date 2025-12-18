@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import LandlordAppBridge from '../components/LandlordAppBridge';
 import AuthDebugger from '../components/AuthDebugger';
@@ -7,6 +7,17 @@ import Footer from '../components/Footer';
 
 const LandlordDemo: React.FC = () => {
   const { isAuthenticated, user, isLoading } = useAuth();
+  const location = window.location;
+
+  // Handle redirect for unauthenticated users
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      const currentPath = location.pathname + location.search;
+      sessionStorage.setItem('redirectAfterLogin', currentPath);
+      const redirectPath = encodeURIComponent(currentPath);
+      window.location.href = `/login?redirect=${redirectPath}`;
+    }
+  }, [isAuthenticated, isLoading, location.pathname, location.search]);
 
   if (isLoading) {
     return (
@@ -20,31 +31,25 @@ const LandlordDemo: React.FC = () => {
   }
 
   if (!isAuthenticated) {
-    // Store the current path for redirect after login
-    const currentPath = window.location.pathname + window.location.search;
-    sessionStorage.setItem('redirectAfterLogin', currentPath);
+    // Show loading state while redirecting
+    const currentPath = location.pathname + location.search;
     
+    // Show loading state while redirecting
     return (
       <div className="min-h-screen font-nunito">
         <Navbar />
         <div className="flex items-center justify-center min-h-[80vh]">
           <div className="text-center max-w-md mx-auto px-4">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">
-              Authentication Required
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E65D24] mx-auto mb-4"></div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">
+              Redirecting to Sign In
             </h1>
             <p className="text-gray-600 mb-6">
               Please sign in to access the landlord application.
             </p>
-            <button
-              onClick={() => {
-                // Preserve the redirect path
-                const redirectPath = encodeURIComponent(currentPath);
-                window.location.href = `/login?redirect=${redirectPath}`;
-              }}
-              className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all"
-            >
-              Sign In
-            </button>
+            <p className="text-sm text-gray-500">
+              If you're not redirected automatically, <a href={`/login?redirect=${encodeURIComponent(currentPath)}`} className="text-[#E65D24] underline">click here</a>.
+            </p>
           </div>
         </div>
         <Footer />

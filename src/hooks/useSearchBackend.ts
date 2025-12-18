@@ -248,47 +248,6 @@ export const useSearchBackend = () => {
       });
 
       if (!response.ok) {
-        // If OnTheMarket fails, try internet search as fallback
-        if (type === 'onthemarket') {
-          console.log('OnTheMarket search failed, trying internet search as fallback...');
-          const fallbackResponse = await fetch(`${searchBackendUrl}/scrape-internet-real`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ query: searchQuery }),
-          });
-          
-          if (fallbackResponse.ok) {
-            const fallbackData = await fallbackResponse.json();
-            let fallbackResults: Property[] = [];
-            if (Array.isArray(fallbackData)) {
-              fallbackResults = fallbackData;
-            } else if (fallbackData.properties) {
-              fallbackResults = fallbackData.properties;
-            }
-            
-            // Clean the pricing for all properties
-            const cleanedResults = fallbackResults.map(property => ({
-              ...property,
-              price: cleanPropertyPrice(property.price)
-            }));
-            
-            setResults(cleanedResults);
-            
-            // Cache the results in sessionStorage
-            const cacheData = {
-              results: cleanedResults,
-              query: searchQuery,
-              searchType: 'internet', // Update to reflect fallback
-              timestamp: Date.now()
-            };
-            sessionStorage.setItem('searchResults', JSON.stringify(cacheData));
-            
-            return fallbackResults;
-          }
-        }
-        
         throw new Error(`Search failed: ${response.statusText}`);
       }
 

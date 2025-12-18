@@ -121,3 +121,7 @@ All protected routes in the frontend use the `ProtectedRoute` component which:
 - [ ] Click viewing-cancel email link (landlord) → Should redirect to login if not authenticated → After login, should go to `/landlord/viewings`
 - [ ] Click contract email link → Should redirect to login if not authenticated → After login, should go to `/landlord/contracts?tab=signed`
 
+
+
+
+

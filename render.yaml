@@ -52,11 +52,13 @@ services:
       - type: rewrite
         source: /static/*
         destination: /static/:splat
+      # Landlord App Routing (Use /** to match nested paths)
       - type: rewrite
-        source: /landlord/*
+        source: /landlord/**
         destination: /landlord/index.html
+      # Main App Catch-all (Use /** to match nested paths)
       - type: rewrite
-        source: /*
+        source: /**
         destination: /index.html
 
   # Backend (NestJS)

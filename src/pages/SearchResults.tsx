@@ -643,8 +643,12 @@ const SearchResults = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const searchQuery = searchParams.get('q') || '';
-  const searchTypeParam = searchParams.get('type') || 'internet';
-  const searchType = searchTypeParam as 'onthemarket' | 'internet' | 'proptii';
+  const rawSearchTypeParam = searchParams.get('type');
+  const searchTypeParam =
+    rawSearchTypeParam === 'proptii' || rawSearchTypeParam === 'onthemarket'
+      ? rawSearchTypeParam
+      : 'onthemarket';
+  const searchType = searchTypeParam as 'onthemarket' | 'proptii';
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [isNavigatingToBooking, setIsNavigatingToBooking] = useState(false);
@@ -1291,6 +1295,15 @@ const SearchResults = () => {
   }
 
   if (error) {
+    // Check if error is likely due to invalid input format vs network issue
+    const isNetworkError = error.includes('Network connection') || 
+                          error.includes('Failed to fetch') || 
+                          error.includes('ERR_CONNECTION_REFUSED') ||
+                          error.includes('timeout') ||
+                          error.includes('connect');
+    
+    const isFormatError = !isNetworkError;
+
     return (
       <div className="min-h-screen flex flex-col font-nunito">
         {/* Custom Header with navigation */}
@@ -1311,42 +1324,185 @@ const SearchResults = () => {
             </div>
           </div>
         </header>
-        <div className="flex-1 bg-gray-50 pt-20 flex items-center justify-center">
-          <div className="text-center max-w-md">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Search Error</h3>
-            <p className="text-gray-600 mb-4">{error}</p>
-            
-            {/* Network connectivity check */}
-            {error.includes('Network connection') || error.includes('connect') && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 text-left">
-                <h4 className="font-medium text-blue-900 mb-2">Troubleshooting Tips:</h4>
-                <ul className="text-sm text-blue-800 space-y-1">
-                  <li>• Check your internet connection</li>
-                  <li>• Try refreshing the page</li>
-                  <li>• Switch to "Internet Search" mode</li>
-                  <li>• Try a different search query</li>
-                </ul>
+        <div className="flex-1 bg-gray-50 pt-8">
+          <div className="max-w-5xl mx-auto px-4 py-16 sm:py-20">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-gradient-to-b from-[#136C9E]/10 to-[#E65D24]/10 flex items-center justify-center shadow-sm">
+                <svg className="w-12 h-12 sm:w-14 sm:h-14 text-[#136C9E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
               </div>
+
+              <h2 className="mt-6 text-2xl sm:text-4xl font-bold" style={{ color: '#23272f' }}>
+                {isFormatError ? 'Please Use the Correct Search Format' : 'Search Error'}
+              </h2>
+              <p className="mt-3 max-w-2xl text-gray-600">
+                {isFormatError 
+                  ? "We couldn't process your search. Please try using a clear property search format with location, bedrooms, and property type."
+                  : error
+                }
+              </p>
+            </div>
+
+            {isFormatError && (
+              <>
+                <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+                    <div className="w-11 h-11 rounded-full bg-[#136C9E]/10 text-[#136C9E] flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h16" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-gray-900">Include Property Details</h3>
+                    <p className="mt-2 text-sm text-gray-600">
+                      Specify bedrooms, property type (flat, house, apartment), and location in your search.
+                    </p>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+                    <div className="w-11 h-11 rounded-full bg-[#E65D24]/10 text-[#E65D24] flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2C8.134 2 5 5.134 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.866-3.134-7-7-7z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11a2 2 0 100-4 2 2 0 000 4z" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-gray-900">Add a Location</h3>
+                    <p className="mt-2 text-sm text-gray-600">
+                      Always include a location like "in London", "in Manchester", or "in Leeds" to get relevant results.
+                    </p>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+                    <div className="w-11 h-11 rounded-full bg-green-100 text-green-700 flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-gray-900">Use Natural Language</h3>
+                    <p className="mt-2 text-sm text-gray-600">
+                      Write your search like you're talking: "2 bedroom flats to rent in London" works perfectly.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-10 pt-8 border-t border-gray-100">
+                  <p className="text-center text-sm text-gray-500 mb-4">
+                    Try these example searches:
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {[
+                      { label: '2 bedroom flats in London', query: '2 bedroom flats to rent in London' },
+                      { label: '3 bed house in Manchester', query: '3 bedroom house to rent in Manchester' },
+                      { label: '1 bed apartment in Leeds', query: '1 bedroom apartment to rent in Leeds' },
+                      { label: 'Studio in Birmingham', query: 'studio flat to rent in Birmingham' },
+                      { label: 'Properties under £1500', query: 'properties to rent in London under 1500pcm' },
+                    ].map((chip) => (
+                      <button
+                        key={chip.label}
+                        onClick={() => {
+                          clearCache();
+                          navigate(`/search?q=${encodeURIComponent(chip.query)}&type=${encodeURIComponent(searchTypeParam || 'onthemarket')}`);
+                        }}
+                        className="px-4 py-2 rounded-full border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors"
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
-            
-            <div className="flex gap-3 justify-center">
+
+            {isNetworkError && (
+              <>
+                <div className="mt-10 bg-blue-50 border border-blue-200 rounded-xl p-6 max-w-2xl mx-auto">
+                  <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Troubleshooting Tips
+                  </h4>
+                  <ul className="text-sm text-blue-800 space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 mt-0.5">•</span>
+                      <span>Check your internet connection and try again</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 mt-0.5">•</span>
+                      <span>Refresh the page or wait a moment and retry</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 mt-0.5">•</span>
+                      <span>Try a different search query with proper format</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="mt-6 max-w-2xl mx-auto">
+                  <p className="text-center text-sm font-medium text-gray-700 mb-4">Try this: correct method</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {[
+                      { label: '2 bedroom flats in London', query: '2 bedroom flats to rent in London' },
+                      { label: '3 bed house in Manchester', query: '3 bedroom house to rent in Manchester' },
+                      { label: '1 bed apartment in Leeds', query: '1 bedroom apartment to rent in Leeds' },
+                    ].map((example, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          clearCache();
+                          navigate(`/search?q=${encodeURIComponent(example.query)}&type=${encodeURIComponent(searchTypeParam || 'onthemarket')}`);
+                        }}
+                        className="bg-white border border-gray-200 rounded-lg p-4 text-left hover:border-[#E65D24] hover:shadow-md transition-all group"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-[#136C9E]/10 text-[#136C9E] flex items-center justify-center flex-shrink-0 group-hover:bg-[#E65D24]/10 group-hover:text-[#E65D24] transition-colors">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900 group-hover:text-[#E65D24] transition-colors">
+                              {example.label}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="mt-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
               <button
-                onClick={retry}
-                className="bg-[#E65D24] text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
+                onClick={() => {
+                  const currentPlatform = searchTypeParam === 'proptii' ? 'proptii' : 'onthemarket';
+                  clearCache();
+                  navigate(`/?q=${encodeURIComponent(searchQuery)}&type=${currentPlatform}`);
+                }}
+                className="inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-[#E65D24] to-[#D54D14] hover:opacity-95 transition-all shadow-md"
               >
-                Try Again
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                Start New Search
               </button>
-              <button
-                onClick={handleNewSearch}
-                className="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
-              >
-                New Search
-              </button>
+
+              {isNetworkError && (
+                <button
+                  onClick={() => {
+                    const currentPlatform = searchTypeParam === 'proptii' ? 'proptii' : 'onthemarket';
+                    clearCache();
+                    navigate(`/?q=${encodeURIComponent(searchQuery)}&type=${currentPlatform}`);
+                  }}
+                  className="inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 transition-all"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Try Again
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1396,9 +1552,7 @@ const SearchResults = () => {
                   <div className="flex items-center">
                     <span className="text-gray-500 font-medium w-20">Platform:</span>
                     <span className="text-gray-900">
-                      {searchTypeParam === 'onthemarket' ? 'On the Market' : 
-                       searchTypeParam === 'proptii' ? 'Proptii' : 
-                       'Internet Search'}
+                      {searchTypeParam === 'onthemarket' ? 'On the Market' : 'Proptii'}
                     </span>
                   </div>
                   <div className="flex items-center">
@@ -1458,21 +1612,129 @@ const SearchResults = () => {
 
           {/* Results */}
           {results.length === 0 ? (
-            <div className="flex justify-center items-center py-20">
-              <div className="text-center max-w-md">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+            <div className="py-16 sm:py-20">
+              <div className="max-w-5xl mx-auto px-4">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-gradient-to-b from-[#136C9E]/10 to-[#E65D24]/10 flex items-center justify-center shadow-sm">
+                    <svg className="w-12 h-12 sm:w-14 sm:h-14 text-[#136C9E]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+
+                  <h2 className="mt-6 text-2xl sm:text-4xl font-bold" style={{ color: '#23272f' }}>
+                    No Properties Found
+                  </h2>
+                  <p className="mt-3 max-w-2xl text-gray-600">
+                    We couldn't find any properties matching your search criteria. Don&apos;t worry though – there are plenty of options available!
+                  </p>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Properties Found</h3>
-                <p className="text-gray-600 mb-4">Try adjusting your search criteria or try a different location.</p>
-                <button
-                  onClick={handleNewSearch}
-                  className="bg-[#E65D24] text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition-colors"
-                >
-                  New Search
-                </button>
+
+                <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+                    <div className="w-11 h-11 rounded-full bg-[#136C9E]/10 text-[#136C9E] flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h16" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-gray-900">Adjust Your Filters</h3>
+                    <p className="mt-2 text-sm text-gray-600">
+                      Try broadening your search criteria like price range, number of bedrooms, or apartment type.
+                    </p>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+                    <div className="w-11 h-11 rounded-full bg-[#E65D24]/10 text-[#E65D24] flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2C8.134 2 5 5.134 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.866-3.134-7-7-7z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11a2 2 0 100-4 2 2 0 000 4z" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-gray-900">Try Different Location</h3>
+                    <p className="mt-2 text-sm text-gray-600">
+                      Consider searching in nearby areas or neighborhoods that might have similar properties.
+                    </p>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+                    <div className="w-11 h-11 rounded-full bg-green-100 text-green-700 flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-gray-900">Check Back Later</h3>
+                    <p className="mt-2 text-sm text-gray-600">
+                      New properties are added daily. Save your search and we&apos;ll notify you when new matches appear.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+                  <button
+                    onClick={() => {
+                      const currentPlatform = searchTypeParam === 'proptii' ? 'proptii' : 'onthemarket';
+                      clearCache();
+                      navigate(`/?q=${encodeURIComponent(searchQuery)}&type=${currentPlatform}`);
+                    }}
+                    className="inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-[#E65D24] to-[#D54D14] hover:opacity-95 transition-all shadow-md"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Start New Search
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const currentPlatform = searchTypeParam === 'proptii' ? 'proptii' : 'onthemarket';
+                      const nextPlatform = currentPlatform === 'proptii' ? 'onthemarket' : 'proptii';
+                      clearCache();
+                      navigate(`/?q=${encodeURIComponent(searchQuery)}&type=${nextPlatform}`);
+                    }}
+                    className="inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 transition-all"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 10a1 1 0 011-1h10a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zm14-5a1 1 0 011-1h2a1 1 0 011 1v10a1 1 0 01-1 1h-2a1 1 0 01-1-1V9z" />
+                    </svg>
+                    {searchTypeParam === 'proptii' ? 'Try On The Market' : 'Try Proptii'}
+                  </button>
+                </div>
+
+                {(() => {
+                  const locationMatch = searchQuery.match(/(?:in|at|near)\s+([A-Za-z\s,]+)/i);
+                  const locationLabel = (locationMatch?.[1]?.trim() || '').replace(/\s{2,}/g, ' ');
+                  const hasLocation = Boolean(locationLabel);
+                  const baseLocation = hasLocation ? locationLabel : 'London';
+                  const chips = [
+                    { label: '1 Bed Apartments', query: `1 bedroom apartments to rent in ${baseLocation}` },
+                    { label: '2 Bed Houses', query: `2 bedroom houses to rent in ${baseLocation}` },
+                    { label: 'Studio Flats', query: `studio flats to rent in ${baseLocation}` },
+                    { label: 'Properties under £1500', query: `properties to rent in ${baseLocation} under 1500pcm` },
+                    { label: 'Central London', query: `properties to rent in Central London` },
+                    { label: 'Pet-Friendly', query: `pet friendly properties to rent in ${baseLocation}` },
+                  ];
+
+                  return (
+                    <div className="mt-10 pt-8 border-t border-gray-100">
+                      <p className="text-center text-sm text-gray-500 mb-4">
+                        Popular searches{hasLocation ? ` in ${locationLabel}` : ''}:
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {chips.map((chip) => (
+                          <button
+                            key={chip.label}
+                            onClick={() => {
+                              clearCache();
+                              navigate(`/search?q=${encodeURIComponent(chip.query)}&type=${encodeURIComponent(searchTypeParam || 'onthemarket')}`);
+                            }}
+                            className="px-4 py-2 rounded-full border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors"
+                          >
+                            {chip.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ) : (

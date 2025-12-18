@@ -63,6 +63,24 @@ const LandlordAppBridge: React.FC<LandlordAppBridgeProps> = ({ className, style 
     };
   }, [isAuthenticated, user, isLoading, location.pathname]);
 
+  // Listen for redirect requests from the iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Only accept messages from our iframe (same origin)
+      if (event.data?.type === 'REDIRECT_TO_LOGIN') {
+        const redirectPath = event.data.payload?.redirect || window.location.pathname + window.location.search;
+        const loginPath = `/login?redirect=${encodeURIComponent(redirectPath)}`;
+        console.log('🔒 LandlordAppBridge: Received redirect request from iframe, redirecting to:', loginPath);
+        window.location.href = loginPath;
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
+
   // Update iframe src to include the path as a hash or query parameter for initial load
   const iframeSrc = `/landlord/index.html${getLandlordPath() !== '/' ? `#${getLandlordPath()}` : ''}`;
 
