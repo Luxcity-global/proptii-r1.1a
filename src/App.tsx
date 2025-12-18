@@ -56,12 +56,12 @@ export const App: React.FC = () => {
             {/* Protected Routes */}
             <Route path="/agent" element={
               <ProtectedRoute>
-                <Navigate to="/?mode=agent" replace />
+                <AgentHome />
               </ProtectedRoute>
             } />
             <Route path="/Agent" element={
               <ProtectedRoute>
-                <Navigate to="/?mode=agent" replace />
+                <AgentHome />
               </ProtectedRoute>
             } />
             <Route path="/landlord" element={

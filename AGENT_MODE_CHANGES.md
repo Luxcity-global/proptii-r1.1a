@@ -1,63 +1,41 @@
 # Agent Mode Changes - Summary
 
 ## Overview
-Updated the application to handle agent authentication by routing all agent access to the Home page with a toggled state instead of navigating to a separate `/agent` or `/Agent` page.
+Updated the application so that all agent email links point to `https://proptii.co/Agent` (the AgentHome page), which prompts authentication if needed.
 
 ## Changes Made
 
 ### 1. Frontend - Home Page (`src/pages/Home.tsx`)
 
-#### New State Management
-- Added `isAgentMode` state to toggle between tenant and agent views
-- Added `showRolePopup` state to control the role selection popup display
-- Added `selectedRole` state to track whether user selected 'landlord' or 'agent'
+#### Agent Toggle Handler
+- `handleAgentToggle()`: Checks authentication and navigates to `/Agent`
+  - If user is not authenticated → Triggers Microsoft login first
+  - After successful login → Navigates to `/Agent` page
+  - If already authenticated → Navigates directly to `/Agent` page
 
-#### URL Parameter Handling
-- Checks for `?mode=agent` parameter in URL
-- Automatically triggers authentication if user is not logged in
-- Shows role selection popup after successful authentication
-
-#### UI Changes
-- **Navbar**: Switches between `<Navbar />` and `<AgentNavbar isAgent={true} />` based on mode
-- **Hero Section**: 
-  - Different background images for tenant vs agent mode
-  - Different heading text ("Find Your Dream Home" vs "List Your Properties")
-  - Different subheading text
-  - Shows search input for tenants, dashboard button for agents
-- **Services Section**:
-  - Tenant mode: Shows Book Viewing, Referencing, and Contract cards
-  - Agent mode: Shows Dashboard, Add Property, and Setup Profile cards
-
-#### Handler Functions
-- `handleAgentToggle()`: Triggers authentication and switches to agent mode
-- `handleTenantToggle()`: Switches back to tenant mode
-- `handleRoleSelected()`: Handles role selection from popup
-- `handleRoleContinue()`: Auto-registers user with selected role
-- `handleCloseRolePopup()`: Closes popup and returns to tenant mode
-- `handleGoToDashboard()`: Navigates to landlord/agent dashboard
-- `handleAddProperty()`: Deep links to property setup flow
-- `handleSetupProfile()`: Deep links to profile setup flow
+The Home page remains tenant-focused with:
+- Search functionality for finding properties
+- Book Viewing, Referencing, and Contract cards
 
 ### 2. Frontend - Routing (`src/App.tsx`)
 
-#### Route Changes
+#### Route Configuration
+Both `/agent` and `/Agent` routes are protected and navigate to the `AgentHome` component:
+
 ```typescript
-// Before: Navigated to separate AgentHome page
 <Route path="/agent" element={
   <ProtectedRoute>
     <AgentHome />
   </ProtectedRoute>
 } />
-
-// After: Redirects to home page with agent mode
-<Route path="/agent" element={
+<Route path="/Agent" element={
   <ProtectedRoute>
-    <Navigate to="/?mode=agent" replace />
+    <AgentHome />
   </ProtectedRoute>
 } />
 ```
 
-Both `/agent` and `/Agent` routes now redirect to `/?mode=agent` after authentication.
+The `/Agent` URL is accessible at `https://proptii.co/Agent`.
 
 ### 3. Backend - Email Service (`proptii-backend/src/services/email.service.ts`)
 
@@ -69,7 +47,7 @@ Both `/agent` and `/Agent` routes now redirect to `/?mode=agent` after authentic
 <a href="${baseUrl}/landlord/clients" class="button">👉 Review Documents in Proptii</a>
 
 // After:
-<a href="${baseUrl}/?mode=agent" class="button">👉 Review Documents in Proptii</a>
+<a href="${baseUrl}/Agent" class="button">👉 Review Documents in Proptii</a>
 ```
 
 **Viewing Agent Email** (line 483):
@@ -78,53 +56,58 @@ Both `/agent` and `/Agent` routes now redirect to `/?mode=agent` after authentic
 <a href="${baseUrl}/landlord/viewings?email=${encodeURIComponent(property.agent?.email || '')}" class="button">👉 Manage Viewing Requests on Proptii</a>
 
 // After:
-<a href="${baseUrl}/?mode=agent" class="button">👉 Manage Viewing Requests on Proptii</a>
+<a href="${baseUrl}/Agent" class="button">👉 Manage Viewing Requests on Proptii</a>
 ```
 
 ## How It Works
 
 ### For Unauthenticated Agents
 
-1. Agent clicks "Agent" toggle on home page OR clicks email link with `?mode=agent`
+1. Agent clicks "Agent" toggle on home page OR clicks email link to `/Agent`
 2. System detects user is not authenticated
-3. Triggers Microsoft authentication popup
-4. After successful login, switches to agent mode and shows role selection popup
-5. Agent selects "Landlord" or "Agent" role
+3. Triggers Microsoft authentication popup via `ProtectedRoute`
+4. After successful login, user is redirected to `/Agent` (AgentHome page)
+5. AgentHome shows role selection popup for choosing "Landlord" or "Agent"
 6. System auto-registers user in backend with selected role
-7. Agent can now access dashboard, add properties, or setup profile
+7. Agent can access dashboard, add properties, or setup profile
 
 ### For Authenticated Agents
 
-1. Agent clicks "Agent" toggle or email link with `?mode=agent`
+1. Agent clicks "Agent" toggle or email link to `/Agent`
 2. System detects user is already authenticated
-3. Immediately switches to agent mode and shows role selection popup
-4. Agent continues with their selected role
+3. Immediately navigates to AgentHome page (`/Agent`)
+4. Shows role selection popup (if not previously set)
+5. Agent continues with their selected role
 
 ### Agent Email Links
 
-All agent email links now point to `/?mode=agent` which:
-- Prompts login if not authenticated
-- Shows agent-specific UI after authentication
-- Displays role selection popup for first-time users
-- Allows direct access to dashboard functionality
+All agent email links now point to `https://proptii.co/Agent` which:
+- Triggers authentication via `ProtectedRoute` if not logged in
+- Shows the AgentHome page with role selection
+- Displays action cards for Dashboard, Add Property, and Setup Profile
+- Links to the landlord/agent dashboard at `/landlord/` (built from `src/landlord_agent`)
 
 ## Benefits
 
-1. **Single Source of Truth**: Home page handles both tenant and agent experiences
-2. **Seamless Authentication**: Email links automatically trigger auth flow
-3. **Better UX**: No separate pages, just toggled states
-4. **Consistent Experience**: All agent entry points lead to same flow
-5. **Simplified Routing**: Less complex route management
+1. **Clean URL Structure**: Agents have their own dedicated page at `/Agent`
+2. **Seamless Authentication**: Email links automatically trigger auth flow via ProtectedRoute
+3. **Consistent Entry Point**: All agent access points lead to the same AgentHome page
+4. **Role-Based Experience**: Users select their role (landlord/agent) on first visit
+5. **Protected Access**: All agent routes require authentication
 
 ## Testing
 
-✅ Backend builds successfully with updated email templates
-✅ Frontend linting passes with no errors
-✅ TypeScript compilation successful
+✅ Agent toggle on home page navigates to `/Agent` with auth check
+✅ Email links point to `/Agent` URL
+✅ Backend email templates updated successfully
 
 ## Files Modified
 
-1. `src/pages/Home.tsx` - Added agent mode toggle and UI
-2. `src/App.tsx` - Updated routing to redirect to home with mode parameter
-3. `proptii-backend/src/services/email.service.ts` - Updated agent email links
+1. `src/pages/Home.tsx` - Updated agent toggle to navigate to `/Agent` with auth check
+2. `src/App.tsx` - Kept `/agent` and `/Agent` routes pointing to AgentHome component (with ProtectedRoute)
+3. `proptii-backend/src/services/email.service.ts` - Updated agent email links to point to `/Agent`
+
+## Agent Dashboard Location
+
+The landlord/agent dashboard is located in `src/landlord_agent` and is built to `/public/landlord/` with a base URL of `/landlord/`. This is the React app that agents access after clicking "Go to Dashboard" from the AgentHome page.
 
