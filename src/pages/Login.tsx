@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
@@ -17,18 +17,19 @@ export const LoginPage: React.FC = () => {
   const { login, isAuthenticated, isLoading } = useAuth();
   const [error, setError] = useState('');
   const [autoLoginTriggered, setAutoLoginTriggered] = useState(false);
+  const hasRedirectedRef = useRef(false);
 
-  // Get the intended destination from location state (set by ProtectedRoute) or sessionStorage
-  const getRedirectPath = () => {
+  // Memoize the redirect path to prevent recalculation on every render
+  const from = useMemo(() => {
     const statePath = (location.state as any)?.from?.pathname;
     const storedPath = sessionStorage.getItem('redirectAfterLogin');
-    const queryRedirect = new URLSearchParams(window.location.search).get('redirect');
+    const queryRedirect = new URLSearchParams(location.search).get('redirect');
     
     // Priority: query param > state > sessionStorage > default
-    return queryRedirect || statePath || storedPath || '/';
-  };
-  
-  const from = getRedirectPath();
+    const redirectPath = queryRedirect || statePath || storedPath || '/';
+    console.log('📍 Calculated redirect path:', redirectPath);
+    return redirectPath;
+  }, [location.state, location.search]); // Only recalculate when location changes
 
   // Clear auto-login flag immediately if already authenticated
   useEffect(() => {
@@ -37,14 +38,21 @@ export const LoginPage: React.FC = () => {
     }
   }, [isAuthenticated]);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (only once)
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !hasRedirectedRef.current) {
+      hasRedirectedRef.current = true;
+      
       // Clear stored redirect path and auto-login flag
       sessionStorage.removeItem('redirectAfterLogin');
       sessionStorage.removeItem('autoLoginAttempted');
+      
       console.log('✅ Already authenticated, redirecting to:', from);
-      navigate(from, { replace: true });
+      
+      // Use setTimeout to ensure this happens after current render cycle
+      setTimeout(() => {
+        navigate(from, { replace: true });
+      }, 0);
     }
   }, [isAuthenticated, navigate, from]);
 
@@ -52,6 +60,8 @@ export const LoginPage: React.FC = () => {
   // This skips the intermediate "Sign in with Microsoft" button and goes straight to Azure B2C
   // Only runs ONCE when component mounts
   useEffect(() => {
+    console.log('🔍 Auto-login check:', { isLoading, isAuthenticated, autoLoginTriggered, hasRedirected: hasRedirectedRef.current });
+    
     // Don't do anything while auth is loading
     if (isLoading) {
       console.log('⏳ Auth is loading, waiting...');
@@ -61,6 +71,12 @@ export const LoginPage: React.FC = () => {
     // If already authenticated, don't trigger auto-login
     if (isAuthenticated) {
       console.log('✅ Already authenticated, skipping auto-login');
+      return;
+    }
+
+    // If we've already redirected, don't do anything
+    if (hasRedirectedRef.current) {
+      console.log('✅ Already redirected, skipping auto-login');
       return;
     }
 
@@ -77,6 +93,8 @@ export const LoginPage: React.FC = () => {
       setTimeout(() => {
         handleLogin();
       }, 500);
+    } else {
+      console.log('⏭️ Skipping auto-login:', { shouldAutoLogin, autoLoginTriggered, hasAutoLoginRun });
     }
   }, [isLoading, isAuthenticated, autoLoginTriggered]); // Only re-run when loading state or auth state changes
 
