@@ -14,8 +14,9 @@ import { useAuth } from '../contexts/AuthContext';
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth();
   const [error, setError] = useState('');
+  const [autoLoginTriggered, setAutoLoginTriggered] = useState(false);
 
   // Get the intended destination from location state (set by ProtectedRoute) or sessionStorage
   const getRedirectPath = () => {
@@ -29,24 +30,47 @@ export const LoginPage: React.FC = () => {
   
   const from = getRedirectPath();
 
+  // Clear auto-login flag immediately if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      sessionStorage.removeItem('autoLoginAttempted');
+    }
+  }, [isAuthenticated]);
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
       // Clear stored redirect path and auto-login flag
       sessionStorage.removeItem('redirectAfterLogin');
       sessionStorage.removeItem('autoLoginAttempted');
+      console.log('✅ Already authenticated, redirecting to:', from);
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, from]);
 
   // Auto-trigger login when landing on this page with a redirect parameter
   // This skips the intermediate "Sign in with Microsoft" button and goes straight to Azure B2C
+  // Only runs ONCE when component mounts
   useEffect(() => {
+    // Don't do anything while auth is loading
+    if (isLoading) {
+      console.log('⏳ Auth is loading, waiting...');
+      return;
+    }
+
+    // If already authenticated, don't trigger auto-login
+    if (isAuthenticated) {
+      console.log('✅ Already authenticated, skipping auto-login');
+      return;
+    }
+
+    // Only auto-login if we haven't triggered it yet in this session
     const shouldAutoLogin = new URLSearchParams(window.location.search).get('redirect');
     const hasAutoLoginRun = sessionStorage.getItem('autoLoginAttempted');
     
-    if (shouldAutoLogin && !isAuthenticated && !hasAutoLoginRun) {
+    if (shouldAutoLogin && !autoLoginTriggered && !hasAutoLoginRun) {
       console.log('🔐 Auto-triggering login for redirect:', shouldAutoLogin);
+      setAutoLoginTriggered(true);
       sessionStorage.setItem('autoLoginAttempted', 'true');
       
       // Small delay to ensure the page is fully loaded
@@ -54,7 +78,7 @@ export const LoginPage: React.FC = () => {
         handleLogin();
       }, 500);
     }
-  }, [isAuthenticated]);
+  }, [isLoading, isAuthenticated, autoLoginTriggered]); // Only re-run when loading state or auth state changes
 
   // Listen for auth state changes (for MSAL popup login) as a backup
   // The main redirect is handled by the useEffect above that watches isAuthenticated

@@ -19,7 +19,16 @@
    - ✅ After signing in, should land on `/landlord/viewings` (NOT homepage)
    - ✅ Should see the viewings page with the request
 
-### Test 3: Referencing Email Link
+### Test 3: Already Signed-In Agent via Email (IMPORTANT!)
+1. **Sign in** to the platform as an agent first
+2. While signed in, click an email link (e.g., viewing notification)
+3. **Expected Behavior**:
+   - ✅ Should **immediately redirect** to the intended page (e.g., `/landlord/viewings`)
+   - ✅ NO login popup should appear
+   - ✅ NO looping or flickering between pages
+   - ✅ Console should show: `✅ Already authenticated, skipping auto-login`
+
+### Test 4: Referencing Email Link
 1. Send a referencing notification to an agent
 2. Click "Review Documents in Proptii"
 3. **Expected Behavior**:
@@ -50,6 +59,24 @@ Login successful
 ```
 
 ## Troubleshooting
+
+### Problem: Page looping/flickering for already signed-in users
+**Cause**: Auto-login triggering even when user is already authenticated
+
+**Check**:
+1. Console should show: `✅ Already authenticated, skipping auto-login`
+2. If you see `🔐 Auto-triggering login` for signed-in users, this is the bug
+
+**Fix**: This has been fixed in the latest version. The login page now:
+- Waits for auth state to load (`isLoading`)
+- Checks if user is already authenticated before triggering auto-login
+- Uses a state flag to ensure auto-login only runs once
+- Console logs: `⏳ Auth is loading, waiting...` then `✅ Already authenticated, skipping auto-login`
+
+**If still looping**:
+1. Clear browser cache and sessionStorage
+2. Hard refresh (Ctrl+Shift+R)
+3. Check console for error messages
 
 ### Problem: Still showing intermediate "Sign in with Microsoft" page
 **Cause**: Auto-login not triggering

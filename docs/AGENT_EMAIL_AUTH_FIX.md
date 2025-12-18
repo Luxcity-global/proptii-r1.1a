@@ -26,26 +26,47 @@ This created an unnecessary step where users had to manually click a button.
 
 **File**: `src/pages/Login.tsx`
 
-Added automatic login trigger when the login page is loaded with a redirect parameter:
+Added automatic login trigger when the login page is loaded with a redirect parameter, with safeguards to prevent loops for already-authenticated users:
 
 ```typescript
 // Auto-trigger login when landing on this page with a redirect parameter
+// Only runs ONCE when component mounts
 useEffect(() => {
+  // Don't do anything while auth is loading
+  if (isLoading) {
+    console.log('⏳ Auth is loading, waiting...');
+    return;
+  }
+
+  // If already authenticated, don't trigger auto-login
+  if (isAuthenticated) {
+    console.log('✅ Already authenticated, skipping auto-login');
+    return;
+  }
+
+  // Only auto-login if we haven't triggered it yet in this session
   const shouldAutoLogin = new URLSearchParams(window.location.search).get('redirect');
   const hasAutoLoginRun = sessionStorage.getItem('autoLoginAttempted');
   
-  if (shouldAutoLogin && !isAuthenticated && !hasAutoLoginRun) {
+  if (shouldAutoLogin && !autoLoginTriggered && !hasAutoLoginRun) {
     console.log('🔐 Auto-triggering login for redirect:', shouldAutoLogin);
+    setAutoLoginTriggered(true);
     sessionStorage.setItem('autoLoginAttempted', 'true');
     
     setTimeout(() => {
       handleLogin();
     }, 500);
   }
-}, [isAuthenticated]);
+}, [isLoading, isAuthenticated, autoLoginTriggered]);
 ```
 
-**Result**: Users now go directly from email link → Azure B2C authentication (skipping the intermediate "Sign in with Microsoft" button)
+**Key Features**:
+- ✅ Waits for auth state to load before checking
+- ✅ Skips auto-login if user is already authenticated
+- ✅ Uses component state to ensure it only runs once
+- ✅ Prevents infinite loops for signed-in users
+
+**Result**: Users now go directly from email link → Azure B2C authentication (skipping the intermediate "Sign in with Microsoft" button), and already-signed-in users are redirected immediately without triggering login
 
 ### Solution 2: Preserve Redirect Through MSAL State Parameter
 
