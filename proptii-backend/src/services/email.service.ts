@@ -376,7 +376,7 @@ export class EmailService {
             <p>Once completed, you will receive the confirmation forms from the referee and guarantor. Please review all submissions and verify the documents. Once confirmed, you may proceed to accept the user as a tenant.</p>
 
             <div class="cta">
-              <a href="${baseUrl}/landlord/clients" class="button">👉 Review Documents in Proptii</a>
+              <a href="${baseUrl}/?mode=agent" class="button">👉 Review Documents in Proptii</a>
             </div>
 
             <p>If you need any assistance during the verification process, please contact our support team through your Proptii dashboard.</p>
@@ -480,7 +480,7 @@ export class EmailService {
             <p>Please send your response to <strong>${user.email}</strong>.</p>
             
             <div class="cta">
-              <a href="${baseUrl}/landlord/viewings?email=${encodeURIComponent(property.agent?.email || '')}" class="button">👉 Manage Viewing Requests on Proptii</a>
+              <a href="${baseUrl}/?mode=agent" class="button">👉 Manage Viewing Requests on Proptii</a>
             </div>
           `
         );
