@@ -1070,7 +1070,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
   if (error) {
     // If error is about authentication, show a sign-in prompt instead
-    if (error.includes('Unable to determine your email') || error.includes('sign in')) {
+    if (error.includes('Unable to determine your email') || error.includes('sign in') || error.includes('sign-in')) {
       const handleSignIn = () => {
         const currentPath = window.location.pathname + window.location.search;
         const redirectPath = encodeURIComponent(currentPath);

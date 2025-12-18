@@ -338,6 +338,7 @@ function AppContent() {
       navigate(path);
     }
   };
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole>('landlord');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -471,6 +472,7 @@ function AppContent() {
           });
           console.log('✅ Received AUTH_STATE from parent, updated userProfile:', user);
         }
+        setIsAuthLoading(false);
       }
       
       // Handle NAVIGATE messages
@@ -516,14 +518,21 @@ function AppContent() {
             logo: undefined
           });
           console.log('✅ Loaded auth state from localStorage and updated userProfile:', user);
+          setIsAuthLoading(false);
         }
       }
     } catch (err) {
       // ignore parse errors
     }
 
+    // Set a timeout to stop loading if no auth state is received
+    const timer = setTimeout(() => {
+        setIsAuthLoading(false);
+    }, 2000);
+
     return () => {
       window.removeEventListener('message', handleMessage);
+      clearTimeout(timer);
     };
   }, []);
 
@@ -3489,6 +3498,17 @@ function AppContent() {
         return <WelcomeScreen onGetStarted={() => navigateToScreen('role-selection')} />;
     }
   };
+
+  if (isAuthLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="flex flex-col items-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#E65D24] mb-4"></div>
+            <p className="text-gray-600 font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

@@ -11,7 +11,33 @@ interface EmailTemplateData {
 }
 
 // Base URL for Proptii application
-const BASE_URL = process.env.REACT_APP_URL || 'https://proptii.com';
+// Get base URL for email links - supports both localhost (for local testing) and proptii.co (for production)
+const getBaseUrl = (): string => {
+  // Priority 1: If REACT_APP_URL is explicitly set, use it (allows override for any environment)
+  if (process.env.REACT_APP_URL) {
+    return process.env.REACT_APP_URL;
+  }
+  
+  // Priority 2: If VITE_APP_URL is set (for Vite projects), use it
+  if (import.meta.env?.VITE_APP_URL) {
+    return import.meta.env.VITE_APP_URL;
+  }
+  
+  // Priority 3: Check if we're in development mode
+  const isDevelopment = process.env.NODE_ENV === 'development' || 
+                       import.meta.env?.DEV ||
+                       process.env.NODE_ENV !== 'production';
+  
+  if (isDevelopment) {
+    // Default to localhost:5173 (Vite default) for local development
+    return 'http://localhost:5173';
+  }
+  
+  // Priority 4: Production - use proptii.co
+  return 'https://proptii.co';
+};
+
+const BASE_URL = getBaseUrl();
 
 // Helper function to format time strings properly
 const formatTimeString = (timeString: string): string => {

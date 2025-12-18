@@ -191,24 +191,29 @@ export class EmailService {
     const agentDetails = formData.agentDetails || {};
 
     // Get the base URL for links in the email
-    // In development, use localhost. In production, use mail.proptii.co
+    // Supports both localhost (for local testing) and proptii.co (for production)
     const getBaseUrl = (): string => {
-      // If APP_URL is explicitly set, use it (allows override)
+      // Priority 1: If APP_URL is explicitly set, use it (allows override for any environment)
       if (process.env.APP_URL) {
         return process.env.APP_URL;
       }
       
-      // Check if we're in development mode
+      // Priority 2: If FRONTEND_URL is set, use it (allows specifying localhost explicitly)
+      if (process.env.FRONTEND_URL) {
+        return process.env.FRONTEND_URL;
+      }
+      
+      // Priority 3: Check if we're in development mode
       const isDevelopment = process.env.NODE_ENV === 'development' || 
                            process.env.NODE_ENV !== 'production';
       
       if (isDevelopment) {
-        // Default to localhost:5173 (Vite default) or localhost:3000
-        return process.env.FRONTEND_URL || 'http://localhost:5173';
+        // Default to localhost:5173 (Vite default) for local development
+        return 'http://localhost:5173';
       }
       
-      // Production: use mail.proptii.co
-      return 'https://mail.proptii.co';
+      // Priority 4: Production - use proptii.co (not mail.proptii.co for consistency)
+      return 'https://proptii.co';
     };
     
     const baseUrl = getBaseUrl();
