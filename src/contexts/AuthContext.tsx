@@ -229,7 +229,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const initializeAuth = async () => {
       try {
         // Handle redirect response if any
-        await instance.handleRedirectPromise();
+        const redirectResponse = await instance.handleRedirectPromise();
+        
+        // Check if there's a redirect path in the response state
+        if (redirectResponse && redirectResponse.state) {
+          try {
+            const state = JSON.parse(redirectResponse.state);
+            if (state.redirect) {
+              console.log('🔐 Restored redirect path from state:', state.redirect);
+              sessionStorage.setItem('redirectAfterLogin', state.redirect);
+            }
+          } catch (e) {
+            // State might not be JSON, that's okay
+            console.log('State is not JSON:', redirectResponse.state);
+          }
+        }
 
         if (accounts.length > 0) {
           const currentAccount = accounts[0];
@@ -409,8 +423,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // First, refresh CSRF token
       await securityMiddleware.refreshCsrfToken();
 
-      // Try popup login
-      const result = await instance.loginPopup(loginRequest);
+      // Get the intended redirect path from sessionStorage
+      const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+      console.log('🔐 Login starting with redirect path:', redirectPath);
+
+      // Create login request with state to preserve redirect
+      const loginRequestWithState = {
+        ...loginRequest,
+        // Store redirect path in state to survive the auth flow
+        state: redirectPath ? JSON.stringify({ redirect: redirectPath }) : undefined,
+        // Use redirect flow instead of popup for better reliability with Azure B2C signup
+        redirectStartPage: window.location.href
+      };
+
+      // Try popup login first
+      const result = await instance.loginPopup(loginRequestWithState);
 
       if (result) {
         // Extract stable userId from token claims (oid or sub)
@@ -465,7 +492,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Record login activity
         sessionManager.updateActivity('interaction', 'User login');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
 
       // Dispatch auth state change event with failure status
@@ -482,8 +509,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }));
 
-      // Try redirect login as fallback
-      await instance.loginRedirect(loginRequest);
+      // Get the intended redirect path from sessionStorage
+      const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+      console.log('🔐 Login popup failed, using redirect flow with path:', redirectPath);
+
+      // Create login request with state to preserve redirect
+      const loginRequestWithState = {
+        ...loginRequest,
+        // Store redirect path in state to survive the auth flow
+        state: redirectPath ? JSON.stringify({ redirect: redirectPath }) : undefined
+      };
+
+      // Try redirect login as fallback - this is more reliable for Azure B2C signup
+      await instance.loginRedirect(loginRequestWithState);
     } finally {
       setIsLoading(false);
     }

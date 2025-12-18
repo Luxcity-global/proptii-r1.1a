@@ -262,7 +262,7 @@ export const SearchInput = ({
                   <img
                     src="/images/OTM-logo_final_full-col.png"
                     alt="On the Market"
-                    className="h-7 w-auto object-contain"
+                    className="h-5 w-auto object-contain"
                   />
                 </button>
               </div>
