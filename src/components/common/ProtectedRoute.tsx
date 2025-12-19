@@ -16,6 +16,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Show loading state while checking authentication
   if (isLoading) {
+    console.log('🔒 ProtectedRoute: Auth is loading for path:', location.pathname);
     return (
       <div style={{ 
         display: 'flex', 
@@ -32,29 +33,26 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
+  // Log authentication state for debugging
+  console.log('🔒 ProtectedRoute check:', { 
+    path: location.pathname, 
+    isAuthenticated, 
+    isLoading,
+    hasUser: !!user 
+  });
+
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     // Store intended destination in sessionStorage as backup (include full path with search params)
     const fullPath = location.pathname + location.search;
-    sessionStorage.setItem('redirectAfterLogin', fullPath);
     
-    // Build login path with redirect parameter
-    // Always use ?redirect= (not &redirect=) since we're going to /login
-    const loginPath = `/login?redirect=${encodeURIComponent(fullPath)}`;
+    // Check if we're already trying to redirect to prevent loops
+    const redirectInProgress = sessionStorage.getItem('redirect_in_progress');
+    const lastRedirectPath = sessionStorage.getItem('last_redirect_path');
     
-    // Use window.location for more reliable redirect (especially for email links)
-    // This ensures the redirect happens even if React Router hasn't fully initialized
-    // Only redirect if we're not already on the login page
-    if (window.location.pathname !== '/login') {
-      console.log('🔒 ProtectedRoute: User not authenticated, redirecting to login');
-      console.log('🔒 Intended path:', fullPath);
-      console.log('🔒 Login path:', loginPath);
-      
-      // Use setTimeout to ensure this happens after render
-      setTimeout(() => {
-        window.location.href = loginPath;
-      }, 0);
-      
+    // If we're already redirecting to the same path, don't do it again (loop prevention)
+    if (redirectInProgress === 'true' && lastRedirectPath === fullPath) {
+      console.log('🔒 ProtectedRoute: Redirect already in progress, skipping to prevent loop');
       return (
         <div style={{ 
           display: 'flex', 
@@ -65,14 +63,30 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         }}>
           <div style={{ textAlign: 'center' }}>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p style={{ color: '#666' }}>Redirecting to login...</p>
+            <p style={{ color: '#666' }}>Authenticating...</p>
           </div>
         </div>
       );
     }
     
+    sessionStorage.setItem('redirectAfterLogin', fullPath);
+    sessionStorage.setItem('redirect_in_progress', 'true');
+    sessionStorage.setItem('last_redirect_path', fullPath);
+    
+    // Build login path with redirect parameter
+    const loginPath = `/login?redirect=${encodeURIComponent(fullPath)}`;
+    
+    console.log('🔒 ProtectedRoute: User not authenticated, redirecting to login');
+    console.log('🔒 Intended path:', fullPath);
+    console.log('🔒 Login path:', loginPath);
+    
+    // Use React Router's Navigate for cleaner state management (no full page reload)
     return <Navigate to={loginPath} state={{ from: location }} replace />;
   }
+  
+  // Clear redirect flags if we get here (user is authenticated)
+  sessionStorage.removeItem('redirect_in_progress');
+  sessionStorage.removeItem('last_redirect_path');
 
   // Check role-based access if roles are specified
   if (requiredRoles.length > 0 && user) {

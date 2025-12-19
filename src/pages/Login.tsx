@@ -43,9 +43,11 @@ export const LoginPage: React.FC = () => {
     if (isAuthenticated && !hasRedirectedRef.current) {
       hasRedirectedRef.current = true;
       
-      // Clear stored redirect path and auto-login flag
+      // Clear all redirect-related flags
       sessionStorage.removeItem('redirectAfterLogin');
       sessionStorage.removeItem('autoLoginAttempted');
+      sessionStorage.removeItem('redirect_in_progress');
+      sessionStorage.removeItem('last_redirect_path');
       
       console.log('✅ Already authenticated, redirecting to:', from);
       
