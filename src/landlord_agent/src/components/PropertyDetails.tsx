@@ -33,12 +33,21 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Separator } from './ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
+import { Switch } from './ui/switch';
+import { Label } from './ui/label';
+import { Input } from './ui/input';
+import { ShortletCalendar } from './ShortletCalendar';
+import { ProvisioningChecklist } from './ProvisioningChecklist';
+import { PricingRules } from './PricingRules';
+import { AddGuest } from './AddGuest';
+import { Guest } from '../App';
 
 interface PropertyDetailsProps {
   property: Property | null;
   tenants?: Tenant[];
   onBack: () => void;
   onEdit: (property: Property) => void;
+  onEditPropertyDetails?: (property: Property) => void;
   onManageDocuments: () => void;
   onManagePhotos: () => void;
   onViewInsights: () => void;
@@ -55,6 +64,7 @@ export function PropertyDetails({
   tenants = [],
   onBack,
   onEdit,
+  onEditPropertyDetails,
   onManageDocuments,
   onManagePhotos,
   onViewInsights,
@@ -68,6 +78,19 @@ export function PropertyDetails({
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [showChangeTenantDialog, setShowChangeTenantDialog] = useState(false);
   const [selectedNewTenantId, setSelectedNewTenantId] = useState<string>('');
+  const isForSale = !!(property as any)?.isForSale;
+  const [saleToggleChecked, setSaleToggleChecked] = useState(isForSale);
+  const [showSaleOnDialog, setShowSaleOnDialog] = useState(false);
+  const [showAddGuest, setShowAddGuest] = useState(false);
+  const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
+  
+  // Property mode (long-term vs shortlet)
+  const propertyMode = property?.propertyMode || 'long-term';
+  const isShortlet = propertyMode === 'shortlet';
+
+  React.useEffect(() => {
+    setSaleToggleChecked(isForSale);
+  }, [isForSale, property?.id]);
 
   // Filter tenants to only show those without a property assigned or with different property
   const availableTenants = useMemo(() => {
@@ -197,6 +220,18 @@ export function PropertyDetails({
     updateProperty(property.id, { status: 'under-renovation' });
   };
 
+  const getTenureLabel = (value?: string) => {
+    const labels: Record<string, string> = {
+      'freehold': 'Freehold',
+      'leasehold': 'Leasehold',
+      'share-of-freehold': 'Share of Freehold',
+      'commonhold': 'Commonhold',
+      'other': 'Other'
+    };
+    if (!value) return 'Not provided';
+    return labels[value] || value;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -210,8 +245,8 @@ export function PropertyDetails({
               <div>
                 <h1 className="mb-1">{property.address}</h1>
                 <div className="flex items-center space-x-3">
-                  <Badge className={`${getStatusColor(property.status)} text-white border-0`}>
-                    {getStatusText(property.status)}
+                  <Badge className={`${isForSale ? 'bg-blue-600' : getStatusColor(property.status)} text-white border-0`}>
+                    {isForSale ? 'For Sale' : getStatusText(property.status)}
                   </Badge>
                   <span className="text-muted-foreground">
                     {property.type} • {property.bedrooms} bed{property.bedrooms !== 1 ? 's' : ''}
@@ -304,6 +339,9 @@ export function PropertyDetails({
             <Tabs defaultValue="details" className="space-y-4">
               <TabsList>
                 <TabsTrigger value="details">Details</TabsTrigger>
+                {isShortlet && <TabsTrigger value="calendar">Calendar</TabsTrigger>}
+                {isShortlet && <TabsTrigger value="provisioning">Provisioning</TabsTrigger>}
+                {isShortlet && <TabsTrigger value="pricing">Pricing Rules</TabsTrigger>}
                 <TabsTrigger value="documents">
                   Documents
                   {property.documents.some(d => d.status === 'expiring-soon' || d.status === 'expired') && (
@@ -497,6 +535,34 @@ export function PropertyDetails({
                   </div>
                 </Card>
               </TabsContent>
+
+              {/* Shortlet-specific tabs */}
+              {isShortlet && (
+                <>
+                  <TabsContent value="calendar">
+                    <ShortletCalendar
+                      calendarDates={property.calendarDates || []}
+                      onDatesChange={(dates) => updateProperty(property.id, { calendarDates: dates })}
+                      basePrice={property.nightlyRate}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="provisioning">
+                    <ProvisioningChecklist
+                      tasks={property.provisioningChecklist || []}
+                      onTasksChange={(tasks) => updateProperty(property.id, { provisioningChecklist: tasks })}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="pricing">
+                    <PricingRules
+                      rules={property.pricingRules || []}
+                      onRulesChange={(rules) => updateProperty(property.id, { pricingRules: rules })}
+                      basePrice={property.nightlyRate || 0}
+                    />
+                  </TabsContent>
+                </>
+              )}
             </Tabs>
           </div>
 
@@ -538,11 +604,297 @@ export function PropertyDetails({
                   <BarChart3 className="w-4 h-4 mr-2" />
                   View Insights
                 </Button>
+
+                <div className="pt-3 border-t space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm text-muted-foreground">Mark for sale</Label>
+                    <Switch
+                      checked={saleToggleChecked}
+                      onCheckedChange={(checked) => {
+                        setSaleToggleChecked(checked);
+                        updateProperty(property.id, { isForSale: checked });
+                        if (checked && !isForSale) {
+                          setShowSaleOnDialog(true);
+                        }
+                      }}
+                      aria-label="Mark property for sale"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm text-muted-foreground">Property Mode</Label>
+                    <Select
+                      value={propertyMode}
+                      onValueChange={(value: 'long-term' | 'shortlet') => {
+                        updateProperty(property.id, { propertyMode: value });
+                      }}
+                    >
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="long-term">Long-term</SelectItem>
+                        <SelectItem value="shortlet">Shortlet</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
             </Card>
 
-            {/* Current Tenant */}
-            {property.status === 'occupied' && property.tenant && (
+            {/* Shortlet Settings */}
+            {isShortlet && (
+              <Card className="p-6">
+                <h3 className="mb-4">Shortlet Settings</h3>
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Nightly Rate</Label>
+                    <div className="relative mt-1">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2">£</span>
+                      <Input
+                        type="number"
+                        value={property.nightlyRate || ''}
+                        onChange={(e) => updateProperty(property.id, { nightlyRate: parseFloat(e.target.value) || undefined })}
+                        className="pl-8"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm text-muted-foreground">Min Stay (nights)</Label>
+                      <Input
+                        type="number"
+                        value={property.minStay || ''}
+                        onChange={(e) => updateProperty(property.id, { minStay: parseInt(e.target.value) || undefined })}
+                        className="mt-1"
+                        placeholder="1"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm text-muted-foreground">Max Stay (nights)</Label>
+                      <Input
+                        type="number"
+                        value={property.maxStay || ''}
+                        onChange={(e) => updateProperty(property.id, { maxStay: parseInt(e.target.value) || undefined })}
+                        className="mt-1"
+                        placeholder="365"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* Current Guest (Shortlet) */}
+            {isShortlet && !isForSale && (
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold">Current Guest</h3>
+                  {property.currentGuest ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditingGuest(property.currentGuest!);
+                        setShowAddGuest(true);
+                      }}
+                    >
+                      <Edit3 className="w-4 h-4 mr-2" />
+                      Edit
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditingGuest(null);
+                        setShowAddGuest(true);
+                      }}
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Add Guest
+                    </Button>
+                  )}
+                </div>
+                
+                {property.currentGuest ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback>
+                          {property.currentGuest.name?.split(' ').map(n => n?.[0]).join('') || 'G'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{property.currentGuest.name}</p>
+                        {property.currentGuest.numberOfGuests && (
+                          <p className="text-sm text-muted-foreground">
+                            {property.currentGuest.numberOfGuests} guest{property.currentGuest.numberOfGuests !== 1 ? 's' : ''}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {property.currentGuest.email && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Mail className="w-4 h-4 mr-2" />
+                          <span className="truncate">{property.currentGuest.email}</span>
+                        </div>
+                      )}
+                      {property.currentGuest.phone && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Phone className="w-4 h-4 mr-2" />
+                          {property.currentGuest.phone}
+                        </div>
+                      )}
+                      {property.currentGuest.checkIn && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Check-in: {new Date(property.currentGuest.checkIn).toLocaleDateString('en-GB')}
+                        </div>
+                      )}
+                      {property.currentGuest.checkOut && (
+                        <div className="flex items-center text-sm text-muted-foreground">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Check-out: {new Date(property.currentGuest.checkOut).toLocaleDateString('en-GB')}
+                        </div>
+                      )}
+                      {property.currentGuest.emergencyContact && (
+                        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                          <p className="text-xs font-medium text-gray-700 mb-1">Emergency Contact</p>
+                          <p className="text-sm">{property.currentGuest.emergencyContact.name}</p>
+                          <p className="text-xs text-muted-foreground">{property.currentGuest.emergencyContact.phone}</p>
+                          {property.currentGuest.emergencyContact.relationship && (
+                            <p className="text-xs text-muted-foreground">{property.currentGuest.emergencyContact.relationship}</p>
+                          )}
+                        </div>
+                      )}
+                      {property.currentGuest.notes && (
+                        <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
+                          <p className="text-gray-700">{property.currentGuest.notes}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                        onClick={() => {
+                          if (window.confirm('Remove current guest?')) {
+                            updateProperty(property.id, { currentGuest: undefined });
+                          }
+                        }}
+                      >
+                        <UserX className="w-4 h-4 mr-2" />
+                        Remove Guest
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
+                      <User className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground mb-2">No guest assigned</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Add guest information for this stay
+                    </p>
+                    <Button onClick={() => {
+                      setEditingGuest(null);
+                      setShowAddGuest(true);
+                    }}>
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Add Guest
+                    </Button>
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {/* Add/Edit Guest Dialog */}
+            {property && (
+              <AddGuest
+                isOpen={showAddGuest}
+                propertyAddress={property.address}
+                initialGuest={editingGuest}
+                onSave={(guest) => {
+                  updateProperty(property.id, { currentGuest: guest });
+                  setShowAddGuest(false);
+                  setEditingGuest(null);
+                }}
+                onCancel={() => {
+                  setShowAddGuest(false);
+                  setEditingGuest(null);
+                }}
+              />
+            )}
+
+            <Dialog open={showSaleOnDialog} onOpenChange={setShowSaleOnDialog}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Marking this property for sale</DialogTitle>
+                  <DialogDescription>
+                    To list this property for sale, you’ll need to update the property details (tenure, ground rent, council tax band, service charge) and upload the required documents (EPC).
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button variant="outline" onClick={() => setShowSaleOnDialog(false)}>
+                    Close
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowSaleOnDialog(false);
+                      onEditPropertyDetails?.(property);
+                    }}
+                    style={{ backgroundColor: '#DC5F12' }}
+                  >
+                    Update property details
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Sale Details (replaces tenant section when For Sale) */}
+            {isForSale && (
+              <Card className="p-6">
+                <h3 className="mb-4">Sale Details</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tenure</span>
+                    <span>{getTenureLabel((property as any).tenureType)}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Council tax band</span>
+                    <span>{((property as any).councilTaxBand as string) || 'Not provided'}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Ground rent (annual)</span>
+                    <span>
+                      {typeof (property as any).annualGroundRent === 'number'
+                        ? `£${(property as any).annualGroundRent.toLocaleString()}`
+                        : 'Not provided'}
+                    </span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Service charge (annual)</span>
+                    <span>
+                      {typeof (property as any).annualServiceCharge === 'number'
+                        ? `£${(property as any).annualServiceCharge.toLocaleString()}`
+                        : 'Not provided'}
+                    </span>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* Current Tenant (Long-term only) */}
+            {!isForSale && !isShortlet && property.status === 'occupied' && property.tenant && (
               <Card className="p-6">
                 <h3 className="mb-4">Current Tenant</h3>
                 <div className="space-y-4">
@@ -657,7 +1009,7 @@ export function PropertyDetails({
               </Card>
             )}
 
-            {property.status === 'vacant' && (
+            {!isForSale && !isShortlet && property.status === 'vacant' && (
               <Card className="p-6">
                 <h3 className="mb-4">Property Status</h3>
                 <div className="text-center py-6">
@@ -698,7 +1050,7 @@ export function PropertyDetails({
               </Card>
             )}
 
-            {property.status === 'under-renovation' && (
+            {!isForSale && !isShortlet && property.status === 'under-renovation' && (
               <Card className="p-6">
                 <h3 className="mb-4">Property Status</h3>
                 <div className="text-center py-6">

@@ -2,10 +2,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Switch } from './ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ArrowLeft, MapPin, PoundSterling, Bed, Bath, Home, Upload, FileText, X, Navigation, Map } from 'lucide-react';
 import { ProgressTracker } from './ProgressTracker';
 
 interface PropertyDetailsSelectionProps {
+  propertyType?: string | null;
   propertyDetails?: {
     address: string;
     monthlyRent: string;
@@ -13,6 +17,15 @@ interface PropertyDetailsSelectionProps {
     bathrooms: string;
     squareFootage: string;
     uploadedDocuments: File[];
+    isForSale: boolean;
+    tenureType: string;
+    annualGroundRent: string;
+    councilTaxBand: string;
+    annualServiceCharge: string;
+    // Shortlet fields
+    nightlyRate?: string;
+    minStay?: string;
+    maxStay?: string;
   };
   onPropertyDetailsChange?: (updates: Partial<{
     address: string;
@@ -21,21 +34,39 @@ interface PropertyDetailsSelectionProps {
     bathrooms: string;
     squareFootage: string;
     uploadedDocuments: File[];
+    isForSale: boolean;
+    tenureType: string;
+    annualGroundRent: string;
+    councilTaxBand: string;
+    annualServiceCharge: string;
+    nightlyRate?: string;
+    minStay?: string;
+    maxStay?: string;
   }>) => void;
   onNext: () => void;
   onBack: () => void;
   onHome: () => void;
   onPropertySetup: () => void;
+  onSaveAndExit: () => void;
 }
 
-export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails, onPropertyDetailsChange, onNext, onBack, onHome, onPropertySetup }: PropertyDetailsSelectionProps) {
+export function PropertyDetailsSelection({ propertyType, propertyDetails: propPropertyDetails, onPropertyDetailsChange, onNext, onBack, onHome, onPropertySetup, onSaveAndExit }: PropertyDetailsSelectionProps) {
+  const isShortlet = propertyType === 'shortlet';
   const [propertyDetails, setPropertyDetails] = useState(propPropertyDetails || {
     address: '',
     monthlyRent: '',
     bedrooms: '',
     bathrooms: '',
     squareFootage: '',
-    uploadedDocuments: []
+    uploadedDocuments: [],
+    isForSale: false,
+    tenureType: '',
+    annualGroundRent: '',
+    councilTaxBand: '',
+    annualServiceCharge: '',
+    nightlyRate: '',
+    minStay: '',
+    maxStay: ''
   });
   
   // Update local state when prop changes
@@ -45,7 +76,6 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
     }
   }, [propPropertyDetails]);
   
-  const [uploadedDocuments, setUploadedDocuments] = useState<File[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [useLocation, setUseLocation] = useState(false);
   const [mapError, setMapError] = useState('');
@@ -85,6 +115,36 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
     }
   };
 
+  const handleToggleForSale = (isForSale: boolean) => {
+    const newPropertyDetails = {
+      ...propertyDetails,
+      isForSale,
+      ...(isForSale
+        ? {}
+        : {
+            tenureType: '',
+            annualGroundRent: '',
+            councilTaxBand: '',
+            annualServiceCharge: '',
+          }),
+    };
+    setPropertyDetails(newPropertyDetails);
+
+    if (onPropertyDetailsChange) {
+      onPropertyDetailsChange({
+        isForSale,
+        ...(!isForSale
+          ? {
+              tenureType: '',
+              annualGroundRent: '',
+              councilTaxBand: '',
+              annualServiceCharge: '',
+            }
+          : {}),
+      });
+    }
+  };
+
   const geocodeAddress = (address: string) => {
     if (!geocoderRef.current) return;
 
@@ -109,10 +169,8 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
     const files = event.target.files;
     if (files) {
       const newDocuments = Array.from(files);
-      setUploadedDocuments(prev => [...prev, ...newDocuments]);
-      
-      // Update property details with new documents
-      const updatedDocuments = [...uploadedDocuments, ...newDocuments];
+
+      const updatedDocuments = [...propertyDetails.uploadedDocuments, ...newDocuments];
       const newPropertyDetails = { ...propertyDetails, uploadedDocuments: updatedDocuments };
       setPropertyDetails(newPropertyDetails);
       
@@ -124,8 +182,7 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
   };
 
   const removeDocument = (index: number) => {
-    const updatedDocuments = uploadedDocuments.filter((_, i) => i !== index);
-    setUploadedDocuments(updatedDocuments);
+    const updatedDocuments = propertyDetails.uploadedDocuments.filter((_, i) => i !== index);
     
     // Update property details with removed documents
     const newPropertyDetails = { ...propertyDetails, uploadedDocuments: updatedDocuments };
@@ -343,7 +400,18 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
     };
   }, []);
 
-  const isFormValid = propertyDetails.address && propertyDetails.monthlyRent && propertyDetails.bedrooms && propertyDetails.bathrooms;
+  const isSaleDocsValid = !propertyDetails.isForSale || propertyDetails.uploadedDocuments.length > 0;
+  const isFormValid = isShortlet
+    ? propertyDetails.address &&
+      propertyDetails.nightlyRate &&
+      propertyDetails.bedrooms &&
+      propertyDetails.bathrooms &&
+      isSaleDocsValid
+    : propertyDetails.address &&
+      propertyDetails.monthlyRent &&
+      propertyDetails.bedrooms &&
+      propertyDetails.bathrooms &&
+      isSaleDocsValid;
 
   return (
     <div className="min-h-screen flex flex-col px-4" style={{ backgroundColor: '#F7F7F7', fontFamily: 'Archivo, sans-serif' }}>
@@ -364,7 +432,7 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
               <Button variant="outline" className="rounded-full px-4 py-2">
                 Questions?
               </Button>
-              <Button variant="outline" className="rounded-full px-4 py-2">
+              <Button variant="outline" className="rounded-full px-4 py-2" onClick={onSaveAndExit}>
                 Save & exit
               </Button>
               <Button 
@@ -401,6 +469,30 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
           }}>
             <h2 className="text-2xl font-bold mb-2" style={{ color: '#374957' }}>Property Details</h2>
             <p style={{ color: '#374957' }}>Tell us about your property's key details</p>
+          </div>
+
+          {/* For Sale Toggle (beneath header) */}
+          <div className="mb-8 px-4">
+            <div className="bg-white rounded-xl p-4 flex items-center justify-between border border-gray-200">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold" style={{ color: '#374957' }}>
+                  Is this property for sale?
+                </p>
+                <p className="text-xs text-gray-600">
+                  If yes, you'll need to upload an EPC certificate and provide sale details.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Label className="text-sm text-gray-700">
+                  {propertyDetails.isForSale ? 'Yes' : 'No'}
+                </Label>
+                <Switch
+                  checked={propertyDetails.isForSale}
+                  onCheckedChange={handleToggleForSale}
+                  aria-label="Property is for sale"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Main Content */}
@@ -479,23 +571,75 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
                 )}
               </div>
 
-              {/* Monthly Rent */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Monthly Rent
-                </label>
-                <div className="relative">
-                  <PoundSterling className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <Input
-                    type="number"
-                    placeholder="0"
-                    value={propertyDetails.monthlyRent}
-                    onChange={(e) => handleInputChange('monthlyRent', e.target.value)}
-                    className="pl-10 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    style={{ '--tw-ring-color': '#DDE4FF' } as React.CSSProperties & { '--tw-ring-color': string }}
-                  />
+              {/* Monthly Rent (Long-term) or Nightly Rate (Shortlet) */}
+              {!isShortlet ? (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Monthly Rent
+                  </label>
+                  <div className="relative">
+                    <PoundSterling className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      value={propertyDetails.monthlyRent}
+                      onChange={(e) => handleInputChange('monthlyRent', e.target.value)}
+                      className="pl-10 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      style={{ '--tw-ring-color': '#DDE4FF' } as React.CSSProperties & { '--tw-ring-color': string }}
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      Nightly Rate
+                    </label>
+                    <div className="relative">
+                      <PoundSterling className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        value={propertyDetails.nightlyRate || ''}
+                        onChange={(e) => handleInputChange('nightlyRate', e.target.value)}
+                        className="pl-10 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                        style={{ '--tw-ring-color': '#DDE4FF' } as React.CSSProperties & { '--tw-ring-color': string }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Base price per night</p>
+                  </div>
+                  
+                  {/* Minimum and Maximum Stay */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-900 mb-2">
+                        Minimum Stay (nights)
+                      </label>
+                      <Input
+                        type="number"
+                        placeholder="1"
+                        value={propertyDetails.minStay || ''}
+                        onChange={(e) => handleInputChange('minStay', e.target.value)}
+                        className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                        style={{ '--tw-ring-color': '#DDE4FF' } as React.CSSProperties & { '--tw-ring-color': string }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-900 mb-2">
+                        Maximum Stay (nights)
+                      </label>
+                      <Input
+                        type="number"
+                        placeholder="365"
+                        value={propertyDetails.maxStay || ''}
+                        onChange={(e) => handleInputChange('maxStay', e.target.value)}
+                        className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                        style={{ '--tw-ring-color': '#DDE4FF' } as React.CSSProperties & { '--tw-ring-color': string }}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Bedrooms and Bathrooms Row */}
               <div className="grid grid-cols-2 gap-4">
@@ -555,19 +699,23 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
               {/* Property Documents */}
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Property Documents (Optional)
+                  Property Documents {propertyDetails.isForSale ? '(EPC required)' : '(Optional)'}
                 </label>
                 <div className="space-y-4">
                   {/* Upload Area */}
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
+                  <div
+                    className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                      !isSaleDocsValid ? 'border-red-400 bg-red-50/40' : 'border-gray-300 hover:border-blue-400'
+                    }`}
+                  >
                     <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                     <p className="text-sm text-gray-600 mb-2">
                       Upload property documents (lease agreements, certificates, etc.)
+                      {propertyDetails.isForSale ? ' Please include the EPC certificate.' : ''}
                     </p>
                     <input
                       type="file"
                       multiple
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                       onChange={handleDocumentUpload}
                       className="hidden"
                       id="document-upload"
@@ -581,11 +729,17 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
                     </label>
                   </div>
 
+                  {!isSaleDocsValid && (
+                    <p className="text-sm text-red-600">
+                      Please upload at least 1 document (EPC certificate required for sale properties).
+                    </p>
+                  )}
+
                   {/* Uploaded Documents List */}
-                  {uploadedDocuments.length > 0 && (
+                  {propertyDetails.uploadedDocuments.length > 0 && (
                     <div className="space-y-2">
                       <h4 className="text-sm font-medium text-gray-900">Uploaded Documents:</h4>
-                      {uploadedDocuments.map((doc, index) => (
+                      {propertyDetails.uploadedDocuments.map((doc, index) => (
                         <div key={index} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
                           <div className="flex items-center space-x-3">
                             <FileText className="w-5 h-5 text-blue-600" />
@@ -608,6 +762,89 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
                   )}
                 </div>
               </div>
+
+              {/* Sale Details (conditional) */}
+              {propertyDetails.isForSale && (
+                <div className="space-y-4 pt-2">
+                  <div className="pt-2">
+                    <h3 className="text-sm font-semibold text-gray-900">Sale Details</h3>
+                    <p className="text-xs text-gray-600">These details help us prepare your property for sale.</p>
+                  </div>
+
+                  {/* Tenure Type */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      Tenure Type
+                    </label>
+                    <Select
+                      value={propertyDetails.tenureType}
+                      onValueChange={(value) => handleInputChange('tenureType', value)}
+                    >
+                      <SelectTrigger className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        <SelectValue placeholder="Select tenure type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="freehold">Freehold</SelectItem>
+                        <SelectItem value="leasehold">Leasehold</SelectItem>
+                        <SelectItem value="share-of-freehold">Share of Freehold</SelectItem>
+                        <SelectItem value="commonhold">Commonhold</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Ground Rent / Service Charge */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-900 mb-2">
+                        Ground Rent (Annual)
+                      </label>
+                      <div className="relative">
+                        <PoundSterling className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={propertyDetails.annualGroundRent}
+                          onChange={(e) => handleInputChange('annualGroundRent', e.target.value)}
+                          className="pl-10 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                          style={{ '--tw-ring-color': '#DDE4FF' } as React.CSSProperties & { '--tw-ring-color': string }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-900 mb-2">
+                        Service Charge (Annual)
+                      </label>
+                      <div className="relative">
+                        <PoundSterling className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={propertyDetails.annualServiceCharge}
+                          onChange={(e) => handleInputChange('annualServiceCharge', e.target.value)}
+                          className="pl-10 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                          style={{ '--tw-ring-color': '#DDE4FF' } as React.CSSProperties & { '--tw-ring-color': string }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Council Tax Band */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      Council Tax Band
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="e.g., D"
+                      value={propertyDetails.councilTaxBand}
+                      onChange={(e) => handleInputChange('councilTaxBand', e.target.value)}
+                      className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      style={{ '--tw-ring-color': '#DDE4FF' } as React.CSSProperties & { '--tw-ring-color': string }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

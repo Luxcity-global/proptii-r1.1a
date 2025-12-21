@@ -80,9 +80,79 @@ export interface Property {
   notes: string;
   photos: PropertyPhoto[];
   documents: PropertyDocument[];
+  // Sale-related (optional)
+  isForSale?: boolean;
+  tenureType?: string;
+  annualGroundRent?: number;
+  councilTaxBand?: string;
+  annualServiceCharge?: number;
+  // Shortlet-related (optional)
+  propertyMode?: 'long-term' | 'shortlet'; // Property rental mode
+  nightlyRate?: number; // Nightly rate for shortlets
+  minStay?: number; // Minimum stay in nights
+  maxStay?: number; // Maximum stay in nights
+  currentGuest?: Guest; // Current guest information
+  calendarDates?: CalendarDate[]; // Availability calendar
+  pricingRules?: PricingRule[]; // Pricing rules for shortlets
+  provisioningChecklist?: ProvisioningTask[]; // Property readiness checklist
   createdAt: Date;
   tenant?: Tenant;
   tenantId?: string;
+}
+
+export interface CalendarDate {
+  date: string; // ISO date string (YYYY-MM-DD)
+  status: 'available' | 'booked' | 'blocked' | 'maintenance';
+  price?: number; // Override price for this date
+  notes?: string;
+}
+
+export interface PricingRule {
+  id: string;
+  name: string;
+  type: 'seasonal' | 'weekend' | 'weekday' | 'length-of-stay' | 'last-minute' | 'special-date' | 'custom';
+  priority: number; // Higher priority rules override lower ones
+  enabled: boolean;
+  // Date range rules
+  startDate?: string; // ISO date string
+  endDate?: string; // ISO date string
+  // Day of week rules (0 = Sunday, 6 = Saturday)
+  daysOfWeek?: number[];
+  // Length of stay rules
+  minNights?: number;
+  maxNights?: number;
+  // Pricing adjustment
+  adjustmentType: 'fixed' | 'percentage' | 'multiplier';
+  adjustmentValue: number; // Fixed amount, percentage, or multiplier
+  // Special date
+  specificDate?: string; // ISO date string
+}
+
+export interface ProvisioningTask {
+  id: string;
+  title: string;
+  description?: string;
+  category: 'cleaning' | 'supplies' | 'maintenance' | 'inspection' | 'documentation' | 'other';
+  completed: boolean;
+  completedAt?: Date;
+  notes?: string;
+  priority?: 'low' | 'medium' | 'high';
+}
+
+export interface Guest {
+  id?: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  checkIn?: Date;
+  checkOut?: Date;
+  numberOfGuests?: number;
+  notes?: string;
+  emergencyContact?: {
+    name: string;
+    phone: string;
+    relationship?: string;
+  };
 }
 
 export interface PropertyPhoto {
@@ -276,6 +346,15 @@ interface PropertySetupData {
     bathrooms: string;
     squareFootage: string;
     uploadedDocuments: File[];
+    isForSale: boolean;
+    tenureType: string;
+    annualGroundRent: string;
+    councilTaxBand: string;
+    annualServiceCharge: string;
+    // Shortlet fields
+    nightlyRate?: string;
+    minStay?: string;
+    maxStay?: string;
   };
   amenities: string[];
   images: string[]; // Blob URLs for preview
@@ -354,7 +433,15 @@ export default function App() {
       bedrooms: '',
       bathrooms: '',
       squareFootage: '',
-      uploadedDocuments: []
+      uploadedDocuments: [],
+      isForSale: false,
+      tenureType: '',
+      annualGroundRent: '',
+      councilTaxBand: '',
+      annualServiceCharge: '',
+      nightlyRate: '',
+      minStay: '',
+      maxStay: ''
     },
     amenities: [],
     images: [], // Blob URLs for preview
@@ -660,6 +747,14 @@ export default function App() {
     const bathrooms = parseInt(propertyDetails.bathrooms);
     const squareFootage = parseInt(propertyDetails.squareFootage);
     const rent = parseInt(propertyDetails.monthlyRent) || 0;
+    const annualGroundRent = parseInt(propertyDetails.annualGroundRent);
+    const annualServiceCharge = parseInt(propertyDetails.annualServiceCharge);
+    
+    // Shortlet fields
+    const isShortlet = propertyType === 'shortlet';
+    const nightlyRate = propertyDetails.nightlyRate ? parseInt(propertyDetails.nightlyRate) : undefined;
+    const minStay = propertyDetails.minStay ? parseInt(propertyDetails.minStay) : undefined;
+    const maxStay = propertyDetails.maxStay ? parseInt(propertyDetails.maxStay) : undefined;
 
     const propertyData: any = {
       id: 'setup-property',
@@ -672,8 +767,21 @@ export default function App() {
       notes: additionalNotes,
       photos: photos,
       documents: documents,
+      isForSale: propertyDetails.isForSale,
+      propertyMode: isShortlet ? 'shortlet' : 'long-term',
       createdAt: new Date()
     };
+    
+    // Add shortlet fields if it's a shortlet
+    if (isShortlet) {
+      if (nightlyRate !== undefined) propertyData.nightlyRate = nightlyRate;
+      if (minStay !== undefined) propertyData.minStay = minStay;
+      if (maxStay !== undefined) propertyData.maxStay = maxStay;
+      // Initialize empty arrays for shortlet features
+      propertyData.calendarDates = [];
+      propertyData.pricingRules = [];
+      propertyData.provisioningChecklist = [];
+    }
 
     // Only include optional fields if they have valid values
     if (!isNaN(bathrooms)) {
@@ -683,7 +791,64 @@ export default function App() {
       propertyData.squareFootage = squareFootage;
     }
 
+    // Sale-related optional fields
+    if (propertyDetails.isForSale) {
+      if (propertyDetails.tenureType?.trim()) {
+        propertyData.tenureType = propertyDetails.tenureType.trim();
+      }
+      if (propertyDetails.councilTaxBand?.trim()) {
+        propertyData.councilTaxBand = propertyDetails.councilTaxBand.trim();
+      }
+      if (!isNaN(annualGroundRent)) {
+        propertyData.annualGroundRent = annualGroundRent;
+      }
+      if (!isNaN(annualServiceCharge)) {
+        propertyData.annualServiceCharge = annualServiceCharge;
+      }
+    }
+
     return propertyData;
+  };
+
+  const handleSaveAndExitPropertySetup = async () => {
+    // When editing an existing property, persist changes immediately then return to that property.
+    if (isEditing && editingPropertyId) {
+      const updatedFromSetup = createPropertyFromSetupData();
+
+      await updateProperty(editingPropertyId, {
+        address: updatedFromSetup.address,
+        type: updatedFromSetup.type,
+        bedrooms: updatedFromSetup.bedrooms,
+        bathrooms: (updatedFromSetup as any).bathrooms,
+        squareFootage: (updatedFromSetup as any).squareFootage,
+        rent: updatedFromSetup.rent,
+        amenities: updatedFromSetup.amenities,
+        notes: updatedFromSetup.notes,
+        isForSale: (updatedFromSetup as any).isForSale,
+        tenureType: (updatedFromSetup as any).tenureType,
+        councilTaxBand: (updatedFromSetup as any).councilTaxBand,
+        annualGroundRent: (updatedFromSetup as any).annualGroundRent,
+        annualServiceCharge: (updatedFromSetup as any).annualServiceCharge,
+      });
+
+      try {
+        const refreshed = await propertyService.getProperty(editingPropertyId);
+        if (refreshed) {
+          setSelectedProperty(refreshed);
+        }
+      } catch (err) {
+        console.warn('Failed to refresh property after Save & exit:', err);
+      }
+
+      setIsEditing(false);
+      setEditingPropertyId(null);
+      navigateToScreen('property-details');
+      return;
+    }
+
+    // For the add-property flow, just exit back to dashboard.
+    navigateToScreen('main-app');
+    setNavigationScreen('dashboard');
   };
 
   // Initialize with mock data for better demonstration
@@ -2475,6 +2640,7 @@ export default function App() {
             onSection2={() => navigateToScreen('property-details-selection')}
             onSection3={() => navigateToScreen('amenities-selection')}
             onSection4={() => navigateToScreen('images-notes-selection')}
+            onSaveAndExit={handleSaveAndExitPropertySetup}
           />
         );
       
@@ -2487,18 +2653,21 @@ export default function App() {
             onBack={() => navigateToScreen('property-setup-step1')}
             onHome={() => navigateToScreen('main-app')}
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
+            onSaveAndExit={handleSaveAndExitPropertySetup}
           />
         );
       
       case 'property-details-selection':
         return (
           <PropertyDetailsSelection
+            propertyType={propertySetupData.propertyType}
             propertyDetails={propertySetupData.propertyDetails}
             onPropertyDetailsChange={updatePropertyDetails}
             onNext={() => navigateToScreen('amenities-selection')}
             onBack={() => navigateToScreen('property-type-selection')}
             onHome={() => navigateToScreen('main-app')}
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
+            onSaveAndExit={handleSaveAndExitPropertySetup}
           />
         );
       
@@ -2511,6 +2680,7 @@ export default function App() {
             onBack={() => navigateToScreen('property-details-selection')}
             onHome={() => navigateToScreen('main-app')}
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
+            onSaveAndExit={handleSaveAndExitPropertySetup}
           />
         );
       
@@ -2525,6 +2695,7 @@ export default function App() {
             onBack={() => navigateToScreen('amenities-selection')}
             onHome={() => navigateToScreen('main-app')}
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
+            onSaveAndExit={handleSaveAndExitPropertySetup}
           />
         );
       
@@ -2609,7 +2780,12 @@ export default function App() {
                   bedrooms: String(property.bedrooms ?? ''),
                   bathrooms: String((property as any).bathrooms ?? ''),
                   squareFootage: String((property as any).squareFootage ?? ''),
-                  uploadedDocuments: []
+                  uploadedDocuments: [],
+                  isForSale: !!(property as any).isForSale,
+                  tenureType: String((property as any).tenureType ?? ''),
+                  annualGroundRent: String((property as any).annualGroundRent ?? ''),
+                  councilTaxBand: String((property as any).councilTaxBand ?? ''),
+                  annualServiceCharge: String((property as any).annualServiceCharge ?? '')
                 },
                 amenities: property.amenities || [],
                 images: (property.photos || []).map(p => p.url),
@@ -2617,6 +2793,33 @@ export default function App() {
                 additionalNotes: property.notes || ''
               });
               navigateToScreen('property-setup-step1');
+            }}
+            onEditPropertyDetails={(property) => {
+              // Jump straight to Property Details step in the add-property flow (edit mode)
+              setSelectedProperty(property);
+              setIsEditing(true);
+              setEditingPropertyId(property.id);
+              setPropertySetupData({
+                propertyType: property.type || null,
+                propertyDetails: {
+                  address: property.address || '',
+                  monthlyRent: String(property.rent ?? ''),
+                  bedrooms: String(property.bedrooms ?? ''),
+                  bathrooms: String((property as any).bathrooms ?? ''),
+                  squareFootage: String((property as any).squareFootage ?? ''),
+                  uploadedDocuments: [],
+                  isForSale: true,
+                  tenureType: String((property as any).tenureType ?? ''),
+                  annualGroundRent: String((property as any).annualGroundRent ?? ''),
+                  councilTaxBand: String((property as any).councilTaxBand ?? ''),
+                  annualServiceCharge: String((property as any).annualServiceCharge ?? '')
+                },
+                amenities: property.amenities || [],
+                images: (property.photos || []).map(p => p.url),
+                imageFiles: [],
+                additionalNotes: property.notes || ''
+              });
+              navigateToScreen('property-details-selection');
             }}
             onManageDocuments={() => navigateToScreen('document-management')}
             onManagePhotos={() => navigateToScreen('photo-management')}
@@ -3036,6 +3239,11 @@ export default function App() {
                     rent: newProperty.rent,
                     amenities: newProperty.amenities,
                     notes: newProperty.notes,
+                    isForSale: (newProperty as any).isForSale,
+                    tenureType: (newProperty as any).tenureType,
+                    councilTaxBand: (newProperty as any).councilTaxBand,
+                    annualGroundRent: (newProperty as any).annualGroundRent,
+                    annualServiceCharge: (newProperty as any).annualServiceCharge,
                   });
                   // Optionally handle photos update here later
                   const updated = await propertyService.getProperty(editingPropertyId);
@@ -3044,7 +3252,7 @@ export default function App() {
                   }
                   setIsEditing(false);
                   setEditingPropertyId(null);
-                  navigateToScreen('property-details');
+                  return { success: true, propertyId: editingPropertyId };
                 } else {
                   console.log('Creating property with photos:', newProperty.photos.length);
                   console.log('Property photos data:', JSON.stringify(newProperty.photos, null, 2));
@@ -3058,16 +3266,47 @@ export default function App() {
                   
                   if (createdProperty) {
                     selectProperty(createdProperty);
-                    navigateToScreen('property-details');
+                    return { success: true, propertyId };
                   } else {
                     console.error('Failed to retrieve created property');
                     alert('Property created but failed to load. Please refresh the page.');
+                    return { success: false };
                   }
                 }
               } catch (error) {
                 console.error('Error publishing property:', error);
                 alert(`Failed to publish property: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                return { success: false };
               }
+            }}
+            onAfterPublishAddNewProperty={() => {
+              setIsEditing(false);
+              setEditingPropertyId(null);
+              setSelectedProperty(null);
+              setPropertySetupData({
+                propertyType: null,
+                propertyDetails: {
+                  address: '',
+                  monthlyRent: '',
+                  bedrooms: '',
+                  bathrooms: '',
+                  squareFootage: '',
+                  uploadedDocuments: [],
+                  isForSale: false,
+                  tenureType: '',
+                  annualGroundRent: '',
+                  councilTaxBand: '',
+                  annualServiceCharge: ''
+                },
+                amenities: [],
+                images: [],
+                imageFiles: [],
+                additionalNotes: ''
+              });
+              navigateToScreen('property-setup-step1');
+            }}
+            onAfterPublishViewProperty={() => {
+              navigateToScreen('property-details');
             }}
           />
         );

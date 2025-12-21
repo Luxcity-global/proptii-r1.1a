@@ -46,7 +46,8 @@ class PropertyService {
         return cleanPhoto;
       });
 
-      const propertyDoc = {
+      // Convert guest dates to Timestamps if present
+      const propertyDoc: any = {
         ...clean,
         userId: ownerUserId,
         photos: cleanedPhotos,
@@ -54,6 +55,11 @@ class PropertyService {
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       };
+      
+      // Convert guest object dates to Timestamps
+      if (propertyData.currentGuest) {
+        propertyDoc.currentGuest = this.convertGuestForFirestore(propertyData.currentGuest);
+      }
 
       console.log('✅ PropertyService: Creating property with userId:', ownerUserId);
       console.log('Property document to save:', {
@@ -151,6 +157,19 @@ class PropertyService {
   }
 
   /**
+   * Convert guest object for Firestore (convert Date to Timestamp)
+   */
+  private convertGuestForFirestore(guest: any): any {
+    if (!guest) return guest;
+    
+    return {
+      ...guest,
+      checkIn: guest.checkIn instanceof Date ? Timestamp.fromDate(guest.checkIn) : guest.checkIn,
+      checkOut: guest.checkOut instanceof Date ? Timestamp.fromDate(guest.checkOut) : guest.checkOut,
+    };
+  }
+
+  /**
    * Update an existing property
    */
   async updateProperty(
@@ -161,11 +180,19 @@ class PropertyService {
       const docRef = doc(this.propertiesCollection, propertyId);
       // Also remove any legacy 'id' field if present on the document
       const { deleteField } = await import('firebase/firestore');
-      await updateDoc(docRef, {
+      
+      // Convert guest dates to Timestamps if present
+      const firestoreUpdates: any = {
         id: (deleteField as any)(),
         ...updates,
         updatedAt: Timestamp.now(),
-      } as any);
+      };
+      
+      if (updates.currentGuest !== undefined) {
+        firestoreUpdates.currentGuest = this.convertGuestForFirestore(updates.currentGuest);
+      }
+      
+      await updateDoc(docRef, firestoreUpdates);
       console.log('Property updated successfully:', propertyId);
     } catch (error) {
       console.error('Error updating property:', error);
@@ -310,6 +337,21 @@ class PropertyService {
       notes: data.notes || '',
       photos: this.mapPhotos(data.photos || []),
       documents: this.mapDocuments(data.documents || []),
+      // Sale-related fields (optional)
+      isForSale: data.isForSale ?? false,
+      tenureType: data.tenureType,
+      councilTaxBand: data.councilTaxBand,
+      annualGroundRent: data.annualGroundRent,
+      annualServiceCharge: data.annualServiceCharge,
+      // Shortlet-related fields (optional)
+      propertyMode: data.propertyMode,
+      nightlyRate: data.nightlyRate,
+      minStay: data.minStay,
+      maxStay: data.maxStay,
+      currentGuest: this.mapGuest(data.currentGuest),
+      calendarDates: data.calendarDates || [],
+      pricingRules: data.pricingRules || [],
+      provisioningChecklist: this.mapProvisioningChecklist(data.provisioningChecklist || []),
       createdAt: data.createdAt?.toDate() || new Date(),
       tenantId: data.tenantId,
       userId: data.userId, // Preserve userId for verification
@@ -361,6 +403,32 @@ class PropertyService {
       expiryDate: doc.expiryDate?.toDate(),
       status: doc.status || 'valid',
     }));
+  }
+
+  /**
+   * Map provisioning checklist from Firestore
+   */
+  private mapProvisioningChecklist(checklist: any[]): any[] {
+    if (!checklist || !Array.isArray(checklist)) {
+      return [];
+    }
+    return checklist.map(task => ({
+      ...task,
+      completedAt: task.completedAt?.toDate(),
+    }));
+  }
+
+  /**
+   * Map guest from Firestore
+   */
+  private mapGuest(guest: any): any {
+    if (!guest) return undefined;
+    
+    return {
+      ...guest,
+      checkIn: guest.checkIn?.toDate ? guest.checkIn.toDate() : (guest.checkIn ? new Date(guest.checkIn) : undefined),
+      checkOut: guest.checkOut?.toDate ? guest.checkOut.toDate() : (guest.checkOut ? new Date(guest.checkOut) : undefined),
+    };
   }
 }
 

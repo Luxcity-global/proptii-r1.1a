@@ -10,9 +10,10 @@ interface PropertyTypeSelectionProps {
   onBack: () => void;
   onHome: () => void;
   onPropertySetup: () => void;
+  onSaveAndExit: () => void;
 }
 
-export function PropertyTypeSelection({ selectedType: propSelectedType, onTypeSelect, onNext, onBack, onHome, onPropertySetup }: PropertyTypeSelectionProps) {
+export function PropertyTypeSelection({ selectedType: propSelectedType, onTypeSelect, onNext, onBack, onHome, onPropertySetup, onSaveAndExit }: PropertyTypeSelectionProps) {
   const [selectedType, setSelectedType] = useState<string | null>(propSelectedType || null);
   
   // Update local state when prop changes
@@ -33,6 +34,7 @@ export function PropertyTypeSelection({ selectedType: propSelectedType, onTypeSe
     { id: 'flat', name: 'Flat/Apartment', icon: Building2, description: 'Self-contained residential unit' },
     { id: 'studio', name: 'Studio', icon: Home, description: 'Single room with kitchen and bathroom' },
     { id: 'shared', name: 'Room in shared house', icon: Users, description: 'Private room in shared accommodation' },
+    { id: 'shortlet', name: 'Shortlet', icon: Home, description: 'Short-term rental property' },
     { id: 'commercial', name: 'Commercial', icon: Briefcase, description: 'Business or retail property' },
     { id: 'other', name: 'Other', icon: HelpCircle, description: 'Other property type not listed' }
   ];
@@ -56,7 +58,7 @@ export function PropertyTypeSelection({ selectedType: propSelectedType, onTypeSe
               <Button variant="outline" className="rounded-full px-4 py-2">
                 Questions?
               </Button>
-              <Button variant="outline" className="rounded-full px-4 py-2">
+              <Button variant="outline" className="rounded-full px-4 py-2" onClick={onSaveAndExit}>
                 Save & exit
               </Button>
               <Button 

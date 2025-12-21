@@ -10,9 +10,10 @@ interface AmenitiesSelectionProps {
   onBack: () => void;
   onHome: () => void;
   onPropertySetup: () => void;
+  onSaveAndExit: () => void;
 }
 
-export function AmenitiesSelection({ selectedAmenities: propSelectedAmenities, onAmenitiesChange, onNext, onBack, onHome, onPropertySetup }: AmenitiesSelectionProps) {
+export function AmenitiesSelection({ selectedAmenities: propSelectedAmenities, onAmenitiesChange, onNext, onBack, onHome, onPropertySetup, onSaveAndExit }: AmenitiesSelectionProps) {
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>(propSelectedAmenities || []);
   
   // Update local state when prop changes
@@ -75,7 +76,7 @@ export function AmenitiesSelection({ selectedAmenities: propSelectedAmenities, o
               <Button variant="outline" className="rounded-full px-4 py-2">
                 Questions?
               </Button>
-              <Button variant="outline" className="rounded-full px-4 py-2">
+              <Button variant="outline" className="rounded-full px-4 py-2" onClick={onSaveAndExit}>
                 Save & exit
               </Button>
               <Button 

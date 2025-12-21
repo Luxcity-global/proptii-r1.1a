@@ -42,6 +42,9 @@ export function PropertiesPage({
   onExportProperties,
   onImportProperties: handleImportProperties,
 }: PropertiesPageProps) {
+  // Feature flag: keep Import hidden until we're ready to ship it.
+  const ENABLE_IMPORT_PROPERTIES = true;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -547,6 +550,18 @@ export function PropertiesPage({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              {ENABLE_IMPORT_PROPERTIES && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowImportDialog(true)}
+                  disabled={!handleImportProperties}
+                  className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -923,14 +938,13 @@ export function PropertiesPage({
         </div>
       )}
 
-      {/* Import Properties Dialog - Hidden for now */}
-      {/* 
-      <ImportPropertiesDialog
-        isOpen={showImportDialog}
-        onClose={() => setShowImportDialog(false)}
-        onImport={handleImportPropertiesSubmit}
-      />
-      */}
+      {ENABLE_IMPORT_PROPERTIES && (
+        <ImportPropertiesDialog
+          isOpen={showImportDialog}
+          onClose={() => setShowImportDialog(false)}
+          onImport={handleImportPropertiesSubmit}
+        />
+      )}
     </div>
   );
 }

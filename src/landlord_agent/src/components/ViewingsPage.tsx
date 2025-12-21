@@ -114,12 +114,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
     let unsubscribeRequests: (() => void) | undefined;
     let unsubscribeStats: (() => void) | undefined;
 
-<<<<<<< HEAD
     if (!managerId && !managerEmail) {
-=======
-    // Use email for filtering instead of managerId
-    if (!managerEmail) {
->>>>>>> 990afeeb03f16049c3d8b38a5d3be482dc156d22
       setLoading(false);
       setError('Unable to determine your email. Please sign in again.');
       return;
@@ -130,7 +125,6 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         setLoading(true);
         setError(null);
 
-<<<<<<< HEAD
         // Look up the landlordUser record by email to get the correct landlordUser ID
         // This is important because the auth user ID might be different from the landlordUser ID
         let landlordUserId: string | null = null;
@@ -182,67 +176,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
         if (statsResult.success && statsResult.stats) {
           setStats(statsResult.stats);
-=======
-        // OPTIMIZATION: Fetch bookings once and calculate stats from the same data
-        // This eliminates the duplicate query that was happening in getViewingStatsByEmail
-        const allBookingsResult = await viewingService.getViewingBookingsByEmail(managerEmail);
-        
-        // Filter bookings by status: 'pending' = requests, others = bookings
-        const requests: BookViewingRequest[] = [];
-        const bookings: ViewingBooking[] = [];
-        
-        if (allBookingsResult.success && allBookingsResult.bookings) {
-          allBookingsResult.bookings.forEach((booking) => {
-            if (booking.status === 'pending') {
-              // Convert ViewingBooking to BookViewingRequest format for pending requests
-              requests.push({
-                id: booking.id,
-                userId: booking.userId,
-                propertyId: booking.propertyId || '',
-                landlordId: booking.landlordId,
-                agentId: booking.agentId,
-                property: booking.property,
-                status: 'requested' as const,
-                createdAt: booking.createdAt,
-                updatedAt: booking.updatedAt
-              });
-            } else {
-              bookings.push(booking);
-            }
-          });
         }
-
-        // OPTIMIZATION: Calculate stats from the bookings we already fetched
-        // instead of making a separate query
-        const calculatedStats: ViewingStats = {
-          upcoming: 0,
-          completed: 0,
-          rescheduled: 0,
-          total: allBookingsResult.bookings?.length || 0
-        };
-
-        if (allBookingsResult.success && allBookingsResult.bookings) {
-          allBookingsResult.bookings.forEach((booking) => {
-            switch (booking.status) {
-              case 'pending':
-              case 'confirmed':
-                calculatedStats.upcoming++;
-                break;
-              case 'completed':
-                calculatedStats.completed++;
-                break;
-              case 'rescheduled':
-                calculatedStats.rescheduled++;
-                break;
-            }
-          });
->>>>>>> 990afeeb03f16049c3d8b38a5d3be482dc156d22
-        }
-
-        // Update state with all data at once
-        setRequests(requests);
-        setBookings(bookings);
-        setStats(calculatedStats);
         setLoading(false);
 
         // Set up real-time subscriptions using the landlordUser ID
@@ -277,82 +211,12 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
     loadInitialData();
 
-<<<<<<< HEAD
-=======
-    // Use email-based subscriptions for real-time updates (all from viewingBookings)
-    unsubscribeBookings = viewingService.subscribeToViewingBookingsByEmail(
-      managerEmail,
-      (allItems) => {
-        // Filter by status: pending = requests, others = bookings
-        const pendingRequests: BookViewingRequest[] = [];
-        const confirmedBookings: ViewingBooking[] = [];
-        
-        allItems.forEach((item) => {
-          if (item.status === 'pending') {
-            pendingRequests.push({
-              id: item.id,
-              userId: item.userId,
-              propertyId: item.propertyId || '',
-              landlordId: item.landlordId,
-              agentId: item.agentId,
-              property: item.property,
-              status: 'requested' as const,
-              createdAt: item.createdAt,
-              updatedAt: item.updatedAt
-            });
-          } else {
-            confirmedBookings.push(item);
-          }
-        });
-        
-        setRequests(pendingRequests);
-        setBookings(confirmedBookings);
-        
-        // Calculate stats from the updated bookings
-        const calculatedStats: ViewingStats = {
-          upcoming: 0,
-          completed: 0,
-          rescheduled: 0,
-          total: allItems.length
-        };
-        
-        allItems.forEach((booking) => {
-          switch (booking.status) {
-            case 'pending':
-            case 'confirmed':
-              calculatedStats.upcoming++;
-              break;
-            case 'completed':
-              calculatedStats.completed++;
-              break;
-            case 'rescheduled':
-              calculatedStats.rescheduled++;
-              break;
-          }
-        });
-        
-        setStats(calculatedStats);
-      },
-      (err) => {
-        console.error('Viewing bookings subscription error:', err);
-      }
-    );
-    
-    // No separate subscription for requests or stats - they're calculated from bookings
-    unsubscribeRequests = undefined;
-    unsubscribeStats = undefined;
-
->>>>>>> 990afeeb03f16049c3d8b38a5d3be482dc156d22
     return () => {
       unsubscribeBookings?.();
       unsubscribeRequests?.();
       unsubscribeStats?.();
     };
-<<<<<<< HEAD
   }, [managerId, managerEmail]);
-=======
-  }, [managerEmail]);
->>>>>>> 990afeeb03f16049c3d8b38a5d3be482dc156d22
 
   const upcomingViewings = useMemo(
     () =>

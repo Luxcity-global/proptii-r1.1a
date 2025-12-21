@@ -13,9 +13,10 @@ interface ImagesAndNotesSelectionProps {
   onBack: () => void;
   onHome: () => void;
   onPropertySetup: () => void;
+  onSaveAndExit: () => void;
 }
 
-export function ImagesAndNotesSelection({ uploadedImages: propUploadedImages, additionalNotes: propAdditionalNotes, onImagesChange, onNotesChange, onNext, onBack, onHome, onPropertySetup }: ImagesAndNotesSelectionProps) {
+export function ImagesAndNotesSelection({ uploadedImages: propUploadedImages, additionalNotes: propAdditionalNotes, onImagesChange, onNotesChange, onNext, onBack, onHome, onPropertySetup, onSaveAndExit }: ImagesAndNotesSelectionProps) {
   const [uploadedImages, setUploadedImages] = useState<string[]>(propUploadedImages || []);
   const [imageFiles, setImageFiles] = useState<File[]>([]); // Store File objects
   const [additionalNotes, setAdditionalNotes] = useState(propAdditionalNotes || '');
@@ -172,7 +173,7 @@ export function ImagesAndNotesSelection({ uploadedImages: propUploadedImages, ad
               <Button variant="outline" className="rounded-full px-4 py-2">
                 Questions?
               </Button>
-              <Button variant="outline" className="rounded-full px-4 py-2">
+              <Button variant="outline" className="rounded-full px-4 py-2" onClick={onSaveAndExit}>
                 Save & exit
               </Button>
               <Button 

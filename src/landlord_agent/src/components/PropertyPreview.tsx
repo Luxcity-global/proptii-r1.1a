@@ -22,12 +22,14 @@ import {
   UserPlus,
   Mail,
   Phone,
-  Eye
+  Eye,
+  Loader2
 } from 'lucide-react';
 import { Property } from '../App';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Separator } from './ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 
 interface PropertyPreviewProps {
   property: Property | null;
@@ -39,7 +41,9 @@ interface PropertyPreviewProps {
   onViewInsights: () => void;
   updateProperty: (propertyId: string, updates: Partial<Property>) => void;
   onViewTenant?: (tenantId: string) => void;
-  onPublishProperty?: () => void;
+  onPublishProperty?: () => Promise<{ success: boolean; propertyId?: string }>;
+  onAfterPublishAddNewProperty?: () => void;
+  onAfterPublishViewProperty?: () => void;
   onAddTenant?: () => void;
 }
 
@@ -54,9 +58,13 @@ export function PropertyPreview({
   updateProperty,
   onViewTenant,
   onPublishProperty,
+  onAfterPublishAddNewProperty,
+  onAfterPublishViewProperty,
   onAddTenant
 }: PropertyPreviewProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [showPublishSuccess, setShowPublishSuccess] = useState(false);
   
   console.log('PropertyPreview rendered with property:', property);
 
@@ -173,6 +181,33 @@ export function PropertyPreview({
     updateProperty(property.id, { status: 'under-renovation' });
   };
 
+  const isForSale = !!(property as any).isForSale;
+
+  const getTenureLabel = (value?: string) => {
+    const labels: Record<string, string> = {
+      'freehold': 'Freehold',
+      'leasehold': 'Leasehold',
+      'share-of-freehold': 'Share of Freehold',
+      'commonhold': 'Commonhold',
+      'other': 'Other'
+    };
+    if (!value) return 'Not provided';
+    return labels[value] || value;
+  };
+
+  const handlePublish = async () => {
+    if (!onPublishProperty) return;
+    setIsPublishing(true);
+    try {
+      const result = await onPublishProperty();
+      if (result?.success) {
+        setShowPublishSuccess(true);
+      }
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -186,8 +221,8 @@ export function PropertyPreview({
               <div>
                 <h1 className="mb-1">{property.address}</h1>
                 <div className="flex items-center space-x-3">
-                  <Badge className={`${getStatusColor(property.status)} text-white border-0`}>
-                    {getStatusText(property.status)}
+                  <Badge className={`${isForSale ? 'bg-blue-600' : getStatusColor(property.status)} text-white border-0`}>
+                    {isForSale ? 'For Sale' : getStatusText(property.status)}
                   </Badge>
                   <span className="text-muted-foreground">
                     {property.type} • {property.bedrooms} bed{property.bedrooms !== 1 ? 's' : ''}
@@ -292,13 +327,8 @@ export function PropertyPreview({
                 </TabsList>
                 
                 <Button 
-                  onClick={() => {
-                    if (onPublishProperty) {
-                      onPublishProperty();
-                    } else {
-                      console.log('Publishing property...');
-                    }
-                  }}
+                  onClick={handlePublish}
+                  disabled={isPublishing}
                   className="px-6 py-2 rounded-full transition-all duration-300" 
                   style={{ 
                     backgroundColor: '#DC5F12', 
@@ -317,7 +347,14 @@ export function PropertyPreview({
                     e.currentTarget.style.transform = 'translateY(0px)';
                   }}
                 >
-                  {isEditing ? 'Save changes' : 'Publish Property'}
+                  {isPublishing ? (
+                    <span className="flex items-center">
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {isEditing ? 'Saving...' : 'Publishing...'}
+                    </span>
+                  ) : (
+                    <>{isEditing ? 'Save changes' : 'Publish Property'}</>
+                  )}
                 </Button>
               </div>
 
@@ -534,8 +571,41 @@ export function PropertyPreview({
               </div>
             </Card>
 
-
-            {property.status === 'vacant' && (
+            {/* Tenant / Vacancy section OR Sale details */}
+            {isForSale ? (
+              <Card className="p-6">
+                <h3 className="mb-4">Sale Details</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tenure</span>
+                    <span>{getTenureLabel((property as any).tenureType)}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Council tax band</span>
+                    <span>{((property as any).councilTaxBand as string) || 'Not provided'}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Ground rent (annual)</span>
+                    <span>
+                      {typeof (property as any).annualGroundRent === 'number'
+                        ? `£${(property as any).annualGroundRent.toLocaleString()}`
+                        : 'Not provided'}
+                    </span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Service charge (annual)</span>
+                    <span>
+                      {typeof (property as any).annualServiceCharge === 'number'
+                        ? `£${(property as any).annualServiceCharge.toLocaleString()}`
+                        : 'Not provided'}
+                    </span>
+                  </div>
+                </div>
+              </Card>
+            ) : property.status === 'vacant' && (
               <Card className="p-6">
                 <h3 className="mb-4">Property Status</h3>
                 <div className="text-center py-6">
@@ -556,7 +626,7 @@ export function PropertyPreview({
               </Card>
             )}
 
-            {property.status === 'under-renovation' && (
+            {!isForSale && property.status === 'under-renovation' && (
               <Card className="p-6">
                 <h3 className="mb-4">Property Status</h3>
                 <div className="text-center py-6">
@@ -628,6 +698,42 @@ export function PropertyPreview({
           </div>
         </div>
       </div>
+
+      {/* Publish Success Dialog */}
+      <Dialog open={showPublishSuccess} onOpenChange={setShowPublishSuccess}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isEditing ? 'Property updated successfully' : 'Property added successfully'}
+            </DialogTitle>
+            <DialogDescription>
+              {isForSale
+                ? 'Your documents are currently being reviewed. Once the review is complete, your property will be shown to prospective buyers.'
+                : 'Your property has been added successfully.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPublishSuccess(false);
+                onAfterPublishAddNewProperty?.();
+              }}
+            >
+              Add a new property
+            </Button>
+            <Button
+              onClick={() => {
+                setShowPublishSuccess(false);
+                onAfterPublishViewProperty?.();
+              }}
+              style={{ backgroundColor: '#DC5F12' }}
+            >
+              View property
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -10,9 +10,10 @@ interface PropertySetupStep1Props {
   onSection2: () => void;
   onSection3: () => void;
   onSection4: () => void;
+  onSaveAndExit: () => void;
 }
 
-export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSection2, onSection3, onSection4 }: PropertySetupStep1Props) {
+export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSection2, onSection3, onSection4, onSaveAndExit }: PropertySetupStep1Props) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   
@@ -91,7 +92,7 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
             <Button variant="outline" className="rounded-full px-4 py-2">
               Questions?
             </Button>
-            <Button variant="outline" className="rounded-full px-4 py-2">
+            <Button variant="outline" className="rounded-full px-4 py-2" onClick={onSaveAndExit}>
               Save & exit
             </Button>
           </div>
