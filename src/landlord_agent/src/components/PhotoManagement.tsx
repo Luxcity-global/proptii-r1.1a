@@ -405,20 +405,32 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => setSelectedPhoto(photo)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setSelectedPhoto(photo);
+                      }}
                     >
                       <Eye className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="secondary"
                       size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }}
                     >
                       <Download className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => removePhoto(photo.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        removePhoto(photo.id);
+                      }}
                     >
                       <X className="w-4 h-4" />
                     </Button>
@@ -442,27 +454,33 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
                   <div className="text-sm truncate">{photo.filename}</div>
                   
                   <div className="space-y-2">
-                    <Select
-                      value={photo.room || 'none'}
-                      onValueChange={(value) => updatePhotoRoom(photo.id, value)}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Tag room" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No tag</SelectItem>
-                        {roomTypes.map(room => (
-                          <SelectItem key={room} value={room}>{room}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Select
+                        value={photo.room || 'none'}
+                        onValueChange={(value) => updatePhotoRoom(photo.id, value)}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Tag room" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No tag</SelectItem>
+                          {roomTypes.map(room => (
+                            <SelectItem key={room} value={room}>{room}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
                     {!photo.isCover && (
                       <Button
                         variant="outline"
                         size="sm"
                         className="w-full h-7 text-xs"
-                        onClick={() => setCoverPhoto(photo.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setCoverPhoto(photo.id);
+                        }}
                       >
                         <Star className="w-3 h-3 mr-1" />
                         Set as Cover

@@ -1812,8 +1812,27 @@ function AppContent() {
 
   const updateProperty = async (propertyId: string, updates: Partial<Property>) => {
     try {
-      // Update in Firebase (exclude id, createdAt, tenant from updates)
-      const { id, createdAt, tenant, photos, documents, ...firebaseUpdates } = updates as any;
+      // Update in Firebase (exclude id, createdAt, tenant from updates, but include photos/documents if present)
+      const { id, createdAt, tenant, ...firebaseUpdates } = updates as any;
+      
+      // Clean photos array if present - remove undefined values (Firestore doesn't accept undefined)
+      if (firebaseUpdates.photos) {
+        firebaseUpdates.photos = firebaseUpdates.photos.map((photo: any) => {
+          const cleanPhoto: any = {
+            id: photo.id,
+            url: photo.url,
+            filename: photo.filename,
+            isCover: photo.isCover
+          };
+          // Only include room if it's defined
+          if (photo.room) {
+            cleanPhoto.room = photo.room;
+          }
+          return cleanPhoto;
+        });
+        console.log('Updating property with photos:', firebaseUpdates.photos.length);
+      }
+      
       await propertyService.updateProperty(propertyId, firebaseUpdates);
       
       // Update local state

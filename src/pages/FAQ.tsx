@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -31,11 +31,30 @@ const FAQ = () => {
                 .join(' ');
             setOpenSection(sectionTitle);
 
-            // Smooth scroll to the section
-            const element = document.getElementById(hash);
-            if (element) {
-                element.scrollIntoView({ behavior: 'smooth' });
-            }
+            // Wait for the element to be available in the DOM, then scroll
+            const scrollToElement = () => {
+                const element = document.getElementById(hash);
+                if (element) {
+                    // Use a longer delay to ensure section is fully expanded
+                    setTimeout(() => {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 600);
+                    return true;
+                }
+                return false;
+            };
+
+            // Try multiple times until element is found or max attempts reached
+            let attempts = 0;
+            const maxAttempts = 20;
+            const checkInterval = setInterval(() => {
+                attempts++;
+                if (scrollToElement() || attempts >= maxAttempts) {
+                    clearInterval(checkInterval);
+                }
+            }, 100);
+
+            return () => clearInterval(checkInterval);
         }
     }, [location.hash]);
 
@@ -215,7 +234,7 @@ const FAQ = () => {
                         sizes="100vw"
                     />
                 </div>
-                <div className="max-w-4xl mx-auto px-4">
+                <div className="max-w-4xl mx-auto px-4 relative z-10">
                     <div className="space-y-4">
                         {faqSections.map((section) => (
                             <div
