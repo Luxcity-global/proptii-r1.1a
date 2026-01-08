@@ -7,6 +7,13 @@ interface HomeownerNavbarProps {
   isHomeowner?: boolean;
 }
 
+type UserType = 'Tenant' | 'Agent' | 'Home Owner' | 'Public worker';
+
+interface NavLinkItem {
+  label: string;
+  path: string;
+}
+
 const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -15,6 +22,31 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [loginInProgress, setLoginInProgress] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [userType, setUserType] = useState<UserType>('Home Owner');
+  const [isUserTypeDropdownOpen, setIsUserTypeDropdownOpen] = useState(false);
+
+  // Navigation links mapping for each user type
+  const navLinksMap: Record<UserType, NavLinkItem[]> = {
+    'Tenant': [
+      { label: 'Book Viewing', path: '/bookviewing' },
+      { label: 'Referencing', path: '/referencing' },
+      { label: 'Contracts', path: '/contracts' }
+    ],
+    'Agent': [
+      { label: 'Book Viewing', path: '/bookviewing' },
+      { label: 'Contracts', path: '/agent-contracts' }
+    ],
+    'Home Owner': [
+      { label: 'Maintenance', path: '/homeowner/maintenance' },
+      { label: 'Projects', path: '/homeowner/projects' },
+      { label: 'Documents', path: '/homeowner/documents' }
+    ],
+    'Public worker': [
+      { label: 'Services', path: '/public-worker/services' },
+      { label: 'Resources', path: '/public-worker/resources' },
+      { label: 'Support', path: '/public-worker/support' }
+    ]
+  };
 
   // Check if we're on variant B page
   const isVariantB = location.pathname.includes('/variant-b');
@@ -40,13 +72,31 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
       if (isMobileMenuOpen && !target.closest('.mobile-menu') && !target.closest('.mobile-menu-button')) {
         setIsMobileMenuOpen(false);
       }
+      if (isUserTypeDropdownOpen && !target.closest('.user-type-dropdown')) {
+        setIsUserTypeDropdownOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isDropdownOpen, isMobileMenuOpen]);
+  }, [isDropdownOpen, isMobileMenuOpen, isUserTypeDropdownOpen]);
+
+  const handleUserTypeSelect = (type: UserType) => {
+    setUserType(type);
+    setIsUserTypeDropdownOpen(false);
+    
+    // Navigate based on user type
+    if (type === 'Agent') {
+      navigate('/Agent');
+    } else if (type === 'Home Owner') {
+      navigate('/Homeowner');
+    } else if (type === 'Tenant') {
+      navigate('/');
+    }
+    // Public worker stays on current page
+  };
 
   // Listen for auth state changes
   useEffect(() => {
@@ -136,6 +186,8 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
     }
   };
 
+  const currentNavLinks = navLinksMap[userType];
+
   return (
     <nav className="absolute top-0 left-0 right-0 z-20">
       <div className="max-w-7xl mx-auto px-4">
@@ -151,38 +203,64 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
             </Link>
           </div>
 
+          {/* User Type Selector - Desktop */}
+          <div className="hidden md:block ml-6 relative user-type-dropdown">
+            <button
+              onClick={() => setIsUserTypeDropdownOpen(!isUserTypeDropdownOpen)}
+              className="flex items-center space-x-2 px-5 py-2.5 rounded-full bg-gray-800 text-white hover:bg-gray-700 transition-colors border border-gray-600"
+            >
+              <span className="text-sm font-semibold">{userType}</span>
+              <ChevronDown 
+                className={`w-4 h-4 transition-transform ${isUserTypeDropdownOpen ? 'rotate-180' : ''}`}
+                style={{ color: '#8FCDFF' }}
+              />
+            </button>
+            
+            {isUserTypeDropdownOpen && (
+              <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-50">
+                <button
+                  onClick={() => handleUserTypeSelect('Tenant')}
+                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  Tenant
+                </button>
+                <button
+                  onClick={() => handleUserTypeSelect('Agent')}
+                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  Agent
+                </button>
+                <button
+                  onClick={() => handleUserTypeSelect('Home Owner')}
+                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  Home Owner
+                </button>
+                <button
+                  onClick={() => handleUserTypeSelect('Public worker')}
+                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  Public worker
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Desktop Navigation */}
           <div className="hidden md:flex flex-1 justify-center space-x-8">
-            <NavLink
-              to="/homeowner/maintenance"
-              className={({ isActive }) =>
-                isActive
-                  ? 'text-[#E76F51] font-bold transition-colors'
-                  : 'text-white hover:text-[#E76F51] transition-colors'
-              }
-            >
-              Maintenance
-            </NavLink>
-            <NavLink
-              to="/homeowner/projects"
-              className={({ isActive }) =>
-                isActive
-                  ? 'text-[#E76F51] font-bold transition-colors'
-                  : 'text-white hover:text-[#E76F51] transition-colors'
-              }
-            >
-              Projects
-            </NavLink>
-            <NavLink
-              to="/homeowner/documents"
-              className={({ isActive }) =>
-                isActive
-                  ? 'text-[#E76F51] font-bold transition-colors'
-                  : 'text-white hover:text-[#E76F51] transition-colors'
-              }
-            >
-              Documents
-            </NavLink>
+            {currentNavLinks.map((link) => (
+              <NavLink
+                key={link.path}
+                to={link.path}
+                className={({ isActive }) =>
+                  isActive
+                    ? 'text-[#E76F51] font-bold transition-colors'
+                    : 'text-white hover:text-[#E76F51] transition-colors'
+                }
+              >
+                {link.label}
+              </NavLink>
+            ))}
           </div>
 
           {/* Desktop User Section */}
@@ -333,39 +411,78 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
         {isMobileMenuOpen && (
           <div className="md:hidden mobile-menu">
             <div className="px-2 pt-2 pb-3 space-y-1 bg-black bg-opacity-90 rounded-lg mt-2">
-              <NavLink
-                to="/homeowner/maintenance"
-                onClick={closeMobileMenu}
-                className={({ isActive }) =>
-                  isActive
-                    ? 'block px-3 py-2 text-[#E76F51] font-bold'
-                    : 'block px-3 py-2 text-white hover:text-[#E76F51] transition-colors'
-                }
-              >
-                Maintenance
-              </NavLink>
-              <NavLink
-                to="/homeowner/projects"
-                onClick={closeMobileMenu}
-                className={({ isActive }) =>
-                  isActive
-                    ? 'block px-3 py-2 text-[#E76F51] font-bold'
-                    : 'block px-3 py-2 text-white hover:text-[#E76F51] transition-colors'
-                }
-              >
-                Projects
-              </NavLink>
-              <NavLink
-                to="/homeowner/documents"
-                onClick={closeMobileMenu}
-                className={({ isActive }) =>
-                  isActive
-                    ? 'block px-3 py-2 text-[#E76F51] font-bold'
-                    : 'block px-3 py-2 text-white hover:text-[#E76F51] transition-colors'
-                }
-              >
-                Documents
-              </NavLink>
+              {/* Mobile User Type Selector */}
+              <div className="px-3 py-2 border-b border-gray-600 mb-2">
+                <div className="relative user-type-dropdown">
+                  <button
+                    onClick={() => setIsUserTypeDropdownOpen(!isUserTypeDropdownOpen)}
+                    className="flex items-center justify-between w-full px-4 py-2.5 rounded-full bg-gray-800 text-white hover:bg-gray-700 transition-colors border border-gray-600"
+                  >
+                    <span className="text-sm font-semibold">{userType}</span>
+                    <ChevronDown 
+                      className={`w-4 h-4 transition-transform ${isUserTypeDropdownOpen ? 'rotate-180' : ''}`}
+                      style={{ color: '#8FCDFF' }}
+                    />
+                  </button>
+                  
+                  {isUserTypeDropdownOpen && (
+                    <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-lg shadow-lg py-1 z-50">
+                      <button
+                        onClick={() => {
+                          handleUserTypeSelect('Tenant');
+                          setIsUserTypeDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        Tenant
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleUserTypeSelect('Agent');
+                          setIsUserTypeDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        Agent
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleUserTypeSelect('Home Owner');
+                          setIsUserTypeDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        Home Owner
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleUserTypeSelect('Public worker');
+                          setIsUserTypeDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        Public worker
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Mobile Navigation Links */}
+              {currentNavLinks.map((link) => (
+                <NavLink
+                  key={link.path}
+                  to={link.path}
+                  onClick={closeMobileMenu}
+                  className={({ isActive }) =>
+                    isActive
+                      ? 'block px-3 py-2 text-[#E76F51] font-bold'
+                      : 'block px-3 py-2 text-white hover:text-[#E76F51] transition-colors'
+                  }
+                >
+                  {link.label}
+                </NavLink>
+              ))}
 
               {!isAuthenticated && (
                 <div className="pt-4 border-t border-gray-600">
