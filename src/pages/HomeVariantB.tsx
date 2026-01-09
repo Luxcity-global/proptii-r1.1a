@@ -21,8 +21,6 @@ const HomeVariantB = () => {
   const [applicantName, setApplicantName] = useState('');
   const [prefilledEmail, setPrefilledEmail] = useState('');
   const [tenantEmail, setTenantEmail] = useState('');
-  const [userType, setUserType] = useState('Tenant');
-  const [isExpanded, setIsExpanded] = useState(false);
 
   // Check for query parameters to open the response modal
   useEffect(() => {
@@ -58,21 +56,6 @@ const HomeVariantB = () => {
     setIsResponseModalOpen(false);
   };
 
-  const toggleExpanded = () => {
-    setIsExpanded(!isExpanded);
-  };
-
-  const handleOptionClick = (option: string) => {
-    setUserType(option);
-    setIsExpanded(false);
-    
-    if (option === 'Agent') {
-      navigate('/Agent');
-    } else if (option === 'Homeowner') {
-      navigate('/Homeowner');
-    }
-    // Tenant stays on home page, no navigation needed
-  };
 
   return (
     <div className="min-h-screen flex flex-col font-nunito">
@@ -107,140 +90,6 @@ const HomeVariantB = () => {
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full py-8 md:py-0">
-          {/* User Type Selection */}
-          <div className="mt-16 md:mt-20 mb-8 md:mb-12 flex justify-center">
-            <div className="group relative inline-block">
-              {/* Main container - expands symmetrically */}
-              <div 
-                className={`relative rounded-full border-2 bg-black/40 text-white font-semibold text-sm md:text-base cursor-pointer outline-none focus:ring-2 focus:ring-[#8FCDFF] focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-500 ease-out flex items-center ${
-                  isExpanded ? 'px-4 md:px-3' : 'pl-6 pr-4 md:pl-8 md:pr-6'
-                } py-3`}
-                style={{
-                  borderColor: '#2F7DB0',
-                  width: isExpanded ? 'auto' : 'auto',
-                  minWidth: isExpanded ? '400px' : 'auto',
-                  transformOrigin: 'center'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#5AA0D0';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#2F7DB0';
-                }}
-                onClick={toggleExpanded}
-              >
-                {isExpanded ? (
-                  <>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOptionClick('Tenant');
-                      }}
-                      className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
-                        userType === 'Tenant' 
-                          ? 'text-white rounded-full' 
-                          : 'hover:text-[#4E97CC] rounded-l-full'
-                      }`}
-                      style={userType === 'Tenant' ? { backgroundColor: '#2F7DB0' } : {}}
-                    >
-                      Tenant
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOptionClick('Agent');
-                      }}
-                      className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
-                        userType === 'Agent' 
-                          ? 'text-white rounded-full' 
-                          : 'hover:text-[#4E97CC]'
-                      }`}
-                      style={userType === 'Agent' ? { backgroundColor: '#2F7DB0' } : {}}
-                    >
-                      Agent/Landlord
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOptionClick('Homeowner');
-                      }}
-                      className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
-                        userType === 'Homeowner' 
-                          ? 'text-white rounded-full' 
-                          : 'hover:text-[#4E97CC] rounded-r-full'
-                      }`}
-                      style={userType === 'Homeowner' ? { backgroundColor: '#2F7DB0' } : {}}
-                    >
-                      Home Owner
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleExpanded();
-                      }}
-                      className="ml-3 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ease-out flex-shrink-0"
-                      style={{ backgroundColor: '#2F7DB0' }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#5AA0D0';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#2F7DB0';
-                      }}
-                    >
-                      <svg
-                        className="w-4 h-4 text-white transition-all duration-500 ease-out"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        style={{ transform: 'scaleX(-1)' }}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className="hover:text-[#4E97CC] transition-colors duration-300 ease-out">{userType}</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleExpanded();
-                      }}
-                      className="ml-3 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ease-out flex-shrink-0"
-                      style={{ backgroundColor: '#2F7DB0' }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#5AA0D0';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#2F7DB0';
-                      }}
-                    >
-                      <svg
-                        className="w-4 h-4 text-white transition-all duration-500 ease-out"
-                        style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
           {/* Main Heading */}
           <h3 className="text-2xl md:text-6xl font-bold mb-4 md:mb-6 font-archivo leading-tight">
             <TextAnimate

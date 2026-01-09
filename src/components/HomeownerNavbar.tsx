@@ -94,8 +94,9 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
       navigate('/Homeowner');
     } else if (type === 'Tenant') {
       navigate('/');
+    } else if (type === 'Public worker') {
+      navigate('/public-worker');
     }
-    // Public worker stays on current page
   };
 
   // Listen for auth state changes
@@ -203,51 +204,53 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
             </Link>
           </div>
 
-          {/* User Type Selector - Desktop */}
-          <div className="hidden md:block ml-6 relative user-type-dropdown">
-            <button
-              onClick={() => setIsUserTypeDropdownOpen(!isUserTypeDropdownOpen)}
-              className="flex items-center space-x-2 px-5 py-2.5 rounded-full bg-gray-800 text-white hover:bg-gray-700 transition-colors border border-gray-600"
-            >
-              <span className="text-sm font-semibold">{userType}</span>
-              <ChevronDown 
-                className={`w-4 h-4 transition-transform ${isUserTypeDropdownOpen ? 'rotate-180' : ''}`}
-                style={{ color: '#8FCDFF' }}
-              />
-            </button>
-            
-            {isUserTypeDropdownOpen && (
-              <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-50">
-                <button
-                  onClick={() => handleUserTypeSelect('Tenant')}
-                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  Tenant
-                </button>
-                <button
-                  onClick={() => handleUserTypeSelect('Agent')}
-                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  Agent
-                </button>
-                <button
-                  onClick={() => handleUserTypeSelect('Home Owner')}
-                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  Home Owner
-                </button>
-                <button
-                  onClick={() => handleUserTypeSelect('Public worker')}
-                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  Public worker
-                </button>
-              </div>
-            )}
-          </div>
-
           {/* Desktop Navigation */}
-          <div className="hidden md:flex flex-1 justify-center space-x-8">
+          <div className="hidden md:flex flex-1 justify-center items-center space-x-8">
+            {/* User Type Selector - Desktop */}
+            <div className="relative user-type-dropdown">
+              <button
+                onClick={() => setIsUserTypeDropdownOpen(!isUserTypeDropdownOpen)}
+                className="flex items-center space-x-2 px-5 py-2.5 rounded-full text-white hover:bg-gray-700 transition-colors"
+                style={{ border: '2px solid #ffffff', backgroundColor: 'rgba(31, 41, 55, 0.7)' }}
+              >
+                <span className="text-sm font-semibold">{userType}</span>
+                <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#136C9E' }}>
+                  <ChevronDown 
+                    className={`w-4 h-4 transition-transform ${isUserTypeDropdownOpen ? 'rotate-180' : ''}`}
+                    style={{ color: '#ffffff' }}
+                  />
+                </div>
+              </button>
+              
+              {isUserTypeDropdownOpen && (
+                <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg py-1 z-50" style={{ border: '2px solid #ffffff', outline: 'none' }}>
+                  <button
+                    onClick={() => handleUserTypeSelect('Tenant')}
+                    className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    Tenant
+                  </button>
+                  <button
+                    onClick={() => handleUserTypeSelect('Agent')}
+                    className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    Agent
+                  </button>
+                  <button
+                    onClick={() => handleUserTypeSelect('Home Owner')}
+                    className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    Home Owner
+                  </button>
+                  <button
+                    onClick={() => handleUserTypeSelect('Public worker')}
+                    className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    Public worker
+                  </button>
+                </div>
+              )}
+            </div>
             {currentNavLinks.map((link) => (
               <NavLink
                 key={link.path}
@@ -329,7 +332,8 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
                 )}
                 <button
                   onClick={handleLogin}
-                  className="bg-primary text-white px-6 py-2 rounded-full hover:bg-opacity-90 transition-all flex items-center"
+                  className="text-white px-6 py-2 rounded-full hover:bg-opacity-90 transition-all flex items-center"
+                  style={{ backgroundColor: '#DC5F12' }}
                   disabled={isLoading || loginInProgress}
                 >
                   {isLoading || loginInProgress ? (
@@ -416,17 +420,20 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
                 <div className="relative user-type-dropdown">
                   <button
                     onClick={() => setIsUserTypeDropdownOpen(!isUserTypeDropdownOpen)}
-                    className="flex items-center justify-between w-full px-4 py-2.5 rounded-full bg-gray-800 text-white hover:bg-gray-700 transition-colors border border-gray-600"
+                    className="flex items-center justify-between w-full px-4 py-2.5 rounded-full text-white hover:bg-gray-700 transition-colors"
+                    style={{ border: '2px solid #ffffff', backgroundColor: 'rgba(31, 41, 55, 0.7)' }}
                   >
                     <span className="text-sm font-semibold">{userType}</span>
-                    <ChevronDown 
-                      className={`w-4 h-4 transition-transform ${isUserTypeDropdownOpen ? 'rotate-180' : ''}`}
-                      style={{ color: '#8FCDFF' }}
-                    />
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#136C9E' }}>
+                      <ChevronDown 
+                        className={`w-4 h-4 transition-transform ${isUserTypeDropdownOpen ? 'rotate-180' : ''}`}
+                        style={{ color: '#ffffff' }}
+                      />
+                    </div>
                   </button>
                   
                   {isUserTypeDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-lg shadow-lg py-1 z-50">
+                    <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-lg py-1 z-50" style={{ border: '2px solid #ffffff', outline: 'none' }}>
                       <button
                         onClick={() => {
                           handleUserTypeSelect('Tenant');
@@ -493,7 +500,8 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
                   )}
                   <button
                     onClick={handleLogin}
-                    className="mx-3 w-[calc(100%-1.5rem)] bg-primary text-white px-4 py-2 rounded-full hover:bg-opacity-90 transition-all flex items-center justify-center"
+                    className="mx-3 w-[calc(100%-1.5rem)] text-white px-4 py-2 rounded-full hover:bg-opacity-90 transition-all flex items-center justify-center"
+                    style={{ backgroundColor: '#DC5F12' }}
                     disabled={isLoading || loginInProgress}
                   >
                     {isLoading || loginInProgress ? (

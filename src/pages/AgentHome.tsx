@@ -25,8 +25,6 @@ const AgentHome = () => {
   const { user } = useAuth();
   const [showRolePopup, setShowRolePopup] = useState(true);
   const [selectedRole, setSelectedRole] = useState<UserRole>('landlord');
-  const [userType, setUserType] = useState('Agent');
-  const [isExpanded, setIsExpanded] = useState(false);
 
   // Preload hero image when component mounts
   useEffect(() => {
@@ -113,21 +111,6 @@ const AgentHome = () => {
     window.location.href = '/landlord/index.html?start=company-profile-setup';
   };
 
-  const toggleExpanded = () => {
-    setIsExpanded(!isExpanded);
-  };
-
-  const handleOptionClick = (option: string) => {
-    setUserType(option);
-    setIsExpanded(false);
-    
-    if (option === 'Tenant') {
-      navigate('/');
-    } else if (option === 'Homeowner') {
-      navigate('/Homeowner');
-    }
-    // Agent stays on agent page, no navigation needed
-  };
 
   return (
     <div className="min-h-screen font-archivo">
@@ -150,140 +133,6 @@ const AgentHome = () => {
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full">
-          {/* User Type Selection */}
-          <div className="mb-12 flex justify-center">
-            <div className="group relative inline-block">
-              {/* Main container - expands symmetrically */}
-              <div 
-                className={`relative rounded-full border-2 bg-black/40 text-white font-semibold text-sm md:text-base cursor-pointer outline-none focus:ring-2 focus:ring-[#8FCDFF] focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-500 ease-out flex items-center ${
-                  isExpanded ? 'px-4 md:px-3' : 'pl-6 pr-4 md:pl-8 md:pr-6'
-                } py-3`}
-                style={{
-                  borderColor: 'rgba(255, 255, 255, 1)',
-                  width: isExpanded ? 'auto' : 'auto',
-                  minWidth: isExpanded ? '400px' : 'auto',
-                  transformOrigin: 'center'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 1)';
-                }}
-                onClick={toggleExpanded}
-              >
-                {isExpanded ? (
-                  <>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOptionClick('Tenant');
-                      }}
-                      className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
-                        userType === 'Tenant' 
-                          ? 'text-white rounded-full' 
-                          : 'hover:text-[#DC5F12] rounded-l-full'
-                      }`}
-                      style={userType === 'Tenant' ? { backgroundColor: '#DC5F12' } : {}}
-                    >
-                      Tenant
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOptionClick('Agent');
-                      }}
-                      className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
-                        userType === 'Agent' 
-                          ? 'text-white rounded-full' 
-                          : 'hover:text-[#DC5F12]'
-                      }`}
-                      style={userType === 'Agent' ? { backgroundColor: '#DC5F12' } : {}}
-                    >
-                      Agent/Landlord
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOptionClick('Homeowner');
-                      }}
-                      className={`px-4 md:px-6 py-2 transition-colors duration-300 ease-out h-full flex items-center ${
-                        userType === 'Homeowner' 
-                          ? 'text-white rounded-full' 
-                          : 'hover:text-[#DC5F12] rounded-r-full'
-                      }`}
-                      style={userType === 'Homeowner' ? { backgroundColor: '#DC5F12' } : {}}
-                    >
-                      Home Owner
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleExpanded();
-                      }}
-                      className="ml-3 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ease-out flex-shrink-0"
-                      style={{ backgroundColor: '#2F7DB0' }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#5AA0D0';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#2F7DB0';
-                      }}
-                    >
-                      <svg
-                        className="w-4 h-4 text-white transition-all duration-500 ease-out"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        style={{ transform: 'scaleX(-1)' }}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className="hover:text-[#DC5F12] transition-colors duration-300 ease-out">{userType}</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleExpanded();
-                      }}
-                      className="ml-3 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ease-out flex-shrink-0"
-                      style={{ backgroundColor: '#2F7DB0' }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#5AA0D0';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#2F7DB0';
-                      }}
-                    >
-                      <svg
-                        className="w-4 h-4 text-white transition-all duration-500 ease-out"
-                        style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
           {/* Main Heading */}
           <h1 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight">
             <TextAnimate

@@ -1,16 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import HomeownerNavbar from '../components/HomeownerNavbar';
+import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
-import { RoleSelectionPopup } from '../components/RoleSelectionPopup';
-import { useAuth } from '../contexts/AuthContext';
 import { TextAnimate } from '../components/magic-ui/text-animate';
 
-type UserRole = 'homeowner';
-
 // Add preload link for the hero image
-const heroImageUrl = '/images/cheerful-kids-their-parents-casualwear-relaxing-couch-living-room 1.png';
+const heroImageUrl = '/images/01_Lady_Child_Family_BG.jpg';
 const preloadHeroImage = () => {
   const link = document.createElement('link');
   link.rel = 'preload';
@@ -19,53 +15,39 @@ const preloadHeroImage = () => {
   document.head.appendChild(link);
 };
 
-const HomeownerHome = () => {
+const PublicWorkerHome = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [showRolePopup, setShowRolePopup] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<UserRole>('homeowner');
 
   // Preload hero image when component mounts
   useEffect(() => {
     preloadHeroImage();
   }, []);
 
-  const handleGoToDashboard = () => {
-    localStorage.setItem('userRole', 'homeowner');
-    navigate('/homeowner/dashboard');
-  };
-
   const handleGetStarted = () => {
-    localStorage.setItem('userRole', 'homeowner');
-    navigate('/homeowner/dashboard');
+    // Navigate to services or dashboard when available
+    navigate('/public-worker/services');
   };
 
-  const handleGoToMaintenance = () => {
-    localStorage.setItem('userRole', 'homeowner');
-    navigate('/homeowner/dashboard');
-    // The dashboard will handle navigation to maintenance screen
-    localStorage.setItem('homeownerInitialScreen', 'maintenance');
+  const handleViewResources = () => {
+    navigate('/public-worker/resources');
   };
 
-  const handleGoToDocuments = () => {
-    localStorage.setItem('userRole', 'homeowner');
-    navigate('/homeowner/dashboard');
-    // The dashboard will handle navigation to documents screen
-    localStorage.setItem('homeownerInitialScreen', 'documents');
+  const handleConnectWithAgents = () => {
+    // Navigate to agent connection page
+    navigate('/public-worker/services');
   };
 
   const handleViewFeatures = () => {
-    // Scroll to features section or navigate to features page
+    // Scroll to features section
     const featuresSection = document.querySelector('.features-section');
     if (featuresSection) {
       featuresSection.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
-
   return (
-    <div className="min-h-screen font-archivo">
-      <HomeownerNavbar isHomeowner={true} />
+    <div className="min-h-screen font-nunito">
+      <Navbar />
 
       {/* Hero Section */}
       <section className="h-[80vh] relative flex items-center">
@@ -73,9 +55,8 @@ const HomeownerHome = () => {
         <div className="absolute inset-0 z-0 overflow-hidden">
           <img
             src={heroImageUrl}
-            alt="Cheerful family relaxing in living room"
-            className="w-full h-full object-cover object-top"
-            style={{ objectPosition: 'center 20%' }}
+            alt="Family finding their home"
+            className="w-full h-full object-cover"
             loading="eager"
             decoding="sync"
             sizes="100vw"
@@ -85,15 +66,15 @@ const HomeownerHome = () => {
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full">
           {/* Main Heading */}
-          <h1 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight">
+          <h1 className="text-3xl md:text-6xl font-bold mb-6 font-archivo leading-tight">
             <TextAnimate
-              className="text-3xl md:text-6xl font-bold font-archive leading-tight"
+              className="text-3xl md:text-6xl font-bold font-archivo leading-tight"
               by="word"
               animation="fadeIn"
               startOnView={true}
               once={true}
             >
-              Manage Your Home
+              Connect Communities with Housing
             </TextAnimate>
           </h1>
 
@@ -105,7 +86,7 @@ const HomeownerHome = () => {
             startOnView={true}
             once={true}
           >
-            Everything you need to maintain, improve, and protect your home in one place.
+            Partner with agents and landlords to help your clients find safe, affordable housing. Streamline the process and make a real difference in people's lives.
           </TextAnimate>
 
           {/* CTA Buttons */}
@@ -115,6 +96,12 @@ const HomeownerHome = () => {
               className="inline-block px-8 py-4 bg-[#DC5F12] text-white rounded-full text-lg font-semibold hover:bg-opacity-90 transition-all"
             >
               Get Started
+            </button>
+            <button
+              onClick={handleViewFeatures}
+              className="inline-block px-8 py-4 bg-transparent border-2 border-white text-white rounded-full text-lg font-semibold hover:bg-white hover:text-gray-900 transition-all"
+            >
+              Learn More
             </button>
           </div>
         </div>
@@ -135,31 +122,30 @@ const HomeownerHome = () => {
           {/* Section Header */}
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-[#374957] mb-4">
-              Homeowner Features
+              Public Worker Services
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Comprehensive tools to help you manage every aspect of your home.
+              Tools and resources to help you connect your clients with housing opportunities through our network of trusted agents and landlords.
             </p>
           </div>
 
           {/* Feature Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8 mb-8">
-            {/* Maintenance Management */}
+            {/* Agent & Landlord Network */}
             <div className="bg-white rounded-2xl shadow-lg border border-[#D1D5DB] p-8 text-center hover:shadow-xl transition-shadow min-h-[280px] flex flex-col justify-between">
               <div>
                 <div className="mb-6">
-                  <div className="w-16 h-16 bg-[#FFE5D9] rounded-full flex items-center justify-center mx-auto">
-                    <svg className="w-8 h-8 text-[#DC5F12]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <div className="w-16 h-16 bg-[#EBF4FF] rounded-full flex items-center justify-center mx-auto">
+                    <svg className="w-8 h-8 text-[#136C9E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                   </div>
                 </div>
-                <h3 className="text-xl font-bold text-[#374957] mb-4">Maintenance Management</h3>
-                <p className="text-gray-600 mb-8">Track repairs, schedule maintenance, and manage service history</p>
+                <h3 className="text-xl font-bold text-[#374957] mb-4">Agent & Landlord Network</h3>
+                <p className="text-gray-600 mb-8">Connect with verified agents and landlords to find housing solutions for your clients</p>
               </div>
               <button
-                onClick={handleGoToMaintenance}
+                onClick={handleConnectWithAgents}
                 className="text-[#374957] hover:text-[#DC5F12] hover:border-[#DC5F12] border border-transparent rounded-full px-8 py-3 font-medium flex items-center justify-center mx-auto group transition-all"
               >
                 Get Started
@@ -169,18 +155,18 @@ const HomeownerHome = () => {
               </button>
             </div>
 
-            {/* Home Improvement Projects */}
+            {/* Housing Search Tools */}
             <div className="bg-white rounded-2xl shadow-lg border border-[#D1D5DB] p-8 text-center hover:shadow-xl transition-shadow min-h-[280px] flex flex-col justify-between">
               <div>
                 <div className="mb-6">
-                  <div className="w-16 h-16 bg-[#EBF4FF] rounded-full flex items-center justify-center mx-auto">
-                    <svg className="w-8 h-8 text-[#3B82F6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  <div className="w-16 h-16 bg-[#FFE5D9] rounded-full flex items-center justify-center mx-auto">
+                    <svg className="w-8 h-8 text-[#DC5F12]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                   </div>
                 </div>
-                <h3 className="text-xl font-bold text-[#374957] mb-4">Home Improvement</h3>
-                <p className="text-gray-600 mb-8">Plan projects, track progress, and calculate ROI on renovations</p>
+                <h3 className="text-xl font-bold text-[#374957] mb-4">Housing Search Tools</h3>
+                <p className="text-gray-600 mb-8">Access comprehensive property listings and search filters to match clients with suitable homes</p>
               </div>
               <button
                 onClick={handleViewFeatures}
@@ -193,18 +179,18 @@ const HomeownerHome = () => {
               </button>
             </div>
 
-            {/* Home Value Tracking */}
+            {/* Client Management */}
             <div className="bg-white rounded-2xl shadow-lg border border-[#D1D5DB] p-8 text-center hover:shadow-xl transition-shadow min-h-[280px] flex flex-col justify-between">
               <div>
                 <div className="mb-6">
                   <div className="w-16 h-16 bg-[#E6FFFA] rounded-full flex items-center justify-center mx-auto">
                     <svg className="w-8 h-8 text-[#06B6D4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
                 </div>
-                <h3 className="text-xl font-bold text-[#374957] mb-4">Home Value & Equity</h3>
-                <p className="text-gray-600 mb-8">Track your home's value and monitor equity growth over time</p>
+                <h3 className="text-xl font-bold text-[#374957] mb-4">Client Management</h3>
+                <p className="text-gray-600 mb-8">Track client applications, housing needs, and progress through the housing placement process</p>
               </div>
               <button
                 onClick={handleViewFeatures}
@@ -217,12 +203,12 @@ const HomeownerHome = () => {
               </button>
             </div>
 
-            {/* Documentation Hub */}
+            {/* Resources & Support */}
             <div className="bg-white rounded-2xl shadow-lg border-2 border-[#136C9E] p-8 text-center hover:shadow-xl transition-shadow relative min-h-[280px] flex flex-col justify-between">
               {/* Recommended Badge */}
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                 <span className="bg-[#136C9E] text-white px-4 py-1 rounded-full text-sm font-medium">
-                  MVP
+                  Essential
                 </span>
               </div>
               
@@ -230,15 +216,15 @@ const HomeownerHome = () => {
                 <div className="mb-6">
                   <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto">
                     <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                     </svg>
                   </div>
                 </div>
-                <h3 className="text-xl font-bold text-[#374957] mb-4">Documentation Hub</h3>
-                <p className="text-gray-600 mb-8">Store warranties, manuals, receipts, and all home documents</p>
+                <h3 className="text-xl font-bold text-[#374957] mb-4">Resources & Support</h3>
+                <p className="text-gray-600 mb-8">Access guides, templates, and support to help navigate housing assistance programs</p>
               </div>
               <button
-                onClick={handleGoToDocuments}
+                onClick={handleViewResources}
                 className="bg-[#DC5F12] hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#f97316] hover:py-4 hover:shadow-2xl hover:shadow-[#DC5F12]/70 text-white px-8 py-3 rounded-full font-medium flex items-center justify-center mx-auto group transition-all duration-300"
               >
                 Get Started
@@ -251,56 +237,55 @@ const HomeownerHome = () => {
 
           {/* Additional Features Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-            {/* Energy Efficiency */}
+            {/* Application Assistance */}
             <div className="bg-white rounded-2xl shadow-lg border border-[#D1D5DB] p-6 text-center hover:shadow-xl transition-shadow">
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h4 className="font-bold text-[#374957] mb-2">Energy Efficiency</h4>
-              <p className="text-sm text-gray-600">Track utilities and optimize consumption</p>
+              <h4 className="font-bold text-[#374957] mb-2">Application Assistance</h4>
+              <p className="text-sm text-gray-600">Help clients complete rental applications and documentation</p>
             </div>
 
-            {/* Insurance & Protection */}
+            {/* Referencing Support */}
             <div className="bg-white rounded-2xl shadow-lg border border-[#D1D5DB] p-6 text-center hover:shadow-xl transition-shadow">
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <h4 className="font-bold text-[#374957] mb-2">Insurance & Protection</h4>
-              <p className="text-sm text-gray-600">Manage policies and track claims</p>
+              <h4 className="font-bold text-[#374957] mb-2">Referencing Support</h4>
+              <p className="text-sm text-gray-600">Streamline tenant referencing and verification processes</p>
             </div>
 
-            {/* Neighborhood Insights */}
+            {/* Communication Hub */}
             <div className="bg-white rounded-2xl shadow-lg border border-[#D1D5DB] p-6 text-center hover:shadow-xl transition-shadow">
               <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </div>
-              <h4 className="font-bold text-[#374957] mb-2">Neighborhood Insights</h4>
-              <p className="text-sm text-gray-600">Local amenities and market trends</p>
+              <h4 className="font-bold text-[#374957] mb-2">Communication Hub</h4>
+              <p className="text-sm text-gray-600">Coordinate with agents, landlords, and clients in one place</p>
             </div>
 
-            {/* Property Tax & Finance */}
+            {/* Reporting & Analytics */}
             <div className="bg-white rounded-2xl shadow-lg border border-[#D1D5DB] p-6 text-center hover:shadow-xl transition-shadow">
               <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <h4 className="font-bold text-[#374957] mb-2">Tax & Finance</h4>
-              <p className="text-sm text-gray-600">Track taxes and financial planning</p>
+              <h4 className="font-bold text-[#374957] mb-2">Reporting & Analytics</h4>
+              <p className="text-sm text-gray-600">Track outcomes and measure the impact of your housing assistance</p>
             </div>
           </div>
 
           {/* Bottom Note */}
           <div className="text-center mt-12">
             <p className="text-gray-500 text-sm">
-              All features are accessible from your homeowner dashboard
+              All services are designed to help you efficiently connect your clients with housing opportunities
             </p>
           </div>
         </div>
@@ -315,5 +300,5 @@ const HomeownerHome = () => {
   );
 };
 
-export default HomeownerHome;
+export default PublicWorkerHome;
 
