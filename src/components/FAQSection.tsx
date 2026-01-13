@@ -37,7 +37,7 @@ const FAQSection = () => {
   ];
 
   return (
-    <section className="py-20 bg-secondary">
+    <section className="py-20 bg-[#003450]">
       <div className="max-w-7xl mx-auto px-4 text-center">
         <h2 className="text-3xl font-bold mb-8 text-white">Frequently Asked Questions</h2>
         <p className="text-gray-500 mb-12 max-w-2xl mx-auto">

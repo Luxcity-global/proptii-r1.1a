@@ -93,7 +93,7 @@ const HomeownerHome = () => {
               startOnView={true}
               once={true}
             >
-              Manage Your Home
+              Keep Your Home Safe and Organized
             </TextAnimate>
           </h1>
 
@@ -105,7 +105,7 @@ const HomeownerHome = () => {
             startOnView={true}
             once={true}
           >
-            Everything you need to maintain, improve, and protect your home in one place.
+            Track repairs, store important documents, and keep everything about your home in one place.
           </TextAnimate>
 
           {/* CTA Buttons */}
@@ -135,10 +135,10 @@ const HomeownerHome = () => {
           {/* Section Header */}
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-[#374957] mb-4">
-              Homeowner Features
+              What You Can Do
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Comprehensive tools to help you manage every aspect of your home.
+              Practical tools to help you keep track of everything about your home.
             </p>
           </div>
 
@@ -156,7 +156,7 @@ const HomeownerHome = () => {
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-[#374957] mb-4">Maintenance Management</h3>
-                <p className="text-gray-600 mb-8">Track repairs, schedule maintenance, and manage service history</p>
+                <p className="text-gray-600 mb-8">Track what needs fixing and keep a record of all repairs. Know what's been done and what's next.</p>
               </div>
               <button
                 onClick={handleGoToMaintenance}
@@ -180,7 +180,7 @@ const HomeownerHome = () => {
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-[#374957] mb-4">Home Improvement</h3>
-                <p className="text-gray-600 mb-8">Plan projects, track progress, and calculate ROI on renovations</p>
+                <p className="text-gray-600 mb-8">Plan your renovation projects and keep track of what you've spent. See how your home's value changes.</p>
               </div>
               <button
                 onClick={handleViewFeatures}
@@ -204,7 +204,7 @@ const HomeownerHome = () => {
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-[#374957] mb-4">Home Value & Equity</h3>
-                <p className="text-gray-600 mb-8">Track your home's value and monitor equity growth over time</p>
+                <p className="text-gray-600 mb-8">See how much your home is worth and how your equity is growing. Know where you stand.</p>
               </div>
               <button
                 onClick={handleViewFeatures}
@@ -235,7 +235,7 @@ const HomeownerHome = () => {
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-[#374957] mb-4">Documentation Hub</h3>
-                <p className="text-gray-600 mb-8">Store warranties, manuals, receipts, and all home documents</p>
+                <p className="text-gray-600 mb-8">Keep all your home documents in one safe place. Warranties, receipts, manuals - find them when you need them.</p>
               </div>
               <button
                 onClick={handleGoToDocuments}
@@ -259,7 +259,7 @@ const HomeownerHome = () => {
                 </svg>
               </div>
               <h4 className="font-bold text-[#374957] mb-2">Energy Efficiency</h4>
-              <p className="text-sm text-gray-600">Track utilities and optimize consumption</p>
+              <p className="text-sm text-gray-600">Track your bills and see where you can save</p>
             </div>
 
             {/* Insurance & Protection */}
@@ -270,7 +270,7 @@ const HomeownerHome = () => {
                 </svg>
               </div>
               <h4 className="font-bold text-[#374957] mb-2">Insurance & Protection</h4>
-              <p className="text-sm text-gray-600">Manage policies and track claims</p>
+              <p className="text-sm text-gray-600">Keep track of your insurance policies and claims</p>
             </div>
 
             {/* Neighborhood Insights */}
@@ -282,7 +282,7 @@ const HomeownerHome = () => {
                 </svg>
               </div>
               <h4 className="font-bold text-[#374957] mb-2">Neighborhood Insights</h4>
-              <p className="text-sm text-gray-600">Local amenities and market trends</p>
+              <p className="text-sm text-gray-600">See what's happening in your area and nearby amenities</p>
             </div>
 
             {/* Property Tax & Finance */}
@@ -293,14 +293,14 @@ const HomeownerHome = () => {
                 </svg>
               </div>
               <h4 className="font-bold text-[#374957] mb-2">Tax & Finance</h4>
-              <p className="text-sm text-gray-600">Track taxes and financial planning</p>
+              <p className="text-sm text-gray-600">Keep track of property taxes and home-related expenses</p>
             </div>
           </div>
 
           {/* Bottom Note */}
           <div className="text-center mt-12">
             <p className="text-gray-500 text-sm">
-              All features are accessible from your homeowner dashboard
+              All features are available from your homeowner dashboard
             </p>
           </div>
         </div>

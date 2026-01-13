@@ -142,7 +142,7 @@ const AgentHome = () => {
               startOnView={true}
               once={true}
             >
-              List Your Properties
+              List Your Properties, Find Tenants Faster
             </TextAnimate>
           </h1>
 
@@ -154,7 +154,7 @@ const AgentHome = () => {
             startOnView={true}
             once={true}
           >
-            Streamline your property listings and reach more potential tenants.
+            Get your properties in front of serious tenants. Less back-and-forth, more bookings.
           </TextAnimate>
 
           {/* Go to Dashboard Button */}
@@ -183,10 +183,10 @@ const AgentHome = () => {
           {/* Section Header */}
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-[#374957] mb-4">
-              What would you like to do next?
+              Get Started
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Choose how you'd like to continue setting up your property management system. You can always access these options later from your&nbsp;dashboard.
+              Choose what you want to do first. You can always come back to these options later.
             </p>
           </div>
 
@@ -203,7 +203,7 @@ const AgentHome = () => {
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-[#374957] mb-4">Go to Dashboard</h3>
-                <p className="text-gray-600 mb-8">Explore your property management&nbsp;dashboard</p>
+                <p className="text-gray-600 mb-8">See all your properties and bookings in one place</p>
               </div>
               <button
                 onClick={handleGoToDashboard}
@@ -234,7 +234,7 @@ const AgentHome = () => {
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-[#374957] mb-4">Add a Property</h3>
-                <p className="text-gray-600 mb-8">Get started by adding a property to your&nbsp;portfolio</p>
+                <p className="text-gray-600 mb-8">List your first property and start getting bookings</p>
               </div>
               <button
                 onClick={handleAddProperty}
@@ -260,8 +260,8 @@ const AgentHome = () => {
                 <h3 className="text-xl font-bold text-[#374957] mb-4">{selectedRole === 'agent' ? 'Setup Company Profile' : 'Setup Landlord Profile'}</h3>
                 <p className="text-gray-600 mb-8">
                   {selectedRole === 'agent'
-                    ? 'Add company details, logo, and professional\u00A0settings'
-                    : 'Add your landlord details, contact info, and optional branding'}
+                    ? "Add your company details so tenants know who they're working with"
+                    : 'Add your contact details so tenants can reach you'}
                 </p>
               </div>
               <button
@@ -279,7 +279,7 @@ const AgentHome = () => {
           {/* Bottom Note */}
           <div className="text-center">
             <p className="text-gray-500 text-sm">
-              Don't worry - you can access all of these features anytime from your&nbsp;dashboard
+              You can access all of these options anytime from your dashboard
             </p>
           </div>
         </div>

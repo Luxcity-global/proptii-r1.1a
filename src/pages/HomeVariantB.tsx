@@ -99,7 +99,7 @@ const HomeVariantB = () => {
               startOnView={true}
               once={true}
             >
-              Find Your Dream Home
+              Find Real Homes, Less Stress
             </TextAnimate>
           </h3>
 
@@ -111,7 +111,7 @@ const HomeVariantB = () => {
             startOnView={true}
             once={true}
           >
-            We make finding and securing your home easy, every step of the way.
+            A trusted rental assistant that helps you find real listings, book viewings faster, and handle the rental process with fewer risks.
           </TextAnimate>
 
           {/* Search Bar */}
@@ -148,12 +148,12 @@ const HomeVariantB = () => {
               </div>
               <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Book Viewing</h3>
               <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
-                Save time and effort with our AI-powered booking service. Simply enter your desired property details and let our system handle the rest.
+                Book viewings without endless calls and follow-ups. Less chasing, more time to find the right place.
               </p>
               <button
                 onClick={() => navigate('/bookviewing')}
                 className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
-                Learn More
+                See How It Works
               </button>
             </MagicCard>
 
@@ -170,12 +170,12 @@ const HomeVariantB = () => {
               </div>
               <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Referencing</h3>
               <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
-                Ensure peace of mind for both landlords and tenants. Our rigorous referencing process verifies renter or buyer identity, financial stability, and rental history.
+                A tenant profile that helps agents take you seriously. Show you're credible without the back-and-forth.
               </p>
               <button
                 onClick={() => navigate('/referencing')}
                 className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
-                Learn More
+                See How It Works
               </button>
             </div>
 
@@ -192,12 +192,12 @@ const HomeVariantB = () => {
               </div>
               <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Contract</h3>
               <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
-                Save time and reduce errors with our contract management solution. We offer a range of customizable lease agreement templates to suit your specific needs.
+                Know what you're signing and keep proof. All your rental documents in one safe place.
               </p>
               <button
                 onClick={() => navigate('/contracts')}
                 className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
-                Learn More
+                See How It Works
               </button>
             </div>
           </div>

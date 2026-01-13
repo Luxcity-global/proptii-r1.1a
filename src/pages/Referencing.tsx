@@ -96,7 +96,7 @@ const Referencing = () => {
               startOnView={true}
               once={true}
             >
-              Verify Your Identity, Funds, and Rental History
+              Show Agents You're a Serious Tenant
             </TextAnimate>
           </h3>
 
@@ -108,7 +108,7 @@ const Referencing = () => {
             startOnView={true}
             once={true}
           >
-            Ensure peace of mind for both landlords and tenants. Our rigorous referencing process verifies renter's identity, financial status, and rental history
+            Build a tenant profile that proves you're credible. Share it with agents so they take you seriously—without the back-and-forth.
           </TextAnimate>
 
           <InteractiveHoverButton
@@ -131,7 +131,7 @@ const Referencing = () => {
           {/* Left Section - Text Content */}
           <div className="w-full md:w-2/5 space-y-6 md:space-y-10 text-center md:text-left md:absolute md:top-1/2 md:-translate-y-1/2 md:left-48 md:rounded-lg md:p-6 relative z-50">
             <h2 className="text-2xl md:text-3xl font-bold text-[#136C9E] leading-tight">
-              All your referencing, sorted in one place
+              All your referencing in one place
             </h2>
             <TextAnimate
               className="text-gray-600 text-base md:text-lg leading-relaxed"
@@ -140,8 +140,7 @@ const Referencing = () => {
               startOnView={true}
               once={true}
             >
-              No more chasing employers or guarantors. Our platform collects your details, reaches out to your referees,
-              and shares the full package with agents—fast and securely.
+              No more chasing employers or guarantors. We collect your details, reach out to your referees, and share everything with agents. Less work for you, faster results.
             </TextAnimate>
             <InteractiveHoverButton
               onClick={handleGetStarted}

@@ -140,7 +140,7 @@ const BookViewing = () => {
             alt="Family enjoying dinner together"
             className="w-full h-full object-cover"
             loading="eager"
-            fetchpriority="high"
+            fetchPriority="high"
             sizes="100vw"
           />
           {/* Overlay to ensure text readability */}
@@ -157,7 +157,7 @@ const BookViewing = () => {
               startOnView={true}
               once={true}
             >
-              Skip the Hassle and Book Property Viewings with Proptii AI
+              Book Viewings Without the Back-and-Forth
             </TextAnimate>
           </h3>
 
@@ -170,7 +170,7 @@ const BookViewing = () => {
             startOnView={true}
             once={true}
           >
-            We make finding and securing your home easy, every step of the way,
+            Share the listing and your preferred time. We contact the agent and confirm your appointment—so you can focus on finding the right place.
           </TextAnimate>
 
           <InteractiveHoverButton
@@ -193,7 +193,7 @@ const BookViewing = () => {
           {/* Left Section - Text Content */}
           <div className="w-full md:w-2/5 space-y-6 md:space-y-10 text-center md:text-left md:absolute md:top-1/2 md:-translate-y-1/2 md:left-48 md:rounded-lg md:p-6 relative z-50">
             <h2 className="text-2xl md:text-3xl font-bold text-[#136C9E] leading-tight">
-              Property viewings made easy.
+              Book viewings without endless calls
             </h2>
             <TextAnimate
               className="text-gray-600 text-base md:text-lg leading-relaxed"
@@ -202,7 +202,7 @@ const BookViewing = () => {
               startOnView={true}
               once={true}
             >
-              Simply share the listing link and your preferred date and time—our AI takes it from there. We'll contact the agent and confirm your appointment, so you can focus on finding the right home.
+              Share the listing link and your preferred date and time. We contact the agent and confirm your appointment. Less chasing, more time to find the right place.
             </TextAnimate>
             <InteractiveHoverButton
               onClick={handleGetStarted}

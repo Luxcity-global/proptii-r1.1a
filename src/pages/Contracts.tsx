@@ -70,7 +70,7 @@ const ContractsPage = () => {
               startOnView={true}
               once={true}
             >
-              Rental Agreements Made Simple.
+              Know What You're Signing, Keep Proof
             </TextAnimate>
           </h3>
 
@@ -82,7 +82,7 @@ const ContractsPage = () => {
             startOnView={true}
             once={true}
           >
-            Fast digital signing, safe storage, and effortless sharing.
+            Sign contracts digitally, store them safely, and share them when needed. All your rental documents in one place.
           </TextAnimate>
 
           <InteractiveHoverButton
@@ -123,12 +123,10 @@ const ContractsPage = () => {
           {/* Text Section */}
           <div className="mb-12 max-w-3xl">
             <h2 className="text-4xl md:text-5xl font-bold font-archive text-[#136C9E]">
-              Securely store rental documents.
+              Keep all your rental documents safe
             </h2>
             <p className="mt-6 text-lg text-gray-600">
-              Our platform lets tenants sign contracts digitally, store them safely, and share instantly with
-              <br />
-              landlords or agents—no more printing, scanning, or searching.
+              Sign contracts digitally, store them safely, and share them when needed. No more printing, scanning, or searching for lost papers.
             </p>
           </div>
 
@@ -177,7 +175,7 @@ const ContractsPage = () => {
                 }
                 Icon={Lock}
                 iconClassName="text-[#136C9E]"
-                description="All your rental documents are automatically saved and encrypted. Access them securely from anywhere, anytime—no more lost paperwork."
+                description="All your rental documents are saved in one safe place. Access them from anywhere, anytime—no more lost paperwork."
                 href="#"
                 cta="Get started"
                 onClick={handleGetStarted}
@@ -207,7 +205,7 @@ const ContractsPage = () => {
                 }
                 Icon={Zap}
                 iconClassName="text-blue-600"
-                description="Stay updated in real-time. Get instant alerts when contracts are signed, documents are ready, or actions are needed."
+                description="Get notified when contracts are signed, documents are ready, or when you need to take action. Stay on top of everything."
                 href="#"
                 cta="Get started"
                 onClick={handleGetStarted}
@@ -232,7 +230,7 @@ const ContractsPage = () => {
                 }
                 Icon={Users}
                 iconClassName="text-purple-600"
-                description="Share contracts instantly with tenants, landlords, and agents. Everyone stays in sync with real-time updates and seamless collaboration."
+                description="Share contracts instantly with tenants, landlords, and agents. Everyone sees the same thing, no confusion."
                 href="#"
                 cta="Get started"
                 onClick={handleGetStarted}
@@ -258,11 +256,9 @@ const ContractsPage = () => {
                 iconClassName="text-green-600"
                 description={
                   <>
-                    Sign contracts in minutes, not days. No printing, scanning,
+                    Sign contracts in minutes, not days. No printing or scanning needed.
                     <br />
-                    or mailing required. Complete agreements instantly from
-                    <br />
-                    any device.
+                    Complete everything from your phone or computer.
                   </>
                 }
                 href="#"

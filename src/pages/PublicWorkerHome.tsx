@@ -74,7 +74,7 @@ const PublicWorkerHome = () => {
               startOnView={true}
               once={true}
             >
-              Connect Communities with Housing
+              Help Your Clients Find Real Homes
             </TextAnimate>
           </h1>
 
@@ -86,7 +86,7 @@ const PublicWorkerHome = () => {
             startOnView={true}
             once={true}
           >
-            Partner with agents and landlords to help your clients find safe, affordable housing. Streamline the process and make a real difference in people's lives.
+            Connect with trusted agents and landlords to help your clients find safe, affordable housing. Less chasing, more results.
           </TextAnimate>
 
           {/* CTA Buttons */}
@@ -122,10 +122,10 @@ const PublicWorkerHome = () => {
           {/* Section Header */}
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-[#374957] mb-4">
-              Public Worker Services
+              How Proptii Helps You
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Tools and resources to help you connect your clients with housing opportunities through our network of trusted agents and landlords.
+              Practical tools to connect your clients with real housing opportunities. All in one place.
             </p>
           </div>
 
@@ -142,7 +142,7 @@ const PublicWorkerHome = () => {
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-[#374957] mb-4">Agent & Landlord Network</h3>
-                <p className="text-gray-600 mb-8">Connect with verified agents and landlords to find housing solutions for your clients</p>
+                <p className="text-gray-600 mb-8">Connect with verified agents and landlords. Find real listings without the usual back-and-forth.</p>
               </div>
               <button
                 onClick={handleConnectWithAgents}
@@ -166,7 +166,7 @@ const PublicWorkerHome = () => {
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-[#374957] mb-4">Housing Search Tools</h3>
-                <p className="text-gray-600 mb-8">Access comprehensive property listings and search filters to match clients with suitable homes</p>
+                <p className="text-gray-600 mb-8">Find real listings that match your clients' needs. No fake ads or wasted time.</p>
               </div>
               <button
                 onClick={handleViewFeatures}
@@ -190,7 +190,7 @@ const PublicWorkerHome = () => {
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-[#374957] mb-4">Client Management</h3>
-                <p className="text-gray-600 mb-8">Track client applications, housing needs, and progress through the housing placement process</p>
+                <p className="text-gray-600 mb-8">Keep track of your clients' applications and housing needs. All in one place.</p>
               </div>
               <button
                 onClick={handleViewFeatures}
@@ -221,7 +221,7 @@ const PublicWorkerHome = () => {
                   </div>
                 </div>
                 <h3 className="text-xl font-bold text-[#374957] mb-4">Resources & Support</h3>
-                <p className="text-gray-600 mb-8">Access guides, templates, and support to help navigate housing assistance programs</p>
+                <p className="text-gray-600 mb-8">Guides and templates to help you navigate housing assistance. Clear, practical support when you need it.</p>
               </div>
               <button
                 onClick={handleViewResources}
@@ -245,7 +245,7 @@ const PublicWorkerHome = () => {
                 </svg>
               </div>
               <h4 className="font-bold text-[#374957] mb-2">Application Assistance</h4>
-              <p className="text-sm text-gray-600">Help clients complete rental applications and documentation</p>
+              <p className="text-sm text-gray-600">Help clients complete applications properly. Fewer mistakes, faster results.</p>
             </div>
 
             {/* Referencing Support */}
@@ -256,7 +256,7 @@ const PublicWorkerHome = () => {
                 </svg>
               </div>
               <h4 className="font-bold text-[#374957] mb-2">Referencing Support</h4>
-              <p className="text-sm text-gray-600">Streamline tenant referencing and verification processes</p>
+              <p className="text-sm text-gray-600">Help clients show they're serious tenants. Less chasing, more credibility.</p>
             </div>
 
             {/* Communication Hub */}
@@ -267,7 +267,7 @@ const PublicWorkerHome = () => {
                 </svg>
               </div>
               <h4 className="font-bold text-[#374957] mb-2">Communication Hub</h4>
-              <p className="text-sm text-gray-600">Coordinate with agents, landlords, and clients in one place</p>
+              <p className="text-sm text-gray-600">Coordinate with agents, landlords, and clients. All messages in one place.</p>
             </div>
 
             {/* Reporting & Analytics */}
@@ -278,14 +278,14 @@ const PublicWorkerHome = () => {
                 </svg>
               </div>
               <h4 className="font-bold text-[#374957] mb-2">Reporting & Analytics</h4>
-              <p className="text-sm text-gray-600">Track outcomes and measure the impact of your housing assistance</p>
+              <p className="text-sm text-gray-600">Track how many clients you've helped find homes. See what's working.</p>
             </div>
           </div>
 
           {/* Bottom Note */}
           <div className="text-center mt-12">
             <p className="text-gray-500 text-sm">
-              All services are designed to help you efficiently connect your clients with housing opportunities
+              All tools are designed to help you connect your clients with real housing opportunities
             </p>
           </div>
         </div>
