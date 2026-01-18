@@ -127,26 +127,38 @@ const RentalDocuments: React.FC = () => {
           </p>
           
           {/* SEO Content Section */}
-          <div className="max-w-4xl mx-auto text-left bg-white rounded-2xl p-8 mb-12 shadow-sm border border-gray-100">
-            <h3 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
-              Official UK Government Rental Documents
-            </h3>
-            <div className="max-w-none" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }} contentEditable={false}>
-              <p className="mb-4">
-                All documents available here are official publications from UK government departments, including the Department for Levelling Up, Housing and Communities (DLUHC) and the Home Office. These are the same documents you would find on official government websites, provided here for your convenience.
-              </p>
-              <p className="mb-4">
-                <strong>How to Rent Guide:</strong> The official DLUHC guide for tenants renting in England. This comprehensive guide covers everything from finding a property to ending a tenancy, including your rights and responsibilities, deposit protection, repairs, and eviction procedures. Updated October 2023.
-              </p>
-              <p className="mb-4">
-                <strong>Right to Rent Documents:</strong> UK landlords must verify tenants' right to rent in the UK. We provide both the standard guide and an easy-read version for better accessibility. These guides explain what documents are acceptable and the verification process.
-              </p>
-              <p className="mb-4">
-                <strong>Deposit Templates:</strong> The Tenancy Deposit Scheme prescribed information template helps ensure your deposit is properly registered and protected. This is a legal requirement for landlords in England and Wales.
-              </p>
-              <p>
-                <strong>Health & Safety:</strong> The Legionella Risk Assessment template helps landlords assess and manage the risk of Legionnaires' disease in rental properties. While this is primarily a landlord responsibility, understanding it helps you know what to expect.
-              </p>
+          <div className="max-w-7xl mx-auto text-left bg-white rounded-2xl p-8 mb-12 shadow-sm border border-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start" contentEditable={false}>
+              {/* Image on the left */}
+              <div className="order-2 md:order-1">
+                <img
+                  src="/images/Documents introsectn image.png"
+                  alt="UK rental documents"
+                  className="w-full h-auto rounded-lg object-cover"
+                />
+              </div>
+              
+              {/* Text on the right */}
+              <div className="order-1 md:order-2" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  Official UK Government Rental Documents
+                </h3>
+                <p className="mb-4">
+                  All documents available here are official publications from UK government departments, including the Department for Levelling Up, Housing and Communities (DLUHC) and the Home Office.
+                </p>
+                <p className="mb-4">
+                  <strong>How to Rent Guide:</strong> The official DLUHC guide for tenants renting in England. This comprehensive guide covers everything from finding a property to ending a tenancy, including your rights and responsibilities, deposit protection, repairs, and eviction procedures. Updated October 2023.
+                </p>
+                <p className="mb-4">
+                  <strong>Right to Rent Documents:</strong> UK landlords must verify tenants' right to rent in the UK. We provide both the standard guide and an easy-read version for better accessibility. These guides explain what documents are acceptable and the verification process.
+                </p>
+                <p className="mb-4">
+                  <strong>Deposit Templates:</strong> The Tenancy Deposit Scheme prescribed information template helps ensure your deposit is properly registered and protected. This is a legal requirement for landlords in England and Wales.
+                </p>
+                <p>
+                  <strong>Health & Safety:</strong> The Legionella Risk Assessment template helps landlords assess and manage the risk of Legionnaires' disease in rental properties. While this is primarily a landlord responsibility, understanding it helps you know what to expect.
+                </p>
+              </div>
             </div>
           </div>
         </div>

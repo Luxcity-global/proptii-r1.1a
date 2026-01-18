@@ -259,7 +259,7 @@ const Tools: React.FC = () => {
                 
                 {/* SEO Content Section */}
                 <div className="max-w-7xl mx-auto text-left bg-white rounded-2xl p-8 mb-12 shadow-sm border border-gray-100">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center" contentEditable={false}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start" contentEditable={false}>
                     {/* Image on the left */}
                     <div className="order-2 md:order-1">
                       <img
