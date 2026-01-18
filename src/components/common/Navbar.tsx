@@ -53,6 +53,12 @@ export const Navbar: React.FC = () => {
             >
               Contracts
             </Link>
+            <Link
+              to="/tools"
+              className="text-white hover:text-gray-200 text-xl font-medium"
+            >
+              Tools
+            </Link>
           </div>
 
           <div>

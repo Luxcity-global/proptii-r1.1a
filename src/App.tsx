@@ -36,6 +36,13 @@ import TermsOfService from './pages/TermsOfService';
 import FAQ from './pages/FAQ';
 // import AgentContractLanding from './pages/AgentContractLanding';
 import SearchResults from './pages/SearchResults';
+import Tools from './pages/Tools';
+import ReadinessChecker from './pages/tools/ReadinessChecker';
+import DocumentTracker from './pages/tools/DocumentTracker';
+import ViewingTracker from './pages/tools/ViewingTracker';
+import ProcessSimulator from './pages/tools/ProcessSimulator';
+import TimelineGenerator from './pages/tools/TimelineGenerator';
+import KnowYourRights from './pages/tools/KnowYourRights';
 
 export const App: React.FC = () => {
   return (
@@ -76,6 +83,15 @@ export const App: React.FC = () => {
             <Route path="/contracts" element={<ContractsPage />} />
 
             <Route path="/bookviewing" element={<BookViewing />} />
+
+            {/* Tools routes */}
+            <Route path="/tools" element={<Tools />} />
+            <Route path="/tools/readiness-checker" element={<ReadinessChecker />} />
+            <Route path="/tools/document-tracker" element={<DocumentTracker />} />
+            <Route path="/tools/viewing-tracker" element={<ViewingTracker />} />
+            <Route path="/tools/process-simulator" element={<ProcessSimulator />} />
+            <Route path="/tools/timeline-generator" element={<TimelineGenerator />} />
+            <Route path="/tools/know-your-rights" element={<KnowYourRights />} />
 
             {/* Listings routes */}
             <Route path="/listings" element={<Listings />} />

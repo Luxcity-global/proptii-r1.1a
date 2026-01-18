@@ -30,21 +30,25 @@ const HomeownerNavbar: React.FC<HomeownerNavbarProps> = ({ isHomeowner = true })
     'Tenant': [
       { label: 'Book Viewing', path: '/bookviewing' },
       { label: 'Referencing', path: '/referencing' },
-      { label: 'Contracts', path: '/contracts' }
+      { label: 'Contracts', path: '/contracts' },
+      { label: 'Tools', path: '/tools' }
     ],
     'Agent': [
       { label: 'Book Viewing', path: '/bookviewing' },
-      { label: 'Contracts', path: '/agent-contracts' }
+      { label: 'Contracts', path: '/agent-contracts' },
+      { label: 'Tools', path: '/tools' }
     ],
     'Home Owner': [
       { label: 'Maintenance', path: '/homeowner/maintenance' },
       { label: 'Projects', path: '/homeowner/projects' },
-      { label: 'Documents', path: '/homeowner/documents' }
+      { label: 'Documents', path: '/homeowner/documents' },
+      { label: 'Tools', path: '/tools' }
     ],
     'Public worker': [
       { label: 'Services', path: '/public-worker/services' },
       { label: 'Resources', path: '/public-worker/resources' },
-      { label: 'Support', path: '/public-worker/support' }
+      { label: 'Support', path: '/public-worker/support' },
+      { label: 'Tools', path: '/tools' }
     ]
   };
 
