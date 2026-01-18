@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, XCircle, Download } from 'lucide-react';
-import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import { SEO } from '../../components/SEO';
 
@@ -72,17 +71,45 @@ const ReadinessChecker: React.FC = () => {
   return (
     <>
       <SEO
-        title="Rental Readiness Checker | Proptii"
-        description="Assess your readiness for rental applications with our interactive checklist. Check if you have all required documents and information."
+        title="Free Rental Readiness Checker | UK Tenant Application Checklist | Proptii"
+        description="Free interactive rental readiness checker for UK tenants. Assess if you're prepared for rental applications with our comprehensive checklist covering documents, references, income, and legal requirements. Get instant feedback and download your personalized checklist."
         canonical="/tools/readiness-checker"
-        keywords={['rental readiness', 'tenant checklist', 'rental application', 'UK rental']}
+        keywords={[
+          'rental readiness checker',
+          'tenant application checklist',
+          'UK rental readiness',
+          'rental application preparation',
+          'tenant document checklist',
+          'rental application requirements',
+          'UK tenant checklist',
+          'rental readiness assessment',
+          'property rental preparation',
+          'tenant application readiness'
+        ]}
+        relatedTerms={[
+          'renting in UK',
+          'tenant application',
+          'rental documents',
+          'property rental',
+          'UK housing application'
+        ]}
         category="Rental Tools"
+        structuredData={{
+          '@context': 'https://schema.org',
+          '@type': 'WebApplication',
+          name: 'Rental Readiness Checker',
+          description: 'Interactive tool to assess your readiness for UK rental applications',
+          applicationCategory: 'RealEstateApplication',
+          offers: {
+            '@type': 'Offer',
+            price: '0',
+            priceCurrency: 'GBP'
+          }
+        }}
       />
       
       <div className="min-h-screen font-nunito">
-        <Navbar />
-
-        <div className="max-w-4xl mx-auto px-4 py-12">
+        <div className="max-w-4xl mx-auto px-4 pt-12 pb-12">
           <Link
             to="/tools"
             className="inline-flex items-center text-indigo-600 hover:text-indigo-700 mb-8"
@@ -92,10 +119,28 @@ const ReadinessChecker: React.FC = () => {
           </Link>
 
           <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">Rental Readiness Checker</h1>
-            <p className="text-gray-600 mb-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>Rental Readiness Checker</h1>
+            <p className="text-gray-600 mb-8" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
               Answer these questions to assess your readiness for rental applications. Be honest to get the most accurate assessment.
             </p>
+
+            {/* SEO Content Section */}
+            <div className="bg-blue-50 rounded-xl p-6 mb-8 border border-blue-100">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                Why Check Your Rental Readiness?
+              </h2>
+              <div style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }} contentEditable={false}>
+                <p className="mb-4">
+                  Before you start applying for rental properties in the UK, it's essential to ensure you have everything landlords and letting agents require. Missing documents or unprepared applications can lead to rejection, wasted time, and lost opportunities on properties you love.
+                </p>
+                <p className="mb-4">
+                  Our rental readiness checker evaluates your preparation across eight key areas: legal documentation (right to rent), proof of income, references, financial readiness, credit checks, identity verification, guarantor arrangements, and deposit funds. Each question helps identify gaps in your application package.
+                </p>
+                <p>
+                  <strong>How it works:</strong> Answer all 8 questions honestly. Based on your responses, you'll receive a readiness score and personalized feedback. If you score 75% or higher, you're well-prepared. Below 50%, you may need to gather additional documents or make arrangements before applying. You can download your checklist as a text file for reference.
+                </p>
+              </div>
+            </div>
 
             {answeredCount > 0 && (
               <div className="mb-8">

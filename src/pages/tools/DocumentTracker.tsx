@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Circle } from 'lucide-react';
-import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import { SEO } from '../../components/SEO';
 
@@ -44,17 +43,33 @@ const DocumentTracker: React.FC = () => {
   return (
     <>
       <SEO
-        title="Document Tracker | Proptii"
-        description="Track which rental documents you have and what you still need. Organize your rental application documents with our interactive tracker."
+        title="Free Rental Document Tracker | UK Tenant Application Documents | Proptii"
+        description="Free interactive document tracker for UK rental applications. Track which documents you have and what you still need. Organize by category: Identity, Income, References, Financial, and Guarantor documents. Visual progress tracking included."
         canonical="/tools/document-tracker"
-        keywords={['document tracker', 'rental documents', 'tenant documents', 'application checklist']}
+        keywords={[
+          'rental document tracker',
+          'tenant document checklist',
+          'UK rental documents',
+          'rental application documents',
+          'tenant document organizer',
+          'property rental documents',
+          'rental document list',
+          'UK tenant paperwork',
+          'rental application checklist',
+          'document preparation rental'
+        ]}
+        relatedTerms={[
+          'rental documents UK',
+          'tenant application',
+          'rental paperwork',
+          'property rental documents',
+          'UK housing documents'
+        ]}
         category="Rental Tools"
       />
       
       <div className="min-h-screen font-nunito">
-        <Navbar />
-
-        <div className="max-w-4xl mx-auto px-4 py-12">
+        <div className="max-w-4xl mx-auto px-4 pt-12 pb-12">
           <Link
             to="/tools"
             className="inline-flex items-center text-indigo-600 hover:text-indigo-700 mb-8"
@@ -64,10 +79,28 @@ const DocumentTracker: React.FC = () => {
           </Link>
 
           <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">Document Tracker</h1>
-            <p className="text-gray-600 mb-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>Document Tracker</h1>
+            <p className="text-gray-600 mb-8" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
               Track which rental documents you have and what you still need for your application.
             </p>
+
+            {/* SEO Content Section */}
+            <div className="bg-purple-50 rounded-xl p-6 mb-8 border border-purple-100">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                Essential Documents for UK Rental Applications
+              </h2>
+              <div style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }} contentEditable={false}>
+                <p className="mb-4">
+                  UK landlords and letting agents require specific documents to verify your identity, income, rental history, and financial stability. Having all required documents ready before you start viewing properties significantly increases your chances of securing a rental.
+                </p>
+                <p className="mb-4">
+                  Our document tracker organizes required documents into six categories: <strong>Identity</strong> (passport, right to rent documents, proof of address), <strong>Income</strong> (payslips, bank statements, employment contract), <strong>Rental History</strong> (previous landlord references), <strong>References</strong> (employer references), <strong>Financial</strong> (credit checks, deposit proof), and <strong>Guarantor</strong> (if required).
+                </p>
+                <p className="mb-4">
+                  <strong>Tip:</strong> Most landlords require documents from the last 3 months. Keep digital copies of all documents ready, as many agents now accept online applications. Check off documents as you gather them to track your progress visually.
+                </p>
+              </div>
+            </div>
 
             {/* Progress Section */}
             <div className="mb-8 bg-gray-50 rounded-lg p-6">

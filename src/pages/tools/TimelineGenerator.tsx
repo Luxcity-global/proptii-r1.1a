@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock } from 'lucide-react';
-import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import { SEO } from '../../components/SEO';
 
@@ -71,17 +70,33 @@ const TimelineGenerator: React.FC = () => {
   return (
     <>
       <SEO
-        title="Timeline Generator | Proptii"
-        description="Estimate how long your rental application process will take based on your situation and documents."
+        title="Free Rental Application Timeline Calculator | UK Property Rental Timeline | Proptii"
+        description="Free rental application timeline calculator for UK tenants. Estimate how long your rental application will take based on your documents, credit score, guarantor needs, and property competitiveness. Get personalized timeline estimates to plan your move."
         canonical="/tools/timeline-generator"
-        keywords={['rental timeline', 'application timeline', 'tenancy timeline', 'UK rental']}
+        keywords={[
+          'rental timeline calculator',
+          'rental application timeline',
+          'UK rental timeline',
+          'property rental timeline',
+          'tenancy application time',
+          'rental process duration',
+          'how long to rent property',
+          'UK rental application time',
+          'rental timeline estimate',
+          'property application timeline'
+        ]}
+        relatedTerms={[
+          'rental application duration',
+          'UK housing timeline',
+          'property rental time',
+          'tenant application time',
+          'rental process length'
+        ]}
         category="Rental Tools"
       />
       
       <div className="min-h-screen font-nunito">
-        <Navbar />
-
-        <div className="max-w-4xl mx-auto px-4 py-12">
+        <div className="max-w-4xl mx-auto px-4 pt-12 pb-12">
           <Link
             to="/tools"
             className="inline-flex items-center text-indigo-600 hover:text-indigo-700 mb-8"
@@ -91,10 +106,31 @@ const TimelineGenerator: React.FC = () => {
           </Link>
 
           <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">Timeline Generator</h1>
-            <p className="text-gray-600 mb-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>Timeline Generator</h1>
+            <p className="text-gray-600 mb-8" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
               Estimate how long your rental application process will take based on your situation.
             </p>
+
+            {/* SEO Content Section */}
+            <div className="bg-teal-50 rounded-xl p-6 mb-8 border border-teal-100">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                How Long Does a UK Rental Application Take?
+              </h2>
+              <div style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }} contentEditable={false}>
+                <p className="mb-4">
+                  The time it takes to complete a rental application in the UK varies significantly based on several factors. Our timeline generator helps you estimate a realistic timeframe based on your specific circumstances.
+                </p>
+                <p className="mb-4">
+                  <strong>Factors that affect your timeline:</strong> Having all documents ready can save 5-7 days. Needing a guarantor adds 3-5 days for their verification. Your credit score impacts processing time - excellent scores can speed things up, while poor scores may require additional checks. Highly competitive properties (in popular areas) often have longer processing times due to multiple applicants.
+                </p>
+                <p className="mb-4">
+                  <strong>Typical timeline breakdown:</strong> Application submission (1-2 days), referencing and checks (5-10 days), contract preparation (2-3 days), deposit payment and finalization (2-3 days), and move-in preparation (2-4 days). Most straightforward applications complete in 14-21 days, while complex cases may take 3-4 weeks.
+                </p>
+                <p>
+                  Use the calculator below to get a personalized estimate. Remember, these are estimates - actual timelines depend on the landlord, agent efficiency, and any unexpected issues that arise during the process.
+                </p>
+              </div>
+            </div>
 
             <div className="space-y-6 mb-8">
               <div className="border border-gray-200 rounded-lg p-6">

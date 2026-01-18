@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, ChevronUp, CheckCircle2, Circle } from 'lucide-react';
-import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import { SEO } from '../../components/SEO';
 
@@ -90,10 +89,30 @@ const KnowYourRights: React.FC = () => {
   return (
     <>
       <SEO
-        title="Know Your Rights | Proptii"
-        description="Interactive guide to UK tenant rights and responsibilities. Learn about deposit protection, repairs, privacy, eviction, and discrimination protection."
+        title="UK Tenant Rights Guide | Know Your Rental Rights & Responsibilities | Proptii"
+        description="Comprehensive interactive guide to UK tenant rights and responsibilities. Learn about deposit protection schemes, landlord repair obligations, privacy rights, eviction protection, and discrimination laws. Based on official UK government guidance."
         canonical="/tools/know-your-rights"
-        keywords={['tenant rights', 'UK tenant rights', 'rental rights', 'tenant protection']}
+        keywords={[
+          'UK tenant rights',
+          'tenant rights UK',
+          'rental rights',
+          'tenant protection UK',
+          'landlord tenant rights',
+          'UK housing rights',
+          'tenant responsibilities',
+          'deposit protection rights',
+          'eviction protection UK',
+          'tenant privacy rights',
+          'discrimination protection tenant',
+          'repair rights tenant'
+        ]}
+        relatedTerms={[
+          'tenant legal rights',
+          'UK housing law',
+          'rental agreement rights',
+          'tenant obligations',
+          'UK tenancy rights'
+        ]}
         category="Rental Tools"
         structuredData={{
           '@context': 'https://schema.org',
@@ -110,9 +129,7 @@ const KnowYourRights: React.FC = () => {
       />
       
       <div className="min-h-screen font-nunito">
-        <Navbar />
-
-        <div className="max-w-4xl mx-auto px-4 py-12">
+        <div className="max-w-4xl mx-auto px-4 pt-12 pb-12">
           <Link
             to="/tools"
             className="inline-flex items-center text-indigo-600 hover:text-indigo-700 mb-8"
@@ -122,10 +139,37 @@ const KnowYourRights: React.FC = () => {
           </Link>
 
           <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">Know Your Rights</h1>
-            <p className="text-gray-600 mb-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>Know Your Rights</h1>
+            <p className="text-gray-600 mb-8" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
               Interactive guide to UK tenant rights and responsibilities. Check off items as you learn about them.
             </p>
+
+            {/* SEO Content Section */}
+            <div className="bg-red-50 rounded-xl p-6 mb-8 border border-red-100">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                Understanding Your Rights as a UK Tenant
+              </h2>
+              <div style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }} contentEditable={false}>
+                <p className="mb-4">
+                  As a tenant in the UK, you have specific legal rights protected by law. Understanding these rights helps you recognize when they're being violated and ensures you can live safely and comfortably in your rental property. This guide covers the five most important areas of tenant rights.
+                </p>
+                <p className="mb-4">
+                  <strong>Deposit Protection:</strong> Your landlord must protect your deposit in a government-approved scheme within 30 days and provide you with protection information. You can dispute unfair deductions, and deposits must be returned within 10 days of tenancy ending (minus legitimate deductions).
+                </p>
+                <p className="mb-4">
+                  <strong>Repairs & Maintenance:</strong> Landlords are legally required to keep properties in good repair, ensure gas, electricity, and water are safe, and provide an Energy Performance Certificate. You must report issues promptly.
+                </p>
+                <p className="mb-4">
+                  <strong>Privacy & Quiet Enjoyment:</strong> You have the right to live without unnecessary interference. Landlords must give 24 hours' notice before visiting (except emergencies) and cannot enter without permission.
+                </p>
+                <p className="mb-4">
+                  <strong>Eviction Protection:</strong> Landlords must follow proper legal procedures - giving proper notice (usually 2 months), obtaining a court order, and using bailiffs for eviction. You have the right to challenge evictions in court.
+                </p>
+                <p>
+                  <strong>Protection from Discrimination:</strong> You're protected from discrimination based on age, disability, gender, race, religion, or sexual orientation. Report discrimination to the Equality and Human Rights Commission.
+                </p>
+              </div>
+            </div>
 
             {/* Progress Section */}
             <div className="mb-8 bg-gray-50 rounded-lg p-6">

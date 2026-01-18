@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Plus, Calendar, MapPin, User, FileText, Trash2 } from 'lucide-react';
-import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import { SEO } from '../../components/SEO';
 
@@ -71,17 +70,33 @@ const ViewingTracker: React.FC = () => {
   return (
     <>
       <SEO
-        title="Viewing Tracker | Proptii"
-        description="Organize and track your property viewings and agent communications. Keep all your viewing information in one place."
+        title="Free Property Viewing Tracker | Organize Rental Viewings | Proptii"
+        description="Free property viewing tracker for UK tenants. Organize and track all property viewings, agent contacts, viewing dates, and notes. Save your data locally in your browser. Perfect for managing multiple property viewings during your rental search."
         canonical="/tools/viewing-tracker"
-        keywords={['viewing tracker', 'property viewings', 'rental viewings', 'property organizer']}
+        keywords={[
+          'property viewing tracker',
+          'rental viewing organizer',
+          'UK property viewings',
+          'viewing tracker tool',
+          'property viewing notes',
+          'rental property organizer',
+          'viewing management',
+          'property search tracker',
+          'viewing schedule tracker',
+          'rental viewing log'
+        ]}
+        relatedTerms={[
+          'property viewings UK',
+          'rental property search',
+          'viewing properties',
+          'property hunting',
+          'UK rental search'
+        ]}
         category="Rental Tools"
       />
       
       <div className="min-h-screen font-nunito">
-        <Navbar />
-
-        <div className="max-w-4xl mx-auto px-4 py-12">
+        <div className="max-w-4xl mx-auto px-4 pt-12 pb-12">
           <Link
             to="/tools"
             className="inline-flex items-center text-indigo-600 hover:text-indigo-700 mb-8"
@@ -93,8 +108,8 @@ const ViewingTracker: React.FC = () => {
           <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 mb-8">
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h1 className="text-4xl font-bold text-gray-900 mb-2">Viewing Tracker</h1>
-                <p className="text-gray-600">
+                <h1 className="text-4xl font-bold text-gray-900 mb-2" style={{ fontFamily: 'Archivo, sans-serif' }}>Viewing Tracker</h1>
+                <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
                   Organize and track your property viewings and agent communications.
                 </p>
               </div>
@@ -105,6 +120,24 @@ const ViewingTracker: React.FC = () => {
                 <Plus className="h-5 w-5 mr-2" />
                 Add Viewing
               </button>
+            </div>
+
+            {/* SEO Content Section */}
+            <div className="bg-green-50 rounded-xl p-6 mb-8 border border-green-100">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                Why Track Your Property Viewings?
+              </h2>
+              <div style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }} contentEditable={false}>
+                <p className="mb-4">
+                  When searching for a rental property in the UK, you'll likely view multiple properties with different agents. Keeping track of viewing details, agent contacts, and your impressions helps you make informed decisions and stay organized throughout your search.
+                </p>
+                <p className="mb-4">
+                  Our viewing tracker lets you record: <strong>Property address</strong>, <strong>Viewing date and time</strong>, <strong>Agent name and contact information</strong>, and <strong>Personal notes</strong> about the property, neighborhood, or any concerns. All data is saved locally in your browser for privacy.
+                </p>
+                <p>
+                  <strong>Pro tip:</strong> Take photos during viewings (with permission) and note any issues, questions, or positive features. This helps you compare properties later and remember important details when making your decision.
+                </p>
+              </div>
             </div>
 
             {isFormOpen && (

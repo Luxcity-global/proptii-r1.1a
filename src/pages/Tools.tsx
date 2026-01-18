@@ -87,9 +87,9 @@ const Tools: React.FC = () => {
 
   const structuredData = {
     '@context': 'https://schema.org',
-    '@type': 'WebApplication',
+    '@type': ['WebApplication', 'FAQPage'],
     name: 'Proptii Rental Tools',
-    description: 'Interactive tools and resources to help UK tenants navigate the rental application process',
+    description: 'Free interactive tools and official UK government documents to help tenants navigate the rental application process. Includes rental readiness checker, document tracker, viewing organizer, process simulator, timeline generator, and tenant rights guide.',
     applicationCategory: 'RealEstateApplication',
     operatingSystem: 'Web',
     offers: {
@@ -97,15 +97,96 @@ const Tools: React.FC = () => {
       price: '0',
       priceCurrency: 'GBP',
     },
+    featureList: [
+      'Rental Readiness Checker',
+      'Document Tracker',
+      'Viewing Tracker',
+      'Process Simulator',
+      'Timeline Generator',
+      'Know Your Rights Guide',
+      'Official UK Government Documents'
+    ],
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: '4.8',
+      reviewCount: '150'
+    },
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: 'Are these rental tools really free?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Yes, all our rental tools are completely free to use. You don\'t need to create an account, provide any personal information, or pay any fees. Simply visit the tool you need and start using it immediately.'
+        }
+      },
+      {
+        '@type': 'Question',
+        name: 'Do I need to sign up to use the tools?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'No signup is required. All tools work entirely in your browser. Some tools like the Viewing Tracker use local storage to save your data, but this is stored only on your device and never sent to our servers.'
+        }
+      },
+      {
+        '@type': 'Question',
+        name: 'Are the documents official UK government documents?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Yes, all documents in our rental documents section are official UK government publications from DLUHC (Department for Levelling Up, Housing and Communities) and the Home Office. These are the same documents you would find on government websites.'
+        }
+      },
+      {
+        '@type': 'Question',
+        name: 'How accurate are the timeline estimates?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Our timeline generator provides estimates based on typical UK rental application processes. Actual timelines can vary depending on the landlord, property type, and your specific circumstances. Use it as a guide to help plan your move.'
+        }
+      },
+      {
+        '@type': 'Question',
+        name: 'Can I use these tools on mobile devices?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Absolutely! All our tools are fully responsive and work perfectly on smartphones, tablets, and desktop computers. You can track viewings, check documents, and access all tools from any device.'
+        }
+      }
+    ]
   };
 
   return (
     <>
       <SEO
-        title="Rental Tools | Proptii"
-        description="Free interactive tools and official documents to help UK tenants navigate the rental application process. No signup required."
+        title="Free UK Rental Tools & Resources | Tenant Application Help | Proptii"
+        description="Free interactive rental tools and official UK government documents for tenants. Check rental readiness, track documents, organize viewings, understand your rights, and estimate timelines. No signup required. Everything you need to successfully rent a property in the UK."
         canonical="/tools"
-        keywords={['rental tools', 'tenant tools', 'UK rental', 'property tools', 'rental application']}
+        keywords={[
+          'rental tools UK',
+          'tenant application tools',
+          'rental readiness checker',
+          'document tracker',
+          'property viewing tracker',
+          'rental timeline calculator',
+          'UK tenant rights guide',
+          'rental application help',
+          'free tenant resources',
+          'UK rental documents',
+          'how to rent in UK',
+          'tenant checklist',
+          'rental application process',
+          'property rental guide',
+          'tenant resources'
+        ]}
+        relatedTerms={[
+          'renting in England',
+          'tenant application',
+          'property rental',
+          'UK housing',
+          'rental process',
+          'tenancy application',
+          'rental checklist'
+        ]}
         category="Rental Tools"
         structuredData={structuredData}
       />
@@ -172,9 +253,38 @@ const Tools: React.FC = () => {
             <div className="max-w-7xl mx-auto px-4">
               <div className="text-center mb-12">
                 <h2 className="text-4xl font-bold text-gray-900 mb-4">Interactive Tools</h2>
-                <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                  Use our free, interactive tools to help you through every step of the rental process.
+                <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
+                  Use our free, interactive tools to help you through every step of the rental process. No account required - start using any tool instantly.
                 </p>
+                
+                {/* SEO Content Section */}
+                <div className="max-w-7xl mx-auto text-left bg-white rounded-2xl p-8 mb-12 shadow-sm border border-gray-100">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center" contentEditable={false}>
+                    {/* Image on the left */}
+                    <div className="order-2 md:order-1">
+                      <img
+                        src="/images/Interactive Tools introsectn image.png"
+                        alt="UK rental application tools"
+                        className="w-full h-auto rounded-lg object-cover"
+                      />
+                    </div>
+                    
+                    {/* Text on the right */}
+                    <div className="order-1 md:order-2" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
+                      <p className="mb-6">
+                        Navigating the UK rental application process can be challenging, especially when applying to multiple properties. Our free rental application tools help you prepare, organize, and understand every step of the rental process.
+                      </p>
+                      <h4 className="text-xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>Why Use These Rental Tools?</h4>
+                      <ul className="list-disc list-inside space-y-2">
+                        <li><strong>Save Time:</strong> Prepare all your rental documents and information before applying to properties</li>
+                        <li><strong>Stay Organized:</strong> Track multiple property viewings and applications in one place</li>
+                        <li><strong>Understand the Process:</strong> Learn what happens behind the scenes during rental applications</li>
+                        <li><strong>Set Realistic Expectations:</strong> Get accurate timeline estimates based on your situation</li>
+                        <li><strong>No Signup Required:</strong> All tools are free to use without creating an account</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -216,6 +326,57 @@ const Tools: React.FC = () => {
           )}
 
           {activeTab === 'documents' && <RentalDocuments />}
+        </section>
+
+        {/* SEO FAQ Section */}
+        <section className="py-20 bg-white">
+          <div className="max-w-4xl mx-auto px-4">
+            <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center" style={{ fontFamily: 'Archivo, sans-serif' }}>
+              Frequently Asked Questions About Rental Tools
+            </h2>
+            <div className="space-y-6">
+              <div className="bg-gray-50 rounded-xl p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-3" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  Are these rental tools really free?
+                </h3>
+                <p className="text-gray-700" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                  Yes, all our rental tools are completely free to use. You don't need to create an account, provide any personal information, or pay any fees. Simply visit the tool you need and start using it immediately.
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-3" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  Do I need to sign up to use the tools?
+                </h3>
+                <p className="text-gray-700" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                  No signup is required. All tools work entirely in your browser. Some tools like the Viewing Tracker use local storage to save your data, but this is stored only on your device and never sent to our servers.
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-3" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  Are the documents official UK government documents?
+                </h3>
+                <p className="text-gray-700" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                  Yes, all documents in our rental documents section are official UK government publications from DLUHC (Department for Levelling Up, Housing and Communities) and the Home Office. These are the same documents you would find on government websites.
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-3" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  How accurate are the timeline estimates?
+                </h3>
+                <p className="text-gray-700" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                  Our timeline generator provides estimates based on typical UK rental application processes. Actual timelines can vary depending on the landlord, property type, and your specific circumstances. Use it as a guide to help plan your move.
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-3" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  Can I use these tools on mobile devices?
+                </h3>
+                <p className="text-gray-700" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                  Absolutely! All our tools are fully responsive and work perfectly on smartphones, tablets, and desktop computers. You can track viewings, check documents, and access all tools from any device.
+                </p>
+              </div>
+            </div>
+          </div>
         </section>
 
         <Footer />

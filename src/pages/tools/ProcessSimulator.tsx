@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
-import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
 import { SEO } from '../../components/SEO';
 
@@ -105,17 +104,33 @@ const ProcessSimulator: React.FC = () => {
   return (
     <>
       <SEO
-        title="Rental Process Simulator | Proptii"
-        description="Walk through the UK rental application process step by step. Understand what happens at each stage of renting a property."
+        title="UK Rental Application Process Guide | Step-by-Step Simulator | Proptii"
+        description="Complete step-by-step guide to the UK rental application process. Walk through all 6 stages: property search, application submission, referencing, offer negotiation, deposit & contract, and move-in. Understand exactly what happens at each stage when renting in the UK."
         canonical="/tools/process-simulator"
-        keywords={['rental process', 'tenancy process', 'UK rental', 'property application']}
+        keywords={[
+          'UK rental process',
+          'rental application process',
+          'tenancy application steps',
+          'UK rental process guide',
+          'property rental process',
+          'rental application stages',
+          'how to rent in UK',
+          'UK tenancy process',
+          'rental application walkthrough',
+          'property rental steps'
+        ]}
+        relatedTerms={[
+          'renting process UK',
+          'tenant application',
+          'UK housing process',
+          'rental application guide',
+          'property rental UK'
+        ]}
         category="Rental Tools"
       />
       
       <div className="min-h-screen font-nunito">
-        <Navbar />
-
-        <div className="max-w-4xl mx-auto px-4 py-12">
+        <div className="max-w-4xl mx-auto px-4 pt-12 pb-12">
           <Link
             to="/tools"
             className="inline-flex items-center text-indigo-600 hover:text-indigo-700 mb-8"
@@ -125,10 +140,34 @@ const ProcessSimulator: React.FC = () => {
           </Link>
 
           <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">Rental Process Simulator</h1>
-            <p className="text-gray-600 mb-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>Rental Process Simulator</h1>
+            <p className="text-gray-600 mb-8" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
               Walk through the UK rental application process step by step to understand what to expect.
             </p>
+
+            {/* SEO Content Section */}
+            <div className="bg-yellow-50 rounded-xl p-6 mb-8 border border-yellow-100">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                Understanding the UK Rental Application Process
+              </h2>
+              <div style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }} contentEditable={false}>
+                <p className="mb-4">
+                  The UK rental application process typically follows six main stages, from initial property search to moving in. Understanding each stage helps you prepare, know what to expect, and avoid common pitfalls that can delay or derail your application.
+                </p>
+                <p className="mb-4">
+                  <strong>Stage 1 - Search & View Properties:</strong> Use property portals like Rightmove and Zoopla, contact agents, attend viewings, and compare options. <strong>Stage 2 - Submit Application:</strong> Complete application forms, submit documents, provide references, and pay any application fees.
+                </p>
+                <p className="mb-4">
+                  <strong>Stage 3 - Referencing & Credit Check:</strong> Landlords verify your income, check your credit history, contact previous landlords and employers, and verify your right to rent. <strong>Stage 4 - Offer & Negotiation:</strong> Receive the landlord's offer, review tenancy terms, and negotiate if needed.
+                </p>
+                <p className="mb-4">
+                  <strong>Stage 5 - Deposit & Contract:</strong> Pay your security deposit (usually 5 weeks' rent), review and sign the tenancy agreement, and ensure your deposit is registered with a protection scheme. <strong>Stage 6 - Move In:</strong> Complete inventory check-in, receive keys, set up utilities, and update your address.
+                </p>
+                <p>
+                  Use the interactive timeline below to navigate through each stage. Click on any step to jump directly to it, or use the Previous/Next buttons to walk through sequentially.
+                </p>
+              </div>
+            </div>
 
             {/* Step Timeline */}
             <div className="mb-8 flex items-center justify-between">
