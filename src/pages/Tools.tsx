@@ -270,17 +270,17 @@ const Tools: React.FC = () => {
                     </div>
                     
                     {/* Text on the right */}
-                    <div className="order-1 md:order-2" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
+                    <div className="order-1 md:order-2" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif', userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none' }}>
                       <p className="mb-6">
                         Navigating the UK rental application process can be challenging, especially when applying to multiple properties. Our free rental application tools help you prepare, organize, and understand every step of the rental process.
                       </p>
                       <h4 className="text-xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>Why Use These Rental Tools?</h4>
-                      <ul className="list-disc list-inside space-y-2">
-                        <li><strong>Save Time:</strong> Prepare all your rental documents and information before applying to properties</li>
-                        <li><strong>Stay Organized:</strong> Track multiple property viewings and applications in one place</li>
-                        <li><strong>Understand the Process:</strong> Learn what happens behind the scenes during rental applications</li>
-                        <li><strong>Set Realistic Expectations:</strong> Get accurate timeline estimates based on your situation</li>
-                        <li><strong>No Signup Required:</strong> All tools are free to use without creating an account</li>
+                      <ul className="list-disc list-inside space-y-2" style={{ textWrap: 'pretty', hyphens: 'auto' }}>
+                        <li><strong>Save Time:</strong> Prepare all your rental documents and information before applying to rental{'\u00A0'}properties.</li>
+                        <li><strong>Stay Organized:</strong> Track multiple property viewings and applications all in one convenient{'\u00A0'}place.</li>
+                        <li><strong>Understand the Process:</strong> Learn what happens behind the scenes during the rental application{'\u00A0'}process.</li>
+                        <li><strong>Set Realistic Expectations:</strong> Get accurate timeline estimates based on your specific{'\u00A0'}situation.</li>
+                        <li><strong>No Signup Required:</strong> All tools are free to use without creating an account or providing personal{'\u00A0'}information.</li>
                       </ul>
                     </div>
                   </div>

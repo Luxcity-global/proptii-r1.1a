@@ -147,6 +147,7 @@
     "googleapis": "^149.0.0",
     "jose": "^6.0.12",
     "jsonwebtoken": "^9.0.2",
+    "jspdf": "^4.0.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.330.0",
     "mammoth": "^1.9.1",

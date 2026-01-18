@@ -139,7 +139,7 @@ const RentalDocuments: React.FC = () => {
               </div>
               
               {/* Text on the right */}
-              <div className="order-1 md:order-2" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
+              <div className="order-1 md:order-2" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif', userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none' }}>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
                   Official UK Government Rental Documents
                 </h3>
