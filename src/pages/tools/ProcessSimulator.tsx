@@ -17,7 +17,7 @@ const steps: Step[] = [
     title: 'Search & View Properties',
     description: 'Find properties that match your criteria and schedule viewings',
     details: [
-      'Use property search websites (Rightmove, Zoopla, etc.)',
+      'Search for properties on Proptii',
       'Contact agents to arrange viewings',
       'Attend viewings and take notes',
       'Compare properties and locations',
@@ -155,7 +155,7 @@ const ProcessSimulator: React.FC = () => {
                   The UK rental application process typically follows six main stages, from initial property search to moving in. Understanding each stage helps you prepare, know what to expect, and avoid common pitfalls that can delay or derail your application.
                 </p>
                 <p className="mb-4">
-                  <strong>Stage 1 - Search & View Properties:</strong> Use property portals like Rightmove and Zoopla, contact agents, attend viewings, and compare options. <strong>Stage 2 - Submit Application:</strong> Complete application forms, submit documents, provide references, and pay any application fees.
+                  <strong>Stage 1 - Search & View Properties:</strong> Search for properties on Proptii, contact agents, attend viewings, and compare options. <strong>Stage 2 - Submit Application:</strong> Complete application forms, submit documents, provide references, and pay any application fees.
                 </p>
                 <p className="mb-4">
                   <strong>Stage 3 - Referencing & Credit Check:</strong> Landlords verify your income, check your credit history, contact previous landlords and employers, and verify your right to rent. <strong>Stage 4 - Offer & Negotiation:</strong> Receive the landlord's offer, review tenancy terms, and negotiate if needed.
