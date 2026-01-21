@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, XCircle, Download } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, Download, Circle } from 'lucide-react';
 import Footer from '../../components/Footer';
 import { SEO } from '../../components/SEO';
 import jsPDF from 'jspdf';
@@ -17,14 +17,15 @@ const questions: Question[] = [
   { id: 'q3', text: 'Do you have references from previous landlords or employers?', category: 'References' },
   { id: 'q4', text: 'Do you have a UK bank account?', category: 'Financial' },
   { id: 'q5', text: 'Do you have a credit check report ready?', category: 'Financial' },
+  { id: 'q8', text: 'Do you have deposit funds ready (usually 5 weeks rent)?', category: 'Financial' },
   { id: 'q6', text: 'Do you have proof of address (utility bill, council tax bill)?', category: 'Identity' },
   { id: 'q7', text: 'Do you have a guarantor if required?', category: 'Guarantor' },
-  { id: 'q8', text: 'Do you have deposit funds ready (usually 5 weeks rent)?', category: 'Financial' },
 ];
 
 const ReadinessChecker: React.FC = () => {
   const [answers, setAnswers] = useState<Record<string, boolean | null>>({});
   const [readinessState, setReadinessState] = useState<string | null>(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   const handleAnswer = (questionId: string, answer: boolean) => {
     const newAnswers = { ...answers, [questionId]: answer };
@@ -50,6 +51,41 @@ const ReadinessChecker: React.FC = () => {
   const yesCount = Object.values(answers).filter(a => a === true).length;
   const percentage = answeredCount > 0 ? (yesCount / answeredCount) * 100 : 0;
   const totalPercentage = answeredCount === questions.length ? (yesCount / questions.length) * 100 : 0;
+
+  const categories = Array.from(new Set(questions.map((q) => q.category)));
+  const currentQuestion = questions[currentQuestionIndex];
+  const currentCategoryQuestions = questions.filter(
+    (q) => q.category === currentQuestion.category
+  );
+  const currentCategoryIndex =
+    currentCategoryQuestions.findIndex((q) => q.id === currentQuestion.id) + 1;
+  const currentCategoryTotal = currentCategoryQuestions.length;
+  const currentAnswer = answers[currentQuestion.id];
+
+  const handleNext = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    }
+  };
+
+  const handleCategoryClick = (category: string) => {
+    // Find the first unanswered question in this category, or the first question if all are answered
+    const categoryQuestions = questions.filter((q) => q.category === category);
+    const firstUnanswered = categoryQuestions.find((q) => answers[q.id] === undefined || answers[q.id] === null);
+    const targetIndex = firstUnanswered 
+      ? questions.findIndex((q) => q.id === firstUnanswered.id)
+      : questions.findIndex((q) => q.category === category);
+    
+    if (targetIndex !== -1) {
+      setCurrentQuestionIndex(targetIndex);
+    }
+  };
+
+  // Check if a category is complete (all questions answered)
+  const isCategoryComplete = (category: string) => {
+    const categoryQuestions = questions.filter((q) => q.category === category);
+    return categoryQuestions.every((q) => answers[q.id] !== undefined && answers[q.id] !== null);
+  };
 
   const downloadChecklist = () => {
     const doc = new jsPDF();
@@ -306,8 +342,17 @@ const ReadinessChecker: React.FC = () => {
         }}
       />
       
-      <div className="min-h-screen font-nunito">
-        <div className="max-w-4xl mx-auto px-4 pt-12 pb-12">
+      <div 
+        className="min-h-screen font-nunito"
+        style={{ 
+          backgroundImage: 'url(/assets/add_prp_slide/addtenbg.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          width: '100%'
+        }}
+      >
+        <div className="max-w-5xl mx-auto px-4 pt-12 pb-16">
           <Link
             to="/tools"
             className="inline-flex items-center text-indigo-600 hover:text-indigo-700 mb-8"
@@ -316,89 +361,188 @@ const ReadinessChecker: React.FC = () => {
             Back to Tools
           </Link>
 
-          <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>Rental Readiness Checker</h1>
-            <p className="text-gray-600 mb-8" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
-              Answer these questions to assess your readiness for rental applications. Be honest to get the most accurate assessment.
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 md:p-10 mb-10">
+            <h1
+              className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 text-center"
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              Rental Readiness Checker
+            </h1>
+            <p
+              className="text-gray-600 mb-8 text-center max-w-2xl mx-auto"
+              style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}
+            >
+              Answer a few quick questions to check how ready you are for rental applications.
             </p>
 
-            {/* SEO Content Section */}
-            <div className="bg-blue-50 rounded-xl p-6 mb-8 border border-blue-100">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                Why Check Your Rental Readiness?
-              </h2>
-              <div style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }} contentEditable={false}>
-                <p className="mb-4">
-                  Before you start applying for rental properties in the UK, it's essential to ensure you have everything landlords and letting agents require. Missing documents or unprepared applications can lead to rejection, wasted time, and lost opportunities on properties you love.
-                </p>
-                <p className="mb-4">
-                  Our rental readiness checker evaluates your preparation across eight key areas: legal documentation (right to rent), proof of income, references, financial readiness, credit checks, identity verification, guarantor arrangements, and deposit funds. Each question helps identify gaps in your application package.
-                </p>
-                <p>
-                  <strong>How it works:</strong> Answer all 8 questions honestly. Based on your responses, you'll receive a readiness score and personalized feedback. If you score 75% or higher, you're well-prepared. Below 50%, you may need to gather additional documents or make arrangements before applying. You can download your checklist as a PDF document for reference.
-                </p>
-              </div>
-            </div>
+            {/* Main assessment layout */}
+            <div className="bg-[#F7F8FB] rounded-3xl p-6 md:p-10">
+              <div className="grid md:grid-cols-[280px,minmax(0,1fr)] gap-10 items-stretch">
+                {/* Left sidebar - categories */}
+                <div>
+                  <div className="bg-white rounded-2xl shadow-md p-4 space-y-2">
+                    {categories.map((category, index) => {
+                      const isCurrentCategory = currentQuestion.category === category;
+                      const isComplete = isCategoryComplete(category);
 
-            {answeredCount > 0 && (
-              <div className="mb-8">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-700">
-                    Progress: {answeredCount}/{questions.length}
-                  </span>
-                  <span className="text-sm font-medium text-gray-700">
-                    {Math.round(percentage)}% Yes
-                  </span>
+                      return (
+                        <button
+                          key={category}
+                          type="button"
+                          onClick={() => handleCategoryClick(category)}
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                            isCurrentCategory
+                              ? 'bg-[#E6F3FF] border-2 border-[#136C9E] shadow-sm'
+                              : isComplete
+                              ? 'bg-green-50 border border-green-200 hover:bg-green-100'
+                              : 'bg-white border border-gray-200 hover:bg-gray-50'
+                          }`}
+                          style={isCurrentCategory ? { fontFamily: 'Archivo, sans-serif' } : { fontFamily: 'Archivo, sans-serif' }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                isCurrentCategory
+                                  ? 'bg-[#136C9E] text-white'
+                                  : isComplete
+                                  ? 'bg-green-500 text-white'
+                                  : 'bg-gray-300 text-gray-600'
+                              }`}
+                            >
+                              {isComplete ? '✓' : index + 1}
+                            </div>
+                            <span
+                              className={`text-sm font-medium ${
+                                isCurrentCategory
+                                  ? 'text-[#136C9E]'
+                                  : isComplete
+                                  ? 'text-green-700'
+                                  : 'text-gray-800'
+                              }`}
+                              style={{ fontFamily: 'Archivo, sans-serif' }}
+                            >
+                              {category}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
-                  <div
-                    className="bg-indigo-600 h-3 rounded-full transition-all duration-300"
-                    style={{ width: `${(answeredCount / questions.length) * 100}%` }}
-                  />
+
+                {/* Right side - current question & answers */}
+                <div className="flex flex-col items-center md:items-start">
+                  <p
+                    className="text-sm text-gray-500 mb-2 text-center md:text-left"
+                    style={{ fontFamily: 'Archivo, sans-serif' }}
+                  >
+                    {currentQuestion.category} question {currentCategoryIndex} of{' '}
+                    {currentCategoryTotal}
+                  </p>
+                  <h2
+                    className="text-xl md:text-2xl font-semibold text-gray-900 mb-8 text-center md:text-left"
+                    style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}
+                  >
+                    {currentQuestion.text}
+                  </h2>
+
+                  <div className="flex flex-col sm:flex-row gap-6 justify-center md:justify-start w-full">
+                    {/* Yes card */}
+                    <button
+                      type="button"
+                      onClick={() => handleAnswer(currentQuestion.id, true)}
+                      className={`flex-1 max-w-xs rounded-2xl border-2 shadow-sm transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg ${
+                        currentAnswer === true
+                          ? 'border-emerald-400 shadow-lg bg-white scale-105'
+                          : 'border-gray-200 bg-white hover:border-emerald-300'
+                      }`}
+                    >
+                      <div
+                        className={`h-12 w-full rounded-t-2xl transition-colors ${
+                          currentAnswer === true ? 'bg-emerald-100' : 'bg-emerald-50'
+                        }`}
+                      />
+                      <div className="px-8 py-6 flex flex-col items-center justify-center -mt-6">
+                        <CheckCircle2
+                          className={`h-8 w-8 transition-colors ${
+                            currentAnswer === true
+                              ? 'text-emerald-500'
+                              : 'text-emerald-400'
+                          }`}
+                        />
+                        <span
+                          className="mt-3 text-lg font-semibold text-gray-900"
+                          style={{ fontFamily: 'Archivo, sans-serif' }}
+                        >
+                          Yes
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* No card */}
+                    <button
+                      type="button"
+                      onClick={() => handleAnswer(currentQuestion.id, false)}
+                      className={`flex-1 max-w-xs rounded-2xl border-2 shadow-sm transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg ${
+                        currentAnswer === false
+                          ? 'border-rose-400 shadow-lg bg-white scale-105'
+                          : 'border-gray-200 bg-white hover:border-rose-300'
+                      }`}
+                    >
+                      <div
+                        className={`h-12 w-full rounded-t-2xl transition-colors ${
+                          currentAnswer === false ? 'bg-rose-100' : 'bg-rose-50'
+                        }`}
+                      />
+                      <div className="px-8 py-6 flex flex-col items-center justify-center -mt-6">
+                        <XCircle
+                          className={`h-8 w-8 transition-colors ${
+                            currentAnswer === false ? 'text-rose-500' : 'text-rose-400'
+                          }`}
+                        />
+                        <span
+                          className="mt-3 text-lg font-semibold text-gray-900"
+                          style={{ fontFamily: 'Archivo, sans-serif' }}
+                        >
+                          No
+                        </span>
+                      </div>
+                    </button>
+                  </div>
                 </div>
               </div>
-            )}
 
-            <div className="space-y-4 mb-8">
-              {questions.map((question) => (
-                <div
-                  key={question.id}
-                  className="border border-gray-200 rounded-lg p-6"
+              {/* Next button */}
+              <div className="mt-10 flex justify-center">
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={currentAnswer === undefined || currentAnswer === null || currentQuestionIndex === questions.length - 1}
+                  className={`px-10 py-3 rounded-full font-semibold text-white transition-all duration-300 flex items-center gap-2 min-w-[140px] justify-center ${
+                    currentAnswer !== undefined && currentAnswer !== null && currentQuestionIndex < questions.length - 1
+                      ? 'bg-gradient-to-r from-[#DC5F12] to-[#DC5F12]/80 hover:from-[#DC5F12]/90 hover:to-[#DC5F12]/70 hover:scale-105 hover:shadow-lg'
+                      : 'bg-gray-300 cursor-not-allowed'
+                  }`}
+                  style={{
+                    background: currentAnswer !== undefined && currentAnswer !== null && currentQuestionIndex < questions.length - 1
+                      ? 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)'
+                      : '#D1D5DB',
+                    boxShadow: currentAnswer !== undefined && currentAnswer !== null && currentQuestionIndex < questions.length - 1
+                      ? '0 4px 14px 0 rgba(220, 95, 18, 0.39)'
+                      : 'none',
+                    fontFamily: 'Archivo, sans-serif'
+                  }}
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
-                        {question.category}
-                      </span>
-                      <p className="text-lg font-medium text-gray-900">{question.text}</p>
-                    </div>
-                  </div>
-                  <div className="flex space-x-4">
-                    <button
-                      onClick={() => handleAnswer(question.id, true)}
-                      className={`flex-1 py-3 px-4 rounded-lg font-medium transition ${
-                        answers[question.id] === true
-                          ? 'bg-green-600 text-white'
-                          : 'bg-green-50 text-green-700 hover:bg-green-100'
-                      }`}
-                    >
-                      <CheckCircle2 className="h-5 w-5 inline mr-2" />
-                      Yes
-                    </button>
-                    <button
-                      onClick={() => handleAnswer(question.id, false)}
-                      className={`flex-1 py-3 px-4 rounded-lg font-medium transition ${
-                        answers[question.id] === false
-                          ? 'bg-red-600 text-white'
-                          : 'bg-red-50 text-red-700 hover:bg-red-100'
-                      }`}
-                    >
-                      <XCircle className="h-5 w-5 inline mr-2" />
-                      No
-                    </button>
-                  </div>
-                </div>
-              ))}
+                  <span>
+                    {currentQuestionIndex === questions.length - 1
+                      ? 'Complete'
+                      : 'Next'}
+                  </span>
+                  {currentQuestionIndex < questions.length - 1 && (
+                    <span aria-hidden="true">→</span>
+                  )}
+                </button>
+              </div>
             </div>
 
             {readinessState && (
