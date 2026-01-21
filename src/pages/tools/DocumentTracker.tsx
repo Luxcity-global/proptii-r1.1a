@@ -27,6 +27,7 @@ const categories = ['Identity', 'Income', 'Rental History', 'References', 'Finan
 
 const DocumentTracker: React.FC = () => {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [selectedCategory, setSelectedCategory] = useState<string>(categories[0]);
 
   const toggleCheck = (id: string) => {
     setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -68,45 +69,45 @@ const DocumentTracker: React.FC = () => {
         category="Rental Tools"
       />
       
-      <div className="min-h-screen font-nunito">
-        <div className="max-w-4xl mx-auto px-4 pt-12 pb-12">
+      <div 
+        className="min-h-screen font-nunito"
+        style={{ 
+          backgroundImage: 'url(/assets/add_prp_slide/addtenbg.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          width: '100%'
+        }}
+      >
+        <div className="max-w-5xl mx-auto px-4 pt-12 pb-16">
           <Link
             to="/tools"
             className="inline-flex items-center text-indigo-600 hover:text-indigo-700 mb-8"
+            style={{ fontFamily: 'Archivo, sans-serif' }}
           >
             <ArrowLeft className="h-5 w-5 mr-2" />
             Back to Tools
           </Link>
 
-          <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>Document Tracker</h1>
-            <p className="text-gray-600 mb-8" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 md:p-10 mb-10">
+            <h1 
+              className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 text-center" 
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              Document Tracker
+            </h1>
+            <p 
+              className="text-gray-600 mb-8 text-center max-w-2xl mx-auto" 
+              style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}
+            >
               Track which rental documents you have and what you still need for your application.
             </p>
-
-            {/* SEO Content Section */}
-            <div className="bg-purple-50 rounded-xl p-6 mb-8 border border-purple-100">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                Essential Documents for UK Rental Applications
-              </h2>
-              <div style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }} contentEditable={false}>
-                <p className="mb-4">
-                  UK landlords and letting agents require specific documents to verify your identity, income, rental history, and financial stability. Having all required documents ready before you start viewing properties significantly increases your chances of securing a rental.
-                </p>
-                <p className="mb-4">
-                  Our document tracker organizes required documents into six categories: <strong>Identity</strong> (passport, right to rent documents, proof of address), <strong>Income</strong> (payslips, bank statements, employment contract), <strong>Rental History</strong> (previous landlord references), <strong>References</strong> (employer references), <strong>Financial</strong> (credit checks, deposit proof), and <strong>Guarantor</strong> (if required).
-                </p>
-                <p className="mb-4">
-                  <strong>Tip:</strong> Most landlords require documents from the last 3 months. Keep digital copies of all documents ready, as many agents now accept online applications. Check off documents as you gather them to track your progress visually.
-                </p>
-              </div>
-            </div>
 
             {/* Progress Section */}
             <div className="mb-8 bg-gray-50 rounded-lg p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Progress</h3>
-                <span className="text-2xl font-bold text-indigo-600">{Math.round(percentage)}%</span>
+                <h3 className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'Archivo, sans-serif' }}>Progress</h3>
+                <span className="text-2xl font-bold text-indigo-600" style={{ fontFamily: 'Archivo, sans-serif' }}>{Math.round(percentage)}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-4">
                 <div
@@ -114,54 +115,123 @@ const DocumentTracker: React.FC = () => {
                   style={{ width: `${percentage}%` }}
                 />
               </div>
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-sm text-gray-600 mt-2" style={{ fontFamily: 'Archivo, sans-serif' }}>
                 {checkedCount} of {totalItems} documents collected
               </p>
             </div>
 
-            {/* Documents by Category */}
-            <div className="space-y-6">
-              {categories.map((category) => {
-                const categoryDocs = getCategoryDocuments(category);
-                const categoryChecked = categoryDocs.filter((doc) => checked[doc.id]).length;
-                const categoryPercentage = categoryDocs.length > 0 
-                  ? (categoryChecked / categoryDocs.length) * 100 
-                  : 0;
+            {/* Main document tracker layout */}
+            <div className="bg-[#F7F8FB] rounded-3xl p-6 md:p-10">
+              <div className="grid md:grid-cols-[280px,minmax(0,1fr)] gap-10 items-stretch">
+                {/* Left sidebar - categories */}
+                <div>
+                  <div className="bg-white rounded-2xl shadow-md p-4 space-y-2">
+                    {categories.map((category, index) => {
+                      const categoryDocs = getCategoryDocuments(category);
+                      const categoryChecked = categoryDocs.filter((doc) => checked[doc.id]).length;
+                      const isComplete = categoryDocs.length > 0 && categoryChecked === categoryDocs.length;
+                      const isCurrentCategory = selectedCategory === category;
 
-                return (
-                  <div key={category} className="border border-gray-200 rounded-lg p-6">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-xl font-bold text-gray-900">{category}</h3>
-                      <span className="text-sm font-medium text-gray-600">
-                        {categoryChecked}/{categoryDocs.length}
-                      </span>
-                    </div>
-                    <div className="space-y-3">
-                      {categoryDocs.map((doc) => (
-                        <label
-                          key={doc.id}
-                          className="flex items-center p-4 rounded-lg hover:bg-gray-50 cursor-pointer transition"
+                      return (
+                        <button
+                          key={category}
+                          type="button"
+                          onClick={() => setSelectedCategory(category)}
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                            isCurrentCategory
+                              ? 'bg-[#E6F3FF] border-2 border-[#136C9E] shadow-sm'
+                              : isComplete
+                              ? 'bg-green-50 border border-green-200 hover:bg-green-100'
+                              : 'bg-white border border-gray-200 hover:bg-gray-50'
+                          }`}
+                          style={{ fontFamily: 'Archivo, sans-serif' }}
                         >
-                          <input
-                            type="checkbox"
-                            checked={checked[doc.id] || false}
-                            onChange={() => toggleCheck(doc.id)}
-                            className="sr-only"
-                          />
-                          {checked[doc.id] ? (
-                            <CheckCircle2 className="h-6 w-6 text-green-600 mr-4 flex-shrink-0" />
-                          ) : (
-                            <Circle className="h-6 w-6 text-gray-400 mr-4 flex-shrink-0" />
-                          )}
-                          <span className={`flex-1 ${checked[doc.id] ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                            {doc.name}
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                isCurrentCategory
+                                  ? 'bg-[#136C9E] text-white'
+                                  : isComplete
+                                  ? 'bg-green-500 text-white'
+                                  : 'bg-gray-300 text-gray-600'
+                              }`}
+                            >
+                              {isComplete ? '✓' : index + 1}
+                            </div>
+                            <span
+                              className={`text-sm font-medium ${
+                                isCurrentCategory
+                                  ? 'text-[#136C9E]'
+                                  : isComplete
+                                  ? 'text-green-700'
+                                  : 'text-gray-800'
+                              }`}
+                              style={{ fontFamily: 'Archivo, sans-serif' }}
+                            >
+                              {category}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {categoryChecked}/{categoryDocs.length}
                           </span>
-                        </label>
-                      ))}
-                    </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+
+                {/* Right side - documents list */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
+                  {(() => {
+                    const categoryDocs = getCategoryDocuments(selectedCategory);
+                    const categoryChecked = categoryDocs.filter((doc) => checked[doc.id]).length;
+
+                    return (
+                      <div>
+                        <div className="flex justify-between items-center mb-6">
+                          <h3 
+                            className="text-xl md:text-2xl font-semibold text-gray-900"
+                            style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}
+                          >
+                            {selectedCategory}
+                          </h3>
+                          <span className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                            {categoryChecked}/{categoryDocs.length} documents
+                          </span>
+                        </div>
+                        <div className="space-y-3">
+                          {categoryDocs.map((doc) => (
+                            <label
+                              key={doc.id}
+                              className="flex items-center p-4 rounded-lg hover:bg-gray-50 cursor-pointer transition"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked[doc.id] || false}
+                                onChange={() => toggleCheck(doc.id)}
+                                className="sr-only"
+                              />
+                              {checked[doc.id] ? (
+                                <CheckCircle2 className="h-6 w-6 text-green-600 mr-4 flex-shrink-0" />
+                              ) : (
+                                <Circle className="h-6 w-6 text-gray-400 mr-4 flex-shrink-0" />
+                              )}
+                              <span 
+                                className={`flex-1 text-sm md:text-base ${
+                                  checked[doc.id] ? 'line-through text-gray-500' : 'text-gray-900'
+                                }`}
+                                style={{ fontFamily: 'Archivo, sans-serif' }}
+                              >
+                                {doc.name}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
             </div>
           </div>
         </div>
