@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
+import { Calendar, ClipboardCheck, Clock, Files, Route, ShieldCheck } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import RentalDocuments from './tools/RentalDocuments';
@@ -10,8 +11,9 @@ interface Tool {
   title: string;
   description: string;
   link: string;
-  image: string;
+  icon: React.ComponentType<{ className?: string }>;
   iconBgColor: string;
+  iconColorClass: string;
 }
 
 const tools: Tool[] = [
@@ -20,48 +22,54 @@ const tools: Tool[] = [
     title: 'Rental Readiness Checker',
     description: 'Assess your readiness for rental applications with our interactive checklist',
     link: '/tools/readiness-checker',
-    image: '/images/rental rediness image.png',
+    icon: ClipboardCheck,
     iconBgColor: 'bg-blue-100',
+    iconColorClass: 'text-blue-600',
   },
   {
     id: 'document-tracker',
     title: 'Document Tracker',
     description: 'Track which rental documents you have and what you still need',
     link: '/tools/document-tracker',
-    image: '/images/document tracker image.png',
+    icon: Files,
     iconBgColor: 'bg-purple-100',
+    iconColorClass: 'text-purple-600',
   },
   {
     id: 'viewing-tracker',
     title: 'Viewing Tracker',
     description: 'Organize and track your property viewings and agent communications',
     link: '/tools/viewing-tracker',
-    image: '/images/viewing tracker image.png',
+    icon: Calendar,
     iconBgColor: 'bg-green-100',
+    iconColorClass: 'text-green-600',
   },
   {
     id: 'process-simulator',
     title: 'Process Simulator',
     description: 'Walk through the rental application process step by step',
     link: '/tools/process-simulator',
-    image: '/images/Process simulator image.png',
+    icon: Route,
     iconBgColor: 'bg-yellow-100',
+    iconColorClass: 'text-yellow-600',
   },
   {
     id: 'timeline-generator',
     title: 'Timeline Generator',
     description: 'Estimate how long your rental application process will take',
     link: '/tools/timeline-generator',
-    image: '/images/Time line generator image.png',
+    icon: Clock,
     iconBgColor: 'bg-teal-100',
+    iconColorClass: 'text-teal-600',
   },
   {
     id: 'know-your-rights',
     title: 'Know Your Rights',
     description: 'Interactive guide to UK tenant rights and responsibilities',
     link: '/tools/know-your-rights',
-    image: '/images/Know your rights image.png',
+    icon: ShieldCheck,
     iconBgColor: 'bg-red-100',
+    iconColorClass: 'text-red-600',
   },
 ];
 
@@ -289,6 +297,7 @@ const Tools: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {tools.map((tool) => {
+                  const Icon = tool.icon;
                   return (
                     <Link
                       key={tool.id}
@@ -297,11 +306,7 @@ const Tools: React.FC = () => {
                     >
                       {/* Icon with colored background */}
                       <div className={`${tool.iconBgColor} w-20 h-20 rounded-2xl flex items-center justify-center mb-6 shadow-sm`}>
-                        <img
-                          src={tool.image}
-                          alt={tool.title}
-                          className="w-16 h-16 object-contain"
-                        />
+                        <Icon className={`h-10 w-10 ${tool.iconColorClass}`} />
                       </div>
                       
                       {/* Title */}

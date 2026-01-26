@@ -10,7 +10,7 @@ interface Document {
   icon: React.ComponentType<{ className?: string }>;
   category: string;
   iconBgColor: string;
-  image?: string; // Will be added later when images are provided
+  iconColorClass: string;
 }
 
 const documents: Document[] = [
@@ -22,7 +22,7 @@ const documents: Document[] = [
     icon: FileText,
     category: 'Tenant Guide',
     iconBgColor: 'bg-blue-100',
-    image: '/images/How to rent image.png',
+    iconColorClass: 'text-blue-600',
   },
   {
     id: 'right-to-rent-guide',
@@ -32,7 +32,7 @@ const documents: Document[] = [
     icon: FileText,
     category: 'Legal',
     iconBgColor: 'bg-green-100',
-    image: '/images/Right to rent cheks guide image.png',
+    iconColorClass: 'text-green-600',
   },
   {
     id: 'right-to-rent-easy-read',
@@ -42,7 +42,7 @@ const documents: Document[] = [
     icon: FileText,
     category: 'Legal',
     iconBgColor: 'bg-purple-100',
-    image: '/images/right to rrent user guide.png',
+    iconColorClass: 'text-purple-600',
   },
   {
     id: 'prescribed-information',
@@ -52,7 +52,7 @@ const documents: Document[] = [
     icon: File,
     category: 'Deposit',
     iconBgColor: 'bg-orange-100',
-    image: '/images/Prescribed information template.png',
+    iconColorClass: 'text-orange-600',
   },
   {
     id: 'legionella-assessment',
@@ -62,7 +62,7 @@ const documents: Document[] = [
     icon: FileText,
     category: 'Health & Safety',
     iconBgColor: 'bg-red-100',
-    image: '/images/Legionella Risk Assessment Template.png',
+    iconColorClass: 'text-red-600',
   },
 ];
 
@@ -181,31 +181,8 @@ const RentalDocuments: React.FC = () => {
                 </div>
 
                 {/* Icon with colored background */}
-                <div className={`${doc.iconBgColor} w-20 h-20 rounded-2xl flex items-center justify-center mb-6 shadow-sm relative`}>
-                  {doc.image ? (
-                    <>
-                      <img
-                        src={encodeURI(doc.image)}
-                        alt={doc.title}
-                        className="w-16 h-16 object-contain"
-                        onError={(e) => {
-                          // Hide image and show icon fallback
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const fallback = target.nextElementSibling as HTMLElement;
-                          if (fallback) {
-                            fallback.style.display = 'block';
-                          }
-                        }}
-                      />
-                      <Icon 
-                        className="h-10 w-10 absolute" 
-                        style={{ color: '#374957', display: 'none' }}
-                      />
-                    </>
-                  ) : (
-                    <Icon className="h-10 w-10" style={{ color: '#374957' }} />
-                  )}
+                <div className={`${doc.iconBgColor} w-20 h-20 rounded-2xl flex items-center justify-center mb-6 shadow-sm`}>
+                  <Icon className={`h-10 w-10 ${doc.iconColorClass}`} />
                 </div>
                 
                 {/* Title */}

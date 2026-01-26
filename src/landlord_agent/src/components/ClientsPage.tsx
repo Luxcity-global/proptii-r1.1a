@@ -520,7 +520,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
           </p>
         </div>
         <Button 
-          onClick={onAddTenant} 
+          onClick={activeTab === 'landlords' ? onAddLandlord : onAddTenant} 
           className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto" 
           style={{ 
             backgroundColor: '#DC5F12', 
@@ -541,7 +541,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
           }}
         >
           <Plus className="w-4 h-4" strokeWidth={2.5} />
-          <span>Add Tenant</span>
+          <span>{activeTab === 'landlords' ? 'Add Landlord' : 'Add Tenant'}</span>
         </Button>
       </div>
 
@@ -1029,14 +1029,6 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                     <SelectItem value="suspended">Suspended</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button 
-                  onClick={onAddLandlord}
-                  className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full hover:shadow-md transition-shadow flex-shrink-0 w-auto" 
-                  style={{ backgroundColor: '#DC5F12', borderColor: '#DC5F12', minWidth: '180px' }}
-                >
-                  <Plus className="w-4 h-4" strokeWidth={2.5} />
-                  <span>Add Landlord</span>
-                </Button>
               </div>
             </div>
 
