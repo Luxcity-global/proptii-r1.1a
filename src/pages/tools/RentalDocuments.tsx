@@ -11,6 +11,7 @@ interface Document {
   category: string;
   iconBgColor: string;
   iconColorClass: string;
+  image?: string;
 }
 
 const documents: Document[] = [
@@ -21,8 +22,9 @@ const documents: Document[] = [
     file: '/rental_documents/DLUHC_How_to_rent_Oct2023.pdf',
     icon: FileText,
     category: 'Tenant Guide',
-    iconBgColor: 'bg-blue-100',
+    iconBgColor: 'bg-[#519D5F]/10',
     iconColorClass: 'text-blue-600',
+    image: '/images/How to rent icon image.png',
   },
   {
     id: 'right-to-rent-guide',
@@ -31,8 +33,9 @@ const documents: Document[] = [
     file: '/rental_documents/Right to Rent Checks_ A guide to immigration documents for tenants and landlords.pdf',
     icon: FileText,
     category: 'Legal',
-    iconBgColor: 'bg-green-100',
+    iconBgColor: 'bg-[#D37E3C]/10',
     iconColorClass: 'text-green-600',
+    image: '/images/Right to rent cheks guide icon image.png',
   },
   {
     id: 'right-to-rent-easy-read',
@@ -41,8 +44,9 @@ const documents: Document[] = [
     file: '/rental_documents/3286 Home Office Right to Rent User Guide Easy Read v3.pdf',
     icon: FileText,
     category: 'Legal',
-    iconBgColor: 'bg-purple-100',
+    iconBgColor: 'bg-[#892F94]/10',
     iconColorClass: 'text-purple-600',
+    image: '/images/right to rrent user guide icon image.png',
   },
   {
     id: 'prescribed-information',
@@ -51,8 +55,9 @@ const documents: Document[] = [
     file: '/rental_documents/1tds-ew-custodial-prescribed-information-template.docx',
     icon: File,
     category: 'Deposit',
-    iconBgColor: 'bg-orange-100',
+    iconBgColor: 'bg-[#C64345]/10',
     iconColorClass: 'text-orange-600',
+    image: '/images/Prescribed information templateicon image.png',
   },
   {
     id: 'legionella-assessment',
@@ -61,8 +66,9 @@ const documents: Document[] = [
     file: '/rental_documents/legionella_Risk_Assessment_template.pdf',
     icon: FileText,
     category: 'Health & Safety',
-    iconBgColor: 'bg-red-100',
+    iconBgColor: 'bg-[#1A8E97]/10',
     iconColorClass: 'text-red-600',
+    image: '/images/Legionella Risk Assessment Template icon image.png',
   },
 ];
 
@@ -182,7 +188,15 @@ const RentalDocuments: React.FC = () => {
 
                 {/* Icon with colored background */}
                 <div className={`${doc.iconBgColor} w-20 h-20 rounded-2xl flex items-center justify-center mb-6 shadow-sm`}>
-                  <Icon className={`h-10 w-10 ${doc.iconColorClass}`} />
+                  {doc.image ? (
+                    <img
+                      src={doc.image}
+                      alt={doc.title}
+                      className="h-12 w-12 object-contain"
+                    />
+                  ) : (
+                    <Icon className={`h-10 w-10 ${doc.iconColorClass}`} />
+                  )}
                 </div>
                 
                 {/* Title */}
