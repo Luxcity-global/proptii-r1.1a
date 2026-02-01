@@ -31,19 +31,20 @@ setInterval(logMemory, 30000); // Log every 30s
 app.options('*', cors());
 
 app.use(cors({
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     const allowedOrigins = [
       'https://proptii-r1-1a-new.onrender.com',
       'https://proptii-frontend.onrender.com',
+      'https://proptii.co',
       'http://localhost:5173',
       'http://localhost:4173'
     ];
-    
-    // Check if origin is allowed directly or matches .onrender.com pattern
-    if (allowedOrigins.indexOf(origin) !== -1 || /\.onrender\.com$/.test(origin)) {
+
+    // Check if origin is allowed directly or matches .onrender.com or .proptii.co pattern
+    if (allowedOrigins.indexOf(origin) !== -1 || /\.onrender\.com$/.test(origin) || /\.proptii\.co$/.test(origin)) {
       callback(null, true);
     } else {
       console.log(`Blocked by CORS: ${origin}`);
@@ -61,8 +62,8 @@ app.use(express.json());
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     service: 'property-search-backend'
   });
@@ -72,7 +73,7 @@ app.get('/health', (req, res) => {
 app.post('/scrape-fallback', async (req, res) => {
   try {
     const { query } = req.body;
-    
+
     // Return mock data as fallback
     const mockProperties = [
       {
@@ -94,7 +95,7 @@ app.post('/scrape-fallback', async (req, res) => {
         fallback: true
       }
     ];
-    
+
     res.json(mockProperties);
   } catch (error) {
     console.error('Error in fallback endpoint:', error);
@@ -109,7 +110,7 @@ app.post('/scrape-fallback', async (req, res) => {
 app.post('/scrape-api', async (req, res) => {
   try {
     const { query } = req.body;
-    
+
     if (!query) {
       return res.status(400).json({
         error: 'Missing required parameters',
@@ -118,19 +119,19 @@ app.post('/scrape-api', async (req, res) => {
     }
 
     console.log('API-based search query:', query);
-    
+
     // Extract location from query
     const locationMatch = query.match(/in\s+([a-zA-Z\s,]+)/i);
     const location = locationMatch ? locationMatch[1].trim() : 'Leeds';
-    
+
     // Extract price from query
     const priceMatch = query.match(/(\d+)(?:k|pcm|\s*pound)/i);
     const price = priceMatch ? priceMatch[1] : '1200';
-    
+
     // Extract bedrooms from query
     const bedroomMatch = query.match(/(\d+)\s*bed/i);
     const bedrooms = bedroomMatch ? bedroomMatch[1] : '2';
-    
+
     // Create sample properties based on the query
     const sampleProperties = [
       {
@@ -200,10 +201,10 @@ app.post('/scrape-api', async (req, res) => {
         apiBased: true
       }
     ];
-    
+
     console.log(`API search completed: ${sampleProperties.length} properties found`);
     res.json(sampleProperties);
-    
+
   } catch (error) {
     console.error('Error in /scrape-api endpoint:', error);
     res.status(500).json({
@@ -217,7 +218,7 @@ app.post('/scrape-api', async (req, res) => {
 app.post('/scrape-internet', async (req, res) => {
   try {
     const { query } = req.body;
-    
+
     if (!query) {
       return res.status(400).json({
         error: 'Missing required parameters',
@@ -226,19 +227,19 @@ app.post('/scrape-internet', async (req, res) => {
     }
 
     console.log('Internet search query:', query);
-    
+
     // Extract location from query
     const locationMatch = query.match(/in\s+([a-zA-Z\s,]+)/i);
     const location = locationMatch ? locationMatch[1].trim() : 'Leeds';
-    
+
     // Extract price from query
     const priceMatch = query.match(/(\d+)(?:k|pcm|\s*pound)/i);
     const price = priceMatch ? priceMatch[1] : '1200';
-    
+
     // Extract bedrooms from query
     const bedroomMatch = query.match(/(\d+)\s*bed/i);
     const bedrooms = bedroomMatch ? bedroomMatch[1] : '2';
-    
+
     // Create sample properties for internet search
     const internetProperties = [
       {
@@ -286,10 +287,10 @@ app.post('/scrape-internet', async (req, res) => {
         internetBased: true
       }
     ];
-    
+
     console.log(`Internet search completed: ${internetProperties.length} properties found`);
     res.json(internetProperties);
-    
+
   } catch (error) {
     console.error('Error in /scrape-internet endpoint:', error);
     res.status(500).json({
@@ -313,11 +314,11 @@ app.post('/scrape-internet-real', async (req, res) => {
     }
 
     console.log('Real internet search query:', query);
-    
+
     // Use the real scrapeInternet function from scraper.ts
     const results = await scrapeInternet(query, apiKey);
     res.json(results);
-    
+
   } catch (error) {
     console.error('Error in /scrape-internet-real endpoint:', error);
     res.status(500).json({
@@ -341,7 +342,7 @@ app.post('/scrape', async (req, res) => {
     }
 
     console.log('Fetching URL:', url);
-    
+
     // Route to appropriate scraper based on URL
     if (url.includes('openrent.co.uk')) {
       console.log('Detected OpenRent URL, using OpenRent scraper');
@@ -362,35 +363,35 @@ app.post('/scrape', async (req, res) => {
         res.json(results);
       } catch (onTheMarketError) {
         console.error('OnTheMarket scraping failed:', onTheMarketError);
-        
+
         // Only fallback if it's NOT a timeout error
         const errorMessage = onTheMarketError instanceof Error ? onTheMarketError.message : '';
         if (errorMessage.includes('TimeoutError') || errorMessage.includes('timed out')) {
           console.log('Timeout error detected, NOT falling back to other providers to avoid irrelevant results.');
           throw onTheMarketError;
         }
-        
+
         // Try to extract search parameters from the URL for fallback
         try {
           const urlObj = new URL(url);
           const pathParts = urlObj.pathname.split('/');
           const location = pathParts[pathParts.length - 2]; // Extract location from path
-          
+
           if (location && location !== 'property') {
             console.log('Attempting fallback to Rentola with location:', location);
-            
+
             // Build a basic search query for Rentola
             const searchQuery = `property in ${location.replace(/-/g, ' ')}`;
             const rentolaUrl = buildRentolaUrl(searchQuery);
             const rentolaResults = await scrapeRentola(rentolaUrl, apiKey);
-            
+
             // Mark results as fallback
-            const fallbackResults = rentolaResults.map(prop => ({ 
-              ...prop, 
+            const fallbackResults = rentolaResults.map(prop => ({
+              ...prop,
               source: 'Rentola (Fallback)',
-              fallback: true 
+              fallback: true
             }));
-            
+
             console.log(`Fallback search completed: ${fallbackResults.length} properties found`);
             res.json(fallbackResults);
           } else {
@@ -404,7 +405,7 @@ app.post('/scrape', async (req, res) => {
     }
   } catch (error) {
     console.error('Error in /scrape endpoint:', error);
-    
+
     // Handle specific error types
     if (error && typeof error === 'object' && 'response' in error) {
       const axiosError = error as { response?: { status?: number; statusText?: string; data?: unknown } };
@@ -436,14 +437,14 @@ app.post('/scrape', async (req, res) => {
           const pathParts = urlObj.pathname.split('/');
           const location = pathParts[pathParts.length - 2] || 'Leeds';
           const fallbackQuery = `property in ${location.replace(/-/g, ' ')}`;
-          
+
           // Call the fallback endpoint
           const fallbackResponse = await fetch(`${req.protocol}://${req.get('host')}/scrape-fallback`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query: fallbackQuery })
           });
-          
+
           if (fallbackResponse.ok) {
             const fallbackData = await fallbackResponse.json();
             return res.json(fallbackData);
@@ -452,7 +453,7 @@ app.post('/scrape', async (req, res) => {
       } catch (fallbackError) {
         console.error('Fallback endpoint also failed:', fallbackError);
       }
-      
+
       // If URL extraction failed, use a generic fallback
       try {
         const fallbackResponse = await fetch(`${req.protocol}://${req.get('host')}/scrape-fallback`, {
@@ -460,7 +461,7 @@ app.post('/scrape', async (req, res) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: 'property in Leeds' })
         });
-        
+
         if (fallbackResponse.ok) {
           const fallbackData = await fallbackResponse.json();
           return res.json(fallbackData);
@@ -469,7 +470,7 @@ app.post('/scrape', async (req, res) => {
         console.error('Generic fallback also failed:', genericFallbackError);
       }
     }
-    
+
     res.status(500).json({
       error: 'Internal server error',
       message: errorMessage
@@ -500,12 +501,12 @@ app.post('/scrape-rightmove', async (req, res) => {
     // Build Rightmove URL from the query (prefer resolved identifier when available)
     const rightmoveUrl = buildRightmoveUrl(query, resolvedId);
     console.log('Generated Rightmove URL:', rightmoveUrl);
-    
+
     const results = await scrapeRightmove(rightmoveUrl, apiKey);
     res.json(results);
   } catch (error) {
     console.error('Error in /scrape-rightmove endpoint:', error);
-    
+
     // Handle specific error types
     if (error && typeof error === 'object' && 'response' in error) {
       const axiosError = error as { response?: { status?: number; statusText?: string; data?: unknown } };
@@ -537,20 +538,20 @@ app.post('/scrape-openrent', async (req, res) => {
     }
 
     console.log('OpenRent search query:', query);
-    
+
     // Parse the query to extract location and filters
     const { location, maxPrice, bedrooms, propertyType } = parseOpenRentQuery(query);
     console.log('Parsed OpenRent query:', { location, maxPrice, bedrooms, propertyType });
-    
+
     // Build OpenRent URL from the query
     const openRentUrl = buildOpenRentUrl(location, { maxPrice, bedrooms, propertyType });
     console.log('Generated OpenRent URL:', openRentUrl);
-    
+
     const results = await scrapeOpenRent(openRentUrl, apiKey);
     res.json(results);
   } catch (error) {
     console.error('Error in /scrape-openrent endpoint:', error);
-    
+
     // Handle specific error types
     if (error && typeof error === 'object' && 'response' in error) {
       const axiosError = error as { response?: { status?: number; statusText?: string; data?: unknown } };
@@ -592,7 +593,7 @@ app.listen(port, () => {
       // Check Puppeteer Cache
       const puppeteerCacheDir = process.env.PUPPETEER_CACHE_DIR || path.join(os.homedir(), '.cache', 'puppeteer');
       console.log(`Puppeteer cache dir: ${puppeteerCacheDir}`);
-      
+
       if (!fs.existsSync(puppeteerCacheDir) || fs.readdirSync(puppeteerCacheDir).length === 0) {
         console.log('Puppeteer cache missing or empty. Installing Chrome...');
         try {
