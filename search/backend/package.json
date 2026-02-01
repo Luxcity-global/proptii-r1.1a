@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "PUPPETEER_CACHE_DIR=./.cache/puppeteer PLAYWRIGHT_BROWSERS_PATH=./.cache/ms-playwright npx ts-node-dev src/index.ts",
+    "dev": "cross-env PUPPETEER_CACHE_DIR=./.cache/puppeteer PLAYWRIGHT_BROWSERS_PATH=./.cache/ms-playwright npx ts-node-dev src/index.ts",
     "build": "tsc",
-    "start": "PUPPETEER_CACHE_DIR=./.cache/puppeteer PLAYWRIGHT_BROWSERS_PATH=./.cache/ms-playwright node dist/index.js",
+    "start": "cross-env PUPPETEER_CACHE_DIR=./.cache/puppeteer PLAYWRIGHT_BROWSERS_PATH=./.cache/ms-playwright node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:browsers": "node test-browsers.js",
-    "install:browsers": "PUPPETEER_CACHE_DIR=./.cache/puppeteer PLAYWRIGHT_BROWSERS_PATH=./.cache/ms-playwright npx playwright install chromium && PUPPETEER_CACHE_DIR=./.cache/puppeteer PLAYWRIGHT_BROWSERS_PATH=./.cache/ms-playwright npx puppeteer browsers install chrome",
+    "install:browsers": "cross-env PUPPETEER_CACHE_DIR=./.cache/puppeteer PLAYWRIGHT_BROWSERS_PATH=./.cache/ms-playwright npx playwright install chromium && cross-env PUPPETEER_CACHE_DIR=./.cache/puppeteer PLAYWRIGHT_BROWSERS_PATH=./.cache/ms-playwright npx puppeteer browsers install chrome",
     "postinstall": "npm run install:browsers"
   },
   "keywords": [],
@@ -29,6 +29,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.11.24",
+    "cross-env": "^10.1.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.3.3"
