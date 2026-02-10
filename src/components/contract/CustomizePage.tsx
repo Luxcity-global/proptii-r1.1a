@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Menu, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import * as pdfjs from "pdfjs-dist";
-import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
+import * as pdfjs from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker?url';
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 import DocumentSigningViewer from './DocumentSigningViewer';
 import SendContract from './SendContract';
+import { DemoGuideBubble } from '../onboarding/DemoGuideBubble';
 
 interface CustomizePageProps {
   templateId: string;
@@ -39,6 +40,7 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
   
   // Store signed PDF bytes for sending
   const [signedPdfBytes, setSignedPdfBytes] = useState<Uint8Array | null>(null);
+  const [customizeGuideStepIndex, setCustomizeGuideStepIndex] = useState(0);
 
   // Toggle sidebar visibility
   const toggleSidebar = () => {
@@ -201,247 +203,267 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
     alert(`Document exported as ${format.toUpperCase()}`);
   };
 
+  const CUSTOMIZE_GUIDE_STEPS = [
+    {
+      message: 'Click Edit to start signing this document.',
+      targetSelector: '[data-demo-customize-edit-tab]'
+    },
+    {
+      message: 'Use Draw, Type or Upload to add your signature in the way that suits you.',
+      targetSelector: '[data-demo-customize-sign-tools]'
+    }
+  ] as const;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-    {/*<div className="flex transition-all duration-300 max-w-3xl">*/}
-    <div className={`flex transition-all duration-300 ${
-      isSidebarOpen 
-        ? (activeTab === 'edit' ? 'max-w-7xl' : 'max-w-5xl') 
-        : (activeTab === 'edit' ? 'max-w-6xl' : 'max-w-3xl')
-    } ${activeTab === 'edit' ? 'max-h-[95vh]' : 'max-h-[90vh]'}`}>
-      {/* Sidebar (Outside the modal, placed beside it) */}
-      {isSidebarOpen && (
-        <div className="max-h-[700px] w-80 bg-white shadow-lg p-6 flex flex-col">
+      <div className="flex transition-all duration-300 max-h-[95vh]">
+        {/* Sidebar (Outside the modal, placed beside it) */}
+        {isSidebarOpen && (
+          <div className="max-h-[700px] w-80 bg-white shadow-lg p-6 flex flex-col">
+            <h2 className="text-xl font-bold text-orange-600 mb-6">Actions Menu</h2>
+            <p className="text-gray-600 mb-6">
+              Our contract management solution streamlines contracting, saves time, and reduces errors.
+            </p>
 
-          <h2 className="text-xl font-bold text-orange-600 mb-6">Actions Menu</h2>
-          <p className="text-gray-600 mb-6">
-            Our contract management solution streamlines contracting, saves time, and reduces errors.
-          </p>
-          
-          <button onClick={onBack} className="flex items-center gap-2 bg-blue-50 text-gray-900 px-4 py-3 rounded-md w-full justify-center hover:bg-blue-100">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-orange-500 bi bi-upload" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/>
-              <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708z"/>
-            </svg>
-            Main Contract Pg
-          </button>
-          
-          <button className="flex items-center gap-2 text-gray-600 mt-6 hover:text-gray-900 px-4 py-3 rounded-md w-full justify-center hover:bg-blue-100">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-orange-500 bi bi-person" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z"/>
-            </svg>
-            Go To Dashboard
-          </button>
-        </div>
-      )}
-
-      {/* Main Content Area */}
-      <div className={`bg-[#FFFFFF] rounded-md shadow-lg w-full ${
-        activeTab === 'edit' ? 'max-w-6xl' : 
-        activeTab === 'send' ? 'max-w-5xl' : 'max-w-3xl'
-      } p-6 relative pt-20 ${
-        activeTab === 'edit' ? 'max-h-[95vh] overflow-auto' : 
-        activeTab === 'send' ? 'max-h-[90vh] overflow-auto' : 'max-h-[85vh] overflow-auto'
-      }`}>
-            
-        {/* Keep the same navbar style for consistency */}
-        <nav className="absolute top-0 left-0 right-0 bg-white p-4 shadow flex items-center z-10">
-          <button onClick={toggleSidebar}>
-            <Menu className="text-gray-700 cursor-pointer mr-2" />
-          </button>
-          <h2 className="text-xl font-bold text-gray-800">Customize Page</h2>
-        </nav>
-
-      <div className="mt-2 p-4">
-        {/* Tab Navigation */}
-        <div className="border-b border-gray-200 flex">
-          {[
-            { id: 'home', label: 'Home' },
-            { id: 'edit', label: 'Edit' },
-            { id: 'send', label: 'Send' },
-          ].map((tab) => (
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as 'home' | 'edit' | 'send')}
-              className={`py-2 px-8 font-medium text-sm border-b-2 transition-all ${
-                activeTab === tab.id
-                  ? 'border-orange-500 text-orange-500'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              onClick={onBack}
+              className="flex items-center gap-2 bg-blue-50 text-gray-900 px-4 py-3 rounded-md w-full justify-center hover:bg-blue-100"
             >
-              {tab.label}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-4 h-4 text-orange-500 bi bi-upload"
+                viewBox="0 0 16 16"
+              >
+                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5" />
+                <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708z" />
+              </svg>
+              Main Contract Pg
             </button>
-          ))}
-        </div>
 
-        {/* Tab Content */}
-        {activeTab === 'home' && (
-          <div className="mt-4 p-4 flex justify-center max-h-[300px] overflow-y-auto">
-          <div className="max-w-2xl w-full">
-              {/* PDF Canvas Container */}
-              <div className="flex items-center justify-center overflow-auto bg-gray-100 rounded border">
-                <canvas 
-                  ref={canvasRef}
-                  className="max-w-full max-h-full shadow-lg"
-                  style={{ display: pdfDocument && !isLoadingPdf && !pdfError && !isRendering ? 'block' : 'none' }}
-                />
-                
-                {/* Loading indicator */}
-                {isLoadingPdf && (
-                  <div className="flex flex-col items-center justify-center space-y-2 p-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                    <div className="text-gray-500">Loading PDF...</div>
-                  </div>
-                )}
+            <button
+              className="flex items-center gap-2 text-gray-600 mt-6 hover:text-gray-900 px-4 py-3 rounded-md w-full justify-center hover:bg-blue-100"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-5 h-5 text-orange-500 bi bi-person"
+                viewBox="0 0 16 16"
+              >
+                <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6m2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0m4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4m-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10s-3.516.68-4.168 1.332c-.678.678-.83 1.418-.832 1.664z" />
+              </svg>
+              Go To Dashboard
+            </button>
+          </div>
+        )}
 
-                {/* Error message */}
-                {pdfError && (
-                  <div className="flex flex-col items-center justify-center space-y-2 p-4">
-                    <div className="text-red-500 text-center">
-                      <div className="font-semibold">Error loading PDF</div>
-                      <div className="text-sm mt-1">{pdfError}</div>
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setPdfError(null);
-                        setIsLoadingPdf(true);
-                        // Force reload by clearing and reloading
-                        setPdfDocument(null);
-                        setCurrentPage(1);
-                        setTotalPages(0);
-                        // The useEffect will trigger reload
+        {/* Main Content Area */}
+        <div className="bg-[#FFFFFF] rounded-md shadow-lg w-full max-w-6xl p-6 relative pt-20 max-h-[95vh] overflow-auto">
+          {/* Navbar */}
+          <nav className="absolute top-0 left-0 right-0 bg-white p-4 shadow flex items-center z-10">
+            <button onClick={toggleSidebar}>
+              <Menu className="text-gray-700 cursor-pointer mr-2" />
+            </button>
+            <h2 className="text-xl font-bold text-gray-800">Customize Page</h2>
+          </nav>
+
+          <div className="mt-2 p-4">
+            {/* Tab Navigation */}
+            <div className="border-b border-gray-200 flex">
+              {[
+                { id: 'home', label: 'Home' },
+                { id: 'edit', label: 'Edit' },
+                { id: 'send', label: 'Send' }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as 'home' | 'edit' | 'send')}
+                  className={`py-2 px-8 font-medium text-sm border-b-2 transition-all ${
+                    activeTab === tab.id
+                      ? 'border-orange-500 text-orange-500'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                  {...(tab.id === 'edit' ? { 'data-demo-customize-edit-tab': true } : {})}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            {activeTab === 'home' && (
+              <div className="mt-4 p-4 flex justify-center max-h-[300px] overflow-y-auto">
+                <div className="max-w-2xl w-full">
+                  {/* PDF Canvas Container */}
+                  <div className="flex items-center justify-center overflow-auto bg-gray-100 rounded border">
+                    <canvas
+                      ref={canvasRef}
+                      className="max-w-full max-h-full shadow-lg"
+                      style={{
+                        display:
+                          pdfDocument && !isLoadingPdf && !pdfError && !isRendering ? 'block' : 'none'
                       }}
-                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                      Retry
-                    </button>
-                  </div>
-                )}
+                    />
 
-                {/* No document state */}
-                {!isLoadingPdf && !pdfError && !pdfDocument && (
-                  <div className="text-gray-500 p-8">
-                    No PDF loaded
-                  </div>
-                )}
-              </div>
+                    {/* Loading indicator */}
+                    {isLoadingPdf && (
+                      <div className="flex flex-col items-center justify-center space-y-2 p-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                        <div className="text-gray-500">Loading PDF...</div>
+                      </div>
+                    )}
 
-              {/* Navigation Controls */}
-              <div className="flex justify-center items-center space-x-4 mt-4 pt-2 border-t">
-              {totalPages > 1 && (
-                  <>
-                  <button
-                    onClick={goToPrevPage}
-                    disabled={currentPage === 1}
-                    className={`flex items-center space-x-1 px-3 py-2 rounded ${
-                      currentPage === 1 
-                        ? 'text-gray-400 cursor-not-allowed' 
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <ChevronLeft size={16} />
-                    <span>Previous</span>
-                  </button>
-                  
-                  <span className="text-sm text-gray-600 font-medium">
-                    {currentPage} / {totalPages}
-                  </span>
-                  
-                  <button
-                    onClick={goToNextPage}
-                    disabled={currentPage === totalPages}
-                    className={`flex items-center space-x-1 px-3 py-2 rounded ${
-                      currentPage === totalPages 
-                        ? 'text-gray-400 cursor-not-allowed' 
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <span>Next</span>
-                    <ChevronRight size={16} />
-                  </button>
-                  </>
-                )}
-                
-                {/* Removed manual Refresh button; rendering is now stable */}
-                
-                {/* Rotation Buttons */}
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => {
-                      setManualRotation(manualRotation - 90);
-                      console.log('Rotating left, new rotation:', manualRotation - 90);
-                    }}
-                    className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                  >
-                    ↶
-                  </button>
-                  <span className="text-xs text-gray-600">{manualRotation}°</span>
-                  <button
-                    onClick={() => {
-                      setManualRotation(manualRotation + 90);
-                      console.log('Rotating right, new rotation:', manualRotation + 90);
-                    }}
-                    className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                  >
-                    ↷
-                  </button>
+                    {/* Error message */}
+                    {pdfError && (
+                      <div className="flex flex-col items-center justify-center space-y-2 p-4">
+                        <div className="text-red-500 text-center">
+                          <div className="font-semibold">Error loading PDF</div>
+                          <div className="text-sm mt-1">{pdfError}</div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setPdfError(null);
+                            setIsLoadingPdf(true);
+                            setPdfDocument(null);
+                            setCurrentPage(1);
+                            setTotalPages(0);
+                          }}
+                          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+
+                    {/* No document state */}
+                    {!isLoadingPdf && !pdfError && !pdfDocument && (
+                      <div className="text-gray-500 p-8">No PDF loaded</div>
+                    )}
+                  </div>
+
+                  {/* Navigation Controls */}
+                  <div className="flex justify-center items-center space-x-4 mt-4 pt-2 border-t">
+                    {totalPages > 1 && (
+                      <>
+                        <button
+                          onClick={goToPrevPage}
+                          disabled={currentPage === 1}
+                          className={`flex items-center space-x-1 px-3 py-2 rounded ${
+                            currentPage === 1
+                              ? 'text-gray-400 cursor-not-allowed'
+                              : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          <ChevronLeft size={16} />
+                          <span>Previous</span>
+                        </button>
+
+                        <span className="text-sm text-gray-600 font-medium">
+                          {currentPage} / {totalPages}
+                        </span>
+
+                        <button
+                          onClick={goToNextPage}
+                          disabled={currentPage === totalPages}
+                          className={`flex items-center space-x-1 px-3 py-2 rounded ${
+                            currentPage === totalPages
+                              ? 'text-gray-400 cursor-not-allowed'
+                              : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          <span>Next</span>
+                          <ChevronRight size={16} />
+                        </button>
+                      </>
+                    )}
+
+                    {/* Rotation Buttons */}
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => {
+                          setManualRotation(manualRotation - 90);
+                        }}
+                        className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                      >
+                        ↶
+                      </button>
+                      <span className="text-xs text-gray-600">{manualRotation}°</span>
+                      <button
+                        onClick={() => {
+                          setManualRotation(manualRotation + 90);
+                        }}
+                        className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                      >
+                        ↷
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
+            )}
+
+            {activeTab === 'edit' && (
+              <div
+                className="mt-4 flex-1 overflow-hidden"
+                style={{ height: 'calc(100vh - 100px)', maxHeight: '90vh' }}
+              >
+                <DocumentSigningViewer
+                  template={template}
+                  recipient={{
+                    email: 'user@example.com',
+                    name: 'Document Signer'
+                  }}
+                  onSigned={(signedBytes) => {
+                    setSignedPdfBytes(signedBytes);
+                  }}
+                  onSave={(signedBytes) => {
+                    handleDocumentSave('signed_document');
+                  }}
+                  onExport={(format) => {
+                    handleDocumentExport(format);
+                  }}
+                />
+              </div>
+            )}
+
+            {activeTab === 'send' && (
+              <div className="mt-4 overflow-y-auto max-h-[calc(100vh-200px)]">
+                <SendContract
+                  contractData={{
+                    title: template.name,
+                    content: 'Contract content will be extracted here',
+                    extractedFields: {
+                      landlord: 'Landlord Name',
+                      tenant: 'Tenant Name',
+                      propertyAddress: 'Property Address',
+                      startDate: 'Start Date'
+                    }
+                  }}
+                  signedPdfBytes={signedPdfBytes}
+                  onSend={(recipients, signature) => {
+                    console.log('Sending contract to:', recipients);
+                    console.log('With signature:', signature?.name);
+                  }}
+                  onClose={onBack}
+                />
+              </div>
+            )}
+
+            {/* Customize/signing guide */}
+            <DemoGuideBubble
+              message={CUSTOMIZE_GUIDE_STEPS[customizeGuideStepIndex]?.message}
+              targetSelector={CUSTOMIZE_GUIDE_STEPS[customizeGuideStepIndex]?.targetSelector}
+              highlightTarget
+              placement={customizeGuideStepIndex === 0 ? 'below' : 'above'}
+              hidden={false}
+              onNext={() => {
+                setCustomizeGuideStepIndex((prev) => (prev === 0 ? 1 : prev));
+              }}
+              onDismiss={() => {
+                setCustomizeGuideStepIndex(1);
+              }}
+            />
           </div>
         </div>
-        )}
-
-        {activeTab === 'edit' && (
-          <div className="mt-4 flex-1 overflow-hidden" style={{ height: 'calc(100vh - 100px)', maxHeight: '90vh' }}>
-            <DocumentSigningViewer
-              template={template}
-              recipient={{
-                email: 'user@example.com',
-                name: 'Document Signer'
-              }}
-              onSigned={(signedPdfBytes) => {
-                console.log('Document signed successfully, PDF bytes:', signedPdfBytes.length);
-                // Store signed PDF bytes for sending
-                setSignedPdfBytes(signedPdfBytes);
-              }}
-              onSave={(signedPdfBytes) => {
-                console.log('Saving signed document, PDF bytes:', signedPdfBytes.length);
-                handleDocumentSave('signed_document');
-              }}
-              onExport={(format) => {
-                console.log(`Exporting document as ${format}`);
-                handleDocumentExport(format);
-              }}
-            />
-          </div>
-        )}
-
-        {activeTab === 'send' && (
-          <div className="mt-4 overflow-y-auto max-h-[calc(100vh-200px)]">
-            <SendContract
-              contractData={{
-                title: template.name,
-                content: 'Contract content will be extracted here',
-                extractedFields: {
-                  landlord: 'Landlord Name',
-                  tenant: 'Tenant Name',
-                  propertyAddress: 'Property Address',
-                  startDate: 'Start Date'
-                }
-              }}
-              signedPdfBytes={signedPdfBytes}
-              onSend={(recipients, signature) => {
-                console.log('Sending contract to:', recipients);
-                console.log('With signature:', signature?.name);
-                // Handle the actual sending logic here
-              }}
-              onClose={onBack}
-            />
-          </div>
-        )}
       </div>
-    </div>
-    </div>
     </div>
   );
 };

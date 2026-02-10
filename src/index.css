@@ -235,3 +235,9 @@ input, textarea {
     @apply bg-background text-foreground;
   }
 }
+
+/* Remove focus outline on onboarding option buttons */
+button[data-onboarding-option]:focus,
+button[data-onboarding-option]:focus-visible {
+  outline: none !important;
+}

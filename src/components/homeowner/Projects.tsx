@@ -13,6 +13,7 @@ import {
   Clock,
   AlertCircle
 } from 'lucide-react';
+import { ProjectFormModal } from './ProjectFormModal';
 
 export interface HomeProject {
   id: string;
@@ -43,9 +44,10 @@ export function Projects({ onBack }: ProjectsProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
 
   // Mock data - will be replaced with Firebase data
-  const [projects] = useState<HomeProject[]>([
+  const [projects, setProjects] = useState<HomeProject[]>([
     {
       id: '1',
       name: 'Kitchen Renovation',
@@ -145,6 +147,14 @@ export function Projects({ onBack }: ProjectsProps) {
     }
   };
 
+  const handleCreateProject = (project: Omit<HomeProject, 'id'>) => {
+    const newProject: HomeProject = {
+      ...project,
+      id: String(Date.now()),
+    };
+    setProjects((prev) => [newProject, ...prev]);
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -161,10 +171,7 @@ export function Projects({ onBack }: ProjectsProps) {
           <p className="text-gray-600">Track and manage your home improvement projects</p>
         </div>
         <button
-          onClick={() => {
-            // TODO: Open project creation modal
-            console.log('Create new project');
-          }}
+          onClick={() => setIsFormModalOpen(true)}
           className="bg-[#DC5F12] text-white px-4 py-2 rounded-lg font-medium hover:bg-[#c54f0f] transition-colors flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
@@ -173,24 +180,29 @@ export function Projects({ onBack }: ProjectsProps) {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="md:col-span-2 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search projects..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC5F12] focus:border-transparent"
-            />
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Search
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search projects..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC5F12] focus:border-transparent transition-all"
+              />
+            </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Status</label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC5F12] focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC5F12] focus:border-transparent transition-all bg-white"
             >
               <option value="all">All</option>
               <option value="planning">Planning</option>
@@ -201,11 +213,11 @@ export function Projects({ onBack }: ProjectsProps) {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Category</label>
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC5F12] focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#DC5F12] focus:border-transparent transition-all bg-white"
             >
               <option value="all">All</option>
               <option value="renovation">Renovation</option>
@@ -227,7 +239,7 @@ export function Projects({ onBack }: ProjectsProps) {
               <p className="text-gray-600 mb-2">No projects found</p>
               <p className="text-sm text-gray-500 mb-4">Try adjusting your filters or create a new project</p>
               <button
-                onClick={() => console.log('Create project')}
+                onClick={() => setIsFormModalOpen(true)}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center gap-2 mx-auto"
               >
                 <Plus className="w-4 h-4" />
@@ -323,6 +335,12 @@ export function Projects({ onBack }: ProjectsProps) {
           ))
         )}
       </div>
+
+      <ProjectFormModal
+        isOpen={isFormModalOpen}
+        onClose={() => setIsFormModalOpen(false)}
+        onSubmit={handleCreateProject}
+      />
     </div>
   );
 }

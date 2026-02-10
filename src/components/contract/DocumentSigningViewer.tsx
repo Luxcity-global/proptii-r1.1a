@@ -638,7 +638,10 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
         {/* Action Buttons Row */}
         <div className="flex items-center gap-3">
           {/* Signature Method Selection */}
-          <div className="flex items-center gap-2 bg-white rounded-lg p-2 border border-gray-200">
+          <div
+            className="flex items-center gap-2 bg-white rounded-lg p-2 border border-gray-200"
+            data-demo-customize-sign-tools
+          >
             <button
               onClick={() => { setSignatureMethod('draw'); handleCreateSignature(); }}
               className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${

@@ -170,6 +170,7 @@ export const SearchInput = ({
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               placeholder="AI-assisted property search..."
+              data-demo-hero-search-input
               className={`w-full text-lg rounded-2xl border-0 focus:outline-none focus:ring-0 resize-none transition-all duration-150 ${
                 error ? 'border-red-500' : ''
               }`}
@@ -246,6 +247,7 @@ export const SearchInput = ({
                 <button 
                   onClick={() => setShowPlatformDropdown(!showPlatformDropdown)}
                   className="p-2 rounded-lg transition-all hover:bg-gray-50 flex items-center gap-2"
+                  data-demo-hero-provider-toggle
                   style={{ color: '#888' }}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -304,6 +306,7 @@ export const SearchInput = ({
               onClick={handleSearch}
               disabled={loading || !query.trim()}
               className="w-12 h-12 rounded-full text-white shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              data-demo-hero-search-button
               style={{ 
                 backgroundColor: '#E65D24',
               }}

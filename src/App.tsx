@@ -5,7 +5,9 @@ import { MSALProviderWrapper } from './contexts/AuthContext';
 import { AuthProvider } from './context/AuthContext';
 import { SavedPropertiesProvider } from './contexts/SavedPropertiesContext';
 import { SignedContractsProvider } from './contexts/SignedContractsContext';
+import { OnboardingSessionProvider } from './contexts/OnboardingSessionContext';
 import Home from './pages/Home';
+import TenantOnboardingOptions from './pages/TenantOnboardingOptions';
 import { LoginPage } from './pages/Login';
 import { RegisterPage } from './pages/Register';
 import { NotFoundPage } from './pages/NotFound';
@@ -51,10 +53,12 @@ export const App: React.FC = () => {
       <MSALProviderWrapper>
         <AuthProvider>
           <SavedPropertiesProvider>
-            <SignedContractsProvider>
-              <Routes>
+            <OnboardingSessionProvider>
+              <SignedContractsProvider>
+                <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
+            <Route path="/tenant-onboarding" element={<TenantOnboardingOptions />} />
             <Route path="/search" element={<SearchResults />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -67,10 +71,12 @@ export const App: React.FC = () => {
             {/* Protected Routes */}
             <Route path="/agent" element={<AgentHome />} />
             <Route path="/Agent" element={<AgentHome />} />
-            <Route path="/homeowner" element={<HomeownerHome />} />
-            <Route path="/Homeowner" element={<HomeownerHome />} />
-            <Route path="/homeowner/variant-b" element={<HomeownerHomeVariantB />} />
-            <Route path="/Homeowner/variant-b" element={<HomeownerHomeVariantB />} />
+            {/* Homeowner landing: use Variant B as default */}
+            <Route path="/homeowner" element={<HomeownerHomeVariantB />} />
+            <Route path="/Homeowner" element={<HomeownerHomeVariantB />} />
+            {/* Keep alternate hero image available under /variant-b */}
+            <Route path="/homeowner/variant-b" element={<HomeownerHome />} />
+            <Route path="/Homeowner/variant-b" element={<HomeownerHome />} />
             <Route path="/homeowner/dashboard" element={<HomeownerDashboard />} />
             <Route path="/Homeowner/dashboard" element={<HomeownerDashboard />} />
             <Route path="/public-worker" element={<PublicWorkerHome />} />
@@ -117,7 +123,8 @@ export const App: React.FC = () => {
             {/* Catch-all route for 404 */}
             <Route path="*" element={<NotFoundPage />} />
               </Routes>
-            </SignedContractsProvider>
+              </SignedContractsProvider>
+            </OnboardingSessionProvider>
           </SavedPropertiesProvider>
         </AuthProvider>
       </MSALProviderWrapper>

@@ -110,6 +110,25 @@ What matters is the quality and style we bring to it. A light sprinkling of fun,
 
 ---
 
+# Current implementation status
+
+| Phase | Page | Status | Where it lives (or should live) |
+|-------|------|--------|---------------------------------|
+| **Discovery** | 1.1 Welcome to Proptii | **Built** | Homepage (`/`) for unauthenticated users — `OnboardingFlow` step 1 |
+| **Discovery** | 1.2 How do you want to use Proptii? | **Built** | Same flow, step 2 — chips stored via `setDiscoveryAnswer` |
+| **Discovery** | 1.3 How did you find us? | **Built** | Same flow, step 3 — chips stored via `setDiscoveryAnswer` |
+| **Profiling** | 2.1 User group (Tenant / Landlord / Agent / Homeowner) | **Built** | Same flow, step 4 — then redirect to demo (`/search`, `/landlord-demo`, `/homeowner`) |
+| **Engagement** | 3.1 Demo (e.g. AI search for tenants) | **Built** | `/search` — guide + Save → sign-up for unauthenticated users |
+| **Engagement** | 3.3 Guide bubble + triggers | **Built** | `SearchResults.tsx` + `DemoGuideBubble` + intercept |
+| **Sign up** | 4.1 Soft prompt modal | **Built** | `SignUpPromptModal` when user clicks Save (not signed in) |
+
+**Option A implemented (homepage as onboarding)**
+
+- For **unauthenticated** visitors who have **not** completed onboarding (`hasOnboardingCompleted()` is false), the **homepage** (`/`, `Home.tsx`) shows **OnboardingFlow**: Welcome → "How do you want to use Proptii?" → "How did you find us?" → "Who are you?" (Profiling). Answers are stored in `onboardingSession`; on Profiling choice we call `setOnboardingUserGroup`, `setOnboardingCompleted`, and redirect to the demo (`/search` for Tenant, `/landlord-demo` for Landlord/Agent, `/homeowner` for Homeowner). Once completed, the same visitor sees the normal homepage on next visit (sessionStorage `onboarding_completed`).
+- **Components:** `src/components/onboarding/OnboardingFlow.tsx` (multi-step UI), `src/utils/onboardingSession.ts` (`setOnboardingCompleted`, `hasOnboardingCompleted`, `setDiscoveryAnswer`).
+
+---
+
 # Summary: Page flow at a glance
 
 | # | Phase | Page / Step | Purpose |
@@ -180,9 +199,9 @@ We do **not** need a separate “fake” demo app. We treat the existing `/searc
    - Set when user completes Profiling (or on first visit if we start onboarding from homepage).  
    - Cleared or marked “converted” after sign-up.
 
-2. **Demo flag on /search**  
-   - Either: `sessionStorage.onboardingUserGroup === 'tenant'` and not logged in, or URL `?onboarding=tenant`.  
-   - When true: show optional onboarding UI (e.g. mascot, one-line hint) and enable “intercept Save → show sign-up modal”.
+2. **Demo flow on /search (targeted at new users)**  
+   - The demo (guide bubble + sign-up prompt on Save) shows **automatically** for users who **do not have an account or are not signed in**. No URL param required.  
+   - When **not authenticated**: show guide bubble (“Click here to save property”) and intercept Save → show sign-up modal. When signed in: normal Save behaviour.
 
 3. **Intercept Save property**  
    - In `SearchResults`, where `toggleSaveProperty(property)` is called: if demo mode and not authenticated, **prevent** default behaviour, open **SignUpModal** (soft prompt: “Want to save this? Sign up in 10 seconds”).  
@@ -202,16 +221,17 @@ We do **not** need a separate “fake” demo app. We treat the existing `/searc
 ## Data flow summary
 
 ```
-User (anonymous) → Profiling: Tenant → Redirect to /search?onboarding=tenant
+User without account / not signed in → Lands on /search (e.g. from homepage search)
        → Search (existing UI + useSearchBackend)
-       → Sees results (real or mock fallback)
+       → Sees results; guide bubble appears: "Click here to save property"
        → Clicks "Save property"
        → Intercept: show SignUpModal ("Want to save this? Sign up in 10 seconds")
        → User signs up (Google / Apple / email)
-       → Migrate session + localStorage savedProperties to user account
-       → Add current property to saved list
+       → Migrate: pending property + localStorage savedProperties → user account
        → Confirm: "You're in. We've saved your property."
 ```
+
+**Note:** The demo flow is targeted at new users: it shows automatically when the user is **not signed in**. No URL param (`?onboarding=tenant`) is required for the search page. Optional: when we add the full onboarding funnel (Profiling → Tenant), we can still pass `?onboarding=tenant` for analytics or to tailor other demos.
 
 ---
 
@@ -332,15 +352,14 @@ Use this checklist to manually test the demo end-to-end and catch edge cases.
 
 ### Happy path (anonymous → Save → sign-up → migration)
 
-1. **Start anonymous**
+1. **Start as new user (not signed in)**
    - Open the app in incognito (or clear site data).
    - Go through onboarding: Welcome → “How do you want to use Proptii?” → “How did you find us?” → Profiling.
    - In Profiling, choose **Tenant**.
    - **Check:** You are redirected to the search demo (e.g. `/search` or `/search?onboarding=tenant`).
 
-2. **Anonymous session**
-   - Open DevTools → Application (Chrome) → Session Storage / Local Storage.
-   - **Check:** There is an anonymous session (e.g. `onboardingAnonymousId`, `onboardingUserGroup: tenant`).
+2. **Demo flow (no account required)**
+   - **Check:** The guide bubble appears (“Click here to save property”) and the first property’s heart has a highlight. No sign-in or URL param required.
 
 3. **Search**
    - Enter a query (e.g. “2 bed flats in Leeds”) and run the search.
@@ -375,7 +394,7 @@ Use this checklist to manually test the demo end-to-end and catch edge cases.
 |----------|------------|----------------|
 | **Already logged in** | Log in first, then go through Profiling → Tenant → Search. Click Save. | No sign-up modal; property saves normally to your account. |
 | **Search backend down** | Turn off the search backend (or use a URL that fails). Enter demo as Tenant and run a search. | If mock fallback is implemented: results still appear (mock). If not: graceful error and no crash. |
-| **Direct URL to /search** | Open `/search?onboarding=tenant` (or equivalent) in incognito without going through Profiling. Click Save. | Anonymous session may be created on first interaction; Save still shows sign-up modal when not logged in. |
+| **Direct URL to /search** | Open `/search?q=...` in incognito (not signed in). Click Save. | Save shows sign-up modal (demo targets users without an account). |
 | **Modal dismissed multiple times** | Open modal → dismiss → Save again → dismiss again. | Modal can reappear each time; no broken state. |
 | **Sign-up fails (e.g. network error)** | Trigger sign-up but cause a failure (e.g. disconnect network). | User sees an error; they can retry or dismiss; pending save is not lost (e.g. still in session or re-triggered on next Save). |
 
@@ -385,8 +404,8 @@ Use this checklist to manually test the demo end-to-end and catch edge cases.
 
 If you only have a few minutes:
 
-1. Incognito → Profiling: Tenant → Search.
-2. Run any search → see results.
+1. Incognito (not signed in) → go to search (homepage search or `/search?q=...`).
+2. Run any search → see results; guide bubble appears.
 3. Click Save on one result → sign-up modal appears.
 4. Complete sign-up → confirmation and property in saved list.
 

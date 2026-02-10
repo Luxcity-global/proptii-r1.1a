@@ -8,12 +8,19 @@ import RefereeGuarantorResponseModal from '../components/referencing/RefereeGuar
 import { Marquee } from '../components/magic-ui/marquee';
 import { MagicCard } from '../components/magic-ui/magic-card';
 import { TextAnimate } from '../components/magic-ui/text-animate';
+import { useAuth } from '../context/AuthContext';
+import { hasOnboardingCompleted } from '../utils/onboardingSession';
+import { OnboardingFlow } from '../components/onboarding/OnboardingFlow';
+import { DemoGuideBubble } from '../components/onboarding/DemoGuideBubble';
 
 import { useState, useEffect } from 'react';
 
 const Home = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
+  const isAuthenticated = !!user;
+  const showOnboarding = !isAuthenticated && !hasOnboardingCompleted();
 
   const [searchInputHeight, setSearchInputHeight] = useState(50);
   const [isResponseModalOpen, setIsResponseModalOpen] = useState(false);
@@ -21,6 +28,28 @@ const Home = () => {
   const [applicantName, setApplicantName] = useState('');
   const [prefilledEmail, setPrefilledEmail] = useState('');
   const [tenantEmail, setTenantEmail] = useState('');
+  const [heroGuideStepIndex, setHeroGuideStepIndex] = useState(0);
+
+  const tenantSearchDemoActive = searchParams.get('tenantSearchDemo') === '1';
+  const showHeroGuide = tenantSearchDemoActive && !showOnboarding && !isAuthenticated;
+
+  const HERO_TENANT_SEARCH_STEPS = [
+    {
+      id: 1,
+      message: "Here's your search box. You can input your search terms here.",
+      targetSelector: '[data-demo-hero-search-input]'
+    },
+    {
+      id: 2,
+      message: 'Click here to change where Proptii searches.',
+      targetSelector: '[data-demo-hero-provider-toggle]'
+    },
+    {
+      id: 3,
+      message: 'When you are ready, click here to search.',
+      targetSelector: '[data-demo-hero-search-button]'
+    }
+  ] as const;
 
   // Check for query parameters to open the response modal
   useEffect(() => {
@@ -86,6 +115,11 @@ const Home = () => {
     setIsResponseModalOpen(false);
   };
 
+  // Option A: Homepage as onboarding — show Discovery + Profiling for unauthenticated users who haven't completed it
+  if (showOnboarding) {
+    return <OnboardingFlow />;
+  }
+
   return (
     <div className="min-h-screen flex flex-col font-nunito">
       <Navbar />
@@ -150,6 +184,28 @@ const Home = () => {
             />
           </div>
         </div>
+
+        {/* Tenant search hero guide (value-first onboarding) */}
+        {showHeroGuide && (
+          <DemoGuideBubble
+            message={HERO_TENANT_SEARCH_STEPS[heroGuideStepIndex]?.message}
+            targetSelector={HERO_TENANT_SEARCH_STEPS[heroGuideStepIndex]?.targetSelector}
+            highlightTarget
+            placement={heroGuideStepIndex === 1 ? 'below' : 'above'}
+            onNext={() => {
+              setHeroGuideStepIndex((prev) =>
+                prev < HERO_TENANT_SEARCH_STEPS.length - 1 ? prev + 1 : prev
+              );
+            }}
+            onDismiss={() => {
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete('tenantSearchDemo');
+                return next;
+              });
+            }}
+          />
+        )}
       </section>
 
 

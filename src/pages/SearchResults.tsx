@@ -2,6 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSearchBackend, type Property } from '../hooks/useSearchBackend';
 import { useSavedProperties } from '../contexts/SavedPropertiesContext';
+import { useAuth } from '../context/AuthContext';
+import { setPendingProperty, setGuideDismissed, isGuideDismissed } from '../utils/onboardingSession';
+import { DemoGuideBubble } from '../components/onboarding/DemoGuideBubble';
+import { SignUpPromptModal } from '../components/onboarding/SignUpPromptModal';
 import Footer from '../components/Footer';
 
 
@@ -38,6 +42,43 @@ const cleanPropertyPrice = (price: string): string => {
   
   return cleanedPrice.trim();
 };
+
+/** Mock results for demo when search backend is unavailable (new users can still try Save → sign-up). */
+const MOCK_SEARCH_RESULTS_FOR_DEMO: Property[] = [
+  {
+    title: '2 Bedroom Flat in Leeds City Centre',
+    price: '£1,200 pcm',
+    location: 'Leeds, West Yorkshire',
+    bedrooms: '2',
+    propertyType: 'Flat',
+    imageUrls: ['https://placehold.co/400x300/e5e7eb/6b7280?text=Property+1'],
+    agent: { name: 'Sample Agent', email: 'agent@example.com', company: 'Proptii Demo' },
+    source: 'Sample',
+    description: 'Spacious 2 bed flat, ideal for professionals.'
+  },
+  {
+    title: 'Modern 2 Bed Apartment near Leeds Station',
+    price: '£1,150 pcm',
+    location: 'Leeds, LS1',
+    bedrooms: '2',
+    propertyType: 'Apartment',
+    imageUrls: ['https://placehold.co/400x300/e5e7eb/6b7280?text=Property+2'],
+    agent: { name: 'Sample Agent', email: 'agent@example.com', company: 'Proptii Demo' },
+    source: 'Sample',
+    description: 'Close to transport and amenities.'
+  },
+  {
+    title: '2 Bed Flat, Headingley',
+    price: '£1,100 pcm',
+    location: 'Headingley, Leeds',
+    bedrooms: '2',
+    propertyType: 'Flat',
+    imageUrls: ['https://placehold.co/400x300/e5e7eb/6b7280?text=Property+3'],
+    agent: { name: 'Sample Agent', email: 'agent@example.com', company: 'Proptii Demo' },
+    source: 'Sample',
+    description: 'Quiet area, garden access.'
+  }
+];
 
 // Property Details Modal Component
 interface PropertyDetailsModalProps {
@@ -598,9 +639,14 @@ const SearchResults = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [isNavigatingToBooking, setIsNavigatingToBooking] = useState(false);
+  const [showSignUpModal, setShowSignUpModal] = useState(false);
 
   const { results, isLoading, error, retry, searchProperties, clearCache } = useSearchBackend();
   const { isPropertySaved, toggleSaveProperty } = useSavedProperties();
+  const { user } = useAuth();
+  const isAuthenticated = !!user;
+  /** Demo flow: show guide + sign-up prompt for users who don't have an account or are not signed in */
+  const showDemoForNewUsers = !isAuthenticated;
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showMap, setShowMap] = useState(false);
@@ -610,6 +656,29 @@ const SearchResults = () => {
   const markersRef = useRef<any[]>([]);
   const markersGeocodedRef = useRef<boolean>(false);
   const lastResultsKeyRef = useRef<string | null>(null);
+
+  const TENANT_SEARCH_GUIDE_STEPS = [
+    {
+      message: 'Click this heart to save your first property.',
+      targetSelector: "[data-demo-save-target='first']"
+    }
+  ] as const;
+
+  const [guideStepIndex, setGuideStepIndex] = useState(0);
+
+  const handleSaveProperty = (property: Property) => {
+    if (showDemoForNewUsers) {
+      setPendingProperty(property);
+      setShowSignUpModal(true);
+      return;
+    }
+    const propertyId = `${property.title}-${property.location}-${property.price}`;
+    const wasSaved = isPropertySaved(propertyId);
+    toggleSaveProperty(property);
+    setToastMessage(wasSaved ? 'Property removed from saved' : 'Property saved!');
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
 
   // Perform search when component mounts or search params change
   useEffect(() => {
@@ -1124,7 +1193,11 @@ const SearchResults = () => {
     );
   }
 
-  if (error) {
+  /** When search fails but user is not signed in (demo), show mock results so they can still try Save → sign-up */
+  const useDemoFallbackResults = Boolean(error && showDemoForNewUsers);
+  const displayResults = useDemoFallbackResults ? MOCK_SEARCH_RESULTS_FOR_DEMO : results;
+
+  if (error && !showDemoForNewUsers) {
     return (
       <div className="min-h-screen flex flex-col font-nunito">
         {/* Custom Header with navigation */}
@@ -1217,7 +1290,7 @@ const SearchResults = () => {
             {/* Top Row: Buttons and Search Summary */}
             <div className="flex items-center justify-between mb-6 bg-white rounded-xl shadow-lg p-6 border border-gray-100">
               {/* Left Side: Search Summary */}
-              <div className="flex-1">
+              <div className="flex-1" data-demo-search-summary>
                 <div className="flex items-center mb-3">
                   <div className="w-2 h-8 bg-gradient-to-b from-[#136C9E] to-[#0F5A8A] rounded-full mr-4"></div>
                   <h2 className="text-xl font-bold text-gray-900">Search Summary</h2>
@@ -1233,7 +1306,7 @@ const SearchResults = () => {
                   </div>
                   <div className="flex items-center">
                     <span className="text-gray-500 font-medium w-20">Results:</span>
-                    <span className="text-gray-900 font-semibold">{results.length} properties found</span>
+                    <span className="text-gray-900 font-semibold">{displayResults.length} properties found</span>
                     {sessionStorage.getItem('searchResults') && (
                       <span className="ml-2 px-2 py-1 bg-[#136C9E]/10 text-[#136C9E] text-xs font-medium rounded-full">cached</span>
                     )}
@@ -1286,8 +1359,15 @@ const SearchResults = () => {
             </div>
           </div>
 
+          {/* Demo fallback: search backend unavailable — show sample results so new users can try Save */}
+          {useDemoFallbackResults && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-sm">
+              <strong>Sample results.</strong> The search service is temporarily unavailable. You can still try saving a property below to get started.
+            </div>
+          )}
+
           {/* Results */}
-          {results.length === 0 ? (
+          {displayResults.length === 0 ? (
             <div className="flex justify-center items-center py-20">
               <div className="text-center max-w-md">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1306,13 +1386,16 @@ const SearchResults = () => {
               </div>
             </div>
           ) : (
-            <div className={showMap ? "grid grid-cols-1 lg:grid-cols-2 gap-6" : ""}>
+            <div
+              className={showMap ? 'grid grid-cols-1 lg:grid-cols-2 gap-6' : ''}
+              data-demo-search-results
+            >
               {/* Property Listings */}
               <div className={showMap ? "" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"}>
                 {showMap ? (
                   // When map is shown, display in single column
                   <div className="grid grid-cols-1 gap-6">
-                    {results.map((property, index) => (
+                    {displayResults.map((property, index) => (
                 <div
                   key={index}
                   className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
@@ -1341,14 +1424,10 @@ const SearchResults = () => {
                     
                     {/* Heart Button */}
                     <button
+                      {...(index === 0 ? { 'data-demo-save-target': 'first' } : {})}
                       onClick={(e) => {
                         e.stopPropagation();
-                        const propertyId = `${property.title}-${property.location}-${property.price}`;
-                        const wasSaved = isPropertySaved(propertyId);
-                        toggleSaveProperty(property);
-                        setToastMessage(wasSaved ? 'Property removed from saved' : 'Property saved!');
-                        setShowToast(true);
-                        setTimeout(() => setShowToast(false), 3000);
+                        handleSaveProperty(property);
                       }}
                       className="absolute top-4 right-4 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
                     >
@@ -1415,7 +1494,7 @@ const SearchResults = () => {
                   </div>
                 ) : (
                   // When map is hidden, display in grid
-                  results.map((property, index) => (
+                  displayResults.map((property, index) => (
                     <div
                       key={index}
                       className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
@@ -1444,14 +1523,10 @@ const SearchResults = () => {
                         
                         {/* Heart Button */}
                         <button
+                          {...(index === 0 ? { 'data-demo-save-target': 'first' } : {})}
                           onClick={(e) => {
                             e.stopPropagation();
-                            const propertyId = `${property.title}-${property.location}-${property.price}`;
-                            const wasSaved = isPropertySaved(propertyId);
-                            toggleSaveProperty(property);
-                            setToastMessage(wasSaved ? 'Property removed from saved' : 'Property saved!');
-                            setShowToast(true);
-                            setTimeout(() => setShowToast(false), 3000);
+                            handleSaveProperty(property);
                           }}
                           className="absolute top-4 right-4 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
                         >
@@ -1542,7 +1617,7 @@ const SearchResults = () => {
                   </div>
 
                   {/* Location Insights Section */}
-                  <LocationInsights searchQuery={searchQuery} propertyCount={results.length} />
+                  <LocationInsights searchQuery={searchQuery} propertyCount={displayResults.length} />
                 </>
               )}
             </div>
@@ -1574,6 +1649,30 @@ const SearchResults = () => {
           </button>
         </div>
       )}
+
+      {/* Demo for new users (not signed in): multi-step guide + sign-up on Save */}
+      {showDemoForNewUsers && displayResults.length > 0 && !isGuideDismissed() && (
+        <DemoGuideBubble
+          message={TENANT_SEARCH_GUIDE_STEPS[guideStepIndex]?.message}
+          targetSelector={TENANT_SEARCH_GUIDE_STEPS[guideStepIndex]?.targetSelector}
+          highlightTarget
+          onDismiss={() => setGuideDismissed(true)}
+          onNext={() => {
+            setGuideStepIndex((prev) =>
+              prev < TENANT_SEARCH_GUIDE_STEPS.length - 1 ? prev + 1 : prev
+            );
+          }}
+          hidden={showSignUpModal}
+        />
+      )}
+
+      {/* Sign-up prompt when a user without an account clicks Save */}
+      <SignUpPromptModal
+        isOpen={showSignUpModal}
+        onClose={() => setShowSignUpModal(false)}
+        title="Want to save this property?"
+        reassurance="Don't worry — you won't have to go through the entire search process again."
+      />
 
       <Footer />
     </div>

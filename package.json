@@ -80,7 +80,8 @@
     "test:docs": "node scripts/generate-test-documentation.js",
     "test:all": "npm run test:integration && npm run test:load && npm run test:edge && npm run test:docs",
     "test:ai-search": "vitest run src/components/__tests__/SearchInput.test.tsx src/hooks/__tests__/useSearch.test.ts src/services/__tests__/LocalStorageService.test.ts src/search/__tests__/search.service.test.ts --coverage --reporter=verbose --coverage.reporter=text --coverage.reporter=lcov && (cat coverage/lcov.info | grep -q 'LF:' && echo 'Coverage check passed' || (echo 'Coverage check failed' && exit 1))",
-    "clean-restart": "node scripts/clean-restart.js"
+    "clean-restart": "node scripts/clean-restart.js",
+    "start:vendor-backend": "node server.js"
   },
   "dependencies": {
     "@azure-rest/ai-inference": "^1.0.0-beta.6",
