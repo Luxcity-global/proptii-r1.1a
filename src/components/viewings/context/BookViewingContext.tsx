@@ -3,10 +3,10 @@ import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 // Types
 interface Agent {
   id: string;
-  name: string;
-  email: string;
-  phone: string;
-  company: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  company?: string;
 }
 
 interface PropertyDetails {
@@ -24,6 +24,8 @@ export interface ViewingDetails {
     email?: string;
     phoneNumber?: string;
   };
+  notificationPreference?: string[];
+  whatsappNumber?: string;
 }
 
 interface BookViewingState {
@@ -55,9 +57,10 @@ const initialState: BookViewingState = {
     }
   },
   viewingDetails: {
-    date: null,
-    time: null,
-    preference: ''
+    date: '',
+    time: '',
+    preference: '',
+    notificationPreference: ['email']
   },
   isLoading: false,
   error: null
@@ -81,8 +84,8 @@ function bookViewingReducer(state: BookViewingState, action: ActionType): BookVi
           agent: {
             ...state.selectedProperty?.agent,
             ...(action.payload.agent || {})
-          }
-        }
+          } as Agent
+        } as PropertyDetails
       };
     case 'SET_SELECTED_PROPERTY':
       return {
@@ -128,4 +131,4 @@ export function useBookViewing() {
   return context;
 }
 
-export type { BookViewingState, PropertyDetails, ViewingDetails, Agent }; 
+export type { BookViewingState, PropertyDetails, Agent }; 

@@ -331,7 +331,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
 
   const handleNext = async () => {
     console.log('handleNext called', { activeStep, isAllDataComplete: isAllDataComplete() });
-    
+
     // Check if current step has missing fields (only for steps 0 and 1)
     if (activeStep < 2) {
       const warningMessages = getStepWarningMessage(activeStep);
@@ -365,10 +365,10 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         // Save to Firestore
         const userIdToUse = user?.id || 'anonymous';
         console.log('Using user ID for Firestore save:', userIdToUse);
-        
+
         // Look up the landlord/agent by email to get their ID
         let landlordAgentId: string | null = property.agent?.id || null;
-        
+
         if (!landlordAgentId && property.agent?.email) {
           console.log('🔍 Looking up landlord/agent by email:', property.agent.email);
           try {
@@ -385,7 +385,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
             // Continue without the ID - viewing will still be saved
           }
         }
-        
+
         const managerInfo = {
           landlordId: landlordAgentId,
           agentId: landlordAgentId
@@ -414,6 +414,8 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           date: viewing.date,
           time: viewing.time,
           preference: viewing.preference,
+          notificationPreference: viewing.notificationPreference,
+          whatsappNumber: viewing.whatsappNumber,
           userDetails: {
             fullName: viewing.userDetails.fullName || '',
             email: viewing.userDetails.email || '',
@@ -472,7 +474,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         }
 
         console.log('✅ All submission steps completed successfully');
-        
+
         setSaveComplete(true);
         setShowSavedIndicator(true);
         setTimeout(() => {
@@ -480,7 +482,7 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           setIsSaving(false);
           console.log('Showing success dialog...');
           setShowSuccess(true);
-          
+
           // Auto-close after showing success for 3 seconds
           setTimeout(() => {
             console.log('Auto-closing modal after success...');
@@ -523,10 +525,10 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
     setShowSuccess(false);
     dispatch({ type: 'RESET_STATE' });
     setActiveStep(0);
-    
+
     // Close the main modal first
     onClose();
-    
+
     // Then trigger the review modal in the parent component after a short delay
     if (onSubmissionComplete) {
       setTimeout(() => {

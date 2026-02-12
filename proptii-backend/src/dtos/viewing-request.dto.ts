@@ -59,6 +59,10 @@ export class CreateViewingRequestDto {
   @IsString()
   preference: string;
 
+  @IsOptional()
+  @IsString()
+  whatsappNumber?: string;
+
   @IsNotEmpty()
   @IsString()
   @IsIn(['PENDING', 'CONFIRMED', 'CANCELLED'])

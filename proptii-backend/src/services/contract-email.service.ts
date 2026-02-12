@@ -35,12 +35,12 @@ export class ContractEmailService {
         this.resend = new Resend(resendApiKey);
         this.isConfigured = true;
         console.log('✅ Contract email service initialized with Resend API');
-        
+
         // If using Resend, determine the best from address
         // Priority: EMAIL_FROM_ADDRESS > verified domain > Resend default
-        if (process.env.EMAIL_FROM_ADDRESS && 
-            process.env.EMAIL_FROM_ADDRESS.includes('@') && 
-            !process.env.EMAIL_FROM_ADDRESS.endsWith('@resend.dev')) {
+        if (process.env.EMAIL_FROM_ADDRESS &&
+          process.env.EMAIL_FROM_ADDRESS.includes('@') &&
+          !process.env.EMAIL_FROM_ADDRESS.endsWith('@resend.dev')) {
           // User has explicitly set EMAIL_FROM_ADDRESS with a custom domain
           this.fromAddress = process.env.EMAIL_FROM_ADDRESS;
           console.log(`📧 Using from address: ${this.fromAddress}`);
@@ -70,10 +70,10 @@ export class ContractEmailService {
 
       if (missingVars.length > 0) {
         if (!resendApiKey) {
-          console.error('Missing required environment variables:', missingVars);
-          console.error('Set RESEND_API_KEY for Resend API (recommended)');
-          console.error('OR set SMTP credentials (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS) for SMTP');
-          throw new Error('Missing required email configuration');
+          console.warn('⚠️ Email service not configured - No RESEND_API_KEY or SMTP credentials set');
+          console.warn('   Set RESEND_API_KEY for Resend API (recommended)');
+          console.warn('   OR set SMTP credentials (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS) for SMTP');
+          this.isConfigured = false;
         }
       } else {
         // Create nodemailer transporter with improved TLS configuration
@@ -152,7 +152,7 @@ export class ContractEmailService {
     // Use SMTP as fallback (or primary if Resend not configured)
     if (this.isConfigured && this.transporter) {
       let lastError: Error | null = null;
-      
+
       for (let attempt = 1; attempt <= retries; attempt++) {
         try {
           // Prepare email attachments
@@ -171,7 +171,7 @@ export class ContractEmailService {
               html: params.htmlContent,
               attachments: attachments
             }),
-            new Promise((_, reject) => 
+            new Promise((_, reject) =>
               setTimeout(() => reject(new Error('Email send timeout after 30 seconds')), 30000)
             )
           ]) as any;
@@ -199,7 +199,7 @@ export class ContractEmailService {
 
           // If it's a connection error and we have retries left, wait and retry
           if (attempt < retries && (
-            (error as any)?.code === 'ECONNRESET' || 
+            (error as any)?.code === 'ECONNRESET' ||
             (error as any)?.code === 'ESOCKET' ||
             (error as any)?.code === 'ETIMEDOUT' ||
             (error as any)?.code === 'ECONNREFUSED'
@@ -207,14 +207,14 @@ export class ContractEmailService {
             const waitTime = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
             console.log(`⏳ Waiting ${waitTime}ms before retry...`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
-            
+
             // Try to recreate transporter on connection errors
             try {
               await this.transporter?.close();
             } catch (closeError) {
               // Ignore close errors
             }
-            
+
             // Recreate transporter
             if (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS) {
               this.transporter = nodemailer.createTransport({
@@ -237,10 +237,10 @@ export class ContractEmailService {
                 logger: process.env.NODE_ENV === 'development'
               });
             }
-            
+
             continue;
           }
-          
+
           // If all retries failed or it's not a retryable error, throw
           throw lastError;
         }
@@ -354,7 +354,7 @@ export class ContractEmailService {
       });
 
       const results = await Promise.allSettled(emailPromises);
-      
+
       const processedResults = results.map((result, index) => {
         if (result.status === 'fulfilled') {
           return result.value;
@@ -388,7 +388,7 @@ export class ContractEmailService {
     senderName: string;
   }): string {
     const { recipientName, contractName, senderName } = params;
-    
+
     // Get the base URL for links in the email
     // Supports both localhost (for local testing) and proptii.co (for production)
     const getBaseUrl = (): string => {
@@ -396,27 +396,27 @@ export class ContractEmailService {
       if (process.env.APP_URL) {
         return process.env.APP_URL;
       }
-      
+
       // Priority 2: If FRONTEND_URL is set, use it (allows specifying localhost explicitly)
       if (process.env.FRONTEND_URL) {
         return process.env.FRONTEND_URL;
       }
-      
+
       // Priority 3: Check if we're in development mode
-      const isDevelopment = process.env.NODE_ENV === 'development' || 
-                           process.env.NODE_ENV !== 'production';
-      
+      const isDevelopment = process.env.NODE_ENV === 'development' ||
+        process.env.NODE_ENV !== 'production';
+
       if (isDevelopment) {
         // Default to localhost:5173 (Vite default) for local development
         return 'http://localhost:5173';
       }
-      
+
       // Priority 4: Production - use proptii.co (not mail.proptii.co for consistency)
       return 'https://proptii.co';
     };
-    
+
     const baseUrl = getBaseUrl();
-    
+
     // Unified base styles matching email.service.ts
     const baseStyles = `
       body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background: #f5f7fa; padding: 24px 0; margin: 0; }
@@ -447,7 +447,7 @@ export class ContractEmailService {
         <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com">here</a>.</em>
       </div>
     `;
-    
+
     return `
       <!DOCTYPE html>
       <html>
@@ -467,11 +467,11 @@ export class ContractEmailService {
             <h3>Contract Details</h3>
             <p><strong>Contract Name:</strong> ${contractName}</p>
             <p><strong>Signed Date:</strong> ${new Date().toLocaleDateString('en-GB', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}</p>
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })}</p>
             <p><strong>Status:</strong> <span class="status-badge">✅ Fully Executed</span></p>
           </div>
           

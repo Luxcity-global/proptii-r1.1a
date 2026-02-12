@@ -1,10 +1,27 @@
 import { Controller, Post, Body, Get, Param, HttpCode, UseInterceptors, UploadedFiles } from '@nestjs/common';
 import { ReferencingService } from '../services/referencing.service';
+import { AIExtractionService } from '../services/ai-extraction.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 
 @Controller('referencing')
 export class ReferencingController {
-  constructor(private readonly referencingService: ReferencingService) { }
+  constructor(
+    private readonly referencingService: ReferencingService,
+    private readonly aiExtractionService: AIExtractionService
+  ) { }
+
+  @Post('ai-extract')
+  @HttpCode(200)
+  async extractDataFromAI(@Body() data: { base64Data: string; mimeType: string }) {
+    try {
+      console.log('Received AI extraction request (mimeType):', data.mimeType);
+      const result = await this.aiExtractionService.extractDataFromDocument(data.base64Data, data.mimeType);
+      return { success: true, data: result };
+    } catch (error) {
+      console.error('Error in AI extraction endpoint:', error);
+      throw error;
+    }
+  }
 
   @Post('identity')
   @HttpCode(200)

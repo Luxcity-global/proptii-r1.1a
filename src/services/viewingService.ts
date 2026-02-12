@@ -1,17 +1,17 @@
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
   getDocs,
   orderBy,
   onSnapshot,
   serverTimestamp,
-  Timestamp 
+  Timestamp
 } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 
@@ -44,6 +44,7 @@ export interface ViewingBooking {
       email: string;
       phoneNumber: string;
     };
+    whatsappNumber?: string;
   };
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'rescheduled';
   createdAt: Timestamp;
@@ -83,15 +84,15 @@ class ViewingService {
       // Check if we're online
       if (!navigator.onLine) {
         console.warn('⚠️ Device is offline, viewing booking will be saved when connection is restored');
-        return { 
-          success: false, 
-          error: 'Device is offline. Viewing booking will be saved when connection is restored.' 
+        return {
+          success: false,
+          error: 'Device is offline. Viewing booking will be saved when connection is restored.'
         };
       }
 
       const bookingId = `${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const docRef = doc(db, this.collectionName, bookingId);
-      
+
       const bookingData: ViewingBooking = {
         id: bookingId,
         userId,
@@ -107,31 +108,31 @@ class ViewingService {
       };
 
       await setDoc(docRef, bookingData);
-      
+
       console.log('✅ Viewing booking saved to Firestore successfully');
       return { success: true, bookingId };
     } catch (error: any) {
       console.error('❌ Error saving viewing booking to Firestore:', error);
-      
+
       // Handle specific Firebase errors
       if (error.code === 'unavailable') {
-        return { 
-          success: false, 
-          error: 'Firestore is currently unavailable. Please check your internet connection and try again.' 
+        return {
+          success: false,
+          error: 'Firestore is currently unavailable. Please check your internet connection and try again.'
         };
       }
-      
+
       if (error.code === 'permission-denied') {
         console.warn('⚠️ Firestore permission denied - this is expected if Firestore security rules are not configured yet');
-        return { 
-          success: false, 
-          error: 'Firestore access denied. Please configure Firestore security rules or check your Firebase setup.' 
+        return {
+          success: false,
+          error: 'Firestore access denied. Please configure Firestore security rules or check your Firebase setup.'
         };
       }
-      
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }
@@ -197,23 +198,23 @@ class ViewingService {
         where('userId', '==', userId),
         orderBy('createdAt', 'desc')
       );
-      
+
       const querySnapshot = await getDocs(q);
       const bookings: ViewingBooking[] = [];
-      
+
       console.log('Query snapshot size:', querySnapshot.size);
       querySnapshot.forEach((doc) => {
         console.log('Found document:', doc.id, doc.data());
         bookings.push(doc.data() as ViewingBooking);
       });
-      
+
       console.log('Retrieved bookings:', bookings);
       return { success: true, bookings };
     } catch (error) {
       console.error('❌ Error getting user viewing bookings:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }
@@ -222,7 +223,7 @@ class ViewingService {
    * Get viewing bookings by status
    */
   async getViewingBookingsByStatus(
-    userId: string, 
+    userId: string,
     status: ViewingBooking['status']
   ): Promise<{ success: boolean; bookings?: ViewingBooking[]; error?: string }> {
     try {
@@ -233,23 +234,23 @@ class ViewingService {
         where('status', '==', status),
         orderBy('createdAt', 'desc')
       );
-      
+
       const querySnapshot = await getDocs(q);
       const bookings: ViewingBooking[] = [];
-      
+
       console.log(`Query snapshot size for status ${status}:`, querySnapshot.size);
       querySnapshot.forEach((doc) => {
         console.log(`Found document for status ${status}:`, doc.id, doc.data());
         bookings.push(doc.data() as ViewingBooking);
       });
-      
+
       console.log(`Retrieved bookings for status ${status}:`, bookings);
       return { success: true, bookings };
     } catch (error) {
       console.error('❌ Error getting viewing bookings by status:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }
@@ -336,7 +337,7 @@ class ViewingService {
     try {
       // Normalize email to lowercase for comparison (emails are case-insensitive)
       const normalizedEmail = agentEmail?.toLowerCase().trim();
-      
+
       // OPTIMIZATION: Try top-level agentEmail field first (much faster than nested field query)
       // This works for new documents. For backward compatibility, we'll also check nested field.
       let q = query(
@@ -344,7 +345,7 @@ class ViewingService {
         where('agentEmail', '==', normalizedEmail),
         orderBy('createdAt', 'desc')
       );
-      
+
       let querySnapshot;
       try {
         querySnapshot = await getDocs(q);
@@ -369,26 +370,26 @@ class ViewingService {
           throw indexError;
         }
       }
-      
+
       const bookings: ViewingBooking[] = [];
-      
+
       querySnapshot.forEach((doc) => {
         const data = doc.data() as ViewingBooking;
         bookings.push(data);
       });
-      
+
       // If we used nested field query, filter and sort in memory
       if (bookings.length > 0 && !bookings[0].agentEmail) {
         // Filter by email in case some documents don't match
-        const filtered = bookings.filter(b => 
-          b.agentEmail?.toLowerCase() === normalizedEmail || 
+        const filtered = bookings.filter(b =>
+          b.agentEmail?.toLowerCase() === normalizedEmail ||
           b.property?.agent?.email?.toLowerCase() === normalizedEmail
         );
         // Sort by createdAt descending
         const sorted = filtered.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
         return { success: true, bookings: sorted };
       }
-      
+
       return { success: true, bookings };
     } catch (error: any) {
       // Final fallback: query without orderBy and sort in memory
@@ -403,8 +404,8 @@ class ViewingService {
           const bookings: ViewingBooking[] = [];
           fallbackSnapshot.forEach((doc) => {
             const data = doc.data() as ViewingBooking;
-            if (data.agentEmail?.toLowerCase() === normalizedEmail || 
-                data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+            if (data.agentEmail?.toLowerCase() === normalizedEmail ||
+              data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
               bookings.push(data);
             }
           });
@@ -417,8 +418,8 @@ class ViewingService {
           const bookings: ViewingBooking[] = [];
           allSnapshot.forEach((doc) => {
             const data = doc.data() as ViewingBooking;
-            if (data.agentEmail?.toLowerCase() === normalizedEmail || 
-                data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+            if (data.agentEmail?.toLowerCase() === normalizedEmail ||
+              data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
               bookings.push(data);
             }
           });
@@ -426,7 +427,7 @@ class ViewingService {
           return { success: true, bookings: sorted };
         }
       }
-      
+
       console.error('Error getting viewing bookings by email:', error);
       return {
         success: false,
@@ -451,14 +452,14 @@ class ViewingService {
         where('status', '==', status),
         orderBy('createdAt', 'desc')
       );
-      
+
       const querySnapshot = await getDocs(q);
       const bookings: ViewingBooking[] = [];
-      
+
       querySnapshot.forEach((doc) => {
         bookings.push(doc.data() as ViewingBooking);
       });
-      
+
       return { success: true, bookings };
     } catch (error: any) {
       // Fallback without orderBy if index is missing
@@ -543,14 +544,14 @@ class ViewingService {
       if (updates?.viewingDetails) updateData.viewingDetails = updates.viewingDetails;
 
       await updateDoc(docRef, updateData);
-      
+
       console.log(`✅ Viewing booking status updated to ${status}`);
       return { success: true };
     } catch (error) {
       console.error('❌ Error updating viewing status:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }
@@ -564,7 +565,7 @@ class ViewingService {
         collection(db, this.collectionName),
         where('userId', '==', userId)
       );
-      
+
       const querySnapshot = await getDocs(q);
       const stats: ViewingStats = {
         upcoming: 0,
@@ -572,11 +573,11 @@ class ViewingService {
         rescheduled: 0,
         total: 0
       };
-      
+
       querySnapshot.forEach((doc) => {
         const booking = doc.data() as ViewingBooking;
         stats.total++;
-        
+
         switch (booking.status) {
           case 'pending':
           case 'confirmed':
@@ -590,13 +591,13 @@ class ViewingService {
             break;
         }
       });
-      
+
       return { success: true, stats };
     } catch (error) {
       console.error('❌ Error getting viewing stats:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }
@@ -608,14 +609,14 @@ class ViewingService {
     try {
       const docRef = doc(db, this.collectionName, bookingId);
       await deleteDoc(docRef);
-      
+
       console.log('✅ Viewing booking deleted successfully');
       return { success: true };
     } catch (error) {
       console.error('❌ Error deleting viewing booking:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }
@@ -735,11 +736,11 @@ class ViewingService {
           rescheduled: 0,
           total: 0
         };
-        
+
         querySnapshot.forEach((doc) => {
           const booking = doc.data() as ViewingBooking;
           stats.total++;
-          
+
           switch (booking.status) {
             case 'pending':
             case 'confirmed':
@@ -753,7 +754,7 @@ class ViewingService {
               break;
           }
         });
-        
+
         callback(stats);
       },
       (error) => {
@@ -847,8 +848,8 @@ class ViewingService {
         querySnapshot.forEach((doc) => {
           const data = doc.data() as ViewingBooking;
           // Filter to ensure we only include matching bookings (for backward compatibility)
-          if (data.agentEmail?.toLowerCase() === normalizedEmail || 
-              data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+          if (data.agentEmail?.toLowerCase() === normalizedEmail ||
+            data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
             bookings.push(data);
           }
         });
@@ -915,14 +916,14 @@ class ViewingService {
           rescheduled: 0,
           total: 0
         };
-        
+
         querySnapshot.forEach((doc) => {
           const booking = doc.data() as ViewingBooking;
           // Filter to ensure we only count matching bookings
-          if (booking.agentEmail?.toLowerCase() === normalizedEmail || 
-              booking.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+          if (booking.agentEmail?.toLowerCase() === normalizedEmail ||
+            booking.property?.agent?.email?.toLowerCase() === normalizedEmail) {
             stats.total++;
-            
+
             switch (booking.status) {
               case 'pending':
               case 'confirmed':
@@ -937,7 +938,7 @@ class ViewingService {
             }
           }
         });
-        
+
         callback(stats);
       },
       (error) => {
@@ -956,12 +957,12 @@ class ViewingService {
                 rescheduled: 0,
                 total: 0
               };
-              
+
               querySnapshot.forEach((doc) => {
                 const booking = doc.data() as ViewingBooking;
                 if (booking.property?.agent?.email?.toLowerCase() === normalizedEmail) {
                   stats.total++;
-                  
+
                   switch (booking.status) {
                     case 'pending':
                     case 'confirmed':
@@ -976,7 +977,7 @@ class ViewingService {
                   }
                 }
               });
-              
+
               callback(stats);
             },
             (fallbackError) => {

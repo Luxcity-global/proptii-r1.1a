@@ -11,6 +11,8 @@ import referencingService from '../services/referencingService';
 import emailService from '../services/emailService';
 import { firestoreService } from '../services/firestoreService';
 import { toast } from 'react-hot-toast';
+import QuickFillBanner from './referencing/ui/QuickFillBanner';
+import { ExtractedData } from '../services/openRouterService';
 
 interface ReferencingModalProps {
   isOpen: boolean;
@@ -627,7 +629,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
 
       case 'employment': {
         const nonApplicableStatus = ['Unemployed', 'Retired', 'Student'];
-        
+
         // For non-applicable statuses, only status selection is required
         if (nonApplicableStatus.includes(data.employmentStatus)) {
           return 'complete';
@@ -679,7 +681,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       case 'guarantor': {
         // Guarantor section is completely optional
         const hasAnyData = Object.values(data).some(value => !!value && value !== null && value !== '');
-        
+
         // If some data is entered, all fields + document must be complete for green
         if (hasAnyData) {
           const hasAllRequiredFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
@@ -688,7 +690,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
           if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
           return 'partial'; // Orange if partially filled
         }
-        
+
         // If no data entered, it's still orange by default (will be handled in the form completion check)
         return 'partial';
       }
@@ -776,13 +778,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
 
       try {
         const propertyId = 'demo-property-123'; // Using demo property ID as in DashboardHome
-        
+
         // First try to load from Firestore by specific property
         try {
           console.log('🔍 Attempting to load referencing form from Firestore:', { userId: user.id, propertyId });
           let firestoreResult = await firestoreService.getReferencingForm(user.id, propertyId);
           console.log('📋 Firestore result (specific property):', { success: firestoreResult.success, hasData: !!firestoreResult.data, error: firestoreResult.error });
-          
+
           // If not found with specific propertyId, try to get all forms for user and use the latest one
           if (firestoreResult.success && !firestoreResult.data) {
             console.log('ℹ️ No data found for specific property, trying to get all forms for user...');
@@ -798,26 +800,26 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
               console.log('✅ Found form data from user forms (using latest):', sortedForms[0]);
             }
           }
-          
+
           if (firestoreResult.success && firestoreResult.data) {
             console.log('✅ Loading form data from Firestore:', firestoreResult.data);
-            
+
             // Set form data from Firestore
             setFormData(prev => ({
               ...prev,
               ...firestoreResult.data!.formData
             }));
-            
+
             // Set current step from Firestore (only if no initialStep provided)
             if (firestoreResult.data.currentStep && !initialStep) {
               setCurrentStep(firestoreResult.data.currentStep);
             }
-            
+
             // Set step status from Firestore
             if (firestoreResult.data.stepStatus) {
               setStepStatus(firestoreResult.data.stepStatus);
             }
-            
+
             return; // Exit early if Firestore data loaded successfully
           } else if (firestoreResult.success && !firestoreResult.data) {
             console.log('ℹ️ No data found in Firestore for this user');
@@ -827,10 +829,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
         } catch (error) {
           console.warn('❌ Failed to load from Firestore:', error);
         }
-        
+
         // Fallback to localStorage if Firestore fails
         console.log('🔄 Falling back to localStorage...');
-        
+
         // Load current step from localStorage
         const savedStep = localStorage.getItem(`referencing_${user.id}_currentStep`);
         if (savedStep) {
@@ -862,10 +864,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
         try {
           const propertyId = 'demo-property-123';
           console.log('🔍 Loading data on modal open:', { userId: user.id, propertyId });
-          
+
           let firestoreResult = await firestoreService.getReferencingForm(user.id, propertyId);
           console.log('📋 Firestore result on open (specific property):', { success: firestoreResult.success, hasData: !!firestoreResult.data });
-          
+
           // If not found with specific propertyId, try to get all forms for user and use the latest one
           if (firestoreResult.success && !firestoreResult.data) {
             console.log('ℹ️ No data found for specific property on open, trying to get all forms for user...');
@@ -881,23 +883,23 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
               console.log('✅ Found form data from user forms on open (using latest):', sortedForms[0]);
             }
           }
-          
+
           if (firestoreResult.success && firestoreResult.data) {
             console.log('✅ Loading form data on modal open:', firestoreResult.data);
-            
+
             // Set form data from Firestore
             setFormData(prev => ({
               ...prev,
               ...firestoreResult.data!.formData
             }));
-            
+
             // Set current step - prioritize initialStep prop over saved step
             if (initialStep) {
               setCurrentStep(initialStep);
             } else if (firestoreResult.data.currentStep) {
               setCurrentStep(firestoreResult.data.currentStep);
             }
-            
+
             // Set step status from Firestore
             if (firestoreResult.data.stepStatus) {
               setStepStatus(firestoreResult.data.stepStatus);
@@ -927,7 +929,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
           }
         }
       };
-      
+
       loadDataOnOpen();
     }
   }, [isOpen, user, initialStep]);
@@ -1011,10 +1013,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       } else {
         toast.success('Progress saved successfully (local storage)');
       }
-      
+
       // Show save success indicator
       setShowSaveSuccess(true);
-      
+
       // Auto-hide save success after 3 seconds
       setTimeout(() => {
         setShowSaveSuccess(false);
@@ -1134,7 +1136,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       // Don't show multiple progress updates - just submit directly
 
       const propertyId = 'demo-property-123'; // Using demo property ID as in DashboardHome
-      
+
       // Save final form data to Firestore before submission (non-blocking - don't wait for it)
       // Firestore save is optional - API submission is the primary action
       firestoreService.saveReferencingForm(
@@ -1167,7 +1169,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       ]);
 
       const result = await submitWithTimeout as any;
-      
+
       console.log('✅ Backend API submission result:', result);
 
       // Mark as submitted in Firestore (non-blocking - don't wait for it)
@@ -1245,7 +1247,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
 
     const handleClose = () => {
       setShowSuccessModal(false);
-      
+
       // Clear form data from localStorage if user is logged in
       if (user?.id) {
         const keysToRemove = [
@@ -1256,10 +1258,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
         ];
         keysToRemove.forEach(key => localStorage.removeItem(key));
       }
-      
+
       // Close the main modal first
       onClose();
-      
+
       // Then trigger the review modal in the parent component
       if (onSubmissionComplete) {
         // Use setTimeout to ensure the modal is fully closed before showing review
@@ -1334,11 +1336,77 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
     }
   }, [isOpen, user]);
 
+  // Helper for AI data extraction
+  const handleAIDataExtracted = (data: ExtractedData) => {
+    console.log('Applying AI extracted data to form:', data);
+
+    // Helper to map backend employment status to frontend options
+    const mapEmploymentStatus = (status: string | undefined): string => {
+      if (!status) return '';
+      const s = status.toLowerCase();
+      if (s === 'employed' || s === 'full-time') return 'Full-time';
+      if (s === 'part-time') return 'Part-time';
+      if (s === 'self-employed') return 'Self-employed';
+      if (s === 'student') return 'Student';
+      if (s === 'retired') return 'Retired';
+      if (s === 'unemployed') return 'Unemployed';
+
+      const options = ['Full-time', 'Part-time', 'Self-employed', 'Unemployed', 'Retired', 'Student'];
+      const match = options.find(opt => opt.toLowerCase() === s);
+      return match || '';
+    };
+
+    if (currentStep <= 4) {
+      // Main Applicant sections
+      // Identity Section
+      updateFormData('identity', {
+        ...(data.firstName && { firstName: data.firstName }),
+        ...(data.lastName && { lastName: data.lastName }),
+        ...(data.email && { email: data.email }),
+        ...(data.phoneNumber && { phoneNumber: data.phoneNumber }),
+        ...(data.dateOfBirth && { dateOfBirth: data.dateOfBirth }),
+        ...(data.nationality && { nationality: data.nationality }),
+      });
+
+      // Employment Section
+      const employmentData: any = {};
+      if (data.companyDetails) employmentData.companyDetails = data.companyDetails;
+      if (data.jobPosition) employmentData.jobPosition = data.jobPosition;
+      if (data.employmentStatus) employmentData.employmentStatus = mapEmploymentStatus(data.employmentStatus);
+
+      if (Object.keys(employmentData).length > 0) {
+        updateFormData('employment', employmentData);
+      }
+
+      // Residential Section
+      if (data.currentAddress) {
+        updateFormData('residential', { currentAddress: data.currentAddress });
+      }
+
+      // Financial Section
+      if (data.monthlyIncome) {
+        updateFormData('financial', { monthlyIncome: data.monthlyIncome });
+      }
+    } else if (currentStep === 5) {
+      // Guarantor section
+      updateFormData('guarantor', {
+        ...(data.firstName && { firstName: data.firstName }),
+        ...(data.lastName && { lastName: data.lastName }),
+        ...(data.email && { email: data.email }),
+        ...(data.phoneNumber && { phoneNumber: data.phoneNumber }),
+        ...(data.currentAddress && { address: data.currentAddress }),
+      });
+    }
+
+    toast.success('Fields auto-filled successfully!');
+  };
+
   const renderFormContent = () => {
     switch (currentStep) {
       case 1:
         return (
           <div className="relative">
+            <QuickFillBanner onDataExtracted={handleAIDataExtracted} />
             <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4 md:mb-6">Fill in your personal details below</h3>
             <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6 grid grid-cols-1 md:grid-cols-2 gap-x-3 sm:gap-x-4 md:gap-x-6 gap-y-3 sm:gap-y-4">
               <div>
@@ -1563,6 +1631,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       case 2:
         return (
           <div className="relative">
+            <QuickFillBanner onDataExtracted={handleAIDataExtracted} />
             <div className="mb-3 sm:mb-4 md:mb-6">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your employment details below</h2>
             </div>
@@ -1664,6 +1733,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       case 3:
         return (
           <div className="relative">
+            <QuickFillBanner onDataExtracted={handleAIDataExtracted} />
             <div className="mb-3 sm:mb-4 md:mb-6">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your residential details below</h2>
             </div>
@@ -1809,6 +1879,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       case 5:
         return (
           <div className="relative">
+            <QuickFillBanner onDataExtracted={handleAIDataExtracted} />
             <div className="mb-3 sm:mb-4 md:mb-6">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Fill in your guarantor's personal details below</h2>
               <p className="text-sm text-gray-600 mt-2">
@@ -1873,7 +1944,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
             <GuarantorUpload updateFormData={updateFormData} formData={formData} />
           </div>
         );
-      {/*case 6:
+        {/*case 6:
         return (
           <div className="relative">
             <div className="mb-4 sm:mb-6">

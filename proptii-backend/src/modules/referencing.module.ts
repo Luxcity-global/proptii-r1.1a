@@ -3,10 +3,11 @@ import { ReferencingService } from '../services/referencing.service';
 import { ReferencingController } from '../controllers/referencing.controller';
 import { EmailService } from '../services/email.service';
 import { EmailController } from '../controllers/email.controller';
+import { AIExtractionService } from '../services/ai-extraction.service';
 
 @Module({
   controllers: [ReferencingController, EmailController],
-  providers: [ReferencingService, EmailService],
-  exports: [ReferencingService, EmailService],
+  providers: [ReferencingService, EmailService, AIExtractionService],
+  exports: [ReferencingService, EmailService, AIExtractionService],
 })
-export class ReferencingModule {} 
+export class ReferencingModule { } 

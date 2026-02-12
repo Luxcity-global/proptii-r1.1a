@@ -17,16 +17,16 @@ interface EmailData {
   attachments?: EmailAttachment[];
   formData?: any;
   emailType?:
-    | 'agent'
-    | 'referee'
-    | 'guarantor'
-    | 'user'
-    | 'viewing-agent'
-    | 'viewing-user'
-    | 'viewing-confirmed'
-    | 'viewing-reschedule'
-    | 'viewing-cancel'
-    | 'viewing-cancellation';
+  | 'agent'
+  | 'referee'
+  | 'guarantor'
+  | 'user'
+  | 'viewing-agent'
+  | 'viewing-user'
+  | 'viewing-confirmed'
+  | 'viewing-reschedule'
+  | 'viewing-cancel'
+  | 'viewing-cancellation';
 }
 
 interface MultiEmailData {
@@ -63,12 +63,12 @@ export class EmailService {
         this.resend = new Resend(resendApiKey);
         this.isConfigured = true;
         console.log('✅ Email service initialized with Resend API');
-        
+
         // If using Resend, determine the best from address
         // Priority: EMAIL_FROM_ADDRESS > verified domain > Resend default
-        if (process.env.EMAIL_FROM_ADDRESS && 
-            process.env.EMAIL_FROM_ADDRESS.includes('@') && 
-            !process.env.EMAIL_FROM_ADDRESS.endsWith('@resend.dev')) {
+        if (process.env.EMAIL_FROM_ADDRESS &&
+          process.env.EMAIL_FROM_ADDRESS.includes('@') &&
+          !process.env.EMAIL_FROM_ADDRESS.endsWith('@resend.dev')) {
           // User has explicitly set EMAIL_FROM_ADDRESS with a custom domain
           this.fromAddress = process.env.EMAIL_FROM_ADDRESS;
           console.log(`📧 Using from address: ${this.fromAddress}`);
@@ -105,7 +105,7 @@ export class EmailService {
           // Port 587 is more reliable on cloud hosting providers
           const usePort = this.isCloudPlatform && port === 465 ? 587 : port;
           const isSecure = usePort === 465;
-          
+
           this.transporter = nodemailer.createTransport({
             host: smtpHost,
             port: usePort,
@@ -150,7 +150,7 @@ export class EmailService {
           }
           console.log(`   Connection pooling: ${!this.isCloudPlatform ? 'enabled' : 'disabled (cloud platform)'}`);
           console.log(`   Timeouts: connection=${60000}ms, socket=${60000}ms, greeting=${30000}ms, dns=${30000}ms`);
-          
+
           // Verify SMTP connection on startup (optional, with timeout)
           if (this.isCloudPlatform) {
             console.log('🔍 Verifying SMTP connection...');
@@ -197,25 +197,25 @@ export class EmailService {
       if (process.env.APP_URL) {
         return process.env.APP_URL;
       }
-      
+
       // Priority 2: If FRONTEND_URL is set, use it (allows specifying localhost explicitly)
       if (process.env.FRONTEND_URL) {
         return process.env.FRONTEND_URL;
       }
-      
+
       // Priority 3: Check if we're in development mode
-      const isDevelopment = process.env.NODE_ENV === 'development' || 
-                           process.env.NODE_ENV !== 'production';
-      
+      const isDevelopment = process.env.NODE_ENV === 'development' ||
+        process.env.NODE_ENV !== 'production';
+
       if (isDevelopment) {
         // Default to localhost:5173 (Vite default) for local development
         return 'http://localhost:5173';
       }
-      
+
       // Priority 4: Production - use proptii.co (not mail.proptii.co for consistency)
       return 'https://proptii.co';
     };
-    
+
     const baseUrl = getBaseUrl();
 
     const baseStyles = `
@@ -431,7 +431,7 @@ export class EmailService {
         const property = formData.property || {};
         const viewing = formData.viewing || {};
         const user = formData.user || {};
-        
+
         // Format viewing date
         let viewingDate = 'N/A';
         if (viewing.date) {
@@ -447,7 +447,7 @@ export class EmailService {
             console.error('Error formatting date:', error);
           }
         }
-        
+
         // Format viewing time
         let viewingTime = viewing.time || 'N/A';
         if (viewing.time && /^\d{2}:\d{2}$/.test(viewing.time)) {
@@ -457,10 +457,10 @@ export class EmailService {
           const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
           viewingTime = `${displayHour}:${minutes} ${ampm}`;
         }
-        
+
         const agentName = property.agent?.name || 'Agent';
         const propertyAddress = property.street || 'the property';
-        
+
         return wrapEmailContent(
           'New Viewing Request',
           `
@@ -474,6 +474,7 @@ export class EmailService {
               <p><strong>Viewing type:</strong> ${viewing.preference || 'Not specified'}</p>
               <p><strong>Contact email:</strong> ${user.email || 'Not provided'}</p>
               <p><strong>Phone number:</strong> ${viewing.userDetails?.phoneNumber || 'Not provided'}</p>
+              ${viewing.whatsappNumber ? `<p><strong>WhatsApp number:</strong> ${viewing.whatsappNumber}</p>` : ''}
             </div>
             
             <p>If the property is available, please review the request and confirm the appointment at your earliest convenience. If the suggested time doesn't work for you, kindly propose an alternative that suits your schedule.</p>
@@ -490,7 +491,7 @@ export class EmailService {
         const property = formData.property || {};
         const viewing = formData.viewing || {};
         const user = formData.user || {};
-        
+
         // Format viewing date
         let viewingDate = 'N/A';
         if (viewing.date) {
@@ -506,7 +507,7 @@ export class EmailService {
             console.error('Error formatting date:', error);
           }
         }
-        
+
         // Format viewing time
         let viewingTime = viewing.time || 'N/A';
         if (viewing.time && /^\d{2}:\d{2}$/.test(viewing.time)) {
@@ -516,11 +517,11 @@ export class EmailService {
           const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
           viewingTime = `${displayHour}:${minutes} ${ampm}`;
         }
-        
+
         const userName = user.name?.split(' ')[0] || 'there';
         const propertyAddress = property.street || 'the property';
         const fullAddress = `${property.street || ''}, ${property.city || ''}, ${property.postcode || ''}`.trim().replace(/, ,/g, ',').replace(/^,|,$/g, '');
-        
+
         return wrapEmailContent(
           'Your Viewing Request Confirmation',
           `
@@ -533,6 +534,7 @@ export class EmailService {
               <p><strong>Viewing type:</strong> ${viewing.preference || 'Not specified'}</p>
               <p><strong>Agent:</strong> ${property.agent?.name || 'Not provided'}</p>
               <p><strong>Property address:</strong> ${fullAddress || 'Not provided'}</p>
+              ${viewing.whatsappNumber ? `<p><strong>WhatsApp number:</strong> ${viewing.whatsappNumber}</p>` : ''}
             </div>
             
             <p>The agent will contact you shortly to confirm the appointment.</p>
@@ -740,46 +742,46 @@ export class EmailService {
           lastError = error instanceof Error ? error : new Error('Failed to send email via SMTP');
           const errorCode = (error as any)?.code;
           const errorMessage = error instanceof Error ? error.message : String(error);
-          
+
           console.error(`❌ SMTP error while sending email (attempt ${attempt}/${retries}):`, error);
           console.error(`   Error code: ${errorCode || 'UNKNOWN'}`);
           console.error(`   Error message: ${errorMessage}`);
-          
+
           // On cloud platforms, log timeout but don't assume SMTP is blocked (it works on Render)
           if (this.isCloudPlatform && errorCode === 'ETIMEDOUT') {
             console.warn('⚠️ SMTP connection timeout on cloud platform. Retrying...');
           }
-          
+
           // Check if it's a retryable error
-          const isRetryable = errorCode === 'ECONNRESET' || 
-                             errorCode === 'ESOCKET' ||
-                             errorCode === 'ECONNREFUSED' ||
-                             // Retry ETIMEDOUT on all platforms (SMTP works on Render)
-                             errorCode === 'ETIMEDOUT';
-          
+          const isRetryable = errorCode === 'ECONNRESET' ||
+            errorCode === 'ESOCKET' ||
+            errorCode === 'ECONNREFUSED' ||
+            // Retry ETIMEDOUT on all platforms (SMTP works on Render)
+            errorCode === 'ETIMEDOUT';
+
           if (attempt < retries && isRetryable) {
             const waitTime = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
             console.log(`⏳ Waiting ${waitTime}ms before retry...`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
-            
+
             // Try to recreate transporter on connection errors
             try {
               await this.transporter?.close();
             } catch (closeError) {
               // Ignore close errors
             }
-            
+
             // Recreate transporter with improved settings
             const smtpHost = process.env.SMTP_HOST;
             const smtpPort = process.env.SMTP_PORT;
             const smtpUser = process.env.SMTP_USER;
             const smtpPass = process.env.SMTP_PASS;
-            
+
             if (smtpHost && smtpPort && smtpUser && smtpPass) {
               const port = parseInt(smtpPort);
               const usePort = this.isCloudPlatform && port === 465 ? 587 : port;
               const isSecure = usePort === 465;
-              
+
               this.transporter = nodemailer.createTransport({
                 host: smtpHost,
                 port: usePort,
@@ -806,18 +808,18 @@ export class EmailService {
                 logger: process.env.NODE_ENV === 'development' || this.isCloudPlatform
               } as any);
             }
-            
+
             continue;
           }
-          
+
           // If all retries failed or it's not a retryable error, break
           break;
         }
       }
-      
+
       // If we get here, all SMTP retries failed
       const errorMsg = lastError?.message || 'Failed to send email via SMTP';
-      
+
       return {
         success: false,
         error: errorMsg,
@@ -849,7 +851,7 @@ export class EmailService {
       console.log(`📧 Sending email via Resend API to: ${emailData.to}`);
       console.log(`   From: ${fromAddress}`);
       console.log(`   Subject: ${emailData.subject}`);
-      
+
       // Convert attachments to Resend format if present
       const attachments = emailData.attachments?.map(att => {
         // Resend expects attachments as base64 strings or file paths
@@ -891,16 +893,16 @@ export class EmailService {
         emailPayload.attachments = attachments;
         console.log(`   Attachments: ${attachments.length} file(s)`);
       }
-      
+
       const result = await this.resend.emails.send(emailPayload);
-      
+
       // Log the full response for debugging
       console.log(`📧 Resend API response:`, JSON.stringify(result, null, 2));
-      
+
       // Check if there's an error in the response
       if (result.error) {
         console.error('❌ Resend API returned an error:', result.error);
-        
+
         // Provide helpful guidance for common errors
         // Type-safe check: Resend error can have statusCode or name
         const error = result.error as any;
@@ -919,21 +921,21 @@ export class EmailService {
             console.error('');
           }
         }
-        
+
         throw new Error(error.message || 'Resend API returned an error');
       }
-      
+
       // Extract message ID from Resend response structure
       // Resend v4 returns: { data: { id: string }, error: null }
       const messageId = result.data?.id;
-      
+
       if (!messageId) {
         console.warn('⚠️ Resend API response missing message ID. Full response:', JSON.stringify(result, null, 2));
         console.warn('   This might indicate the email was not actually sent. Check Resend dashboard for details.');
       }
-      
+
       console.log(`✅ Email sent successfully via Resend API to ${emailData.to}${messageId ? ` (ID: ${messageId})` : ' (no ID returned)'}`);
-      
+
       return {
         success: true,
         messageId: messageId || 'resend-email-sent',
@@ -947,13 +949,13 @@ export class EmailService {
         response: error.response?.data || error.response,
         stack: error.stack
       });
-      
+
       // If it's a Resend API error with more details, include them
       if (error.response?.data) {
         console.error('   Resend API error response:', JSON.stringify(error.response.data, null, 2));
         throw new Error(error.response.data.message || error.message || 'Failed to send email via Resend');
       }
-      
+
       throw new Error(error.message || 'Failed to send email via Resend');
     }
   }

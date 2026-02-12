@@ -67,24 +67,24 @@ export class ViewingRequestService {
 
         return createdViewing;
       }
-      
+
       // Fallback to Firestore if Cosmos DB is not available
       if (this.firestore) {
         try {
           // Check for conflicting viewings in Firestore (only if postcode is provided)
           if (createViewingRequestDto.property.postcode) {
-            const viewingDateStr = typeof createViewingRequestDto.viewing_date === 'string' 
-              ? createViewingRequestDto.viewing_date 
+            const viewingDateStr = typeof createViewingRequestDto.viewing_date === 'string'
+              ? createViewingRequestDto.viewing_date
               : new Date(createViewingRequestDto.viewing_date).toISOString().split('T')[0];
-            
+
             const conflictingQuery = this.firestore.collection(this.collectionName)
               .where('viewing_date', '==', viewingDateStr)
               .where('viewing_time', '==', createViewingRequestDto.viewing_time)
               .where('property.postcode', '==', createViewingRequestDto.property.postcode)
               .where('status', 'in', ['PENDING', 'CONFIRMED']);
-            
+
             const conflictingSnapshot = await conflictingQuery.get();
-            
+
             if (!conflictingSnapshot.empty) {
               throw new BadRequestException('This viewing slot is already booked');
             }
@@ -92,13 +92,13 @@ export class ViewingRequestService {
 
           // Create the viewing request in Firestore
           const docRef = this.firestore.collection(this.collectionName).doc();
-          
+
           // Convert viewing_date to string format for Firestore (YYYY-MM-DD)
           const viewingDateObj = createViewingRequestDto.viewing_date instanceof Date
             ? createViewingRequestDto.viewing_date
             : new Date(createViewingRequestDto.viewing_date);
           const viewingDate = viewingDateObj.toISOString().split('T')[0];
-          
+
           // Convert DTOs to plain objects for Firestore (Firestore can't serialize class instances)
           const viewingRequestData = {
             property: {
@@ -116,6 +116,7 @@ export class ViewingRequestService {
             viewing_date: viewingDate, // Store as string in YYYY-MM-DD format
             viewing_time: createViewingRequestDto.viewing_time,
             preference: createViewingRequestDto.preference,
+            whatsappNumber: createViewingRequestDto.whatsappNumber,
             status: createViewingRequestDto.status,
             id: docRef.id,
             type: 'viewing-request',
@@ -144,7 +145,7 @@ export class ViewingRequestService {
       // This allows the API to work even when backend Firestore is not configured.
       console.warn('⚠️ No backend database available. Frontend will handle persistence via client SDK.');
       console.warn('   The viewing request will be saved to Firestore by the frontend.');
-      
+
       // Return a mock success response since frontend handles the actual save
       const mockResponse = {
         id: `mock_${Date.now()}`,
@@ -154,7 +155,7 @@ export class ViewingRequestService {
         updatedAt: new Date().toISOString(),
         _note: 'Saved by frontend Firestore client SDK - backend database not configured'
       };
-      
+
       return mockResponse;
     } catch (error) {
       if (error instanceof BadRequestException) {
@@ -173,14 +174,14 @@ export class ViewingRequestService {
         .fetchAll();
       return resources;
     }
-    
+
     if (this.firestore) {
       const snapshot = await this.firestore.collection(this.collectionName)
         .where('type', '==', 'viewing-request')
         .get();
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
-    
+
     console.warn('No database available. Returning empty array for viewing requests.');
     return [];
   }
@@ -194,7 +195,7 @@ export class ViewingRequestService {
         }
         return resource;
       }
-      
+
       if (this.firestore) {
         const doc = await this.firestore.collection(this.collectionName).doc(id).get();
         if (!doc.exists) {
@@ -202,7 +203,7 @@ export class ViewingRequestService {
         }
         return { id: doc.id, ...doc.data() };
       }
-      
+
       const missingConfig = [];
       if (!process.env.COSMOS_DB_CONNECTION_STRING || !process.env.COSMOS_DB_KEY) {
         missingConfig.push('Cosmos DB (COSMOS_DB_CONNECTION_STRING, COSMOS_DB_KEY)');
@@ -229,7 +230,7 @@ export class ViewingRequestService {
         .fetchAll();
       return resources;
     }
-    
+
     if (this.firestore) {
       const snapshot = await this.firestore.collection(this.collectionName)
         .where('type', '==', 'viewing-request')
@@ -237,7 +238,7 @@ export class ViewingRequestService {
         .get();
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
-    
+
     console.warn('No database available. Returning empty array for property viewings.');
     return [];
   }
@@ -252,7 +253,7 @@ export class ViewingRequestService {
         .fetchAll();
       return resources;
     }
-    
+
     if (this.firestore) {
       const snapshot = await this.firestore.collection(this.collectionName)
         .where('type', '==', 'viewing-request')
@@ -260,7 +261,7 @@ export class ViewingRequestService {
         .get();
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
-    
+
     console.warn('No database available. Returning empty array for agent viewings.');
     return [];
   }
@@ -282,11 +283,11 @@ export class ViewingRequestService {
         const { resource } = await this.container.item(id).replace(updatedViewing);
         return resource;
       }
-      
+
       if (this.firestore) {
         const docRef = this.firestore.collection(this.collectionName).doc(id);
         const doc = await docRef.get();
-        
+
         if (!doc.exists) {
           throw new NotFoundException(`Viewing request with ID ${id} not found`);
         }
@@ -295,7 +296,7 @@ export class ViewingRequestService {
         const updateData: any = {
           updatedAt: new Date().toISOString()
         };
-        
+
         // Only include fields that are being updated
         if (updateViewingRequestDto.status) {
           updateData.status = updateViewingRequestDto.status;
@@ -305,7 +306,7 @@ export class ViewingRequestService {
         const updatedDoc = await docRef.get();
         return { id: doc.id, ...updatedDoc.data() };
       }
-      
+
       const missingConfig = [];
       if (!process.env.COSMOS_DB_CONNECTION_STRING || !process.env.COSMOS_DB_KEY) {
         missingConfig.push('Cosmos DB (COSMOS_DB_CONNECTION_STRING, COSMOS_DB_KEY)');
@@ -328,19 +329,19 @@ export class ViewingRequestService {
         await this.container.item(id).delete();
         return;
       }
-      
+
       if (this.firestore) {
         const docRef = this.firestore.collection(this.collectionName).doc(id);
         const doc = await docRef.get();
-        
+
         if (!doc.exists) {
           throw new NotFoundException(`Viewing request with ID ${id} not found`);
         }
-        
+
         await docRef.delete();
         return;
       }
-      
+
       const missingConfig = [];
       if (!process.env.COSMOS_DB_CONNECTION_STRING || !process.env.COSMOS_DB_KEY) {
         missingConfig.push('Cosmos DB (COSMOS_DB_CONNECTION_STRING, COSMOS_DB_KEY)');
