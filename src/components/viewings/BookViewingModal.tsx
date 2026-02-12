@@ -455,10 +455,10 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         try {
           const emailResult = await viewingEmailService.sendViewingEmails({
             property,
-            viewing,
+            viewing: viewingBookingDetails,
             user: {
-              name: viewing.userDetails?.fullName,
-              email: viewing.userDetails?.email
+              name: viewingBookingDetails.userDetails?.fullName,
+              email: viewingBookingDetails.userDetails?.email
             }
           });
 
