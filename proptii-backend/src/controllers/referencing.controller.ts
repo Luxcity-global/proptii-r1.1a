@@ -97,6 +97,7 @@ export class ReferencingController {
         to: emailData.to,
         subject: emailData.subject,
         formData,
+        html: emailData.html, // Add this line
         attachments,
         submissionId: emailData.submissionId,
         emailType: emailData.emailType || 'agent'
@@ -124,6 +125,7 @@ export class ReferencingController {
 
       const results = await this.referencingService.sendMultipleEmails({
         formData,
+        html: emailData.html, // Add this line
         attachments,
         submissionId: emailData.submissionId
       });

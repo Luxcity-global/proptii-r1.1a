@@ -24,6 +24,7 @@ import ViewingComparison from './components/ViewingComparison';
 import { BookViewingProvider, useBookViewing } from './context/BookViewingContext';
 import { bookingService } from './services/bookingService';
 import { viewingEmailService } from './services/viewingEmailService';
+import { generateAgentEmailTemplate, generateUserEmailTemplate } from './services/emailTemplates';
 import { viewingService } from '../../services/viewingService';
 import { bookViewingRequestService } from '../../services/bookViewingRequestService';
 import landlordUserService from '../../services/landlordUserService';
@@ -453,13 +454,36 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
 
         // Send emails - Optional
         try {
+          // Generate HTML templates in the frontend to ensure all details are included correctly
+          const agentHtml = generateAgentEmailTemplate({
+            property,
+            viewing: viewingBookingDetails,
+            user: {
+              name: viewingBookingDetails.userDetails?.fullName,
+              email: viewingBookingDetails.userDetails?.email,
+              phoneNumber: viewingBookingDetails.userDetails?.phoneNumber
+            }
+          });
+
+          const userHtml = generateUserEmailTemplate({
+            property,
+            viewing: viewingBookingDetails,
+            user: {
+              name: viewingBookingDetails.userDetails?.fullName,
+              email: viewingBookingDetails.userDetails?.email,
+              phoneNumber: viewingBookingDetails.userDetails?.phoneNumber
+            }
+          });
+
           const emailResult = await viewingEmailService.sendViewingEmails({
             property,
             viewing: viewingBookingDetails,
             user: {
               name: viewingBookingDetails.userDetails?.fullName,
               email: viewingBookingDetails.userDetails?.email
-            }
+            },
+            agentHtml, // Pass generated HTML
+            userHtml   // Pass generated HTML
           });
 
           if (emailResult.error) {

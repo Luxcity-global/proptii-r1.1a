@@ -17,22 +17,22 @@ const getBaseUrl = (): string => {
   if (process.env.REACT_APP_URL) {
     return process.env.REACT_APP_URL;
   }
-  
+
   // Priority 2: If VITE_APP_URL is set (for Vite projects), use it
   if (import.meta.env?.VITE_APP_URL) {
     return import.meta.env.VITE_APP_URL;
   }
-  
+
   // Priority 3: Check if we're in development mode
-  const isDevelopment = process.env.NODE_ENV === 'development' || 
-                       import.meta.env?.DEV ||
-                       process.env.NODE_ENV !== 'production';
-  
+  const isDevelopment = process.env.NODE_ENV === 'development' ||
+    import.meta.env?.DEV ||
+    process.env.NODE_ENV !== 'production';
+
   if (isDevelopment) {
     // Default to localhost:5173 (Vite default) for local development
     return 'http://localhost:5173';
   }
-  
+
   // Priority 4: Production - use proptii.co
   return 'https://proptii.co';
 };
@@ -122,6 +122,7 @@ export const generateAgentEmailTemplate = (data: EmailTemplateData): string => {
           <p>Preferred date/time: ${viewingDate} at ${viewingTime}</p>
           <p>Contact email: ${user.email || 'Not provided'}</p>
           <p>Phone number: ${user.phoneNumber || 'Not provided'}</p>
+          ${viewing.whatsappNumber ? `<p>WhatsApp number: ${viewing.whatsappNumber}</p>` : ''}
         </div>
 
         <div class="message">
@@ -200,6 +201,7 @@ export const generateUserEmailTemplate = (data: EmailTemplateData): string => {
           <p>Date/time requested: ${viewingDate} at ${viewingTime}</p>
           <p>Agent: ${property.agent?.name || 'Not provided'}</p>
           <p>Address: ${property.street || 'Not provided'}</p>
+          ${viewing.whatsappNumber ? `<p>WhatsApp number: ${viewing.whatsappNumber}</p>` : ''}
         </div>
 
         <div class="message">

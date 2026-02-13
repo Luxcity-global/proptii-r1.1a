@@ -60,11 +60,11 @@ export const bookingService = {
       const propertyData: any = {
         street: property.street
       };
-      
+
       // Try to get city and postcode from property object
       let city = (property as any).city;
       let postcode = (property as any).postcode;
-      
+
       // If city/postcode not directly available, try to extract from street
       if (!city && !postcode && property.street) {
         // Try to parse address format: "Street, City, Postcode"
@@ -76,7 +76,7 @@ export const bookingService = {
           postcode = parts[parts.length - 1];
         }
       }
-      
+
       // Only include city and postcode if they have values (since they're optional)
       if (city) {
         propertyData.city = city;
@@ -99,6 +99,7 @@ export const bookingService = {
           viewing_date: viewingDetails.date,
           viewing_time: viewingDetails.time,
           preference: viewingDetails.preference,
+          whatsappNumber: viewingDetails.whatsappNumber,
           status: 'PENDING'
         })
       };

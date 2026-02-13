@@ -14,16 +14,16 @@ interface EmailContent {
   attachments: EmailAttachment[];
   formData?: any;
   emailType?:
-    | 'agent'
-    | 'referee'
-    | 'guarantor'
-    | 'user'
-    | 'viewing-agent'
-    | 'viewing-user'
-    | 'viewing-confirmed'
-    | 'viewing-reschedule'
-    | 'viewing-cancel'
-    | 'viewing-cancellation';
+  | 'agent'
+  | 'referee'
+  | 'guarantor'
+  | 'user'
+  | 'viewing-agent'
+  | 'viewing-user'
+  | 'viewing-confirmed'
+  | 'viewing-reschedule'
+  | 'viewing-cancel'
+  | 'viewing-cancellation';
 }
 
 interface SendEmailResponse {
@@ -77,11 +77,11 @@ class EmailService {
     const financial = formData.financial || {};
     const guarantor = formData.guarantor || {};
     const agentDetails = formData.agentDetails || {};
-    
+
     // Get the base URL for links in the email
-    const baseUrl = import.meta.env.VITE_APP_URL || 
-                    (typeof window !== 'undefined' && window.location ? window.location.origin : 
-                    (import.meta.env.DEV ? 'http://localhost:5173' : 'https://proptii.com'));
+    const baseUrl = import.meta.env.VITE_APP_URL ||
+      (typeof window !== 'undefined' && window.location ? window.location.origin :
+        (import.meta.env.DEV ? 'http://localhost:5173' : 'https://proptii.com'));
 
     const htmlString = `
       <!DOCTYPE html>
@@ -454,6 +454,7 @@ class EmailService {
           to: data.property.agent.email,
           subject: `New Viewing Request - ${data.property.street}`,
           formData: data,
+          html: data.agentHtml,
           attachments: [],
           emailType: 'viewing-agent'
         });
@@ -466,6 +467,7 @@ class EmailService {
           to: data.user.email,
           subject: 'Your Viewing Request Confirmation',
           formData: data,
+          html: data.userHtml,
           attachments: [],
           emailType: 'viewing-user'
         });

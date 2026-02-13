@@ -8,6 +8,8 @@ interface ViewingEmailData {
         name?: string;
         email?: string;
     };
+    agentHtml?: string;
+    userHtml?: string;
 }
 
 class ViewingEmailService {
