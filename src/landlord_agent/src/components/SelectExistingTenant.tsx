@@ -47,22 +47,73 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
       setIsLoadingUsers(true);
       setError(null);
       try {
-        const API_BASE_URL = window.location.hostname === 'localhost' 
-          ? 'http://localhost:3000/api' 
-          : 'https://proptii-r1-1a-new-backend.onrender.com/api';
+        // Determine API base URL - same pattern as InviteTenant for consistency
+        const getApiBaseUrl = () => {
+          if (import.meta.env.VITE_API_URL) {
+            return import.meta.env.VITE_API_URL;
+          }
+          const hostname = window.location.hostname;
+          if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return 'http://localhost:3000';
+          }
+          return 'https://proptii-r1-1a-new-backend.onrender.com';
+        };
+
+        const API_BASE_URL = getApiBaseUrl();
+        const endpoint = `${API_BASE_URL}/api/azure-users`;
         
-        const response = await axios.get(`${API_BASE_URL}/azure-users`, {
-          params: searchTerm ? { search: searchTerm } : {}
+        console.log('🔍 Fetching Azure AD B2C users from:', endpoint);
+        if (searchTerm) {
+          console.log('🔎 Search term:', searchTerm);
+        }
+        
+        const response = await axios.get(endpoint, {
+          params: searchTerm ? { search: searchTerm } : {},
+          timeout: 30000 // 30 second timeout
         });
+
+        console.log('📋 Response received:', response.data);
 
         if (response.data.success) {
           setAzureUsers(response.data.users || []);
+          console.log(`✅ Successfully loaded ${response.data.users?.length || 0} users`);
         } else {
           throw new Error(response.data.error || 'Failed to fetch users');
         }
       } catch (err: any) {
-        console.error('Error fetching Azure AD B2C users:', err);
-        setError(err.response?.data?.error || err.message || 'Failed to load users from Azure AD B2C');
+        console.error('❌ Error fetching Azure AD B2C users:', err);
+        
+        let errorMessage = 'Failed to load users from Azure AD B2C';
+        
+        if (axios.isAxiosError(err)) {
+          if (err.code === 'ECONNREFUSED') {
+            errorMessage = 'Cannot connect to backend server. Please ensure the backend is running on port 3000.';
+          } else if (err.code === 'ETIMEDOUT') {
+            errorMessage = 'Request timed out. Please check your connection and try again.';
+          } else if (err.response?.status === 500) {
+            const errorData = err.response?.data;
+            if (errorData?.error?.includes('not configured')) {
+              errorMessage = 'Azure AD B2C is not configured on the backend. Please check the backend environment variables.';
+            } else {
+              errorMessage = errorData?.error || 'Server error while fetching users. Check backend logs.';
+            }
+          } else if (err.response?.data?.error) {
+            errorMessage = err.response.data.error;
+          } else if (err.message) {
+            errorMessage = err.message;
+          }
+        } else if (err instanceof Error) {
+          errorMessage = err.message;
+        }
+        
+        console.error('💡 Error details:', {
+          message: errorMessage,
+          code: err.code,
+          status: err.response?.status,
+          data: err.response?.data
+        });
+        
+        setError(errorMessage);
       } finally {
         setIsLoadingUsers(false);
       }
@@ -305,8 +356,27 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
                 <CardContent className="p-4">
                   <div className="flex items-start space-x-3">
                     <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-red-800 text-sm">{error}</p>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-red-900 mb-1">Error Loading Users</h3>
+                      <p className="text-red-800 text-sm mb-2">{error}</p>
+                      {error.includes('not configured') && (
+                        <div className="mt-3 p-3 bg-red-100 rounded border border-red-300">
+                          <p className="text-red-900 text-xs font-semibold mb-2">💡 Backend Configuration Required:</p>
+                          <ol className="text-red-800 text-xs list-decimal list-inside space-y-1">
+                            <li>Add to <code className="bg-red-200 px-1 rounded">proptii-backend/.env</code>:</li>
+                          </ol>
+                          <pre className="mt-2 text-xs bg-red-200 p-2 rounded overflow-x-auto">
+AZURE_AD_B2C_CLIENT_ID=your-client-id
+AZURE_AD_B2C_CLIENT_SECRET=your-client-secret
+AZURE_AD_B2C_TENANT_ID=your-tenant.onmicrosoft.com</pre>
+                          <p className="text-red-800 text-xs mt-2">Then restart the backend server.</p>
+                        </div>
+                      )}
+                      {error.includes('backend') && (
+                        <p className="text-red-600 text-xs mt-2">
+                          💡 <strong>Troubleshooting:</strong> Ensure the backend server is running on the correct port and is accessible.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </CardContent>

@@ -296,7 +296,7 @@ export class EmailService {
       <div class="footer">
         <p>Best regards,<br>The Proptii Team</p>
         <hr />
-        <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com">here</a>.</em>
+        <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.co">here</a>.</em>
       </div>
     `;
 

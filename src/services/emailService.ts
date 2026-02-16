@@ -79,9 +79,9 @@ class EmailService {
     const agentDetails = formData.agentDetails || {};
 
     // Get the base URL for links in the email
-    const baseUrl = import.meta.env.VITE_APP_URL ||
-      (typeof window !== 'undefined' && window.location ? window.location.origin :
-        (import.meta.env.DEV ? 'http://localhost:5173' : 'https://proptii.com'));
+    const baseUrl = import.meta.env.VITE_APP_URL || 
+                    (typeof window !== 'undefined' && window.location ? window.location.origin : 
+                    (import.meta.env.DEV ? 'http://localhost:5173' : 'https://proptii.co'));
 
     const htmlString = `
       <!DOCTYPE html>
@@ -172,7 +172,7 @@ class EmailService {
         </div>
         <hr />
         <div class="footer-desc">
-          <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com" class="footer-link">here</a>.</em>
+          <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.co" class="footer-link">here</a>.</em>
         </div>
         <div class="footer-logo">
           <img src="https://ci3.googleusercontent.com/meips/ADKq_NY8hEqCfpvIsclrL2Y7Bh5rbsplzRLKZCSdpIpnfd0yj3UbdHYRghh_jcqBeTVksaYGkXybNBH7dR78-7qrgfVu81YmwI4tHtHb3B7ILEq32SZW1Rf1WYXK=s0-d-e1-ft#https://framerusercontent.com/images/tjOUqAPA6VZNlXVDj9tqwYJ7BE.png" alt="Proptii Logo" />

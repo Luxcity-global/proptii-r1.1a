@@ -211,36 +211,112 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
         throw new Error('Selected property not found');
       }
 
-      // Determine API base URL
-      const API_BASE_URL = window.location.hostname === 'localhost'
-        ? 'http://localhost:3000/api'
-        : 'https://proptii-r1-1a-new-backend.onrender.com/api';
+      console.log('🔍 Starting email send process...');
+      console.log('📧 Recipient:', formData.email);
+      console.log('🏠 Property:', selectedProperty.address);
+
+      // Determine API base URL - try multiple endpoints with fallback
+      const getApiBaseUrl = () => {
+        // Priority 1: Use environment variable if set
+        if (import.meta.env.VITE_API_URL) {
+          console.log('✅ Using VITE_API_URL:', import.meta.env.VITE_API_URL);
+          return import.meta.env.VITE_API_URL;
+        }
+        
+        // Priority 2: Check hostname
+        const hostname = window.location.hostname;
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+          console.log('✅ Using localhost API');
+          return 'http://localhost:3000';
+        }
+        
+        // Priority 3: Production URL
+        console.log('✅ Using production API');
+        return 'https://proptii-r1-1a-new-backend.onrender.com';
+      };
+
+      const API_BASE_URL = getApiBaseUrl();
+      const emailEndpoint = `${API_BASE_URL}/api/email/send`;
+
+      console.log('📡 API Endpoint:', emailEndpoint);
 
       // Generate email HTML
       const emailHTML = generateInvitationEmailHTML(selectedProperty);
       const emailSubject = `Invitation to join as tenant for ${selectedProperty.address}`;
 
-      // Send email via API
-      const response = await axios.post(
-        `${API_BASE_URL}/email/send`,
-        {
-          to: formData.email,
-          subject: emailSubject,
-          html: emailHTML
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          timeout: 30000
-        }
-      );
+      console.log('📝 Email generated successfully');
+      console.log('📨 Sending email request...');
 
-      if (!response.data.success) {
-        throw new Error(response.data.error || 'Failed to send email');
+      // Send email via API with multiple retry attempts
+      let lastError: any = null;
+      let response: any = null;
+      const maxRetries = 3;
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`🔄 Attempt ${attempt}/${maxRetries}...`);
+          
+          response = await axios.post(
+            emailEndpoint,
+            {
+              to: formData.email,
+              subject: emailSubject,
+              html: emailHTML
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              timeout: 45000, // Increased timeout to 45 seconds
+              validateStatus: (status) => status < 500 // Don't throw on 4xx errors
+            }
+          );
+
+          // Check if the request was successful
+          if (response.status >= 200 && response.status < 300) {
+            if (response.data && response.data.success === false) {
+              throw new Error(response.data.error || 'Email service returned failure status');
+            }
+            
+            console.log('✅ Email sent successfully!');
+            console.log('📬 Message ID:', response.data.messageId);
+            break; // Success - exit retry loop
+          } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText || 'Request failed'}`);
+          }
+        } catch (attemptError: any) {
+          lastError = attemptError;
+          console.error(`❌ Attempt ${attempt} failed:`, attemptError.message || attemptError);
+          
+          // If it's the last attempt or a non-retryable error, throw
+          if (attempt === maxRetries) {
+            throw lastError;
+          }
+          
+          // Check if it's a retryable error
+          const isNetworkError = axios.isAxiosError(attemptError) && 
+            (attemptError.code === 'ECONNREFUSED' || 
+             attemptError.code === 'ETIMEDOUT' ||
+             attemptError.code === 'ECONNRESET' ||
+             !attemptError.response);
+          
+          if (!isNetworkError) {
+            // Not a network error, don't retry
+            throw attemptError;
+          }
+          
+          // Wait before retrying (exponential backoff)
+          const waitTime = attempt * 2000; // 2s, 4s
+          console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
       }
 
-      console.log('Invitation email sent successfully:', response.data.messageId);
+      if (!response || (response.data && response.data.success === false)) {
+        throw lastError || new Error('Failed to send email after all retries');
+      }
+
+      console.log('🎉 Invitation email sent successfully!');
       
       setIsSuccess(true);
       
@@ -250,13 +326,23 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
       }, 3000);
       
     } catch (error: any) {
-      console.error('Failed to send invitation:', error);
+      console.error('❌ Failed to send invitation:', error);
       
       let errorMessage = 'Failed to send invitation. Please try again.';
       
       if (axios.isAxiosError(error)) {
         if (error.code === 'ECONNREFUSED') {
-          errorMessage = 'Cannot connect to email server. Please ensure the backend is running.';
+          errorMessage = 'Cannot connect to email server. Please ensure the backend is running and accessible.';
+          console.error('💡 Troubleshooting: Make sure the backend server is running on the correct port');
+        } else if (error.code === 'ETIMEDOUT') {
+          errorMessage = 'Request timed out. The server may be slow or unavailable. Please try again.';
+          console.error('💡 Troubleshooting: Check your internet connection and server status');
+        } else if (error.response?.status === 400) {
+          errorMessage = error.response.data?.message || 'Invalid request. Please check the form data.';
+          console.error('💡 Troubleshooting:', error.response.data);
+        } else if (error.response?.status === 500) {
+          errorMessage = 'Server error. The email service may not be configured correctly.';
+          console.error('💡 Troubleshooting: Check backend logs and email service configuration (SMTP/Resend)');
         } else if (error.response?.data?.error) {
           errorMessage = error.response.data.error;
         } else if (error.message) {
@@ -265,6 +351,12 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
+      
+      console.error('📋 Error details:', {
+        message: errorMessage,
+        code: error.code,
+        response: error.response?.data
+      });
       
       setErrors({ general: errorMessage });
     } finally {
@@ -352,7 +444,16 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
               <CardContent className="space-y-6">
                 {errors.general && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p className="text-red-800 text-sm">{errors.general}</p>
+                    <div className="flex items-start space-x-3">
+                      <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-red-800 text-sm">{errors.general}</p>
+                        <p className="text-red-600 text-xs mt-2">
+                          💡 <strong>Troubleshooting:</strong> Make sure the backend server is running. 
+                          Check the browser console for detailed error logs.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
 

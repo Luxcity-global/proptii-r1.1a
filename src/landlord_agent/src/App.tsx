@@ -631,6 +631,39 @@ function AppContent() {
     }
   }, []);
 
+  // Restore current screen from sessionStorage on mount (survives page reload)
+  React.useEffect(() => {
+    try {
+      const savedScreen = sessionStorage.getItem('proptii_current_screen') as Screen | null;
+      const savedPreviousScreen = sessionStorage.getItem('proptii_previous_screen') as Screen | null;
+      
+      if (savedScreen && savedScreen !== 'main-app' && savedScreen !== 'welcome') {
+        console.log('🔄 Restoring screen from sessionStorage:', savedScreen);
+        setCurrentScreen(savedScreen);
+        
+        if (savedPreviousScreen) {
+          setPreviousScreen(savedPreviousScreen);
+        }
+      }
+    } catch (e) {
+      // Ignore storage errors
+      console.warn('Failed to restore screen from sessionStorage:', e);
+    }
+  }, []);
+
+  // Persist previousScreen to sessionStorage whenever it changes
+  React.useEffect(() => {
+    try {
+      if (previousScreen) {
+        sessionStorage.setItem('proptii_previous_screen', previousScreen);
+      } else {
+        sessionStorage.removeItem('proptii_previous_screen');
+      }
+    } catch (e) {
+      // Ignore storage errors
+    }
+  }, [previousScreen]);
+
   // Helper: Compress image to reduce size for Firestore
   const compressImage = (file: File, maxSizeKB: number = 150): Promise<File> => {
     return new Promise((resolve) => {
@@ -1263,6 +1296,13 @@ function AppContent() {
     setTimeout(() => {
       setCurrentScreen(screen);
       setIsTransitioning(false);
+      
+      // Persist current screen to sessionStorage (survives reload within same tab)
+      try {
+        sessionStorage.setItem('proptii_current_screen', screen);
+      } catch (e) {
+        // Ignore storage errors
+      }
       
       // Clear selected property when navigating to certain screens
       if (screen === 'main-app' || screen === 'property-setup') {
@@ -2825,7 +2865,7 @@ function AppContent() {
             onAddTenant={() => {
               editingTenantRef.current = null;
               setSelectedTenant(null);
-              navigateToScreen('add-tenant');
+              navigateToScreen('tenant-selection');
             }}
             onSelectExistingTenant={async (tenantId) => {
               if (!selectedProperty) return;
@@ -3453,9 +3493,8 @@ function AppContent() {
               } else if (selectedTenant) {
                 navigateToScreen('tenant-details');
               } else {
-                // If no tenant selected, go to clients list instead of tenant-selection
-                navigateToScreen('main-app');
-                setNavigationScreen('clients');
+                // If no tenant selected, go back to tenant-selection page
+                navigateToScreen('tenant-selection');
               }
             }}
           />
@@ -3483,6 +3522,7 @@ function AppContent() {
           <SelectExistingTenant
             properties={properties}
             existingTenants={tenants}
+            userId={resolveManagerId() || undefined}
             onBack={() => navigateToScreen('tenant-selection')}
             onSuccess={() => {
               if (previousScreen === 'property-preview') {

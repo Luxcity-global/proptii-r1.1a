@@ -103,7 +103,7 @@ class ContractEmailService {
           <div class="footer">
             <p>Best regards,<br>${senderName}</p>
             <hr />
-            <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.com">here</a>.</em>
+            <em>Proptii is a one-stop AI platform created for tenants, agents, and landlords to conduct and fulfill property transactions. Try it <a href="https://proptii.co">here</a>.</em>
           </div>
         </div>
       </body>
@@ -129,7 +129,7 @@ class ContractEmailService {
       formData.append('recipientName', params.recipientName);
       formData.append('contractName', params.contractName);
       formData.append('senderName', params.senderName || 'Proptii Team');
-      formData.append('senderEmail', params.senderEmail || 'noreply@proptii.com');
+      formData.append('senderEmail', params.senderEmail || 'noreply@proptii.co');
       formData.append('emailType', 'signed-contract');
 
       // Convert Uint8Array to Blob and then to File

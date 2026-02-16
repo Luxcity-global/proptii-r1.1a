@@ -33,8 +33,8 @@ export class AzureUsersService {
     // Debug logging
     this.logger.log('🔍 Azure AD B2C Configuration Check:');
     this.logger.log(`  CLIENT_ID: ${clientId ? `${clientId.substring(0, 8)}...` : 'MISSING'}`);
-    this.logger.log(`  CLIENT_SECRET: ${clientSecret ? '***SET***' : 'MISSING'}`);
-    this.logger.log(`  TENANT_ID: ${tenantId ? `${tenantId.substring(0, 8)}...` : 'MISSING'}`);
+    this.logger.log(`  CLIENT_SECRET: ${clientSecret ? `${clientSecret.substring(0, 10)}...(length: ${clientSecret.length})` : 'MISSING'}`);
+    this.logger.log(`  TENANT_ID: ${tenantId ? tenantId : 'MISSING'}`);
 
     if (!clientId || !clientSecret || !tenantId) {
       this.logger.warn('⚠️ Azure AD B2C configuration missing. Some features may not work.');
