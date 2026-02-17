@@ -91,14 +91,12 @@ export function OnboardingFlow() {
 
   const textStyle = { fontFamily: 'Archivo, sans-serif', color: '#374957' };
 
-  const isHowUseStep = step === 'howUse';
-
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-6 py-12 md:px-10 md:py-16 bg-cover bg-center bg-no-repeat"
       style={{ backgroundImage: 'url(/images/addtenbg.png)', ...textStyle }}
     >
-      <div className={`w-full ${step === 'welcome' ? 'max-w-4xl' : isHowUseStep ? 'max-w-5xl' : 'max-w-2xl'}`}>
+      <div className={`w-full ${step === 'welcome' ? 'max-w-4xl' : step === 'howUse' || step === 'howFind' || step === 'whoAreYou' ? 'max-w-5xl' : 'max-w-2xl'}`}>
 
         {/* Step: Welcome */}
         {step === 'welcome' && (
@@ -159,7 +157,7 @@ export function OnboardingFlow() {
               />
             </div>
             {/* Right: speech-bubble card */}
-            <div className="w-full max-w-2xl rounded-3xl border-2 border-[#A3CEF7] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-8 md:px-8 md:py-10">
+            <div className="w-full max-w-4xl rounded-3xl border-2 border-[#A3CEF7] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-8 md:px-8 md:py-10">
               <h2 className="text-2xl md:text-3xl font-bold mb-2 text-left" style={textStyle}>
                 <TextAnimate
                   className="text-2xl md:text-3xl font-bold text-left"
@@ -224,105 +222,119 @@ export function OnboardingFlow() {
 
         {/* Step: How did you find us? */}
         {step === 'howFind' && (
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold mb-2 text-center" style={textStyle}>
-              <TextAnimate
-                className="text-2xl md:text-3xl font-bold text-center"
-                by="word"
-                animation="fadeIn"
-                startOnView={true}
-                once={true}
-              >
-                How did you hear about Proptii?
-              </TextAnimate>
-            </h2>
-            <p className="mb-8 text-center" style={textStyle}>
-              <TextAnimate by="word" animation="fadeIn" startOnView={true} once={true}>
-                Quick question. One tap.
-              </TextAnimate>
-            </p>
-            <div className="grid grid-cols-1 gap-3">
-              {HOW_FIND_OPTIONS.map((opt) => {
-                const Icon = opt.icon;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => handleHowFind(opt.id)}
-                    data-onboarding-option
-                    className="group flex items-center gap-4 w-full px-5 py-4 rounded-full border-2 border-[#A3CEF7] bg-white font-medium text-left shadow-[0_1px_3px_0_rgba(0,0,0,0.06)] transition-all duration-200 ease-out outline-none focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 [&:focus]:outline-none [&:focus]:ring-0 [&:focus]:ring-offset-0 hover:border-[#136C9E] hover:bg-[#136C9E] hover:text-white hover:shadow-[0_4px_14px_-2px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 active:scale-[0.99]"
-                    style={{ fontFamily: 'Archivo, sans-serif', color: 'inherit', outline: 'none' }}
-                  >
-                    <span className="flex-shrink-0 text-[#374957] group-hover:text-white transition-colors">
-                      <Icon className="w-5 h-5" strokeWidth={1.5} />
-                    </span>
-                    <span className="flex-1 text-[#374957] group-hover:text-white transition-colors">
-                      {opt.label}
-                    </span>
-                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[#E8ECEF] flex items-center justify-center text-[#9CA3AF] group-hover:bg-white/25 group-hover:text-white transition-all">
-                      <Check className="w-4 h-4" strokeWidth={2.5} />
-                    </span>
-                  </button>
-                );
-              })}
+          <div className="flex flex-col md:flex-row items-center justify-center gap-0 w-full">
+            <div className="flex-shrink-0 w-full md:w-auto md:max-w-[320px] flex justify-center md:justify-end">
+              <img
+                src="/images/onboard%20que.png"
+                alt=""
+                className="w-56 md:w-72 h-auto object-contain object-bottom"
+              />
+            </div>
+            <div className="w-full max-w-4xl rounded-3xl border-2 border-[#A3CEF7] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-8 md:px-8 md:py-10">
+              <h2 className="text-2xl md:text-3xl font-bold mb-2 text-left" style={textStyle}>
+                <TextAnimate
+                  className="text-2xl md:text-3xl font-bold text-left"
+                  by="word"
+                  animation="fadeIn"
+                  startOnView={true}
+                  once={true}
+                >
+                  How did you hear about Proptii?
+                </TextAnimate>
+              </h2>
+              <p className="text-[#6b7280] text-sm md:text-base mb-6 text-left" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                <TextAnimate by="word" animation="fadeIn" startOnView={true} once={true}>
+                  Quick question. One tap.
+                </TextAnimate>
+              </p>
+              <div className="grid grid-cols-1 gap-3">
+                {HOW_FIND_OPTIONS.map((opt) => {
+                  const Icon = opt.icon;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => handleHowFind(opt.id)}
+                      data-onboarding-option
+                      className="group flex items-center gap-3 w-full px-4 py-3.5 rounded-2xl border border-[#A3CEF7] bg-white font-medium text-left transition-all duration-200 ease-out active:scale-[0.99] outline-none focus:outline-none focus:ring-0 focus:ring-offset-0 [&:focus]:outline-none hover:border-[#136C9E] hover:bg-[#f8fbff]"
+                      style={{ fontFamily: 'Archivo, sans-serif', color: 'inherit', outline: 'none' }}
+                    >
+                      <span className="flex-shrink-0 text-[#374957] group-hover:text-[#136C9E]">
+                        <Icon className="w-5 h-5" strokeWidth={1.5} />
+                      </span>
+                      <span className="flex-1 text-[#374957]">{opt.label}</span>
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center border-2 border-[#d1d5db] bg-white text-[#9CA3AF]">
+                        <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
 
         {/* Step: Who are you? (Profiling) */}
         {step === 'whoAreYou' && (
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold mb-2 text-center" style={textStyle}>
-              <TextAnimate
-                className="text-2xl md:text-3xl font-bold text-center"
-                by="word"
-                animation="fadeIn"
-                startOnView={true}
-                once={true}
-              >
-                Who are you?
-              </TextAnimate>
-            </h2>
-            <p className="mb-8 text-center" style={textStyle}>
-              <TextAnimate by="word" animation="fadeIn" startOnView={true} once={true}>
-                So we can show you the most useful bit first.
-              </TextAnimate>
-            </p>
-            <div className="grid grid-cols-1 gap-3">
-              {USER_GROUP_OPTIONS.map((opt) => {
-                const Icon = opt.icon;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => handleWhoAreYou(opt.id)}
-                    data-onboarding-option
-                    className="group flex items-center gap-4 w-full px-5 py-4 rounded-full border-2 border-[#A3CEF7] bg-white font-medium text-left shadow-[0_1px_3px_0_rgba(0,0,0,0.06)] transition-all duration-200 ease-out outline-none focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 [&:focus]:outline-none [&:focus]:ring-0 [&:focus]:ring-offset-0 hover:border-[#136C9E] hover:bg-[#136C9E] hover:text-white hover:shadow-[0_4px_14px_-2px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 active:scale-[0.99]"
-                    style={{ fontFamily: 'Archivo, sans-serif', color: 'inherit', outline: 'none' }}
-                  >
-                    <span className="flex-shrink-0 text-[#374957] group-hover:text-white transition-colors">
-                      <Icon className="w-5 h-5" strokeWidth={1.5} />
-                    </span>
-                    <span className="flex-1 text-[#374957] group-hover:text-white transition-colors">
-                      {opt.label}
-                    </span>
-                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[#E8ECEF] flex items-center justify-center text-[#9CA3AF] group-hover:bg-white/25 group-hover:text-white transition-all">
-                      <Check className="w-4 h-4" strokeWidth={2.5} />
-                    </span>
-                  </button>
-                );
-              })}
+          <div className="flex flex-col md:flex-row items-center justify-center gap-0 w-full">
+            <div className="flex-shrink-0 w-full md:w-auto md:max-w-[320px] flex justify-center md:justify-end">
+              <img
+                src="/images/onboard%20que.png"
+                alt=""
+                className="w-56 md:w-72 h-auto object-contain object-bottom"
+              />
             </div>
-            <p className="mt-6 text-center">
-              <button
-                type="button"
-                onClick={handleSkipToSearch}
-                className="text-sm underline hover:opacity-80 transition-opacity"
-                style={textStyle}
-              >
-                Just show me around
-              </button>
-            </p>
+            <div className="w-full max-w-4xl rounded-3xl border-2 border-[#A3CEF7] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-8 md:px-8 md:py-10">
+              <h2 className="text-2xl md:text-3xl font-bold mb-2 text-left" style={textStyle}>
+                <TextAnimate
+                  className="text-2xl md:text-3xl font-bold text-left"
+                  by="word"
+                  animation="fadeIn"
+                  startOnView={true}
+                  once={true}
+                >
+                  Who are you?
+                </TextAnimate>
+              </h2>
+              <p className="text-[#6b7280] text-sm md:text-base mb-6 text-left" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                <TextAnimate by="word" animation="fadeIn" startOnView={true} once={true}>
+                  So we can show you the most useful bit first.
+                </TextAnimate>
+              </p>
+              <div className="grid grid-cols-1 gap-3">
+                {USER_GROUP_OPTIONS.map((opt) => {
+                  const Icon = opt.icon;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => handleWhoAreYou(opt.id)}
+                      data-onboarding-option
+                      className="group flex items-center gap-3 w-full px-4 py-3.5 rounded-2xl border border-[#A3CEF7] bg-white font-medium text-left transition-all duration-200 ease-out active:scale-[0.99] outline-none focus:outline-none focus:ring-0 focus:ring-offset-0 [&:focus]:outline-none hover:border-[#136C9E] hover:bg-[#f8fbff]"
+                      style={{ fontFamily: 'Archivo, sans-serif', color: 'inherit', outline: 'none' }}
+                    >
+                      <span className="flex-shrink-0 text-[#374957] group-hover:text-[#136C9E]">
+                        <Icon className="w-5 h-5" strokeWidth={1.5} />
+                      </span>
+                      <span className="flex-1 text-[#374957]">{opt.label}</span>
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center border-2 border-[#d1d5db] bg-white text-[#9CA3AF]">
+                        <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-6 text-center">
+                <button
+                  type="button"
+                  onClick={handleSkipToSearch}
+                  className="text-sm underline hover:opacity-80 transition-opacity"
+                  style={textStyle}
+                >
+                  Just show me around
+                </button>
+              </p>
+            </div>
           </div>
         )}
 

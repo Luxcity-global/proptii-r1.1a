@@ -10,19 +10,23 @@ const TenantOnboardingOptions: React.FC = () => {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center px-4 py-12 bg-cover bg-center bg-no-repeat"
+      className="min-h-screen flex flex-col items-center justify-center px-6 py-12 md:px-10 md:py-16 bg-cover bg-center bg-no-repeat"
       style={{ backgroundImage: 'url(/images/addtenbg.png)', ...textStyle }}
     >
-      <div className="w-full max-w-3xl">
-        <div className="text-center mb-10">
+      <div className="w-full max-w-5xl flex flex-col md:flex-row items-center justify-center gap-0">
+        {/* Left: illustration */}
+        <div className="flex-shrink-0 w-full md:w-auto md:max-w-[320px] flex justify-center md:justify-end">
           <img
-            src="/images/proptii-logo.png"
-            alt="Proptii"
-            className="h-12 md:h-14 w-auto mx-auto mb-6 object-contain"
+            src="/images/onboard%20que.png"
+            alt=""
+            className="w-56 md:w-72 h-auto object-contain object-bottom"
           />
-          <h1 className="text-3xl md:text-4xl font-bold mb-3" style={textStyle}>
+        </div>
+        {/* Right: question card */}
+        <div className="w-full max-w-4xl rounded-3xl border-2 border-[#A3CEF7] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-8 md:px-8 md:py-10">
+          <h1 className="text-2xl md:text-3xl font-bold mb-2 text-left" style={textStyle}>
             <TextAnimate
-              className="text-3xl md:text-4xl font-bold font-archivo"
+              className="text-2xl md:text-3xl font-bold text-left"
               by="word"
               animation="fadeIn"
               startOnView={true}
@@ -31,14 +35,13 @@ const TenantOnboardingOptions: React.FC = () => {
               Great, you&apos;re a tenant
             </TextAnimate>
           </h1>
-          <p className="text-base md:text-lg max-w-xl mx-auto" style={textStyle}>
+          <p className="text-[#6b7280] text-sm md:text-base mb-6 text-left" style={{ fontFamily: 'Archivo, sans-serif' }}>
             <TextAnimate by="word" animation="fadeIn" startOnView={true} once={true}>
               What would you like to do first?
             </TextAnimate>
           </p>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           {/* Option 1: Find and save a property */}
           <button
             type="button"
@@ -98,6 +101,7 @@ const TenantOnboardingOptions: React.FC = () => {
               </p>
             </div>
           </button>
+        </div>
         </div>
       </div>
     </div>
