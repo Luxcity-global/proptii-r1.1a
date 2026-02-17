@@ -192,6 +192,8 @@ const Home = () => {
             targetSelector={HERO_TENANT_SEARCH_STEPS[heroGuideStepIndex]?.targetSelector}
             highlightTarget
             placement={heroGuideStepIndex === 1 ? 'below' : 'above'}
+            avatarSrc={heroGuideStepIndex === 0 ? '/images/Scout%20ava.png' : undefined}
+            align={heroGuideStepIndex === 0 ? 'left' : 'center'}
             onNext={() => {
               setHeroGuideStepIndex((prev) =>
                 prev < HERO_TENANT_SEARCH_STEPS.length - 1 ? prev + 1 : prev

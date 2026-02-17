@@ -15,6 +15,10 @@ export interface DemoGuideBubbleProps {
   hidden?: boolean;
   /** Optional: where to place the bubble relative to the target. Defaults to 'above'. */
   placement?: 'above' | 'below';
+  /** Optional: avatar image URL shown to the left of the bubble (e.g. Scout character). */
+  avatarSrc?: string;
+  /** Optional: horizontal alignment relative to target. 'left' = bubble to the left of target; 'center' = above/below centered. */
+  align?: 'left' | 'center';
 }
 
 /**
@@ -28,7 +32,9 @@ export function DemoGuideBubble({
   onDismiss,
   onNext,
   hidden = false,
-  placement = 'above'
+  placement = 'above',
+  avatarSrc,
+  align = 'center'
 }: DemoGuideBubbleProps) {
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [bubbleVisible, setBubbleVisible] = useState(false);
@@ -73,66 +79,90 @@ export function DemoGuideBubble({
 
   // Position bubble near the target
   const bubbleWidth = 220;
-  const bubbleLeft = Math.max(16, targetRect.left - bubbleWidth / 2 + targetRect.width / 2);
-  const bubbleBottom = window.innerHeight - targetRect.top + 12;
-  const bubbleTop = targetRect.bottom + 12;
+  const avatarSize = 64;
+  const gap = 8;
+  const totalWidth = avatarSrc ? avatarSize + gap + bubbleWidth : bubbleWidth;
+  const bubbleLeft =
+    align === 'left'
+      ? Math.max(16, targetRect.left - totalWidth - 16)
+      : Math.max(16, targetRect.left - bubbleWidth / 2 + targetRect.width / 2);
+  const gapToTarget = align === 'left' ? 112 : 12;
+  const bubbleBottom = window.innerHeight - targetRect.top - gapToTarget;
+  const bubbleTop = targetRect.bottom + gapToTarget;
+  const verticalPos = placement === 'above' ? { bottom: bubbleBottom } : { top: bubbleTop };
 
   return (
     <>
       <div
         ref={containerRef}
-        className="fixed z-[100] pointer-events-auto"
-        style={
-          placement === 'above'
-            ? {
-                left: bubbleLeft,
-                bottom: bubbleBottom,
-                width: bubbleWidth
-              }
-            : {
-                left: bubbleLeft,
-                top: bubbleTop,
-                width: bubbleWidth
-              }
-        }
+        className="fixed z-[100] pointer-events-auto flex items-end"
+        style={{
+          left: bubbleLeft,
+          ...verticalPos,
+          width: totalWidth
+        }}
       >
-        <div className="bg-[#CBE6FF] rounded-xl px-4 py-3 shadow-lg border border-[#136C9E]">
-          <p className="text-sm font-medium text-[#0F172A]">{message}</p>
-          {(onDismiss || onNext) && (
-            <div className="mt-2 flex justify-end gap-3">
-              {onDismiss && (
-                <button
-                  type="button"
-                  onClick={onDismiss}
-                  className="text-xs text-gray-600 hover:text-gray-900 underline"
-                >
-                  Dismiss
-                </button>
-              )}
-              {onNext && (
-                <button
-                  type="button"
-                  onClick={onNext}
-                  className="text-xs font-semibold text-[#136C9E] hover:text-[#0F5A8A]"
-                >
-                  Next
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-        {/* Pointer: small triangle between bubble and target */}
-        {placement === 'above' ? (
-          <div
-            className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-4 h-4 bg-[#CBE6FF] border-r border-b border-[#136C9E] rotate-45"
-            style={{ marginBottom: 0 }}
-          />
-        ) : (
-          <div
-            className="absolute left-1/2 -translate-x-1/2 -top-2 w-4 h-4 bg-[#CBE6FF] border-l border-t border-[#136C9E] rotate-45"
-            style={{ marginTop: 0 }}
+        {avatarSrc && (
+          <img
+            src={avatarSrc}
+            alt=""
+            className="flex-shrink-0 rounded-full object-cover border-2 border-[#136C9E] bg-white"
+            style={{ width: avatarSize, height: avatarSize }}
           />
         )}
+        <div className="relative flex-shrink-0" style={{ width: bubbleWidth }}>
+          <div
+            className={`bg-[#CBE6FF] rounded-xl px-4 py-3 shadow-lg border border-[#136C9E] ${avatarSrc ? 'ml-2' : ''}`}
+          >
+            <p className="text-sm font-medium text-[#0F172A]">{message}</p>
+            {(onDismiss || onNext) && (
+              <div className="mt-2 flex justify-end gap-3">
+                {onDismiss && (
+                  <button
+                    type="button"
+                    onClick={onDismiss}
+                    className="text-xs text-gray-600 hover:text-gray-900 underline"
+                  >
+                    Dismiss
+                  </button>
+                )}
+                {onNext && (
+                  <button
+                    type="button"
+                    onClick={onNext}
+                    className="text-xs font-semibold text-[#136C9E] hover:text-[#0F5A8A]"
+                  >
+                    Next
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          {/* Pointer: on the right of the bubble pointing toward the target (search box) */}
+          {align === 'left' ? (
+            <div
+              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full"
+              style={{
+                width: 0,
+                height: 0,
+                borderTop: '8px solid transparent',
+                borderBottom: '8px solid transparent',
+                borderLeft: '10px solid #CBE6FF',
+                filter: 'drop-shadow(1px 0 0 #136C9E)'
+              }}
+            />
+          ) : placement === 'above' ? (
+            <div
+              className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-4 h-4 bg-[#CBE6FF] border-r border-b border-[#136C9E] rotate-45"
+              style={{ marginBottom: 0 }}
+            />
+          ) : (
+            <div
+              className="absolute left-1/2 -translate-x-1/2 -top-2 w-4 h-4 bg-[#CBE6FF] border-l border-t border-[#136C9E] rotate-45"
+              style={{ marginTop: 0 }}
+            />
+          )}
+        </div>
       </div>
       <style>{`
         .demo-guide-target-highlight {
