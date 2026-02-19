@@ -1656,6 +1656,9 @@ const SearchResults = () => {
           message={TENANT_SEARCH_GUIDE_STEPS[guideStepIndex]?.message}
           targetSelector={TENANT_SEARCH_GUIDE_STEPS[guideStepIndex]?.targetSelector}
           highlightTarget
+          avatarSrc="/images/Scout%20ava.png"
+          offsetX={-60}
+          offsetY={-32}
           onDismiss={() => setGuideDismissed(true)}
           onNext={() => {
             setGuideStepIndex((prev) =>

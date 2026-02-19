@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, Building2, FileCheck, FileSignature, Sparkles, MoreHorizontal, Check, Search, UserPlus, Share2, Megaphone, User, Briefcase } from 'lucide-react';
+import { Home, Building2, FileCheck, FileSignature, Sparkles, MoreHorizontal, Check, Search, UserPlus, Share2, Megaphone, User, Briefcase, Send } from 'lucide-react';
 import { TextAnimate } from '../magic-ui/text-animate';
 import {
   getOrCreateAnonymousId,
@@ -18,7 +18,7 @@ const HOW_USE_OPTIONS = [
   { id: 'get_referenced', label: 'Get referenced', icon: FileCheck },
   { id: 'sign_contracts', label: 'Sign contracts', icon: FileSignature },
   { id: 'search_ai', label: 'Search with AI', icon: Sparkles },
-  { id: 'other', label: '... Other', icon: MoreHorizontal }
+  { id: 'other', label: 'Other', icon: MoreHorizontal }
 ];
 
 const HOW_FIND_OPTIONS = [
@@ -49,7 +49,12 @@ export function OnboardingFlow() {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>('welcome');
   const [howUseSelected, setHowUseSelected] = useState<string[]>([]);
+  const [howUseOtherText, setHowUseOtherText] = useState('');
+  const [howUseOtherSubmitted, setHowUseOtherSubmitted] = useState(false);
   const [howFind, setHowFind] = useState<string | null>(null);
+  const [howFindOtherText, setHowFindOtherText] = useState('');
+  const [howFindOtherSubmitted, setHowFindOtherSubmitted] = useState(false);
+  const [howFindOtherInputVisible, setHowFindOtherInputVisible] = useState(false);
 
   const handleStart = () => {
     getOrCreateAnonymousId();
@@ -66,7 +71,10 @@ export function OnboardingFlow() {
 
   const handleHowUseContinue = () => {
     if (howUseSelected.length > 0) {
-      setDiscoveryAnswer('howDoYouWantToUse', howUseSelected.join(','));
+      const value = howUseSelected
+        .map((id) => (id === 'other' && howUseOtherText.trim() ? `other:${howUseOtherText.trim()}` : id))
+        .join(',');
+      setDiscoveryAnswer('howDoYouWantToUse', value);
     }
     setStep('howFind');
   };
@@ -74,6 +82,9 @@ export function OnboardingFlow() {
   const handleHowFind = (value: string) => {
     setDiscoveryAnswer('howDidYouFindUs', value);
     setHowFind(value);
+    setHowFindOtherText('');
+    setHowFindOtherSubmitted(false);
+    setHowFindOtherInputVisible(false);
     setStep('whoAreYou');
   };
 
@@ -93,9 +104,18 @@ export function OnboardingFlow() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center px-6 py-12 md:px-10 md:py-16 bg-cover bg-center bg-no-repeat"
+      className="relative min-h-screen flex flex-col items-center justify-center px-6 py-12 md:px-10 md:py-16 bg-cover bg-center bg-no-repeat"
       style={{ backgroundImage: 'url(/images/addtenbg.png)', ...textStyle }}
     >
+      {/* Logo in top left (welcome step only) */}
+      {step === 'welcome' && (
+        <img
+          src="/images/proptii-logo.png"
+          alt="Proptii"
+          className="absolute top-6 left-6 md:top-8 md:left-10 h-12 md:h-14 w-auto object-contain z-10"
+        />
+      )}
+
       <div className={`w-full ${step === 'welcome' ? 'max-w-4xl' : step === 'howUse' || step === 'howFind' || step === 'whoAreYou' ? 'max-w-5xl' : 'max-w-2xl'}`}>
 
         {/* Step: Welcome */}
@@ -108,12 +128,7 @@ export function OnboardingFlow() {
                 className="w-64 h-auto md:w-96 lg:w-[28rem] object-contain"
               />
             </div>
-            <div className="text-center md:text-left flex-1">
-              <img
-                src="/images/proptii-logo.png"
-                alt="Proptii"
-                className="h-12 md:h-14 w-auto mx-auto md:mx-0 mb-6 object-contain"
-              />
+            <div className="text-center md:text-left flex-1 mt-8 md:mt-12">
               <h1 className="text-3xl md:text-4xl font-bold mb-3" style={textStyle}>
                 <TextAnimate
                   className="text-3xl md:text-4xl font-bold font-archivo"
@@ -182,7 +197,13 @@ export function OnboardingFlow() {
                     <button
                       key={opt.id}
                       type="button"
-                      onClick={() => toggleHowUse(opt.id)}
+                      onClick={() => {
+                        if (opt.id === 'other' && selected) {
+                        setHowUseOtherText('');
+                        setHowUseOtherSubmitted(false);
+                      }
+                        toggleHowUse(opt.id);
+                      }}
                       data-onboarding-option
                       className={`group flex items-center gap-3 w-full px-4 py-3.5 rounded-2xl border font-medium text-left transition-all duration-200 ease-out active:scale-[0.99] outline-none focus:outline-none focus:ring-0 focus:ring-offset-0 [&:focus]:outline-none ${
                         selected
@@ -205,6 +226,33 @@ export function OnboardingFlow() {
                     </button>
                   );
                 })}
+              </div>
+              <div
+                className={`overflow-hidden transition-all duration-300 ease-out ${
+                  howUseSelected.includes('other') ? 'max-h-24 mt-3' : 'max-h-0 mt-0'
+                }`}
+              >
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={howUseOtherText}
+                    onChange={(e) => setHowUseOtherText(e.target.value)}
+                    placeholder="Tell us what you'd like to do..."
+                    className="w-full pl-4 pr-12 py-3 rounded-2xl border-2 border-[#A3CEF7] bg-white text-[#374957] placeholder:text-gray-400 focus:border-[#136C9E] focus:outline-none focus:ring-0"
+                    style={{ fontFamily: 'Archivo, sans-serif' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setHowUseOtherSubmitted(true)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    {howUseOtherSubmitted ? (
+                      <Check className="w-5 h-5 text-green-600" strokeWidth={2.5} />
+                    ) : (
+                      <Send className="w-5 h-5" strokeWidth={2} />
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="mt-6 text-center">
                 <button
@@ -250,11 +298,22 @@ export function OnboardingFlow() {
               <div className="grid grid-cols-1 gap-3">
                 {HOW_FIND_OPTIONS.map((opt) => {
                   const Icon = opt.icon;
+                  const isOther = opt.id === 'other';
                   return (
                     <button
                       key={opt.id}
                       type="button"
-                      onClick={() => handleHowFind(opt.id)}
+                      onClick={() => {
+                        if (isOther) {
+                          setHowFindOtherInputVisible((v) => !v);
+                          if (howFindOtherInputVisible) {
+                            setHowFindOtherText('');
+                            setHowFindOtherSubmitted(false);
+                          }
+                          return;
+                        }
+                        handleHowFind(opt.id);
+                      }}
                       data-onboarding-option
                       className="group flex items-center gap-3 w-full px-4 py-3.5 rounded-2xl border border-[#A3CEF7] bg-white font-medium text-left transition-all duration-200 ease-out active:scale-[0.99] outline-none focus:outline-none focus:ring-0 focus:ring-offset-0 [&:focus]:outline-none hover:border-[#136C9E] hover:bg-[#f8fbff]"
                       style={{ fontFamily: 'Archivo, sans-serif', color: 'inherit', outline: 'none' }}
@@ -269,6 +328,36 @@ export function OnboardingFlow() {
                     </button>
                   );
                 })}
+              </div>
+              <div
+                className={`overflow-hidden transition-all duration-300 ease-out ${
+                  howFindOtherInputVisible ? 'max-h-24 mt-3' : 'max-h-0 mt-0'
+                }`}
+              >
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={howFindOtherText}
+                    onChange={(e) => setHowFindOtherText(e.target.value)}
+                    placeholder="Tell us how you found us..."
+                    className="w-full pl-4 pr-12 py-3 rounded-2xl border-2 border-[#A3CEF7] bg-white text-[#374957] placeholder:text-gray-400 focus:border-[#136C9E] focus:outline-none focus:ring-0"
+                    style={{ fontFamily: 'Archivo, sans-serif' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHowFindOtherSubmitted(true);
+                      handleHowFind(howFindOtherText.trim() ? `other:${howFindOtherText.trim()}` : 'other');
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    {howFindOtherSubmitted ? (
+                      <Check className="w-5 h-5 text-green-600" strokeWidth={2.5} />
+                    ) : (
+                      <Send className="w-5 h-5" strokeWidth={2} />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -15,10 +15,18 @@ export interface DemoGuideBubbleProps {
   hidden?: boolean;
   /** Optional: where to place the bubble relative to the target. Defaults to 'above'. */
   placement?: 'above' | 'below';
-  /** Optional: avatar image URL shown to the left of the bubble (e.g. Scout character). */
+  /** Optional: avatar image URL (e.g. Scout character). */
   avatarSrc?: string;
   /** Optional: horizontal alignment relative to target. 'left' = bubble to the left of target; 'center' = above/below centered. */
   align?: 'left' | 'center';
+  /** Optional: which side the avatar is on. Default 'left'. */
+  avatarSide?: 'left' | 'right';
+  /** Optional: which side the arrow points from. Default 'right' when align is left, else bottom/top center. */
+  arrowSide?: 'left' | 'right';
+  /** Optional: horizontal nudge in pixels (positive = right). */
+  offsetX?: number;
+  /** Optional: vertical nudge in pixels (positive = down). */
+  offsetY?: number;
 }
 
 /**
@@ -34,7 +42,11 @@ export function DemoGuideBubble({
   hidden = false,
   placement = 'above',
   avatarSrc,
-  align = 'center'
+  align = 'center',
+  avatarSide = 'left',
+  arrowSide,
+  offsetX = 0,
+  offsetY = 0
 }: DemoGuideBubbleProps) {
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [bubbleVisible, setBubbleVisible] = useState(false);
@@ -86,20 +98,24 @@ export function DemoGuideBubble({
     align === 'left'
       ? Math.max(16, targetRect.left - totalWidth - 16)
       : Math.max(16, targetRect.left - bubbleWidth / 2 + targetRect.width / 2);
+  const bubbleLeftWithOffset = bubbleLeft + offsetX;
   const gapToTarget = align === 'left' ? 112 : 12;
   const bubbleBottom = window.innerHeight - targetRect.top - gapToTarget;
   const bubbleTop = targetRect.bottom + gapToTarget;
-  const verticalPos = placement === 'above' ? { bottom: bubbleBottom } : { top: bubbleTop };
+  const verticalPos = placement === 'above'
+    ? { bottom: bubbleBottom - offsetY }
+    : { top: bubbleTop + offsetY };
 
   return (
     <>
       <div
         ref={containerRef}
-        className="fixed z-[100] pointer-events-auto flex items-end"
+        className={`fixed z-[100] pointer-events-auto flex ${avatarSrc ? 'items-center' : 'items-end'}`}
         style={{
-          left: bubbleLeft,
+          left: bubbleLeftWithOffset,
           ...verticalPos,
-          width: totalWidth
+          width: totalWidth,
+          flexDirection: avatarSide === 'right' ? 'row-reverse' : 'row'
         }}
       >
         {avatarSrc && (
@@ -112,7 +128,7 @@ export function DemoGuideBubble({
         )}
         <div className="relative flex-shrink-0" style={{ width: bubbleWidth }}>
           <div
-            className={`bg-[#CBE6FF] rounded-xl px-4 py-3 shadow-lg border border-[#136C9E] ${avatarSrc ? 'ml-2' : ''}`}
+            className={`bg-[#CBE6FF] rounded-xl px-4 py-3 shadow-lg border border-[#136C9E] ${avatarSrc ? (avatarSide === 'left' ? 'ml-2' : 'mr-2') : ''}`}
           >
             <p className="text-sm font-medium text-[#0F172A]">{message}</p>
             {(onDismiss || onNext) && (
@@ -138,8 +154,20 @@ export function DemoGuideBubble({
               </div>
             )}
           </div>
-          {/* Pointer: on the right of the bubble pointing toward the target (search box) */}
-          {align === 'left' ? (
+          {/* Pointer: left or right of bubble pointing toward the target */}
+          {arrowSide === 'left' ? (
+            <div
+              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full"
+              style={{
+                width: 0,
+                height: 0,
+                borderTop: '8px solid transparent',
+                borderBottom: '8px solid transparent',
+                borderRight: '10px solid #CBE6FF',
+                filter: 'drop-shadow(-1px 0 0 #136C9E)'
+              }}
+            />
+          ) : align === 'left' ? (
             <div
               className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full"
               style={{

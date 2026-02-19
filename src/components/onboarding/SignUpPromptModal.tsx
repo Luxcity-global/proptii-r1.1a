@@ -53,29 +53,20 @@ export function SignUpPromptModal({
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50">
       <div
-        className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden"
+        className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden min-h-[420px] flex flex-col justify-between"
+        style={{ fontFamily: 'Archivo, sans-serif' }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="signup-prompt-title"
       >
+        <div>
         {/* Icon */}
-        <div className="flex justify-center pt-8 pb-2">
-          <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center">
-            <svg
-              className="w-8 h-8 text-gray-500"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-              />
-            </svg>
-          </div>
+        <div className="flex justify-center pt-10 pb-2">
+          <img
+            src="/images/scout1.png"
+            alt=""
+            className="w-28 h-28 object-contain"
+          />
         </div>
 
         {/* Title */}
@@ -94,25 +85,26 @@ export function SignUpPromptModal({
         )}
 
         {/* Buttons */}
-        <div className="p-6 pt-6 flex flex-col gap-3">
+        <div className="px-6 pt-6 flex flex-col gap-3">
           <button
             type="button"
             onClick={handleSignUpEmail}
-            className="w-full py-3 px-4 rounded-xl font-medium text-white bg-[#E65D24] hover:bg-[#d9541f] transition-colors"
+            className="w-full py-3 px-4 rounded-full font-medium text-white bg-[#E65D24] hover:bg-[#d9541f] transition-colors"
           >
             Sign up with email
           </button>
           <button
             type="button"
             onClick={handleSignUpSocial}
-            className="w-full py-3 px-4 rounded-xl font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
+            className="w-full py-3 px-4 rounded-full font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
           >
             Social Media sign up
           </button>
         </div>
+        </div>
 
         {/* Close */}
-        <div className="flex justify-center pb-6">
+        <div className="flex justify-center pb-8">
           <button
             type="button"
             onClick={onClose}
