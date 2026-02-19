@@ -1,0 +1,12 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "DOCUSIGN_INTEGRATION_KEY": "your_integration_key_here",
+    "DOCUSIGN_USER_ID": "your_user_id_here",
+    "DOCUSIGN_ACCOUNT_ID": "your_account_id_here",
+    "DOCUSIGN_BASE_URL": "https://demo.docusign.net",
+    "DOCUSIGN_RSA_PRIVATE_KEY": "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+  }
+} 

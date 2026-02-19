@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "cd src/landlord_agent ; npm run build": "proptii-16946"
+  },
+  "targets": {},
+  "etags": {}
+}

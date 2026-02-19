@@ -1,0 +1,106 @@
+services:
+  # Frontend (Vite)
+  - type: web
+    name: proptii-frontend
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      - key: VITE_APP_ENV
+        value: production
+      - key: VITE_API_URL
+        value: https://proptii-r11a-production-0c93.up.railway.app/api
+      - key: VITE_AZURE_OPENAI_API_KEY
+        sync: false
+      - key: VITE_AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: VITE_AZURE_OPENAI_DEPLOYMENT_NAME
+        sync: false
+      - key: VITE_GOOGLE_SHEETS_API_ENDPOINT
+        value: https://proptii-r11a-production-0c93.up.railway.app/api/sheets
+      - key: VITE_SEARCH_BACKEND_URL
+        value: https://proptii-r1-1a-search.onrender.com
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: sameorigin
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-XSS-Protection
+        value: "1; mode=block"
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; connect-src 'self' https://proptii-r11a-production-0c93.up.railway.app/api/* https://proptii-r1-1a-1.onrender.com/api/* https://proptii-r1-1a-search.onrender.com https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com https://proptii.co https://*.cognitiveservices.azure.com https://*.onrender.com https://*.railway.app http://localhost:10000/api/*; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; frame-ancestors 'none';"
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /static/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    routes:
+      - type: rewrite
+        source: /assets/*
+        destination: /assets/:splat
+      - type: rewrite
+        source: /static/*
+        destination: /static/:splat
+      # Landlord App Routing (Use /** to match nested paths)
+      - type: rewrite
+        source: /landlord/**
+        destination: /landlord/index.html
+      # Main App Catch-all (Use /** to match nested paths)
+      - type: rewrite
+        source: /**
+        destination: /index.html
+
+  # Backend (NestJS)
+  - type: web
+    name: proptii-backend
+    env: node
+    plan: free
+    buildCommand: cd proptii-backend && npm install && npm run build
+    startCommand: cd proptii-backend && npm run start:prod
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 465
+      - key: FRONTEND_URL
+        value: https://proptii.co
+      - key: AZURE_OPENAI_API_KEY
+        sync: false
+      - key: AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: AZURE_OPENAI_DEPLOYMENT_NAME
+        sync: false
+      - key: GOOGLE_SHEETS_CREDENTIALS_JSON
+        sync: false
+
+  # Search Backend (Express)
+  - type: web
+    name: proptii-search-backend
+    env: docker
+    dockerfilePath: ./search/backend/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001

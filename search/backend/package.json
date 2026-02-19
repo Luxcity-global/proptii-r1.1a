@@ -1,0 +1,52 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "cross-env PUPPETEER_CACHE_DIR=./.cache/puppeteer PLAYWRIGHT_BROWSERS_PATH=./.cache/ms-playwright npx ts-node-dev src/index.ts",
+    "build": "tsc",
+    "start": "cross-env PUPPETEER_CACHE_DIR=./.cache/puppeteer PLAYWRIGHT_BROWSERS_PATH=./.cache/ms-playwright node dist/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:staged": "node scripts/run-sprint1-staged-tests.js --stage=all",
+    "test:staged:a": "node scripts/run-sprint1-staged-tests.js --stage=a",
+    "test:staged:b": "node scripts/run-sprint1-staged-tests.js --stage=b",
+    "test:staged:c": "node scripts/run-sprint1-staged-tests.js --stage=c",
+    "test:s2:staged": "node scripts/run-sprint2-staged-tests.js --stage=all",
+    "test:s2:staged:a": "node scripts/run-sprint2-staged-tests.js --stage=a",
+    "test:s2:staged:b": "node scripts/run-sprint2-staged-tests.js --stage=b",
+    "test:s2:staged:c": "node scripts/run-sprint2-staged-tests.js --stage=c",
+    "test:s3:staged": "node scripts/run-sprint3-staged-tests.js --stage=all",
+    "test:s3:staged:a": "node scripts/run-sprint3-staged-tests.js --stage=a",
+    "test:s3:staged:b": "node scripts/run-sprint3-staged-tests.js --stage=b",
+    "test:s3:staged:c": "node scripts/run-sprint3-staged-tests.js --stage=c",
+    "test:final:staged": "node scripts/run-final-search-tests.js",
+    "pre-push:search": "node scripts/run-pre-push-search-check.js",
+    "test:browsers": "node test-browsers.js",
+    "install:browsers": "cross-env PUPPETEER_CACHE_DIR=./.cache/puppeteer PLAYWRIGHT_BROWSERS_PATH=./.cache/ms-playwright npx playwright install chromium && cross-env PUPPETEER_CACHE_DIR=./.cache/puppeteer PLAYWRIGHT_BROWSERS_PATH=./.cache/ms-playwright npx puppeteer browsers install chrome",
+    "postinstall": "npm run install:browsers"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/tunnel": "^0.0.7",
+    "axios": "^1.11.0",
+    "cheerio": "^1.0.0-rc.12",
+    "cors": "^2.8.5",
+    "express": "^4.18.3",
+    "playwright": "^1.54.2",
+    "puppeteer": "^24.14.0",
+    "tunnel": "^0.0.6"
+  },
+  "devDependencies": {
+    "@types/cheerio": "^0.22.35",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.24",
+    "cross-env": "^10.1.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3"
+  },
+  "description": ""
+}

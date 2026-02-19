@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Migrate UserIds - Proptii</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    .info {
+      background: #e3f2fd;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+    .warning {
+      background: #fff3cd;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      border-left: 4px solid #ffc107;
+    }
+    button {
+      background: #DC5F12;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button:hover {
+      background: #c55310;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    #log {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 14px;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 20px;
+      white-space: pre-wrap;
+    }
+    .input-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔧 UserId Migration Tool</h1>
+    
+    <div class="warning">
+      <strong>⚠️ Important:</strong> After the authentication fix, you need to rebuild the frontend. Then log in fresh and use this tool to migrate your existing data to your new stable userId.
+    </div>
+    
+    <div class="info" id="currentUserInfo">
+      <strong>Current UserId:</strong> <span id="currentUserId">Loading...</span><br>
+      <strong>Email:</strong> <span id="currentEmail">Loading...</span>
+    </div>
+    
+    <div class="input-group">
+      <label for="targetUserId">Target UserId (leave empty to use current user):</label>
+      <input type="text" id="targetUserId" placeholder="e8df04a7-f193-4f74-9585-6736c031e6dd">
+    </div>
+    
+    <button onclick="migrateTenants()" id="migrateBtn">
+      🔄 Migrate All Tenants & Properties
+    </button>
+    
+    <button onclick="previewMigration()" id="previewBtn">
+      👁️ Preview Changes
+    </button>
+    
+    <div id="log"></div>
+  </div>
+  
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getFirestore, collection, getDocs, updateDoc, doc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+    
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDNUXAc5PxZy-LVt5HHaI9OBMuCTOUzQXk",
+      authDomain: "proptii-16946.firebaseapp.com",
+      projectId: "proptii-16946",
+      storageBucket: "proptii-16946.firebasestorage.app",
+      messagingSenderId: "831508824766",
+      appId: "1:831508824766:web:bab9e5e9dfa88f1c84a11e",
+      measurementId: "G-HJQW3KQP10"
+    };
+    
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    
+    function log(message) {
+      const logDiv = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString();
+      logDiv.textContent += `[${timestamp}] ${message}\n`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+    
+    function getCurrentUserId() {
+      // Try to get from localStorage
+      const targetInput = document.getElementById('targetUserId').value.trim();
+      if (targetInput) {
+        return targetInput;
+      }
+      
+      const cached = localStorage.getItem('proptii_auth_state');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId;
+      }
+      
+      // Try from URL params
+      const params = new URLSearchParams(window.location.search);
+      return params.get('uid');
+    }
+    
+    function getUserEmail() {
+      const cached = localStorage.getItem('proptii_auth_state');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed?.user?.email || 'Unknown';
+      }
+      return 'Unknown';
+    }
+    
+    // Display current user info
+    const userId = getCurrentUserId();
+    const userEmail = getUserEmail();
+    document.getElementById('currentUserId').textContent = userId || 'Not found';
+    document.getElementById('currentEmail').textContent = userEmail;
+    
+    window.previewMigration = async function() {
+      const targetUserId = getCurrentUserId();
+      
+      if (!targetUserId) {
+        alert('❌ Could not determine userId. Please enter it manually.');
+        return;
+      }
+      
+      document.getElementById('previewBtn').disabled = true;
+      log('🔍 Preview Mode - No changes will be made');
+      log(`Target UserId: ${targetUserId}`);
+      log('');
+      
+      try {
+        // Preview tenants
+        const tenantsSnap = await getDocs(collection(db, 'tenants'));
+        log(`Found ${tenantsSnap.size} tenants in database`);
+        
+        let tenantsToUpdate = 0;
+        tenantsSnap.forEach(doc => {
+          const data = doc.data();
+          if (data.userId !== targetUserId) {
+            tenantsToUpdate++;
+            log(`  📝 Tenant: ${data.name} (${doc.id}) - Current userId: ${data.userId || 'MISSING'}`);
+          }
+        });
+        
+        log(`\n${tenantsToUpdate} tenants would be updated`);
+        log('');
+        
+        // Preview properties
+        const propertiesSnap = await getDocs(collection(db, 'properties'));
+        log(`Found ${propertiesSnap.size} properties in database`);
+        
+        let propertiesToUpdate = 0;
+        propertiesSnap.forEach(doc => {
+          const data = doc.data();
+          if (data.userId !== targetUserId) {
+            propertiesToUpdate++;
+            log(`  🏠 Property: ${data.address} (${doc.id}) - Current userId: ${data.userId || 'MISSING'}`);
+          }
+        });
+        
+        log(`\n${propertiesToUpdate} properties would be updated`);
+        log('');
+        log('✅ Preview complete. Click "Migrate" to apply changes.');
+        
+      } catch (error) {
+        log(`❌ Error during preview: ${error.message}`);
+      } finally {
+        document.getElementById('previewBtn').disabled = false;
+      }
+    };
+    
+    window.migrateTenants = async function() {
+      const targetUserId = getCurrentUserId();
+      
+      if (!targetUserId) {
+        alert('❌ Could not determine userId. Please enter it manually.');
+        return;
+      }
+      
+      if (!confirm(`Are you sure you want to migrate ALL tenants and properties to userId: ${targetUserId}?`)) {
+        return;
+      }
+      
+      document.getElementById('migrateBtn').disabled = true;
+      document.getElementById('previewBtn').disabled = true;
+      log('🚀 Starting migration...');
+      log(`Target UserId: ${targetUserId}`);
+      log('');
+      
+      try {
+        // Migrate tenants
+        log('📋 Migrating tenants...');
+        const tenantsSnap = await getDocs(collection(db, 'tenants'));
+        let tenantsUpdated = 0;
+        
+        for (const docSnap of tenantsSnap.docs) {
+          const data = docSnap.data();
+          if (data.userId !== targetUserId) {
+            await updateDoc(doc(db, 'tenants', docSnap.id), {
+              userId: targetUserId
+            });
+            tenantsUpdated++;
+            log(`  ✅ Updated tenant: ${data.name} (${docSnap.id})`);
+          }
+        }
+        
+        log(`\n✅ Updated ${tenantsUpdated} tenants`);
+        log('');
+        
+        // Migrate properties
+        log('🏠 Migrating properties...');
+        const propertiesSnap = await getDocs(collection(db, 'properties'));
+        let propertiesUpdated = 0;
+        
+        for (const docSnap of propertiesSnap.docs) {
+          const data = docSnap.data();
+          if (data.userId !== targetUserId) {
+            await updateDoc(doc(db, 'properties', docSnap.id), {
+              userId: targetUserId
+            });
+            propertiesUpdated++;
+            log(`  ✅ Updated property: ${data.address} (${docSnap.id})`);
+          }
+        }
+        
+        log(`\n✅ Updated ${propertiesUpdated} properties`);
+        log('');
+        
+        // Migrate contracts
+        log('📄 Migrating contracts...');
+        const contractsSnap = await getDocs(collection(db, 'contracts'));
+        let contractsUpdated = 0;
+        
+        for (const docSnap of contractsSnap.docs) {
+          const data = docSnap.data();
+          if (data.userId !== targetUserId) {
+            await updateDoc(doc(db, 'contracts', docSnap.id), {
+              userId: targetUserId
+            });
+            contractsUpdated++;
+            log(`  ✅ Updated contract: ${docSnap.id}`);
+          }
+        }
+        
+        log(`\n✅ Updated ${contractsUpdated} contracts`);
+        log('');
+        log('🎉 Migration complete!');
+        log('');
+        log('Please refresh your landlord dashboard to see the updated data.');
+        
+        setTimeout(() => {
+          if (confirm('Migration complete! Refresh the page now?')) {
+            window.location.reload();
+          }
+        }, 2000);
+        
+      } catch (error) {
+        log(`❌ Error during migration: ${error.message}`);
+        console.error(error);
+      } finally {
+        document.getElementById('migrateBtn').disabled = false;
+        document.getElementById('previewBtn').disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>
+

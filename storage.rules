@@ -1,0 +1,28 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Contracts folder - allow public read, authenticated write
+    match /contracts/{allPaths=**} {
+      // Allow read access to all (for email attachments)
+      allow read: if true;
+      // Allow write (upload) for authenticated users with file size limit
+      allow write: if request.auth != null && 
+                   request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
+    
+    // Properties folder - allow public read, authenticated write (for development)
+    match /properties/{allPaths=**} {
+      allow read: if true; // Public read access
+      // For development: allow writes without auth (remove in production)
+      allow write: if true; // TODO: Change to `request.auth != null` in production
+      // allow write: if request.auth != null && 
+      //              request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
+    
+    // Other files - maintain existing rules
+    match /{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+  }
+}
