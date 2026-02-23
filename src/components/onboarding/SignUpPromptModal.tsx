@@ -14,6 +14,10 @@ export interface SignUpPromptModalProps {
   onSignUpEmail?: () => void;
   /** Called when user chooses "Social Media sign up"; default navigates to /register (or could open OAuth). */
   onSignUpSocial?: () => void;
+  /** When true, show "Explore more features" as the secondary button instead of "Social Media sign up". */
+  showExploreFeaturesAsSecondary?: boolean;
+  /** Called when user clicks "Explore more features"; default calls onClose. */
+  onExploreFeatures?: () => void;
 }
 
 /**
@@ -26,7 +30,9 @@ export function SignUpPromptModal({
   title,
   reassurance = "Don't worry, you won't have to go through the entire search process again.",
   onSignUpEmail,
-  onSignUpSocial
+  onSignUpSocial,
+  showExploreFeaturesAsSecondary = false,
+  onExploreFeatures
 }: SignUpPromptModalProps) {
   const navigate = useNavigate();
 
@@ -91,14 +97,14 @@ export function SignUpPromptModal({
             onClick={handleSignUpEmail}
             className="w-full py-3 px-4 rounded-full font-medium text-white bg-[#E65D24] hover:bg-[#d9541f] transition-colors"
           >
-            Sign up with email
+            {showExploreFeaturesAsSecondary ? 'Sign in / Sign up' : 'Sign up with email'}
           </button>
           <button
             type="button"
-            onClick={handleSignUpSocial}
+            onClick={showExploreFeaturesAsSecondary ? (onExploreFeatures || onClose) : handleSignUpSocial}
             className="w-full py-3 px-4 rounded-full font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
           >
-            Social Media sign up
+            {showExploreFeaturesAsSecondary ? 'Explore more features' : 'Social Media sign up'}
           </button>
         </div>
         </div>

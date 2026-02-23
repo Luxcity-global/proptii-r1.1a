@@ -19,6 +19,7 @@ import {
 } from '../../../services/bookViewingRequestService';
 import emailService from '../../../services/emailService';
 import landlordUserService from '../../../services/landlordUserService';
+import { LandlordEmptyState } from './LandlordEmptyState';
 
 // ViewingsPage component for managing property viewings and requests
 
@@ -28,6 +29,8 @@ interface ViewingsPageProps {
   managerId: string | null;
   managerName?: string;
   managerEmail?: string;
+  userProfile?: { name?: string; email?: string } | null;
+  onSignIn?: () => void;
 }
 
 interface ScheduleFormState {
@@ -89,7 +92,7 @@ function formatTime(time: string) {
   }
 }
 
-const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, managerEmail }) => {
+const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, managerEmail, userProfile, onSignIn }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('requests');
@@ -550,6 +553,38 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
       setIsProcessing(false);
     }
   };
+
+  // Guest view: show layout with empty state in table area
+  if (!userProfile && onSignIn) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6" style={{ fontFamily: 'Archivo, sans-serif' }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Viewings & Requests</h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Manage incoming requests, schedule property viewings, and keep tenants informed.
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {[
+            { title: 'Pending Requests', value: 0, accent: 'bg-blue-100' },
+            { title: 'Scheduled Viewings', value: 0, accent: 'bg-orange-100' },
+            { title: 'Completed Viewings', value: 0, accent: 'bg-green-100' },
+            { title: 'Cancelled Viewings', value: 0, accent: 'bg-red-100' }
+          ].map((card) => (
+            <div key={card.title} className={`rounded-xl border border-[#f3f3f3] p-6 ${card.accent}`}>
+              <p className="text-sm text-gray-600 mb-1">{card.title}</p>
+              <p className="text-2xl font-semibold">{card.value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="rounded-xl border border-[#f3f3f3] bg-white p-12">
+          <LandlordEmptyState onSignIn={onSignIn} />
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

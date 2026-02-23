@@ -7,8 +7,6 @@ import { useNavigate } from 'react-router-dom';
 import CustomizePage from './CustomizePage';
 import { contractService, ContractTemplate } from '../../services/contractService';
 import { useAuth } from '../../contexts/AuthContext';
-import { DemoGuideBubble } from '../onboarding/DemoGuideBubble';
-
 interface ContractModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -119,8 +117,6 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
   const [customizingTemplate, setCustomizingTemplate] = useState<Template | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
-  const [contractGuideStepIndex, setContractGuideStepIndex] = useState(0);
-
   // Load templates and contracts from Firestore on component mount
   useEffect(() => {
     const loadTemplatesFromFirestore = async () => {
@@ -608,21 +604,6 @@ const findCustomizedTemplate = () => {
   if (!isOpen) return null;
 
   const customizedTemplate = findCustomizedTemplate();
-
-  const CONTRACT_GUIDE_STEPS = [
-    {
-      message: 'Click here to upload a contract you’d like to sign.',
-      targetSelector: '[data-demo-contract-upload]',
-      placement: 'above' as const
-    },
-    {
-      message: 'Once uploaded, use Manage to customise or prepare it for signing.',
-      targetSelector: '[data-demo-contract-manage-first]',
-      placement: 'right' as const,
-      avatarSide: 'right' as const,
-      offsetX: 24
-    }
-  ] as const;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
@@ -1116,30 +1097,6 @@ const findCustomizedTemplate = () => {
 
       </div>
         )}  
-
-      {/* Contract onboarding guide: upload → manage (hidden when CustomizePage is shown) */}
-      <DemoGuideBubble
-        message={CONTRACT_GUIDE_STEPS[contractGuideStepIndex]?.message}
-        targetSelector={CONTRACT_GUIDE_STEPS[contractGuideStepIndex]?.targetSelector}
-        highlightTarget
-        placement={CONTRACT_GUIDE_STEPS[contractGuideStepIndex]?.placement ?? 'above'}
-        avatarSrc="/images/Scout%20ava.png"
-        avatarSide={CONTRACT_GUIDE_STEPS[contractGuideStepIndex]?.avatarSide}
-        offsetX={CONTRACT_GUIDE_STEPS[contractGuideStepIndex]?.offsetX}
-        hidden={customizeMode}
-        onNext={() => {
-          setContractGuideStepIndex((prev) => {
-            if (prev === 0) {
-              // Only advance to Manage step if a template exists
-              return uploadedTemplates.length > 0 ? 1 : 0;
-            }
-            return prev;
-          });
-        }}
-        onDismiss={() => {
-          setContractGuideStepIndex(1);
-        }}
-      />
 
       {previewFile && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={closePreview}>

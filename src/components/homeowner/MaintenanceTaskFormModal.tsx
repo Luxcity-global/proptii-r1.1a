@@ -5,7 +5,7 @@ import { MaintenanceTask } from './MaintenanceManagement';
 interface MaintenanceTaskFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (task: Omit<MaintenanceTask, 'id'>) => void;
+  onSubmit: (task: Omit<MaintenanceTask, 'id'>) => void | Promise<void>;
   initialTask?: MaintenanceTask | null;
 }
 
@@ -64,7 +64,9 @@ export function MaintenanceTaskFormModal({
     }
   }, [initialTask, isOpen]);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     const task: Omit<MaintenanceTask, 'id'> = {
@@ -86,8 +88,16 @@ export function MaintenanceTaskFormModal({
       notes: formData.notes || undefined,
     };
 
-    onSubmit(task);
-    onClose();
+    setIsSubmitting(true);
+    try {
+      await Promise.resolve(onSubmit(task));
+      onClose();
+    } catch (err) {
+      console.error('Form submit error:', err);
+      // Error handling is done by the parent (e.g. alert)
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -300,9 +310,10 @@ export function MaintenanceTaskFormModal({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-[#DC5F12] hover:bg-[#c54f0f] text-white rounded-lg font-medium transition-colors"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-[#DC5F12] hover:bg-[#c54f0f] disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
             >
-              {initialTask ? 'Update Task' : 'Create Task'}
+              {isSubmitting ? 'Saving...' : (initialTask ? 'Update Task' : 'Create Task')}
             </button>
           </div>
         </form>

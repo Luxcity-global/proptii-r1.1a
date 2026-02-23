@@ -215,6 +215,22 @@ service cloud.firestore {
       //   resource.data.userId == request.auth.uid;
     }
 
+    // Homeowner projects collection
+    match /homeownerProjects/{projectId} {
+      allow read, write: if true;
+    }
+
+    // Homeowner maintenance tasks collection
+    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
+    // For development, we allow all access. For production, secure with userId checks.
+    match /homeownerMaintenanceTasks/{taskId} {
+      allow read, write: if true;
+
+      // Production-ready rule (commented out until Firebase Auth is set up):
+      // allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
+      // allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
     // Market Insights collection
     // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
     // For development, we allow all reads and writes. For production, you should:

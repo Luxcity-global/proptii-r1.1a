@@ -12,11 +12,27 @@ import {
   DollarSign
 } from 'lucide-react';
 
+interface MaintenanceTaskSummary {
+  id: string;
+  title: string;
+  dueDate: string;
+  priority: string;
+  status: string;
+}
+
+interface ProjectSummary {
+  id: string;
+  status: string;
+  progress?: number;
+}
+
 interface DashboardProps {
   onNavigate: (screen: 'maintenance' | 'documents' | 'projects' | 'home-value') => void;
   onCreateMaintenance: () => void;
   onCreateProject: () => void;
   onUploadDocument: () => void;
+  maintenanceTasks?: MaintenanceTaskSummary[];
+  projects?: ProjectSummary[];
 }
 
 interface StatCard {
@@ -33,14 +49,26 @@ export function Dashboard({
   onNavigate, 
   onCreateMaintenance, 
   onCreateProject, 
-  onUploadDocument 
+  onUploadDocument,
+  maintenanceTasks = [],
+  projects = []
 }: DashboardProps) {
-  // Mock data - will be replaced with real data from Firebase
+  const pendingTasks = maintenanceTasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled');
+  const dueThisWeek = pendingTasks.filter(t => {
+    const due = new Date(t.dueDate);
+    const now = new Date();
+    const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    return due >= now && due <= weekFromNow;
+  });
+  const recentTasksForDisplay = maintenanceTasks.slice(0, 5);
+  const activeProjects = projects.filter(p => p.status !== 'completed' && p.status !== 'cancelled');
+  const inProgressCount = projects.filter(p => p.status === 'in-progress').length;
+
   const stats: StatCard[] = [
     {
       title: 'Upcoming Maintenance',
-      value: 3,
-      subtitle: '2 due this week',
+      value: pendingTasks.length,
+      subtitle: dueThisWeek.length > 0 ? `${dueThisWeek.length} due this week` : undefined,
       icon: Wrench,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
@@ -48,8 +76,8 @@ export function Dashboard({
     },
     {
       title: 'Active Projects',
-      value: 2,
-      subtitle: '1 in progress',
+      value: activeProjects.length,
+      subtitle: inProgressCount > 0 ? `${inProgressCount} in progress` : undefined,
       icon: TrendingUp,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
@@ -75,11 +103,7 @@ export function Dashboard({
     },
   ];
 
-  const recentTasks = [
-    { id: '1', title: 'HVAC Service', dueDate: '2024-12-15', priority: 'high', status: 'pending' },
-    { id: '2', title: 'Gutter Cleaning', dueDate: '2024-12-20', priority: 'medium', status: 'pending' },
-    { id: '3', title: 'Smoke Detector Check', dueDate: '2024-12-18', priority: 'high', status: 'completed' },
-  ];
+  const recentTasks = recentTasksForDisplay;
 
   const quickActions = [
     {
@@ -95,13 +119,6 @@ export function Dashboard({
       icon: TrendingUp,
       onClick: onCreateProject,
       color: 'bg-purple-500 hover:bg-purple-600',
-    },
-    {
-      title: 'Upload Document',
-      description: 'Add warranty, receipt, or manual',
-      icon: FileText,
-      onClick: onUploadDocument,
-      color: 'bg-green-500 hover:bg-green-600',
     },
   ];
 
@@ -186,7 +203,10 @@ export function Dashboard({
           </div>
           <div className="p-6">
             <div className="space-y-4">
-              {recentTasks.map((task) => (
+              {recentTasks.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4">No maintenance tasks yet. Add one to get started.</p>
+              ) : (
+              recentTasks.map((task) => (
                 <div
                   key={task.id}
                   className="flex items-start justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all"
@@ -194,9 +214,9 @@ export function Dashboard({
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <h3 className="font-medium text-[#374957]">{task.title}</h3>
-                      {task.priority === 'high' && (
+                      {(task.priority === 'high' || task.priority === 'urgent') && (
                         <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded">
-                          High
+                          {task.priority}
                         </span>
                       )}
                       {task.status === 'completed' && (
@@ -211,7 +231,7 @@ export function Dashboard({
                     </div>
                   </div>
                 </div>
-              ))}
+              )))}
             </div>
           </div>
         </div>

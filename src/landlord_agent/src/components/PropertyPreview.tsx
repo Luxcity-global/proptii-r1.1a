@@ -23,7 +23,8 @@ import {
   Mail,
   Phone,
   Eye,
-  Loader2
+  Loader2,
+  LogIn
 } from 'lucide-react';
 import { Property } from '../App';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -45,6 +46,11 @@ interface PropertyPreviewProps {
   onAfterPublishAddNewProperty?: () => void;
   onAfterPublishViewProperty?: () => void;
   onAddTenant?: () => void;
+  userProfile?: { name?: string; email?: string } | null;
+  onSignIn?: () => void;
+  onExploreOtherFeatures?: () => void;
+  /** Call before showing sign-up modal to save form data for restore after sign-in */
+  onSavePendingBeforeSignUp?: () => void | Promise<void>;
 }
 
 export function PropertyPreview({
@@ -60,11 +66,16 @@ export function PropertyPreview({
   onPublishProperty,
   onAfterPublishAddNewProperty,
   onAfterPublishViewProperty,
-  onAddTenant
+  onAddTenant,
+  userProfile,
+  onSignIn,
+  onExploreOtherFeatures,
+  onSavePendingBeforeSignUp
 }: PropertyPreviewProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [isPublishing, setIsPublishing] = useState(false);
   const [showPublishSuccess, setShowPublishSuccess] = useState(false);
+  const [showSignUpModal, setShowSignUpModal] = useState(false);
   
   console.log('PropertyPreview rendered with property:', property);
 
@@ -196,6 +207,11 @@ export function PropertyPreview({
   };
 
   const handlePublish = async () => {
+    if (!userProfile && onSignIn) {
+      await onSavePendingBeforeSignUp?.();
+      setShowSignUpModal(true);
+      return;
+    }
     if (!onPublishProperty) return;
     setIsPublishing(true);
     try {
@@ -732,6 +748,59 @@ export function PropertyPreview({
               View property
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sign up modal for guests */}
+      <Dialog open={showSignUpModal} onOpenChange={setShowSignUpModal}>
+        <DialogContent className="sm:max-w-md flex flex-col items-center text-center">
+          <div className="flex flex-col items-center w-full">
+            <img
+              src="/images/scout1.png"
+              alt="Scout"
+              className="w-24 h-24 object-contain mb-4"
+            />
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="text-center" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                Sign in to publish your property
+              </DialogTitle>
+              <DialogDescription className="text-center">
+                Create an account or sign in to publish your property and make it visible to potential tenants. You can save your progress and return later.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-4 py-4 w-full items-center">
+              {onSignIn && (
+                <Button
+                  onClick={() => {
+                    setShowSignUpModal(false);
+                    onSignIn();
+                  }}
+                  className="flex items-center gap-2 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 w-full justify-center"
+                  style={{
+                    backgroundColor: '#DC5F12',
+                    borderColor: '#DC5F12',
+                    background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                  }}
+                >
+                  <LogIn className="w-4 h-4" strokeWidth={2.5} />
+                  Sign in / Sign up
+                </Button>
+              )}
+              {onExploreOtherFeatures && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowSignUpModal(false);
+                    onExploreOtherFeatures();
+                  }}
+                  className="w-full"
+                >
+                  Explore other Features
+                </Button>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

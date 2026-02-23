@@ -25,9 +25,11 @@ import {
   Users,
   Building,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  LogIn
 } from 'lucide-react';
 import { Property, Tenant, UserProfile } from '../App';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 
 interface AddTenantProps {
   properties: Property[];
@@ -37,6 +39,8 @@ interface AddTenantProps {
   preselectedPropertyId?: string;
   userProfile?: UserProfile | null;
   initialTenant?: Tenant | null;
+  onSignIn?: () => void;
+  onExploreOtherFeatures?: () => void;
 }
 
 // Define form steps for Typeform-style progression
@@ -284,12 +288,13 @@ function formReducer(state: FormState, action: FormAction): FormState {
   }
 }
 
-export function AddTenant({ properties, onSave, onBack, onBackToSelection, preselectedPropertyId, userProfile, initialTenant }: AddTenantProps) {
+export function AddTenant({ properties, onSave, onBack, onBackToSelection, preselectedPropertyId, userProfile, initialTenant, onSignIn, onExploreOtherFeatures }: AddTenantProps) {
   // Phase 4: Replace useState with useReducer for advanced state management
   const [state, dispatch] = useReducer(formReducer, initialFormState);
   const [isGuidelinesExpanded, setIsGuidelinesExpanded] = useState(false);
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [showSignUpModal, setShowSignUpModal] = useState(false);
 
   // Debug: Log initialTenant on mount
   console.log('🔍 AddTenant mounted with initialTenant:', initialTenant);
@@ -2096,7 +2101,6 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
         </div>
       </div>
 
-
       {/* Navigation */}
       <div className="w-full bg-white shadow-lg border-t border-gray-200 ">
         <div className="max-w-4xl mx-auto px-6 py-4">
@@ -2126,14 +2130,22 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
                 <button
                   onClick={(e) => {
                     e.preventDefault();
-                    // Force validation check with current state
                     const currentStepInfo = FORM_STEPS[state.currentStep];
                     const isValid = currentStepInfo ? validateStep(currentStepInfo.id) : true;
-                    console.log('🔍 Continue clicked - Step:', state.currentStep, 'Valid:', isValid, 'Data:', state.formData);
-                    if (isValid && !state.isTransitioning && !state.isLoading) {
-                      goToNextStep();
-                    } else {
+                    const isReviewStep = state.currentStep === FORM_STEPS.length - 2;
+                    if (!isValid || state.isTransitioning || state.isLoading) {
                       console.log('⚠️ Cannot proceed - Valid:', isValid, 'Transitioning:', state.isTransitioning, 'Loading:', state.isLoading);
+                      return;
+                    }
+                    // On review step, guest must sign in first
+                    if (isReviewStep && !userProfile && onSignIn) {
+                      setShowSignUpModal(true);
+                      return;
+                    }
+                    if (isReviewStep) {
+                      handleSubmit();
+                    } else {
+                      goToNextStep();
                     }
                   }}
                   disabled={state.isTransitioning || state.isLoading || !isCurrentStepValid}
@@ -2165,7 +2177,13 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
               </div>
             ) : state.currentStep === FORM_STEPS.length - 2 ? (
               <button
-                onClick={handleSubmit}
+                onClick={() => {
+                  if (!userProfile && onSignIn) {
+                    setShowSignUpModal(true);
+                    return;
+                  }
+                  handleSubmit();
+                }}
                 disabled={state.isTransitioning || state.isLoading}
                 className="bg-gradient-to-r from-[#DC5F12] to-[#DC5F12]/80 hover:from-[#DC5F12]/90 hover:to-[#DC5F12]/70 text-white px-8 py-3 rounded-full flex items-center space-x-2 transition-all duration-300 hover:scale-105 hover: disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none min-w-[140px] font-medium"
                 style={{
@@ -2209,6 +2227,59 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
           </div>
         </div>
       </div>
+
+      {/* Sign-up modal for guests on review step */}
+      <Dialog open={showSignUpModal} onOpenChange={setShowSignUpModal}>
+        <DialogContent className="sm:max-w-xl min-w-[340px] flex flex-col items-center justify-center text-center p-8">
+          <div className="flex flex-col items-center w-full">
+            <img
+              src="/images/scout1.png"
+              alt="Scout"
+              className="w-28 h-28 object-contain mb-5"
+            />
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="text-center" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+                Sign in to add your tenant
+              </DialogTitle>
+              <DialogDescription className="text-center">
+                Create an account or sign in to save your tenant and manage your portfolio. You can save your progress and return later.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-4 py-4 w-full items-center">
+              {onSignIn && (
+                <Button
+                  onClick={() => {
+                    setShowSignUpModal(false);
+                    onSignIn();
+                  }}
+                  className="flex items-center gap-2 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 w-full justify-center"
+                  style={{
+                    backgroundColor: '#DC5F12',
+                    borderColor: '#DC5F12',
+                    background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                  }}
+                >
+                  <LogIn className="w-4 h-4" strokeWidth={2.5} />
+                  Sign in / Sign up
+                </Button>
+              )}
+              {onExploreOtherFeatures && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowSignUpModal(false);
+                    onExploreOtherFeatures();
+                  }}
+                  className="w-full"
+                >
+                  Explore other Features
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,112 +1,65 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Hammer, 
   Plus, 
   Search, 
   Calendar, 
-  DollarSign, 
-  TrendingUp,
+  DollarSign,
   Edit,
   Trash2,
-  X,
-  CheckCircle2,
-  Clock,
-  AlertCircle
+  X
 } from 'lucide-react';
 import { ProjectFormModal } from './ProjectFormModal';
+import { SignUpPromptModal } from '../onboarding/SignUpPromptModal';
+import { savePendingProject } from '../../utils/homeownerPendingForm';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  homeownerProjectsFirestoreService,
+  type HomeProject
+} from '../../services/homeownerProjectsFirestoreService';
 
-export interface HomeProject {
-  id: string;
-  name: string;
-  description?: string;
-  category: 'renovation' | 'repair' | 'improvement' | 'landscaping' | 'other';
-  status: 'planning' | 'in-progress' | 'on-hold' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high';
-  startDate?: string;
-  targetDate?: string;
-  completedDate?: string;
-  budget?: number;
-  actualCost?: number;
-  progress: number; // 0-100
-  contractor?: {
-    id: string;
-    name: string;
-    contact?: string;
-  };
-  notes?: string;
-}
+export type { HomeProject };
 
 interface ProjectsProps {
+  projects: HomeProject[];
+  projectsLoading: boolean;
   onBack: () => void;
+  openProjectFormModalOnMount?: boolean;
+  /** Project data to restore after sign-in (from sessionStorage). */
+  restoreProjectData?: Omit<HomeProject, 'id'> | null;
+  /** Called when restore data has been applied. */
+  onRestoreConsumed?: () => void;
 }
 
-export function Projects({ onBack }: ProjectsProps) {
+export function Projects({ projects, projectsLoading, onBack, openProjectFormModalOnMount = false, restoreProjectData, onRestoreConsumed }: ProjectsProps) {
+  const { user, login } = useAuth();
+  const navigate = useNavigate();
+  const [showSignUpModal, setShowSignUpModal] = useState(false);
+  const [projectDataToRestore, setProjectDataToRestore] = useState<Omit<HomeProject, 'id'> | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<HomeProject | null>(null);
 
-  // Mock data - will be replaced with Firebase data
-  const [projects, setProjects] = useState<HomeProject[]>([
-    {
-      id: '1',
-      name: 'Kitchen Renovation',
-      description: 'Complete kitchen remodel including new cabinets, countertops, and appliances',
-      category: 'renovation',
-      status: 'in-progress',
-      priority: 'high',
-      startDate: '2024-10-01',
-      targetDate: '2025-02-01',
-      budget: 25000,
-      actualCost: 18500,
-      progress: 65,
-      contractor: {
-        id: 'c1',
-        name: 'Elite Home Renovations',
-        contact: '555-0303',
-      },
-    },
-    {
-      id: '2',
-      name: 'Bathroom Upgrade',
-      description: 'Update master bathroom with new fixtures and tile',
-      category: 'improvement',
-      status: 'planning',
-      priority: 'medium',
-      targetDate: '2025-04-01',
-      budget: 12000,
-      progress: 15,
-    },
-    {
-      id: '3',
-      name: 'Deck Construction',
-      description: 'Build new composite deck in backyard',
-      category: 'improvement',
-      status: 'completed',
-      priority: 'low',
-      startDate: '2024-06-01',
-      completedDate: '2024-08-15',
-      budget: 8000,
-      actualCost: 7500,
-      progress: 100,
-      contractor: {
-        id: 'c2',
-        name: 'Outdoor Living Solutions',
-        contact: '555-0404',
-      },
-    },
-    {
-      id: '4',
-      name: 'Garden Landscaping',
-      description: 'Redesign front yard with new plants and walkway',
-      category: 'landscaping',
-      status: 'on-hold',
-      priority: 'low',
-      targetDate: '2025-05-01',
-      budget: 5000,
-      progress: 0,
-    },
-  ]);
+  // Open project form modal when navigating from "Create project" onboarding option
+  useEffect(() => {
+    if (openProjectFormModalOnMount) {
+      setEditingProject(null);
+      setIsFormModalOpen(true);
+    }
+  }, [openProjectFormModalOnMount]);
+
+  // Restore pending project data after sign-in
+  useEffect(() => {
+    if (restoreProjectData) {
+      setEditingProject(null);
+      setProjectDataToRestore(restoreProjectData);
+      setIsFormModalOpen(true);
+      onRestoreConsumed?.();
+    }
+  }, [restoreProjectData, onRestoreConsumed]);
 
   const filteredProjects = projects.filter(project => {
     const matchesSearch = 
@@ -147,12 +100,30 @@ export function Projects({ onBack }: ProjectsProps) {
     }
   };
 
-  const handleCreateProject = (project: Omit<HomeProject, 'id'>) => {
-    const newProject: HomeProject = {
-      ...project,
-      id: String(Date.now()),
-    };
-    setProjects((prev) => [newProject, ...prev]);
+  const handleSubmitProject = async (project: Omit<HomeProject, 'id'>) => {
+    if (!user?.id) {
+      savePendingProject(project as Record<string, unknown>);
+      setShowSignUpModal(true);
+      throw new Error('User not authenticated');
+    }
+    if (editingProject) {
+      await homeownerProjectsFirestoreService.updateProject(editingProject.id, project);
+    } else {
+      await homeownerProjectsFirestoreService.createProject(user.id, project);
+    }
+    setEditingProject(null);
+    setProjectDataToRestore(null);
+    setIsFormModalOpen(false);
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    if (!confirm('Are you sure you want to delete this project?')) return;
+    try {
+      await homeownerProjectsFirestoreService.deleteProject(projectId);
+    } catch (err) {
+      console.error('Failed to delete project:', err);
+      alert('Failed to delete project. Please try again.');
+    }
   };
 
   return (
@@ -171,7 +142,10 @@ export function Projects({ onBack }: ProjectsProps) {
           <p className="text-gray-600">Track and manage your home improvement projects</p>
         </div>
         <button
-          onClick={() => setIsFormModalOpen(true)}
+          onClick={() => {
+            setEditingProject(null);
+            setIsFormModalOpen(true);
+          }}
           className="bg-[#DC5F12] text-white px-4 py-2 rounded-lg font-medium hover:bg-[#c54f0f] transition-colors flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
@@ -232,14 +206,24 @@ export function Projects({ onBack }: ProjectsProps) {
 
       {/* Projects Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProjects.length === 0 ? (
+        {projectsLoading ? (
+          <div className="col-span-full">
+            <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+              <div className="w-10 h-10 border-2 border-[#DC5F12] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-gray-600">Loading projects...</p>
+            </div>
+          </div>
+        ) : filteredProjects.length === 0 ? (
           <div className="col-span-full">
             <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
               <Hammer className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600 mb-2">No projects found</p>
               <p className="text-sm text-gray-500 mb-4">Try adjusting your filters or create a new project</p>
               <button
-                onClick={() => setIsFormModalOpen(true)}
+                onClick={() => {
+                  setEditingProject(null);
+                  setIsFormModalOpen(true);
+                }}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center gap-2 mx-auto"
               >
                 <Plus className="w-4 h-4" />
@@ -270,14 +254,17 @@ export function Projects({ onBack }: ProjectsProps) {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => console.log('Edit project:', project.id)}
+                    onClick={() => {
+                      setEditingProject(project);
+                      setIsFormModalOpen(true);
+                    }}
                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                     aria-label="Edit project"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => console.log('Delete project:', project.id)}
+                    onClick={() => handleDeleteProject(project.id)}
                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                     aria-label="Delete project"
                   >
@@ -338,8 +325,28 @@ export function Projects({ onBack }: ProjectsProps) {
 
       <ProjectFormModal
         isOpen={isFormModalOpen}
-        onClose={() => setIsFormModalOpen(false)}
-        onSubmit={handleCreateProject}
+        onClose={() => {
+          setIsFormModalOpen(false);
+          setEditingProject(null);
+          setProjectDataToRestore(null);
+        }}
+        onSubmit={handleSubmitProject}
+        initialProject={projectDataToRestore ? { ...projectDataToRestore, id: '' } : editingProject}
+      />
+
+      {/* Sign-up prompt when guest tries to save project */}
+      <SignUpPromptModal
+        isOpen={showSignUpModal}
+        onClose={() => setShowSignUpModal(false)}
+        title="Sign in to save your project"
+        reassurance="Create an account or sign in to save projects and manage your home improvements. Your progress won't be lost."
+        onSignUpEmail={login}
+        onSignUpSocial={login}
+        showExploreFeaturesAsSecondary
+        onExploreFeatures={() => {
+          setShowSignUpModal(false);
+          navigate('/homeowner-onboarding');
+        }}
       />
     </div>
   );

@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { Tenant, Property, ArrearsAlert, UserRole } from '../App';
+import { Tenant, Property, ArrearsAlert, UserRole, UserProfile } from '../App';
+import { LandlordEmptyState } from './LandlordEmptyState';
 import { referencingService } from '../services/referencingService';
 
 
@@ -38,6 +39,8 @@ interface ClientsPageProps {
   properties: Property[];
   arrearsAlerts: ArrearsAlert[];
   userRole: UserRole;
+  userProfile?: UserProfile | null;
+  onSignIn?: () => void;
   onViewTenant: (tenant: Tenant) => void;
   onViewProperty: (property: Property) => void;
   onAddTenant: () => void;
@@ -51,7 +54,7 @@ interface ClientsPageProps {
   onExportLandlords?: (format: 'json' | 'csv' | 'excel' | 'pdf') => void;
 }
 
-export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onViewTenant, onViewProperty, onAddTenant, onAddLandlord, onViewLandlord, onDeleteTenant, onArchiveTenant, onExportTenants, onDeleteLandlord, onArchiveLandlord, onExportLandlords }: ClientsPageProps) {
+export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, userProfile, onSignIn, onViewTenant, onViewProperty, onAddTenant, onAddLandlord, onViewLandlord, onDeleteTenant, onArchiveTenant, onExportTenants, onDeleteLandlord, onArchiveLandlord, onExportLandlords }: ClientsPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('tenants');
   const [tenantFilter, setTenantFilter] = useState('all');
@@ -633,7 +636,11 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
         </Card>
       </div>
 
-      {userRole !== 'landlord' ? (
+      {!userProfile && onSignIn ? (
+        <Card className="p-12">
+          <LandlordEmptyState onSignIn={onSignIn} />
+        </Card>
+      ) : userRole !== 'landlord' ? (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className={`grid w-full ${userRole === 'agent' ? 'grid-cols-2' : 'grid-cols-1'} h-16 bg-transparent`}>
             <TabsTrigger 

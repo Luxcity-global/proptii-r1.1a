@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { WelcomeScreen } from './components/WelcomeScreen';
+import { LandlordEmptyState } from './components/LandlordEmptyState';
 import { RoleSelection } from './components/RoleSelection';
 import { ProfileSetup } from './components/ProfileSetup';
 import { PropertySetup } from './components/PropertySetup';
@@ -40,10 +41,14 @@ import { tenantService } from './services/tenantService';
 import { marketInsightService } from './services/marketInsightService';
 import ViewingsPage from './components/ViewingsPage';
 import { storage, db } from './config/firebase';
+import { savePendingProperty, consumePendingProperty } from '../../utils/landlordPendingProperty';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, query, where, onSnapshot, Unsubscribe, doc, updateDoc, Timestamp } from 'firebase/firestore';
 
 export type UserRole = 'landlord' | 'agent';
+
+/** Azure B2C sign-in URL for guest users in empty state */
+const SIGN_IN_URL = 'https://proptii.b2clogin.com/proptii.onmicrosoft.com/b2c_1_signupandsigninproptii/oauth2/v2.0/authorize?client_id=532e1fa0-18a6-4356-bd78-1f62bd6d5e2f&scope=openid%20profile%20email%20offline_access&redirect_uri=https%3A%2F%2Fproptii.co&client-request-id=019c89da-c0f9-7dde-8814-96ced1d1ac4a&response_mode=fragment&client_info=1&nonce=019c89da-c0fd-7ed4-acf5-ad3b2621c727&state=eyJpZCI6IjAxOWM4OWRhLWMwZmEtNzcwOC1iYjYwLTRiM2MzODZkZmJiZCIsIm1ldGEiOnsiaW50ZXJhY3Rpb25UeXBlIjoicmVkaXJlY3QifX0%3D&claims=%7B%22id_token%22%3A%7B%22extension_PhoneNumber%22%3Anull%7D%7D&x-client-SKU=msal.js.browser&x-client-VER=4.12.0&response_type=code&code_challenge=YWSXzXu9cBV85rUs9pzakoUBSnweIFd2NW-SzZdpjyI&code_challenge_method=S256';
 
 export interface CompanyProfile {
   companyName: string;
@@ -550,26 +555,54 @@ export default function App() {
     }
   }, []);
 
-  // Optional deep-link: start directly at specific flows when requested
-  React.useEffect(() => {
+  // Optional deep-link: start directly at specific flows when requested (useLayoutEffect to run before paint)
+  React.useLayoutEffect(() => {
     try {
+      // Restore pending add-property data after sign-in redirect (takes precedence)
+      const pending = consumePendingProperty();
+      if (pending) {
+        setPropertySetupData(pending);
+        setCurrentScreen('property-preview');
+        return;
+      }
       // Prefer query param if present
       const params = new URLSearchParams(window.location.search);
       const qpStart = params.get('start');
-      if (qpStart === 'property-setup-step1' || qpStart === 'company-profile-setup' || qpStart === 'add-tenant') {
+      const qpNav = params.get('nav');
+      if (qpStart === 'property-setup-step1' || qpStart === 'company-profile-setup' || qpStart === 'tenant-selection') {
         setCurrentScreen(qpStart as Screen);
+        return;
+      }
+      if (qpNav === 'contracts') {
+        setCurrentScreen('main-app');
+        setNavigationScreen('contracts');
+        if (params.get('openSendModal') === '1') {
+          try {
+            sessionStorage.setItem('contracts_openSendModal', '1');
+          } catch (_) {}
+        }
         return;
       }
       const startScreen = localStorage.getItem('startScreen');
       if (startScreen === 'property-setup-step1') {
         setCurrentScreen('property-setup-step1');
         localStorage.removeItem('startScreen');
-      } else if (startScreen === 'add-tenant') {
-        setCurrentScreen('add-tenant');
+      } else if (startScreen === 'add-tenant' || startScreen === 'tenant-selection') {
+        setCurrentScreen('tenant-selection');
         localStorage.removeItem('startScreen');
       } else if (startScreen === 'company-profile-setup') {
         setCurrentScreen('company-profile-setup');
         localStorage.removeItem('startScreen');
+      } else if (startScreen === 'contracts') {
+        setCurrentScreen('main-app');
+        setNavigationScreen('contracts');
+        localStorage.removeItem('startScreen');
+        if (localStorage.getItem('openSendModal') === '1') {
+          localStorage.removeItem('openSendModal');
+          try {
+            sessionStorage.setItem('contracts_openSendModal', '1');
+          } catch (_) {}
+        }
       }
     } catch (e) {
       // ignore
@@ -2089,8 +2122,8 @@ export default function App() {
       case 'dashboard':
         return (
           <Dashboard
-            properties={properties}
-            tenants={tenants}
+            properties={!userProfile ? [] : properties}
+            tenants={!userProfile ? [] : tenants}
             userProfile={userProfile}
             onAddProperty={() => navigateToScreen('property-setup-step1')}
             onViewProperty={(property) => {
@@ -2121,18 +2154,19 @@ export default function App() {
                 navigateToScreen('arrears-management');
               }
             }}
-            marketInsights={marketInsights}
-            vacancyAlerts={vacancyAlerts}
-            arrearsAlerts={arrearsAlerts}
+            marketInsights={!userProfile ? [] : marketInsights}
+            vacancyAlerts={!userProfile ? [] : vacancyAlerts}
+            arrearsAlerts={!userProfile ? [] : arrearsAlerts}
+            onSignIn={!userProfile ? () => { (window.top || window).location.href = SIGN_IN_URL; } : undefined}
           />
         );
 
       case 'properties':
         return (
           <PropertiesPage
-            properties={properties}
-            tenants={tenants}
-            arrearsAlerts={arrearsAlerts}
+            properties={!userProfile ? [] : properties}
+            tenants={!userProfile ? [] : tenants}
+            arrearsAlerts={!userProfile ? [] : arrearsAlerts}
             onAddProperty={() => navigateToScreen('property-setup-step1')}
             onViewProperty={(property) => {
               selectProperty(property);
@@ -2177,13 +2211,17 @@ export default function App() {
             onDuplicateProperty={duplicateProperty}
             onExportProperties={exportProperties}
             onImportProperties={importProperties}
+            userProfile={userProfile}
+            onSignIn={!userProfile ? () => { (window.top || window).location.href = SIGN_IN_URL; } : undefined}
           />
         );
 
       case 'documents':
         return (
           <DocumentsPage
-            properties={properties}
+            properties={!userProfile ? [] : properties}
+            userProfile={userProfile}
+            onSignIn={!userProfile ? () => { (window.top || window).location.href = SIGN_IN_URL; } : undefined}
             onViewProperty={(property) => {
               selectProperty(property);
               navigateToScreen('property-details');
@@ -2439,25 +2477,30 @@ export default function App() {
             managerId={resolveManagerId()}
             managerName={userProfile?.name}
             managerEmail={managerEmailValue}
+            userProfile={userProfile}
+            onSignIn={!userProfile ? () => { (window.top || window).location.href = SIGN_IN_URL; } : undefined}
           />
         );
 
       case 'contracts':
         return (
           <ContractsPage
-            tenants={tenants}
+            tenants={!userProfile ? [] : tenants}
             userProfile={userProfile}
             onBack={() => setNavigationScreen('dashboard')}
+            onSignIn={!userProfile ? () => { (window.top || window).location.href = SIGN_IN_URL; } : undefined}
           />
         );
 
       case 'clients':
         return (
           <ClientsPage
-            tenants={tenants}
-            properties={properties}
-            arrearsAlerts={arrearsAlerts}
+            tenants={!userProfile ? [] : tenants}
+            properties={!userProfile ? [] : properties}
+            arrearsAlerts={!userProfile ? [] : arrearsAlerts}
             userRole={userRole}
+            userProfile={userProfile}
+            onSignIn={!userProfile ? () => { (window.top || window).location.href = SIGN_IN_URL; } : undefined}
             onViewTenant={(tenant) => {
               selectTenant(tenant);
               navigateToScreen('tenant-details');
@@ -3181,6 +3224,16 @@ export default function App() {
           <PropertyPreview
             property={createPropertyFromSetupData()}
             isEditing={isEditing}
+            userProfile={userProfile}
+            onSignIn={!userProfile ? () => { (window.top || window).location.href = SIGN_IN_URL; } : undefined}
+            onExploreOtherFeatures={() => {
+              (window.top || window).location.href = '/landlord-onboarding';
+            }}
+            onSavePendingBeforeSignUp={
+              !userProfile
+                ? () => savePendingProperty(propertySetupData)
+                : undefined
+            }
             onBack={() => navigateToScreen('images-notes-selection')}
             onEdit={() => navigateToScreen('property-type-selection')}
             onManageDocuments={() => {}}
@@ -3341,6 +3394,8 @@ export default function App() {
             preselectedPropertyId={selectedProperty?.id}
             userProfile={userProfile}
             initialTenant={tenantToEdit}
+            onSignIn={!userProfile ? () => { (window.top || window).location.href = SIGN_IN_URL; } : undefined}
+            onExploreOtherFeatures={!userProfile ? () => { (window.top || window).location.href = '/landlord-onboarding'; } : undefined}
             onBackToSelection={() => {
               setSelectedTenant(null);
               editingTenantRef.current = null;

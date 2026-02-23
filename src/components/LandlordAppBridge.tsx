@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LandlordAppBridgeProps {
@@ -8,7 +9,9 @@ interface LandlordAppBridgeProps {
 
 const LandlordAppBridge: React.FC<LandlordAppBridgeProps> = ({ className, style }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const { search } = useLocation();
   const { isAuthenticated, user, isLoading } = useAuth();
+  const iframeSrc = `/landlord/index.html${search}`;
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -46,7 +49,7 @@ const LandlordAppBridge: React.FC<LandlordAppBridgeProps> = ({ className, style 
   return (
     <iframe
       ref={iframeRef}
-      src="/landlord/index.html"
+      src={iframeSrc}
       className={className}
       style={{
         width: '100%',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MainLayout, HomeownerNavigationScreen } from './MainLayout';
 import { Dashboard } from './Dashboard';
 import { MaintenanceManagement, MaintenanceTask } from './MaintenanceManagement';
@@ -8,12 +8,28 @@ import { CommunicationHub, HomeownerMessage } from './CommunicationHub';
 import { Projects } from './Projects';
 import { HomeValue } from './HomeValue';
 import { Settings } from './Settings';
+import { useHomeownerMaintenanceTasks } from '../../hooks/useHomeownerMaintenanceTasks';
+import { useHomeownerProjects } from '../../hooks/useHomeownerProjects';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  consumePendingMaintenanceTask,
+  consumePendingProject
+} from '../../utils/homeownerPendingForm';
+import type { HomeProject } from './Projects';
 
 interface HomeownerDashboardProps {
   onLogout?: () => void;
 }
 
 export function HomeownerDashboard({ onLogout }: HomeownerDashboardProps) {
+  const { user } = useAuth();
+  const prevUserRef = useRef<string | null>(null);
+  const { tasks: maintenanceTasks, loading: maintenanceLoading } = useHomeownerMaintenanceTasks();
+  const { projects: homeownerProjects, loading: projectsLoading } = useHomeownerProjects();
+
+  const [restoreTaskData, setRestoreTaskData] = useState<Omit<MaintenanceTask, 'id'> | null>(null);
+  const [restoreProjectData, setRestoreProjectData] = useState<Omit<HomeProject, 'id'> | null>(null);
+
   // Check for initial screen from localStorage (set by landing page buttons)
   const initialScreenRaw = localStorage.getItem('homeownerInitialScreen');
   const initialScreen = initialScreenRaw as HomeownerNavigationScreen | 'vendor-search' | null;
@@ -26,7 +42,28 @@ export function HomeownerDashboard({ onLogout }: HomeownerDashboardProps) {
         : 'dashboard'
   );
   const openVendorSearchOnMount = initialScreen === 'vendor-search';
+  const openAddTaskModalOnMount = initialScreen === 'maintenance';
+  const openProjectFormModalOnMount = initialScreen === 'projects';
   const [selectedTask, setSelectedTask] = useState<MaintenanceTask | null>(null);
+
+  // Restore pending form data after sign-in
+  useEffect(() => {
+    const hadUser = prevUserRef.current;
+    const hasUser = !!user?.id;
+    prevUserRef.current = user?.id ?? null;
+
+    if (!hadUser && hasUser) {
+      const pendingTask = consumePendingMaintenanceTask();
+      const pendingProject = consumePendingProject();
+      if (pendingTask && typeof pendingTask === 'object') {
+        setRestoreTaskData(pendingTask as Omit<MaintenanceTask, 'id'>);
+        setCurrentScreen('maintenance');
+      } else if (pendingProject && typeof pendingProject === 'object') {
+        setRestoreProjectData(pendingProject as Omit<HomeProject, 'id'>);
+        setCurrentScreen('projects');
+      }
+    }
+  }, [user?.id]);
   const [selectedDocument, setSelectedDocument] = useState<HomeDocument | null>(null);
 
   // Clear initial screen after first load
@@ -67,9 +104,9 @@ export function HomeownerDashboard({ onLogout }: HomeownerDashboardProps) {
   };
 
   const handleDeleteTask = (taskId: string) => {
-    // TODO: Confirm and delete task
-    if (confirm('Are you sure you want to delete this task?')) {
-      console.log('Delete task:', taskId);
+    // Close task details view if the deleted task was selected
+    if (selectedTask?.id === taskId) {
+      setSelectedTask(null);
     }
   };
 
@@ -113,18 +150,25 @@ export function HomeownerDashboard({ onLogout }: HomeownerDashboardProps) {
             onCreateMaintenance={handleCreateMaintenance}
             onCreateProject={handleCreateProject}
             onUploadDocument={handleUploadDocument}
+            maintenanceTasks={maintenanceTasks}
+            projects={homeownerProjects}
           />
         );
 
       case 'maintenance':
         return (
           <MaintenanceManagement
+            tasks={maintenanceTasks}
+            tasksLoading={maintenanceLoading}
             onBack={() => handleNavigate('dashboard')}
             onViewTask={handleViewTask}
             onCreateTask={handleCreateMaintenance}
             onEditTask={handleEditTask}
             onDeleteTask={handleDeleteTask}
             openVendorSearchOnMount={openVendorSearchOnMount}
+            openAddTaskModalOnMount={openAddTaskModalOnMount}
+            restoreTaskData={restoreTaskData}
+            onRestoreConsumed={() => setRestoreTaskData(null)}
           />
         );
 
@@ -149,7 +193,12 @@ export function HomeownerDashboard({ onLogout }: HomeownerDashboardProps) {
       case 'projects':
         return (
           <Projects
+            projects={homeownerProjects}
+            projectsLoading={projectsLoading}
             onBack={() => handleNavigate('dashboard')}
+            openProjectFormModalOnMount={openProjectFormModalOnMount}
+            restoreProjectData={restoreProjectData}
+            onRestoreConsumed={() => setRestoreProjectData(null)}
           />
         );
 
@@ -174,6 +223,8 @@ export function HomeownerDashboard({ onLogout }: HomeownerDashboardProps) {
             onCreateMaintenance={handleCreateMaintenance}
             onCreateProject={handleCreateProject}
             onUploadDocument={handleUploadDocument}
+            maintenanceTasks={maintenanceTasks}
+            projects={homeownerProjects}
           />
         );
     }

@@ -1,18 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Wrench,
   Plus,
   Search,
-  Filter,
   Calendar,
   AlertCircle,
-  CheckCircle2,
   Clock,
   Edit,
   Trash2,
   DollarSign,
   User,
-  FileText,
   X,
   BookOpen,
   Phone,
@@ -24,51 +22,44 @@ import { DIYGuideViewer } from './DIYGuideViewer';
 import { VendorSearch } from './VendorSearch';
 import { MaintenanceTemplate } from './data/maintenanceTemplates';
 import { diyGuides, getGuidesByCategory } from './data/diyGuides';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  homeownerMaintenanceFirestoreService,
+  type MaintenanceTask
+} from '../../services/homeownerMaintenanceFirestoreService';
+import { SignUpPromptModal } from '../onboarding/SignUpPromptModal';
+import { savePendingMaintenanceTask } from '../../utils/homeownerPendingForm';
 
-export interface MaintenanceTask {
-  id: string;
-  title: string;
-  description?: string;
-  category: 'hvac' | 'plumbing' | 'electrical' | 'appliance' | 'exterior' | 'interior' | 'other';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'pending' | 'in-progress' | 'completed' | 'cancelled';
-  dueDate: string;
-  completedDate?: string;
-  cost?: number;
-  vendor?: {
-    id: string;
-    name: string;
-    contact?: string;
-  };
-  recurring?: {
-    frequency: 'monthly' | 'quarterly' | 'yearly' | 'custom';
-    nextDue?: string;
-  };
-  attachments?: Array<{
-    id: string;
-    name: string;
-    url: string;
-    type: string;
-  }>;
-  notes?: string;
-}
+export type { MaintenanceTask };
 
 interface MaintenanceManagementProps {
+  tasks: MaintenanceTask[];
+  tasksLoading: boolean;
   onBack: () => void;
   onViewTask: (task: MaintenanceTask) => void;
   onCreateTask: () => void;
   onEditTask: (task: MaintenanceTask) => void;
   onDeleteTask: (taskId: string) => void;
   openVendorSearchOnMount?: boolean;
+  openAddTaskModalOnMount?: boolean;
+  /** Task data to restore after sign-in (from sessionStorage). */
+  restoreTaskData?: Omit<MaintenanceTask, 'id'> | null;
+  /** Called when restore data has been applied. */
+  onRestoreConsumed?: () => void;
 }
 
 export function MaintenanceManagement({
+  tasks,
+  tasksLoading,
   onBack,
   onViewTask,
   onCreateTask,
   onEditTask,
   onDeleteTask,
   openVendorSearchOnMount = false,
+  openAddTaskModalOnMount = false,
+  restoreTaskData,
+  onRestoreConsumed,
 }: MaintenanceManagementProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -84,6 +75,11 @@ export function MaintenanceManagement({
   const [isVendorSearchOpen, setIsVendorSearchOpen] = useState(false);
   const [vendorSearchCategory, setVendorSearchCategory] = useState<string>('other');
   const [showDIYGuidesGrid, setShowDIYGuidesGrid] = useState(false);
+  const [showSignUpModal, setShowSignUpModal] = useState(false);
+  const [taskDataToRestore, setTaskDataToRestore] = useState<Omit<MaintenanceTask, 'id'> | null>(null);
+
+  const { user, login } = useAuth();
+  const navigate = useNavigate();
 
   // Open vendor search when navigating from "Find a vendor" onboarding option
   useEffect(() => {
@@ -92,67 +88,27 @@ export function MaintenanceManagement({
     }
   }, [openVendorSearchOnMount]);
 
+  // Open add task modal when navigating from "Schedule maintenance" onboarding option
+  useEffect(() => {
+    if (openAddTaskModalOnMount) {
+      setEditingTask(null);
+      setIsFormModalOpen(true);
+    }
+  }, [openAddTaskModalOnMount]);
+
+  // Restore pending task data after sign-in
+  useEffect(() => {
+    if (restoreTaskData) {
+      setEditingTask(null);
+      setTaskDataToRestore(restoreTaskData);
+      setIsFormModalOpen(true);
+      onRestoreConsumed?.();
+    }
+  }, [restoreTaskData, onRestoreConsumed]);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
-
-  // Mock data - will be replaced with Firebase data
-  const [tasks, setTasks] = useState<MaintenanceTask[]>([
-    {
-      id: '1',
-      title: 'HVAC Annual Service',
-      description: 'Schedule annual maintenance for heating and cooling system',
-      category: 'hvac',
-      priority: 'high',
-      status: 'pending',
-      dueDate: '2024-12-15',
-      cost: 150,
-      vendor: {
-        id: 'v1',
-        name: 'ABC Heating & Cooling',
-        contact: '555-0101',
-      },
-      recurring: {
-        frequency: 'yearly',
-        nextDue: '2025-12-15',
-      },
-    },
-    {
-      id: '2',
-      title: 'Gutter Cleaning',
-      description: 'Clean gutters and downspouts before winter',
-      category: 'exterior',
-      priority: 'medium',
-      status: 'pending',
-      dueDate: '2024-12-20',
-      cost: 75,
-    },
-    {
-      id: '3',
-      title: 'Smoke Detector Check',
-      description: 'Test all smoke detectors and replace batteries',
-      category: 'electrical',
-      priority: 'high',
-      status: 'completed',
-      dueDate: '2024-12-10',
-      completedDate: '2024-12-10',
-      cost: 25,
-    },
-    {
-      id: '4',
-      title: 'Water Leak Repair',
-      description: 'Fix leaky faucet in master bathroom',
-      category: 'plumbing',
-      priority: 'urgent',
-      status: 'in-progress',
-      dueDate: '2024-12-12',
-      vendor: {
-        id: 'v2',
-        name: 'Quick Fix Plumbing',
-        contact: '555-0202',
-      },
-    },
-  ]);
 
   const filteredTasks = tasks.filter(task => {
     const matchesSearch =
@@ -371,7 +327,12 @@ export function MaintenanceManagement({
 
       {/* Tasks Table / DIY Guides Grid */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {showDIYGuidesGrid ? (
+        {tasksLoading ? (
+          <div className="p-12 text-center">
+            <div className="w-10 h-10 border-2 border-[#DC5F12] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Loading maintenance tasks...</p>
+          </div>
+        ) : showDIYGuidesGrid ? (
           <div className="p-6">
             <div className="mb-4">
               <h2 className="text-xl font-bold text-[#374957]">
@@ -577,8 +538,16 @@ export function MaintenanceManagement({
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => {
-                              onDeleteTask(task.id);
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!confirm('Are you sure you want to delete this task?')) return;
+                              try {
+                                await homeownerMaintenanceFirestoreService.deleteTask(task.id);
+                                onDeleteTask(task.id);
+                              } catch (err) {
+                                console.error('Failed to delete task:', err);
+                                alert('Failed to delete task. Please try again.');
+                              }
                             }}
                             className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600 hover:text-red-700"
                             aria-label="Delete task"
@@ -642,29 +611,67 @@ export function MaintenanceManagement({
         onClose={() => {
           setIsFormModalOpen(false);
           setEditingTask(null);
+          setTaskDataToRestore(null);
         }}
-        onSubmit={(taskData) => {
+        onSubmit={async (taskData) => {
+          if (!user?.id) {
+            savePendingMaintenanceTask(taskData as Record<string, unknown>);
+            setShowSignUpModal(true);
+            throw new Error('User not authenticated');
+          }
           if (editingTask) {
+            await homeownerMaintenanceFirestoreService.updateTask(
+              editingTask.id,
+              taskData
+            );
             onEditTask({ ...editingTask, ...taskData } as MaintenanceTask);
           } else {
+            await homeownerMaintenanceFirestoreService.createTask(
+              user.id,
+              taskData
+            );
             onCreateTask();
-            // TODO: Create task with taskData
-            console.log('Create task:', taskData);
           }
+          setIsFormModalOpen(false);
+          setEditingTask(null);
+          setTaskDataToRestore(null);
         }}
-        initialTask={editingTask}
+        initialTask={taskDataToRestore ? { ...taskDataToRestore, id: '' } : editingTask}
       />
 
       {/* Maintenance Templates Browser */}
       <MaintenanceTemplatesBrowser
         isOpen={isTemplatesBrowserOpen}
         onClose={() => setIsTemplatesBrowserOpen(false)}
-        onSelectTemplate={(template: MaintenanceTemplate) => {
-          // Convert template to task format
+        onSelectTemplate={async (template: MaintenanceTemplate) => {
+          if (!user?.id) {
+            const today = new Date();
+            const dueDate = new Date(today);
+            if (template.frequency === 'monthly') dueDate.setMonth(dueDate.getMonth() + 1);
+            else if (template.frequency === 'quarterly') dueDate.setMonth(dueDate.getMonth() + 3);
+            else if (template.frequency === 'biannual') dueDate.setMonth(dueDate.getMonth() + 6);
+            else if (template.frequency === 'yearly') dueDate.setFullYear(dueDate.getFullYear() + 1);
+            else dueDate.setMonth(dueDate.getMonth() + 1);
+            const taskData: Omit<MaintenanceTask, 'id'> = {
+              title: template.title,
+              description: template.description,
+              category: template.category,
+              priority: template.priority,
+              status: 'pending',
+              dueDate: dueDate.toISOString().split('T')[0],
+              cost: template.estimatedCost.min,
+              recurring: template.frequency !== 'once' ? {
+                frequency: template.frequency === 'biannual' ? 'custom' : template.frequency as 'monthly' | 'quarterly' | 'yearly',
+                nextDue: dueDate.toISOString().split('T')[0]
+              } : undefined
+            };
+            savePendingMaintenanceTask(taskData as Record<string, unknown>);
+            setShowSignUpModal(true);
+            throw new Error('User not authenticated');
+          }
           const today = new Date();
           const dueDate = new Date(today);
 
-          // Calculate due date based on frequency
           if (template.frequency === 'monthly') {
             dueDate.setMonth(dueDate.getMonth() + 1);
           } else if (template.frequency === 'quarterly') {
@@ -677,9 +684,7 @@ export function MaintenanceManagement({
             dueDate.setMonth(dueDate.getMonth() + 1);
           }
 
-          // Create new task from template
-          const newTask: MaintenanceTask = {
-            id: `task-${Date.now()}`, // Generate unique ID
+          const taskData: Omit<MaintenanceTask, 'id'> = {
             title: template.title,
             description: template.description,
             category: template.category,
@@ -693,14 +698,13 @@ export function MaintenanceManagement({
             } : undefined
           };
 
-          // Add task to the list
-          setTasks(prevTasks => [...prevTasks, newTask]);
-
-          // Close the template browser
-          setIsTemplatesBrowserOpen(false);
-
-          // Show success message (optional)
-          console.log('Task created from template:', newTask);
+          try {
+            await homeownerMaintenanceFirestoreService.createTask(user.id, taskData);
+            setIsTemplatesBrowserOpen(false);
+          } catch (err) {
+            console.error('Failed to create task from template:', err);
+            alert('Failed to add task. Please try again.');
+          }
         }}
       />
 
@@ -725,6 +729,21 @@ export function MaintenanceManagement({
         isOpen={isVendorSearchOpen}
         onClose={() => setIsVendorSearchOpen(false)}
         category={vendorSearchCategory}
+      />
+
+      {/* Sign-up prompt when guest tries to save maintenance task */}
+      <SignUpPromptModal
+        isOpen={showSignUpModal}
+        onClose={() => setShowSignUpModal(false)}
+        title="Sign in to save your maintenance task"
+        reassurance="Create an account or sign in to save tasks and manage your home maintenance. Your progress won't be lost."
+        onSignUpEmail={login}
+        onSignUpSocial={login}
+        showExploreFeaturesAsSecondary
+        onExploreFeatures={() => {
+          setShowSignUpModal(false);
+          navigate('/homeowner-onboarding');
+        }}
       />
     </div>
   );

@@ -8,10 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Alert, AlertDescription } from './ui/alert';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { Property, PropertyDocument } from '../App';
+import { Property, PropertyDocument, UserProfile } from '../App';
+import { LandlordEmptyState } from './LandlordEmptyState';
 
 interface DocumentsPageProps {
   properties: Property[];
+  userProfile?: UserProfile | null;
+  onSignIn?: () => void;
   onViewProperty: (property: Property) => void;
   onManageDocuments: (property: Property) => void;
   onDeleteDocuments?: (documentIds: string[]) => void;
@@ -24,7 +27,7 @@ interface DocumentWithProperty extends PropertyDocument {
   propertyId: string;
 }
 
-export function DocumentsPage({ properties, onViewProperty, onManageDocuments, onDeleteDocuments, onArchiveDocuments, onExportDocuments }: DocumentsPageProps) {
+export function DocumentsPage({ properties, userProfile, onSignIn, onViewProperty, onManageDocuments, onDeleteDocuments, onArchiveDocuments, onExportDocuments }: DocumentsPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -278,6 +281,12 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
         </Alert>
       )}
 
+      {!userProfile && onSignIn ? (
+        <Card className="p-12">
+          <LandlordEmptyState onSignIn={onSignIn} />
+        </Card>
+      ) : (
+      <>
       {/* Filters and Search */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
         <div className="relative flex-1">
@@ -520,6 +529,8 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
           )}
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 }

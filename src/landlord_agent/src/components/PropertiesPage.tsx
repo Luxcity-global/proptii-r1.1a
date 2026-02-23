@@ -7,7 +7,8 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Property, Tenant, ArrearsAlert } from '../App';
+import { Property, Tenant, ArrearsAlert, UserProfile } from '../App';
+import { LandlordEmptyState } from './LandlordEmptyState';
 
 interface PropertiesPageProps {
   properties: Property[];
@@ -24,6 +25,8 @@ interface PropertiesPageProps {
   onDuplicateProperty?: (property: Property) => void;
   onExportProperties?: (properties: Property[], format: string) => void;
   onImportProperties?: (properties: Property[]) => void;
+  userProfile?: UserProfile | null;
+  onSignIn?: () => void;
 }
 
 export function PropertiesPage({
@@ -41,6 +44,8 @@ export function PropertiesPage({
   onDuplicateProperty,
   onExportProperties,
   onImportProperties: handleImportProperties,
+  userProfile,
+  onSignIn,
 }: PropertiesPageProps) {
   // Feature flag: keep Import hidden until we're ready to ship it.
   const ENABLE_IMPORT_PROPERTIES = true;
@@ -706,7 +711,13 @@ export function PropertiesPage({
       </div>
 
       {/* Properties Grid */}
-      {filteredProperties.length === 0 ? (
+      {!userProfile && onSignIn ? (
+        <Card>
+          <CardContent className="p-0">
+            <LandlordEmptyState onSignIn={onSignIn} />
+          </CardContent>
+        </Card>
+      ) : filteredProperties.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Building2 className="h-12 w-12 text-muted-foreground mb-4" />

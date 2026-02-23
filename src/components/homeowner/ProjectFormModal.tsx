@@ -5,7 +5,7 @@ import { HomeProject } from './Projects';
 interface ProjectFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (project: Omit<HomeProject, 'id'>) => void;
+  onSubmit: (project: Omit<HomeProject, 'id'>) => void | Promise<void>;
   initialProject?: HomeProject | null;
 }
 
@@ -15,6 +15,7 @@ export function ProjectFormModal({
   onSubmit,
   initialProject,
 }: ProjectFormModalProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -58,7 +59,7 @@ export function ProjectFormModal({
     }
   }, [initialProject, isOpen]);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     const project: Omit<HomeProject, 'id'> = {
@@ -69,7 +70,7 @@ export function ProjectFormModal({
       priority: formData.priority,
       targetDate: formData.targetDate || undefined,
       budget: formData.budget ? parseFloat(formData.budget) : undefined,
-      progress: formData.status === 'completed' ? 100 : formData.status === 'planning' ? 0 : 15,
+      progress: formData.status === 'completed' ? 100 : formData.status === 'planning' ? 0 : (initialProject?.progress ?? 15),
       contractor: formData.contractorName
         ? {
             id: '',
@@ -80,8 +81,13 @@ export function ProjectFormModal({
       notes: formData.notes || undefined,
     };
 
-    onSubmit(project);
-    onClose();
+    setIsSubmitting(true);
+    try {
+      await Promise.resolve(onSubmit(project));
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -271,9 +277,10 @@ export function ProjectFormModal({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-[#DC5F12] hover:bg-[#c54f0f] text-white rounded-lg font-medium transition-colors"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-[#DC5F12] hover:bg-[#c54f0f] disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
             >
-              {initialProject ? 'Update Project' : 'Create Project'}
+              {isSubmitting ? 'Saving...' : (initialProject ? 'Update Project' : 'Create Project')}
             </button>
           </div>
         </form>

@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { SendContractModal } from './SendContractModal';
+import { LandlordEmptyState } from './LandlordEmptyState';
 import { contractService } from '../services/contractService';
 import { Checkbox } from './ui/checkbox';
 import { Input } from './ui/input';
@@ -53,10 +54,12 @@ export interface Contract {
 
 interface ContractsPageProps {
   tenants?: Array<{ id: string; name: string; email: string; propertyId?: string }>;
+  userProfile?: { name?: string; email?: string } | null;
   onBack?: () => void;
+  onSignIn?: () => void;
 }
 
-export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
+export function ContractsPage({ tenants = [], userProfile, onBack, onSignIn }: ContractsPageProps) {
   const [activeTab, setActiveTab] = useState<'sent' | 'unsigned' | 'signed'>('sent');
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -117,6 +120,16 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
   useEffect(() => {
     loadContracts();
   }, [activeTab, landlordEmail, userId]);
+
+  // Open Send Contract modal when arriving via deep link (e.g. from home/onboarding)
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('contracts_openSendModal') === '1') {
+        sessionStorage.removeItem('contracts_openSendModal');
+        setIsSendModalOpen(true);
+      }
+    } catch (_) {}
+  }, []);
 
   const loadContracts = async () => {
     try {
@@ -976,6 +989,12 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
           </Card>
         </div>
 
+        {!userProfile && onSignIn ? (
+          <Card className="p-12">
+            <LandlordEmptyState onSignIn={onSignIn} />
+          </Card>
+        ) : (
+        <>
         {/* Alerts Section */}
         {alerts.length > 0 && (
           <div className="mb-8">
@@ -1163,6 +1182,8 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
             )}
           </TabsContent>
         </Tabs>
+        </>
+        )}
       </div>
 
       {/* Send Contract Modal */}

@@ -43,6 +43,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { LandlordEmptyState } from "./LandlordEmptyState";
 import {
   PieChart,
   Pie,
@@ -72,6 +73,7 @@ interface DashboardProps {
   marketInsights: MarketInsight[];
   vacancyAlerts?: any[];
   arrearsAlerts?: any[];
+  onSignIn?: () => void;
 }
 
 export function Dashboard({
@@ -88,6 +90,7 @@ export function Dashboard({
   marketInsights,
   vacancyAlerts = [],
   arrearsAlerts = [],
+  onSignIn,
 }: DashboardProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -165,9 +168,9 @@ export function Dashboard({
 
   const totalPriorityAlerts = combinedAlerts.length;
 
-  // Mock data for demonstration
+  // Mock data for demonstration (disabled for guests - show 0s instead)
   const mockProperties: Property[] =
-    properties.length === 0
+    properties.length === 0 && !onSignIn
       ? [
           {
             id: "1",
@@ -541,7 +544,7 @@ export function Dashboard({
             {/* Left Column - Welcome Message */}
             <div className="flex items-center">
               <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium text-lg mr-3">
-                {(userProfile?.name || "Tosin Lanipekun").charAt(0).toUpperCase()}
+                {(userProfile?.name || "Guest").charAt(0).toUpperCase()}
               </div>
               <div>
                 <h1 
@@ -551,7 +554,7 @@ export function Dashboard({
                     fontFamily: 'Archivo, sans-serif'
                   }}
                 >
-                  Welcome <span style={{ color: '#136C9E' }}>{userProfile?.name || "Tosin Lanipekun"}</span>
+                  Welcome <span style={{ color: '#136C9E' }}>{userProfile?.name || "Guest"}</span>
               </h1>
                 <p 
                   className="text-sm"
@@ -584,7 +587,7 @@ export function Dashboard({
               >
                 <Mail className="w-4 h-4 flex-shrink-0" style={{ color: '#374957' }} />
                 <span className="text-sm" style={{ color: '#374957' }}>
-                  {userProfile?.email || 'TosinLanipekun@Luxcity.omnimicrosoft'}
+                  {userProfile?.email || ''}
                 </span>
               </div>
             </div>
@@ -1122,7 +1125,11 @@ export function Dashboard({
         </Card>
 
         {/* Properties Grid */}
-        {displayProperties.length === 0 ? (
+        {!userProfile && onSignIn ? (
+          <Card className="p-12">
+            <LandlordEmptyState onSignIn={onSignIn} />
+          </Card>
+        ) : displayProperties.length === 0 ? (
           <Card className="p-12 text-center">
             <Building2 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="mb-2" style={{ color: '#374957' }}>No properties found</h3>

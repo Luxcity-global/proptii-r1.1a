@@ -2,11 +2,13 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home, UserPlus, FileSignature } from 'lucide-react';
 import { TextAnimate } from '../components/magic-ui/text-animate';
+import { useAuth } from '../contexts/AuthContext';
 
 const textStyle = { fontFamily: 'Archivo, sans-serif', color: '#374957' };
 
 const LandlordOnboardingOptions: React.FC = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
   const handleAddProperty = () => {
     if (typeof window !== 'undefined') {
@@ -16,9 +18,13 @@ const LandlordOnboardingOptions: React.FC = () => {
   };
 
   const handleAddTenant = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('startScreen', 'add-tenant');
-      window.location.href = '/landlord/index.html?start=add-tenant';
+    if (isAuthenticated) {
+      navigate('/landlord?start=tenant-selection');
+    } else {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('startScreen', 'tenant-selection');
+        window.location.href = '/landlord/index.html?start=tenant-selection';
+      }
     }
   };
 
@@ -99,7 +105,17 @@ const LandlordOnboardingOptions: React.FC = () => {
             {/* Option 3: Send Contract */}
             <button
               type="button"
-              onClick={() => navigate('/contracts?contractsDemo=1')}
+              onClick={() => {
+                if (isAuthenticated) {
+                  navigate('/landlord?nav=contracts&openSendModal=1');
+                } else {
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('startScreen', 'contracts');
+                    localStorage.setItem('openSendModal', '1');
+                    window.location.href = '/landlord/index.html?nav=contracts&openSendModal=1';
+                  }
+                }
+              }}
               className="group flex flex-col items-start gap-3 w-full px-5 py-5 rounded-3xl border-2 border-[#A3CEF7] bg-white/95 backdrop-blur-sm text-left shadow-[0_1px_3px_0_rgba(0,0,0,0.06)] transition-all duration-200 ease-out hover:border-[#136C9E] hover:bg-[#136C9E] hover:text-white hover:shadow-[0_8px_24px_-6px_rgba(0,0,0,0.35)] hover:-translate-y-0.5 active:scale-[0.99]"
               style={{ fontFamily: 'Archivo, sans-serif', color: 'inherit' }}
             >
