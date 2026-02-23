@@ -8,6 +8,8 @@ import { SignedContractsProvider } from './contexts/SignedContractsContext';
 import { OnboardingSessionProvider } from './contexts/OnboardingSessionContext';
 import Home from './pages/Home';
 import TenantOnboardingOptions from './pages/TenantOnboardingOptions';
+import LandlordOnboardingOptions from './pages/LandlordOnboardingOptions';
+import HomeownerOnboardingOptions from './pages/HomeownerOnboardingOptions';
 import { LoginPage } from './pages/Login';
 import { RegisterPage } from './pages/Register';
 import { NotFoundPage } from './pages/NotFound';
@@ -59,6 +61,8 @@ export const App: React.FC = () => {
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/tenant-onboarding" element={<TenantOnboardingOptions />} />
+            <Route path="/landlord-onboarding" element={<LandlordOnboardingOptions />} />
+            <Route path="/homeowner-onboarding" element={<HomeownerOnboardingOptions />} />
             <Route path="/search" element={<SearchResults />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />

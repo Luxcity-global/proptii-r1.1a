@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import ContractModal from '../components/contract/ContractModal';
+import { DemoGuideBubble } from '../components/onboarding/DemoGuideBubble';
 import { InteractiveHoverButton } from '../components/magic-ui/interactive-hover-button';
 import { AnimatedList } from '../components/magic-ui/animated-list';
 import { TextAnimate } from '../components/magic-ui/text-animate';
@@ -22,8 +24,10 @@ const preloadHeroImage = () => {
 };
 
 const ContractsPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isAuthenticated, login } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const showContractsGetStartedGuide = searchParams.get('contractsDemo') === '1';
 
   // Preload hero image when component mounts
   useEffect(() => {
@@ -85,12 +89,26 @@ const ContractsPage = () => {
             Fast digital signing, safe storage, and effortless sharing.
           </TextAnimate>
 
-          <InteractiveHoverButton
-            onClick={handleGetStarted}
-            className="bg-primary text-white border-primary hover:bg-opacity-90 text-xl font-medium"
-          >
-            {isAuthenticated ? 'Start Contracts' : 'Get Started'}
-          </InteractiveHoverButton>
+          <div className="relative inline-block">
+            <InteractiveHoverButton
+              onClick={handleGetStarted}
+              className="bg-primary text-white border-primary hover:bg-opacity-90 text-xl font-medium"
+              data-demo-contracts-get-started
+            >
+              {isAuthenticated ? 'Start Contracts' : 'Get Started'}
+            </InteractiveHoverButton>
+          </div>
+          {showContractsGetStartedGuide && (
+            <DemoGuideBubble
+              message="Click here to get started"
+              targetSelector="[data-demo-contracts-get-started]"
+              highlightTarget
+              onDismiss={() => setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete('contractsDemo'); return n; })}
+              avatarSrc="/images/Scout%20ava.png"
+              offsetY={-32}
+              hidden={isModalOpen}
+            />
+          )}
         </div>
       </section>
 

@@ -38,9 +38,9 @@ const USER_GROUP_OPTIONS: { id: OnboardingUserGroup; label: string; icon: React.
 
 const DEMO_URL_BY_GROUP: Record<OnboardingUserGroup, string> = {
   tenant: '/tenant-onboarding',
-  landlord: '/landlord-demo',
-  agent: '/landlord-demo',
-  homeowner: '/homeowner'
+  landlord: '/landlord-onboarding',
+  agent: '/landlord-onboarding',
+  homeowner: '/homeowner-onboarding'
 };
 
 const MAX_HOW_USE_SELECTIONS = 3;

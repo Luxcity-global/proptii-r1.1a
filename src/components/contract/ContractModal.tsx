@@ -612,11 +612,15 @@ const findCustomizedTemplate = () => {
   const CONTRACT_GUIDE_STEPS = [
     {
       message: 'Click here to upload a contract you’d like to sign.',
-      targetSelector: '[data-demo-contract-upload]'
+      targetSelector: '[data-demo-contract-upload]',
+      placement: 'above' as const
     },
     {
       message: 'Once uploaded, use Manage to customise or prepare it for signing.',
-      targetSelector: '[data-demo-contract-manage-first]'
+      targetSelector: '[data-demo-contract-manage-first]',
+      placement: 'right' as const,
+      avatarSide: 'right' as const,
+      offsetX: 24
     }
   ] as const;
 
@@ -1113,13 +1117,16 @@ const findCustomizedTemplate = () => {
       </div>
         )}  
 
-      {/* Contract onboarding guide: upload → manage */}
+      {/* Contract onboarding guide: upload → manage (hidden when CustomizePage is shown) */}
       <DemoGuideBubble
         message={CONTRACT_GUIDE_STEPS[contractGuideStepIndex]?.message}
         targetSelector={CONTRACT_GUIDE_STEPS[contractGuideStepIndex]?.targetSelector}
         highlightTarget
-        placement="above"
-        hidden={false}
+        placement={CONTRACT_GUIDE_STEPS[contractGuideStepIndex]?.placement ?? 'above'}
+        avatarSrc="/images/Scout%20ava.png"
+        avatarSide={CONTRACT_GUIDE_STEPS[contractGuideStepIndex]?.avatarSide}
+        offsetX={CONTRACT_GUIDE_STEPS[contractGuideStepIndex]?.offsetX}
+        hidden={customizeMode}
         onNext={() => {
           setContractGuideStepIndex((prev) => {
             if (prev === 0) {

@@ -65,7 +65,7 @@ const TenantOnboardingOptions: React.FC = () => {
           {/* Option 2: Sign a contract */}
           <button
             type="button"
-            onClick={() => navigate('/contracts')}
+            onClick={() => navigate('/contracts?contractsDemo=1')}
             className="group flex flex-col items-start gap-3 w-full px-5 py-5 rounded-3xl border-2 border-[#A3CEF7] bg-white/95 backdrop-blur-sm text-left shadow-[0_1px_3px_0_rgba(0,0,0,0.06)] transition-all duration-200 ease-out hover:border-[#136C9E] hover:bg-[#136C9E] hover:text-white hover:shadow-[0_8px_24px_-6px_rgba(0,0,0,0.35)] hover:-translate-y-0.5 active:scale-[0.99]"
             style={{ fontFamily: 'Archivo, sans-serif', color: 'inherit' }}
           >

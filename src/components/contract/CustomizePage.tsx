@@ -6,6 +6,8 @@ pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 import DocumentSigningViewer from './DocumentSigningViewer';
 import SendContract from './SendContract';
 import { DemoGuideBubble } from '../onboarding/DemoGuideBubble';
+import { SignUpPromptModal } from '../onboarding/SignUpPromptModal';
+import { useOnboardingSession } from '../../contexts/OnboardingSessionContext';
 
 interface CustomizePageProps {
   templateId: string;
@@ -22,7 +24,9 @@ interface CustomizePageProps {
 }
 
 const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onBack }) => {
+  const { isDemoMode } = useOnboardingSession();
   const [activeTab, setActiveTab] = useState<'home' | 'edit' | 'send'>('home');
+  const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // PDF Preview states
@@ -203,16 +207,37 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
     alert(`Document exported as ${format.toUpperCase()}`);
   };
 
-  const CUSTOMIZE_GUIDE_STEPS = [
+  const CUSTOMIZE_GUIDE_STEPS: Array<{
+    message: string;
+    targetSelector: string;
+    placement?: 'above' | 'below' | 'left' | 'right';
+  }> = [
     {
       message: 'Click Edit to start signing this document.',
-      targetSelector: '[data-demo-customize-edit-tab]'
+      targetSelector: '[data-demo-customize-edit-tab]',
+      placement: 'below'
     },
     {
       message: 'Use Draw, Type or Upload to add your signature in the way that suits you.',
-      targetSelector: '[data-demo-customize-sign-tools]'
+      targetSelector: '[data-demo-customize-sign-tools]',
+      placement: 'above'
+    },
+    {
+      message: "Choose how you'd like to sign. Draw your signature with your mouse or finger, type it out, or upload an image of your signature. Once you're happy with it, click Use Signature to add it to your file.",
+      targetSelector: '[data-demo-customize-sign-document]',
+      placement: 'right'
+    },
+    {
+      message: "Click on the document where you want to place your signature. Then click the Sign Document button to finalize.\n\n💡 The signature will be placed exactly where you click",
+      targetSelector: '[data-demo-no-highlight]',
+      placement: 'right'
+    },
+    {
+      message: 'Click here to send your signed contract to recipients.',
+      targetSelector: '[data-demo-customize-send-tab]',
+      placement: 'right'
     }
-  ] as const;
+  ];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
@@ -275,13 +300,21 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
               ].map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as 'home' | 'edit' | 'send')}
+                  onClick={() => {
+                  setActiveTab(tab.id as 'home' | 'edit' | 'send');
+                  if (tab.id === 'edit' && customizeGuideStepIndex === 0) {
+                    setCustomizeGuideStepIndex(1);
+                  }
+                  if (tab.id === 'send') {
+                    setCustomizeGuideStepIndex(CUSTOMIZE_GUIDE_STEPS.length);
+                  }
+                }}
                   className={`py-2 px-8 font-medium text-sm border-b-2 transition-all ${
                     activeTab === tab.id
                       ? 'border-orange-500 text-orange-500'
                       : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
-                  {...(tab.id === 'edit' ? { 'data-demo-customize-edit-tab': true } : {})}
+                  {...(tab.id === 'edit' ? { 'data-demo-customize-edit-tab': true } : tab.id === 'send' ? { 'data-demo-customize-send-tab': true } : {})}
                 >
                   {tab.label}
                 </button>
@@ -411,8 +444,21 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
                     email: 'user@example.com',
                     name: 'Document Signer'
                   }}
+                  onSignatureMethodSelect={
+                    customizeGuideStepIndex === 1
+                      ? () => setCustomizeGuideStepIndex(2)
+                      : undefined
+                  }
+                  onUseSignature={
+                    customizeGuideStepIndex === 2
+                      ? () => setCustomizeGuideStepIndex(3)
+                      : undefined
+                  }
                   onSigned={(signedBytes) => {
                     setSignedPdfBytes(signedBytes);
+                    if (customizeGuideStepIndex === 3) {
+                      setCustomizeGuideStepIndex(4);
+                    }
                   }}
                   onSave={(signedBytes) => {
                     handleDocumentSave('signed_document');
@@ -438,6 +484,8 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
                     }
                   }}
                   signedPdfBytes={signedPdfBytes}
+                  interceptWithSignUp={isDemoMode}
+                  onInterceptSignUp={() => setShowSignUpModal(true)}
                   onSend={(recipients, signature) => {
                     console.log('Sending contract to:', recipients);
                     console.log('With signature:', signature?.name);
@@ -449,17 +497,52 @@ const CustomizePage: React.FC<CustomizePageProps> = ({ templateId, template, onB
 
             {/* Customize/signing guide */}
             <DemoGuideBubble
+              hidden={customizeGuideStepIndex >= CUSTOMIZE_GUIDE_STEPS.length}
               message={CUSTOMIZE_GUIDE_STEPS[customizeGuideStepIndex]?.message}
               targetSelector={CUSTOMIZE_GUIDE_STEPS[customizeGuideStepIndex]?.targetSelector}
               highlightTarget
-              placement={customizeGuideStepIndex === 0 ? 'below' : 'above'}
-              hidden={false}
+              placement={CUSTOMIZE_GUIDE_STEPS[customizeGuideStepIndex]?.placement ?? 'above'}
+              fixedPosition={customizeGuideStepIndex === 0 ? 'top-left' : undefined}
+              fallbackPosition={
+                customizeGuideStepIndex === 1 ? { top: 200, left: 400 }
+                : customizeGuideStepIndex === 2 ? { top: 240, left: 400 }
+                : customizeGuideStepIndex === 3 ? { top: 280, left: 1100 }
+                : customizeGuideStepIndex === 4 ? undefined
+                : undefined
+              }
+              avatarSrc="/images/Scout%20ava.png"
+              avatarSide="top"
+              arrowSide={
+                customizeGuideStepIndex === 2 || customizeGuideStepIndex === 3 ? 'left'
+                : customizeGuideStepIndex === 4 ? 'right'
+                : 'right'
+              }
+              offsetX={
+                customizeGuideStepIndex === 0 ? -280
+                : customizeGuideStepIndex === 2 || customizeGuideStepIndex === 3 ? 280
+                : customizeGuideStepIndex === 4 ? -40
+                : -280
+              }
+              offsetY={
+                customizeGuideStepIndex === 0 ? 480
+                : customizeGuideStepIndex === 2 || customizeGuideStepIndex === 3 ? 0
+                : customizeGuideStepIndex === 4 ? 120
+                : 80
+              }
               onNext={() => {
-                setCustomizeGuideStepIndex((prev) => (prev === 0 ? 1 : prev));
+                setCustomizeGuideStepIndex((prev) =>
+                  prev < CUSTOMIZE_GUIDE_STEPS.length - 1 ? prev + 1 : prev
+                );
               }}
               onDismiss={() => {
-                setCustomizeGuideStepIndex(1);
+                setCustomizeGuideStepIndex(CUSTOMIZE_GUIDE_STEPS.length);
               }}
+            />
+            <SignUpPromptModal
+              isOpen={showSignUpModal}
+              onClose={() => setShowSignUpModal(false)}
+              title="Sign up to send your contract"
+              reassurance="Create a free account to send contracts to your tenants and manage everything in one place."
             />
           </div>
         </div>

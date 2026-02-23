@@ -25,6 +25,8 @@ interface DocumentSigningViewerProps {
   onSigned?: (signedPdfBytes: Uint8Array) => void;
   onSave?: (signedPdfBytes: Uint8Array) => void;
   onExport?: (format: 'docx' | 'pdf') => void;
+  onSignatureMethodSelect?: () => void;
+  onUseSignature?: () => void;
 }
 
 interface SignaturePlacement {
@@ -42,7 +44,9 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
   recipient = { email: 'user@example.com', name: 'Document Signer' },
   onSigned,
   onSave,
-  onExport
+  onExport,
+  onSignatureMethodSelect,
+  onUseSignature
 }) => {
   // Debug: Check if context is available
   console.log('🔍 DocumentSigningViewer - Component rendering, checking context...');
@@ -643,7 +647,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
             data-demo-customize-sign-tools
           >
             <button
-              onClick={() => { setSignatureMethod('draw'); handleCreateSignature(); }}
+              onClick={() => { setSignatureMethod('draw'); handleCreateSignature(); onSignatureMethodSelect?.(); }}
               className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
                 signatureMethod === 'draw' 
                   ? 'text-white shadow-sm' 
@@ -655,7 +659,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
               Draw
             </button>
             <button
-              onClick={() => { setSignatureMethod('type'); handleCreateSignature(); }}
+              onClick={() => { setSignatureMethod('type'); handleCreateSignature(); onSignatureMethodSelect?.(); }}
               className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
                 signatureMethod === 'type' 
                   ? 'text-white shadow-sm' 
@@ -667,7 +671,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
               Type
             </button>
             <button
-              onClick={() => { setSignatureMethod('upload'); handleCreateSignature(); }}
+              onClick={() => { setSignatureMethod('upload'); handleCreateSignature(); onSignatureMethodSelect?.(); }}
               className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${
                 signatureMethod === 'upload' 
                   ? 'text-white shadow-sm' 
@@ -682,6 +686,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
 
           {/* Sign Document Button */}
           <button
+            data-demo-customize-sign-document
             onClick={signDocument}
             disabled={isSigning || signaturePlacements.length === 0}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
@@ -725,6 +730,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
           {/* PDF Canvas Container */}
           <div 
             ref={containerRef}
+            data-demo-customize-document-canvas
             className="relative border-2 border-gray-300 rounded-lg overflow-auto bg-gray-100 max-h-[70vh]"
           >
             <canvas 
@@ -1002,6 +1008,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
                   if (getCurrentSignature()) {
                     setShowSignaturePad(false);
                     setIsPlacingSignature(true);
+                    onUseSignature?.();
                     console.log('🖊️ Ready to place signature on document');
                   }
                 }}

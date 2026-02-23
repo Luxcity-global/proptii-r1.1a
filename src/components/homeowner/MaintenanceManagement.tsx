@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Wrench,
   Plus,
@@ -59,6 +59,7 @@ interface MaintenanceManagementProps {
   onCreateTask: () => void;
   onEditTask: (task: MaintenanceTask) => void;
   onDeleteTask: (taskId: string) => void;
+  openVendorSearchOnMount?: boolean;
 }
 
 export function MaintenanceManagement({
@@ -67,6 +68,7 @@ export function MaintenanceManagement({
   onCreateTask,
   onEditTask,
   onDeleteTask,
+  openVendorSearchOnMount = false,
 }: MaintenanceManagementProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -82,6 +84,13 @@ export function MaintenanceManagement({
   const [isVendorSearchOpen, setIsVendorSearchOpen] = useState(false);
   const [vendorSearchCategory, setVendorSearchCategory] = useState<string>('other');
   const [showDIYGuidesGrid, setShowDIYGuidesGrid] = useState(false);
+
+  // Open vendor search when navigating from "Find a vendor" onboarding option
+  useEffect(() => {
+    if (openVendorSearchOnMount) {
+      setIsVendorSearchOpen(true);
+    }
+  }, [openVendorSearchOnMount]);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);

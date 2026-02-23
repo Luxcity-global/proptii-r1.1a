@@ -556,13 +556,16 @@ export default function App() {
       // Prefer query param if present
       const params = new URLSearchParams(window.location.search);
       const qpStart = params.get('start');
-      if (qpStart === 'property-setup-step1' || qpStart === 'company-profile-setup') {
+      if (qpStart === 'property-setup-step1' || qpStart === 'company-profile-setup' || qpStart === 'add-tenant') {
         setCurrentScreen(qpStart as Screen);
         return;
       }
       const startScreen = localStorage.getItem('startScreen');
       if (startScreen === 'property-setup-step1') {
         setCurrentScreen('property-setup-step1');
+        localStorage.removeItem('startScreen');
+      } else if (startScreen === 'add-tenant') {
+        setCurrentScreen('add-tenant');
         localStorage.removeItem('startScreen');
       } else if (startScreen === 'company-profile-setup') {
         setCurrentScreen('company-profile-setup');

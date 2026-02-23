@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface DemoGuideBubbleProps {
   /** Message shown in the bubble (e.g. "Click here to save property"). */
@@ -13,20 +14,24 @@ export interface DemoGuideBubbleProps {
   onNext?: () => void;
   /** If true, the bubble is not shown. */
   hidden?: boolean;
-  /** Optional: where to place the bubble relative to the target. Defaults to 'above'. */
-  placement?: 'above' | 'below';
+  /** Optional: where to place the bubble relative to the target. Defaults to 'above'. Use 'left' or 'right' to place beside the target. */
+  placement?: 'above' | 'below' | 'left' | 'right';
   /** Optional: avatar image URL (e.g. Scout character). */
   avatarSrc?: string;
   /** Optional: horizontal alignment relative to target. 'left' = bubble to the left of target; 'center' = above/below centered. */
   align?: 'left' | 'center';
-  /** Optional: which side the avatar is on. Default 'left'. */
-  avatarSide?: 'left' | 'right';
+  /** Optional: which side the avatar is on. Default 'left'. Use 'top' to place avatar above the bubble. */
+  avatarSide?: 'left' | 'right' | 'top';
   /** Optional: which side the arrow points from. Default 'right' when align is left, else bottom/top center. */
   arrowSide?: 'left' | 'right';
   /** Optional: horizontal nudge in pixels (positive = right). */
   offsetX?: number;
   /** Optional: vertical nudge in pixels (positive = down). */
   offsetY?: number;
+  /** Optional: fix the bubble to a corner of the viewport instead of positioning near the target. */
+  fixedPosition?: 'top-left' | 'top-right';
+  /** Optional: when target not found, show bubble at this position (e.g. { top: 200, left: 100 }). */
+  fallbackPosition?: { top: number; left: number };
 }
 
 /**
@@ -46,7 +51,9 @@ export function DemoGuideBubble({
   avatarSide = 'left',
   arrowSide,
   offsetX = 0,
-  offsetY = 0
+  offsetY = 0,
+  fixedPosition,
+  fallbackPosition
 }: DemoGuideBubbleProps) {
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [bubbleVisible, setBubbleVisible] = useState(false);
@@ -61,7 +68,7 @@ export function DemoGuideBubble({
     const el = document.querySelector(targetSelector);
     if (!el) {
       setTargetRect(null);
-      setBubbleVisible(false);
+      setBubbleVisible(!!fallbackPosition);
       return;
     }
     const rect = el.getBoundingClientRect();
@@ -75,7 +82,7 @@ export function DemoGuideBubble({
     observer.observe(el);
 
     return () => observer.disconnect();
-  }, [targetSelector, hidden]);
+  }, [targetSelector, hidden, fallbackPosition]);
 
   useEffect(() => {
     if (!hidden && targetSelector) {
@@ -87,38 +94,97 @@ export function DemoGuideBubble({
     }
   }, [targetSelector, hidden, highlightTarget]);
 
-  if (hidden || !bubbleVisible || !targetRect) return null;
+  if (hidden) return null;
+  const useFallback = !targetRect && fallbackPosition;
+  if (!bubbleVisible || (!targetRect && !useFallback)) return null;
 
   // Position bubble near the target
   const bubbleWidth = 220;
   const avatarSize = 64;
   const gap = 8;
-  const totalWidth = avatarSrc ? avatarSize + gap + bubbleWidth : bubbleWidth;
-  const bubbleLeft =
-    align === 'left'
-      ? Math.max(16, targetRect.left - totalWidth - 16)
-      : Math.max(16, targetRect.left - bubbleWidth / 2 + targetRect.width / 2);
-  const bubbleLeftWithOffset = bubbleLeft + offsetX;
-  const gapToTarget = align === 'left' ? 112 : 12;
-  const bubbleBottom = window.innerHeight - targetRect.top - gapToTarget;
-  const bubbleTop = targetRect.bottom + gapToTarget;
-  const verticalPos = placement === 'above'
-    ? { bottom: bubbleBottom - offsetY }
-    : { top: bubbleTop + offsetY };
+  const avatarOnTop = avatarSrc && avatarSide === 'top';
+  const totalWidth = avatarOnTop ? Math.max(avatarSize, bubbleWidth) : (avatarSrc ? avatarSize + gap + bubbleWidth : bubbleWidth);
+  const gapToTarget = 12;
+  const cornerPadding = 24;
 
-  return (
+  let positionStyle: React.CSSProperties;
+
+  if (useFallback && fallbackPosition) {
+    positionStyle = {
+      left: fallbackPosition.left + offsetX,
+      top: fallbackPosition.top + offsetY
+    };
+  } else if (fixedPosition === 'top-left') {
+    positionStyle = {
+      left: Math.max(-350, cornerPadding + offsetX),
+      top: cornerPadding + offsetY
+    };
+  } else if (fixedPosition === 'top-right') {
+    positionStyle = {
+      left: 'auto',
+      right: cornerPadding - offsetX,
+      top: cornerPadding + offsetY
+    };
+  } else if (placement === 'left') {
+    // Beside target, to the left; vertically centered
+    const left = Math.max(16, targetRect.left - totalWidth - gapToTarget);
+    const centerY = targetRect.top + targetRect.height / 2;
+    positionStyle = {
+      left: left + offsetX,
+      top: centerY + offsetY,
+      transform: 'translateY(-50%)'
+    };
+  } else if (placement === 'right') {
+    // Beside target, to the right; vertically centered
+    const left = targetRect.right + gapToTarget;
+    const centerY = targetRect.top + targetRect.height / 2;
+    positionStyle = {
+      left: left + offsetX,
+      top: centerY + offsetY,
+      transform: 'translateY(-50%)'
+    };
+  } else {
+    const bubbleLeft =
+      align === 'left'
+        ? Math.max(16, targetRect.left - totalWidth - 16)
+        : Math.max(16, targetRect.left - bubbleWidth / 2 + targetRect.width / 2);
+    const bubbleLeftWithOffset = bubbleLeft + offsetX;
+    const gapToTargetAlign = align === 'left' ? 112 : 12;
+    const bubbleBottom = window.innerHeight - targetRect.top - gapToTargetAlign;
+    const bubbleTop = targetRect.bottom + gapToTargetAlign;
+    const verticalPos = placement === 'above'
+      ? { bottom: bubbleBottom - offsetY }
+      : { top: bubbleTop + offsetY };
+    positionStyle = {
+      left: bubbleLeftWithOffset,
+      ...verticalPos
+    };
+  }
+
+  // Arrow: for left placement, point right; for right placement, point left
+  const arrowPointsRight = placement === 'left';
+  const arrowPointsLeft = placement === 'right';
+
+  const content = (
     <>
       <div
         ref={containerRef}
-        className={`fixed z-[100] pointer-events-auto flex ${avatarSrc ? 'items-center' : 'items-end'}`}
+        className={`fixed z-[100] pointer-events-auto flex ${avatarOnTop ? 'flex-col items-start' : avatarSrc ? 'items-center' : 'items-end'}`}
         style={{
-          left: bubbleLeftWithOffset,
-          ...verticalPos,
+          ...positionStyle,
           width: totalWidth,
-          flexDirection: avatarSide === 'right' ? 'row-reverse' : 'row'
+          flexDirection: avatarOnTop ? 'column' : (avatarSide === 'right' ? 'row-reverse' : 'row')
         }}
       >
-        {avatarSrc && (
+        {avatarSrc && avatarOnTop && (
+          <img
+            src={avatarSrc}
+            alt=""
+            className="flex-shrink-0 rounded-full object-cover border-2 border-[#136C9E] bg-white mb-2"
+            style={{ width: avatarSize, height: avatarSize }}
+          />
+        )}
+        {avatarSrc && !avatarOnTop && (
           <img
             src={avatarSrc}
             alt=""
@@ -128,9 +194,9 @@ export function DemoGuideBubble({
         )}
         <div className="relative flex-shrink-0" style={{ width: bubbleWidth }}>
           <div
-            className={`bg-[#CBE6FF] rounded-xl px-4 py-3 shadow-lg border border-[#136C9E] ${avatarSrc ? (avatarSide === 'left' ? 'ml-2' : 'mr-2') : ''}`}
+            className={`bg-[#CBE6FF] rounded-xl px-4 py-3 shadow-lg border border-[#136C9E] ${avatarSrc && !avatarOnTop ? (avatarSide === 'left' ? 'ml-2' : 'mr-2') : ''}`}
           >
-            <p className="text-sm font-medium text-[#0F172A]">{message}</p>
+            <p className="text-sm font-medium text-[#0F172A] whitespace-pre-line">{message}</p>
             {(onDismiss || onNext) && (
               <div className="mt-2 flex justify-end gap-3">
                 {onDismiss && (
@@ -154,8 +220,32 @@ export function DemoGuideBubble({
               </div>
             )}
           </div>
-          {/* Pointer: left or right of bubble pointing toward the target */}
-          {arrowSide === 'left' ? (
+          {/* Pointer: hide when fixed to corner (unless arrowSide requested) */}
+          {(fixedPosition && arrowSide === 'right') ? (
+            <div
+              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full"
+              style={{
+                width: 0,
+                height: 0,
+                borderTop: '8px solid transparent',
+                borderBottom: '8px solid transparent',
+                borderLeft: '10px solid #CBE6FF',
+                filter: 'drop-shadow(1px 0 0 #136C9E)'
+              }}
+            />
+          ) : !fixedPosition && (arrowPointsRight ? (
+            <div
+              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full"
+              style={{
+                width: 0,
+                height: 0,
+                borderTop: '8px solid transparent',
+                borderBottom: '8px solid transparent',
+                borderLeft: '10px solid #CBE6FF',
+                filter: 'drop-shadow(1px 0 0 #136C9E)'
+              }}
+            />
+          ) : arrowPointsLeft ? (
             <div
               className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full"
               style={{
@@ -167,7 +257,19 @@ export function DemoGuideBubble({
                 filter: 'drop-shadow(-1px 0 0 #136C9E)'
               }}
             />
-          ) : align === 'left' ? (
+          ) : arrowSide === 'left' ? (
+            <div
+              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full"
+              style={{
+                width: 0,
+                height: 0,
+                borderTop: '8px solid transparent',
+                borderBottom: '8px solid transparent',
+                borderRight: '10px solid #CBE6FF',
+                filter: 'drop-shadow(-1px 0 0 #136C9E)'
+              }}
+            />
+          ) : align === 'left' || arrowSide === 'right' ? (
             <div
               className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full"
               style={{
@@ -189,7 +291,7 @@ export function DemoGuideBubble({
               className="absolute left-1/2 -translate-x-1/2 -top-2 w-4 h-4 bg-[#CBE6FF] border-l border-t border-[#136C9E] rotate-45"
               style={{ marginTop: 0 }}
             />
-          )}
+          ))}
         </div>
       </div>
       <style>{`
@@ -197,7 +299,7 @@ export function DemoGuideBubble({
           outline: 2px solid #DC5F12;
           outline-offset: 2px;
           border-radius: 9999px;
-          animation: demo-guide-pulse 1.5s ease-in-out infinite;
+          animation:         demo-guide-pulse 1.5s ease-in-out infinite;
         }
         @keyframes demo-guide-pulse {
           0%, 100% { outline-color: #DC5F12; }
@@ -206,4 +308,8 @@ export function DemoGuideBubble({
       `}</style>
     </>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(content, document.body)
+    : content;
 }

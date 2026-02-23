@@ -15,21 +15,26 @@ interface HomeownerDashboardProps {
 
 export function HomeownerDashboard({ onLogout }: HomeownerDashboardProps) {
   // Check for initial screen from localStorage (set by landing page buttons)
-  const initialScreen = localStorage.getItem('homeownerInitialScreen') as HomeownerNavigationScreen | null;
+  const initialScreenRaw = localStorage.getItem('homeownerInitialScreen');
+  const initialScreen = initialScreenRaw as HomeownerNavigationScreen | 'vendor-search' | null;
+  const validScreens = ['maintenance', 'documents', 'projects', 'home-value', 'communication', 'settings'];
   const [currentScreen, setCurrentScreen] = useState<HomeownerNavigationScreen>(
-    initialScreen && ['maintenance', 'documents', 'projects', 'home-value', 'communication', 'settings'].includes(initialScreen)
-      ? initialScreen
-      : 'dashboard'
+    initialScreen === 'vendor-search'
+      ? 'maintenance'
+      : initialScreen && validScreens.includes(initialScreen)
+        ? initialScreen
+        : 'dashboard'
   );
+  const openVendorSearchOnMount = initialScreen === 'vendor-search';
   const [selectedTask, setSelectedTask] = useState<MaintenanceTask | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<HomeDocument | null>(null);
 
   // Clear initial screen after first load
   useEffect(() => {
-    if (initialScreen) {
+    if (initialScreenRaw) {
       localStorage.removeItem('homeownerInitialScreen');
     }
-  }, [initialScreen]);
+  }, [initialScreenRaw]);
 
   const handleNavigate = (screen: HomeownerNavigationScreen) => {
     setCurrentScreen(screen);
@@ -119,6 +124,7 @@ export function HomeownerDashboard({ onLogout }: HomeownerDashboardProps) {
             onCreateTask={handleCreateMaintenance}
             onEditTask={handleEditTask}
             onDeleteTask={handleDeleteTask}
+            openVendorSearchOnMount={openVendorSearchOnMount}
           />
         );
 
