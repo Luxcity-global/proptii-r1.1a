@@ -146,6 +146,7 @@ export function Projects({ projects, projectsLoading, onBack, openProjectFormMod
             setEditingProject(null);
             setIsFormModalOpen(true);
           }}
+          data-demo-homeowner-new-project="1"
           className="bg-[#DC5F12] text-white px-4 py-2 rounded-lg font-medium hover:bg-[#c54f0f] transition-colors flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />

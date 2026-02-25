@@ -250,7 +250,7 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
                 <CardTitle className="text-base font-semibold">Recipient</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
+                <div className="space-y-2" data-demo-send-contract-recipient-type="1">
                   <Label>Recipient Type</Label>
                   <Select value={recipientType} onValueChange={handleRecipientTypeChange}>
                     <SelectTrigger>
@@ -264,7 +264,7 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
                 </div>
 
                 {recipientType === 'manual' ? (
-                  <div className="space-y-4">
+                  <div className="space-y-4" data-demo-send-contract-manual="1">
                     <div className="space-y-2">
                       <Label htmlFor="recipient-name">Recipient Name</Label>
                       <div className="relative">
@@ -313,7 +313,7 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-4" data-demo-send-contract-existing="1">
                     {!selectedExistingTenant || showTenantList ? (
                       <>
                         <div className="space-y-2">
@@ -452,7 +452,7 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
             </Card>
 
             {/* File Upload Section */}
-            <Card className="border border-gray-200">
+            <Card className="border border-gray-200" data-demo-send-contract-upload="1">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-semibold" style={{ fontFamily: 'Archivo, sans-serif' }}>
                   Contract File (Optional)

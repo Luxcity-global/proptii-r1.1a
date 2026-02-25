@@ -16,6 +16,9 @@ import {
   consumePendingProject
 } from '../../utils/homeownerPendingForm';
 import type { HomeProject } from './Projects';
+import { startScheduleMaintenanceTour } from '../../onboarding/homeowner/scheduleMaintenanceTour';
+import { startCreateProjectTour } from '../../onboarding/homeowner/createProjectTour';
+import { startFindVendorTour } from '../../onboarding/homeowner/findVendorTour';
 
 interface HomeownerDashboardProps {
   onLogout?: () => void;
@@ -72,6 +75,70 @@ export function HomeownerDashboard({ onLogout }: HomeownerDashboardProps) {
       localStorage.removeItem('homeownerInitialScreen');
     }
   }, [initialScreenRaw]);
+
+  // Start schedule maintenance tour when arriving with startScheduleMaintenanceTour=1
+  // Clear params inside setTimeout so React Strict Mode (double effect run) doesn't cancel the tour
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get('startScheduleMaintenanceTour') === '1';
+      const fromStorage = localStorage.getItem('startScheduleMaintenanceTour') === '1';
+      if (!fromUrl && !fromStorage) return;
+      setCurrentScreen('dashboard');
+      const t = setTimeout(() => {
+        localStorage.removeItem('startScheduleMaintenanceTour');
+        if (fromUrl) {
+          params.delete('startScheduleMaintenanceTour');
+          const newSearch = params.toString();
+          window.history.replaceState({}, '', window.location.pathname + (newSearch ? '?' + newSearch : ''));
+        }
+        startScheduleMaintenanceTour(setCurrentScreen);
+      }, 400);
+      return () => clearTimeout(t);
+    } catch (_) {}
+  }, []);
+
+  // Start create project tour when arriving with startCreateProjectTour=1
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get('startCreateProjectTour') === '1';
+      const fromStorage = localStorage.getItem('startCreateProjectTour') === '1';
+      if (!fromUrl && !fromStorage) return;
+      setCurrentScreen('dashboard');
+      const t = setTimeout(() => {
+        localStorage.removeItem('startCreateProjectTour');
+        if (fromUrl) {
+          params.delete('startCreateProjectTour');
+          const newSearch = params.toString();
+          window.history.replaceState({}, '', window.location.pathname + (newSearch ? '?' + newSearch : ''));
+        }
+        startCreateProjectTour(setCurrentScreen);
+      }, 400);
+      return () => clearTimeout(t);
+    } catch (_) {}
+  }, []);
+
+  // Start find vendor tour when arriving with startFindVendorTour=1
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get('startFindVendorTour') === '1';
+      const fromStorage = localStorage.getItem('startFindVendorTour') === '1';
+      if (!fromUrl && !fromStorage) return;
+      setCurrentScreen('dashboard');
+      const t = setTimeout(() => {
+        localStorage.removeItem('startFindVendorTour');
+        if (fromUrl) {
+          params.delete('startFindVendorTour');
+          const newSearch = params.toString();
+          window.history.replaceState({}, '', window.location.pathname + (newSearch ? '?' + newSearch : ''));
+        }
+        startFindVendorTour(setCurrentScreen);
+      }, 400);
+      return () => clearTimeout(t);
+    } catch (_) {}
+  }, []);
 
   const handleNavigate = (screen: HomeownerNavigationScreen) => {
     setCurrentScreen(screen);

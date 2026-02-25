@@ -275,6 +275,7 @@ export function ImagesAndNotesSelection({ uploadedImages: propUploadedImages, ad
               
               {/* Upload Area */}
               <div
+                data-demo-add-property-images
                 className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors cursor-pointer"
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}

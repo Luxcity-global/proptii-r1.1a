@@ -228,7 +228,7 @@ export function VendorSearch({
                     </div>
 
                     {/* Search Bar & Term */}
-                    <div className="space-y-3">
+                    <div className="space-y-3" data-demo-homeowner-vendor-search-area="1">
                         <div className="flex flex-col md:flex-row gap-3">
                             <div className="flex-1 relative">
                                 <MapPin className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />

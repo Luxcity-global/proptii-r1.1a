@@ -99,7 +99,7 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
         </div>
 
         {/* Main Content */}
-        <div className="flex items-center" style={{ gap: '60px', minHeight: '800px' }}>
+        <div className="flex items-center" style={{ gap: '60px', minHeight: '800px' }} data-demo-add-property-step1>
           {/* Left Section - Text */}
           <div className="flex-1 max-w-md flex flex-col justify-center">
             <header className="mb-1">

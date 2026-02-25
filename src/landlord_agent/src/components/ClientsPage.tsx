@@ -523,7 +523,8 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, user
           </p>
         </div>
         <Button 
-          onClick={activeTab === 'landlords' ? onAddLandlord : onAddTenant} 
+          onClick={activeTab === 'landlords' ? onAddLandlord : onAddTenant}
+          data-demo-add-tenant-cta={activeTab === 'tenants' ? '1' : undefined}
           className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto" 
           style={{ 
             backgroundColor: '#DC5F12', 

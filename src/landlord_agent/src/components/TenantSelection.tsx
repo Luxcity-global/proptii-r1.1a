@@ -107,6 +107,7 @@ export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting
               return (
                 <Card
                   key={option.id}
+                  data-demo-add-tenant-option={option.id}
                   className={`relative cursor-pointer transition-all duration-300 ${
                     option.recommended ? 'ring-1 shadow-lg' : 'hover:shadow-md'
                   }`}

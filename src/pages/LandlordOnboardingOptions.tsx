@@ -13,17 +13,18 @@ const LandlordOnboardingOptions: React.FC = () => {
   const handleAddProperty = () => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('startScreen', 'property-setup-step1');
-      window.location.href = '/landlord/index.html?start=property-setup-step1';
+      localStorage.setItem('startAddPropertyTour', '1');
+      window.location.href = '/landlord/index.html?start=property-setup-step1&startAddPropertyTour=1';
     }
   };
 
   const handleAddTenant = () => {
     if (isAuthenticated) {
-      navigate('/landlord?start=tenant-selection');
+      navigate('/landlord?startAddTenantTour=1');
     } else {
       if (typeof window !== 'undefined') {
-        localStorage.setItem('startScreen', 'tenant-selection');
-        window.location.href = '/landlord/index.html?start=tenant-selection';
+        localStorage.setItem('startAddTenantTour', '1');
+        window.location.href = '/landlord/index.html?startAddTenantTour=1';
       }
     }
   };
@@ -107,12 +108,11 @@ const LandlordOnboardingOptions: React.FC = () => {
               type="button"
               onClick={() => {
                 if (isAuthenticated) {
-                  navigate('/landlord?nav=contracts&openSendModal=1');
+                  navigate('/landlord?startSendContractTour=1');
                 } else {
                   if (typeof window !== 'undefined') {
-                    localStorage.setItem('startScreen', 'contracts');
-                    localStorage.setItem('openSendModal', '1');
-                    window.location.href = '/landlord/index.html?nav=contracts&openSendModal=1';
+                    localStorage.setItem('startSendContractTour', '1');
+                    window.location.href = '/landlord/index.html?startSendContractTour=1';
                   }
                 }
               }}

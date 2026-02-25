@@ -41,6 +41,9 @@ import { tenantService } from './services/tenantService';
 import { marketInsightService } from './services/marketInsightService';
 import ViewingsPage from './components/ViewingsPage';
 import { storage, db } from './config/firebase';
+import { startAddPropertyTour } from './onboarding/addPropertyTour';
+import { startAddTenantTour } from './onboarding/addTenantTour';
+import { startSendContractTour } from './onboarding/sendContractTour';
 import { savePendingProperty, consumePendingProperty } from '../../utils/landlordPendingProperty';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, query, where, onSnapshot, Unsubscribe, doc, updateDoc, Timestamp } from 'firebase/firestore';
@@ -604,6 +607,92 @@ export default function App() {
           } catch (_) {}
         }
       }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
+  // Start add property tour when arriving with startAddPropertyTour=1 (from landlord/agent landing)
+  React.useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get('startAddPropertyTour') === '1';
+      const fromStorage = localStorage.getItem('startAddPropertyTour') === '1';
+      if (!fromUrl && !fromStorage) return;
+
+      localStorage.removeItem('startAddPropertyTour');
+      if (fromUrl) {
+        params.delete('startAddPropertyTour');
+        const newSearch = params.toString();
+        window.history.replaceState(
+          {},
+          '',
+          window.location.pathname + (newSearch ? '?' + newSearch : '')
+        );
+      }
+      const t = setTimeout(() => {
+        startAddPropertyTour((screen) => setCurrentScreen(screen));
+      }, 400);
+      return () => clearTimeout(t);
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
+  // Start add tenant tour when arriving with startAddTenantTour=1 (from Add Tenant on landlord onboarding)
+  React.useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get('startAddTenantTour') === '1';
+      const fromStorage = localStorage.getItem('startAddTenantTour') === '1';
+      if (!fromUrl && !fromStorage) return;
+
+      localStorage.removeItem('startAddTenantTour');
+      if (fromUrl) {
+        params.delete('startAddTenantTour');
+        const newSearch = params.toString();
+        window.history.replaceState(
+          {},
+          '',
+          window.location.pathname + (newSearch ? '?' + newSearch : '')
+        );
+      }
+      // Ensure we start on dashboard (main-app with clients nav)
+      setCurrentScreen('main-app');
+      setNavigationScreen('dashboard');
+      const t = setTimeout(() => {
+        startAddTenantTour(setNavigationScreen, setCurrentScreen);
+      }, 400);
+      return () => clearTimeout(t);
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+
+  // Start send contract tour when arriving with startSendContractTour=1 (from Send Contract on landlord onboarding)
+  React.useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get('startSendContractTour') === '1';
+      const fromStorage = localStorage.getItem('startSendContractTour') === '1';
+      if (!fromUrl && !fromStorage) return;
+
+      localStorage.removeItem('startSendContractTour');
+      if (fromUrl) {
+        params.delete('startSendContractTour');
+        const newSearch = params.toString();
+        window.history.replaceState(
+          {},
+          '',
+          window.location.pathname + (newSearch ? '?' + newSearch : '')
+        );
+      }
+      setCurrentScreen('main-app');
+      setNavigationScreen('dashboard');
+      const t = setTimeout(() => {
+        startSendContractTour(setNavigationScreen);
+      }, 400);
+      return () => clearTimeout(t);
     } catch (e) {
       // ignore
     }

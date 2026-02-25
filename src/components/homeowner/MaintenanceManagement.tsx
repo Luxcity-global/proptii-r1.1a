@@ -88,6 +88,18 @@ export function MaintenanceManagement({
     }
   }, [openVendorSearchOnMount]);
 
+  // Listen for tour-triggered vendor search open/close
+  useEffect(() => {
+    const open = () => setIsVendorSearchOpen(true);
+    const close = () => setIsVendorSearchOpen(false);
+    window.addEventListener('homeowner-open-vendor-search', open);
+    window.addEventListener('homeowner-close-vendor-search', close);
+    return () => {
+      window.removeEventListener('homeowner-open-vendor-search', open);
+      window.removeEventListener('homeowner-close-vendor-search', close);
+    };
+  }, []);
+
   // Open add task modal when navigating from "Schedule maintenance" onboarding option
   useEffect(() => {
     if (openAddTaskModalOnMount) {
@@ -201,6 +213,7 @@ export function MaintenanceManagement({
               setEditingTask(null);
               setIsFormModalOpen(true);
             }}
+            data-demo-homeowner-add-task="1"
             className="bg-[#DC5F12] text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-[#c54f0f] transition-all flex items-center gap-2 shadow-md hover:shadow-lg"
           >
             <Plus className="w-4 h-4" />
@@ -218,6 +231,7 @@ export function MaintenanceManagement({
             setShowDIYGuidesGrid(false);
             setIsTemplatesBrowserOpen(true);
           }}
+          data-demo-homeowner-templates="1"
           className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-purple-500 hover:shadow-lg transition-all text-left group"
         >
           <div className="flex items-start gap-4">
@@ -239,6 +253,7 @@ export function MaintenanceManagement({
             // Show DIY guides grid in place of the tasks table
             setShowDIYGuidesGrid(true);
           }}
+          data-demo-homeowner-diy-guides="1"
           className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-blue-500 hover:shadow-lg transition-all text-left group"
         >
           <div className="flex items-start gap-4">
@@ -257,6 +272,7 @@ export function MaintenanceManagement({
         {/* Vendor Finder Card */}
         <button
           onClick={() => setIsVendorSearchOpen(true)}
+          data-demo-homeowner-vendor-finder="1"
           className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-green-500 hover:shadow-lg transition-all text-left group"
         >
           <div className="flex items-start gap-4">

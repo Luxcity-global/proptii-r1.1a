@@ -140,6 +140,7 @@
     "docusign-esign": "^8.3.0",
     "docx": "^9.5.1",
     "dotenv": "^16.6.1",
+    "driver.js": "^1.4.0",
     "express": "^5.1.0",
     "express-async-handler": "^1.2.0",
     "firebase": "^12.5.0",

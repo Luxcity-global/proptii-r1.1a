@@ -119,7 +119,7 @@ export function AmenitiesSelection({ selectedAmenities: propSelectedAmenities, o
           <div className="max-w-6xl mx-auto">
             
             {/* Amenities Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-demo-add-property-amenities>
             {amenities.map((amenity) => {
               const IconComponent = amenity.icon;
               const isSelected = selectedAmenities.includes(amenity.id);

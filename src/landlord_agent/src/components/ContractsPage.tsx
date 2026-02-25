@@ -131,6 +131,18 @@ export function ContractsPage({ tenants = [], userProfile, onBack, onSignIn }: C
     } catch (_) {}
   }, []);
 
+  // Listen for tour-triggered modal open/close
+  useEffect(() => {
+    const open = () => setIsSendModalOpen(true);
+    const close = () => setIsSendModalOpen(false);
+    window.addEventListener('proptii-open-send-contract-modal', open);
+    window.addEventListener('proptii-close-send-contract-modal', close);
+    return () => {
+      window.removeEventListener('proptii-open-send-contract-modal', open);
+      window.removeEventListener('proptii-close-send-contract-modal', close);
+    };
+  }, []);
+
   const loadContracts = async () => {
     try {
       setLoading(true);
@@ -926,6 +938,7 @@ export function ContractsPage({ tenants = [], userProfile, onBack, onSignIn }: C
           </div>
           <Button 
             onClick={() => setIsSendModalOpen(true)}
+            data-demo-send-contract-cta="1"
             className="flex items-center space-x-2 px-6 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0"
             style={{ 
               backgroundColor: '#DC5F12', 

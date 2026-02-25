@@ -414,7 +414,7 @@ export function PropertyDetailsSelection({ propertyType, propertyDetails: propPr
       isSaleDocsValid;
 
   return (
-    <div className="min-h-screen flex flex-col px-4" style={{ backgroundColor: '#F7F7F7', fontFamily: 'Archivo, sans-serif' }}>
+    <div className="min-h-screen flex flex-col px-4" style={{ backgroundColor: '#F7F7F7', fontFamily: 'Archivo, sans-serif' }} data-demo-add-property-details>
       <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col">
         {/* Main Content Area */}
         <div className="flex-1 py-8">
@@ -472,7 +472,7 @@ export function PropertyDetailsSelection({ propertyType, propertyDetails: propPr
           </div>
 
           {/* For Sale Toggle (beneath header) */}
-          <div className="mb-8 px-4">
+          <div className="mb-8 px-4" data-demo-add-property-for-sale>
             <div className="bg-white rounded-xl p-4 flex items-center justify-between border border-gray-200">
               <div className="space-y-1">
                 <p className="text-sm font-semibold" style={{ color: '#374957' }}>

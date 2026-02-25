@@ -96,9 +96,10 @@ const AgentHome = () => {
     if (selectedRole === 'agent') {
       localStorage.setItem('userRole', 'agent');
     }
-    // Instruct landlord app to open property setup flow immediately
+    // Instruct landlord app to open property setup flow immediately and start add property tour
     localStorage.setItem('startScreen', 'property-setup-step1');
-    window.location.href = '/landlord/index.html?start=property-setup-step1';
+    localStorage.setItem('startAddPropertyTour', '1');
+    window.location.href = '/landlord/index.html?start=property-setup-step1&startAddPropertyTour=1';
   };
 
   const handleSetupProfile = () => {

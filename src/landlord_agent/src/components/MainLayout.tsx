@@ -91,6 +91,8 @@ function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
+              data-demo-add-tenant-clients={item.id === 'clients' ? '1' : undefined}
+              data-demo-send-contract-nav={item.id === 'contracts' ? '1' : undefined}
               className={`
                 w-full flex items-center h-10 px-3 rounded-md text-sm font-medium transition-colors
                 ${isCollapsed ? 'justify-center' : 'justify-start'}

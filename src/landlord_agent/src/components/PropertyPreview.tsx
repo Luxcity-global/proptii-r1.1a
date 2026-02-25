@@ -345,6 +345,7 @@ export function PropertyPreview({
                 <Button 
                   onClick={handlePublish}
                   disabled={isPublishing}
+                  data-demo-add-property-publish
                   className="px-6 py-2 rounded-full transition-all duration-300" 
                   style={{ 
                     backgroundColor: '#DC5F12', 

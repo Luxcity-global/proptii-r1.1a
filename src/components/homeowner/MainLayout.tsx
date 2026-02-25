@@ -99,6 +99,8 @@ export function MainLayout({ currentScreen, onNavigate, children }: MainLayoutPr
                   <button
                     key={item.id}
                     onClick={() => onNavigate(item.id)}
+                    data-demo-homeowner-maintenance={item.id === 'maintenance' ? '1' : undefined}
+                    data-demo-homeowner-projects={item.id === 'projects' ? '1' : undefined}
                     className={`
                       w-full flex items-center h-10 px-3 rounded-md text-sm font-medium transition-colors
                       ${isCollapsed ? 'justify-center' : 'justify-start'}

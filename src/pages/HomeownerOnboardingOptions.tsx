@@ -10,20 +10,20 @@ const HomeownerOnboardingOptions: React.FC = () => {
 
   const handleScheduleMaintenance = () => {
     localStorage.setItem('userRole', 'homeowner');
-    localStorage.setItem('homeownerInitialScreen', 'maintenance');
-    navigate('/homeowner/dashboard');
+    localStorage.setItem('startScheduleMaintenanceTour', '1');
+    navigate('/homeowner/dashboard?startScheduleMaintenanceTour=1');
   };
 
   const handleCreateProject = () => {
     localStorage.setItem('userRole', 'homeowner');
-    localStorage.setItem('homeownerInitialScreen', 'projects');
-    navigate('/homeowner/dashboard');
+    localStorage.setItem('startCreateProjectTour', '1');
+    navigate('/homeowner/dashboard?startCreateProjectTour=1');
   };
 
   const handleFindVendor = () => {
     localStorage.setItem('userRole', 'homeowner');
-    localStorage.setItem('homeownerInitialScreen', 'vendor-search');
-    navigate('/homeowner/dashboard');
+    localStorage.setItem('startFindVendorTour', '1');
+    navigate('/homeowner/dashboard?startFindVendorTour=1');
   };
 
   return (

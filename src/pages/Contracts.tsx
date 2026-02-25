@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { startContractsTour } from '../onboarding/contractsTour';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
@@ -23,12 +25,25 @@ const preloadHeroImage = () => {
 
 const ContractsPage = () => {
   const { isAuthenticated, login } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Preload hero image when component mounts
   useEffect(() => {
     preloadHeroImage();
   }, []);
+
+  // Start contracts tour when arriving from "Review and sign a contract" on tenant onboarding
+  useEffect(() => {
+    if (searchParams.get('startContractsTour') !== '1') return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('startContractsTour');
+      return next;
+    });
+    const t = setTimeout(() => startContractsTour(), 100);
+    return () => clearTimeout(t);
+  }, [searchParams, setSearchParams]);
 
   const handleGetStarted = () => {
     // Commenting out authentication check for now
@@ -85,13 +100,20 @@ const ContractsPage = () => {
             Fast digital signing, safe storage, and effortless sharing.
           </TextAnimate>
 
-          <div className="relative inline-block">
+          <div className="relative inline-block flex flex-col items-center gap-3" data-demo-contracts-hero-cta>
             <InteractiveHoverButton
               onClick={handleGetStarted}
               className="bg-primary text-white border-primary hover:bg-opacity-90 text-xl font-medium"
             >
               {isAuthenticated ? 'Start Contracts' : 'Get Started'}
             </InteractiveHoverButton>
+            <button
+              type="button"
+              onClick={startContractsTour}
+              className="text-white/90 hover:text-white text-sm font-medium underline underline-offset-2 transition-colors"
+            >
+              How contracts work
+            </button>
           </div>
         </div>
       </section>
@@ -123,7 +145,7 @@ const ContractsPage = () => {
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 md:pl-14">
           {/* Text Section */}
-          <div className="mb-12 max-w-3xl">
+          <div className="mb-12 max-w-3xl" data-demo-contracts-section>
             <h2 className="text-4xl md:text-5xl font-bold font-archive text-[#136C9E]">
               Securely store rental documents.
             </h2>
@@ -135,7 +157,7 @@ const ContractsPage = () => {
           </div>
 
           {/* Bento Grid Section */}
-          <div className="mb-12">
+          <div className="mb-12" data-demo-contracts-features>
             <BentoGrid className="max-w-7xl mx-auto">
               <BentoCard
                 name="Secure Digital Storage"
@@ -275,7 +297,7 @@ const ContractsPage = () => {
           </div>
 
           {/* Call-to-action button beneath Bento Grid */}
-          <div>
+          <div data-demo-contracts-bottom-cta>
             <button
               onClick={handleGetStarted}
               className="bg-[#E76F51] text-white px-6 py-3 rounded-md hover:bg-opacity-90 transition-all text-lg font-medium"

@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { hasOnboardingCompleted } from '../utils/onboardingSession';
 import { OnboardingFlow } from '../components/onboarding/OnboardingFlow';
 import { DemoGuideBubble } from '../components/onboarding/DemoGuideBubble';
+import { startSearchTour } from '../onboarding/searchTour';
 
 import { useState, useEffect } from 'react';
 
@@ -69,6 +70,18 @@ const Home = () => {
       setSearchParams({});
     }
   }, [searchParams, setSearchParams]);
+
+  // Start search tour when arriving from "Find a place and save a property" on tenant onboarding
+  useEffect(() => {
+    if (searchParams.get('startSearchTour') !== '1' || showOnboarding) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('startSearchTour');
+      return next;
+    });
+    const t = setTimeout(() => startSearchTour(), 100);
+    return () => clearTimeout(t);
+  }, [searchParams, setSearchParams, showOnboarding]);
 
   // useEffect(() => {
   //   const checkBackend = async () => {
@@ -182,6 +195,13 @@ const Home = () => {
             <SearchInput
               onHeightChange={handleSearchInputHeightChange}
             />
+            <button
+              type="button"
+              onClick={startSearchTour}
+              className="mt-4 text-white/90 hover:text-white text-sm font-medium underline underline-offset-2 transition-colors"
+            >
+              How search works
+            </button>
           </div>
         </div>
 
