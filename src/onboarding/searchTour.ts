@@ -1,6 +1,7 @@
 import { driver, type DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
 import './searchTour.css';
+import { markStepComplete } from '../utils/gettingStartedProgress';
 
 const SEARCH_TOUR_STEPS: DriveStep[] = [
   {
@@ -61,6 +62,11 @@ export function createSearchTour() {
     popoverClass: 'proptii-search-tour',
     onDestroyStarted: (_, __, opts) => {
       opts.driver.destroy();
+      try {
+        markStepComplete('tenant', 'search');
+        localStorage.setItem('onboarding_lastClosed', 'search');
+        localStorage.setItem('onboarding_showExitModal', '1');
+      } catch {}
       window.location.href = '/tenant-onboarding';
     },
   });

@@ -1,6 +1,7 @@
 import { driver, type DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
 import './addTenantTour.css';
+import { markStepComplete } from '../../../utils/gettingStartedProgress';
 
 const ADD_TENANT_STEPS: Array<{
   element: string;
@@ -108,6 +109,7 @@ export function createAddTenantTour(
     onDestroyStarted: (_, __, opts) => {
       opts.driver.destroy();
       if (opts.state.activeIndex === ADD_TENANT_STEPS.length - 1) {
+        markStepComplete('landlord', 'addTenant');
         window.location.href = '/landlord-onboarding';
       }
     },

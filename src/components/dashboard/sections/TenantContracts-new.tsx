@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FileText, Download, Eye, Calendar, CheckCircle, Clock, AlertTriangle, User, Mail, Phone, Trash2 } from 'lucide-react';
 import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import ContractModal from '../../contract/ContractModal';
 import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
 import { useAuth } from '../../../contexts/AuthContext';
+import { ContextualBanner } from '../../getting-started';
 
 const TenantContracts: React.FC = () => {
+  const navigate = useNavigate();
   const { signedContracts, isLoading, clearAllContracts, addSignedContract, removeSignedContract } = useSignedContracts();
   const { user } = useAuth();
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
@@ -213,8 +216,22 @@ const TenantContracts: React.FC = () => {
     );
   }
 
+  const startContractsGuide = () => {
+    try {
+      localStorage.setItem('startContractsTour', '1');
+    } catch {}
+    navigate('/contracts?startContractsTour=1');
+  };
+
   return (
     <div className="space-y-6">
+      <ContextualBanner
+        app="tenant"
+        stepId="contracts"
+        message="Ready to sign or view contracts?"
+        linkText="Start the 2-minute guide"
+        onStartGuide={startContractsGuide}
+      />
       {/* Header */}
       <div className="flex items-center justify-between pt-6">
         <div>

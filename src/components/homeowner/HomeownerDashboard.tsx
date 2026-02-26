@@ -19,6 +19,7 @@ import type { HomeProject } from './Projects';
 import { startScheduleMaintenanceTour } from '../../onboarding/homeowner/scheduleMaintenanceTour';
 import { startCreateProjectTour } from '../../onboarding/homeowner/createProjectTour';
 import { startFindVendorTour } from '../../onboarding/homeowner/findVendorTour';
+import { GettingStartedHub } from '../getting-started';
 
 interface HomeownerDashboardProps {
   onLogout?: () => void;
@@ -236,6 +237,14 @@ export function HomeownerDashboard({ onLogout }: HomeownerDashboardProps) {
             openAddTaskModalOnMount={openAddTaskModalOnMount}
             restoreTaskData={restoreTaskData}
             onRestoreConsumed={() => setRestoreTaskData(null)}
+            onStartScheduleGuide={() => {
+              setCurrentScreen('dashboard');
+              setTimeout(() => startScheduleMaintenanceTour(setCurrentScreen), 400);
+            }}
+            onStartFindVendorGuide={() => {
+              setCurrentScreen('dashboard');
+              setTimeout(() => startFindVendorTour(setCurrentScreen), 400);
+            }}
           />
         );
 
@@ -266,6 +275,10 @@ export function HomeownerDashboard({ onLogout }: HomeownerDashboardProps) {
             openProjectFormModalOnMount={openProjectFormModalOnMount}
             restoreProjectData={restoreProjectData}
             onRestoreConsumed={() => setRestoreProjectData(null)}
+            onStartProjectGuide={() => {
+              setCurrentScreen('dashboard');
+              setTimeout(() => startCreateProjectTour(setCurrentScreen), 400);
+            }}
           />
         );
 
@@ -302,7 +315,14 @@ export function HomeownerDashboard({ onLogout }: HomeownerDashboardProps) {
       currentScreen={currentScreen}
       onNavigate={handleNavigate}
     >
-      {renderScreen()}
+      <div className="p-4 md:p-6">
+        <GettingStartedHub
+          app="homeowner"
+          userName={user?.name}
+          placement="top"
+        />
+        {renderScreen()}
+      </div>
     </MainLayout>
   );
 }

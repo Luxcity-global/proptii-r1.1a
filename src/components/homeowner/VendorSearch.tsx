@@ -11,6 +11,7 @@ import {
     ChevronLeft,
     ChevronRight
 } from 'lucide-react';
+import { ContextualBanner } from '../getting-started';
 
 interface VendorSearchResult {
     placeId: string;
@@ -32,6 +33,8 @@ interface VendorSearchProps {
     onClose: () => void;
     category?: string;
     postcode?: string;
+    /** Start the find-vendor guide (from Getting Started). */
+    onStartFindVendorGuide?: () => void;
 }
 
 interface RecentSearch {
@@ -56,7 +59,8 @@ export function VendorSearch({
     isOpen,
     onClose,
     category = 'other',
-    postcode: initialPostcode = ''
+    postcode: initialPostcode = '',
+    onStartFindVendorGuide,
 }: VendorSearchProps) {
     const [postcode, setPostcode] = useState(initialPostcode);
     const [searchTerm, setSearchTerm] = useState(
@@ -291,6 +295,15 @@ export function VendorSearch({
 
                 {/* Main Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {onStartFindVendorGuide && (
+                        <ContextualBanner
+                            app="homeowner"
+                            stepId="findVendor"
+                            message="Ready to find a vendor?"
+                            linkText="Start the 2-minute guide"
+                            onStartGuide={onStartFindVendorGuide}
+                        />
+                    )}
                     {/* Error Message */}
                     {error && (
                         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">

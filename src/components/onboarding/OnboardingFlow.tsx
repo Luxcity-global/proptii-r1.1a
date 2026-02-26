@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, Building2, FileCheck, FileSignature, Sparkles, MoreHorizontal, Check, Search, UserPlus, Share2, Megaphone, User, Briefcase, Send } from 'lucide-react';
+import { Home, Building2, FileCheck, FileSignature, Sparkles, MoreHorizontal, Check, Search, UserPlus, Share2, Megaphone, User, Briefcase, Send, X } from 'lucide-react';
 import { TextAnimate } from '../magic-ui/text-animate';
 import {
   getOrCreateAnonymousId,
@@ -55,6 +55,17 @@ export function OnboardingFlow() {
   const [howFindOtherText, setHowFindOtherText] = useState('');
   const [howFindOtherSubmitted, setHowFindOtherSubmitted] = useState(false);
   const [howFindOtherInputVisible, setHowFindOtherInputVisible] = useState(false);
+  const [showResumeModal, setShowResumeModal] = useState(false);
+
+  const handleCloseOnboarding = () => {
+    setShowResumeModal(true);
+  };
+
+  const handleResumeModalDismiss = () => {
+    setShowResumeModal(false);
+    setOnboardingCompleted(); // so landing page shows instead of onboarding when they hit /
+    navigate('/');
+  };
 
   const handleStart = () => {
     getOrCreateAnonymousId();
@@ -107,6 +118,46 @@ export function OnboardingFlow() {
       className="relative min-h-screen flex flex-col items-center justify-center px-6 py-12 md:px-10 md:py-16 bg-cover bg-center bg-no-repeat"
       style={{ backgroundImage: 'url(/images/addtenbg.png)', ...textStyle }}
     >
+      {/* Close button: top-right of page (all steps) */}
+      <button
+        type="button"
+        onClick={handleCloseOnboarding}
+        className="fixed top-6 right-6 md:top-8 md:right-10 z-20 p-2 rounded-full text-gray-600 hover:text-gray-800 hover:bg-white/80 transition-colors"
+        aria-label="Close"
+      >
+        <X className="w-6 h-6" strokeWidth={2} />
+      </button>
+
+      {/* Resume onboarding modal (after close on post-welcome steps) */}
+      {showResumeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-xl p-6 md:p-8 flex flex-col md:flex-row gap-4">
+            <div className="flex-shrink-0 flex items-center justify-center">
+              <img
+                src="/images/scout1.png"
+                alt="Proptii guide"
+                className="w-28 h-28 object-contain"
+              />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl md:text-2xl font-bold mb-2" style={textStyle}>
+                You can come back anytime
+              </h2>
+              <p className="text-sm text-[#4B5563] mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                You can pick up this process again from your dashboard. Look for the getting started area when you sign in.
+              </p>
+              <button
+                type="button"
+                onClick={handleResumeModalDismiss}
+                className="inline-flex items-center justify-center px-4 py-2 rounded-full text-sm font-medium text-white"
+                style={{ backgroundColor: '#136C9E' }}
+              >
+                Okay, I understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Logo in top left (welcome step only) */}
       {step === 'welcome' && (
         <img

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Calendar, 
   CheckCircle, 
@@ -12,6 +13,7 @@ import {
 import { useAuth } from '../../../contexts/AuthContext';
 import { firestoreService } from '../../../services/firestoreService';
 import ReferencingModal from '../../ReferencingModal.OLD';
+import { ContextualBanner } from '../../getting-started';
 
 // Interface for form data structure - matches the actual Firestore data
 interface FormData {
@@ -76,6 +78,7 @@ interface FormData {
  * Tenant Referencing page - matches the exact design from the image
  */
 const TenantReferencing: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [formData, setFormData] = useState<FormData | null>(null);
   const [stepStatus, setStepStatus] = useState<{ [key: number]: 'empty' | 'partial' | 'complete' }>({});
@@ -197,8 +200,22 @@ const TenantReferencing: React.FC = () => {
     );
   }
 
+  const startReferencingGuide = () => {
+    try {
+      localStorage.setItem('startReferencingTour', '1');
+    } catch {}
+    navigate('/referencing?startReferencingTour=1');
+  };
+
   return (
     <div className="space-y-6 pb-8" style={{ fontFamily: 'Archivo, sans-serif' }}>
+      <ContextualBanner
+        app="tenant"
+        stepId="referencing"
+        message="Ready to complete your referencing?"
+        linkText="Start the 2-minute guide"
+        onStartGuide={startReferencingGuide}
+      />
       {/* Header Section */}
       <div className="flex items-center justify-between mt-8">
         <div>

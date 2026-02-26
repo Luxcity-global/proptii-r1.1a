@@ -14,6 +14,7 @@ import { ProjectFormModal } from './ProjectFormModal';
 import { SignUpPromptModal } from '../onboarding/SignUpPromptModal';
 import { savePendingProject } from '../../utils/homeownerPendingForm';
 import { useAuth } from '../../contexts/AuthContext';
+import { ContextualBanner } from '../getting-started';
 import {
   homeownerProjectsFirestoreService,
   type HomeProject
@@ -30,9 +31,11 @@ interface ProjectsProps {
   restoreProjectData?: Omit<HomeProject, 'id'> | null;
   /** Called when restore data has been applied. */
   onRestoreConsumed?: () => void;
+  /** Start the create-project guide (from Getting Started). */
+  onStartProjectGuide?: () => void;
 }
 
-export function Projects({ projects, projectsLoading, onBack, openProjectFormModalOnMount = false, restoreProjectData, onRestoreConsumed }: ProjectsProps) {
+export function Projects({ projects, projectsLoading, onBack, openProjectFormModalOnMount = false, restoreProjectData, onRestoreConsumed, onStartProjectGuide }: ProjectsProps) {
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const [showSignUpModal, setShowSignUpModal] = useState(false);
@@ -128,6 +131,15 @@ export function Projects({ projects, projectsLoading, onBack, openProjectFormMod
 
   return (
     <div className="p-6 space-y-6">
+      {onStartProjectGuide && (
+        <ContextualBanner
+          app="homeowner"
+          stepId="createProject"
+          message="Ready to create a project?"
+          linkText="Start the 2-minute guide"
+          onStartGuide={onStartProjectGuide}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

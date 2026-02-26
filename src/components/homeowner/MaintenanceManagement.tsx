@@ -29,6 +29,7 @@ import {
 } from '../../services/homeownerMaintenanceFirestoreService';
 import { SignUpPromptModal } from '../onboarding/SignUpPromptModal';
 import { savePendingMaintenanceTask } from '../../utils/homeownerPendingForm';
+import { ContextualBanner } from '../getting-started';
 
 export type { MaintenanceTask };
 
@@ -46,6 +47,10 @@ interface MaintenanceManagementProps {
   restoreTaskData?: Omit<MaintenanceTask, 'id'> | null;
   /** Called when restore data has been applied. */
   onRestoreConsumed?: () => void;
+  /** Start the schedule-maintenance guide (from Getting Started). */
+  onStartScheduleGuide?: () => void;
+  /** Start the find-vendor guide (from Getting Started). */
+  onStartFindVendorGuide?: () => void;
 }
 
 export function MaintenanceManagement({
@@ -60,6 +65,8 @@ export function MaintenanceManagement({
   openAddTaskModalOnMount = false,
   restoreTaskData,
   onRestoreConsumed,
+  onStartScheduleGuide,
+  onStartFindVendorGuide,
 }: MaintenanceManagementProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -187,6 +194,15 @@ export function MaintenanceManagement({
 
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+      {onStartScheduleGuide && (
+        <ContextualBanner
+          app="homeowner"
+          stepId="scheduleMaintenance"
+          message="Ready to schedule maintenance?"
+          linkText="Start the 2-minute guide"
+          onStartGuide={onStartScheduleGuide}
+        />
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -745,6 +761,7 @@ export function MaintenanceManagement({
         isOpen={isVendorSearchOpen}
         onClose={() => setIsVendorSearchOpen(false)}
         category={vendorSearchCategory}
+        onStartFindVendorGuide={onStartFindVendorGuide}
       />
 
       {/* Sign-up prompt when guest tries to save maintenance task */}

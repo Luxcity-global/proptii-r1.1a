@@ -1,6 +1,7 @@
 import { driver, type DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
 import './homeownerTours.css';
+import { markStepComplete } from '../../utils/gettingStartedProgress';
 
 type HomeownerNavScreen = 'dashboard' | 'maintenance' | 'projects';
 
@@ -78,6 +79,7 @@ export function createFindVendorTour(setCurrentScreen: (screen: HomeownerNavScre
     onDestroyStarted: (_, __, opts) => {
       opts.driver.destroy();
       if (opts.state.activeIndex === STEPS.length - 1) {
+        markStepComplete('homeowner', 'findVendor');
         window.location.href = '/homeowner-onboarding';
       }
     },

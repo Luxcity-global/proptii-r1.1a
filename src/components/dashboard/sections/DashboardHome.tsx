@@ -33,6 +33,7 @@ import { contractService } from '../../../services/contractService';
 import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
 import { viewingService, ViewingStats } from '../../../services/viewingService';
 import FilePreviewModal from './FilePreviewModal';
+import { ContextualBanner } from '../../getting-started';
 
 /**
  * Main dashboard home page component following the style guide
@@ -664,8 +665,22 @@ const DashboardHome: React.FC = () => {
 
   const pieSegments = calculatePieChartSegments();
 
+  const startSearchGuide = () => {
+    try {
+      localStorage.setItem('startSearchTour', '1');
+    } catch {}
+    navigate('/?startSearchTour=1');
+  };
+
   return (
     <div className="space-y-6 pb-8" style={{ fontFamily: 'Archivo, sans-serif' }}>
+      <ContextualBanner
+        app="tenant"
+        stepId="search"
+        message="Ready to search for properties?"
+        linkText="Start the 2-minute guide"
+        onStartGuide={startSearchGuide}
+      />
       {/* Overview Section */}
       <div className="mt-8">
         <h2 

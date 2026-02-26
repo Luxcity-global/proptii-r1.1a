@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import DashboardSidebar from './ui/DashboardSidebar';
 import DashboardHeader from './ui/DashboardHeader';
+import { GettingStartedHub } from '../getting-started';
 import { useAuth } from '../../contexts/AuthContext';
 
 // Define color constants (matching ReferencingModal)
@@ -193,6 +194,11 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="max-w-7xl mx-auto px-3 pb-8">
+          <GettingStartedHub
+            app="tenant"
+            userName={user?.name || user?.givenName}
+            placement="top"
+          />
             <Outlet />
         </div>
       </main>

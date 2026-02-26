@@ -1,6 +1,7 @@
 import { driver, type DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
 import './sendContractTour.css';
+import { markStepComplete } from '../../../utils/gettingStartedProgress';
 
 const SEND_CONTRACT_EVENT = 'proptii-open-send-contract-modal';
 
@@ -106,6 +107,7 @@ export function createSendContractTour(
     onDestroyStarted: (_, __, opts) => {
       opts.driver.destroy();
       if (opts.state.activeIndex === SEND_CONTRACT_STEPS.length - 1) {
+        markStepComplete('landlord', 'sendContract');
         window.location.href = '/landlord-onboarding';
       }
     },

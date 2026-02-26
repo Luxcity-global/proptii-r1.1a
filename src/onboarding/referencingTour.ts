@@ -1,6 +1,7 @@
 import { driver, type DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
 import './searchTour.css';
+import { markStepComplete } from '../utils/gettingStartedProgress';
 
 const REFERENCING_TOUR_STEPS: DriveStep[] = [
   {
@@ -58,6 +59,11 @@ export function createReferencingTour() {
     popoverClass: 'proptii-search-tour',
     onDestroyStarted: (_, __, opts) => {
       opts.driver.destroy();
+      try {
+        markStepComplete('tenant', 'referencing');
+        localStorage.setItem('onboarding_lastClosed', 'referencing');
+        localStorage.setItem('onboarding_showExitModal', '1');
+      } catch {}
       window.location.href = '/tenant-onboarding';
     },
   });
