@@ -34,14 +34,17 @@ const ContractsPage = () => {
   }, []);
 
   // Start contracts tour when arriving from "Review and sign a contract" on tenant onboarding
+  // Clear param inside setTimeout so React Strict Mode (double effect run) doesn't cancel the tour
   useEffect(() => {
     if (searchParams.get('startContractsTour') !== '1') return;
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete('startContractsTour');
-      return next;
-    });
-    const t = setTimeout(() => startContractsTour(), 100);
+    const t = setTimeout(() => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('startContractsTour');
+        return next;
+      });
+      startContractsTour();
+    }, 100);
     return () => clearTimeout(t);
   }, [searchParams, setSearchParams]);
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -10,6 +11,7 @@ import { InteractiveHoverButton } from '../components/magic-ui/interactive-hover
 import { TextAnimate } from '../components/magic-ui/text-animate';
 import { DotPattern } from '../components/magic-ui/dot-pattern';
 import { AnimatedList } from '../components/magic-ui/animated-list';
+import { startReferencingTour } from '../onboarding/referencingTour';
 
 
 // Add preload link for the hero image
@@ -24,6 +26,7 @@ const preloadHeroImage = () => {
 
 const Referencing = () => {
   const { isAuthenticated, login, user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
   const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -32,6 +35,20 @@ const Referencing = () => {
   useEffect(() => {
     preloadHeroImage();
   }, []);
+
+  // Start referencing tour when arriving from tenant onboarding
+  useEffect(() => {
+    if (searchParams.get('startReferencingTour') !== '1') return;
+    const t = setTimeout(() => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('startReferencingTour');
+        return next;
+      });
+      startReferencingTour();
+    }, 100);
+    return () => clearTimeout(t);
+  }, [searchParams, setSearchParams]);
 
   const handleGetStarted = () => {
     if (!isAuthenticated) {
@@ -113,6 +130,7 @@ const Referencing = () => {
 
           <InteractiveHoverButton
             onClick={handleGetStarted}
+            data-demo-referencing-hero-cta="1"
             className="bg-transparent text-[#DC5F12] px-10 py-4 rounded-full hover:bg-[#DC5F12] hover:text-white text-xl font-medium border-2"
             style={{ 
               borderColor: '#DC5F12'
@@ -124,7 +142,11 @@ const Referencing = () => {
       </section>
 
       {/* Steps Section */}
-      <section className="relative bg-cover bg-center bg-no-repeat py-16 md:py-24 px-4 md:px-8 min-h-[600px] flex items-center justify-center" style={{ backgroundImage: "url('/images/Referencing.png')" }}>
+      <section
+        className="relative bg-cover bg-center bg-no-repeat py-16 md:py-24 px-4 md:px-8 min-h-[600px] flex items-center justify-center"
+        style={{ backgroundImage: "url('/images/Referencing.png')" }}
+        data-demo-referencing-steps="1"
+      >
         {/* Container with spacing */}
         <div className="relative container mx-auto flex flex-col md:flex-row items-start gap-8 md:gap-12 w-full overflow-hidden" style={{ backgroundColor: 'rgba(247, 247, 247, 0.5)', minHeight: '500px', padding: '2rem', paddingLeft: '4rem', maxWidth: '90%', borderRadius: '1.5rem', backdropFilter: 'blur(10px)' }}>
           <DotPattern className="opacity-30" />

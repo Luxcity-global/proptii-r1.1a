@@ -60,6 +60,10 @@ export function createContractsTour() {
     smoothScroll: true,
     allowClose: true,
     popoverClass: 'proptii-search-tour',
+    onDestroyStarted: (_, __, opts) => {
+      opts.driver.destroy();
+      window.location.href = '/tenant-onboarding';
+    },
   });
 }
 

@@ -72,14 +72,17 @@ const Home = () => {
   }, [searchParams, setSearchParams]);
 
   // Start search tour when arriving from "Find a place and save a property" on tenant onboarding
+  // Clear param inside setTimeout so React Strict Mode (double effect run) doesn't cancel the tour
   useEffect(() => {
     if (searchParams.get('startSearchTour') !== '1' || showOnboarding) return;
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete('startSearchTour');
-      return next;
-    });
-    const t = setTimeout(() => startSearchTour(), 100);
+    const t = setTimeout(() => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('startSearchTour');
+        return next;
+      });
+      startSearchTour();
+    }, 100);
     return () => clearTimeout(t);
   }, [searchParams, setSearchParams, showOnboarding]);
 
