@@ -1,5 +1,6 @@
 import React from 'react';
 import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature, CalendarDays } from 'lucide-react';
+import { GettingStartedHub } from './getting-started/GettingStartedHub';
 import {
   Sidebar,
   SidebarContent,
@@ -328,7 +329,12 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
         />
 
         {/* Main Content */}
-        <main className="flex-1" style={{ backgroundColor: '#F7F7F7' }}>
+        <main className="flex-1 relative" style={{ backgroundColor: '#F7F7F7' }}>
+          <GettingStartedHub
+            app="landlord"
+            userName={userProfile?.name}
+            onResumeClick={() => {}}
+          />
           {children}
         </main>
       </div>

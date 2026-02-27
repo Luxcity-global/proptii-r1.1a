@@ -6,7 +6,7 @@
 const KEY_PREFIX = 'gettingStarted_';
 const MINIMIZED_KEY = 'gettingStarted_hubMinimized_';
 
-export type GettingStartedApp = 'tenant' | 'homeowner' | 'landlord';
+export type GettingStartedApp = 'tenant' | 'homeowner' | 'landlord' | 'home';
 
 export interface GettingStartedStep {
   id: string;
@@ -15,29 +15,51 @@ export interface GettingStartedStep {
   tourParam?: string; // e.g. startSearchTour=1 for tenant search
 }
 
-/** Step definitions per app (max 5 high-impact tasks). */
+/** Step definitions per app. Tenant, landlord, homeowner: 3 options each (from onboarding). Home: combined. */
 export const GETTING_STARTED_STEPS: Record<GettingStartedApp, GettingStartedStep[]> = {
+  /** 3 options from TenantOnboardingOptions */
   tenant: [
-    { id: 'search', label: 'Try property search', path: '/', tourParam: 'startSearchTour=1' },
-    { id: 'contracts', label: 'Sign or view contracts', path: '/contracts', tourParam: 'startContractsTour=1' },
-    { id: 'referencing', label: 'Complete referencing', path: '/referencing', tourParam: 'startReferencingTour=1' },
-    { id: 'viewings', label: 'Book or manage viewings', path: '/dashboard/viewings' },
-    { id: 'your-files', label: 'Organise your files', path: '/dashboard/your-files' },
+    { id: 'search', label: 'Find a place and save a property', path: '/', tourParam: 'startSearchTour=1' },
+    { id: 'contracts', label: 'Review and sign a contract', path: '/contracts', tourParam: 'startContractsTour=1' },
+    { id: 'referencing', label: 'Begin your referencing', path: '/referencing', tourParam: 'startReferencingTour=1' },
   ],
+  /** 3 options from HomeownerOnboardingOptions */
   homeowner: [
     { id: 'scheduleMaintenance', label: 'Schedule maintenance', path: '/homeowner/dashboard', tourParam: 'startScheduleMaintenanceTour=1' },
     { id: 'createProject', label: 'Create a project', path: '/homeowner/dashboard', tourParam: 'startCreateProjectTour=1' },
     { id: 'findVendor', label: 'Find a vendor', path: '/homeowner/dashboard', tourParam: 'startFindVendorTour=1' },
-    { id: 'documents', label: 'Upload documents', path: '/homeowner/dashboard' },
-    { id: 'homeValue', label: 'Check your home value', path: '/homeowner/dashboard' },
   ],
+  /** 3 options from LandlordOnboardingOptions (used for home hub; landlord app has its own) */
   landlord: [
-    { id: 'addTenant', label: 'Add a tenant', path: '/landlord-onboarding', tourParam: 'startAddTenantTour=1' },
-    { id: 'sendContract', label: 'Send a contract', path: '/landlord-onboarding', tourParam: 'startSendContractTour=1' },
-    { id: 'addProperty', label: 'Add a property', path: '/landlord-onboarding' },
-    { id: 'manageDocuments', label: 'Manage documents', path: '/landlord-onboarding' },
-    { id: 'viewings', label: 'Manage viewings', path: '/landlord-onboarding' },
+    { id: 'addProperty', label: 'Add a property', path: '/landlord', tourParam: 'startAddPropertyTour=1&start=property-setup-step1' },
+    { id: 'addTenant', label: 'Add a tenant', path: '/landlord', tourParam: 'startAddTenantTour=1' },
+    { id: 'sendContract', label: 'Send a contract', path: '/landlord', tourParam: 'startSendContractTour=1' },
   ],
+  /** Combined: all 9 options from tenant + landlord + homeowner onboarding */
+  home: [
+    { id: 'search', label: 'Find a place and save a property', path: '/', tourParam: 'startSearchTour=1' },
+    { id: 'contracts', label: 'Review and sign a contract', path: '/contracts', tourParam: 'startContractsTour=1' },
+    { id: 'referencing', label: 'Begin your referencing', path: '/referencing', tourParam: 'startReferencingTour=1' },
+    { id: 'addProperty', label: 'Add a property', path: '/landlord', tourParam: 'startAddPropertyTour=1&start=property-setup-step1' },
+    { id: 'addTenant', label: 'Add a tenant', path: '/landlord', tourParam: 'startAddTenantTour=1' },
+    { id: 'sendContract', label: 'Send a contract', path: '/landlord', tourParam: 'startSendContractTour=1' },
+    { id: 'scheduleMaintenance', label: 'Schedule maintenance', path: '/homeowner/dashboard', tourParam: 'startScheduleMaintenanceTour=1' },
+    { id: 'createProject', label: 'Create a project', path: '/homeowner/dashboard', tourParam: 'startCreateProjectTour=1' },
+    { id: 'findVendor', label: 'Find a vendor', path: '/homeowner/dashboard', tourParam: 'startFindVendorTour=1' },
+  ],
+};
+
+/** For home hub: inherit completion from tenant/homeowner/landlord steps */
+const HOME_STEP_SOURCE: Partial<Record<string, { app: Exclude<GettingStartedApp, 'home'>; stepId: string }>> = {
+  search: { app: 'tenant', stepId: 'search' },
+  contracts: { app: 'tenant', stepId: 'contracts' },
+  referencing: { app: 'tenant', stepId: 'referencing' },
+  addProperty: { app: 'landlord', stepId: 'addProperty' },
+  addTenant: { app: 'landlord', stepId: 'addTenant' },
+  sendContract: { app: 'landlord', stepId: 'sendContract' },
+  scheduleMaintenance: { app: 'homeowner', stepId: 'scheduleMaintenance' },
+  createProject: { app: 'homeowner', stepId: 'createProject' },
+  findVendor: { app: 'homeowner', stepId: 'findVendor' },
 };
 
 function storage(): Storage | null {
@@ -57,6 +79,13 @@ export function markStepComplete(app: GettingStartedApp, stepId: string): void {
   storage()?.setItem(stepKey(app, stepId), '1');
 }
 
+function isHomeStepComplete(stepId: string): boolean {
+  const direct = isStepComplete('home', stepId);
+  if (direct) return true;
+  const src = HOME_STEP_SOURCE[stepId];
+  return src ? isStepComplete(src.app, src.stepId) : false;
+}
+
 export function getProgress(app: GettingStartedApp): {
   completedCount: number;
   total: number;
@@ -66,7 +95,7 @@ export function getProgress(app: GettingStartedApp): {
   const steps = GETTING_STARTED_STEPS[app];
   const withStatus = steps.map((s) => ({
     ...s,
-    completed: isStepComplete(app, s.id),
+    completed: app === 'home' ? isHomeStepComplete(s.id) : isStepComplete(app, s.id),
   }));
   const completedCount = withStatus.filter((s) => s.completed).length;
   const total = steps.length;

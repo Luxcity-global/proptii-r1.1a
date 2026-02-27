@@ -65,7 +65,7 @@ function buildSteps(setCurrentScreen: (screen: HomeownerNavScreen) => void): Dri
 }
 
 export function createFindVendorTour(setCurrentScreen: (screen: HomeownerNavScreen) => void) {
-  return driver({
+  const driverObj = driver({
     showProgress: true,
     progressText: '{{current}} of {{total}}',
     nextBtnText: 'Next',
@@ -78,12 +78,14 @@ export function createFindVendorTour(setCurrentScreen: (screen: HomeownerNavScre
     popoverClass: 'proptii-homeowner-tour',
     onDestroyStarted: (_, __, opts) => {
       opts.driver.destroy();
-      if (opts.state.activeIndex === STEPS.length - 1) {
-        markStepComplete('homeowner', 'findVendor');
-        window.location.href = '/homeowner-onboarding';
-      }
+      try {
+        if (opts.state.activeIndex === STEPS.length - 1) {
+          markStepComplete('homeowner', 'findVendor');
+        }
+      } catch {}
     },
   });
+  return driverObj;
 }
 
 export function startFindVendorTour(setCurrentScreen: (screen: HomeownerNavScreen) => void) {

@@ -1,6 +1,7 @@
 import { driver, type DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
 import './addPropertyTour.css';
+import { markStepComplete } from '../../../utils/gettingStartedProgress';
 
 export type AddPropertyScreen =
   | 'property-setup-step1'
@@ -10,7 +11,9 @@ export type AddPropertyScreen =
   | 'images-notes-selection'
   | 'property-preview';
 
+/** Screens for each tour step; step 0 is on dashboard, step 1+ are in the wizard. */
 const ADD_PROPERTY_SCREENS: AddPropertyScreen[] = [
+  'property-setup-step1',   // step 0 next -> go here
   'property-setup-step1',
   'property-type-selection',
   'property-details-selection',
@@ -21,7 +24,7 @@ const ADD_PROPERTY_SCREENS: AddPropertyScreen[] = [
 
 /**
  * Extensible step definitions for the add property tour.
- * Add or edit steps here to customize the flow.
+ * Step 0 highlights the Add Property button on the dashboard; step 1+ are in the wizard.
  */
 export const ADD_PROPERTY_TOUR_STEPS: Array<{
   element: string;
@@ -30,6 +33,13 @@ export const ADD_PROPERTY_TOUR_STEPS: Array<{
   side?: 'top' | 'right' | 'bottom' | 'left';
   align?: 'start' | 'center' | 'end';
 }> = [
+  {
+    element: '[data-demo-add-property-button]',
+    title: 'Add new property',
+    description: 'Click the "Add Property" button to start adding a new property to your portfolio.',
+    side: 'left',
+    align: 'center',
+  },
   {
     element: '[data-demo-add-property-step1]',
     title: 'Add new property',
@@ -75,13 +85,26 @@ export const ADD_PROPERTY_TOUR_STEPS: Array<{
 ];
 
 function buildSteps(
-  navigateToScreen: (screen: AddPropertyScreen) => void
+  navigateToScreen: (screen: AddPropertyScreen) => void,
+  onGoToDashboard: () => void
 ): DriveStep[] {
   return ADD_PROPERTY_TOUR_STEPS.map((step, index) => {
     const isLast = index === ADD_PROPERTY_TOUR_STEPS.length - 1;
     const isFirst = index === 0;
     const nextScreen = ADD_PROPERTY_SCREENS[index + 1];
     const prevScreen = ADD_PROPERTY_SCREENS[index - 1];
+    // Step 1 Back -> go to dashboard (step 0); step 0 has no Back
+    const onPrev = isFirst
+      ? undefined
+      : index === 1
+        ? (_, __, opts: { driver: { movePrevious: () => void } }) => {
+            onGoToDashboard();
+            setTimeout(() => opts.driver.movePrevious(), 250);
+          }
+        : (_, __, opts: { driver: { movePrevious: () => void } }) => {
+            navigateToScreen(prevScreen!);
+            setTimeout(() => opts.driver.movePrevious(), 250);
+          };
 
     return {
       element: step.element,
@@ -93,51 +116,51 @@ function buildSteps(
         onNextClick: isLast
           ? undefined
           : (_, __, opts) => {
-              navigateToScreen(nextScreen);
+              navigateToScreen(nextScreen!);
               setTimeout(() => opts.driver.moveNext(), 250);
             },
-        onPrevClick: isFirst
-          ? undefined
-          : (_, __, opts) => {
-              navigateToScreen(prevScreen);
-              setTimeout(() => opts.driver.movePrevious(), 250);
-            },
+        onPrevClick: onPrev,
       },
     };
   });
 }
 
 /**
- * Creates the add property tour. Pass navigateToScreen so the tour can
- * advance the wizard when the user clicks Next.
+ * Creates the add property tour. Pass navigateToScreen and onGoToDashboard so the tour can
+ * advance the wizard and go back to the dashboard when needed.
  */
 export function createAddPropertyTour(
-  navigateToScreen: (screen: AddPropertyScreen) => void
+  navigateToScreen: (screen: AddPropertyScreen) => void,
+  onGoToDashboard: () => void
 ) {
-  return driver({
+  const driverObj = driver({
     showProgress: true,
     progressText: '{{current}} of {{total}}',
     nextBtnText: 'Next',
     prevBtnText: 'Back',
     doneBtnText: 'Done',
-    steps: buildSteps(navigateToScreen),
+    steps: buildSteps(navigateToScreen, onGoToDashboard),
     overlayOpacity: 0.6,
     smoothScroll: true,
     allowClose: true,
     popoverClass: 'proptii-add-property-tour',
     onDestroyStarted: (_, __, opts) => {
-      opts.driver.destroy();
-      if (opts.state.activeIndex === ADD_PROPERTY_TOUR_STEPS.length - 1) {
-        window.location.href = '/landlord-onboarding';
-      }
+      try {
+        if (opts.state.activeIndex === ADD_PROPERTY_TOUR_STEPS.length - 1) {
+          markStepComplete('landlord', 'addProperty');
+        }
+      } catch {}
+      driverObj.destroy();
     },
   });
+  return driverObj;
 }
 
-/** Start the add property tour. Requires navigateToScreen from App. */
+/** Start the add property tour. Requires navigateToScreen and onGoToDashboard from App. */
 export function startAddPropertyTour(
-  navigateToScreen: (screen: AddPropertyScreen) => void
+  navigateToScreen: (screen: AddPropertyScreen) => void,
+  onGoToDashboard: () => void
 ) {
-  const driverObj = createAddPropertyTour(navigateToScreen);
+  const driverObj = createAddPropertyTour(navigateToScreen, onGoToDashboard);
   driverObj.drive();
 }

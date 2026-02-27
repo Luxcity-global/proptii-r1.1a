@@ -49,7 +49,7 @@ const SEARCH_TOUR_STEPS: DriveStep[] = [
  * Call .drive() when you want to start the tour (e.g. on button click).
  */
 export function createSearchTour() {
-  return driver({
+  const driverObj = driver({
     showProgress: true,
     progressText: '{{current}} of {{total}}',
     nextBtnText: 'Next',
@@ -63,13 +63,13 @@ export function createSearchTour() {
     onDestroyStarted: (_, __, opts) => {
       opts.driver.destroy();
       try {
-        markStepComplete('tenant', 'search');
-        localStorage.setItem('onboarding_lastClosed', 'search');
-        localStorage.setItem('onboarding_showExitModal', '1');
+        if (opts.state.activeIndex === SEARCH_TOUR_STEPS.length - 1) {
+          markStepComplete('tenant', 'search');
+        }
       } catch {}
-      window.location.href = '/tenant-onboarding';
     },
   });
+  return driverObj;
 }
 
 /** Start the search tour. Safe to call from a click handler; creates the driver and runs it. */

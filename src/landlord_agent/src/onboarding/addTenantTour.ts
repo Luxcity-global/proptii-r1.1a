@@ -95,7 +95,7 @@ export function createAddTenantTour(
   setNavigationScreen: (nav: NavScreen) => void,
   setCurrentScreen: (screen: MainScreen) => void
 ) {
-  return driver({
+  const driverObj = driver({
     showProgress: true,
     progressText: '{{current}} of {{total}}',
     nextBtnText: 'Next',
@@ -108,12 +108,14 @@ export function createAddTenantTour(
     popoverClass: 'proptii-add-tenant-tour',
     onDestroyStarted: (_, __, opts) => {
       opts.driver.destroy();
-      if (opts.state.activeIndex === ADD_TENANT_STEPS.length - 1) {
-        markStepComplete('landlord', 'addTenant');
-        window.location.href = '/landlord-onboarding';
-      }
+      try {
+        if (opts.state.activeIndex === ADD_TENANT_STEPS.length - 1) {
+          markStepComplete('landlord', 'addTenant');
+        }
+      } catch {}
     },
   });
+  return driverObj;
 }
 
 export function startAddTenantTour(

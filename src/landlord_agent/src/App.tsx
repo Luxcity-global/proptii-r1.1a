@@ -613,6 +613,7 @@ export default function App() {
   }, []);
 
   // Start add property tour when arriving with startAddPropertyTour=1 (from landlord/agent landing)
+  // Ensure we start on dashboard so the first step can highlight the Add Property button
   React.useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -630,8 +631,16 @@ export default function App() {
           window.location.pathname + (newSearch ? '?' + newSearch : '')
         );
       }
+      setCurrentScreen('main-app');
+      setNavigationScreen('dashboard');
       const t = setTimeout(() => {
-        startAddPropertyTour((screen) => setCurrentScreen(screen));
+        startAddPropertyTour(
+          (screen) => setCurrentScreen(screen),
+          () => {
+            setCurrentScreen('main-app');
+            setNavigationScreen('dashboard');
+          }
+        );
       }, 400);
       return () => clearTimeout(t);
     } catch (e) {

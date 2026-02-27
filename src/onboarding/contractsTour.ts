@@ -50,7 +50,7 @@ const CONTRACTS_TOUR_STEPS: DriveStep[] = [
  * Creates and returns the Driver.js instance for the contracts onboarding tour.
  */
 export function createContractsTour() {
-  return driver({
+  const driverObj = driver({
     showProgress: true,
     progressText: '{{current}} of {{total}}',
     nextBtnText: 'Next',
@@ -64,13 +64,13 @@ export function createContractsTour() {
     onDestroyStarted: (_, __, opts) => {
       opts.driver.destroy();
       try {
-        markStepComplete('tenant', 'contracts');
-        localStorage.setItem('onboarding_lastClosed', 'contracts');
-        localStorage.setItem('onboarding_showExitModal', '1');
+        if (opts.state.activeIndex === CONTRACTS_TOUR_STEPS.length - 1) {
+          markStepComplete('tenant', 'contracts');
+        }
       } catch {}
-      window.location.href = '/tenant-onboarding';
     },
   });
+  return driverObj;
 }
 
 /** Start the contracts tour. Safe to call from a click handler. */

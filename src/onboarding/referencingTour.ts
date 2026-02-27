@@ -46,7 +46,7 @@ const REFERENCING_TOUR_STEPS: DriveStep[] = [
 ];
 
 export function createReferencingTour() {
-  return driver({
+  const driverObj = driver({
     showProgress: true,
     progressText: '{{current}} of {{total}}',
     nextBtnText: 'Next',
@@ -60,13 +60,13 @@ export function createReferencingTour() {
     onDestroyStarted: (_, __, opts) => {
       opts.driver.destroy();
       try {
-        markStepComplete('tenant', 'referencing');
-        localStorage.setItem('onboarding_lastClosed', 'referencing');
-        localStorage.setItem('onboarding_showExitModal', '1');
+        if (opts.state.activeIndex === REFERENCING_TOUR_STEPS.length - 1) {
+          markStepComplete('tenant', 'referencing');
+        }
       } catch {}
-      window.location.href = '/tenant-onboarding';
     },
   });
+  return driverObj;
 }
 
 export function startReferencingTour() {

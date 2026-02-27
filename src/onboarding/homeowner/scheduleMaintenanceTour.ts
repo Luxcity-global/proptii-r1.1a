@@ -67,7 +67,7 @@ function buildSteps(setCurrentScreen: (screen: HomeownerNavScreen) => void): Dri
 }
 
 export function createScheduleMaintenanceTour(setCurrentScreen: (screen: HomeownerNavScreen) => void) {
-  return driver({
+  const driverObj = driver({
     showProgress: true,
     progressText: '{{current}} of {{total}}',
     nextBtnText: 'Next',
@@ -80,12 +80,14 @@ export function createScheduleMaintenanceTour(setCurrentScreen: (screen: Homeown
     popoverClass: 'proptii-homeowner-tour',
     onDestroyStarted: (_, __, opts) => {
       opts.driver.destroy();
-      if (opts.state.activeIndex === STEPS.length - 1) {
-        markStepComplete('homeowner', 'scheduleMaintenance');
-        window.location.href = '/homeowner-onboarding';
-      }
+      try {
+        if (opts.state.activeIndex === STEPS.length - 1) {
+          markStepComplete('homeowner', 'scheduleMaintenance');
+        }
+      } catch {}
     },
   });
+  return driverObj;
 }
 
 export function startScheduleMaintenanceTour(setCurrentScreen: (screen: HomeownerNavScreen) => void) {

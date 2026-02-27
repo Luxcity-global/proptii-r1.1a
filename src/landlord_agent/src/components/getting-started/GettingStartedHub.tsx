@@ -1,30 +1,29 @@
 import React, { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Check, Minus } from 'lucide-react';
 import {
-  type GettingStartedApp,
   getProgress,
   getHubMinimized,
   setHubMinimized,
-} from '../../utils/gettingStartedProgress';
+  type GettingStartedApp,
+} from '../../../utils/gettingStartedProgress';
 
 const BRAND_BLUE = '#136C9E';
+
+/** Base URL for "Begin tour" – reload landlord app with tour param so App useEffects start the guide. */
+const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
 
 export interface GettingStartedHubProps {
   app: GettingStartedApp;
   userName?: string;
-  /** 'top' = above main content; 'sidebar' = right-hand sidebar */
-  placement?: 'top' | 'sidebar';
-  /** Optional: custom resume action (e.g. landlord app opens main app URL) */
-  onResumeClick?: (path: string, tourParam?: string) => void;
+  /** Called when user clicks "Begin tour" (path and tourParam). */
+  onResumeClick: (path: string, tourParam?: string) => void;
 }
 
 /**
- * Getting Started dashboard hub: progress, up to 5 steps, minimize (to icon), microcopy.
+ * Getting Started hub for landlord app: FAB + overlay, progress, steps, "Begin tour" per step.
  * FAB always visible; overlay shows progress and steps.
  */
-export function GettingStartedHub({ app, userName, placement = 'top', onResumeClick }: GettingStartedHubProps) {
-  const navigate = useNavigate();
+export function GettingStartedHub({ app, userName, onResumeClick }: GettingStartedHubProps) {
   const [minimized, setMinimizedState] = useState(() => getHubMinimized(app) || true);
   const progress = getProgress(app);
 
@@ -36,47 +35,29 @@ export function GettingStartedHub({ app, userName, placement = 'top', onResumeCl
 
   const handleBeginTour = useCallback(
     (path: string, tourParam?: string) => {
-      // Close the Getting Started modal first so it doesn't stay open over the tour
       setMinimizedState(true);
       setHubMinimized(app, true);
-
       const url = tourParam
         ? `${path}${path.includes('?') ? '&' : '?'}${tourParam}`
         : path;
-
-      const startTour = () => {
-        if (onResumeClick) {
-          onResumeClick(path, tourParam);
-          return;
-        }
-        if (app === 'homeowner' || app === 'landlord') {
-          try {
-            if (tourParam) localStorage.setItem(tourParam.split('=')[0], '1');
-          } catch {}
-          window.location.href = url;
-          return;
-        }
-        // tenant and home: navigate within main app
-        try {
-          if (tourParam) localStorage.setItem(tourParam.split('=')[0], '1');
-        } catch {}
-        navigate(url);
-      };
-
-      // Defer tour start so the modal can close and unmount first
+      const fullUrl = path.startsWith('http') ? url : `${BASE_URL}${url}`;
+      try {
+        if (tourParam) localStorage.setItem(tourParam.split('=')[0], '1');
+      } catch {}
       requestAnimationFrame(() => {
-        setTimeout(startTour, 150);
+        setTimeout(() => {
+          onResumeClick(path, tourParam);
+          window.location.href = fullUrl;
+        }, 150);
       });
     },
-    [app, navigate, onResumeClick]
+    [app, onResumeClick]
   );
 
   const displayName = userName?.trim() || 'there';
 
-  // Floating trigger: lower right – Scout avatar; chat bubble on hover
   const fab = (
     <div className="group fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
-      {/* Chat bubble: visible on hover */}
       <div
         className="relative rounded-2xl rounded-br-md bg-white px-4 py-2.5 shadow-lg border border-gray-200 text-sm text-gray-800 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200"
         style={{ fontFamily: 'Archivo, sans-serif', maxWidth: '200px' }}
@@ -106,7 +87,6 @@ export function GettingStartedHub({ app, userName, placement = 'top', onResumeCl
     </div>
   );
 
-  const isSidebar = placement === 'sidebar';
   const content = (
     <>
       <div className="flex items-start justify-between gap-4">
@@ -132,8 +112,6 @@ export function GettingStartedHub({ app, userName, placement = 'top', onResumeCl
           </button>
         </div>
       </div>
-
-      {/* Progress: horizontal bar + percentage */}
       <div className="mt-4 flex items-center gap-3">
         <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
           <div
@@ -145,10 +123,8 @@ export function GettingStartedHub({ app, userName, placement = 'top', onResumeCl
           {progress.percentage}%
         </span>
       </div>
-
-      {/* Step list: 3 per dashboard, all 9 for home */}
       <ul className="mt-4 space-y-3">
-        {progress.steps.slice(0, app === 'home' ? 9 : 5).map((step) => (
+        {progress.steps.slice(0, 5).map((step) => (
           <li key={step.id} className="flex items-center gap-3 text-sm">
             {step.completed ? (
               <span className="flex items-center justify-center w-5 h-5 rounded-full shrink-0 bg-green-100">
@@ -174,26 +150,11 @@ export function GettingStartedHub({ app, userName, placement = 'top', onResumeCl
     </>
   );
 
-  if (isSidebar) {
-    return (
-      <aside
-        className="w-72 shrink-0 rounded-xl border border-gray-200 bg-white shadow-sm p-5"
-        style={{ fontFamily: 'Archivo, sans-serif' }}
-      >
-        {content}
-      </aside>
-    );
-  }
-
-  // Default: FAB in lower right; when expanded, show overlay
-  if (minimized) {
-    return fab;
-  }
+  if (minimized) return fab;
 
   return (
     <>
       {fab}
-      {/* Overlay: open when not minimized */}
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
         role="dialog"

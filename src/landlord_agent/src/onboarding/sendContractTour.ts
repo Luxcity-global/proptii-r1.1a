@@ -93,7 +93,7 @@ function buildSteps(
 export function createSendContractTour(
   setNavigationScreen: (nav: NavScreen) => void
 ) {
-  return driver({
+  const driverObj = driver({
     showProgress: true,
     progressText: '{{current}} of {{total}}',
     nextBtnText: 'Next',
@@ -106,12 +106,14 @@ export function createSendContractTour(
     popoverClass: 'proptii-send-contract-tour',
     onDestroyStarted: (_, __, opts) => {
       opts.driver.destroy();
-      if (opts.state.activeIndex === SEND_CONTRACT_STEPS.length - 1) {
-        markStepComplete('landlord', 'sendContract');
-        window.location.href = '/landlord-onboarding';
-      }
+      try {
+        if (opts.state.activeIndex === SEND_CONTRACT_STEPS.length - 1) {
+          markStepComplete('landlord', 'sendContract');
+        }
+      } catch {}
     },
   });
+  return driverObj;
 }
 
 export function startSendContractTour(

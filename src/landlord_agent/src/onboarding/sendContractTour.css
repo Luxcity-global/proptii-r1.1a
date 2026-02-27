@@ -26,7 +26,8 @@
 }
 
 .proptii-send-contract-tour .driver-popover-prev-btn,
-.proptii-send-contract-tour .driver-popover-next-btn {
+.proptii-send-contract-tour .driver-popover-next-btn,
+.proptii-send-contract-tour .driver-popover-try-more-btn {
   background: rgba(255, 255, 255, 0.2);
   color: #fff;
   box-shadow: none;
@@ -34,7 +35,8 @@
 }
 
 .proptii-send-contract-tour .driver-popover-prev-btn:hover,
-.proptii-send-contract-tour .driver-popover-next-btn:hover {
+.proptii-send-contract-tour .driver-popover-next-btn:hover,
+.proptii-send-contract-tour .driver-popover-try-more-btn:hover {
   background: rgba(255, 255, 255, 0.3);
   color: #fff;
 }

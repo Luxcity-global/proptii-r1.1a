@@ -628,6 +628,7 @@ export function Dashboard({
               
               {/* Add Property Button */}
               <Button 
+                data-demo-add-property-button
                 onClick={onAddProperty} 
                 className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-lg transition-all duration-300 flex-shrink-0 w-auto" 
                 style={{ 
@@ -1141,6 +1142,7 @@ export function Dashboard({
                 : "Get started by adding your first property"}
             </p>
             <Button 
+              data-demo-add-property-button
               onClick={onAddProperty} 
               className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 w-auto" 
               style={{ 

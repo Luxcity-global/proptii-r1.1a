@@ -9,6 +9,7 @@ import { Marquee } from '../components/magic-ui/marquee';
 import { MagicCard } from '../components/magic-ui/magic-card';
 import { TextAnimate } from '../components/magic-ui/text-animate';
 import { useAuth } from '../context/AuthContext';
+import { GettingStartedHub } from '../components/getting-started';
 import { hasOnboardingCompleted } from '../utils/onboardingSession';
 import { OnboardingFlow } from '../components/onboarding/OnboardingFlow';
 import { DemoGuideBubble } from '../components/onboarding/DemoGuideBubble';
@@ -20,6 +21,7 @@ const Home = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const userName = user?.displayName ?? user?.email ?? undefined;
   const isAuthenticated = !!user;
   const showOnboarding = !isAuthenticated && !hasOnboardingCompleted();
 
@@ -385,6 +387,9 @@ const Home = () => {
 
       <FAQSection />
       <Footer />
+
+      {/* Getting Started hub: combined tenant + homeowner + landlord guides */}
+      <GettingStartedHub app="home" userName={userName} />
 
     </div>
   );
