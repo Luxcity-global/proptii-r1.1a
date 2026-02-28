@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { WelcomeScreen } from './components/WelcomeScreen';
+import { LandlordEmptyState } from './components/LandlordEmptyState';
 import { RoleSelection } from './components/RoleSelection';
 import { ProfileSetup } from './components/ProfileSetup';
 import { PropertySetup } from './components/PropertySetup';
@@ -46,6 +47,9 @@ import { collection, query, where, onSnapshot, Unsubscribe, doc, updateDoc, Time
 
 export type UserRole = 'landlord' | 'agent';
 
+/** Azure B2C sign-in URL for guest users in empty state */
+const SIGN_IN_URL = 'https://proptii.b2clogin.com/proptii.onmicrosoft.com/b2c_1_signupandsigninproptii/oauth2/v2.0/authorize?client_id=532e1fa0-18a6-4356-bd78-1f62bd6d5e2f&scope=openid%20profile%20email%20offline_access&redirect_uri=https%3A%2F%2Fproptii.co&client-request-id=019c89da-c0f9-7dde-8814-96ced1d1ac4a&response_mode=fragment&client_info=1&nonce=019c89da-c0fd-7ed4-acf5-ad3b2621c727&state=eyJpZCI6IjAxOWM4OWRhLWMwZmEtNzcwOC1iYjYwLTRiM2MzODZkZmJiZCIsIm1ldGEiOnsiaW50ZXJhY3Rpb25UeXBlIjoicmVkaXJlY3QifX0%3D&claims=%7B%22id_token%22%3A%7B%22extension_PhoneNumber%22%3Anull%7D%7D&x-client-SKU=msal.js.browser&x-client-VER=4.12.0&response_type=code&code_challenge=YWSXzXu9cBV85rUs9pzakoUBSnweIFd2NW-SzZdpjyI&code_challenge_method=S256';
+
 export interface CompanyProfile {
   companyName: string;
   companyDescription?: string;
@@ -81,6 +85,21 @@ export interface Property {
   notes: string;
   photos: PropertyPhoto[];
   documents: PropertyDocument[];
+  // Sale-related (optional)
+  isForSale?: boolean;
+  tenureType?: string;
+  annualGroundRent?: number;
+  councilTaxBand?: string;
+  annualServiceCharge?: number;
+  // Shortlet-related (optional)
+  propertyMode?: 'long-term' | 'shortlet'; // Property rental mode
+  nightlyRate?: number; // Nightly rate for shortlets
+  minStay?: number; // Minimum stay in nights
+  maxStay?: number; // Maximum stay in nights
+  currentGuest?: Guest; // Current guest information
+  calendarDates?: CalendarDate[]; // Availability calendar
+  pricingRules?: PricingRule[]; // Pricing rules for shortlets
+  provisioningChecklist?: ProvisioningTask[]; // Property readiness checklist
   createdAt: Date;
   tenant?: Tenant;
   tenantId?: string;
@@ -618,6 +637,15 @@ function AppContent() {
         setCurrentScreen(qpStart as Screen);
         return;
       }
+      if (qpStart === 'add-tenant') {
+        setCurrentScreen('add-tenant');
+        return;
+      }
+      if (qpStart === 'contracts') {
+        setCurrentScreen('main-app');
+        setNavigationScreen('contracts');
+        return;
+      }
       const startScreen = localStorage.getItem('startScreen');
       if (startScreen === 'property-setup-step1') {
         setCurrentScreen('property-setup-step1');
@@ -632,21 +660,19 @@ function AppContent() {
   }, []);
 
   // Restore current screen from sessionStorage on mount (survives page reload)
+  // Skip restore when deep-linked from onboarding (start= query param) so Add Property flows correctly
   React.useEffect(() => {
     try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('start')) return; // Deep link takes priority
       const savedScreen = sessionStorage.getItem('proptii_current_screen') as Screen | null;
       const savedPreviousScreen = sessionStorage.getItem('proptii_previous_screen') as Screen | null;
-      
       if (savedScreen && savedScreen !== 'main-app' && savedScreen !== 'welcome') {
         console.log('🔄 Restoring screen from sessionStorage:', savedScreen);
         setCurrentScreen(savedScreen);
-        
-        if (savedPreviousScreen) {
-          setPreviousScreen(savedPreviousScreen);
-        }
+        if (savedPreviousScreen) setPreviousScreen(savedPreviousScreen);
       }
     } catch (e) {
-      // Ignore storage errors
       console.warn('Failed to restore screen from sessionStorage:', e);
     }
   }, []);
@@ -3215,6 +3241,11 @@ function AppContent() {
             onHome={() => navigateToScreen('main-app')}
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
             onPublishProperty={async () => {
+              // Guest user – ask them to sign up before saving to Firebase
+              if (!userProfile) {
+                window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: { action: 'publish' } }, '*');
+                return;
+              }
               try {
                 console.log(isEditing ? '💾 Saving property changes...' : '📤 Publishing property...');
                 console.log('Property setup data:', {
@@ -3445,6 +3476,11 @@ function AppContent() {
               }
             }}
             onSave={async (tenant) => {
+              // Guest user – ask them to sign up before saving to Firebase
+              if (!userProfile) {
+                window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: { action: 'add-tenant' } }, '*');
+                return;
+              }
               const tenantId = editingTenantRef.current?.id || selectedTenant?.id;
               if (tenantId) {
                 // Update existing tenant

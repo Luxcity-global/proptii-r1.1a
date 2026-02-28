@@ -1259,7 +1259,7 @@ const SearchResults = () => {
   };
 
   const goToHome = () => {
-    navigate('/');
+    navigate('/home-v2');
   };
 
   if (isLoading) {

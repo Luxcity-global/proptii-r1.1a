@@ -1,34 +1,29 @@
 import { useState, useCallback, useEffect } from 'react';
 
+/** Search/backend (On The Market scraper) - default port 3001 */
 const DEFAULT_LOCAL_SEARCH_URL = 'http://localhost:3001';
 const DEFAULT_RENDER_SEARCH_URL = 'https://proptii-r1-1a-search.onrender.com';
 
-const normalizeBackendUrl = (rawUrl: string | undefined): string => {
-  if (!rawUrl) {
-    return DEFAULT_LOCAL_SEARCH_URL;
+const normalizeBackendUrl = (rawUrl: string | undefined, defaultUrl: string): string => {
+  if (!rawUrl || !rawUrl.trim()) {
+    return defaultUrl;
   }
-
   const trimmed = rawUrl.trim();
-  if (!trimmed) {
-    return DEFAULT_LOCAL_SEARCH_URL;
-  }
-
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 };
 
+/** URL for search/backend (scraper.ts - On The Market / Rightmove / etc.) */
 const resolveSearchBackendUrl = (): string => {
   const envUrl = import.meta.env.VITE_SEARCH_BACKEND_URL;
   if (envUrl && envUrl.trim()) {
-    return normalizeBackendUrl(envUrl);
+    return normalizeBackendUrl(envUrl, DEFAULT_LOCAL_SEARCH_URL);
   }
-
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname.toLowerCase();
     if (hostname.includes('onrender.com') || hostname.includes('proptii.com')) {
       return DEFAULT_RENDER_SEARCH_URL;
     }
   }
-
   return DEFAULT_LOCAL_SEARCH_URL;
 };
 
@@ -156,40 +151,31 @@ export const useSearchBackend = () => {
     setSearchType(type);
 
     try {
-      // Handle Proptii search (fetch from Firestore)
+      // Handle Proptii search: query Firestore directly (real data, no mock)
       if (type === 'proptii') {
         const { searchProptiiProperties } = await import('../services/proptiiPropertyService');
         const proptiiResults = await searchProptiiProperties(searchQuery);
-        
-        // Clean the pricing for all properties
+
         const cleanedResults = proptiiResults.map(property => ({
           ...property,
           price: cleanPropertyPrice(property.price)
         }));
-        
+
         setResults(cleanedResults);
-        
-        // Cache the results in sessionStorage
-        const cacheData = {
+        sessionStorage.setItem('searchResults', JSON.stringify({
           results: cleanedResults,
           query: searchQuery,
           searchType: 'proptii',
           timestamp: Date.now()
-        };
-        sessionStorage.setItem('searchResults', JSON.stringify(cacheData));
-        
+        }));
         return cleanedResults;
       }
 
-      let endpoint: string;
-      let requestBody: any;
-
       if (type === 'onthemarket') {
-        // Build URL using the same logic as the original frontend
+        // --- Build On The Market scraper URL ---
         const isRental = searchQuery.toLowerCase().includes('rent') || searchQuery.toLowerCase().includes('pcm');
         const baseUrl = isRental ? 'to-rent' : 'for-sale';
-        
-        // Extract location from query
+
         const locationMatch = searchQuery.match(/in\s+([a-zA-Z\s,]+)/i);
         let location = locationMatch ? locationMatch[1].trim().toLowerCase() : '';
         location = location
@@ -198,14 +184,12 @@ export const useSearchBackend = () => {
           .replace(/-+/g, '-')
           .replace(/^-|-$/g, '')
           .replace(/-for|-under/g, '');
-        
-        // Extract price and bedroom information
+
         const priceMatch = searchQuery.match(/(\d+)(?:k|pcm|\s*pound)/i);
         const priceValue = priceMatch ? priceMatch[1] : '';
         const bedroomMatch = searchQuery.match(/(\d+)\s*bed/i);
         const bedrooms = bedroomMatch ? bedroomMatch[1] : '';
-        
-        // Build URL parameters
+
         const params = new URLSearchParams();
         if (bedrooms) {
           params.append('min-bedrooms', bedrooms);
@@ -213,42 +197,89 @@ export const useSearchBackend = () => {
         }
         if (priceValue) {
           if (isRental) {
-            params.append('min-price', priceValue);
+            params.append('max-price', priceValue);
           } else {
-            const price = searchQuery.toLowerCase().includes('k') 
+            const price = searchQuery.toLowerCase().includes('k')
               ? String(parseInt(priceValue) * 1000)
               : priceValue;
             params.append('max-price', price);
           }
         }
         params.append('view', 'grid');
-        
+
         const searchUrl = `https://www.onthemarket.com/${baseUrl}/property/${location}/`;
         const finalUrl = params.toString() ? `${searchUrl}?${params.toString()}` : searchUrl;
-        
-        // Use the real scraping endpoint that uses Puppeteer (correlationId for backend trace)
-        endpoint = '/scrape';
         const correlationId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
           ? crypto.randomUUID()
           : `fe-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-        requestBody = {
-          url: finalUrl,
-          correlationId
-        };
-      } else {
-        // For internet search, use the real scrapeInternet function
-        endpoint = '/scrape-internet-real';
-        requestBody = {
-          query: searchQuery
-        };
+
+        // --- OTM scraper promise ---
+        const scraperPromise = (async (): Promise<Property[]> => {
+          const response = await fetch(`${searchBackendUrl}/scrape`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: finalUrl, correlationId }),
+          });
+          if (!response.ok) throw new Error(`Scraper responded with ${response.status}`);
+          const data = await response.json();
+          return (Array.isArray(data) ? data : (data?.properties ?? [])) as Property[];
+        })();
+
+        // --- Firestore (Proptii) search promise — runs in parallel with scraper ---
+        const firestorePromise = (async (): Promise<Property[]> => {
+          const { searchProptiiProperties } = await import('../services/proptiiPropertyService');
+          return await searchProptiiProperties(searchQuery);
+        })();
+
+        // Run both in parallel — neither failure cancels the other
+        const [scraperSettled, firestoreSettled] = await Promise.allSettled([scraperPromise, firestorePromise]);
+
+        const scraperResults: Property[] = scraperSettled.status === 'fulfilled' ? scraperSettled.value : [];
+        const firestoreResults: Property[] = firestoreSettled.status === 'fulfilled' ? firestoreSettled.value : [];
+
+        if (scraperSettled.status === 'rejected') {
+          console.warn('[Search] OTM scraper failed:', scraperSettled.reason);
+        }
+        if (firestoreSettled.status === 'rejected') {
+          console.warn('[Search] Firestore search failed:', firestoreSettled.reason);
+        }
+
+        if (scraperResults.length === 0 && firestoreResults.length === 0) {
+          throw new Error('No properties found. Please try a different search.');
+        }
+
+        // Merge: Firestore (Proptii) results first, then unique OTM results
+        const deduplicationKey = (p: Property) =>
+          `${p.title?.toLowerCase().trim()}|${p.location?.toLowerCase().trim()}`;
+        const seenKeys = new Set(firestoreResults.map(deduplicationKey));
+        const uniqueScraper = scraperResults.filter(p => {
+          const key = deduplicationKey(p);
+          if (seenKeys.has(key)) return false;
+          seenKeys.add(key);
+          return true;
+        });
+        const finalResults: Property[] = [...firestoreResults, ...uniqueScraper];
+
+        const cleanedResults = finalResults.map(property => ({
+          ...property,
+          price: cleanPropertyPrice(property.price)
+        }));
+
+        setResults(cleanedResults);
+        sessionStorage.setItem('searchResults', JSON.stringify({
+          results: cleanedResults,
+          query: searchQuery,
+          searchType: type,
+          timestamp: Date.now()
+        }));
+        return cleanedResults;
       }
 
-      const response = await fetch(`${searchBackendUrl}${endpoint}`, {
+      // --- Internet / fallback search ---
+      const response = await fetch(`${searchBackendUrl}/scrape-internet-real`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: searchQuery }),
       });
 
       if (!response.ok) {
@@ -256,32 +287,26 @@ export const useSearchBackend = () => {
       }
 
       const data = await response.json();
-      
-      // Handle the response data
+
       let finalResults: Property[] = [];
       if (Array.isArray(data)) {
         finalResults = data;
       } else if (data.properties) {
         finalResults = data.properties;
       }
-      
-      // Clean the pricing for all properties
+
       const cleanedResults = finalResults.map(property => ({
         ...property,
         price: cleanPropertyPrice(property.price)
       }));
-      
+
       setResults(cleanedResults);
-      
-      // Cache the results in sessionStorage
-      const cacheData = {
+      sessionStorage.setItem('searchResults', JSON.stringify({
         results: cleanedResults,
         query: searchQuery,
         searchType: type,
         timestamp: Date.now()
-      };
-      sessionStorage.setItem('searchResults', JSON.stringify(cacheData));
-      
+      }));
       return finalResults;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Search failed';

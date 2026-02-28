@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { consumePendingProperty } from '../utils/onboardingSession';
 
 export interface SavedProperty {
   id: string;
@@ -47,18 +48,47 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
   const [savedProperties, setSavedProperties] = useState<SavedProperty[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Load saved properties from localStorage on mount
+  // Load saved properties from localStorage on mount; migrate any pending property from onboarding
   useEffect(() => {
     const saved = localStorage.getItem('savedProperties');
+    let parsed: SavedProperty[] = [];
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        setSavedProperties(parsed);
+        parsed = JSON.parse(saved);
       } catch (error) {
         console.error('Error loading saved properties:', error);
         localStorage.removeItem('savedProperties');
       }
     }
+    const pending = consumePendingProperty();
+    if (pending && typeof pending === 'object' && pending !== null && 'title' in pending) {
+      const prop = pending as Record<string, unknown>;
+      const propertyId = `${prop.title}-${prop.location}-${prop.price}`;
+      if (!parsed.some(p => p.id === propertyId)) {
+        const agentData = (prop.agent as Record<string, unknown>) || {};
+        parsed.push({
+          id: propertyId,
+          title: String(prop.title ?? ''),
+          price: String(prop.price ?? ''),
+          location: String(prop.location ?? ''),
+          bedrooms: String(prop.bedrooms ?? ''),
+          propertyType: String(prop.propertyType ?? ''),
+          imageUrls: Array.isArray(prop.imageUrls) ? prop.imageUrls as string[] : [],
+          agent: {
+            id: agentData.id as string | undefined,
+            name: String(agentData.name ?? prop.source ?? 'Unknown Agent'),
+            email: String(agentData.email ?? ''),
+            phone: agentData.phone as string | undefined,
+            company: agentData.company as string | undefined,
+            website: agentData.website as string | undefined
+          },
+          source: prop.source as string | undefined,
+          description: prop.description as string | undefined,
+          savedAt: new Date().toISOString()
+        });
+      }
+    }
+    setSavedProperties(parsed);
     setIsInitialized(true);
   }, []);
 

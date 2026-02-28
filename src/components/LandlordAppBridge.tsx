@@ -9,18 +9,9 @@ interface LandlordAppBridgeProps {
 
 const LandlordAppBridge: React.FC<LandlordAppBridgeProps> = ({ className, style }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const location = useLocation();
+  const { search } = useLocation();
   const { isAuthenticated, user, isLoading } = useAuth();
-
-  // Extract the path after /landlord (e.g., /viewings from /landlord/viewings)
-  const getLandlordPath = () => {
-    const path = location.pathname;
-    if (path.startsWith('/landlord')) {
-      const landlordPath = path.substring('/landlord'.length) || '/';
-      return landlordPath;
-    }
-    return '/';
-  };
+  const iframeSrc = `/landlord/index.html${search}`;
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -28,8 +19,6 @@ const LandlordAppBridge: React.FC<LandlordAppBridgeProps> = ({ className, style 
 
     // Wait for iframe to load
     const handleIframeLoad = () => {
-      const landlordPath = getLandlordPath();
-      
       // Send authentication state to landlord app
       const authState = {
         isAuthenticated,
@@ -42,13 +31,7 @@ const LandlordAppBridge: React.FC<LandlordAppBridgeProps> = ({ className, style 
         payload: authState
       }, '*');
 
-      // Send navigation path to landlord app
-      iframe.contentWindow?.postMessage({
-        type: 'NAVIGATE',
-        payload: { path: landlordPath }
-      }, '*');
-
-      console.log('Sent auth state and navigation to landlord app:', { authState, path: landlordPath });
+      console.log('Sent auth state to landlord app:', authState);
     };
 
     iframe.addEventListener('load', handleIframeLoad);
@@ -61,28 +44,7 @@ const LandlordAppBridge: React.FC<LandlordAppBridgeProps> = ({ className, style 
     return () => {
       iframe.removeEventListener('load', handleIframeLoad);
     };
-  }, [isAuthenticated, user, isLoading, location.pathname]);
-
-  // Listen for redirect requests from the iframe
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Only accept messages from our iframe (same origin)
-      if (event.data?.type === 'REDIRECT_TO_LOGIN') {
-        const redirectPath = event.data.payload?.redirect || window.location.pathname + window.location.search;
-        const loginPath = `/login?redirect=${encodeURIComponent(redirectPath)}`;
-        console.log('🔒 LandlordAppBridge: Received redirect request from iframe, redirecting to:', loginPath);
-        window.location.href = loginPath;
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => {
-      window.removeEventListener('message', handleMessage);
-    };
-  }, []);
-
-  // Update iframe src to include the path as a hash or query parameter for initial load
-  const iframeSrc = `/landlord/index.html${getLandlordPath() !== '/' ? `#${getLandlordPath()}` : ''}`;
+  }, [isAuthenticated, user, isLoading]);
 
   return (
     <iframe

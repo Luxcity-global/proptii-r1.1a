@@ -19,12 +19,16 @@ interface SendContractProps {
     };
   };
   signedPdfBytes?: Uint8Array | null;
+  /** When true, Send Contract click shows sign-up modal instead of sending. */
+  interceptWithSignUp?: boolean;
+  /** Called when Send Contract is clicked and interceptWithSignUp is true. */
+  onInterceptSignUp?: () => void;
   onSend: (recipients: string[], signature?: File) => void;
   onClose?: () => void;
 }
 
 
-const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfBytes, onSend, onClose }) => {
+const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfBytes, interceptWithSignUp, onInterceptSignUp, onSend, onClose }) => {
   const { addSignedContract } = useSignedContracts();
   const { user } = useAuth();
   const [recipients, setRecipients] = useState<Array<{name: string, email: string, isRegistered: boolean}>>([{name: '', email: '', isRegistered: false}]);
@@ -204,6 +208,12 @@ const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfByte
     // Check if document is signed
     if (!signedPdfBytes) {
       alert('Please sign the document first before sending. Go to the "Edit" tab to sign the contract.');
+      return;
+    }
+
+    // Demo mode: intercept and show sign-up modal instead of sending
+    if (interceptWithSignUp && onInterceptSignUp) {
+      onInterceptSignUp();
       return;
     }
 

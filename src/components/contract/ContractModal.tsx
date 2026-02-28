@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Menu, UploadCloud, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import * as pdfjs from "pdfjs-dist";
-import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
+import * as pdfjs from 'pdfjs-dist';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker?url';
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from 'react-router-dom';
 import CustomizePage from './CustomizePage';
 import { contractService, ContractTemplate } from '../../services/contractService';
 import { useAuth } from '../../contexts/AuthContext';
-
 interface ContractModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -118,7 +117,6 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
   const [customizingTemplate, setCustomizingTemplate] = useState<Template | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
-
   // Load templates and contracts from Firestore on component mount
   useEffect(() => {
     const loadTemplatesFromFirestore = async () => {
@@ -695,7 +693,10 @@ const findCustomizedTemplate = () => {
           </div>
           <div className="flex gap-6 items-start">
             {/* Upload Box */}
-            <label className="border-dashed bg-white border-2 border-gray-300 rounded-lg w-44 h-56 flex flex-col items-center justify-center cursor-pointer text-gray-500 hover:border-gray-400 transition-all">
+            <label
+              className="border-dashed bg-white border-2 border-gray-300 rounded-lg w-44 h-56 flex flex-col items-center justify-center cursor-pointer text-gray-500 hover:border-gray-400 transition-all"
+              data-demo-contract-upload
+            >
               <UploadCloud size={32} className="mb-2 text-gray-400" />
               <span className="text-center text-sm">Click to upload or drag & drop</span>
               <span className="text-center text-xs text-gray-400 mt-1">Max 10MB • PDF only</span>
@@ -765,8 +766,8 @@ const findCustomizedTemplate = () => {
           </tr>
         </thead>
         <tbody>
-          {uploadedTemplates.map((template) => (
-            <tr key={template.id} className="border-t">
+          {uploadedTemplates.map((template, index) => (
+          <tr key={template.id} className="border-t">
               <td className="p-2 border text-left max-w-0 w-2/5">
                 <div className="truncate" title={template.name}>
                   {template.name}
@@ -778,6 +779,7 @@ const findCustomizedTemplate = () => {
                 <button
                   onClick={() => setDropdownOpen(dropdownOpen === template.id ? null : template.id)}
                   className="border border-[#136C9E] text-[#136C9E] px-4 py-1 rounded-full hover:bg-[#136C9E]/10"
+                  {...(index === 0 ? { 'data-demo-contract-manage-first': true } : {})}
                 >
                   Manage
                 </button>
