@@ -32,6 +32,7 @@ const Home = () => {
   const [prefilledEmail, setPrefilledEmail] = useState('');
   const [tenantEmail, setTenantEmail] = useState('');
   const [heroGuideStepIndex, setHeroGuideStepIndex] = useState(0);
+  const [, setOnboardingRefresh] = useState(0);
 
   const tenantSearchDemoActive = searchParams.get('tenantSearchDemo') === '1';
   const showHeroGuide = tenantSearchDemoActive && !showOnboarding && !isAuthenticated;
@@ -133,14 +134,18 @@ const Home = () => {
     setIsResponseModalOpen(false);
   };
 
-  // Option A: Homepage as onboarding — show Discovery + Profiling for unauthenticated users who haven't completed it
-  if (showOnboarding) {
-    return <OnboardingFlow />;
-  }
+  const handleOnboardingDismiss = () => {
+    setOnboardingRefresh((r) => r + 1);
+  };
 
   return (
     <div className="min-h-screen flex flex-col font-nunito">
       <Navbar />
+
+      {/* Onboarding popup (for unauthenticated users who haven't completed it) */}
+      {showOnboarding && (
+        <OnboardingFlow asModal onDismiss={handleOnboardingDismiss} />
+      )}
 
       {/* Referee/Guarantor Response Modal */}
       <RefereeGuarantorResponseModal

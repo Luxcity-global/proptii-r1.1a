@@ -1,12 +1,32 @@
 import React, { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Check, Minus } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Check, Minus, Wrench, FileDown, Compass } from 'lucide-react';
 import {
   type GettingStartedApp,
   getProgress,
   getHubMinimized,
   setHubMinimized,
 } from '../../utils/gettingStartedProgress';
+import { clearOnboardingCompleted } from '../../utils/onboardingSession';
+
+/** Minimal tool entry for modal tools tab */
+const MODAL_TOOLS: { id: string; title: string; link: string }[] = [
+  { id: 'readiness-checker', title: 'Rental Readiness Checker', link: '/tools/readiness-checker' },
+  { id: 'document-tracker', title: 'Document Tracker', link: '/tools/document-tracker' },
+  { id: 'viewing-tracker', title: 'Viewing Tracker', link: '/tools/viewing-tracker' },
+  { id: 'process-simulator', title: 'Process Simulator', link: '/tools/process-simulator' },
+  { id: 'timeline-generator', title: 'Timeline Generator', link: '/tools/timeline-generator' },
+  { id: 'know-your-rights', title: 'Know Your Rights', link: '/tools/know-your-rights' },
+];
+
+/** Minimal document entry for modal documents tab */
+const MODAL_DOCUMENTS: { id: string; title: string; file: string }[] = [
+  { id: 'how-to-rent', title: 'How to Rent Guide', file: '/rental_documents/DLUHC_How_to_rent_Oct2023.pdf' },
+  { id: 'right-to-rent-guide', title: 'Right to Rent Checks Guide', file: '/rental_documents/Right to Rent Checks_ A guide to immigration documents for tenants and landlords.pdf' },
+  { id: 'right-to-rent-easy-read', title: 'Right to Rent User Guide (Easy Read)', file: '/rental_documents/3286 Home Office Right to Rent User Guide Easy Read v3.pdf' },
+  { id: 'prescribed-information', title: 'Prescribed Information Template', file: '/rental_documents/1tds-ew-custodial-prescribed-information-template.docx' },
+  { id: 'legionella-assessment', title: 'Legionella Risk Assessment Template', file: '/rental_documents/legionella_Risk_Assessment_template.pdf' },
+];
 
 const BRAND_BLUE = '#136C9E';
 
@@ -23,9 +43,12 @@ export interface GettingStartedHubProps {
  * Getting Started dashboard hub: progress, up to 5 steps, minimize (to icon), microcopy.
  * FAB always visible; overlay shows progress and steps.
  */
+type ModalTab = 'tours' | 'tools' | 'documents';
+
 export function GettingStartedHub({ app, userName, placement = 'top', onResumeClick }: GettingStartedHubProps) {
   const navigate = useNavigate();
   const [minimized, setMinimizedState] = useState(() => getHubMinimized(app) || true);
+  const [activeModalTab, setActiveModalTab] = useState<ModalTab>('tours');
   const progress = getProgress(app);
 
   const toggleMinimized = useCallback(() => {
@@ -112,12 +135,17 @@ export function GettingStartedHub({ app, userName, placement = 'top', onResumeCl
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'Archivo, sans-serif' }}>
-            Let&apos;s get you settled, {displayName}.
+            {activeModalTab === 'tours' && `Let's get you settled, ${displayName}.`}
+            {activeModalTab === 'tools' && 'Tools & resources'}
+            {activeModalTab === 'documents' && 'Document downloads'}
           </h2>
           <p className="text-sm text-gray-600 mt-0.5">
-            {progress.completedCount === 0
-              ? 'Complete these steps to get the most out of your dashboard.'
-              : `${progress.completedCount} of ${progress.total} done.`}
+            {activeModalTab === 'tours' &&
+              (progress.completedCount === 0
+                ? 'Complete these steps to get the most out of your dashboard.'
+                : `${progress.completedCount} of ${progress.total} done.`)}
+            {activeModalTab === 'tools' && 'Interactive tools to help you navigate the rental process.'}
+            {activeModalTab === 'documents' && 'Official UK government documents for tenants and landlords.'}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -133,6 +161,52 @@ export function GettingStartedHub({ app, userName, placement = 'top', onResumeCl
         </div>
       </div>
 
+      {/* Tab navigation */}
+      <div className="mt-4 flex gap-2 border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => setActiveModalTab('tours')}
+          className={`px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${
+            activeModalTab === 'tours'
+              ? 'border-[#136C9E] text-gray-900'
+              : 'border-transparent text-gray-600 hover:text-gray-800'
+          }`}
+          style={{ fontFamily: 'Archivo, sans-serif' }}
+        >
+          <Compass size={14} />
+          Guided Tours
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveModalTab('tools')}
+          className={`px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${
+            activeModalTab === 'tools'
+              ? 'border-[#136C9E] text-gray-900'
+              : 'border-transparent text-gray-600 hover:text-gray-800'
+          }`}
+          style={{ fontFamily: 'Archivo, sans-serif' }}
+        >
+          <Wrench size={14} />
+          Tools
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveModalTab('documents')}
+          className={`px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${
+            activeModalTab === 'documents'
+              ? 'border-[#136C9E] text-gray-900'
+              : 'border-transparent text-gray-600 hover:text-gray-800'
+          }`}
+          style={{ fontFamily: 'Archivo, sans-serif' }}
+        >
+          <FileDown size={14} />
+          Documents
+        </button>
+      </div>
+
+      {/* Tab content */}
+      {activeModalTab === 'tours' && (
+        <>
       {/* Progress: horizontal bar + percentage */}
       <div className="mt-4 flex items-center gap-3">
         <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -171,6 +245,96 @@ export function GettingStartedHub({ app, userName, placement = 'top', onResumeCl
           </li>
         ))}
       </ul>
+
+      {/* Resume Onboarding button - lower right */}
+      <div className="mt-4 flex justify-end">
+        <button
+          type="button"
+          onClick={() => {
+            clearOnboardingCompleted();
+            setMinimizedState(true);
+            setHubMinimized(app, true);
+            navigate('/');
+          }}
+          className="px-4 py-2 rounded-md text-sm font-semibold transition-all duration-200 bg-[#E65D24] text-white hover:bg-[#d9541f] hover:shadow-md"
+          style={{ fontFamily: 'Archivo, sans-serif' }}
+        >
+          Resume Onboarding
+        </button>
+      </div>
+        </>
+      )}
+
+      {activeModalTab === 'tools' && (
+        <ul className="mt-4 space-y-3">
+          {MODAL_TOOLS.map((tool) => (
+            <li key={tool.id} className="flex items-center gap-3 text-sm">
+              <span className="w-5 h-5 rounded shrink-0 bg-blue-100 flex items-center justify-center">
+                <Wrench size={12} className="text-blue-600" />
+              </span>
+              <span className="flex-1 min-w-0 text-gray-800">{tool.title}</span>
+              <Link
+                to={tool.link}
+                onClick={() => {
+                  setMinimizedState(true);
+                  setHubMinimized(app, true);
+                }}
+                className="shrink-0 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors hover:bg-gray-50 border-gray-300 text-gray-700"
+                style={{ fontFamily: 'Archivo, sans-serif' }}
+              >
+                Open
+              </Link>
+            </li>
+          ))}
+          <li className="pt-2">
+            <Link
+              to="/tools"
+              onClick={() => {
+                setMinimizedState(true);
+                setHubMinimized(app, true);
+              }}
+              className="text-sm text-[#136C9E] hover:underline font-medium"
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              View all tools →
+            </Link>
+          </li>
+        </ul>
+      )}
+
+      {activeModalTab === 'documents' && (
+        <ul className="mt-4 space-y-3 max-h-64 overflow-y-auto">
+          {MODAL_DOCUMENTS.map((doc) => (
+            <li key={doc.id} className="flex items-center gap-3 text-sm">
+              <span className="w-5 h-5 rounded shrink-0 bg-purple-100 flex items-center justify-center">
+                <FileDown size={12} className="text-purple-600" />
+              </span>
+              <span className="flex-1 min-w-0 text-gray-800">{doc.title}</span>
+              <a
+                href={doc.file}
+                download
+                className="shrink-0 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors hover:bg-gray-50 border-gray-300 text-gray-700"
+                style={{ fontFamily: 'Archivo, sans-serif' }}
+              >
+                Download
+              </a>
+            </li>
+          ))}
+          <li className="pt-2">
+            <Link
+              to="/tools#documents"
+              onClick={() => {
+                setMinimizedState(true);
+                setHubMinimized(app, true);
+              }}
+              className="text-sm text-[#136C9E] hover:underline font-medium"
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              View all documents →
+            </Link>
+          </li>
+        </ul>
+      )}
     </>
   );
 
