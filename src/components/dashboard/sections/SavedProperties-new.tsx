@@ -7,6 +7,7 @@ import { viewingService, ViewingStats } from '../../../services/viewingService';
 import { firestoreService } from '../../../services/firestoreService';
 import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
 import { useIsMobile } from '../ui/use-mobile';
+import { trackEvent } from '../../../utils/analytics';
 
 /**
  * Saved Properties section - redesigned to follow style guide
@@ -343,6 +344,11 @@ const SavedProperties: React.FC = () => {
       } : undefined
     };
     setDetailsModal({ open: true, property: modalProperty });
+    trackEvent('tenant_dashboard_saved_property_view', {
+      property_id: p.id,
+      location: p.location,
+      source: p.source,
+    });
   };
 
   const handleBookViewing = (property: any) => {
@@ -370,6 +376,10 @@ const SavedProperties: React.FC = () => {
     
     setPrefilledPropertyData(propertyData);
     setIsBookViewingOpen(true);
+    trackEvent('tenant_dashboard_saved_property_book_viewing', {
+      property_id: property.id || property.propertyId,
+      has_agent_email: Boolean(agent.email),
+    });
   };
 
   const handleDeleteProperty = (propertyId: string) => {
@@ -380,6 +390,9 @@ const SavedProperties: React.FC = () => {
     if (deleteConfirm) {
       unsaveProperty(deleteConfirm);
       setDeleteConfirm(null);
+      trackEvent('tenant_dashboard_saved_property_removed', {
+        property_id: deleteConfirm,
+      });
     }
   };
 

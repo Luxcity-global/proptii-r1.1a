@@ -5,6 +5,7 @@ import DashboardHeader from './ui/DashboardHeader';
 import { useAuth } from '../../contexts/AuthContext';
 import { useIsMobile } from './ui/use-mobile';
 import { Menu, X, Home, User } from 'lucide-react';
+import { trackEvent } from '../../utils/analytics';
 
 // Define color constants (matching ReferencingModal)
 export const BLUE_COLOR = '#136C9E';
@@ -153,11 +154,22 @@ const Dashboard: React.FC = () => {
     
     if (currentSection) {
       setActiveSection(currentSection.id);
+      trackEvent('tenant_dashboard_section_view', {
+        section_id: currentSection.id,
+        path: location.pathname,
+      });
+    } else {
+      trackEvent('tenant_dashboard_view', {
+        path: location.pathname,
+      });
     }
-  }, [location]);
+  }, [location.pathname]);
 
   const handleSectionChange = (sectionId: string) => {
     setActiveSection(sectionId);
+    trackEvent('tenant_dashboard_section_selected', {
+      section_id: sectionId,
+    });
     if (isMobile) {
       setMobileSidebarOpen(false);
     }

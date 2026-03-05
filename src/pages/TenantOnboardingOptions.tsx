@@ -1,18 +1,70 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, FileSignature, FileCheck } from 'lucide-react';
+import { Home, FileSignature, FileCheck, X } from 'lucide-react';
 import { TextAnimate } from '../components/magic-ui/text-animate';
+import { setOnboardingCompleted } from '../utils/onboardingSession';
 
 const textStyle = { fontFamily: 'Archivo, sans-serif', color: '#374957' };
 
-const TenantOnboardingOptions: React.FC = () => {
-  const navigate = useNavigate();
+interface TenantOnboardingOptionsProps {
+  asModal?: boolean;
+  onDismiss?: () => void;
+}
 
-  return (
+const TenantOnboardingOptions: React.FC<TenantOnboardingOptionsProps> = ({ asModal = false, onDismiss }) => {
+  const navigate = useNavigate();
+  const [showResumeModal, setShowResumeModal] = useState(false);
+
+  const handleCloseClick = () => setShowResumeModal(true);
+  const handleResumeModalDismiss = () => {
+    setShowResumeModal(false);
+    setOnboardingCompleted();
+    onDismiss?.();
+    if (!onDismiss) navigate('/home-v2');
+  };
+
+  const content = (
     <div
-      className="min-h-screen flex flex-col items-center justify-center px-6 py-12 md:px-10 md:py-16 bg-cover bg-center bg-no-repeat"
+      className={`relative flex flex-col items-center justify-center px-6 py-12 md:px-10 md:py-16 bg-cover bg-center bg-no-repeat ${asModal ? 'rounded-2xl overflow-hidden' : 'min-h-screen'}`}
       style={{ backgroundImage: 'url(/images/addtenbg.png)', ...textStyle }}
     >
+      {/* Close button: top-right (fixed when full-screen, absolute when modal) */}
+      <button
+        type="button"
+        onClick={handleCloseClick}
+        className={`z-20 p-2 rounded-full text-gray-600 hover:text-gray-800 hover:bg-white/80 transition-colors ${asModal ? 'absolute top-4 right-4' : 'fixed top-6 right-6 md:top-8 md:right-10'}`}
+        aria-label="Close"
+      >
+        <X className="w-6 h-6" strokeWidth={2} />
+      </button>
+
+      {/* Resume modal: only when user clicked close */}
+      {showResumeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-xl p-6 md:p-8 flex flex-col md:flex-row gap-4">
+            <div className="flex-shrink-0 flex items-center justify-center">
+              <img src="/images/scout1.png" alt="Proptii guide" className="w-28 h-28 object-contain" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl md:text-2xl font-bold mb-2" style={textStyle}>
+                You can come back anytime
+              </h2>
+              <p className="text-sm text-[#4B5563] mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                You can pick up this process again from your dashboard. Look for the getting started area when you sign in.
+              </p>
+              <button
+                type="button"
+                onClick={handleResumeModalDismiss}
+                className="inline-flex items-center justify-center px-4 py-2 rounded-full text-sm font-medium text-white"
+                style={{ backgroundColor: '#136C9E' }}
+              >
+                Okay, I understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="w-full max-w-5xl flex flex-col md:flex-row items-center justify-center gap-0">
         {/* Left: illustration */}
         <div className="flex-shrink-0 w-full md:w-auto md:max-w-[320px] flex justify-center md:justify-end">
@@ -102,10 +154,37 @@ const TenantOnboardingOptions: React.FC = () => {
             </div>
           </button>
         </div>
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={handleCloseClick}
+              className="text-base font-medium underline hover:opacity-80 transition-opacity"
+              style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}
+            >
+              Skip
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
+
+  if (asModal) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Tenant onboarding options"
+      >
+        <div className="my-auto w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl bg-white">
+          {content}
+        </div>
+      </div>
+    );
+  }
+
+  return content;
 };
 
 export default TenantOnboardingOptions;

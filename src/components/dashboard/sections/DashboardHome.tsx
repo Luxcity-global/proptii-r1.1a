@@ -34,6 +34,7 @@ import signedContractsFirestoreService from '../../../services/signedContractsFi
 import { viewingService, ViewingStats } from '../../../services/viewingService';
 import FilePreviewModal from './FilePreviewModal';
 import { useIsMobile } from '../ui/use-mobile';
+import { trackEvent } from '../../../utils/analytics';
 
 /**
  * Main dashboard home page component following the style guide
@@ -80,6 +81,12 @@ const DashboardHome: React.FC = () => {
   
   const userId = getUserId();
   const [completedSections, setCompletedSections] = useState<Set<string>>(new Set());
+
+  React.useEffect(() => {
+    trackEvent('tenant_dashboard_home_view', {
+      user_id_present: Boolean(userId),
+    });
+  }, [userId]);
   
   // Load files on component mount
   React.useEffect(() => {
@@ -429,6 +436,9 @@ const DashboardHome: React.FC = () => {
   const openReferencingModal = (step: number) => {
     setReferencingStep(step);
     setIsReferencingModalOpen(true);
+    trackEvent('tenant_dashboard_referencing_step_opened', {
+      step,
+    });
   };
   
   const closeReferencingModal = () => {

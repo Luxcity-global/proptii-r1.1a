@@ -10,6 +10,7 @@ import {
   Paper
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
+import { trackEvent } from '../utils/analytics';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -50,6 +51,9 @@ export const LoginPage: React.FC = () => {
       sessionStorage.removeItem('last_redirect_path');
       
       console.log('✅ Already authenticated, redirecting to:', from);
+      trackEvent('login_success', {
+        redirect_to: from,
+      });
       
       // Use setTimeout to ensure this happens after current render cycle
       setTimeout(() => {
@@ -123,6 +127,10 @@ export const LoginPage: React.FC = () => {
   const handleLogin = async () => {
     try {
       setError('');
+      trackEvent('login_started', {
+        redirect_to: from,
+        has_redirect_param: new URLSearchParams(location.search).has('redirect'),
+      });
       await login();
       // Note: MSAL popup login will trigger auth-state-changed event
       // The useEffect above will handle the redirect

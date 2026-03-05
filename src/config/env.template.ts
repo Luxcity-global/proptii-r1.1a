@@ -39,6 +39,9 @@ export const requiredEnvVariables = {
   // API Configuration
   VITE_API_BASE_URL: 'http://localhost:3000',
 
+  // Analytics
+  VITE_GA_MEASUREMENT_ID: '',
+
   // App Configuration
   NODE_ENV: 'development'
 } as const;

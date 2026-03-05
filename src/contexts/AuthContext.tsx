@@ -420,9 +420,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
 
-      // First, refresh CSRF token
-      await securityMiddleware.refreshCsrfToken();
-
       // Get the intended redirect path from sessionStorage
       const redirectPath = sessionStorage.getItem('redirectAfterLogin');
       console.log('🔐 Login starting with redirect path:', redirectPath);

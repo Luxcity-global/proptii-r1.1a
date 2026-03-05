@@ -83,6 +83,8 @@ export class SecurityMiddleware {
             'https://*.firebaseapp.com',
             'https://*.firebaseio.com',
             'https://*.google.com',
+            'https://www.googletagmanager.com',
+            'https://www.google-analytics.com',
             'wss://*.googleapis.com',
             'wss://*.firebaseio.com',
             'wss://*.firebaseapp.com'
@@ -106,7 +108,7 @@ export class SecurityMiddleware {
 
         return [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com https://maps.googleapis.com https://*.googleapis.com",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com https://maps.googleapis.com https://*.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' https://fonts.gstatic.com data:",
             "img-src 'self' data: https: blob:",

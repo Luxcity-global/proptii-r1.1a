@@ -1,13 +1,11 @@
-import { Link } from 'react-router-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import { SearchInput } from '../components/SearchInput';
-import ErrorBoundary from '../components/ErrorBoundary';
 import RefereeGuarantorResponseModal from '../components/referencing/RefereeGuarantorResponseModal';
 import { useAuth } from '../contexts/AuthContext';
-
+import { hasOnboardingCompleted } from '../utils/onboardingSession';
 import { useState, useEffect } from 'react';
 
 /**
@@ -17,7 +15,9 @@ import { useState, useEffect } from 'react';
 const HomeLegacy = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated, login, user } = useAuth();
+  const userName = user?.name ?? user?.email ?? undefined;
+  const showOnboarding = !isAuthenticated && !hasOnboardingCompleted();
 
   const [searchInputHeight, setSearchInputHeight] = useState(50);
   const [isResponseModalOpen, setIsResponseModalOpen] = useState(false);
@@ -30,6 +30,30 @@ const HomeLegacy = () => {
   const prefilledSearchQuery = searchParams.get('q') || '';
   const prefilledSearchType: 'onthemarket' | 'proptii' =
     searchParams.get('type') === 'proptii' ? 'proptii' : 'onthemarket';
+
+  const [heroGuideStepIndex, setHeroGuideStepIndex] = useState(0);
+  const [, setOnboardingRefresh] = useState(0);
+
+  const tenantSearchDemoActive = searchParams.get('tenantSearchDemo') === '1';
+  const showHeroGuide = tenantSearchDemoActive && !showOnboarding && !isAuthenticated;
+
+  const HERO_TENANT_SEARCH_STEPS = [
+    {
+      id: 1,
+      message: "Here's your search box. You can input your search terms here.",
+      targetSelector: '[data-demo-hero-search-input]'
+    },
+    {
+      id: 2,
+      message: 'Click here to change where Proptii searches.',
+      targetSelector: '[data-demo-hero-provider-toggle]'
+    },
+    {
+      id: 3,
+      message: 'When you are ready, click here to search.',
+      targetSelector: '[data-demo-hero-search-button]'
+    }
+  ] as const;
 
   // Check for query parameters to open the response modal
   useEffect(() => {

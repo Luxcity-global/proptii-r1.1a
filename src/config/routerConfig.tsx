@@ -1,12 +1,17 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { App } from '../App';
+import { AnalyticsProvider } from '../components/analytics/AnalyticsProvider';
 
 // Enable future flags for React Router v7 compatibility
 const router = createBrowserRouter([
   {
     path: '*',
-    element: <App />
-  }
+    element: (
+      <AnalyticsProvider>
+        <App />
+      </AnalyticsProvider>
+    ),
+  },
 ], {
   future: {
     v7_startTransition: true,

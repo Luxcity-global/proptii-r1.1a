@@ -5,6 +5,8 @@ import FAQSection from '../components/FAQSection';
 import { SearchInput } from '../components/SearchInput';
 import RefereeGuarantorResponseModal from '../components/referencing/RefereeGuarantorResponseModal';
 import { useAuth } from '../contexts/AuthContext';
+import { hasOnboardingCompleted } from '../utils/onboardingSession';
+import { OnboardingFlow } from '../components/onboarding/OnboardingFlow';
 import {
   Search, Home, CalendarCheck, FileCheck, FileSignature,
   Building2, Users, BarChart3, Shield, ChevronDown, Sparkles,
@@ -12,10 +14,62 @@ import {
 
 import { useState, useEffect, useRef } from 'react';
 
-const HomeVariant = () => {
+interface HomeVariantProps {
+  /** When true, hide the initial onboarding flow modal (e.g. when showing tenant/landlord options as modal) */
+  hideOnboardingModal?: boolean;
+}
+
+const TYPING_PHRASES = ['Move in.', 'One platform.', 'Zero hassle.'] as const;
+const TYPING_SPEED_MS = 80;
+const DELETE_SPEED_MS = 50;
+const PAUSE_AFTER_TYPING_MS = 1800;
+const PAUSE_AFTER_DELETING_MS = 400;
+
+const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { isAuthenticated } = useAuth();
+  const [, forceOnboardingRefresh] = useState(0);
+
+  // Typing/deleting animation for hero headline
+  const [typingIndex, setTypingIndex] = useState(0);
+  const [typingText, setTypingText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const phrase = TYPING_PHRASES[typingIndex];
+    const fullPhraseTyped = !isDeleting && typingText.length === phrase.length;
+    const fullyDeleted = isDeleting && typingText.length === 0;
+
+    let delay: number;
+    if (fullPhraseTyped) {
+      delay = PAUSE_AFTER_TYPING_MS;
+    } else if (fullyDeleted) {
+      delay = PAUSE_AFTER_DELETING_MS;
+    } else {
+      delay = isDeleting ? DELETE_SPEED_MS : TYPING_SPEED_MS;
+    }
+
+    const timer = setTimeout(() => {
+      if (isDeleting) {
+        if (typingText.length > 0) {
+          setTypingText(phrase.slice(0, typingText.length - 1));
+        } else {
+          setIsDeleting(false);
+          setTypingIndex((prev) => (prev + 1) % TYPING_PHRASES.length);
+        }
+      } else {
+        if (typingText.length < phrase.length) {
+          setTypingText(phrase.slice(0, typingText.length + 1));
+        } else {
+          setIsDeleting(true);
+        }
+      }
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [typingIndex, typingText, isDeleting]);
+  const showOnboarding = !hideOnboardingModal && !isAuthenticated && !hasOnboardingCompleted();
   const searchBarRef = useRef<HTMLDivElement>(null);
 
   const [searchInputHeight, setSearchInputHeight] = useState(50);
@@ -143,6 +197,13 @@ const HomeVariant = () => {
 
   return (
     <div className="min-h-screen flex flex-col font-nunito">
+      {showOnboarding && (
+        <OnboardingFlow
+          asModal
+          onDismiss={() => forceOnboardingRefresh((k) => k + 1)}
+        />
+      )}
+
       <Navbar hideServiceLinks />
 
       {/* Referee/Guarantor Response Modal */}
@@ -452,10 +513,10 @@ const HomeVariant = () => {
 
           {/* Main Heading */}
           <h3 className="text-2xl md:text-6xl font-bold mb-4 md:mb-6 font-archive leading-tight">
-            Search. Verify. <span className="text-[#F15A22]">Move in.</span>
-            <br />
-            <span className="block text-xl md:text-4xl font-light">
-              One platform. Zero hassle.
+            Search. Verify.{' '}
+            <span className="text-[#F15A22]">
+              {typingText}
+              <span className="animate-pulse" aria-hidden="true">|</span>
             </span>
           </h3>
 

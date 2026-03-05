@@ -116,6 +116,14 @@ export function hasOnboardingCompleted(): boolean {
 }
 
 /**
+ * Clear onboarding completed flag so the onboarding flow can be shown again (for "Resume Onboarding").
+ */
+export function clearOnboardingCompleted(): void {
+  getSessionStorage()?.removeItem(ONBOARDING_COMPLETED_KEY);
+}
+
+
+/**
  * Store a Discovery answer (e.g. "howDoYouWantToUse", "howDidYouFindUs") for analytics.
  */
 export function setDiscoveryAnswer(key: string, value: string): void {

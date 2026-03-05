@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, Building2, FileCheck, FileSignature, Sparkles, MoreHorizontal, Check, Search, UserPlus, Share2, Megaphone, User, Briefcase, Send } from 'lucide-react';
+import { Home, Building2, FileCheck, FileSignature, Sparkles, MoreHorizontal, Check, Search, UserPlus, Share2, Megaphone, User, Briefcase, Send, X } from 'lucide-react';
 import { TextAnimate } from '../magic-ui/text-animate';
 import {
   getOrCreateAnonymousId,
@@ -9,6 +9,7 @@ import {
   setDiscoveryAnswer,
   type OnboardingUserGroup
 } from '../../utils/onboardingSession';
+import { trackEvent } from '../../utils/analytics';
 
 type Step = 'welcome' | 'howUse' | 'howFind' | 'whoAreYou';
 
@@ -45,7 +46,14 @@ const DEMO_URL_BY_GROUP: Record<OnboardingUserGroup, string> = {
 
 const MAX_HOW_USE_SELECTIONS = 3;
 
-export function OnboardingFlow() {
+export interface OnboardingFlowProps {
+  /** When true, renders as a centered modal overlay instead of full screen */
+  asModal?: boolean;
+  /** Called when user dismisses onboarding (e.g. via resume modal). Use to refresh parent state. */
+  onDismiss?: () => void;
+}
+
+export function OnboardingFlow({ asModal = false, onDismiss }: OnboardingFlowProps = {}) {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>('welcome');
   const [howUseSelected, setHowUseSelected] = useState<string[]>([]);
@@ -55,8 +63,21 @@ export function OnboardingFlow() {
   const [howFindOtherText, setHowFindOtherText] = useState('');
   const [howFindOtherSubmitted, setHowFindOtherSubmitted] = useState(false);
   const [howFindOtherInputVisible, setHowFindOtherInputVisible] = useState(false);
+  const [showResumeModal, setShowResumeModal] = useState(false);
+
+  const handleCloseOnboarding = () => {
+    setShowResumeModal(true);
+  };
+
+  const handleResumeModalDismiss = () => {
+    setShowResumeModal(false);
+    setOnboardingCompleted();
+    onDismiss?.();
+    if (!onDismiss) navigate('/');
+  };
 
   const handleStart = () => {
+    trackEvent('onboarding_start');
     getOrCreateAnonymousId();
     setStep('howUse');
   };
@@ -75,6 +96,10 @@ export function OnboardingFlow() {
         .map((id) => (id === 'other' && howUseOtherText.trim() ? `other:${howUseOtherText.trim()}` : id))
         .join(',');
       setDiscoveryAnswer('howDoYouWantToUse', value);
+      trackEvent('onboarding_how_use_selected', {
+        options: howUseSelected,
+        other_text: howUseOtherText.trim() || undefined,
+      });
     }
     setStep('howFind');
   };
@@ -86,36 +111,69 @@ export function OnboardingFlow() {
     setHowFindOtherSubmitted(false);
     setHowFindOtherInputVisible(false);
     setStep('whoAreYou');
+    trackEvent('onboarding_how_find_selected', {
+      value,
+    });
   };
 
   const handleWhoAreYou = (group: OnboardingUserGroup) => {
     setOnboardingUserGroup(group);
     setOnboardingCompleted();
+    trackEvent('onboarding_completed', {
+      user_group: group,
+      how_use: howUseSelected,
+      how_find: howFind,
+    });
     navigate(DEMO_URL_BY_GROUP[group]);
-  };
-
-  const handleSkipToSearch = () => {
-    setOnboardingUserGroup('tenant');
-    setOnboardingCompleted();
-    navigate('/search');
   };
 
   const textStyle = { fontFamily: 'Archivo, sans-serif', color: '#374957' };
 
-  return (
+  const content = (
     <div
-      className="relative min-h-screen flex flex-col items-center justify-center px-6 py-12 md:px-10 md:py-16 bg-cover bg-center bg-no-repeat"
+      className={`relative flex flex-col items-center justify-center px-6 py-12 md:px-10 md:py-16 bg-cover bg-center bg-no-repeat ${asModal ? 'rounded-2xl overflow-hidden' : 'min-h-screen'}`}
       style={{ backgroundImage: 'url(/images/addtenbg.png)', ...textStyle }}
     >
-      {/* Logo in top left (welcome step only) */}
-      {step === 'welcome' && (
-        <img
-          src="/images/proptii-logo.png"
-          alt="Proptii"
-          className="absolute top-6 left-6 md:top-8 md:left-10 h-12 md:h-14 w-auto object-contain z-10"
-        />
-      )}
+      {/* Close button: top-right (fixed when full-screen, absolute when modal) */}
+      <button
+        type="button"
+        onClick={handleCloseOnboarding}
+        className={`z-20 p-2 rounded-full text-gray-600 hover:text-gray-800 hover:bg-white/80 transition-colors ${asModal ? 'absolute top-4 right-4' : 'fixed top-6 right-6 md:top-8 md:right-10'}`}
+        aria-label="Close"
+      >
+        <X className="w-6 h-6" strokeWidth={2} />
+      </button>
 
+      {/* Resume onboarding modal (after close on post-welcome steps) */}
+      {showResumeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-xl p-6 md:p-8 flex flex-col md:flex-row gap-4">
+            <div className="flex-shrink-0 flex items-center justify-center">
+              <img
+                src="/images/scout1.png"
+                alt="Proptii guide"
+                className="w-28 h-28 object-contain"
+              />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl md:text-2xl font-bold mb-2" style={textStyle}>
+                You can come back anytime
+              </h2>
+              <p className="text-sm text-[#4B5563] mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                You can pick up this process again from your dashboard. Look for the getting started area when you sign in.
+              </p>
+              <button
+                type="button"
+                onClick={handleResumeModalDismiss}
+                className="inline-flex items-center justify-center px-4 py-2 rounded-full text-sm font-medium text-white"
+                style={{ backgroundColor: '#136C9E' }}
+              >
+                Okay, I understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={`w-full ${step === 'welcome' ? 'max-w-4xl' : step === 'howUse' || step === 'howFind' || step === 'whoAreYou' ? 'max-w-5xl' : 'max-w-2xl'}`}>
 
         {/* Step: Welcome */}
@@ -147,13 +205,21 @@ export function OnboardingFlow() {
                 <br />
                 
               </p>
-              <div className="flex justify-center md:justify-start">
+              <div className="flex flex-col sm:flex-row justify-center md:justify-start items-center gap-4">
                 <button
                   onClick={handleStart}
-                  className="px-8 py-4 rounded-full bg-[#E65D24] text-white font-semibold text-lg shadow-lg transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[0_10px_25px_-5px_rgba(252,209,181,0.6),0_8px_10px_-6px_rgba(252,209,181,0.4)] hover:bg-gradient-to-r hover:from-[#E65D24] hover:to-[#d9541f]"
+                  className="px-8 py-4 rounded-full bg-[#E65D24] text-white font-semibold text-lg shadow-lg transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-[0_10px_25px_-5px_rgba(252,209,181,0.6),0_8px_10px_-6px_rgba(252,209,181,0.4)] hover:bg-gradient-to-r hover:from-[#E65D24] hover:to-[#d9541f] h-[52px] flex items-center justify-center"
                   style={{ fontFamily: 'Archivo, sans-serif' }}
                 >
                   Get started
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseOnboarding}
+                  className="px-8 py-4 rounded-full font-semibold text-lg shadow-lg transition-all duration-200 ease-out border hover:-translate-y-0.5 hover:shadow-md hover:bg-[#136C9E]/5 h-[52px] flex items-center justify-center box-border"
+                  style={{ fontFamily: 'Archivo, sans-serif', borderWidth: '1px', borderColor: '#136C9E', color: '#136C9E', backgroundColor: 'transparent' }}
+                >
+                  Skip
                 </button>
               </div>
             </div>
@@ -162,7 +228,7 @@ export function OnboardingFlow() {
 
         {/* Step: How do you want to use Proptii? */}
         {step === 'howUse' && (
-          <div className="flex flex-col md:flex-row items-center justify-center gap-0 w-full">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10 w-full">
             {/* Left: illustration (dog character) */}
             <div className="flex-shrink-0 w-full md:w-auto md:max-w-[320px] flex justify-center md:justify-end">
               <img
@@ -172,7 +238,7 @@ export function OnboardingFlow() {
               />
             </div>
             {/* Right: speech-bubble card */}
-            <div className="w-full max-w-4xl rounded-3xl border-2 border-[#A3CEF7] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-8 md:px-8 md:py-10">
+            <div className="w-full max-w-4xl rounded-3xl bg-white shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-8 md:px-8 md:py-10">
               <h2 className="text-2xl md:text-3xl font-bold mb-2 text-left" style={textStyle}>
                 <TextAnimate
                   className="text-2xl md:text-3xl font-bold text-left"
@@ -254,7 +320,7 @@ export function OnboardingFlow() {
                   </button>
                 </div>
               </div>
-              <div className="mt-6 text-center">
+              <div className="mt-6 flex flex-col sm:flex-row justify-center items-center gap-4">
                 <button
                   type="button"
                   onClick={handleHowUseContinue}
@@ -263,6 +329,14 @@ export function OnboardingFlow() {
                 >
                   Continue
                 </button>
+                <button
+                  type="button"
+                  onClick={handleCloseOnboarding}
+                  className="text-base font-medium underline hover:opacity-80 transition-opacity"
+                  style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}
+                >
+                  Skip
+                </button>
               </div>
             </div>
           </div>
@@ -270,7 +344,7 @@ export function OnboardingFlow() {
 
         {/* Step: How did you find us? */}
         {step === 'howFind' && (
-          <div className="flex flex-col md:flex-row items-center justify-center gap-0 w-full">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10 w-full">
             <div className="flex-shrink-0 w-full md:w-auto md:max-w-[320px] flex justify-center md:justify-end">
               <img
                 src="/images/onboard%20que.png"
@@ -278,7 +352,7 @@ export function OnboardingFlow() {
                 className="w-56 md:w-72 h-auto object-contain object-bottom"
               />
             </div>
-            <div className="w-full max-w-4xl rounded-3xl border-2 border-[#A3CEF7] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-8 md:px-8 md:py-10">
+            <div className="w-full max-w-4xl rounded-3xl bg-white shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-8 md:px-8 md:py-10">
               <h2 className="text-2xl md:text-3xl font-bold mb-2 text-left" style={textStyle}>
                 <TextAnimate
                   className="text-2xl md:text-3xl font-bold text-left"
@@ -359,13 +433,23 @@ export function OnboardingFlow() {
                   </button>
                 </div>
               </div>
+              <div className="mt-6 text-center">
+                <button
+                  type="button"
+                  onClick={handleCloseOnboarding}
+                  className="text-base font-medium underline hover:opacity-80 transition-opacity"
+                  style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}
+                >
+                  Skip
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {/* Step: Who are you? (Profiling) */}
         {step === 'whoAreYou' && (
-          <div className="flex flex-col md:flex-row items-center justify-center gap-0 w-full">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10 w-full">
             <div className="flex-shrink-0 w-full md:w-auto md:max-w-[320px] flex justify-center md:justify-end">
               <img
                 src="/images/onboard%20que.png"
@@ -373,7 +457,7 @@ export function OnboardingFlow() {
                 className="w-56 md:w-72 h-auto object-contain object-bottom"
               />
             </div>
-            <div className="w-full max-w-4xl rounded-3xl border-2 border-[#A3CEF7] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-8 md:px-8 md:py-10">
+            <div className="w-full max-w-4xl rounded-3xl bg-white shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-8 md:px-8 md:py-10">
               <h2 className="text-2xl md:text-3xl font-bold mb-2 text-left" style={textStyle}>
                 <TextAnimate
                   className="text-2xl md:text-3xl font-bold text-left"
@@ -416,11 +500,11 @@ export function OnboardingFlow() {
               <p className="mt-6 text-center">
                 <button
                   type="button"
-                  onClick={handleSkipToSearch}
-                  className="text-sm underline hover:opacity-80 transition-opacity"
-                  style={textStyle}
+                  onClick={handleCloseOnboarding}
+                  className="text-base font-medium underline hover:opacity-80 transition-opacity"
+                  style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}
                 >
-                  Just show me around
+                  Skip
                 </button>
               </p>
             </div>
@@ -430,4 +514,21 @@ export function OnboardingFlow() {
       </div>
     </div>
   );
+
+  if (asModal) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Welcome to Proptii"
+      >
+        <div className="my-auto w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl bg-white">
+          {content}
+        </div>
+      </div>
+    );
+  }
+
+  return content;
 }

@@ -11,6 +11,7 @@ import {
   Grid
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
+import { trackEvent } from '../utils/analytics';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -43,6 +44,9 @@ export const RegisterPage: React.FC = () => {
     if (isAuthenticated) {
       // Clear stored redirect path
       sessionStorage.removeItem('redirectAfterLogin');
+      trackEvent('registration_success', {
+        redirect_to: from,
+      });
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, from]);
@@ -62,6 +66,9 @@ export const RegisterPage: React.FC = () => {
     }
 
     try {
+      trackEvent('registration_submitted', {
+        has_redirect_param: new URLSearchParams(window.location.search).has('redirect'),
+      });
       // TODO: Implement actual registration
       await login();
       // The useEffect above will handle the redirect once isAuthenticated becomes true

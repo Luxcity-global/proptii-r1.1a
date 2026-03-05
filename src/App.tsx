@@ -2,13 +2,10 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
 import { MSALProviderWrapper } from './contexts/AuthContext';
-import { AuthProvider } from './contexts/AuthContext';
 import { SavedPropertiesProvider } from './contexts/SavedPropertiesContext';
 import { SignedContractsProvider } from './contexts/SignedContractsContext';
 import { OnboardingSessionProvider } from './contexts/OnboardingSessionContext';
-import TenantOnboardingOptions from './pages/TenantOnboardingOptions';
-import LandlordOnboardingOptions from './pages/LandlordOnboardingOptions';
-import HomeownerOnboardingOptions from './pages/HomeownerOnboardingOptions';
+import { OnboardingOptionsModalRoute } from './pages/OnboardingOptionsModalRoute';
 import HomeLegacy from './pages/HomeLegacy';
 import { LoginPage } from './pages/Login';
 import { RegisterPage } from './pages/Register';
@@ -42,7 +39,6 @@ import FAQ from './pages/FAQ';
 import { AuthRedirectHandler } from './components/common/AuthRedirectHandler';
 import SearchResults from './pages/SearchResults';
 import HomeVariant from './pages/HomeVariant';
-import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import Pricing from './pages/Pricing';
 import Tools from './pages/Tools';
 import ReadinessChecker from './pages/tools/ReadinessChecker';
@@ -51,28 +47,29 @@ import ViewingTracker from './pages/tools/ViewingTracker';
 import ProcessSimulator from './pages/tools/ProcessSimulator';
 import TimelineGenerator from './pages/tools/TimelineGenerator';
 import KnowYourRights from './pages/tools/KnowYourRights';
+import { AuthAnalyticsBridge } from './components/analytics/AuthAnalyticsBridge';
 
 /** Default landing: onboarding flow first. Home pages at /home-v2 and /home-legacy. */
 
 export const App: React.FC = () => {
   return (
-    <AuthProvider>
     <ErrorBoundary fallback={<div>Custom fallback UI</div>}>
       <CssBaseline />
       <MSALProviderWrapper>
         <SavedPropertiesProvider>
           <OnboardingSessionProvider>
           <SignedContractsProvider>
+              <AuthAnalyticsBridge />
               <AuthRedirectHandler />
               <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<OnboardingFlow />} />
+            {/* Public Routes - home-v2 is default landing; onboarding shows as modal overlay */}
+            <Route path="/" element={<Navigate to="/home-v2" replace />} />
             <Route path="/home-v2" element={<HomeVariant />} />
             <Route path="/home-legacy" element={<HomeLegacy />} />
-            <Route path="/home" element={<Navigate to="/" replace />} />
-            <Route path="/tenant-onboarding" element={<TenantOnboardingOptions />} />
-            <Route path="/landlord-onboarding" element={<LandlordOnboardingOptions />} />
-            <Route path="/homeowner-onboarding" element={<HomeownerOnboardingOptions />} />
+            <Route path="/home" element={<Navigate to="/home-v2" replace />} />
+            <Route path="/tenant-onboarding" element={<OnboardingOptionsModalRoute type="tenant" />} />
+            <Route path="/landlord-onboarding" element={<OnboardingOptionsModalRoute type="landlord" />} />
+            <Route path="/homeowner-onboarding" element={<OnboardingOptionsModalRoute type="homeowner" />} />
             <Route path="/search" element={<SearchResults />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -163,6 +160,5 @@ export const App: React.FC = () => {
           </SavedPropertiesProvider>
       </MSALProviderWrapper>
     </ErrorBoundary>
-    </AuthProvider>
   );
 };

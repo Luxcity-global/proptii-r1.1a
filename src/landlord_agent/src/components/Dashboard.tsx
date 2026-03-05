@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { useIsMobile } from "./ui/use-mobile";
 import { Property, UserProfile, MarketInsight, Tenant } from "../App";
+import { trackEvent } from "../../../utils/analytics";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -169,6 +170,13 @@ export function Dashboard({
 
   // Use actual properties - start with empty array when no properties exist
   const mockProperties: Property[] = properties;
+
+  React.useEffect(() => {
+    trackEvent("landlord_dashboard_view", {
+      total_properties: mockProperties.length,
+      total_tenants: tenants.length,
+    });
+  }, [mockProperties.length, tenants.length]);
 
   const displayProperties = mockProperties.filter(
     (property) => {

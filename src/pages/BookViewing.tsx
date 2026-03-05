@@ -7,6 +7,7 @@ import BookViewingModal from '../components/viewings/BookViewingModal';
 import ReviewModal from '../components/ReviewModal';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { bookViewingRequestService } from '../services/bookViewingRequestService';
+import { trackEvent } from '../utils/analytics';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
@@ -177,6 +178,10 @@ const BookViewing = () => {
   }, [isAuthenticated]);
 
   const handleGetStarted = () => {
+    trackEvent('book_viewing_cta_clicked', {
+      is_authenticated: isAuthenticated,
+      has_prefilled_property: Boolean(prefilledPropertyData?.id),
+    });
     if (!isAuthenticated) {
       login();
       return;
@@ -187,6 +192,10 @@ const BookViewing = () => {
   const handleSubmissionComplete = () => {
     // Show review modal after viewing booking modal is closed
     setIsReviewModalOpen(true);
+    trackEvent('book_viewing_request_submitted', {
+      has_prefilled_property: Boolean(prefilledPropertyData?.id),
+      user_id_present: Boolean(user?.id),
+    });
   };
 
   const handleReviewModalClose = () => {
