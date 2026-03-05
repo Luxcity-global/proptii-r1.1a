@@ -39,6 +39,14 @@ import FAQ from './pages/FAQ';
 // import AgentContractLanding from './pages/AgentContractLanding';
 import SearchResults from './pages/SearchResults';
 import Tools from './pages/Tools';
+import MascotGuidelines from './pages/MascotGuidelines';
+import MascotOverview from './pages/mascot/Overview';
+import EmotionalStrategy from './pages/mascot/EmotionalStrategy';
+import Product2D from './pages/mascot/Product2D';
+import Marketing3D from './pages/mascot/Marketing3D';
+import RealWorld from './pages/mascot/RealWorld';
+import MascotDownloads from './pages/mascot/Downloads';
+import MascotGuardrails from './pages/mascot/Guardrails';
 import ReadinessChecker from './pages/tools/ReadinessChecker';
 import DocumentTracker from './pages/tools/DocumentTracker';
 import ViewingTracker from './pages/tools/ViewingTracker';
@@ -69,6 +77,15 @@ export const App: React.FC = () => {
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/faq" element={<FAQ />} />
+            <Route path="/brand/mascot" element={<MascotGuidelines />}>
+              <Route index element={<MascotOverview />} />
+              <Route path="emotional-strategy" element={<EmotionalStrategy />} />
+              <Route path="product-2d" element={<Product2D />} />
+              <Route path="marketing-3d" element={<Marketing3D />} />
+              <Route path="real-world" element={<RealWorld />} />
+              <Route path="downloads" element={<MascotDownloads />} />
+              <Route path="guardrails" element={<MascotGuardrails />} />
+            </Route>
 
             {/* Protected Routes */}
             <Route path="/agent" element={<AgentHome />} />
