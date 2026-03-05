@@ -1,0 +1,23 @@
+{
+  "routes": [
+    {
+      "route": "/landlord*",
+      "rewrite": "/landlord/index.html"
+    }
+  ],
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": [
+      "/assets/*",
+      "/chunks/*",
+      "/entries/*",
+      "/images/*",
+      "/landlord/assets/*",
+      "/landlord/landlord/*",
+      "/*.{css,js,ico,png,jpg,jpeg,gif,svg,woff,woff2}",
+      "/403.html",
+      "/500.html",
+      "/rate-limit-exceeded.html"
+    ]
+  }
+}

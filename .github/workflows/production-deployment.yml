@@ -26,6 +26,7 @@ jobs:
       - name: Create env file
         run: |
           echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" >> .env.production
+          echo "VITE_GA_MEASUREMENT_ID=G-88HC0TG6JJ" >> .env.production
           echo "VITE_AZURE_AD_CLIENT_ID=${{ secrets.VITE_AZURE_AD_CLIENT_ID }}" >> .env.production
           echo "VITE_AZURE_STORAGE_URL=${{ secrets.VITE_AZURE_STORAGE_URL }}" >> .env.production
           echo "VITE_AZURE_CDN_ENDPOINT=${{ secrets.VITE_AZURE_CDN_ENDPOINT }}" >> .env.production
@@ -61,6 +62,7 @@ jobs:
       - name: Create env file
         run: |
           echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" >> .env.production
+          echo "VITE_GA_MEASUREMENT_ID=G-88HC0TG6JJ" >> .env.production
           echo "VITE_AZURE_AD_CLIENT_ID=${{ secrets.VITE_AZURE_AD_CLIENT_ID }}" >> .env.production
           echo "VITE_AZURE_STORAGE_URL=${{ secrets.VITE_AZURE_STORAGE_URL }}" >> .env.production
           echo "VITE_AZURE_CDN_ENDPOINT=${{ secrets.VITE_AZURE_CDN_ENDPOINT }}" >> .env.production
