@@ -23,7 +23,7 @@ const tabs = [
   },
   {
     to: '/brand/mascot/marketing-3d',
-    label: '3D in marketing',
+    label: '3D',
     subcopy: '3D Scout for hero moments, campaigns, and social. Usage contexts, rendering rules, and poses.',
   },
   {
@@ -88,13 +88,13 @@ const sectionNavConfig: Record<MascotSectionKey, { label: string; items: Section
     ],
   },
   'marketing-3d': {
-    label: '3D implementation (marketing)',
+    label: '3D implementation',
     items: [
       { label: '2D vs 3D comparison', anchor: 'marketing3d-comparison' },
       { label: 'Primary usage contexts', anchor: 'marketing3d-usage-contexts' },
       { label: 'Rendering rules (3D)', anchor: 'marketing3d-rendering-rules' },
-      { label: 'Common scenarios (marketing)', anchor: 'marketing3d-scenarios' },
-      { label: 'Pose library – marketing', anchor: 'marketing3d-pose-library' },
+      { label: 'Common scenarios', anchor: 'marketing3d-scenarios' },
+      { label: 'Pose library', anchor: 'marketing3d-pose-library' },
       { label: 'Do / Don’t', anchor: 'marketing3d-do-dont' },
     ],
   },
