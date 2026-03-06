@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { SEO } from '../components/SEO';
@@ -32,16 +32,31 @@ const MascotGuidelines: React.FC = () => {
       />
 
       <div className="min-h-screen font-nunito bg-white">
-        <Navbar />
+        <header className="absolute top-0 left-0 right-0 z-20">
+          <div className="max-w-7xl mx-auto px-4 h-20 flex items-center">
+            <Link to="/">
+              <img
+                src="/images/proptii-logo.png"
+                alt="Proptii"
+                className="h-12 w-auto"
+              />
+            </Link>
+          </div>
+        </header>
 
         <main className="pt-24 pb-16">
-          <section className="relative h-[40vh] md:h-[50vh] flex items-center overflow-hidden bg-gradient-to-br from-[#FDF5EC] via-white to-[#E3F3FF]">
+          <section className="relative h-[40vh] md:h-[50vh] flex items-center overflow-hidden bg-gradient-to-br from-[#FDF5EC]/60 via-white/60 to-[#E3F3FF]/60">
             <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute -top-24 -right-16 w-64 h-64 bg-[#E65D24]/10 rounded-full blur-3xl" />
-              <div className="absolute bottom-0 -left-8 w-72 h-72 bg-[#136C9E]/5 rounded-full blur-3xl" />
+              <img
+                src="/images/sctbg.png"
+                alt="Scout background"
+                className="w-full h-full object-contain opacity-40 object-right"
+              />
+              <div className="absolute -top-24 -right-16 w-64 h-64 bg-[#E65D24]/5 rounded-full blur-3xl" />
+              <div className="absolute bottom-0 -left-8 w-72 h-72 bg-[#136C9E]/10 rounded-full blur-3xl" />
             </div>
 
-            <div className="relative z-10 max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+            <div className="relative z-10 max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-[minmax(0,1.4fr),minmax(0,1fr)] gap-10 items-center">
               <div>
                 <p className="text-xs font-semibold tracking-[0.2em] uppercase text-[#136C9E] mb-3">
                   Brand system
@@ -60,22 +75,7 @@ const MascotGuidelines: React.FC = () => {
                 </div>
               </div>
 
-              <div className="hidden md:flex justify-end">
-                <div className="relative w-80 h-64 rounded-3xl bg-white shadow-xl border border-[#E3EDF7] overflow-hidden flex items-center justify-center">
-                  <div className="absolute inset-x-6 top-6 flex justify-between text-[10px] text-gray-500 font-medium uppercase tracking-wide">
-                    <span>Product</span>
-                    <span>Marketing</span>
-                    <span>Physical</span>
-                  </div>
-                  <div className="mt-6 flex h-full w-full items-end justify-center pb-6">
-                    <div className="flex gap-3 w-full px-6">
-                      <div className="flex-1 h-24 rounded-2xl bg-gradient-to-t from-[#136C9E] to-[#A3D9FF] opacity-90" />
-                      <div className="flex-1 h-32 rounded-2xl bg-gradient-to-t from-[#E65D24] to-[#FFD3B2] opacity-95" />
-                      <div className="flex-1 h-20 rounded-2xl bg-gradient-to-t from-[#F2C94C] to-[#FFE9A3] opacity-90" />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <div className="hidden md:flex justify-end" />
             </div>
           </section>
 
