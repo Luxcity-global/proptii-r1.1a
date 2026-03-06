@@ -11,55 +11,11 @@ const EmotionalStrategy: React.FC = () => {
         clear job and a preferred visual expression.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5">
-          <p className="text-xs font-semibold text-[#136C9E] uppercase tracking-[0.18em] mb-2">
-            Layer 1
-          </p>
-          <h3 className="text-lg font-semibold text-[#0F2537] mb-2">Product layer</h3>
-          <p className="text-sm text-[#374957] mb-3">
-            Scout supports clarity and usability inside core product surfaces.
-          </p>
-          <ul className="text-xs text-[#6B7280] list-disc list-inside space-y-1">
-            <li>Empty states and helper moments</li>
-            <li>Light, glanceable emotion</li>
-            <li>Always secondary to UI clarity</li>
-          </ul>
-        </div>
-
-        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5">
-          <p className="text-xs font-semibold text-[#E65D24] uppercase tracking-[0.18em] mb-2">
-            Layer 2
-          </p>
-          <h3 className="text-lg font-semibold text-[#0F2537] mb-2">Marketing layer</h3>
-          <p className="text-sm text-[#374957] mb-3">
-            Scout leads with emotion in storytelling, campaigns, and hero visuals.
-          </p>
-          <ul className="text-xs text-[#6B7280] list-disc list-inside space-y-1">
-            <li>High-attention hero moments</li>
-            <li>3D rendering and motion-friendly poses</li>
-            <li>Supports brand narrative first</li>
-          </ul>
-        </div>
-
-        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5">
-          <p className="text-xs font-semibold text-[#F2C94C] uppercase tracking-[0.18em] mb-2">
-            Layer 3
-          </p>
-          <h3 className="text-lg font-semibold text-[#0F2537] mb-2">Physical layer</h3>
-          <p className="text-sm text-[#374957] mb-3">
-            Scout becomes a tangible object that people can hold, meet, or photograph.
-          </p>
-          <ul className="text-xs text-[#6B7280] list-disc list-inside space-y-1">
-            <li>Plush toys and physical installations</li>
-            <li>Safe, durable, and huggable</li>
-            <li>Optimised for memorability and delight</li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5 lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div
+          id="emotional-who-is-scout"
+          className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5 lg:col-span-2"
+        >
           <h3 className="text-base font-semibold text-[#0F2537] mb-2">Who is Scout?</h3>
           <p className="text-sm text-[#374957] mb-3">
             Scout is the guide who sits between people and the complexity of renting. They are curious, calm, and
@@ -69,9 +25,30 @@ const EmotionalStrategy: React.FC = () => {
             In every surface, Scout&apos;s job is to make the journey feel understandable, safe, and a little more
             human – not to become the story themselves.
           </p>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs md:text-sm">
+            <div className="rounded-2xl bg-[#F5FBFF] border border-[#CDE6F7] p-4">
+              <p className="font-semibold mb-1 text-[#0F2537]">Scout is</p>
+              <ul className="list-disc list-inside space-y-1 text-[#374957]">
+                <li>Warm, empathetic, and reassuring.</li>
+                <li>Clear and practical, never fluffy.</li>
+                <li>Curious and observant, noticing details tenants might miss.</li>
+              </ul>
+            </div>
+            <div className="rounded-2xl bg-[#FFF4F4] border border-[#F97373] p-4">
+              <p className="font-semibold mb-1 text-[#B91C1C]">Scout is not</p>
+              <ul className="list-disc list-inside space-y-1 text-[#7F1D1D]">
+                <li>Slapstick, chaotic, or hyperactive.</li>
+                <li>Sarcastic or teasing about people&apos;s situations.</li>
+                <li>Babyish or cutesy – they&apos;re a capable guide, not a mascot for kids.</li>
+              </ul>
+            </div>
+          </div>
         </div>
 
-        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5">
+        <div
+          id="emotional-personality-voice"
+          className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5"
+        >
           <h3 className="text-base font-semibold text-[#0F2537] mb-3">Personality & voice</h3>
           <div className="grid grid-cols-2 gap-3 text-xs text-[#374957]">
             <div>
@@ -96,7 +73,66 @@ const EmotionalStrategy: React.FC = () => {
         </div>
       </div>
 
-      <div className="mt-8 rounded-2xl bg-white border border-gray-100 shadow-sm p-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div
+          id="emotional-product-layer"
+          className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5"
+        >
+          <p className="text-xs font-semibold text-[#136C9E] uppercase tracking-[0.18em] mb-2">
+            Layer 1
+          </p>
+          <h3 className="text-lg font-semibold text-[#0F2537] mb-2">Product layer</h3>
+          <p className="text-sm text-[#374957] mb-3">
+            Scout supports clarity and usability inside core product surfaces.
+          </p>
+          <ul className="text-xs text-[#6B7280] list-disc list-inside space-y-1">
+            <li>Empty states and helper moments</li>
+            <li>Light, glanceable emotion</li>
+            <li>Always secondary to UI clarity</li>
+          </ul>
+        </div>
+
+        <div
+          id="emotional-marketing-layer"
+          className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5"
+        >
+          <p className="text-xs font-semibold text-[#E65D24] uppercase tracking-[0.18em] mb-2">
+            Layer 2
+          </p>
+          <h3 className="text-lg font-semibold text-[#0F2537] mb-2">Marketing layer</h3>
+          <p className="text-sm text-[#374957] mb-3">
+            Scout leads with emotion in storytelling, campaigns, and hero visuals.
+          </p>
+          <ul className="text-xs text-[#6B7280] list-disc list-inside space-y-1">
+            <li>High-attention hero moments</li>
+            <li>3D rendering and motion-friendly poses</li>
+            <li>Supports brand narrative first</li>
+          </ul>
+        </div>
+
+        <div
+          id="emotional-physical-layer"
+          className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5"
+        >
+          <p className="text-xs font-semibold text-[#F2C94C] uppercase tracking-[0.18em] mb-2">
+            Layer 3
+          </p>
+          <h3 className="text-lg font-semibold text-[#0F2537] mb-2">Physical layer</h3>
+          <p className="text-sm text-[#374957] mb-3">
+            Scout becomes a tangible object that people can hold, meet, or photograph.
+          </p>
+          <ul className="text-xs text-[#6B7280] list-disc list-inside space-y-1">
+            <li>Plush toys and physical installations</li>
+            <li>Safe, durable, and huggable</li>
+            <li>Optimised for memorability and delight</li>
+          </ul>
+        </div>
+      </div>
+
+      <div
+        id="emotional-emotion-range"
+        className="mt-8 rounded-2xl bg-white border border-gray-100 shadow-sm p-5"
+      >
         <h3 className="text-base font-semibold text-[#0F2537] mb-3">Emotion range examples</h3>
         <p className="text-sm text-[#374957] mb-4 max-w-2xl">
           Use a narrow, intentional set of emotions so Scout feels consistent across product, marketing, and physical

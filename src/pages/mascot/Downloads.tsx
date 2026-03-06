@@ -12,7 +12,10 @@ const MascotDownloads: React.FC = () => {
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+        <div
+          id="downloads-2d-assets"
+          className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden flex flex-col"
+        >
           <div className="h-32 bg-gray-50 border-b border-gray-100 flex items-center justify-center text-xs text-gray-400">
             Sticker sheet preview
           </div>
@@ -30,7 +33,10 @@ const MascotDownloads: React.FC = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+        <div
+          id="downloads-print-swag"
+          className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden flex flex-col"
+        >
           <div className="h-32 bg-gray-50 border-b border-gray-100 flex items-center justify-center text-xs text-gray-400">
             Notebook cover mockup
           </div>
@@ -48,7 +54,10 @@ const MascotDownloads: React.FC = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+        <div
+          id="downloads-merch-artwork"
+          className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden flex flex-col"
+        >
           <div className="h-32 bg-gray-50 border-b border-gray-100 flex items-center justify-center text-xs text-gray-400">
             T‑shirt mockup
           </div>

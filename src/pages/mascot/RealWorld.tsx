@@ -12,7 +12,10 @@ const RealWorld: React.FC = () => {
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5">
+        <div
+          id="realworld-plush-specs"
+          className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5"
+        >
           <h3 className="text-base font-semibold text-[#0F2537] mb-3">Plush toy specs</h3>
           <ul className="text-sm text-[#374957] space-y-2">
             <li>· Simplified vest and accessory detail for manufacturability</li>
@@ -23,7 +26,10 @@ const RealWorld: React.FC = () => {
           </ul>
         </div>
 
-        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5">
+        <div
+          id="realworld-events-spaces"
+          className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5"
+        >
           <h3 className="text-base font-semibold text-[#0F2537] mb-3">Convention & booth assets</h3>
           <ul className="text-sm text-[#374957] space-y-2 mb-4">
             <li>· Option A: 3–5 ft statue with matte paint finish and stable base</li>

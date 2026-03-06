@@ -4,7 +4,7 @@ const Product2D: React.FC = () => {
   return (
     <section>
       <h2 className="text-2xl md:text-3xl font-bold font-archivo text-[#0F2537] mb-3">
-        2D implementation (product)
+        2D implementation
       </h2>
       <p className="text-sm md:text-base text-[#374957] mb-6 max-w-2xl">
         Use 2D Scout wherever clarity and speed matter most. The 2D system is built to feel native to the interface grid
@@ -12,7 +12,10 @@ const Product2D: React.FC = () => {
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5">
+        <div
+          id="product2d-primary-usage"
+          className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5"
+        >
           <h3 className="text-base font-semibold text-[#0F2537] mb-3">Primary usage contexts</h3>
           <ul className="text-sm text-[#374957] space-y-2">
             <li>· Web and mobile UI surfaces</li>
@@ -23,7 +26,10 @@ const Product2D: React.FC = () => {
           </ul>
         </div>
 
-        <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5">
+        <div
+          id="product2d-rendering-rules"
+          className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5"
+        >
           <h3 className="text-base font-semibold text-[#0F2537] mb-3">Rendering rules (2D)</h3>
           <ul className="text-sm text-[#374957] space-y-2">
             <li>· Flat vector only (no gradients or painterly shading)</li>
@@ -35,7 +41,10 @@ const Product2D: React.FC = () => {
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl bg-white border border-gray-100 shadow-sm p-5">
+      <div
+        id="product2d-scenarios"
+        className="mt-6 rounded-2xl bg-white border border-gray-100 shadow-sm p-5"
+      >
         <h3 className="text-base font-semibold text-[#0F2537] mb-3">Common scenarios (product)</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-[#374957]">
           <div className="rounded-xl bg-[#F3FAFF] border border-[#D9ECFF] p-3">
@@ -65,7 +74,10 @@ const Product2D: React.FC = () => {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div
+        id="product2d-pose-library"
+        className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4"
+      >
         <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-4">
           <h3 className="text-sm font-semibold text-[#0F2537] mb-2">Pose library – product</h3>
           <p className="text-xs text-[#6B7280] mb-2">
@@ -89,7 +101,10 @@ const Product2D: React.FC = () => {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div
+        id="product2d-do-dont"
+        className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4"
+      >
         <div className="rounded-2xl bg-[#F3FAFF] border border-[#CFE6FF] p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#136C9E] mb-2">
             Do
