@@ -75,6 +75,27 @@ export interface UserProfile {
   companyProfile?: CompanyProfile;
 }
 
+export type AgentRole = 'lettings' | 'management' | 'sales' | 'block-management';
+
+export type AgentLinkStatus = 'invited' | 'accepted' | 'declined' | 'expired' | 'removed';
+
+export interface PropertyAgentLink {
+  id: string;
+  agentUserId?: string;
+  primary: boolean;
+  selfManaged: boolean;
+  agentName?: string;
+  agencyName?: string;
+  email: string;
+  phone?: string;
+  roles: AgentRole[];
+  status: AgentLinkStatus;
+  invitedAt?: Date;
+  acceptedAt?: Date;
+  lastInviteSentAt?: Date;
+  expiresAt?: Date;
+}
+
 export interface Property {
   id: string;
   address: string;
@@ -106,6 +127,9 @@ export interface Property {
   createdAt: Date;
   tenant?: Tenant;
   tenantId?: string;
+  // Management / agents
+  agents?: PropertyAgentLink[];
+  selfManaged?: boolean;
 }
 
 export interface CalendarDate {
@@ -903,7 +927,10 @@ export default function App() {
       documents: documents,
       isForSale: propertyDetails.isForSale,
       propertyMode: isShortlet ? 'shortlet' : 'long-term',
-      createdAt: new Date()
+      createdAt: new Date(),
+      // Default management setup: self-managed with no external agents
+      selfManaged: true,
+      agents: []
     };
     
     // Add shortlet fields if it's a shortlet

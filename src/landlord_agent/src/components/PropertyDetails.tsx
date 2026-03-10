@@ -27,7 +27,7 @@ import {
   UserX,
   UserCheck
 } from 'lucide-react';
-import { Property, Tenant } from '../App';
+import { Property, Tenant, AgentRole, PropertyAgentLink } from '../App';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Separator } from './ui/separator';
@@ -83,6 +83,10 @@ export function PropertyDetails({
   const [showSaleOnDialog, setShowSaleOnDialog] = useState(false);
   const [showAddGuest, setShowAddGuest] = useState(false);
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
+  const [agentInviteEmail, setAgentInviteEmail] = useState('');
+  const [agentInviteName, setAgentInviteName] = useState('');
+  const [agentInviteAgency, setAgentInviteAgency] = useState('');
+  const [agentInviteRoles, setAgentInviteRoles] = useState<AgentRole[]>(['management']);
   
   // Property mode (long-term vs shortlet)
   const propertyMode = property?.propertyMode || 'long-term';
@@ -230,6 +234,98 @@ export function PropertyDetails({
     };
     if (!value) return 'Not provided';
     return labels[value] || value;
+  };
+
+  const agentRoleOptions: { value: AgentRole; label: string }[] = [
+    { value: 'lettings', label: 'Lettings' },
+    { value: 'management', label: 'Management' },
+    { value: 'sales', label: 'Sales' },
+    { value: 'block-management', label: 'Block management' }
+  ];
+
+  const toggleAgentInviteRole = (role: AgentRole) => {
+    setAgentInviteRoles((current) =>
+      current.includes(role) ? current.filter((r) => r !== role) : [...current, role]
+    );
+  };
+
+  const handleSendAgentInvite = () => {
+    if (!property || !agentInviteEmail.trim()) return;
+
+    const now = new Date();
+    const existingAgents = (property.agents || []) as PropertyAgentLink[];
+
+    const newAgent: PropertyAgentLink = {
+      id: `agent-${Date.now()}`,
+      email: agentInviteEmail.trim(),
+      agentName: agentInviteName.trim() || undefined,
+      agencyName: agentInviteAgency.trim() || undefined,
+      phone: undefined,
+      primary: existingAgents.length === 0,
+      selfManaged: false,
+      roles: agentInviteRoles.length ? agentInviteRoles : ['management'],
+      status: 'invited',
+      invitedAt: now,
+      lastInviteSentAt: now
+    };
+
+    updateProperty(property.id, {
+      agents: [...existingAgents, newAgent],
+      selfManaged: false
+    });
+
+    setAgentInviteEmail('');
+    setAgentInviteName('');
+    setAgentInviteAgency('');
+    setAgentInviteRoles(['management']);
+  };
+
+  const handleSetPrimaryAgent = (agentId: string) => {
+    if (!property || !property.agents) return;
+
+    const updatedAgents = property.agents.map((agent) => ({
+      ...agent,
+      primary: agent.id === agentId
+    }));
+
+    updateProperty(property.id, { agents: updatedAgents });
+  };
+
+  const handleResendAgentInvite = (agentId: string) => {
+    if (!property || !property.agents) return;
+
+    const now = new Date();
+    const updatedAgents = property.agents.map((agent) => {
+      if (agent.id !== agentId) return agent;
+
+      const lastSent = agent.lastInviteSentAt ? new Date(agent.lastInviteSentAt) : undefined;
+      if (lastSent) {
+        const oneDayMs = 24 * 60 * 60 * 1000;
+        const diff = now.getTime() - lastSent.getTime();
+        if (diff < oneDayMs) {
+          return agent;
+        }
+      }
+
+      return {
+        ...agent,
+        lastInviteSentAt: now,
+        invitedAt: agent.invitedAt || now,
+        status: agent.status === 'expired' ? 'invited' : agent.status
+      };
+    });
+
+    updateProperty(property.id, { agents: updatedAgents });
+  };
+
+  const handleRemoveAgent = (agentId: string) => {
+    if (!property || !property.agents) return;
+
+    const updatedAgents = property.agents.map((agent) =>
+      agent.id === agentId ? { ...agent, status: 'removed', primary: false } : agent
+    );
+
+    updateProperty(property.id, { agents: updatedAgents });
   };
 
   return (
@@ -1011,42 +1107,227 @@ export function PropertyDetails({
 
             {!isForSale && !isShortlet && property.status === 'vacant' && (
               <Card className="p-6">
-                <h3 className="mb-4">Property Status</h3>
-                <div className="text-center py-6">
-                  <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
-                    <User className="w-6 h-6 text-muted-foreground" />
-                  </div>
-                  <p className="text-muted-foreground mb-2">Property is vacant</p>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Ready for new tenant
-                  </p>
-                  {onAddTenant && (
-                    <Button onClick={onAddTenant} className="w-full mb-3">
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Add Tenant
-                    </Button>
-                  )}
-                  {availableTenants.length > 0 && onSelectExistingTenant && (
-                    <>
-                      <Separator className="my-4" />
-                      <div className="space-y-2">
-                        <p className="text-xs text-muted-foreground mb-2">Or select existing tenant</p>
-                        <Select onValueChange={onSelectExistingTenant}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select existing tenant" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableTenants.map((tenant) => (
-                              <SelectItem key={tenant.id} value={tenant.id}>
-                                {tenant.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                <h3 className="mb-4">Property Management</h3>
+                <Tabs defaultValue="agents" className="space-y-4">
+                  <TabsList className="w-full">
+                    <TabsTrigger value="agents" className="flex-1">
+                      Agents
+                    </TabsTrigger>
+                    <TabsTrigger value="tenants" className="flex-1">
+                      Tenants
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="agents">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Linked agents</p>
+                          <p className="text-xs text-muted-foreground">
+                            Invite agents or agencies to manage this property.
+                          </p>
+                        </div>
                       </div>
-                    </>
-                  )}
-                </div>
+
+                      <div className="space-y-3">
+                        {(property.agents || [])
+                          .filter((agent) => agent.status !== 'removed')
+                          .map((agent) => {
+                            const lastSent = agent.lastInviteSentAt
+                              ? new Date(agent.lastInviteSentAt)
+                              : undefined;
+                            const canResend =
+                              !lastSent ||
+                              Date.now() - lastSent.getTime() >= 24 * 60 * 60 * 1000;
+
+                            return (
+                              <div
+                                key={agent.id}
+                                className="flex items-start justify-between p-3 border rounded-lg"
+                              >
+                                <div>
+                                  <p className="font-medium">
+                                    {agent.agentName || agent.email}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {agent.agencyName || 'Independent / agency not specified'}
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {agent.primary && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        Primary
+                                      </Badge>
+                                    )}
+                                    {agent.roles?.map((role) => (
+                                      <Badge key={role} variant="outline" className="text-xs">
+                                        {agentRoleOptions.find((r) => r.value === role)?.label ||
+                                          role}
+                                      </Badge>
+                                    ))}
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs capitalize"
+                                    >
+                                      {agent.status}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <div className="flex flex-col gap-2 items-end">
+                                  {!agent.primary && (
+                                    <Button
+                                      variant="outline"
+                                      size="xs"
+                                      onClick={() => handleSetPrimaryAgent(agent.id)}
+                                    >
+                                      Set primary
+                                    </Button>
+                                  )}
+                                  {agent.status === 'invited' && (
+                                    <Button
+                                      variant="outline"
+                                      size="xs"
+                                      disabled={!canResend}
+                                      onClick={() => handleResendAgentInvite(agent.id)}
+                                    >
+                                      Resend invite
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="outline"
+                                    size="xs"
+                                    className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                                    onClick={() => handleRemoveAgent(agent.id)}
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                        {(property.agents || []).filter(
+                          (agent) => agent.status !== 'removed'
+                        ).length === 0 && (
+                          <div className="text-center py-4 text-sm text-muted-foreground">
+                            No agents linked yet.
+                          </div>
+                        )}
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-3">
+                        <p className="text-sm font-medium">Invite agent</p>
+                        <div className="grid gap-3">
+                          <div className="grid gap-1">
+                            <Label className="text-xs text-muted-foreground">
+                              Agent email
+                            </Label>
+                            <Input
+                              type="email"
+                              value={agentInviteEmail}
+                              onChange={(e) => setAgentInviteEmail(e.target.value)}
+                              placeholder="agent@agency.co.uk"
+                            />
+                          </div>
+                          <div className="grid gap-1">
+                            <Label className="text-xs text-muted-foreground">
+                              Agent name (optional)
+                            </Label>
+                            <Input
+                              value={agentInviteName}
+                              onChange={(e) => setAgentInviteName(e.target.value)}
+                              placeholder="Jane Smith"
+                            />
+                          </div>
+                          <div className="grid gap-1">
+                            <Label className="text-xs text-muted-foreground">
+                              Agency name (optional)
+                            </Label>
+                            <Input
+                              value={agentInviteAgency}
+                              onChange={(e) => setAgentInviteAgency(e.target.value)}
+                              placeholder="Acme Lettings"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">
+                              Roles
+                            </Label>
+                            <div className="flex flex-wrap gap-2">
+                              {agentRoleOptions.map((role) => {
+                                const selected = agentInviteRoles.includes(role.value);
+                                return (
+                                  <Button
+                                    key={role.value}
+                                    type="button"
+                                    variant={selected ? 'default' : 'outline'}
+                                    size="xs"
+                                    onClick={() => toggleAgentInviteRole(role.value)}
+                                  >
+                                    {role.label}
+                                  </Button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <Button
+                            className="w-full"
+                            disabled={!agentInviteEmail.trim()}
+                            onClick={handleSendAgentInvite}
+                          >
+                            Invite agent
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Invitations can be resent once every 24 hours.
+                        </p>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="tenants">
+                    <div className="text-center py-6">
+                      <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
+                        <User className="w-6 h-6 text-muted-foreground" />
+                      </div>
+                      <p className="text-muted-foreground mb-2">Property is vacant</p>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Ready for new tenant
+                      </p>
+                      {onAddTenant && (
+                        <Button onClick={onAddTenant} className="w-full mb-3">
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Add Tenant
+                        </Button>
+                      )}
+                      {availableTenants.length > 0 && onSelectExistingTenant && (
+                        <>
+                          <Separator className="my-4" />
+                          <div className="space-y-2">
+                            <p className="text-xs text-muted-foreground mb-2">
+                              Or select existing tenant
+                            </p>
+                            <Select onValueChange={onSelectExistingTenant}>
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select existing tenant" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableTenants.map((tenant) => (
+                                  <SelectItem key={tenant.id} value={tenant.id}>
+                                    {tenant.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </Card>
             )}
 
