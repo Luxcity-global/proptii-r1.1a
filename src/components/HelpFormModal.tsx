@@ -37,7 +37,7 @@ const HelpFormModal: React.FC<HelpFormModalProps> = ({ isOpen, onClose }) => {
             }
 
             // Submit via FormSubmit AJAX API
-            const response = await fetch('https://formsubmit.co/ajax/contactus@theluxcity.co.uk', {
+            const response = await fetch('https://formsubmit.co/ajax/marketing@theluxcity.co.uk', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
