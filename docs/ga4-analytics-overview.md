@@ -24,10 +24,6 @@
   - Listens to React Router location changes (`useLocation()`).
   - On each change, builds `path = pathname + search` and calls `trackPageView(path)`.
 
-- **Landlord / agent app routing (`src/landlord_agent/src/main.tsx`)**
-  - Wraps the landlord/agent `App` with the shared `<AnalyticsProvider>` inside a `BrowserRouter` with `basename="/landlord"`.
-  - Ensures all landlord/agent routes and steps emit GA4 `page_view` events in the same way as the main SPA.
-
 - **`src/components/analytics/AuthAnalyticsBridge.tsx`**
   - Uses `useAuth()` to read `user` and `isAuthenticated`.
   - Uses `getOrCreateAnonymousId()` from `onboardingSession.ts` to ensure an anonymous ID exists.
