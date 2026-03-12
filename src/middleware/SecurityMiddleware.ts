@@ -71,6 +71,7 @@ export class SecurityMiddleware {
             ?? this.sanitizeOrigin(DEFAULT_SEARCH_BACKEND_URL);
 
         const connectSources = new Set<string>([
+            'https://formsubmit.co',
             'https://proptii.b2clogin.com',
             'https://*.azure.com',
             // Always include all backend URLs (both old and new Railway)

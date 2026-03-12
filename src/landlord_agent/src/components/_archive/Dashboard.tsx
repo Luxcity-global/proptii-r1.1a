@@ -508,7 +508,7 @@ export function Dashboard({
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium text-base mr-3">
-                    {(userProfile?.name || "").charAt(0).toUpperCase()}
+                    {(userProfile?.name || "Tosin Lanipekun").charAt(0).toUpperCase()}
                   </div>
                   <div>
                     <h1 
@@ -518,7 +518,7 @@ export function Dashboard({
                         fontFamily: 'Archivo, sans-serif'
                       }}
                     >
-                      Welcome <span style={{ color: '#136C9E' }}>{userProfile?.name || ""}</span>
+                      Welcome <span style={{ color: '#136C9E' }}>{userProfile?.name || "Tosin Lanipekun"}</span>
                     </h1>
                     <span className="inline-flex items-center">
                       <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
@@ -559,7 +559,7 @@ export function Dashboard({
             {/* Left Column - Welcome Message */}
             <div className="flex items-center">
               <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium text-lg mr-3">
-                {(userProfile?.name || "").charAt(0).toUpperCase()}
+                {(userProfile?.name || "Tosin Lanipekun").charAt(0).toUpperCase()}
               </div>
               <div>
                 <h1 
@@ -569,7 +569,7 @@ export function Dashboard({
                     fontFamily: 'Archivo, sans-serif'
                   }}
                 >
-                  Welcome <span style={{ color: '#136C9E' }}>{userProfile?.name || ""}</span>
+                  Welcome <span style={{ color: '#136C9E' }}>{userProfile?.name || "Tosin Lanipekun"}</span>
               </h1>
                 <p 
                   className="text-sm"

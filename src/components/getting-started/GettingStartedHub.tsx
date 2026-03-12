@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Check, Minus, Wrench, FileDown, Compass } from 'lucide-react';
 import {
   type GettingStartedApp,
+  type ProgressStep,
   getProgress,
   getHubMinimized,
   setHubMinimized,
@@ -30,11 +31,16 @@ const MODAL_DOCUMENTS: { id: string; title: string; file: string }[] = [
 
 const BRAND_BLUE = '#136C9E';
 
+/** Scout head avatar image for the getting-started FAB */
+const SCOUT_HEAD_IMAGE = '/images/Scout ava.png';
+
 export interface GettingStartedHubProps {
   app: GettingStartedApp;
   userName?: string;
   /** 'top' = above main content; 'sidebar' = right-hand sidebar */
   placement?: 'top' | 'sidebar';
+  /** 'left' | 'right' – FAB position when using floating placement (default: right) */
+  fabPosition?: 'left' | 'right';
   /** Optional: custom resume action (e.g. landlord app opens main app URL) */
   onResumeClick?: (path: string, tourParam?: string) => void;
 }
@@ -45,7 +51,7 @@ export interface GettingStartedHubProps {
  */
 type ModalTab = 'tours' | 'tools' | 'documents';
 
-export function GettingStartedHub({ app, userName, placement = 'top', onResumeClick }: GettingStartedHubProps) {
+export function GettingStartedHub({ app, userName, placement = 'top', fabPosition = 'right', onResumeClick }: GettingStartedHubProps) {
   const navigate = useNavigate();
   const [minimized, setMinimizedState] = useState(() => getHubMinimized(app) || true);
   const [activeModalTab, setActiveModalTab] = useState<ModalTab>('tours');
@@ -96,17 +102,20 @@ export function GettingStartedHub({ app, userName, placement = 'top', onResumeCl
 
   const displayName = userName?.trim() || 'there';
 
-  // Floating trigger: lower right – Scout avatar; chat bubble on hover
+  // Floating trigger: lower left or right – Scout avatar; chat bubble on hover
+  const isLeft = fabPosition === 'left';
   const fab = (
-    <div className="group fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
+    <div
+      className={`group fixed bottom-6 z-40 flex flex-col gap-2 ${isLeft ? 'left-6 items-start' : 'right-6 items-end'}`}
+    >
       {/* Chat bubble: visible on hover */}
       <div
-        className="relative rounded-2xl rounded-br-md bg-white px-4 py-2.5 shadow-lg border border-gray-200 text-sm text-gray-800 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200"
+        className={`relative rounded-2xl bg-white px-4 py-2.5 shadow-lg border border-gray-200 text-sm text-gray-800 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200 ${isLeft ? 'rounded-bl-md' : 'rounded-br-md'}`}
         style={{ fontFamily: 'Archivo, sans-serif', maxWidth: '200px' }}
       >
         Need help with anything?
         <div
-          className="absolute -bottom-2 right-5 w-4 h-4 rotate-45 border-r border-b border-gray-200 bg-white"
+          className={`absolute -bottom-2 w-4 h-4 rotate-45 border-r border-b border-gray-200 bg-white ${isLeft ? 'left-5' : 'right-5'}`}
           style={{ boxShadow: '2px 2px 0 -1px rgba(0,0,0,0.05)' }}
           aria-hidden
         />
@@ -121,7 +130,7 @@ export function GettingStartedHub({ app, userName, placement = 'top', onResumeCl
         aria-label="Open getting started"
       >
         <img
-          src="/images/Scout ava.png"
+          src={SCOUT_HEAD_IMAGE}
           alt="Scout"
           className="w-full h-full object-cover"
         />
@@ -222,7 +231,7 @@ export function GettingStartedHub({ app, userName, placement = 'top', onResumeCl
 
       {/* Step list: 3 per dashboard, all 9 for home */}
       <ul className="mt-4 space-y-3">
-        {progress.steps.slice(0, app === 'home' ? 9 : 5).map((step) => (
+        {progress.steps.slice(0, app === 'home' ? 9 : 5).map((step: ProgressStep) => (
           <li key={step.id} className="flex items-center gap-3 text-sm">
             {step.completed ? (
               <span className="flex items-center justify-center w-5 h-5 rounded-full shrink-0 bg-green-100">

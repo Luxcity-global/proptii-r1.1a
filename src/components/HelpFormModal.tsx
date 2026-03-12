@@ -30,142 +30,32 @@ const HelpFormModal: React.FC<HelpFormModalProps> = ({ isOpen, onClose }) => {
         setIsSubmitting(true);
 
         try {
-            console.log('Submitting support form...');
-
-            // Step 1: Save to Firestore
-            console.log('Saving to Firestore...');
+            // Save to Firestore (best-effort)
             const firestoreResult = await firestoreService.saveSupportForm(formData);
-            
-            if (firestoreResult.success) {
-                console.log('✅ Support form saved to Firestore successfully');
-            } else {
+            if (!firestoreResult.success) {
                 console.warn('⚠️ Failed to save to Firestore:', firestoreResult.error);
-                // Continue with email even if Firestore fails
             }
 
-            // Step 2: Send email using EXISTING /api/email/send endpoint (from server/index.js)
-            console.log('Sending email...');
-            
-            // Generate HTML email template
-            const emailHtml = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="utf-8">
-                    <style>
-                        body {
-                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                            line-height: 1.6;
-                            color: #333;
-                            max-width: 600px;
-                            margin: 0 auto;
-                            padding: 20px;
-                        }
-                        .header {
-                            background-color: #0A2342;
-                            color: white;
-                            padding: 30px;
-                            text-align: center;
-                            border-radius: 8px 8px 0 0;
-                        }
-                        .content {
-                            background-color: #f9f9f9;
-                            padding: 30px;
-                            border: 1px solid #ddd;
-                            border-top: none;
-                            border-radius: 0 0 8px 8px;
-                        }
-                        .field {
-                            margin-bottom: 20px;
-                            padding: 15px;
-                            background-color: white;
-                            border-left: 4px solid #FF6B35;
-                            border-radius: 4px;
-                        }
-                        .field-label {
-                            font-weight: bold;
-                            color: #0A2342;
-                            margin-bottom: 5px;
-                            font-size: 14px;
-                            text-transform: uppercase;
-                        }
-                        .field-value {
-                            color: #555;
-                            margin-top: 8px;
-                            font-size: 15px;
-                        }
-                        .footer {
-                            text-align: center;
-                            padding: 20px;
-                            color: #888;
-                            font-size: 12px;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <h1 style="margin: 0;">New Support Request</h1>
-                        <p style="margin: 10px 0 0 0; opacity: 0.9;">FAQ Contact Form Submission</p>
-                    </div>
-                    <div class="content">
-                        <div class="field">
-                            <div class="field-label">Subject</div>
-                            <div class="field-value">${formData.subject}</div>
-                        </div>
-                        
-                        <div class="field">
-                            <div class="field-label">Heading</div>
-                            <div class="field-value">${formData.heading}</div>
-                        </div>
-                        
-                        <div class="field">
-                            <div class="field-label">User Email</div>
-                            <div class="field-value"><a href="mailto:${formData.email}" style="color: #FF6B35;">${formData.email}</a></div>
-                        </div>
-                        
-                        <div class="field">
-                            <div class="field-label">Message</div>
-                            <div class="field-value" style="white-space: pre-wrap;">${formData.body}</div>
-                        </div>
-                    </div>
-                    <div class="footer">
-                        <p>This is an automated message from the Proptii Support System</p>
-                        <p>© ${new Date().getFullYear()} Proptii. All rights reserved.</p>
-                    </div>
-                </body>
-                </html>
-            `;
-            
-            // Use the EXISTING email server endpoint (server/index.js)
-            // This is the same one your working modals use
-            const emailServerUrl = window.location.hostname === 'localhost' 
-                ? 'http://localhost:3002'
-                : 'https://proptii-r11a-production-0c93.up.railway.app';
-            
-            const emailEndpoint = `${emailServerUrl}/api/email/send`;
-            console.log('Sending email to:', emailEndpoint);
-            
-            const emailResponse = await fetch(emailEndpoint, {
+            // Submit via FormSubmit AJAX API
+            const response = await fetch('https://formsubmit.co/ajax/contactus@theluxcity.co.uk', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                 },
                 body: JSON.stringify({
-                    to: 'contactus@theluxcity.co.uk',
-                    subject: `[Support Request] ${formData.subject} - ${formData.heading}`,
-                    html: emailHtml
-                })
+                    _subject: `[Support Request] ${formData.subject} - ${formData.heading}`,
+                    subject: formData.subject,
+                    heading: formData.heading,
+                    email: formData.email,
+                    message: formData.body,
+                }),
             });
 
-            if (!emailResponse.ok) {
-                const errorData = await emailResponse.json().catch(() => ({ error: 'Failed to send email' }));
-                throw new Error(errorData.error || 'Failed to send email');
+            if (!response.ok) {
+                throw new Error('Failed to submit form');
             }
 
-            const emailResult = await emailResponse.json();
-            console.log('✅ Email sent successfully:', emailResult);
-
-            // Show success message
             setShowSuccess(true);
         } catch (err) {
             console.error('Form submission error:', err);

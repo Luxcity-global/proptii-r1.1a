@@ -24,6 +24,18 @@ import { useIsMobile } from './ui/use-mobile';
 const proptiiLogoLarge = '/images/proptii-logo.png'; // Full logo for expanded sidebar
 const proptiiLogoSmall = '/images/Proptii ico.png'; // Icon only for collapsed sidebar
 
+const requestSignIn = () => {
+  if (window.self !== window.top) {
+    // Running in iframe inside LandlordDemo — delegate auth to parent
+    window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: {} }, '*');
+  } else {
+    // Running standalone (e.g. /landlord/index.html direct access)
+    // Redirect to the proper /landlord route which has the auth context
+    sessionStorage.setItem('redirectAfterLogin', '/landlord');
+    window.location.href = '/landlord?signin=1';
+  }
+};
+
 export type NavigationScreen = 'dashboard' | 'properties' | 'documents' | 'viewings' | 'clients' | 'insights' | 'inbox' | 'contracts';
 
 interface MainLayoutProps {
@@ -34,13 +46,16 @@ interface MainLayoutProps {
 }
 
 // Custom Sidebar Header with perfect alignment
-function CustomSidebarHeader() {
+function CustomSidebarHeader({ userProfile }: { userProfile: UserProfile | null }) {
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
 
   const handleLogoClick = () => {
-    // Navigate back to the tenant app's home page
-    window.location.href = '/';
+    if (!userProfile) {
+      requestSignIn();
+    } else {
+      window.location.href = '/';
+    }
   };
 
   return (
@@ -180,13 +195,16 @@ function CustomUserProfile({ userProfile }: { userProfile: UserProfile | null })
 }
 
 // Custom Sidebar Trigger
-function CustomSidebarTrigger() {
+function CustomSidebarTrigger({ userProfile }: { userProfile: UserProfile | null }) {
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === 'collapsed';
 
   const handleProptiiHomeClick = () => {
-    // Navigate back to the tenant app's home page
-    window.location.href = '/';
+    if (!userProfile) {
+      requestSignIn();
+    } else {
+      window.location.href = '/';
+    }
   };
 
   return (
@@ -256,7 +274,7 @@ function CustomSidebar({
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <CustomSidebarHeader />
+          <CustomSidebarHeader userProfile={userProfile} />
           
           {/* Navigation */}
           <div className="flex-1 overflow-auto">
@@ -271,7 +289,7 @@ function CustomSidebar({
           <CustomUserProfile userProfile={userProfile} />
           
           {/* Trigger */}
-          <CustomSidebarTrigger />
+          <CustomSidebarTrigger userProfile={userProfile} />
         </div>
       </div>
       
@@ -330,7 +348,11 @@ function MobileSidebar({
   };
 
   const handleLogoClick = () => {
-    window.location.href = '/';
+    if (!userProfile) {
+      requestSignIn();
+    } else {
+      window.location.href = '/';
+    }
   };
 
   return (
@@ -495,7 +517,7 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
                 src="/images/proptii-logo.png" 
                 alt="Proptii Logo" 
                 className="h-14 object-contain cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => window.location.href = '/'}
+                onClick={() => userProfile ? window.location.href = '/' : requestSignIn()}
               />
               <div className="w-10" /> {/* Spacer for centering */}
             </div>

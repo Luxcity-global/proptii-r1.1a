@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LandlordAppBridge from '../components/LandlordAppBridge';
 import Footer from '../components/Footer';
@@ -6,8 +7,19 @@ import { SignUpPromptModal } from '../components/onboarding/SignUpPromptModal';
 
 const LandlordDemo: React.FC = () => {
   const { isAuthenticated, user, isLoading, login } = useAuth();
+  const { pathname, search } = useLocation();
   const [signUpOpen, setSignUpOpen] = useState(false);
   const [signUpTitle, setSignUpTitle] = useState('Sign up to continue');
+
+  // Auto-open sign-in modal when redirected here with ?signin=1
+  // (e.g. from the landlord app running in standalone mode)
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    if (params.get('signin') === '1') {
+      sessionStorage.setItem('redirectAfterLogin', pathname);
+      setSignUpOpen(true);
+    }
+  }, [pathname, search]);
 
   // Listen for REQUIRE_AUTH messages from the landlord iframe
   useEffect(() => {
@@ -23,7 +35,7 @@ const LandlordDemo: React.FC = () => {
             : 'Sign up to continue'
         );
         // Store current path so we can redirect back after login
-        sessionStorage.setItem('redirectAfterLogin', window.location.pathname + window.location.search);
+        sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
         setSignUpOpen(true);
       }
     };

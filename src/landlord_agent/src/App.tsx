@@ -2171,6 +2171,20 @@ function AppContent() {
     console.log('🔄 renderMainAppScreen called with navigationScreen:', navigationScreen);
     switch (navigationScreen) {
       case 'dashboard':
+        if (!userProfile) {
+          return (
+            <LandlordEmptyState
+              onSignIn={() => {
+                if (window.self !== window.top) {
+                  window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: {} }, '*');
+                } else {
+                  sessionStorage.setItem('redirectAfterLogin', '/landlord');
+                  window.location.href = '/landlord?signin=1';
+                }
+              }}
+            />
+          );
+        }
         return (
           <Dashboard
             properties={properties}

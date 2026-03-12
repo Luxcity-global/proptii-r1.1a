@@ -3,6 +3,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import FAQSection from '../components/FAQSection';
 import { SearchInput } from '../components/SearchInput';
+import { GettingStartedHub } from '../components/getting-started';
 import RefereeGuarantorResponseModal from '../components/referencing/RefereeGuarantorResponseModal';
 import { useAuth } from '../contexts/AuthContext';
 import { hasOnboardingCompleted } from '../utils/onboardingSession';
@@ -651,6 +652,9 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
 
       <FAQSection />
       <Footer />
+
+      {/* Getting Started hub – lower-left FAB for resuming onboarding */}
+      <GettingStartedHub app="home" />
 
     </div>
   );
