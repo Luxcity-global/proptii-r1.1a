@@ -25,7 +25,8 @@ import {
   Eye,
   X,
   UserX,
-  UserCheck
+  UserCheck,
+  Plus
 } from 'lucide-react';
 import { Property, Tenant, AgentRole, PropertyAgentLink } from '../App';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -87,6 +88,7 @@ export function PropertyDetails({
   const [agentInviteName, setAgentInviteName] = useState('');
   const [agentInviteAgency, setAgentInviteAgency] = useState('');
   const [agentInviteRoles, setAgentInviteRoles] = useState<AgentRole[]>(['management']);
+  const [showInviteForm, setShowInviteForm] = useState(false);
   
   // Property mode (long-term vs shortlet)
   const propertyMode = property?.propertyMode || 'long-term';
@@ -1217,8 +1219,25 @@ export function PropertyDetails({
                       <Separator />
 
                       <div className="space-y-3">
-                        <p className="text-sm font-medium">Invite agent</p>
-                        <div className="grid gap-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">Invite agent</p>
+                          <button
+                            type="button"
+                            onClick={() => setShowInviteForm((open) => !open)}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-primary/40 text-primary bg-white hover:bg-primary/5 transition-colors"
+                            aria-label={showInviteForm ? 'Hide invite form' : 'Show invite form'}
+                            aria-expanded={showInviteForm}
+                          >
+                            <Plus
+                              className={`w-4 h-4 transition-transform ${
+                                showInviteForm ? 'rotate-45' : ''
+                              }`}
+                            />
+                          </button>
+                        </div>
+
+                        {showInviteForm && (
+                          <div className="grid gap-3">
                           <div className="grid gap-1">
                             <Label className="text-xs text-muted-foreground">
                               Agent email
@@ -1259,15 +1278,20 @@ export function PropertyDetails({
                               {agentRoleOptions.map((role) => {
                                 const selected = agentInviteRoles.includes(role.value);
                                 return (
-                                  <Button
+                                  <Badge
                                     key={role.value}
-                                    type="button"
-                                    variant={selected ? 'default' : 'outline'}
-                                    size="xs"
+                                    variant="outline"
+                                    className={`cursor-pointer px-3 py-1 text-xs ${
+                                      selected
+                                        ? 'bg-blue-600 text-white border-blue-600'
+                                        : 'border-blue-500/50 text-blue-600 bg-transparent hover:border-blue-500 hover:bg-blue-50/50'
+                                    }`}
                                     onClick={() => toggleAgentInviteRole(role.value)}
+                                    role="button"
+                                    tabIndex={0}
                                   >
                                     {role.label}
-                                  </Button>
+                                  </Badge>
                                 );
                               })}
                             </div>
@@ -1281,9 +1305,12 @@ export function PropertyDetails({
                             Invite agent
                           </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          Invitations can be resent once every 24 hours.
-                        </p>
+                        )}
+                        {showInviteForm && (
+                          <p className="text-xs text-muted-foreground">
+                            Invitations can be resent once every 24 hours.
+                          </p>
+                        )}
                       </div>
                     </div>
                   </TabsContent>
