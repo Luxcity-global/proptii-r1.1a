@@ -1,10 +1,26 @@
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react-swc';
+import path from 'path';
 
-  import { defineConfig } from 'vite';
-  import react from '@vitejs/plugin-react-swc';
-  import path from 'path';
+export default defineConfig(({ mode }) => {
+  const rootEnvDir = path.resolve(__dirname, '../..');
+  const env = loadEnv(mode, rootEnvDir, '');
+  const measurementId = env.VITE_GA_MEASUREMENT_ID || 'G-88HC0TG6JJ';
 
-  export default defineConfig({
-    plugins: [react()],
+  return {
+    plugins: [
+      react(),
+      {
+        name: 'ga4-html-replace',
+        transformIndexHtml(html: string) {
+          return html.replace(/%VITE_GA_MEASUREMENT_ID%/g, measurementId);
+        },
+      },
+    ],
+    define: {
+      'import.meta.env.VITE_GA_MEASUREMENT_ID': JSON.stringify(measurementId),
+    },
+    envDir: rootEnvDir,
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {
@@ -53,10 +69,11 @@
         '@': path.resolve(__dirname, './src'),
       },
     },
-  base: '/landlord/',
-  build: {
-    target: 'esnext',
-    outDir: '../../public/landlord',
-    emptyOutDir: true,
-  },
-  });
+    base: '/landlord/',
+    build: {
+      target: 'esnext',
+      outDir: '../../public/landlord',
+      emptyOutDir: true,
+    },
+  };
+});
