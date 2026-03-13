@@ -5,6 +5,7 @@ import FAQSection from '../components/FAQSection';
 import { SearchInput } from '../components/SearchInput';
 import { GettingStartedHub } from '../components/getting-started';
 import RefereeGuarantorResponseModal from '../components/referencing/RefereeGuarantorResponseModal';
+import { ServicesSection } from '../components/home/ServicesSection';
 import { useAuth } from '../contexts/AuthContext';
 import { hasOnboardingCompleted } from '../utils/onboardingSession';
 import { OnboardingFlow } from '../components/onboarding/OnboardingFlow';
@@ -148,6 +149,8 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLDivElement>(null);
+  const [servicesVariant, setServicesVariant] = useState<'v1' | 'v2' | 'v3'>('v2');
+  const [ctaHover, setCtaHover] = useState<'tenant' | 'agent' | null>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -197,7 +200,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
   const menuItems = activeMode === 'search' ? searchMenuItems : listMenuItems;
 
   return (
-    <div className="min-h-screen flex flex-col font-nunito">
+    <div className="min-h-screen flex flex-col font-nunito bg-[#f5efe7]">
       {showOnboarding && (
         <OnboardingFlow
           asModal
@@ -538,113 +541,70 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
         </div>
       </section>
 
-      {/**The new services section */}
-      <section className="relative py-16 md:py-20 bg-[#f9f5f0] z-20">
-        {/* Background Image (Blobs) */}
-        <img
-          src="/images/middle-section.png"
-          alt="Background design"
-          loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover"
+      <section className="mt-6 md:mt-8">
+        <ServicesSection
+          variant={servicesVariant}
+          showVariantToggle
+          onVariantChange={setServicesVariant}
         />
-
-        <div className="max-w-7xl mx-auto px-4 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-            {/* Book Viewing Card */}
-            <div className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
-              <div className="mb-5 md:mb-6">
-                <img
-                  src="/images/viewing-room.jpg"
-                  alt="Viewing room"
-                  loading="lazy"
-                  className="w-full h-full object-cover rounded-lg"
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                />
-              </div>
-              <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Book Viewing</h3>
-              <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
-                Save time and effort with our AI-powered booking service. Simply enter your desired property details and let our system handle the rest.
-              </p>
-              <button
-                onClick={() => navigate('/bookviewing')}
-                className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
-                Learn More
-              </button>
-            </div>
-
-            {/* Referencing Card */}
-            <div className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
-              <div className="mb-5 md:mb-6">
-                <img
-                  src="/images/referencing-person.jpg"
-                  alt="Referencing process"
-                  loading="lazy"
-                  className="w-full h-full object-cover rounded-lg"
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                />
-              </div>
-              <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Referencing</h3>
-              <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
-                Ensure peace of mind for both landlords and tenants. Our rigorous referencing process verifies renter or buyer identity, financial stability, and rental history.
-              </p>
-              <button
-                onClick={() => navigate('/referencing')}
-                className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
-                Learn More
-              </button>
-            </div>
-
-            {/* Contract Card */}
-            <div className="bg-white rounded-3xl shadow-lg p-6 md:p-7 flex flex-col h-full">
-              <div className="mb-5 md:mb-6">
-                <img
-                  src="/images/modern-building.jpg"
-                  alt="Modern building"
-                  loading="lazy"
-                  className="w-full h-full object-cover rounded-lg"
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                />
-              </div>
-              <h3 className="text-[#E65D24] text-2xl md:text-3xl font-bold mb-3 md:mb-4">Contract</h3>
-              <p className="text-gray-600 mb-5 md:mb-6 flex-grow text-sm md:text-base leading-relaxed">
-                Save time and reduce errors with our contract management solution. We offer a range of customizable lease agreement templates to suit your specific needs.
-              </p>
-              <button
-                onClick={() => navigate('/contracts')}
-                className="bg-[#E65D24] text-white px-6 py-3 rounded-full hover:bg-opacity-90 transition-all text-base md:text-lg font-medium">
-                Learn More
-              </button>
-            </div>
-          </div>
-        </div>
       </section>
 
-      {/**End of the new services section */}
-
       {/* Trial CTA section – Workstream 3 */}
-      <section className="relative py-16 md:py-20 bg-[#002B49] z-20">
-        <div className="max-w-3xl mx-auto px-4 text-center text-white">
+      <section className="relative py-16 md:py-20 bg-[#f2f2f2] z-20 overflow-hidden">
+        {/* Background figures anchored to bottom */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none select-none absolute inset-x-0 bottom-0 hidden md:flex justify-between px-10 sm:px-20 md:px-32"
+        >
+          <img
+            src={
+              ctaHover === 'tenant'
+                ? '/images/home page join us/tenant colourful.png'
+                : '/images/home page join us/tenant bw.png'
+            }
+            alt=""
+            className="max-h-72 md:max-h-80 w-auto object-contain translate-y-4 transition-transform duration-200"
+            loading="lazy"
+          />
+          <img
+            src={
+              ctaHover === 'agent'
+                ? '/images/home page join us/agent colourful.png'
+                : '/images/home page join us/agent bw.png'
+            }
+            alt=""
+            className="max-h-72 md:max-h-80 w-auto object-contain translate-y-4 transition-transform duration-200"
+            loading="lazy"
+          />
+        </div>
+
+        {/* Content */}
+        <div className="relative max-w-3xl mx-auto px-4 text-center text-[#374957]">
           <h2 className="text-2xl md:text-4xl font-bold font-archive mb-4 md:mb-6">
             Start free. No credit card. No commitment.
           </h2>
-          <p className="text-base md:text-lg text-white/90 mb-8 md:mb-10 leading-relaxed">
+          <p className="text-base md:text-lg mb-8 md:mb-10 leading-relaxed">
             Every new user gets <strong>3 months of full access</strong> to Proptii — search, viewings, referencing, and contracts. Tenants and buyers: free forever for core search. Landlords and agents: try the full toolkit before you decide.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6 md:mb-8">
             <Link
               to="/register?role=tenant"
-              className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full bg-[#F15A22] text-white font-semibold text-base md:text-lg hover:opacity-90 transition-opacity"
+              onMouseEnter={() => setCtaHover('tenant')}
+              onMouseLeave={() => setCtaHover(null)}
+              className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full border-2 border-[#136C9E] text-[#136C9E] font-semibold text-base md:text-lg bg-transparent transition-all duration-200 hover:text-white hover:border-transparent hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#F47A1A] hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus-visible:outline-none"
             >
               Join as a Tenant / Buyer
             </Link>
             <Link
               to="/register?role=agent"
-              className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full border-2 border-white/80 text-white font-semibold text-base md:text-lg hover:bg-white/10 transition-colors"
+              onMouseEnter={() => setCtaHover('agent')}
+              onMouseLeave={() => setCtaHover(null)}
+              className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full border-2 border-[#136C9E] text-[#136C9E] font-semibold text-base md:text-lg bg-transparent transition-all duration-200 hover:text-white hover:border-transparent hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#F47A1A] hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus-visible:outline-none"
             >
               Join as a Landlord / Agent
             </Link>
           </div>
-          <p className="text-sm md:text-base text-white/70">
+          <p className="text-sm md:text-base">
             After your trial, plans start from [price TBD]/month. We'll notify you before any charges.
           </p>
         </div>

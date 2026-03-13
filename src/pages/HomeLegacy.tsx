@@ -178,7 +178,7 @@ const HomeLegacy = () => {
         </div>
       </section>
 
-      {/**The new services section */}
+      {/* The original services section – left unchanged for legacy */}
       <section className="relative py-16 md:py-20 bg-[#f9f5f0] z-20">
         {/* Background Image (Blobs) */}
         <img
@@ -258,8 +258,6 @@ const HomeLegacy = () => {
           </div>
         </div>
       </section>
-
-      {/**End of the new services section */}
 
       <FAQSection />
       <Footer />
