@@ -147,6 +147,30 @@ All events use `trackEvent` and are **no-ops if GA is disabled**, so they do not
       - `total_properties`: number of properties in the current view.
       - `total_tenants`: number of tenants passed into the dashboard.
 
+- **Landlord app – screen navigation and button clicks (`src/landlord_agent/`)**
+  - `landlord_screen_navigation` – Trigger: User navigates to a screen. Params: `screen`, `from_screen`.
+  - `landlord_nav_click` – Trigger: User clicks sidebar nav. Params: `section` (dashboard, properties, viewings, etc.).
+  - `landlord_add_property_clicked` – Trigger: User clicks Add Property.
+  - `landlord_add_tenant_clicked` – Trigger: User clicks Add Tenant. Params: `source` (clients_page, property_details, property_preview).
+  - `landlord_property_viewed` – Trigger: User opens a property. Params: `property_address`.
+  - `landlord_property_saved` – Trigger: PropertySetup form submitted. Params: `is_edit`.
+  - `landlord_tenant_added` – Trigger: AddTenant form completed successfully.
+  - `landlord_tenant_assigned` – Trigger: SelectExistingTenant assigns tenant. Params: `property_address`.
+  - `landlord_invite_tenant_sent` – Trigger: Invite tenant email sent. Params: `property_address`.
+  - `landlord_viewing_scheduled` – Trigger: Viewing request scheduled.
+  - `landlord_viewing_declined` – Trigger: Viewing request declined.
+  - `landlord_viewing_confirmed` – Trigger: Viewing confirmed.
+  - `landlord_viewing_rescheduled` – Trigger: Viewing rescheduled.
+  - `landlord_viewing_cancelled` – Trigger: Viewing cancelled.
+  - `landlord_contract_sent` – Trigger: Contract sent. Params: `has_file`.
+  - `landlord_properties_imported` – Trigger: Properties imported. Params: `count`.
+  - `landlord_role_selected` – Trigger: Role selection (Landlord/Agent). Params: `role`.
+  - `landlord_welcome_get_started` – Trigger: Welcome screen Get Started.
+  - `landlord_onboarding_add_property` – Trigger: Onboarding Add Property.
+  - `landlord_onboarding_go_to_dashboard` – Trigger: Onboarding Go to Dashboard.
+  - `landlord_onboarding_setup_company` – Trigger: Onboarding Setup Company.
+  - `landlord_vacancy_pre_marketing_approved` – Trigger: Vacancy pre-marketing approved. Params: `property_address`.
+
 ### 4. Behavior and safety guarantees
 
 - If `VITE_GA_MEASUREMENT_ID` is **missing or empty**:

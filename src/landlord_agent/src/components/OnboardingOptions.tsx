@@ -8,6 +8,7 @@ import {
   ArrowRight,
   CheckCircle
 } from 'lucide-react';
+import { trackEvent } from '../../../utils/analytics';
 
 interface OnboardingOptionsProps {
   onGoToDashboard: () => void;
@@ -28,7 +29,10 @@ export function OnboardingOptions({
       title: 'Go to Dashboard',
       description: 'Explore your property management dashboard',
       icon: LayoutDashboard,
-      action: onGoToDashboard,
+      action: () => {
+        trackEvent('landlord_onboarding_go_to_dashboard');
+        onGoToDashboard();
+      },
       buttonText: 'View Dashboard',
       buttonVariant: 'outline' as const,
       recommended: false,
@@ -40,7 +44,10 @@ export function OnboardingOptions({
       title: 'Add a Property',
       description: 'Get started by adding a property to your portfolio',
       icon: PlusCircle,
-      action: onAddProperty,
+      action: () => {
+        trackEvent('landlord_onboarding_add_property');
+        onAddProperty();
+      },
       buttonText: 'Add Property',
       buttonVariant: 'default' as const,
       recommended: true,
@@ -54,7 +61,10 @@ export function OnboardingOptions({
         ? 'Complete your company information and branding'
         : 'Add company details, logo, and professional settings',
       icon: Building2,
-      action: onSetupCompanyProfile,
+      action: () => {
+        trackEvent('landlord_onboarding_setup_company');
+        onSetupCompanyProfile();
+      },
       buttonText: userHasCompanyInfo ? 'Complete Setup' : 'Setup Company',
       buttonVariant: 'outline' as const,
       recommended: false,

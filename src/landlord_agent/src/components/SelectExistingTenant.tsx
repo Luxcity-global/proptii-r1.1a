@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { ArrowLeft, Search, Users, Home, CheckCircle, AlertCircle, Loader2, Info } from 'lucide-react';
 import { Property, Tenant } from '../App';
 import { tenantService } from '../services/tenantService';
+import { trackEvent } from '../../../utils/analytics';
 import axios from 'axios';
 
 interface AzureUser {
@@ -193,6 +194,7 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
 
       // Create tenant in Firestore
       const tenantId = await tenantService.createTenant(tenantData, currentUserId);
+      trackEvent('landlord_tenant_assigned', { property_address: selectedProperty.address });
       console.log('✅ Tenant created in Firestore:', tenantId);
       
       setIsSuccess(true);

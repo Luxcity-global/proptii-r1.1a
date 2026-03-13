@@ -24,6 +24,7 @@ import {
   Clock
 } from 'lucide-react';
 import { VacancyRiskAlert, AIMarketingAssets } from '../App';
+import { trackEvent } from '../../../utils/analytics';
 
 interface VacancyPreventionProps {
   alert: VacancyRiskAlert;
@@ -73,6 +74,7 @@ export function VacancyPrevention({ alert, onBack, onInitiatePreMarketing }: Vac
   };
 
   const handleInitiatePreMarketing = () => {
+    trackEvent('landlord_vacancy_pre_marketing_approved', { property_address: alert.propertyAddress });
     onInitiatePreMarketing(alert, marketingAssets);
     setShowAIAssistant(false);
   };

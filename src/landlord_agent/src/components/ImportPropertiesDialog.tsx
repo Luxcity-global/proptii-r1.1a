@@ -19,6 +19,7 @@ import {
   FileJson
 } from 'lucide-react';
 import { Property } from '../App';
+import { trackEvent } from '../../../utils/analytics';
 
 interface ImportPropertiesDialogProps {
   isOpen: boolean;
@@ -301,6 +302,7 @@ export function ImportPropertiesDialog({ isOpen, onClose, onImport }: ImportProp
         createdAt: new Date()
       } as Property));
 
+    trackEvent('landlord_properties_imported', { count: validProperties.length });
     onImport(validProperties);
     setCurrentStep(3);
   };

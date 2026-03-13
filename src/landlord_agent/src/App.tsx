@@ -44,6 +44,7 @@ import ViewingsPage from './components/ViewingsPage';
 import { storage, db } from './config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, query, where, onSnapshot, Unsubscribe, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { trackEvent } from '../../utils/analytics';
 
 export type UserRole = 'landlord' | 'agent';
 
@@ -336,6 +337,7 @@ function AppContent() {
   
   // Wrapper function to log navigation changes and update URL
   const handleNavigation = (screen: NavigationScreen) => {
+    trackEvent('landlord_nav_click', { section: screen });
     console.log('🧭 Navigation triggered to:', screen);
     console.log('🧭 Current navigationScreen before change:', navigationScreen);
     setNavigationScreen(screen);
@@ -1318,7 +1320,7 @@ function AppContent() {
 
   const navigateToScreen = (screen: Screen) => {
     setIsTransitioning(true);
-    
+    trackEvent('landlord_screen_navigation', { screen, from_screen: currentScreen });
     setTimeout(() => {
       setCurrentScreen(screen);
       setIsTransitioning(false);
@@ -2190,8 +2192,12 @@ function AppContent() {
             properties={properties}
             tenants={tenants}
             userProfile={userProfile}
-            onAddProperty={() => navigateToScreen('property-setup-step1')}
+            onAddProperty={() => {
+              trackEvent('landlord_add_property_clicked');
+              navigateToScreen('property-setup-step1');
+            }}
             onViewProperty={(property) => {
+              trackEvent('landlord_property_viewed', { property_address: property.address });
               selectProperty(property);
               navigateToScreen('property-details');
             }}
@@ -2231,8 +2237,12 @@ function AppContent() {
             properties={properties}
             tenants={tenants}
             arrearsAlerts={arrearsAlerts}
-            onAddProperty={() => navigateToScreen('property-setup-step1')}
+            onAddProperty={() => {
+              trackEvent('landlord_add_property_clicked');
+              navigateToScreen('property-setup-step1');
+            }}
             onViewProperty={(property) => {
+              trackEvent('landlord_property_viewed', { property_address: property.address });
               selectProperty(property);
               navigateToScreen('property-details');
             }}
@@ -2284,6 +2294,7 @@ function AppContent() {
           <DocumentsPage
             properties={properties}
             onViewProperty={(property) => {
+              trackEvent('landlord_property_viewed', { property_address: property.address });
               selectProperty(property);
               navigateToScreen('property-details');
             }}
@@ -2567,10 +2578,12 @@ function AppContent() {
               navigateToScreen('tenant-details');
             }}
             onViewProperty={(property) => {
+              trackEvent('landlord_property_viewed', { property_address: property.address });
               selectProperty(property);
               navigateToScreen('property-details');
             }}
             onAddTenant={() => {
+              trackEvent('landlord_add_tenant_clicked', { source: 'clients_page' });
               editingTenantRef.current = null;
               setSelectedTenant(null);
               navigateToScreen('tenant-selection');
@@ -2635,8 +2648,12 @@ function AppContent() {
           <Dashboard
             properties={properties}
             userProfile={userProfile}
-            onAddProperty={() => navigateToScreen('property-setup-step1')}
+            onAddProperty={() => {
+              trackEvent('landlord_add_property_clicked');
+              navigateToScreen('property-setup-step1');
+            }}
             onViewProperty={(property) => {
+              trackEvent('landlord_property_viewed', { property_address: property.address });
               selectProperty(property);
               navigateToScreen('property-details');
             }}
@@ -2706,7 +2723,10 @@ function AppContent() {
               setCurrentScreen('main-app');
               setNavigationScreen('dashboard');
             }}
-            onAddProperty={() => navigateToScreen('property-setup-step1')}
+            onAddProperty={() => {
+              trackEvent('landlord_add_property_clicked');
+              navigateToScreen('property-setup-step1');
+            }}
             onSetupCompanyProfile={() => navigateToScreen('company-profile-setup')}
             userHasCompanyInfo={!!userProfile?.companyProfile}
           />
@@ -2903,6 +2923,7 @@ function AppContent() {
               }
             }}
             onAddTenant={() => {
+              trackEvent('landlord_add_tenant_clicked', { source: 'property_details' });
               editingTenantRef.current = null;
               setSelectedTenant(null);
               navigateToScreen('tenant-selection');
@@ -3441,6 +3462,7 @@ function AppContent() {
               }
             }}
             onAddTenant={() => {
+              trackEvent('landlord_add_tenant_clicked', { source: 'property_preview' });
               setPreviousScreen('property-preview');
               navigateToScreen('tenant-selection');
             }}

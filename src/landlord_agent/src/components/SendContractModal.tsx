@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Badge } from './ui/badge';
+import { trackEvent } from '../../../utils/analytics';
 
 interface SendContractModalProps {
   isOpen: boolean;
@@ -182,6 +183,7 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
       }
 
       onSend(contractData);
+      trackEvent('landlord_contract_sent', { has_file: !!selectedFile });
       
       // Reset form
       setSelectedFile(null);

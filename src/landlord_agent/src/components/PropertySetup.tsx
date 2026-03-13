@@ -9,6 +9,7 @@ import { Checkbox } from './ui/checkbox';
 import { Badge } from './ui/badge';
 import { MapPin, Home, BedDouble, PoundSterling, AlertCircle, Save, ArrowLeft, Upload, Image as ImageIcon } from 'lucide-react';
 import { Property } from '../App';
+import { trackEvent } from '../../../utils/analytics';
 
 interface PropertySetupProps {
   property?: Property | null;
@@ -108,6 +109,7 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
           documents: property?.documents || []
         };
         await onPropertyComplete(propertyData);
+        trackEvent('landlord_property_saved', { is_edit: !!property });
       } catch (error) {
         console.error('Error submitting property:', error);
         setErrors({ submit: 'Failed to save property. Please try again.' });

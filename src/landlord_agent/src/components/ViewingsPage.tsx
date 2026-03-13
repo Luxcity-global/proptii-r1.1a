@@ -26,6 +26,7 @@ import emailService from '../../../services/emailService';
 import landlordUserService from '../../../services/landlordUserService';
 import { useIsMobile } from './ui/use-mobile';
 import { Button } from './ui/button';
+import { trackEvent } from '../../../utils/analytics';
 
 // ViewingsPage component for managing property viewings and requests
 
@@ -770,6 +771,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         });
       }
 
+      trackEvent('landlord_viewing_scheduled');
       setFeedback({ type: 'success', message: 'Viewing scheduled and notification sent to tenant.' });
       setIsScheduleModalOpen(false);
       setSelectedRequest(null);
@@ -786,6 +788,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
     try {
       // Update status from 'pending' to 'cancelled' in viewingBookings
       await viewingService.updateViewingStatus(request.id, 'cancelled', 'Declined by agent');
+      trackEvent('landlord_viewing_declined');
       setFeedback({ type: 'success', message: 'Viewing request declined.' });
     } catch (err) {
       console.error('Failed to decline viewing request:', err);
@@ -820,6 +823,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         });
       }
 
+      trackEvent('landlord_viewing_confirmed');
       setFeedback({ type: 'success', message: 'Viewing confirmed and tenant notified.' });
     } catch (err) {
       console.error('Failed to confirm viewing:', err);
@@ -887,6 +891,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         });
       }
 
+      trackEvent('landlord_viewing_rescheduled');
       setFeedback({ type: 'success', message: 'Reschedule request sent to tenant.' });
       setIsRescheduleModalOpen(false);
       setSelectedViewing(null);
@@ -917,6 +922,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         undefined
       );
 
+      trackEvent('landlord_viewing_cancelled');
       const tenantEmail = selectedViewing.viewingDetails?.userDetails?.email;
       if (tenantEmail) {
         await emailService.sendEmail({

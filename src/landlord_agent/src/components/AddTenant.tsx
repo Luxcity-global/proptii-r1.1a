@@ -28,6 +28,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Property, Tenant, UserProfile } from '../App';
+import { trackEvent } from '../../../utils/analytics';
 
 interface AddTenantProps {
   properties: Property[];
@@ -867,6 +868,7 @@ export function AddTenant({ properties, onSave, onBack, onBackToSelection, prese
       console.log('📤 [AddTenant] Calling onSave with tenant data:', tenant);
       try {
         await onSave(tenant);
+        trackEvent('landlord_tenant_added');
         console.log('✅ [AddTenant] onSave completed successfully');
         } catch (error) {
         console.error('❌ [AddTenant] Error in onSave:', error);

@@ -5,6 +5,7 @@ import { Badge } from './ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Building2, Users, HelpCircle, Check } from 'lucide-react';
 import { UserRole } from '../App';
+import { trackEvent } from '../../../utils/analytics';
 
 interface RoleSelectionProps {
   selectedRole: UserRole;
@@ -134,7 +135,10 @@ export function RoleSelection({ selectedRole, onRoleSelect, onContinue }: RoleSe
 
         <div className="flex justify-center w-full px-2">
           <Button 
-            onClick={onContinue}
+            onClick={() => {
+              trackEvent('landlord_role_selected', { role: selectedRole });
+              onContinue();
+            }}
             className="flex items-center justify-center space-x-2 px-4 sm:px-6 md:px-8 py-2 sm:py-2.5 min-h-[2.5rem] sm:min-h-[2.75rem] md:min-h-[3rem] rounded-full transition-all duration-300 flex-shrink-0 w-full sm:w-auto text-xs sm:text-sm md:text-base font-semibold max-w-xs" 
             style={{ 
               backgroundColor: '#DC5F12', 

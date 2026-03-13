@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Building2, FileCheck, BarChart3, Shield, Clock, Users } from 'lucide-react';
+import { trackEvent } from '../../../utils/analytics';
 
 interface WelcomeScreenProps {
   onGetStarted: () => void;
@@ -77,7 +78,10 @@ export function WelcomeScreen({ onGetStarted }: WelcomeScreenProps) {
 
         <div className="text-center px-4">
           <Button 
-            onClick={onGetStarted} 
+            onClick={() => {
+              trackEvent('landlord_welcome_get_started');
+              onGetStarted();
+            }} 
             size="lg" 
             className="px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 text-sm sm:text-base w-full sm:w-auto"
           >

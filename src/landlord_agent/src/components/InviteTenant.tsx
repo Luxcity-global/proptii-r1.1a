@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ArrowLeft, Mail, Send, CheckCircle, AlertCircle, Plus } from 'lucide-react';
 import { Property } from '../App';
 import axios from 'axios';
+import { trackEvent } from '../../../utils/analytics';
 
 interface InviteTenantProps {
   properties: Property[];
@@ -279,6 +280,7 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
             }
             
             console.log('✅ Email sent successfully!');
+            trackEvent('landlord_invite_tenant_sent', { property_address: selectedProperty.address });
             console.log('📬 Message ID:', response.data.messageId);
             break; // Success - exit retry loop
           } else {
