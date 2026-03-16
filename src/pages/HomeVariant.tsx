@@ -149,7 +149,6 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLDivElement>(null);
-  const [servicesVariant, setServicesVariant] = useState<'v1' | 'v2' | 'v3'>('v2');
   const [ctaHover, setCtaHover] = useState<'tenant' | 'agent' | null>(null);
 
   useEffect(() => {
@@ -542,20 +541,45 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
       </section>
 
       <section className="mt-6 md:mt-8">
-        <ServicesSection
-          variant={servicesVariant}
-          showVariantToggle
-          onVariantChange={setServicesVariant}
-        />
+        <ServicesSection variant="v1" />
       </section>
 
       {/* Trial CTA section – Workstream 3 */}
-      <section className="relative py-16 md:py-20 bg-[#f2f2f2] z-20 overflow-hidden">
-        {/* Background figures anchored to bottom */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none select-none absolute inset-x-0 bottom-0 hidden md:flex justify-between px-10 sm:px-20 md:px-32"
-        >
+      <section className="relative py-10 md:py-14 bg-[#f2f2f2] z-20 overflow-hidden">
+        {/* Single content container with background figures */}
+        <div className="relative max-w-6xl mx-auto px-2 md:px-4 text-left text-[#374957]">
+          {/* Text / CTAs */}
+          <div className="relative z-10 max-w-xl">
+            <h2 className="text-2xl md:text-4xl font-bold font-archive mb-4 md:mb-6 text-[#136C9E]">
+            Start free. No credit card. No commitment.
+            </h2>
+            <p className="text-base md:text-lg mb-8 md:mb-10 leading-relaxed">
+              Every new user gets <strong>3 months of full access</strong> to Proptii — search, viewings, referencing, and contracts. Tenants and buyers: free forever for core search. Landlords and agents: try the full toolkit before you decide.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-start items-center mb-6 md:mb-8">
+              <Link
+                to="/register?role=tenant"
+                onMouseEnter={() => setCtaHover('tenant')}
+                onMouseLeave={() => setCtaHover(null)}
+                className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full border-2 border-[#136C9E] text-[#136C9E] font-semibold text-base md:text-lg bg-transparent transition-all duration-200 hover:text-white hover:border-transparent hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#F47A1A] hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus-visible:outline-none"
+              >
+                Join as a Tenant / Buyer
+              </Link>
+              <Link
+                to="/register?role=agent"
+                onMouseEnter={() => setCtaHover('agent')}
+                onMouseLeave={() => setCtaHover(null)}
+                className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full border-2 border-[#136C9E] text-[#136C9E] font-semibold text-base md:text-lg bg-transparent transition-all duration-200 hover:text-white hover:border-transparent hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#F47A1A] hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus-visible:outline-none"
+              >
+                Join as a Landlord / Agent
+              </Link>
+            </div>
+            <p className="text-sm md:text-base">
+              After your trial, plans start from [price TBD]/month. We'll notify you before any charges.
+            </p>
+          </div>
+
+          {/* Layered images acting as background on right (desktop only) */}
           <img
             src={
               ctaHover === 'tenant'
@@ -563,7 +587,9 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                 : '/images/home page join us/tenant bw.png'
             }
             alt=""
-            className={`max-h-72 md:max-h-80 w-auto object-contain translate-y-4 transition-transform duration-200 ${ctaHover === 'tenant' ? 'scale-110' : 'scale-100'}`}
+            className={`pointer-events-none select-none hidden md:block absolute bottom-0 right-40 max-h-96 lg:max-h-[26rem] w-auto object-contain translate-y-24 transition-transform duration-200 ${
+              ctaHover === 'tenant' ? 'scale-110 opacity-100' : 'scale-100 opacity-50'
+            }`}
             loading="lazy"
           />
           <img
@@ -573,40 +599,11 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                 : '/images/home page join us/agent bw.png'
             }
             alt=""
-            className={`max-h-72 md:max-h-80 w-auto object-contain translate-y-4 transition-transform duration-200 ${ctaHover === 'agent' ? 'scale-110' : 'scale-100'}`}
+            className={`pointer-events-none select-none hidden md:block absolute bottom-0 right-[-260px] max-h-80 lg:max-h-[24rem] w-auto object-contain translate-y-24 transition-transform duration-200 ${
+              ctaHover === 'agent' ? 'scale-110 opacity-100' : 'scale-100 opacity-50'
+            }`}
             loading="lazy"
           />
-        </div>
-
-        {/* Content */}
-        <div className="relative max-w-3xl mx-auto px-4 text-center text-[#374957]">
-          <h2 className="text-2xl md:text-4xl font-bold font-archive mb-4 md:mb-6">
-            Start free. No credit card. No commitment.
-          </h2>
-          <p className="text-base md:text-lg mb-8 md:mb-10 leading-relaxed">
-            Every new user gets <strong>3 months of full access</strong> to Proptii — search, viewings, referencing, and contracts. Tenants and buyers: free forever for core search. Landlords and agents: try the full toolkit before you decide.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6 md:mb-8">
-            <Link
-              to="/register?role=tenant"
-              onMouseEnter={() => setCtaHover('tenant')}
-              onMouseLeave={() => setCtaHover(null)}
-              className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full border-2 border-[#136C9E] text-[#136C9E] font-semibold text-base md:text-lg bg-transparent transition-all duration-200 hover:text-white hover:border-transparent hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#F47A1A] hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus-visible:outline-none"
-            >
-              Join as a Tenant / Buyer
-            </Link>
-            <Link
-              to="/register?role=agent"
-              onMouseEnter={() => setCtaHover('agent')}
-              onMouseLeave={() => setCtaHover(null)}
-              className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full border-2 border-[#136C9E] text-[#136C9E] font-semibold text-base md:text-lg bg-transparent transition-all duration-200 hover:text-white hover:border-transparent hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#F47A1A] hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus-visible:outline-none"
-            >
-              Join as a Landlord / Agent
-            </Link>
-          </div>
-          <p className="text-sm md:text-base">
-            After your trial, plans start from [price TBD]/month. We'll notify you before any charges.
-          </p>
         </div>
       </section>
 

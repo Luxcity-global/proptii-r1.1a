@@ -103,7 +103,7 @@ const ServicesLayoutV1: React.FC = () => {
                   <span className="text-sm md:text-base text-slate-800 font-medium leading-relaxed">
                     {card.description}
                   </span>
-                  <span className="flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-full border border-[#E65D24] text-[#E65D24] bg-white group-hover:bg-[#E65D24] group-hover:text-white transition-colors duration-200 transform transition-transform duration-200 group-hover:translate-x-0.5 group-hover:rotate-45 shrink-0">
+                  <span className="flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-full border-[2.2px] border-[#E65D24] text-[#E65D24] bg-white group-hover:bg-[#E65D24] group-hover:text-white transition-colors duration-200 transform transition-transform duration-200 group-hover:translate-x-0.5 group-hover:rotate-45 shrink-0">
                     <svg
                       width="16"
                       height="16"
