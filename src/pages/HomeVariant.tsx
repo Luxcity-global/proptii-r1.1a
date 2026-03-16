@@ -563,7 +563,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                 : '/images/home page join us/tenant bw.png'
             }
             alt=""
-            className="max-h-72 md:max-h-80 w-auto object-contain translate-y-4 transition-transform duration-200"
+            className={`max-h-72 md:max-h-80 w-auto object-contain translate-y-4 transition-transform duration-200 ${ctaHover === 'tenant' ? 'scale-110' : 'scale-100'}`}
             loading="lazy"
           />
           <img
@@ -573,7 +573,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                 : '/images/home page join us/agent bw.png'
             }
             alt=""
-            className="max-h-72 md:max-h-80 w-auto object-contain translate-y-4 transition-transform duration-200"
+            className={`max-h-72 md:max-h-80 w-auto object-contain translate-y-4 transition-transform duration-200 ${ctaHover === 'agent' ? 'scale-110' : 'scale-100'}`}
             loading="lazy"
           />
         </div>

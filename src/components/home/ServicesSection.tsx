@@ -300,7 +300,7 @@ const ServicesLayoutV3: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => navigate(card.href)}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-[#F15A22] text-[#F15A22] px-7 py-3.5 text-sm font-semibold tracking-wide bg-white hover:bg-[#FFF4EE] transition-colors duration-200"
+                  className="group inline-flex items-center justify-center gap-2 rounded-full border border-[#F15A22] text-[#F15A22] px-7 py-3.5 text-sm font-semibold tracking-wide bg-white hover:bg-[#FFF4EE] transition-colors duration-200"
                 >
                   <span>Learn More</span>
                   <span className="flex h-5 w-5 items-center justify-center rounded-full border border-current transform transition-transform duration-200 group-hover:translate-x-0.5 group-hover:rotate-45">
