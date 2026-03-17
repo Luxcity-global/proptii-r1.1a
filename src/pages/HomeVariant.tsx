@@ -10,7 +10,7 @@ import { hasOnboardingCompleted } from '../utils/onboardingSession';
 import { OnboardingFlow } from '../components/onboarding/OnboardingFlow';
 import {
   Search, Home, CalendarCheck, FileCheck, FileSignature,
-  Building2, Users, BarChart3, Shield, ChevronDown, Sparkles,
+  Building2, Users, BarChart3, Shield, ChevronDown, Sparkles, Wrench,
 } from 'lucide-react';
 
 import { useState, useEffect, useRef } from 'react';
@@ -192,6 +192,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
     { icon: <Users className="h-4 w-4" />, label: 'Manage Tenants', description: 'Tenant communication and management tools', action: () => { setIsDropdownOpen(false); navigateToAgent(); } },
     { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance and enquiries', action: () => { setIsDropdownOpen(false); navigateToAgent(); } },
     { icon: <Shield className="h-4 w-4" />, label: 'Verify Tenants', description: 'Run background and credit checks securely', action: () => { setIsDropdownOpen(false); navigateToAgent(); } },
+    { icon: <Wrench className="h-4 w-4" />, label: 'Tools', description: 'Free rental tools and official documents for landlords and tenants', action: () => { setIsDropdownOpen(false); navigate('/tools'); } },
   ];
 
   const menuItems = activeMode === 'search' ? searchMenuItems : listMenuItems;
