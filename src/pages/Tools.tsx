@@ -485,13 +485,13 @@ const Tools: React.FC = () => {
                 {/* Contextual dropdown – same design as home-v2 */}
                 <div
                   ref={dropdownRef}
-                  className="absolute bottom-full z-50 mb-3 w-[calc(100vw-2rem)] sm:w-[420px] overflow-hidden"
+                  className="absolute top-full z-50 mt-3 w-[calc(100vw-2rem)] sm:w-[420px] overflow-hidden"
                   style={{
                     left: '50%',
                     opacity: isDropdownOpen ? 1 : 0,
                     transform: isDropdownOpen
                       ? 'translateX(-50%) translateY(0) scale(1)'
-                      : 'translateX(-50%) translateY(8px) scale(0.97)',
+                      : 'translateX(-50%) translateY(-8px) scale(0.97)',
                     pointerEvents: isDropdownOpen ? 'auto' : 'none',
                     transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
                   }}
@@ -528,7 +528,7 @@ const Tools: React.FC = () => {
                       </p>
                     </div>
 
-                    <div className="p-2 max-h-[320px] overflow-y-auto overscroll-contain">
+                    <div className="p-2">
                       {menuItems.map((item, index) => (
                         <button
                           key={`${activeMode}-${index}`}
