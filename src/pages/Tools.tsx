@@ -1,10 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation, Link } from 'react-router-dom';
-import { Calendar, ClipboardCheck, Clock, Files, Route, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
+import {
+  Calendar,
+  ClipboardCheck,
+  Clock,
+  Files,
+  Route,
+  ShieldCheck,
+  Home,
+  Building2,
+  Search,
+  CalendarCheck,
+  FileCheck,
+  FileSignature,
+  Users,
+  BarChart3,
+  Shield,
+  Wrench,
+  ChevronDown,
+  Sparkles,
+} from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import RentalDocuments from './tools/RentalDocuments';
 import { SEO } from '../components/SEO';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Tool {
   id: string;
@@ -75,7 +95,14 @@ const tools: Tool[] = [
 
 const Tools: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<'tools' | 'documents'>('tools');
+  const [activeMode, setActiveMode] = useState<'search' | 'list'>('search');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState<number | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const hash = location.hash.slice(1);
@@ -92,6 +119,134 @@ const Tools: React.FC = () => {
       window.history.replaceState(null, '', '/tools');
     }
   };
+
+  const navigateToAgent = () => {
+    if (isAuthenticated) {
+      navigate('/Agent');
+    } else {
+      navigate('/register?role=agent&redirect=%2FAgent');
+    }
+  };
+
+  const handleSearchCta = () => {
+    navigate('/home-v2');
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        toggleRef.current &&
+        !toggleRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+        setHoveredItem(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  function handleModeSwitch(mode: 'search' | 'list') {
+    if (mode === activeMode) {
+      setIsDropdownOpen(!isDropdownOpen);
+    } else {
+      setActiveMode(mode);
+      setIsDropdownOpen(true);
+    }
+    setHoveredItem(null);
+  }
+
+  const searchMenuItems = [
+    {
+      icon: <Search className="h-4 w-4" />,
+      label: 'Search Properties',
+      description: 'AI-powered property search across multiple platforms',
+      action: () => {
+        setIsDropdownOpen(false);
+        handleSearchCta();
+      },
+    },
+    {
+      icon: <CalendarCheck className="h-4 w-4" />,
+      label: 'Book Viewings',
+      description: 'Schedule and manage property viewings instantly',
+      action: () => {
+        setIsDropdownOpen(false);
+        navigate('/bookviewing');
+      },
+    },
+    {
+      icon: <FileCheck className="h-4 w-4" />,
+      label: 'Referencing',
+      description: 'Complete tenant referencing online, hassle-free',
+      action: () => {
+        setIsDropdownOpen(false);
+        navigate('/referencing');
+      },
+    },
+    {
+      icon: <FileSignature className="h-4 w-4" />,
+      label: 'Sign Contracts',
+      description: 'Digital contract signing, legally binding',
+      action: () => {
+        setIsDropdownOpen(false);
+        navigate('/contracts');
+      },
+    },
+  ];
+
+  const listMenuItems = [
+    {
+      icon: <Building2 className="h-4 w-4" />,
+      label: 'List Property',
+      description: 'Advertise your property to verified tenants',
+      action: () => {
+        setIsDropdownOpen(false);
+        navigateToAgent();
+      },
+    },
+    {
+      icon: <Users className="h-4 w-4" />,
+      label: 'Manage Tenants',
+      description: 'Tenant communication and management tools',
+      action: () => {
+        setIsDropdownOpen(false);
+        navigateToAgent();
+      },
+    },
+    {
+      icon: <BarChart3 className="h-4 w-4" />,
+      label: 'Analytics',
+      description: 'Track listing performance and enquiries',
+      action: () => {
+        setIsDropdownOpen(false);
+        navigateToAgent();
+      },
+    },
+    {
+      icon: <Shield className="h-4 w-4" />,
+      label: 'Verify Tenants',
+      description: 'Run background and credit checks securely',
+      action: () => {
+        setIsDropdownOpen(false);
+        navigateToAgent();
+      },
+    },
+    {
+      icon: <Wrench className="h-4 w-4" />,
+      label: 'Tools',
+      description: 'Free rental tools and official documents',
+      action: () => {
+        setIsDropdownOpen(false);
+        navigate('/tools');
+      },
+    },
+  ];
+
+  const menuItems = activeMode === 'search' ? searchMenuItems : listMenuItems;
 
   const structuredData = {
     '@context': 'https://schema.org',
@@ -200,7 +355,7 @@ const Tools: React.FC = () => {
       />
       
       <div className="min-h-screen font-nunito">
-        <Navbar />
+        <Navbar hideServiceLinks />
 
         {/* Hero Section */}
         <section className="h-[60vh] relative flex items-center overflow-hidden">
@@ -218,6 +373,294 @@ const Tools: React.FC = () => {
           </div>
 
           <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full">
+            {/* Hero toggle – same design as home-v2 */}
+            <div className="absolute left-1/2 top-[5rem] w-full max-w-2xl -translate-x-1/2 -translate-y-[192px] flex justify-center px-4 md:top-[6rem]">
+              <div className="relative inline-flex flex-col items-center">
+                <div ref={toggleRef} className="relative">
+                  <div
+                    className="absolute -inset-1 rounded-full opacity-40 blur-lg transition-all duration-700 pointer-events-none"
+                    style={{
+                      background:
+                        activeMode === 'search'
+                          ? 'linear-gradient(135deg, #6BB2E8 0%, #4D97CF 100%)'
+                          : 'linear-gradient(135deg, #E8D5B0 0%, #D4C4A0 100%)',
+                    }}
+                  />
+                  <div
+                    className="relative flex items-stretch rounded-full border border-white/[0.12] p-1"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      backdropFilter: 'blur(24px) saturate(180%)',
+                      WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                      boxShadow:
+                        '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.1)',
+                    }}
+                  >
+                    {/* Search / renters button */}
+                    <button
+                      onClick={() => handleModeSwitch('search')}
+                      className="group relative flex items-center gap-1.5 sm:gap-2.5 rounded-full px-3 sm:px-5 md:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition-all duration-500 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+                      style={
+                        activeMode === 'search'
+                          ? {
+                              background: 'linear-gradient(135deg, #6BB2E8 0%, #4D97CF 80%, #357FB7 100%)',
+                              color: '#FFFFFF',
+                              boxShadow:
+                                '0 4px 16px rgba(107, 178, 232, 0.45), 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -2px 4px rgba(0, 0, 0, 0.15)',
+                              transform: 'translateY(-1px)',
+                            }
+                          : {
+                              background: 'transparent',
+                              color: 'rgba(255, 255, 255, 0.55)',
+                            }
+                      }
+                      aria-pressed={activeMode === 'search'}
+                      aria-label="Search Properties Free"
+                    >
+                      <Home className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" strokeWidth={2.5} />
+                      <span className="whitespace-nowrap tracking-wide">Search Properties Free</span>
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 transition-all duration-300 ${
+                          activeMode === 'search' && isDropdownOpen
+                            ? 'rotate-180 opacity-100'
+                            : activeMode === 'search'
+                              ? 'rotate-0 opacity-70'
+                              : 'rotate-0 opacity-0'
+                        }`}
+                        strokeWidth={2.5}
+                      />
+                      {activeMode === 'search' && (
+                        <div
+                          className="pointer-events-none absolute inset-0 rounded-full"
+                          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 50%)' }}
+                        />
+                      )}
+                    </button>
+
+                    <div className="my-2.5 w-px bg-white/10" />
+
+                    {/* List / landlords button */}
+                    <button
+                      onClick={() => handleModeSwitch('list')}
+                      className="group relative flex items-center gap-1.5 sm:gap-2.5 rounded-full px-3 sm:px-5 md:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition-all duration-500 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+                      style={
+                        activeMode === 'list'
+                          ? {
+                              background: 'linear-gradient(135deg, #F5E6CC 0%, #E8D5B0 80%, #DBC8A0 100%)',
+                              color: '#3D2E1A',
+                              boxShadow:
+                                '0 4px 16px rgba(232, 213, 176, 0.35), 0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -2px 4px rgba(0, 0, 0, 0.05)',
+                              transform: 'translateY(-1px)',
+                            }
+                          : {
+                              background: 'transparent',
+                              color: 'rgba(255, 255, 255, 0.55)',
+                            }
+                      }
+                      aria-pressed={activeMode === 'list'}
+                      aria-label="List & Manage Properties"
+                    >
+                      <Building2 className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" strokeWidth={2.5} />
+                      <span className="whitespace-nowrap tracking-wide">List &amp; Manage Properties</span>
+                      <ChevronDown
+                        className={`h-3.5 w-3.5 transition-all duration-300 ${
+                          activeMode === 'list' && isDropdownOpen
+                            ? 'rotate-180 opacity-100'
+                            : activeMode === 'list'
+                              ? 'rotate-0 opacity-70'
+                              : 'rotate-0 opacity-0'
+                        }`}
+                        strokeWidth={2.5}
+                      />
+                      {activeMode === 'list' && (
+                        <div
+                          className="pointer-events-none absolute inset-0 rounded-full"
+                          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 50%)' }}
+                        />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Contextual dropdown – same design as home-v2 */}
+                <div
+                  ref={dropdownRef}
+                  className="absolute bottom-full z-50 mb-3 w-[calc(100vw-2rem)] sm:w-[420px] overflow-hidden"
+                  style={{
+                    left: '50%',
+                    opacity: isDropdownOpen ? 1 : 0,
+                    transform: isDropdownOpen
+                      ? 'translateX(-50%) translateY(0) scale(1)'
+                      : 'translateX(-50%) translateY(8px) scale(0.97)',
+                    pointerEvents: isDropdownOpen ? 'auto' : 'none',
+                    transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
+                  }}
+                >
+                  <div
+                    className="relative overflow-hidden rounded-2xl border border-white/[0.1]"
+                    style={{
+                      background: 'rgba(15, 15, 20, 0.75)',
+                      backdropFilter: 'blur(40px) saturate(200%)',
+                      WebkitBackdropFilter: 'blur(40px) saturate(200%)',
+                      boxShadow: '0 24px 48px rgba(0, 0, 0, 0.4), 0 8px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+                    }}
+                  >
+                    <div
+                      className="h-[2px] w-full transition-all duration-700"
+                      style={{
+                        background:
+                          activeMode === 'search'
+                            ? 'linear-gradient(90deg, transparent, #6BB2E8, transparent)'
+                            : 'linear-gradient(90deg, transparent, #E8D5B0, transparent)',
+                      }}
+                    />
+
+                    <div className="flex items-center gap-2 px-5 pt-4 pb-2">
+                      <Sparkles
+                        className="h-3.5 w-3.5 transition-colors duration-500"
+                        style={{ color: activeMode === 'search' ? '#6BB2E8' : '#D4C090' }}
+                      />
+                      <p
+                        className="text-xs font-medium uppercase tracking-widest transition-colors duration-500"
+                        style={{ color: activeMode === 'search' ? 'rgba(107, 178, 232, 0.92)' : 'rgba(212, 192, 144, 0.8)' }}
+                      >
+                        {activeMode === 'search' ? 'For Renters & Buyers' : 'For Landlords & Agents'}
+                      </p>
+                    </div>
+
+                    <div className="p-2 max-h-[320px] overflow-y-auto overscroll-contain">
+                      {menuItems.map((item, index) => (
+                        <button
+                          key={`${activeMode}-${index}`}
+                          onClick={item.action}
+                          className="group relative flex w-full items-center gap-4 rounded-xl px-4 py-3.5 text-left transition-all duration-200"
+                          style={{
+                            background:
+                              hoveredItem === index
+                                ? activeMode === 'search'
+                                  ? 'rgba(33, 71, 102, 0.12)'
+                                  : 'rgba(232, 213, 176, 0.08)'
+                                : 'transparent',
+                          }}
+                          onMouseEnter={() => setHoveredItem(index)}
+                          onMouseLeave={() => setHoveredItem(null)}
+                        >
+                          <div
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-all duration-300"
+                            style={{
+                              borderColor:
+                                hoveredItem === index
+                                  ? activeMode === 'search'
+                                    ? 'rgba(33, 71, 102, 0.35)'
+                                    : 'rgba(232, 213, 176, 0.2)'
+                                  : 'rgba(255, 255, 255, 0.08)',
+                              background:
+                                hoveredItem === index
+                                  ? activeMode === 'search'
+                                    ? 'rgba(33, 71, 102, 0.18)'
+                                    : 'rgba(232, 213, 176, 0.1)'
+                                  : 'rgba(255, 255, 255, 0.04)',
+                              color:
+                                hoveredItem === index
+                                  ? activeMode === 'search'
+                                    ? '#6BB2E8'
+                                    : '#E8D5B0'
+                                  : 'rgba(255, 255, 255, 0.5)',
+                              boxShadow:
+                                hoveredItem === index
+                                  ? activeMode === 'search'
+                                    ? '0 0 20px rgba(33, 71, 102, 0.2)'
+                                    : '0 0 20px rgba(232, 213, 176, 0.1)'
+                                  : 'none',
+                            }}
+                          >
+                            {item.icon}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className="text-sm font-medium transition-colors duration-200"
+                              style={{ color: hoveredItem === index ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.8)' }}
+                            >
+                              {item.label}
+                            </p>
+                            <p
+                              className="mt-0.5 text-xs leading-relaxed transition-colors duration-200"
+                              style={{
+                                color: hoveredItem === index ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.35)',
+                              }}
+                            >
+                              {item.description}
+                            </p>
+                          </div>
+
+                          <div
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all duration-300"
+                            style={{
+                              opacity: hoveredItem === index ? 1 : 0,
+                              transform: hoveredItem === index ? 'translateX(0)' : 'translateX(-4px)',
+                              background:
+                                activeMode === 'search' ? 'rgba(33, 71, 102, 0.25)' : 'rgba(232, 213, 176, 0.12)',
+                              color: activeMode === 'search' ? '#6BB2E8' : '#E8D5B0',
+                            }}
+                          >
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 12 12"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M4.5 2.5L8 6L4.5 9.5" />
+                            </svg>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="border-t border-white/[0.06] px-5 py-3.5">
+                      <button
+                        onClick={() => {
+                          setIsDropdownOpen(false);
+                          if (activeMode === 'search') {
+                            handleSearchCta();
+                          } else {
+                            navigateToAgent();
+                          }
+                        }}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold tracking-wide uppercase transition-all duration-300"
+                        style={{
+                          background: activeMode === 'search' ? 'rgba(33, 71, 102, 0.15)' : 'rgba(232, 213, 176, 0.08)',
+                          color: activeMode === 'search' ? '#6BB2E8' : '#E8D5B0',
+                          border:
+                            activeMode === 'search'
+                              ? '1px solid rgba(33, 71, 102, 0.3)'
+                              : '1px solid rgba(232, 213, 176, 0.12)',
+                        }}
+                      >
+                        {activeMode === 'search' ? 'Get Started Free' : 'Start Listing Today'}
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 14 14"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M5 3L10 7L5 11" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <h1 className="text-3xl md:text-6xl font-bold mb-6 font-archive leading-tight">
               Rental Tools & Resources
             </h1>

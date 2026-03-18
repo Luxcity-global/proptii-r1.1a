@@ -352,13 +352,13 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
               {/* Contextual Dropdown */}
               <div
                 ref={dropdownRef}
-                className="absolute top-full z-50 mt-3 w-[calc(100vw-2rem)] sm:w-[420px] overflow-hidden"
+                className="absolute bottom-full z-50 mb-3 w-[calc(100vw-2rem)] sm:w-[420px] overflow-hidden"
                 style={{
                   left: '50%',
                   opacity: isDropdownOpen ? 1 : 0,
                   transform: isDropdownOpen
                     ? 'translateX(-50%) translateY(0) scale(1)'
-                    : 'translateX(-50%) translateY(-8px) scale(0.97)',
+                    : 'translateX(-50%) translateY(8px) scale(0.97)',
                   pointerEvents: isDropdownOpen ? 'auto' as const : 'none' as const,
                   transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
                 }}
@@ -399,7 +399,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                   </div>
 
                   {/* Menu Items */}
-                  <div className="p-2">
+                  <div className="p-2 max-h-[320px] overflow-y-auto overscroll-contain">
                     {menuItems.map((item, index) => (
                       <button
                         key={`${activeMode}-${index}`}

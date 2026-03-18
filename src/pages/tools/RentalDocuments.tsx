@@ -1,82 +1,236 @@
 import React from 'react';
+import { FileText, Download, File } from 'lucide-react';
+import { SEO } from '../../components/SEO';
 
-interface DocumentLink {
+interface Document {
+  id: string;
   title: string;
   description: string;
-  url: string;
-  source: string;
+  file: string;
+  icon: React.ComponentType<{ className?: string }>;
+  category: string;
+  iconBgColor: string;
+  iconColorClass: string;
+  image?: string;
 }
 
-const documents: DocumentLink[] = [
+const documents: Document[] = [
   {
-    title: 'How to Rent: The Checklist for Renting in England',
-    description: 'Official government guide for tenants and landlords on rental rights and responsibilities.',
-    url: 'https://www.gov.uk/government/publications/how-to-rent',
-    source: 'DLUHC',
+    id: 'how-to-rent',
+    title: 'How to Rent Guide',
+    description: 'Official DLUHC guide for tenants on renting in England (October 2023)',
+    file: '/rental_documents/DLUHC_How_to_rent_Oct2023.pdf',
+    icon: FileText,
+    category: 'Tenant Guide',
+    iconBgColor: 'bg-[#519D5F]/10',
+    iconColorClass: 'text-blue-600',
+    image: '/images/How to rent icon image.png',
   },
   {
-    title: 'Right to Rent',
-    description: 'Guidance for landlords on checking tenant immigration status.',
-    url: 'https://www.gov.uk/check-tenant-right-to-rent-documents',
-    source: 'Home Office',
+    id: 'right-to-rent-guide',
+    title: 'Right to Rent Checks Guide',
+    description: 'A guide to immigration documents for tenants and landlords',
+    file: '/rental_documents/Right to Rent Checks_ A guide to immigration documents for tenants and landlords.pdf',
+    icon: FileText,
+    category: 'Legal',
+    iconBgColor: 'bg-[#D37E3C]/10',
+    iconColorClass: 'text-green-600',
+    image: '/images/Right to rent cheks guide icon image.png',
   },
   {
-    title: 'Deposit Protection',
-    description: 'Rules for protecting tenancy deposits and returning them at the end of a tenancy.',
-    url: 'https://www.gov.uk/tenancy-deposit-protection',
-    source: 'Gov.uk',
+    id: 'right-to-rent-easy-read',
+    title: 'Right to Rent User Guide (Easy Read)',
+    description: 'Home Office guide in easy read format for understanding right to rent checks',
+    file: '/rental_documents/3286 Home Office Right to Rent User Guide Easy Read v3.pdf',
+    icon: FileText,
+    category: 'Legal',
+    iconBgColor: 'bg-[#892F94]/10',
+    iconColorClass: 'text-purple-600',
+    image: '/images/right to rrent user guide icon image.png',
   },
   {
-    title: 'Energy Performance Certificates',
-    description: 'Requirements for EPCs when renting out a property.',
-    url: 'https://www.gov.uk/energy-performance-certificate-commercial-property',
-    source: 'Gov.uk',
+    id: 'prescribed-information',
+    title: 'Prescribed Information Template',
+    description: 'Tenancy deposit scheme prescribed information template (custodial)',
+    file: '/rental_documents/1tds-ew-custodial-prescribed-information-template.docx',
+    icon: File,
+    category: 'Deposit',
+    iconBgColor: 'bg-[#C64345]/10',
+    iconColorClass: 'text-orange-600',
+    image: '/images/Prescribed information templateicon image.png',
   },
   {
-    title: 'Gas Safety',
-    description: 'Landlord responsibilities for gas safety checks and certificates.',
-    url: 'https://www.gov.uk/guidance/gas-safety-regulations-landlords',
-    source: 'Gov.uk',
+    id: 'legionella-assessment',
+    title: 'Legionella Risk Assessment Template',
+    description: 'Template for conducting legionella risk assessments in rental properties',
+    file: '/rental_documents/legionella_Risk_Assessment_template.pdf',
+    icon: FileText,
+    category: 'Health & Safety',
+    iconBgColor: 'bg-[#1A8E97]/10',
+    iconColorClass: 'text-red-600',
+    image: '/images/Legionella Risk Assessment Template icon image.png',
   },
 ];
 
 const RentalDocuments: React.FC = () => {
-  return (
-    <div className="max-w-7xl mx-auto px-4">
-      <div className="text-center mb-12">
-        <h2 className="text-4xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
-          Official UK Rental Documents
-        </h2>
-        <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
-          Access official UK government publications from DLUHC (Department for Levelling Up, Housing and Communities) and the Home Office. These are the same documents you would find on government websites.
-        </p>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {documents.map((doc, index) => (
-          <a
-            key={index}
-            href={doc.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block bg-white rounded-2xl p-6 shadow-md hover:shadow-xl border border-gray-100 transition-all duration-300 hover:-translate-y-1"
-          >
-            <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 mb-4">
-              {doc.source}
-            </span>
-            <h3 className="text-lg font-bold mb-2" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
-              {doc.title}
-            </h3>
-            <p className="text-gray-600 text-sm mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
-              {doc.description}
-            </p>
-            <span className="text-[#E65D24] font-medium text-sm">
-              View on Gov.uk →
-            </span>
-          </a>
-        ))}
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'UK Rental Documents',
+    description: 'Official UK government and legal documents for tenants and landlords',
+    itemListElement: documents.map((doc, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      item: {
+        '@type': 'DigitalDocument',
+        name: doc.title,
+        description: doc.description,
+        url: doc.file,
+        fileFormat: doc.file.endsWith('.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      },
+    })),
+  };
+
+  return (
+    <>
+      <SEO
+        title="Free UK Rental Documents Download | Official Government Guides | Proptii"
+        description="Download free official UK government rental documents. Get the How to Rent guide, Right to Rent checks guide, deposit scheme templates, and health & safety assessments. All documents are official publications from DLUHC and Home Office."
+        canonical="/tools#documents"
+        keywords={[
+          'UK rental documents',
+          'official rental documents',
+          'UK government rental guides',
+          'how to rent guide',
+          'right to rent documents',
+          'tenancy deposit templates',
+          'legionella assessment template',
+          'UK tenant documents',
+          'rental document download',
+          'government rental guides',
+          'DLUHC rental guide',
+          'Home Office rental documents',
+          'UK housing documents',
+          'tenant document templates'
+        ]}
+        relatedTerms={[
+          'UK rental paperwork',
+          'tenant documents',
+          'rental application documents',
+          'UK housing guides',
+          'official tenant resources'
+        ]}
+        category="Rental Tools"
+        structuredData={structuredData}
+      />
+      
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        <div className="text-center mb-12">
+          <h2 className="text-4xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>Rental Documents</h2>
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+            Download official UK government and legal documents to help you navigate the rental process.
+          </p>
+          
+          {/* SEO Content Section */}
+          <div className="max-w-7xl mx-auto text-left bg-white rounded-2xl p-8 mb-12 shadow-sm border border-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start" contentEditable={false}>
+              {/* Image on the left */}
+              <div className="order-2 md:order-1">
+                <img
+                  src="/images/Documents introsectn image.png"
+                  alt="UK rental documents"
+                  className="w-full h-auto rounded-lg object-cover"
+                />
+              </div>
+              
+              {/* Text on the right */}
+              <div className="order-1 md:order-2" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif', userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none' }}>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                  Official UK Government Rental Documents
+                </h3>
+                <p className="mb-4">
+                  All documents available here are official publications from UK government departments, including the Department for Levelling Up, Housing and Communities (DLUHC) and the Home Office.
+                </p>
+                <p className="mb-4">
+                  <strong>How to Rent Guide:</strong> The official DLUHC guide for tenants renting in England. This comprehensive guide covers everything from finding a property to ending a tenancy, including your rights and responsibilities, deposit protection, repairs, and eviction procedures. Updated October 2023.
+                </p>
+                <p className="mb-4">
+                  <strong>Right to Rent Documents:</strong> UK landlords must verify tenants' right to rent in the UK. We provide both the standard guide and an easy-read version for better accessibility. These guides explain what documents are acceptable and the verification process.
+                </p>
+                <p className="mb-4">
+                  <strong>Deposit Templates:</strong> The Tenancy Deposit Scheme prescribed information template helps ensure your deposit is properly registered and protected. This is a legal requirement for landlords in England and Wales.
+                </p>
+                <p>
+                  <strong>Health & Safety:</strong> The Legionella Risk Assessment template helps landlords assess and manage the risk of Legionnaires' disease in rental properties. While this is primarily a landlord responsibility, understanding it helps you know what to expect.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {documents.map((doc) => {
+            const Icon = doc.icon;
+            const isPdf = doc.file.endsWith('.pdf');
+            
+            return (
+              <div
+                key={doc.id}
+                className="bg-white rounded-3xl shadow-md hover:shadow-xl hover:outline hover:outline-2 hover:outline-[#80B2FF] hover:-translate-y-2 transition-all duration-300 p-8 flex flex-col group border border-gray-100 relative"
+              >
+                {/* Category Badge - Top Right */}
+                <div className="absolute top-4 right-4">
+                  <span className={`text-xs font-semibold text-gray-700 uppercase tracking-wide px-3 py-1 rounded-full ${doc.iconBgColor}`}>
+                    {doc.category}
+                  </span>
+                </div>
+
+                {/* Icon with colored background */}
+                <div className={`${doc.iconBgColor} w-20 h-20 rounded-2xl flex items-center justify-center mb-6 shadow-sm`}>
+                  {doc.image ? (
+                    <img
+                      src={doc.image}
+                      alt={doc.title}
+                      className="h-12 w-12 object-contain"
+                    />
+                  ) : (
+                    <Icon className={`h-10 w-10 ${doc.iconColorClass}`} />
+                  )}
+                </div>
+                
+                {/* Title */}
+                <h3 className="text-xl font-bold mb-3 leading-tight" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
+                  {doc.title}
+                </h3>
+                
+                {/* Description */}
+                <p className="mb-6 text-sm leading-relaxed flex-grow" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
+                  {doc.description}
+                </p>
+                
+                {/* Button */}
+                <a
+                  href={doc.file}
+                  download
+                  className="w-full py-3 px-6 rounded-full border-2 border-[#E65D24] bg-white text-[#E65D24] font-medium text-center group-hover:bg-[#E65D24] group-hover:text-white transition-all duration-300 font-archive inline-flex items-center justify-center"
+                >
+                  <Download className="h-5 w-5 mr-2" />
+                  Download {isPdf ? 'PDF' : 'DOCX'}
+                </a>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-12 bg-gray-50 rounded-xl p-8 text-center">
+          <h3 className="text-2xl font-bold text-gray-900 mb-4">Need Help?</h3>
+          <p className="text-gray-600 mb-6">
+            These documents are provided for informational purposes. For legal advice, please consult a qualified solicitor.
+          </p>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

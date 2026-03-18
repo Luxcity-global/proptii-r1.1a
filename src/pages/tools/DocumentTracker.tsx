@@ -1,119 +1,235 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Files } from 'lucide-react';
-import Navbar from '../../components/Navbar';
+import { ArrowLeft, CheckCircle2, Circle } from 'lucide-react';
 import Footer from '../../components/Footer';
+import { SEO } from '../../components/SEO';
 
-const DocumentTracker: React.FC = () => {
-  return (
-    <div className="min-h-screen font-nunito">
-      <Navbar />
-      <main className="max-w-4xl mx-auto px-4 py-16">
-        <Link
-          to="/tools"
-          className="inline-flex items-center gap-2 text-[#E65D24] hover:underline mb-8"
-          style={{ fontFamily: 'Archivo, sans-serif' }}
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Tools
-        </Link>
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-purple-100 flex items-center justify-center">
-            <Files className="w-8 h-8 text-purple-600" />
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
-            Document Tracker
-          </h1>
-        </div>
-        <p className="text-lg text-gray-600 mb-8" style={{ fontFamily: 'Archivo, sans-serif' }}>
-          Track which rental documents you have and what you still need. Use the table below to stay organised.
-        </p>
-
-        <DocumentTrackerTable />
-      </main>
-      <Footer />
-    </div>
-  );
-};
-
-interface TrackedDocument {
+interface DocumentItem {
   id: string;
   name: string;
-  requiredFor: string;
+  category: string;
 }
 
-const BASE_DOCUMENTS: TrackedDocument[] = [
-  { id: 'how-to-rent', name: 'How to Rent guide (provided by landlord/agent)', requiredFor: 'England assured shorthold tenancies' },
-  { id: 'epc', name: 'Energy Performance Certificate (EPC)', requiredFor: 'Most rental properties' },
-  { id: 'gas-safety', name: 'Gas safety certificate', requiredFor: 'Properties with gas appliances' },
-  { id: 'deposit-scheme', name: 'Deposit protection information', requiredFor: 'Tenancies with a deposit' },
-  { id: 'right-to-rent', name: 'Right to Rent documents copied and checked', requiredFor: 'All adults living in the property' },
+const documents: DocumentItem[] = [
+  { id: 'passport', name: 'UK Passport or Right to Rent Document', category: 'Identity' },
+  { id: 'payslips', name: 'Payslips (last 3 months)', category: 'Income' },
+  { id: 'bank-statements', name: 'Bank Statements (last 3 months)', category: 'Income' },
+  { id: 'employment-contract', name: 'Employment Contract', category: 'Income' },
+  { id: 'previous-landlord', name: 'Previous Landlord Reference', category: 'Rental History' },
+  { id: 'employer-reference', name: 'Employer Reference', category: 'References' },
+  { id: 'credit-check', name: 'Credit Check Report', category: 'Financial' },
+  { id: 'proof-of-address', name: 'Proof of Address (Utility Bill)', category: 'Identity' },
+  { id: 'guarantor', name: 'Guarantor Details (if required)', category: 'Guarantor' },
+  { id: 'deposit-proof', name: 'Deposit Funds Proof', category: 'Financial' },
 ];
 
-type DocStatus = 'have' | 'need' | 'not-applicable';
+const categories = ['Identity', 'Income', 'Rental History', 'References', 'Financial', 'Guarantor'];
 
-const STATUS_LABELS: Record<DocStatus, string> = {
-  have: 'Have it',
-  need: 'Need it',
-  'not-applicable': 'Not needed',
-};
+const DocumentTracker: React.FC = () => {
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [selectedCategory, setSelectedCategory] = useState<string>(categories[0]);
 
-const DocumentTrackerTable: React.FC = () => {
-  const [status, setStatus] = useState<Record<string, DocStatus>>({});
-
-  const handleChange = (id: string, value: DocStatus) => {
-    setStatus((prev) => ({ ...prev, [id]: value }));
+  const toggleCheck = (id: string) => {
+    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const haveCount = Object.values(status).filter((v) => v === 'have').length;
-  const needCount = Object.values(status).filter((v) => v === 'need').length;
+  const totalItems = documents.length;
+  const checkedCount = Object.values(checked).filter(Boolean).length;
+  const percentage = totalItems > 0 ? (checkedCount / totalItems) * 100 : 0;
+
+  const getCategoryDocuments = (category: string) => {
+    return documents.filter((doc) => doc.category === category);
+  };
 
   return (
-    <section className="bg-gray-50 rounded-2xl p-6 md:p-8" style={{ fontFamily: 'Archivo, sans-serif' }}>
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-        <h2 className="text-xl md:text-2xl font-semibold text-gray-900">Track your compliance documents</h2>
-        <p className="text-sm text-gray-600">
-          {haveCount} ready · {needCount} to organise
-        </p>
-      </div>
+    <>
+      <SEO
+        title="Free Rental Document Tracker | UK Tenant Application Documents | Proptii"
+        description="Free interactive document tracker for UK rental applications. Track which documents you have and what you still need. Organize by category: Identity, Income, References, Financial, and Guarantor documents. Visual progress tracking included."
+        canonical="/tools/document-tracker"
+        keywords={[
+          'rental document tracker',
+          'tenant document checklist',
+          'UK rental documents',
+          'rental application documents',
+          'tenant document organizer',
+          'property rental documents',
+          'rental document list',
+          'UK tenant paperwork',
+          'rental application checklist',
+          'document preparation rental'
+        ]}
+        relatedTerms={[
+          'rental documents UK',
+          'tenant application',
+          'rental paperwork',
+          'property rental documents',
+          'UK housing documents'
+        ]}
+        category="Rental Tools"
+      />
+      
+      <div className="min-h-screen font-nunito bg-gray-50">
+        <div className="max-w-5xl mx-auto px-4 pt-12 pb-16">
+          <Link
+            to="/tools"
+            className="inline-flex items-center text-indigo-600 hover:text-indigo-700 mb-8"
+            style={{ fontFamily: 'Archivo, sans-serif' }}
+          >
+            <ArrowLeft className="h-5 w-5 mr-2" />
+            Back to Tools
+          </Link>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200">
-              <th className="text-left py-3 pr-4 font-semibold text-gray-700">Document</th>
-              <th className="text-left py-3 pr-4 font-semibold text-gray-700">Required for</th>
-              <th className="text-left py-3 font-semibold text-gray-700">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {BASE_DOCUMENTS.map((doc) => (
-              <tr key={doc.id} className="align-top">
-                <td className="py-3 pr-4 text-gray-900">{doc.name}</td>
-                <td className="py-3 pr-4 text-gray-600 max-w-xs">{doc.requiredFor}</td>
-                <td className="py-3">
-                  <select
-                    value={status[doc.id] ?? 'need'}
-                    onChange={(e) => handleChange(doc.id, e.target.value as DocStatus)}
-                    className="border border-gray-300 rounded-full px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#E65D24]"
-                  >
-                    {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 md:p-10 mb-10">
+            <h1 
+              className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 text-center" 
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              Document Tracker
+            </h1>
+            <p 
+              className="text-gray-600 mb-8 text-center max-w-2xl mx-auto" 
+              style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}
+            >
+              Track which rental documents you have and what you still need for your application.
+            </p>
 
-      <p className="mt-4 text-xs text-gray-500">
-        This tracker is for your own organisation only. Always refer to official government guidance and your tenancy
-        agreement for the full list of documents required.
-      </p>
-    </section>
+            {/* Progress Section */}
+            <div className="mb-8 bg-gray-50 rounded-lg p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'Archivo, sans-serif' }}>Progress</h3>
+                <span className="text-2xl font-bold text-indigo-600" style={{ fontFamily: 'Archivo, sans-serif' }}>{Math.round(percentage)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-4">
+                <div
+                  className="bg-indigo-600 h-4 rounded-full transition-all duration-300"
+                  style={{ width: `${percentage}%` }}
+                />
+              </div>
+              <p className="text-sm text-gray-600 mt-2" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                {checkedCount} of {totalItems} documents collected
+              </p>
+            </div>
+
+            {/* Main document tracker layout */}
+            <div className="bg-[#F7F8FB] rounded-3xl p-6 md:p-10">
+              <div className="grid md:grid-cols-[280px,minmax(0,1fr)] gap-10 items-stretch">
+                {/* Left sidebar - categories */}
+                <div>
+                  <div className="bg-white rounded-2xl shadow-md p-4 space-y-2">
+                    {categories.map((category, index) => {
+                      const categoryDocs = getCategoryDocuments(category);
+                      const categoryChecked = categoryDocs.filter((doc) => checked[doc.id]).length;
+                      const isComplete = categoryDocs.length > 0 && categoryChecked === categoryDocs.length;
+                      const isCurrentCategory = selectedCategory === category;
+
+                      return (
+                        <button
+                          key={category}
+                          type="button"
+                          onClick={() => setSelectedCategory(category)}
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                            isCurrentCategory
+                              ? 'bg-[#E6F3FF] border-2 border-[#136C9E] shadow-sm'
+                              : isComplete
+                              ? 'bg-green-50 border border-green-200 hover:bg-green-100'
+                              : 'bg-white border border-gray-200 hover:bg-gray-50'
+                          }`}
+                          style={{ fontFamily: 'Archivo, sans-serif' }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                isCurrentCategory
+                                  ? 'bg-[#136C9E] text-white'
+                                  : isComplete
+                                  ? 'bg-green-500 text-white'
+                                  : 'bg-gray-300 text-gray-600'
+                              }`}
+                            >
+                              {isComplete ? '✓' : index + 1}
+                            </div>
+                            <span
+                              className={`text-sm font-medium ${
+                                isCurrentCategory
+                                  ? 'text-[#136C9E]'
+                                  : isComplete
+                                  ? 'text-green-700'
+                                  : 'text-gray-800'
+                              }`}
+                              style={{ fontFamily: 'Archivo, sans-serif' }}
+                            >
+                              {category}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {categoryChecked}/{categoryDocs.length}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Right side - documents list */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
+                  {(() => {
+                    const categoryDocs = getCategoryDocuments(selectedCategory);
+                    const categoryChecked = categoryDocs.filter((doc) => checked[doc.id]).length;
+
+                    return (
+                      <div>
+                        <div className="flex justify-between items-center mb-6">
+                          <h3 
+                            className="text-xl md:text-2xl font-semibold text-gray-900"
+                            style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}
+                          >
+                            {selectedCategory}
+                          </h3>
+                          <span className="text-sm font-medium text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
+                            {categoryChecked}/{categoryDocs.length} documents
+                          </span>
+                        </div>
+                        <div className="space-y-3">
+                          {categoryDocs.map((doc) => (
+                            <label
+                              key={doc.id}
+                              className="flex items-center p-4 rounded-lg hover:bg-gray-50 cursor-pointer transition"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked[doc.id] || false}
+                                onChange={() => toggleCheck(doc.id)}
+                                className="sr-only"
+                              />
+                              {checked[doc.id] ? (
+                                <CheckCircle2 className="h-6 w-6 text-green-600 mr-4 flex-shrink-0" />
+                              ) : (
+                                <Circle className="h-6 w-6 text-gray-400 mr-4 flex-shrink-0" />
+                              )}
+                              <span 
+                                className={`flex-1 text-sm md:text-base ${
+                                  checked[doc.id] ? 'line-through text-gray-500' : 'text-gray-900'
+                                }`}
+                                style={{ fontFamily: 'Archivo, sans-serif' }}
+                              >
+                                {doc.name}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Footer />
+      </div>
+    </>
   );
 };
 

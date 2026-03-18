@@ -1,139 +1,307 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Route } from 'lucide-react';
-import Navbar from '../../components/Navbar';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
 import Footer from '../../components/Footer';
+import { SEO } from '../../components/SEO';
 
-const ProcessSimulator: React.FC = () => {
-  return (
-    <div className="min-h-screen font-nunito">
-      <Navbar />
-      <main className="max-w-4xl mx-auto px-4 py-16">
-        <Link
-          to="/tools"
-          className="inline-flex items-center gap-2 text-[#E65D24] hover:underline mb-8"
-          style={{ fontFamily: 'Archivo, sans-serif' }}
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Tools
-        </Link>
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-yellow-100 flex items-center justify-center">
-            <Route className="w-8 h-8 text-yellow-600" />
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
-            Process Simulator
-          </h1>
-        </div>
-        <p className="text-lg text-gray-600 mb-8" style={{ fontFamily: 'Archivo, sans-serif' }}>
-          Walk through the rental application process step by step. Move through each stage to see what typically happens.
-        </p>
+interface Step {
+  id: number;
+  title: string;
+  description: string;
+  details: string[];
+}
 
-        <ProcessSteps />
-      </main>
-      <Footer />
-    </div>
-  );
-};
-
-const STEPS = [
+const steps: Step[] = [
   {
     id: 1,
-    title: '1. Viewing & offer',
-    detail: 'You view the property, ask questions and submit an offer with your preferred move‑in date.',
+    title: 'Search & View Properties',
+    description: 'Find properties that match your criteria and schedule viewings',
+    details: [
+      'Search for properties on Proptii',
+      'Contact agents to arrange viewings',
+      'Attend viewings and take notes',
+      'Compare properties and locations',
+    ],
   },
   {
     id: 2,
-    title: '2. Application & referencing',
-    detail:
-      'The agent collects your details, references and documents. Referencing companies verify income, credit history and previous landlords.',
+    title: 'Submit Application',
+    description: 'Apply for your chosen property with required documents',
+    details: [
+      'Complete application form',
+      'Submit proof of income (payslips, bank statements)',
+      'Provide references (previous landlord, employer)',
+      'Pay application fee (if applicable)',
+    ],
   },
   {
     id: 3,
-    title: '3. Contract & checks',
-    detail:
-      'You receive a draft tenancy agreement, review key clauses and sign. Right to Rent and any outstanding checks are completed.',
+    title: 'Referencing & Credit Check',
+    description: 'Landlord or agent conducts background checks',
+    details: [
+      'Credit check is performed',
+      'Employment verification',
+      'Previous landlord reference check',
+      'Right to rent verification',
+    ],
   },
   {
     id: 4,
-    title: '4. Payment & deposit protection',
-    detail:
-      'You pay the first rent and deposit. The deposit is protected in an approved scheme and you receive confirmation.',
+    title: 'Offer & Negotiation',
+    description: 'Receive offer and negotiate terms if needed',
+    details: [
+      'Receive offer from landlord',
+      'Review tenancy terms',
+      'Negotiate rent or terms if needed',
+      'Accept or decline offer',
+    ],
   },
   {
     id: 5,
-    title: '5. Move‑in day',
-    detail:
-      'You collect keys, complete an inventory and meter readings, and receive safety certificates plus the How to Rent guide.',
+    title: 'Deposit & Contract',
+    description: 'Pay deposit and sign tenancy agreement',
+    details: [
+      'Pay security deposit (usually 5 weeks rent)',
+      'Review tenancy agreement',
+      'Sign contract',
+      'Deposit registered with protection scheme',
+    ],
+  },
+  {
+    id: 6,
+    title: 'Move In',
+    description: 'Complete final checks and move into your new home',
+    details: [
+      'Inventory check-in',
+      'Receive keys',
+      'Set up utilities',
+      'Update address with relevant services',
+    ],
   },
 ];
 
-const ProcessSteps: React.FC = () => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+const ProcessSimulator: React.FC = () => {
+  const [currentStep, setCurrentStep] = useState(0);
 
-  const current = STEPS[currentIndex];
+  const nextStep = () => {
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const goToStep = (stepId: number) => {
+    setCurrentStep(stepId - 1);
+  };
+
+  const currentStepData = steps[currentStep];
 
   return (
-    <section className="bg-gray-50 rounded-2xl p-6 md:p-8" style={{ fontFamily: 'Archivo, sans-serif' }}>
-      <div className="flex flex-col md:flex-row gap-6">
-        <ol className="md:w-1/3 space-y-3">
-          {STEPS.map((step, index) => (
-            <li key={step.id}>
-              <button
-                type="button"
-                onClick={() => setCurrentIndex(index)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  index === currentIndex
-                    ? 'bg-[#E65D24] text-white'
-                    : 'bg-white text-gray-800 hover:bg-gray-100 border border-gray-200'
-                }`}
-              >
-                {step.title}
-              </button>
-            </li>
-          ))}
-        </ol>
+    <>
+      <SEO
+        title="UK Rental Application Process Guide | Step-by-Step Simulator | Proptii"
+        description="Complete step-by-step guide to the UK rental application process. Walk through all 6 stages: property search, application submission, referencing, offer negotiation, deposit & contract, and move-in. Understand exactly what happens at each stage when renting in the UK."
+        canonical="/tools/process-simulator"
+        keywords={[
+          'UK rental process',
+          'rental application process',
+          'tenancy application steps',
+          'UK rental process guide',
+          'property rental process',
+          'rental application stages',
+          'how to rent in UK',
+          'UK tenancy process',
+          'rental application walkthrough',
+          'property rental steps'
+        ]}
+        relatedTerms={[
+          'renting process UK',
+          'tenant application',
+          'UK housing process',
+          'rental application guide',
+          'property rental UK'
+        ]}
+        category="Rental Tools"
+      />
+      
+      <div className="min-h-screen font-nunito bg-gray-50">
+        <div className="max-w-5xl mx-auto px-4 pt-12 pb-16">
+          <Link
+            to="/tools"
+            className="inline-flex items-center text-indigo-600 hover:text-indigo-700 mb-8"
+            style={{ fontFamily: 'Archivo, sans-serif' }}
+          >
+            <ArrowLeft className="h-5 w-5 mr-2" />
+            Back to Tools
+          </Link>
 
-        <div className="md:flex-1 bg-white rounded-xl border border-gray-200 p-5 md:p-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-3">{current.title}</h3>
-            <p className="text-sm text-gray-700 mb-4">{current.detail}</p>
-            <p className="text-xs text-gray-500">
-              Tip: timelines vary between properties and agents. Use this as a guide and always confirm dates in writing.
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 md:p-10 mb-10">
+            <h1 
+              className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 text-center"
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              Rental Process Simulator
+            </h1>
+            <p 
+              className="text-gray-600 mb-8 text-center max-w-2xl mx-auto"
+              style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}
+            >
+              Walk through the UK rental application process step by step to understand what to expect.
             </p>
-          </div>
 
-          <div className="mt-6 flex items-center justify-between">
-            <button
-              type="button"
-              disabled={currentIndex === 0}
-              onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
-              className={`px-3 py-2 rounded-lg text-sm font-medium border ${
-                currentIndex === 0
-                  ? 'border-gray-200 text-gray-300 cursor-not-allowed'
-                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              Previous
-            </button>
-            <p className="text-xs text-gray-500">
-              Step {currentIndex + 1} of {STEPS.length}
-            </p>
-            <button
-              type="button"
-              disabled={currentIndex === STEPS.length - 1}
-              onClick={() => setCurrentIndex((i) => Math.min(STEPS.length - 1, i + 1))}
-              className={`px-3 py-2 rounded-lg text-sm font-medium ${
-                currentIndex === STEPS.length - 1
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-[#E65D24] text-white hover:bg-[#d4501f]'
-              }`}
-            >
-              Next
-            </button>
+            {/* Main wizard layout */}
+            <div className="bg-[#F7F8FB] rounded-3xl p-6 md:p-10">
+              <div className="grid md:grid-cols-[280px,minmax(0,1fr)] gap-10 items-stretch">
+                {/* Left sidebar - steps */}
+                <div>
+                  <div className="bg-white rounded-2xl shadow-md p-4 space-y-2">
+                    {steps.map((step, index) => {
+                      const isCurrentStep = index === currentStep;
+                      const isCompleted = index < currentStep;
+
+                      return (
+                        <button
+                          key={step.id}
+                          type="button"
+                          onClick={() => goToStep(step.id)}
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-left transition-all duration-200 ${
+                            isCurrentStep
+                              ? 'bg-[#E6F3FF] border-2 border-[#136C9E] shadow-sm'
+                              : isCompleted
+                              ? 'bg-green-50 border border-green-200 hover:bg-green-100'
+                              : 'bg-white border border-gray-200 hover:bg-gray-50'
+                          }`}
+                          style={isCurrentStep ? { fontFamily: 'Archivo, sans-serif' } : { fontFamily: 'Archivo, sans-serif' }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                isCurrentStep
+                                  ? 'bg-[#136C9E] text-white'
+                                  : isCompleted
+                                  ? 'bg-green-500 text-white'
+                                  : 'bg-gray-300 text-gray-600'
+                              }`}
+                            >
+                              {isCompleted ? '✓' : step.id}
+                            </div>
+                            <span
+                              className={`text-sm font-medium ${
+                                isCurrentStep
+                                  ? 'text-[#136C9E]'
+                                  : isCompleted
+                                  ? 'text-green-700'
+                                  : 'text-gray-800'
+                              }`}
+                              style={{ fontFamily: 'Archivo, sans-serif' }}
+                            >
+                              {step.title}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Right side - current step content */}
+                <div className="flex flex-col">
+                  <p
+                    className="text-sm text-gray-500 mb-2"
+                    style={{ fontFamily: 'Archivo, sans-serif' }}
+                  >
+                    Step {currentStepData.id} of {steps.length}
+                  </p>
+                  <h2
+                    className="text-2xl md:text-3xl font-bold text-gray-900 mb-4"
+                    style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}
+                  >
+                    {currentStepData.title}
+                  </h2>
+                  <p
+                    className="text-lg text-gray-600 mb-6"
+                    style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}
+                  >
+                    {currentStepData.description}
+                  </p>
+                  
+                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                    <h3
+                      className="text-lg font-semibold text-gray-900 mb-4"
+                      style={{ fontFamily: 'Archivo, sans-serif' }}
+                    >
+                      What happens:
+                    </h3>
+                    <ul className="space-y-3">
+                      {currentStepData.details.map((detail, idx) => (
+                        <li key={idx} className="flex items-start">
+                          <ChevronRight className="h-5 w-5 text-[#136C9E] mr-3 flex-shrink-0 mt-0.5" />
+                          <span
+                            className="text-gray-700"
+                            style={{ fontFamily: 'Archivo, sans-serif' }}
+                          >
+                            {detail}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Navigation buttons */}
+              <div className="mt-10 flex justify-between items-center">
+                <button
+                  onClick={prevStep}
+                  disabled={currentStep === 0}
+                  className={`px-6 py-3 rounded-full font-medium transition flex items-center gap-2 ${
+                    currentStep === 0
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                  style={{ fontFamily: 'Archivo, sans-serif' }}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  <span>Previous</span>
+                </button>
+                <button
+                  onClick={nextStep}
+                  disabled={currentStep === steps.length - 1}
+                  className={`px-10 py-3 rounded-full font-semibold text-white transition-all duration-300 flex items-center gap-2 min-w-[140px] justify-center ${
+                    currentStep === steps.length - 1
+                      ? 'bg-gray-300 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-[#DC5F12] to-[#DC5F12]/80 hover:from-[#DC5F12]/90 hover:to-[#DC5F12]/70 hover:scale-105 hover:shadow-lg'
+                  }`}
+                  style={{
+                    background: currentStep === steps.length - 1
+                      ? '#D1D5DB'
+                      : 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
+                    boxShadow: currentStep === steps.length - 1
+                      ? 'none'
+                      : '0 4px 14px 0 rgba(220, 95, 18, 0.39)',
+                    fontFamily: 'Archivo, sans-serif'
+                  }}
+                >
+                  <span>
+                    {currentStep === steps.length - 1 ? 'Complete' : 'Next'}
+                  </span>
+                  {currentStep < steps.length - 1 && (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+
+        <Footer />
       </div>
-    </section>
+    </>
   );
 };
 

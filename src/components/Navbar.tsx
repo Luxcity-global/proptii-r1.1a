@@ -326,7 +326,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                 {isServiceDropdownOpen && (
                   <div
                     ref={serviceDropdownRef}
-                    className="absolute left-1/2 top-full z-50 mt-3 w-[min(calc(100vw-2rem),420px)] -translate-x-1/2 overflow-hidden"
+                    className="absolute left-1/2 bottom-full z-50 mb-3 w-[min(calc(100vw-2rem),420px)] -translate-x-1/2 overflow-hidden"
                     style={{
                       opacity: 1,
                       transform: 'translateX(-50%) translateY(0) scale(1)',
@@ -357,7 +357,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                           {activeServiceMode === 'search' ? 'For Renters & Buyers' : 'For Landlords & Agents'}
                         </p>
                       </div>
-                      <div className="p-2">
+                      <div className="p-2 max-h-[320px] overflow-y-auto overscroll-contain">
                         {serviceMenuItems.map((item, index) => (
                           <button
                             key={`${activeServiceMode}-${index}`}
