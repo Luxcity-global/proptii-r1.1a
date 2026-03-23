@@ -149,7 +149,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLDivElement>(null);
-  const [ctaHover, setCtaHover] = useState<'tenant' | 'agent' | null>(null);
+  const [ctaHover, setCtaHover] = useState<'tenant' | 'agent' | null>('tenant');
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -549,7 +549,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
         {/* Single content container with background figures */}
         <div className="relative max-w-6xl mx-auto px-2 md:px-4 text-left text-[#374957]">
           {/* Text / CTAs */}
-          <div className="relative z-10 max-w-xl">
+          <div className="relative z-10 max-w-xl md:-translate-x-4">
             <h2 className="text-2xl md:text-4xl font-bold font-archive mb-4 md:mb-6 text-[#136C9E]">
             Start free. No credit card. No commitment.
             </h2>
@@ -560,16 +560,16 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
               <Link
                 to="/register?role=tenant"
                 onMouseEnter={() => setCtaHover('tenant')}
-                onMouseLeave={() => setCtaHover(null)}
-                className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full border-2 border-[#136C9E] text-[#136C9E] font-semibold text-base md:text-lg bg-transparent transition-all duration-200 hover:text-white hover:border-transparent hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#F47A1A] hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus-visible:outline-none"
+                onMouseLeave={() => setCtaHover('tenant')}
+                className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full font-semibold text-base md:text-lg transition-all duration-200 focus:outline-none focus-visible:outline-none text-white border-2 border-transparent bg-gradient-to-r from-[#DC5F12] to-[#F47A1A] shadow-md -translate-y-0.5 hover:shadow-lg hover:-translate-y-1"
               >
                 Join as a Tenant / Buyer
               </Link>
               <Link
                 to="/register?role=agent"
                 onMouseEnter={() => setCtaHover('agent')}
-                onMouseLeave={() => setCtaHover(null)}
-                className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full border-2 border-[#136C9E] text-[#136C9E] font-semibold text-base md:text-lg bg-transparent transition-all duration-200 hover:text-white hover:border-transparent hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#F47A1A] hover:shadow-lg hover:-translate-y-0.5 focus:outline-none focus-visible:outline-none"
+                onMouseLeave={() => setCtaHover('tenant')}
+                className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full border-2 border-[#136C9E] text-[#136C9E] font-semibold text-base md:text-lg bg-transparent transition-all duration-200 hover:text-white hover:border-transparent hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#F47A1A] hover:shadow-lg hover:-translate-y-1 focus:outline-none focus-visible:outline-none"
               >
                 Join as a Landlord / Agent
               </Link>
@@ -587,9 +587,11 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                 : '/images/home page join us/tenant bw.png'
             }
             alt=""
-            className={`pointer-events-none select-none hidden md:block absolute bottom-0 right-40 max-h-96 lg:max-h-[26rem] w-auto object-contain translate-y-24 transition-transform duration-200 ${
+            className={`pointer-events-none select-none hidden md:block absolute bottom-0 right-20 max-h-[28rem] lg:max-h-[32rem] w-auto object-contain transition-transform duration-200 ${
+              ctaHover === 'tenant' ? 'translate-y-16' : 'translate-y-24'
+            } ${
               ctaHover === 'tenant' ? 'scale-110 opacity-100' : 'scale-100 opacity-50'
-            }`}
+            } ${ctaHover === 'agent' ? 'z-0' : 'z-10'}`}
             loading="lazy"
           />
           <img
@@ -599,9 +601,9 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                 : '/images/home page join us/agent bw.png'
             }
             alt=""
-            className={`pointer-events-none select-none hidden md:block absolute bottom-0 right-[-260px] max-h-80 lg:max-h-[24rem] w-auto object-contain translate-y-24 transition-transform duration-200 ${
+            className={`pointer-events-none select-none hidden md:block absolute bottom-0 right-[-320px] max-h-[24rem] lg:max-h-[30rem] w-auto object-contain translate-y-24 transition-transform duration-200 ${
               ctaHover === 'agent' ? 'scale-110 opacity-100' : 'scale-100 opacity-50'
-            }`}
+            } ${ctaHover === 'agent' ? 'z-10' : 'z-0'}`}
             loading="lazy"
           />
         </div>
