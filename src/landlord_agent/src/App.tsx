@@ -648,6 +648,12 @@ function AppContent() {
         setNavigationScreen('contracts');
         return;
       }
+      if (qpStart === 'clients') {
+        setCurrentScreen('main-app');
+        setNavigationScreen('clients');
+        navigate('/clients');
+        return;
+      }
       const startScreen = localStorage.getItem('startScreen');
       if (startScreen === 'property-setup-step1') {
         setCurrentScreen('property-setup-step1');
@@ -659,7 +665,7 @@ function AppContent() {
     } catch (e) {
       // ignore
     }
-  }, []);
+  }, [navigate]);
 
   // Restore current screen from sessionStorage on mount (survives page reload)
   // Skip restore when deep-linked from onboarding (start= query param) so Add Property flows correctly
@@ -2170,21 +2176,39 @@ function AppContent() {
   };
 
   const renderMainAppScreen = () => {
+    const handleUnauthSignIn = () => {
+      if (window.self !== window.top) {
+        window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: {} }, '*');
+      } else {
+        sessionStorage.setItem('redirectAfterLogin', '/landlord');
+        window.location.href = '/landlord?signin=1';
+      }
+    };
+
     console.log('🔄 renderMainAppScreen called with navigationScreen:', navigationScreen);
     switch (navigationScreen) {
       case 'dashboard':
         if (!userProfile) {
           return (
-            <LandlordEmptyState
-              onSignIn={() => {
-                if (window.self !== window.top) {
-                  window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: {} }, '*');
-                } else {
-                  sessionStorage.setItem('redirectAfterLogin', '/landlord');
-                  window.location.href = '/landlord?signin=1';
-                }
-              }}
-            />
+            <>
+              <Dashboard
+                properties={[]}
+                tenants={[]}
+                userProfile={null}
+                guestViewOnly={true}
+                onAddProperty={handleUnauthSignIn}
+                onViewProperty={() => handleUnauthSignIn()}
+                onManageDocuments={() => handleUnauthSignIn()}
+                onManagePhotos={() => handleUnauthSignIn()}
+                onViewInsights={handleUnauthSignIn}
+                onViewVacancyAlert={() => handleUnauthSignIn()}
+                onViewArrearsAlert={() => handleUnauthSignIn()}
+                marketInsights={[]}
+                vacancyAlerts={[]}
+                arrearsAlerts={[]}
+              />
+              <LandlordEmptyState onSignIn={handleUnauthSignIn} />
+            </>
           );
         }
         return (
@@ -2232,6 +2256,29 @@ function AppContent() {
         );
 
       case 'properties':
+        if (!userProfile) {
+          return (
+            <>
+              <PropertiesPage
+                properties={[]}
+                tenants={[]}
+                arrearsAlerts={[]}
+                onAddProperty={handleUnauthSignIn}
+                onViewProperty={() => handleUnauthSignIn()}
+                onEditProperty={() => handleUnauthSignIn()}
+                onManageDocuments={() => handleUnauthSignIn()}
+                onManagePhotos={() => handleUnauthSignIn()}
+                onViewTenant={() => handleUnauthSignIn()}
+                onDeleteProperty={() => handleUnauthSignIn()}
+                onArchiveProperty={() => handleUnauthSignIn()}
+                onDuplicateProperty={() => handleUnauthSignIn()}
+                onExportProperties={() => handleUnauthSignIn()}
+                onImportProperties={() => handleUnauthSignIn()}
+              />
+              <LandlordEmptyState onSignIn={handleUnauthSignIn} />
+            </>
+          );
+        }
         return (
           <PropertiesPage
             properties={properties}
@@ -2290,6 +2337,21 @@ function AppContent() {
         );
 
       case 'documents':
+        if (!userProfile) {
+          return (
+            <>
+              <DocumentsPage
+                properties={[]}
+                onViewProperty={() => handleUnauthSignIn()}
+                onManageDocuments={() => handleUnauthSignIn()}
+                onDeleteDocuments={async () => handleUnauthSignIn()}
+                onArchiveDocuments={async () => handleUnauthSignIn()}
+                onExportDocuments={() => handleUnauthSignIn()}
+              />
+              <LandlordEmptyState onSignIn={handleUnauthSignIn} />
+            </>
+          );
+        }
         return (
           <DocumentsPage
             properties={properties}
@@ -2537,6 +2599,19 @@ function AppContent() {
         );
 
       case 'viewings':
+        if (!userProfile) {
+          return (
+            <>
+              <ViewingsPage
+                managerId=""
+                managerName=""
+                managerEmail=""
+                allowGuestMode={true}
+              />
+              <LandlordEmptyState onSignIn={handleUnauthSignIn} />
+            </>
+          );
+        }
         console.log('🔴🔴🔴 App.tsx: VIEWINGS CASE HIT 🔴🔴🔴');
         console.log('🔴 App.tsx: Rendering ViewingsPage');
         console.log('🔴 userProfile:', userProfile);
@@ -2547,7 +2622,7 @@ function AppContent() {
         const params = new URLSearchParams(window.location.search);
         const emailFromQuery = params.get('email');
         
-        const managerEmailValue = userProfile?.email || emailFromQuery;
+        const managerEmailValue = userProfile?.email || emailFromQuery || undefined;
         console.log('🔴 managerEmailValue being passed:', managerEmailValue);
         return (
           <ViewingsPage
@@ -2558,6 +2633,18 @@ function AppContent() {
         );
 
       case 'contracts':
+        if (!userProfile) {
+          return (
+            <>
+              <ContractsPage
+                tenants={[]}
+                onBack={handleUnauthSignIn}
+                allowGuestMode={true}
+              />
+              <LandlordEmptyState onSignIn={handleUnauthSignIn} />
+            </>
+          );
+        }
         return (
           <ContractsPage
             tenants={tenants}
@@ -2567,6 +2654,27 @@ function AppContent() {
         );
 
       case 'clients':
+        if (!userProfile) {
+          return (
+            <>
+              <ClientsPage
+                tenants={[]}
+                properties={[]}
+                arrearsAlerts={[]}
+                userRole={userRole}
+                onViewTenant={() => handleUnauthSignIn()}
+                onViewProperty={() => handleUnauthSignIn()}
+                onAddTenant={handleUnauthSignIn}
+                onAddLandlord={handleUnauthSignIn}
+                onViewLandlord={() => handleUnauthSignIn()}
+                onDeleteTenant={() => handleUnauthSignIn()}
+                onArchiveTenant={() => handleUnauthSignIn()}
+                onExportTenants={() => handleUnauthSignIn()}
+              />
+              <LandlordEmptyState onSignIn={handleUnauthSignIn} />
+            </>
+          );
+        }
         return (
           <ClientsPage
             tenants={tenants}

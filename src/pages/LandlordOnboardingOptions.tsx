@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { navigateToAddPropertyOnboarding } from '../utils/landlordAddPropertyNavigation';
 import { Home, UserPlus, FileSignature, X } from 'lucide-react';
 import { TextAnimate } from '../components/magic-ui/text-animate';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,8 +13,7 @@ interface LandlordOnboardingOptionsProps {
   onDismiss?: () => void;
 }
 
-/** Links into landlord_agent app: Add property, Add tenant, Send contracts (via ?start= query). */
-const LANDLORD_ADD_PROPERTY = '/landlord?start=property-setup-step1';
+/** Links into landlord_agent app: Add tenant, Send contracts (via ?start= query). Add property uses navigateToAddPropertyOnboarding. */
 const LANDLORD_ADD_TENANT = '/landlord?start=add-tenant';
 const LANDLORD_SEND_CONTRACTS = '/landlord?start=contracts';
 
@@ -31,9 +31,7 @@ const LandlordOnboardingOptions: React.FC<LandlordOnboardingOptionsProps> = ({ a
   };
 
   const handleAddProperty = () => {
-    localStorage.setItem('startScreen', 'property-setup-step1');
-    localStorage.setItem('startAddPropertyTour', '1');
-    navigate('/landlord?start=property-setup-step1&startAddPropertyTour=1');
+    navigateToAddPropertyOnboarding(navigate);
   };
 
   const handleAddTenant = () => {

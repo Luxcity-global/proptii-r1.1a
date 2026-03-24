@@ -24,7 +24,8 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import RentalDocuments from './tools/RentalDocuments';
 import { SEO } from '../components/SEO';
-import { useAuth } from '../contexts/AuthContext';
+import { navigateToAddPropertyOnboarding, navigateToLandlordClients } from '../utils/landlordAddPropertyNavigation';
+import { navigateToComingSoon } from '../utils/comingSoonNavigation';
 
 interface Tool {
   id: string;
@@ -96,7 +97,6 @@ const tools: Tool[] = [
 const Tools: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<'tools' | 'documents'>('tools');
   const [activeMode, setActiveMode] = useState<'search' | 'list'>('search');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -117,14 +117,6 @@ const Tools: React.FC = () => {
       window.history.replaceState(null, '', '/tools#documents');
     } else {
       window.history.replaceState(null, '', '/tools');
-    }
-  };
-
-  const navigateToAgent = () => {
-    if (isAuthenticated) {
-      navigate('/Agent');
-    } else {
-      navigate('/register?role=agent&redirect=%2FAgent');
     }
   };
 
@@ -205,7 +197,7 @@ const Tools: React.FC = () => {
       description: 'Advertise your property to verified tenants',
       action: () => {
         setIsDropdownOpen(false);
-        navigateToAgent();
+        navigateToAddPropertyOnboarding(navigate);
       },
     },
     {
@@ -214,7 +206,7 @@ const Tools: React.FC = () => {
       description: 'Tenant communication and management tools',
       action: () => {
         setIsDropdownOpen(false);
-        navigateToAgent();
+        navigateToLandlordClients(navigate);
       },
     },
     {
@@ -223,7 +215,7 @@ const Tools: React.FC = () => {
       description: 'Track listing performance and enquiries',
       action: () => {
         setIsDropdownOpen(false);
-        navigateToAgent();
+        navigateToComingSoon(navigate, 'analytics');
       },
     },
     {
@@ -232,7 +224,7 @@ const Tools: React.FC = () => {
       description: 'Run background and credit checks securely',
       action: () => {
         setIsDropdownOpen(false);
-        navigateToAgent();
+        navigateToComingSoon(navigate, 'verify-tenants');
       },
     },
     {
@@ -628,7 +620,7 @@ const Tools: React.FC = () => {
                           if (activeMode === 'search') {
                             handleSearchCta();
                           } else {
-                            navigateToAgent();
+                            navigateToAddPropertyOnboarding(navigate);
                           }
                         }}
                         className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold tracking-wide uppercase transition-all duration-300"

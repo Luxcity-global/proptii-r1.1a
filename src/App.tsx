@@ -40,6 +40,7 @@ import { AuthRedirectHandler } from './components/common/AuthRedirectHandler';
 import SearchResults from './pages/SearchResults';
 import HomeVariant from './pages/HomeVariant';
 import Pricing from './pages/Pricing';
+import ComingSoonPage from './pages/ComingSoonPage';
 import Tools from './pages/Tools';
 import ReadinessChecker from './pages/tools/ReadinessChecker';
 import DocumentTracker from './pages/tools/DocumentTracker';
@@ -79,6 +80,7 @@ export const App: React.FC = () => {
             <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/faq" element={<FAQ />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/coming-soon" element={<ComingSoonPage />} />
 
             {/* Legacy / marketing URL redirects */}
             <Route path="/about" element={<Navigate to="/about-us" replace />} />

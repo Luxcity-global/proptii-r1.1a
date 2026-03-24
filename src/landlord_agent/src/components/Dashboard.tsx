@@ -74,6 +74,7 @@ interface DashboardProps {
   marketInsights: MarketInsight[];
   vacancyAlerts?: any[];
   arrearsAlerts?: any[];
+  guestViewOnly?: boolean;
 }
 
 export function Dashboard({
@@ -90,6 +91,7 @@ export function Dashboard({
   marketInsights,
   vacancyAlerts = [],
   arrearsAlerts = [],
+  guestViewOnly = false,
 }: DashboardProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -493,6 +495,73 @@ export function Dashboard({
         return status;
     }
   };
+
+  if (guestViewOnly) {
+    return (
+      <div style={{ backgroundColor: '#F7F7F7' }}>
+        <div className="max-w-7xl mx-auto px-3 pt-6 pb-2">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+              Overview
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-sm">Total Properties</p>
+                  <p className="text-lg font-semibold">{totalProperties}</p>
+                </div>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <Building2 className="w-6 h-6 text-primary" />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-6 flex-1">
+                  <div className="text-center">
+                    <p className="text-muted-foreground mb-1 text-sm">Occupied</p>
+                    <p className="text-lg font-semibold text-green-600">{occupiedProperties}</p>
+                  </div>
+                  <div className="w-px h-12 bg-gray-200"></div>
+                  <div className="text-center">
+                    <p className="text-muted-foreground mb-1 text-sm">Vacant</p>
+                    <p className="text-lg font-semibold text-orange-600">{vacantProperties}</p>
+                  </div>
+                </div>
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-sm">Monthly rental revenue</p>
+                  <p className="text-lg font-semibold">£{totalRent.toLocaleString()}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <PoundSterling className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-sm">Document Alerts</p>
+                  <p className="text-lg font-semibold text-orange-600">{expiringDocuments}</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-orange-600" />
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7' }}>
@@ -1100,9 +1169,8 @@ export function Dashboard({
             </div>
           </div>
         </div>
-      </div>
+        </div>
             </div>
-
 
       <div className="max-w-7xl mx-auto px-3 md:px-3 pb-6">
         {/* Filters */}

@@ -36,6 +36,7 @@ interface ViewingsPageProps {
   managerId: string | null;
   managerName?: string;
   managerEmail?: string;
+  allowGuestMode?: boolean;
 }
 
 interface ScheduleFormState {
@@ -97,7 +98,12 @@ function formatTime(time: string) {
   }
 }
 
-const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, managerEmail }) => {
+const ViewingsPage: React.FC<ViewingsPageProps> = ({
+  managerId,
+  managerName,
+  managerEmail,
+  allowGuestMode = false
+}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
@@ -131,6 +137,11 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
   // Check authentication and redirect if not authenticated - IMMEDIATELY on mount
   useEffect(() => {
+    if (allowGuestMode) {
+      setIsRedirecting(false);
+      return;
+    }
+
     if (!managerId && !managerEmail) {
       setIsRedirecting(true);
       // User is not authenticated - redirect to login IMMEDIATELY
@@ -159,12 +170,22 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         window.location.href = `/login?redirect=${redirectPath}`;
       }
     }
-  }, [managerId, managerEmail]);
+  }, [managerId, managerEmail, allowGuestMode]);
 
   useEffect(() => {
     let unsubscribeBookings: (() => void) | undefined;
     let unsubscribeRequests: (() => void) | undefined;
     let unsubscribeStats: (() => void) | undefined;
+
+    if (allowGuestMode && !managerId && !managerEmail) {
+      // Guest mode intentionally shows empty state without auth redirects or data fetches.
+      setRequests([]);
+      setBookings([]);
+      setStats({ upcoming: 0, completed: 0, rescheduled: 0, total: 0 });
+      setLoading(false);
+      setError(null);
+      return;
+    }
 
     if (!managerId && !managerEmail) {
       // Don't proceed if not authenticated (redirect should have happened above)
@@ -409,7 +430,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
       unsubscribeRequests?.();
       unsubscribeStats?.();
     };
-  }, [managerId, managerEmail]);
+  }, [managerId, managerEmail, allowGuestMode]);
 
   // Function to check if a viewing date/time has passed
   const isViewingDatePassed = (viewing: ViewingBooking): boolean => {
@@ -1048,7 +1069,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   };
 
   // Show redirecting message if not authenticated
-  if (isRedirecting || (!managerId && !managerEmail)) {
+  if (!allowGuestMode && (isRedirecting || (!managerId && !managerEmail))) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center max-w-md mx-auto px-4">

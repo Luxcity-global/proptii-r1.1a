@@ -56,9 +56,11 @@ export interface Contract {
 interface ContractsPageProps {
   tenants?: Array<{ id: string; name: string; email: string; propertyId?: string }>;
   onBack?: () => void;
+  allowGuestMode?: boolean;
+  userProfile?: unknown;
 }
 
-export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
+export function ContractsPage({ tenants = [], onBack, allowGuestMode = false }: ContractsPageProps) {
   const [activeTab, setActiveTab] = useState<'sent' | 'unsigned' | 'signed'>('sent');
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -80,8 +82,12 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
   
   const ITEMS_PER_PAGE = 10;
 
-  // Get landlord email and userId from localStorage/auth on component mount
+  // Get landlord email and userId from localStorage/auth on component mount.
+  // Skip entirely in guest mode — stale localStorage credentials must not
+  // cause the guest view to fetch real contract data.
   useEffect(() => {
+    if (allowGuestMode) return;
+
     const getUserInfo = () => {
       // Try to get from localStorage (set during login/registration)
       const storedEmail = localStorage.getItem('landlordEmail');
@@ -121,14 +127,22 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
     };
 
     getUserInfo();
-  }, []);
+  }, [allowGuestMode]);
 
   // Load contracts when tab changes or landlordEmail/userId is set
   useEffect(() => {
     loadContracts();
-  }, [activeTab, landlordEmail, userId]);
+  }, [activeTab, landlordEmail, userId, allowGuestMode]);
 
   const loadContracts = async () => {
+    // Absolute guard: guest mode must never hit the database.
+    if (allowGuestMode) {
+      setContracts([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -159,7 +173,10 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
       }
       
       if (!userId && !landlordEmail) {
-        console.log('⚠️ No userId or landlordEmail - loading all contracts');
+        console.log('⚠️ No userId or landlordEmail - skipping contract load for safety');
+        setContracts([]);
+        setLoading(false);
+        return;
       }
       
       const fetchedContracts = await contractService.getContracts(filters);

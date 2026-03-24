@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { navigateToAddPropertyOnboarding, navigateToLandlordClients } from '../utils/landlordAddPropertyNavigation';
+import { navigateToComingSoon } from '../utils/comingSoonNavigation';
 import { UserCircle, ChevronDown, Settings, LogOut, Menu, X, CalendarCheck, FileCheck, FileSignature, Home, Building2, Users, BarChart3, Shield, Sparkles } from 'lucide-react';
 
 /** Routes that use the tenant service toggle (current page indicator + dropdown) instead of center nav links */
@@ -44,14 +46,6 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
   const currentServiceRoute = (TENANT_SERVICE_ROUTES.find((r) => pathname === r || pathname.startsWith(r + '/')) ?? '/bookviewing') as TenantServiceRoute;
   const currentServiceLabel = TENANT_SERVICE_LABELS[currentServiceRoute];
 
-  const navigateToAgent = () => {
-    if (isAuthenticated) {
-      navigate('/Agent');
-    } else {
-      navigate('/register?role=agent&redirect=%2FAgent');
-    }
-  };
-
   const handleServiceModeSwitch = (mode: 'search' | 'list') => {
     if (mode === activeServiceMode) {
       setIsServiceDropdownOpen((o) => !o);
@@ -70,10 +64,10 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
   ];
 
   const listServiceMenuItems = [
-    { icon: <Building2 className="h-4 w-4" />, label: 'List Property', description: 'Advertise your property to verified tenants', action: () => { setIsServiceDropdownOpen(false); navigateToAgent(); } },
-    { icon: <Users className="h-4 w-4" />, label: 'Manage Tenants', description: 'Tenant communication and management', action: () => { setIsServiceDropdownOpen(false); navigateToAgent(); } },
-    { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance', action: () => { setIsServiceDropdownOpen(false); navigateToAgent(); } },
-    { icon: <Shield className="h-4 w-4" />, label: 'Verify Tenants', description: 'Run background and credit checks', action: () => { setIsServiceDropdownOpen(false); navigateToAgent(); } },
+    { icon: <Building2 className="h-4 w-4" />, label: 'List Property', description: 'Advertise your property to verified tenants', action: () => { setIsServiceDropdownOpen(false); navigateToAddPropertyOnboarding(navigate); } },
+    { icon: <Users className="h-4 w-4" />, label: 'Manage Tenants', description: 'Tenant communication and management', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordClients(navigate); } },
+    { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance', action: () => { setIsServiceDropdownOpen(false); navigateToComingSoon(navigate, 'analytics'); } },
+    { icon: <Shield className="h-4 w-4" />, label: 'Verify Tenants', description: 'Run background and credit checks', action: () => { setIsServiceDropdownOpen(false); navigateToComingSoon(navigate, 'verify-tenants'); } },
   ];
 
   const serviceMenuItems = activeServiceMode === 'search' ? searchServiceMenuItems : listServiceMenuItems;
@@ -403,7 +397,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                             if (activeServiceMode === 'search') {
                               navigate('/home-v2');
                             } else {
-                              navigateToAgent();
+                              navigateToAddPropertyOnboarding(navigate);
                             }
                           }}
                           className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold uppercase tracking-wide transition-all"

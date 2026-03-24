@@ -7,13 +7,12 @@ interface LandlordEmptyStateProps {
 }
 
 /**
- * Inline empty state for the dashboard content area.
- * Shows when user is not signed in - displays scout mascot, message, and sign-in button
- * in place of the data table, so users can still see the dashboard layout.
+ * Sign-in empty state shown below the page's summary cards when user is not signed in.
+ * Displays scout mascot, message, and sign-in button.
  */
 export function LandlordEmptyState({ onSignIn }: LandlordEmptyStateProps) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 min-h-[400px]">
+    <div className="flex flex-col items-center justify-center p-8 min-h-[400px]">
       <div className="flex flex-col md:flex-row items-center gap-8 max-w-2xl">
         <img
           src="/images/scout1.png"
@@ -37,12 +36,12 @@ export function LandlordEmptyState({ onSignIn }: LandlordEmptyStateProps) {
               background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
               boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
             }}
-            onMouseEnter={(e) => {
+            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
               e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
               e.currentTarget.style.transform = 'translateY(-2px)';
             }}
-            onMouseLeave={(e) => {
+            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
               e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
               e.currentTarget.style.transform = 'translateY(0px)';
