@@ -371,9 +371,8 @@ export function ContractsPage({ tenants = [], onBack, allowGuestMode = false }: 
       
       console.log('Sending email to:', contractData.recipientEmail);
       
-      const API_BASE_URL = window.location.hostname === 'localhost'
-        ? 'http://localhost:3000/api'
-        : 'https://proptii-r11a-production-0c93.up.railway.app/api';
+      const API_BASE_URL = (import.meta as any)?.env?.VITE_API_URL?.replace(/\/+$/, '')
+        || (window.location.hostname === 'localhost' ? 'http://localhost:3000/api' : '/api');
       
       if (contractData.file) {
         // Convert file to base64 and send email with attachment

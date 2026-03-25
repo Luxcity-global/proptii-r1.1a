@@ -161,9 +161,8 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
 
     try {
       // Upload file to backend (which handles Azure Storage upload)
-        const API_BASE_URL = window.location.hostname === 'localhost'
-          ? 'http://localhost:3000/api'
-          : 'https://proptii-r11a-production-0c93.up.railway.app/api';
+        const API_BASE_URL = (import.meta as any)?.env?.VITE_API_URL?.replace(/\/+$/, '')
+          || (window.location.hostname === 'localhost' ? 'http://localhost:3000/api' : '/api');
 
       const uploadedCount = selectedDocuments.length;
 

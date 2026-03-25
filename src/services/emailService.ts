@@ -57,9 +57,8 @@ interface MultiEmailResult {
   error?: string;
 }
 
-const DEFAULT_BROWSER_FALLBACK = window.location.hostname === 'localhost'
-  ? 'http://localhost:3000/api'
-  : 'https://proptii-r11a-production-0c93.up.railway.app/api';
+const DEFAULT_BROWSER_FALLBACK = import.meta.env.VITE_API_URL
+  || (window.location.hostname === 'localhost' ? 'http://localhost:3000/api' : '');
 
 const API_BASE_URLS = API_BASE_CANDIDATES.length > 0 ? API_BASE_CANDIDATES : [DEFAULT_BROWSER_FALLBACK];
 

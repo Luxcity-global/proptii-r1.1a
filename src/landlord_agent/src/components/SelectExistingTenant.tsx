@@ -57,7 +57,8 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
           if (hostname === 'localhost' || hostname === '127.0.0.1') {
             return 'http://localhost:3000';
           }
-          return 'https://proptii-r11a-production-0c93.up.railway.app';
+          // Production requires VITE_API_URL to be configured
+          return '';
         };
 
         const API_BASE_URL = getApiBaseUrl();

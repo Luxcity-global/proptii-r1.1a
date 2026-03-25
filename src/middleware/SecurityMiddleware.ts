@@ -74,9 +74,8 @@ export class SecurityMiddleware {
             'https://formsubmit.co',
             'https://proptii.b2clogin.com',
             'https://*.azure.com',
-            // Always include all backend URLs (both old and new Railway)
-            'https://proptii-r1-1a-1.onrender.com',
-            'https://proptii-r11a-production-0c93.up.railway.app',
+            'https://*.onrender.com',
+            'https://*.railway.app',
             'https://demo.docusign.net',
             'https://www.docusign.net',
             'https://*.docusign.net',

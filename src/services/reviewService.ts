@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 // Get the API URL from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://proptii-r11a-production-0c93.up.railway.app/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL
+  || (window.location.hostname === 'localhost' ? 'http://localhost:3000/api' : '');
 
 console.log('Review Service using API URL:', API_BASE_URL);
 

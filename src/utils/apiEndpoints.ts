@@ -1,7 +1,6 @@
 const normalizeBaseUrl = (url: string) => url.replace(/\/$/, '');
 
 const REMOTE_FALLBACKS = [
-  'https://proptii-r11a-production-0c93.up.railway.app/api',
   'https://proptii-r1-1a-1.onrender.com/api',
   'https://proptii-backend.onrender.com/api',
   'https://api.proptii.com',
@@ -33,7 +32,7 @@ const buildCandidateList = () => {
 
 export const API_BASE_CANDIDATES = buildCandidateList();
 
-export const PRIMARY_API_BASE_URL = API_BASE_CANDIDATES[0] || 'https://proptii-r11a-production-0c93.up.railway.app/api';
+export const PRIMARY_API_BASE_URL = API_BASE_CANDIDATES[0] || '';
 
 const ensureLeadingSlash = (path: string) => (path.startsWith('/') ? path : `/${path}`);
 

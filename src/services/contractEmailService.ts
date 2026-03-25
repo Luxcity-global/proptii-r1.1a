@@ -19,9 +19,9 @@ interface ContractEmailResponse {
 const API_BASE_URL = (() => {
   // Prefer configured URL from Vite env
   const envBase = (import.meta as any)?.env?.VITE_API_URL as string | undefined;
-  const base = (envBase || (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://proptii-r11a-production-0c93.up.railway.app'))
-    .replace(/\/$/, '');
-  return `${base}/api`;
+  if (envBase) return envBase.replace(/\/+$/, '');
+  if (window.location.hostname === 'localhost') return 'http://localhost:3000/api';
+  return '/api';
 })();
 
 class ContractEmailService {

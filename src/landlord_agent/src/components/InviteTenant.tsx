@@ -231,9 +231,9 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
           return 'http://localhost:3000';
         }
         
-        // Priority 3: Production URL
-        console.log('✅ Using production API');
-        return 'https://proptii-r11a-production-0c93.up.railway.app';
+        // Production requires VITE_API_URL to be configured
+        console.warn('⚠️ VITE_API_URL is not set. API calls may fail in production.');
+        return '';
       };
 
       const API_BASE_URL = getApiBaseUrl();
