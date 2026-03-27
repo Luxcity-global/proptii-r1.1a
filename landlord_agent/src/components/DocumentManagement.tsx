@@ -20,7 +20,7 @@ import {
   Filter,
   Plus
 } from 'lucide-react';
-import { Property, PropertyDocument } from '../App';
+import { Property, PropertyDocument } from '../types';
 
 interface DocumentManagementProps {
   property: Property | null;

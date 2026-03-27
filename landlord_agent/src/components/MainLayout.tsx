@@ -15,7 +15,7 @@ import {
   useSidebar,
 } from './ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { UserProfile } from '../App';
+import { UserProfile } from '../types';
 import { LogoutButton } from './auth/LogoutButton';
 
 // Import logos

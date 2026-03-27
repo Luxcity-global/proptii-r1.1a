@@ -8,29 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { Tenant, Property, ArrearsAlert, UserRole } from '../App';
+import { Tenant, Property, ArrearsAlert, UserRole, Landlord } from '../types';
 
 
 
-interface Landlord {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  status: 'active' | 'inactive' | 'new' | 'premium' | 'suspended';
-  portfolio: {
-    totalProperties: number;
-    totalValue: number;
-    monthlyIncome: number;
-  };
-  properties: string[];
-  notes: string;
-  avatar?: string;
-  lastContact: Date;
-  joinDate: Date;
-  location: string;
-  company?: string;
-}
+
 
 interface ClientsPageProps {
   tenants: Tenant[];
@@ -102,17 +84,17 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
 
   // Selection functions
   const toggleTenantSelection = (tenantId: string) => {
-    setSelectedTenants(prev => 
+    setSelectedTenants((prev: string[]) => 
       prev.includes(tenantId) 
-        ? prev.filter(id => id !== tenantId)
+        ? prev.filter((id: string) => id !== tenantId)
         : [...prev, tenantId]
     );
   };
 
   const toggleLandlordSelection = (landlordId: string) => {
-    setSelectedLandlords(prev => 
+    setSelectedLandlords((prev: string[]) => 
       prev.includes(landlordId) 
-        ? prev.filter(id => id !== landlordId)
+        ? prev.filter((id: string) => id !== landlordId)
         : [...prev, landlordId]
     );
   };
@@ -595,7 +577,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                           <input
                             type="checkbox"
                             checked={selectedTenants.includes(tenant.id)}
-                            onChange={(e) => {
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                               e.stopPropagation();
                               toggleTenantSelection(tenant.id);
                             }}
@@ -696,7 +678,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={(e) => {
+                          onClick={(e: React.MouseEvent) => {
                             e.stopPropagation();
                             onViewTenant(tenant);
                           }}
@@ -825,7 +807,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                         <input
                           type="checkbox"
                           checked={selectedLandlords.includes(landlord.id)}
-                          onChange={(e) => {
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                             e.stopPropagation();
                             toggleLandlordSelection(landlord.id);
                           }}
@@ -898,7 +880,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={(e) => {
+                        onClick={(e: React.MouseEvent) => {
                           e.stopPropagation();
                           onViewLandlord(landlord);
                         }}

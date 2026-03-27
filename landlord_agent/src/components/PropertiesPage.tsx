@@ -7,7 +7,7 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Property, Tenant, ArrearsAlert } from '../App';
+import { Property, Tenant, ArrearsAlert } from '../types';
 
 interface PropertiesPageProps {
   properties: Property[];

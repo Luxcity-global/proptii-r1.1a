@@ -1,6 +1,7 @@
 import { collection, getDocs, query, where, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
-import { Property } from '../hooks/useSearchBackend';
+import { Property } from '../types/property';
+
 import landlordUserService from './landlordUserService';
 
 interface FirestoreProperty {

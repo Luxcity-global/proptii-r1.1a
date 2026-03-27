@@ -4,7 +4,7 @@ import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Upload, X, GripVertical, Image, ArrowRight } from 'lucide-react';
-import { Property, PropertyPhoto } from '../App';
+import { Property, PropertyPhoto } from '../types';
 
 interface PhotoUploadProps {
   property: Property | null;

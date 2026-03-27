@@ -3,7 +3,7 @@ import { Building2, BedDouble, Bath, Calendar, MapPin, Heart, Share2, Mail, Phon
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLink, faEnvelope } from "@fortawesome/free-solid-svg-icons";
 import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
-import { PropertyFormData } from './SubmissionForm';
+import { PropertyFormData } from './types';
 
 interface ListingPreviewProps {
   data: PropertyFormData;

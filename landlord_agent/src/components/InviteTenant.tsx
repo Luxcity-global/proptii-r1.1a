@@ -6,7 +6,7 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ArrowLeft, Mail, Send, CheckCircle, AlertCircle } from 'lucide-react';
-import { Property } from '../App';
+import { Property } from '../types';
 
 interface InviteTenantProps {
   properties: Property[];

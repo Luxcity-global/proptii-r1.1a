@@ -8,7 +8,7 @@ import { Textarea } from './ui/textarea';
 import { Checkbox } from './ui/checkbox';
 import { Badge } from './ui/badge';
 import { MapPin, Home, BedDouble, PoundSterling, AlertCircle, Save, ArrowLeft, Upload, Image as ImageIcon } from 'lucide-react';
-import { Property } from '../App';
+import { Property } from '../types';
 
 interface PropertySetupProps {
   property?: Property | null;
@@ -93,7 +93,7 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      const property = {
+      const newProperty = {
         address: formData.address,
         type: formData.type,
         bedrooms: formData.bedrooms,
@@ -104,7 +104,7 @@ export function PropertySetup({ property, onPropertyComplete, onSkip, onBack }: 
         photos: property?.photos || [],
         documents: property?.documents || []
       };
-      onPropertyComplete(property);
+      onPropertyComplete(newProperty);
     }
   };
 

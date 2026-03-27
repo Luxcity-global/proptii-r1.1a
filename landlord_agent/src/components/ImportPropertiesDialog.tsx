@@ -18,7 +18,7 @@ import {
   FileSpreadsheet,
   FileJson
 } from 'lucide-react';
-import { Property } from '../App';
+import { Property } from '../types';
 
 interface ImportPropertiesDialogProps {
   isOpen: boolean;

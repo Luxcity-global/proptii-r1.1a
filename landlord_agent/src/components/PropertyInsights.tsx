@@ -22,7 +22,7 @@ import {
   Star,
   Building
 } from 'lucide-react';
-import { Property, PropertyMarketData } from '../App';
+import { Property, PropertyMarketData } from '../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
 interface PropertyInsightsProps {

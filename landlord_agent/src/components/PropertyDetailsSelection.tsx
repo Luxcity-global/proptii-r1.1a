@@ -257,7 +257,7 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
       markerRef.current = marker;
 
       // Handle map clicks to update location
-      map.addListener('click', (event) => {
+      map.addListener('click', (event: any) => {
         const lat = event.latLng.lat();
         const lng = event.latLng.lng();
         
@@ -269,7 +269,7 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
       });
 
       // Handle marker drag
-      marker.addListener('dragend', (event) => {
+      marker.addListener('dragend', (event: any) => {
         const lat = event.latLng.lat();
         const lng = event.latLng.lng();
         

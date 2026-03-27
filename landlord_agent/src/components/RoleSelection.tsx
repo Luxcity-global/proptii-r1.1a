@@ -4,7 +4,7 @@ import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Building2, Users, HelpCircle, Check } from 'lucide-react';
-import { UserRole } from '../App';
+import { UserRole } from '../types';
 
 interface RoleSelectionProps {
   selectedRole: UserRole;

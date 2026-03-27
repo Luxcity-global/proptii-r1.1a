@@ -24,7 +24,7 @@ import {
   Users,
   Home
 } from 'lucide-react';
-import { Property, UserProfile, MarketInsight } from '../App';
+import { Property, UserProfile, MarketInsight } from '../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
 interface PortfolioInsightsProps {
@@ -508,15 +508,15 @@ export function PortfolioInsights({ properties, userProfile, onBack, marketInsig
                       <>
                         <div>
                           <p className="text-sm text-muted-foreground">Current Rent</p>
-                          <p className="font-semibold">{formatCurrency(scenario.currentRent)}/month</p>
+                          <p className="font-semibold">{formatCurrency((scenario as any).currentRent || 0)}/month</p>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">New Rent</p>
-                          <p className="font-semibold">{formatCurrency(scenario.newRent)}/month</p>
+                          <p className="font-semibold">{formatCurrency((scenario as any).newRent || 0)}/month</p>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Occupancy Impact</p>
-                          <p className="font-semibold text-orange-600">{scenario.occupancyImpact}%</p>
+                          <p className="font-semibold text-orange-600">{(scenario as any).occupancyImpact || 0}%</p>
                         </div>
                       </>
                     )}
@@ -525,11 +525,11 @@ export function PortfolioInsights({ properties, userProfile, onBack, marketInsig
                       <>
                         <div>
                           <p className="text-sm text-muted-foreground">Current Value</p>
-                          <p className="font-semibold">{formatCurrency(scenario.currentValue)}</p>
+                          <p className="font-semibold">{formatCurrency((scenario as any).currentValue || 0)}</p>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">New Value</p>
-                          <p className="font-semibold">{formatCurrency(scenario.newValue)}</p>
+                          <p className="font-semibold">{formatCurrency((scenario as any).newValue || 0)}</p>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Yield Impact</p>

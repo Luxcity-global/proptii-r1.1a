@@ -23,7 +23,7 @@ import {
   MapPin,
   Clock
 } from 'lucide-react';
-import { VacancyRiskAlert, AIMarketingAssets } from '../App';
+import { VacancyRiskAlert, AIMarketingAssets } from '../types';
 
 interface VacancyPreventionProps {
   alert: VacancyRiskAlert;

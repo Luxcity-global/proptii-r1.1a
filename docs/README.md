@@ -1,14 +1,25 @@
-# Proptii Documentation
+# Proptii Enterprise Documentation
 
-## Project Setup
-- [Development Setup](development/DevelopmentSetup.md)
-- [Backend Integration](backend-integration.md)
+Comprehensive guides for development, infrastructure, and feature implementation across the Proptii ecosystem.
 
-## Features
-- [Agent Portal](features/agent-portal.md)
-- [AI Search Input](features/ai-search-input.md)
+## 🏗️ Architecture & Development
+- **[System Architecture](../README.md#system-architecture)**: High-level overview of the repo.
+- **[Development Setup](development/DevelopmentSetup.md)**: Local environment configuration.
+- **[Backend Integration](backend-integration.md)**: API communication patterns.
+- **[Search Engine](features/ai-search-input.md)**: AI embedding and search logic.
 
-## Best Practices
-- [Maintenance Guide](best-practices/maintenance.md)
+## 🚢 Infrastructure & Deployment
+- **[Azure Static Web Apps](development/Azure-SWA-Deployment.md)**: Frontend hosting guide.
+- **[CDN Documentation](development/CDN-Documentation.md)**: Edge caching and SSL management.
+- **[WAF Configuration](development/WAF-Setup.md)**: Security and firewall rules.
 
-## Last Updated: Mon May 26 10:18:05 BST 2025
+## 🔒 Security & Identity
+- **[Azure AD B2C Auth](development/Auth-Setup.md)**: Identity provider configuration.
+- **[Firebase Integration](development/Firebase-Setup.md)**: Real-time database and functions.
+
+## 📈 Maintenance & Operations
+- **[RECOVERY_PROCEDURES.md](RECOVERY_PROCEDURES.md)**: Hotfix and rollback guidelines.
+- **[Maintenance Guide](best-practices/maintenance.md)**: Routine system updates.
+
+---
+© 2026 Proptii. All Rights Reserved.

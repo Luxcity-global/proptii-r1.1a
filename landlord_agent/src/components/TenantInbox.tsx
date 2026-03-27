@@ -24,7 +24,7 @@ import {
   MapPin,
   Calendar
 } from 'lucide-react';
-import { TenantMessage } from '../App';
+import { TenantMessage } from '../types';
 
 interface TenantInboxProps {
   onBack: () => void;

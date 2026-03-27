@@ -26,7 +26,7 @@ import {
   CreditCard,
   Scale
 } from 'lucide-react';
-import { ArrearsAlert, Tenant } from '../App';
+import { ArrearsAlert, Tenant } from '../types';
 
 interface ArrearsManagementProps {
   alert: ArrearsAlert;

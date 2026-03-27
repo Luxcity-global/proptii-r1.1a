@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { ArrowLeft, Search, Users, Home, CheckCircle, AlertCircle } from 'lucide-react';
-import { Property, Tenant } from '../App';
+import { Property, Tenant } from '../types';
 
 interface SelectExistingTenantProps {
   properties: Property[];

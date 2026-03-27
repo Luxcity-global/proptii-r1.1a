@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DASHBOARD_SECTIONS } from '../Dashboard';
+import { DASHBOARD_SECTIONS } from "../Dashboard";
 import { ChevronLeft, ChevronRight, Home, User } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 

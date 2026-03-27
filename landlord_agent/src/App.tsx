@@ -36,215 +36,23 @@ import { AuthProviders } from './providers/AuthProviders';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { useAuth } from './contexts/AuthContext';
 
-export type UserRole = 'landlord' | 'agent';
-
-export interface CompanyProfile {
-  companyName: string;
-  companyDescription?: string;
-  website?: string;
-  officeAddress?: string;
-  officePhone?: string;
-  officeEmail?: string;
-  logo?: string;
-  brandColor?: string;
-  vatNumber?: string;
-  registrationNumber?: string;
-}
-
-export interface UserProfile {
-  name: string;
-  email: string;
-  phone: string;
-  companyName?: string;
-  logo?: string;
-  companyProfile?: CompanyProfile;
-}
-
-export interface Property {
-  id: string;
-  address: string;
-  type: string;
-  bedrooms: number;
-  rent: number;
-  status: 'vacant' | 'occupied' | 'under-renovation';
-  amenities: string[];
-  notes: string;
-  photos: PropertyPhoto[];
-  documents: PropertyDocument[];
-  createdAt: Date;
-  tenant?: Tenant;
-  tenantId?: string;
-}
-
-export interface PropertyPhoto {
-  id: string;
-  url: string;
-  filename: string;
-  room?: string;
-  isCover: boolean;
-}
-
-export interface PropertyDocument {
-  id: string;
-  name: string;
-  type: 'epc' | 'gas-cert' | 'tenancy-agreement' | 'insurance' | 'other';
-  url: string;
-  issueDate: Date;
-  expiryDate?: Date;
-  status: 'valid' | 'expiring-soon' | 'expired';
-}
-
-export interface MarketInsight {
-  id: string;
-  type: 'market-trend' | 'regulatory-change' | 'demand-shift' | 'price-change';
-  title: string;
-  description: string;
-  severity: 'low' | 'medium' | 'high';
-  actionRequired: boolean;
-  date: Date;
-  area?: string;
-}
-
-export interface Tenant {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  propertyAddress: string;
-  propertyId: string;
-  rentAmount: number;
-  leaseStart: Date;
-  leaseEnd: Date;
-  status: 'active' | 'pending' | 'ended';
-  referencingStatus: 'not-started' | 'in-progress' | 'complete';
-  paymentStatus: 'current' | 'overdue' | 'payment-plan';
-  avatar?: string;
-  emergencyContact?: {
-    name: string;
-    phone: string;
-    relationship: string;
-  };
-  defaultRiskScore?: number;
-  lastPaymentDate?: Date;
-  overdueAmount?: number;
-}
-
-export interface PropertyMarketData {
-  averagePrice: number;
-  priceChange12Months: number;
-  rentalDemandIndex: number;
-  occupancyRate: number;
-  averageRent: number;
-  growthScore: number;
-  demographics: {
-    averageAge: number;
-    averageIncome: number;
-    householdSize: number;
-    rentersRatio: number;
-  };
-  nearbyDevelopments: string[];
-  confidenceLevel: 'high' | 'medium' | 'low';
-}
-
-export interface VacancyRiskAlert {
-  id: string;
-  propertyId: string;
-  propertyAddress: string;
-  riskScore: number;
-  predictedVacancyDate: Date;
-  currentTenantEndDate: Date;
-  factors: {
-    marketTrend: number;
-    seasonality: number;
-    tenantHistory: number;
-    propertyCondition: number;
-  };
-  recommendations: {
-    optimalRentPrice: number;
-    marketingStartDate: Date;
-    urgencyLevel: 'low' | 'medium' | 'high';
-  };
-  status: 'new' | 'pre-marketing' | 'marketing-active' | 'resolved';
-}
-
-export interface ArrearsAlert {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  propertyAddress: string;
-  overdueAmount: number;
-  daysPastDue: number;
-  defaultRiskScore: number;
-  lastPaymentDate: Date;
-  status: 'new' | 'reminder-sent' | 'payment-plan' | 'legal-action' | 'resolved';
-  interventionType?: 'reminder' | 'payment-plan' | 'legal';
-}
-
-export interface TenantMessage {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  propertyAddress: string;
-  subject: string;
-  content: string;
-  timestamp: Date;
-  direction: 'inbound' | 'outbound';
-  status: 'new' | 'read' | 'replied' | 'resolved';
-  category: 'maintenance' | 'lease-query' | 'payment' | 'emergency' | 'general';
-  priority: 'low' | 'medium' | 'high';
-  attachments?: {
-    id: string;
-    name: string;
-    url: string;
-    type: string;
-  }[];
-}
-
-export interface AIMarketingAssets {
-  optimalRentPrice: number;
-  marketingCopy: string;
-  virtualStagingImages: string[];
-  marketData: {
-    comparableProperties: {
-      address: string;
-      rent: number;
-      distance: string;
-    }[];
-    demandScore: number;
-    competitionLevel: 'low' | 'medium' | 'high';
-  };
-}
-
-export type Screen = 
-  | 'welcome'
-  | 'role-selection'
-  | 'profile-setup'
-  | 'onboarding-options'
-  | 'company-profile-setup'
-  | 'property-setup-step1'
-  | 'property-type-selection'
-  | 'property-details-selection'
-  | 'amenities-selection'
-  | 'images-notes-selection'
-  | 'property-setup'
-  | 'photo-upload'
-  | 'main-app'
-  | 'property-details'
-  | 'document-management'
-  | 'photo-management'
-  | 'portfolio-insights'
-  | 'property-insights'
-  | 'tenant-details'
-  | 'vacancy-prevention'
-  | 'arrears-management'
-  | 'tenant-inbox'
-  | 'property-preview'
-  | 'tenant-selection'
-  | 'add-tenant'
-  | 'invite-tenant'
-  | 'select-existing-tenant'
-  | 'add-landlord'
-  | 'landlord-details';
+import { 
+  UserRole, 
+  CompanyProfile, 
+  UserProfile, 
+  Property, 
+  PropertyPhoto, 
+  PropertyDocument, 
+  MarketInsight, 
+  Tenant, 
+  PropertyMarketData, 
+  VacancyRiskAlert, 
+  ArrearsAlert, 
+  TenantMessage, 
+  AIMarketingAssets, 
+  Screen,
+  Landlord
+} from './types';
 
 // Property setup data interface
 interface PropertySetupData {
@@ -272,7 +80,7 @@ function AppContent() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
-  const [selectedLandlord, setSelectedLandlord] = useState<any | null>(null);
+  const [selectedLandlord, setSelectedLandlord] = useState<Landlord | null>(null);
   const [selectedVacancyAlert, setSelectedVacancyAlert] = useState<VacancyRiskAlert | null>(null);
   const [selectedArrearsAlert, setSelectedArrearsAlert] = useState<ArrearsAlert | null>(null);
   const [isOnboarding, setIsOnboarding] = useState(true);
@@ -300,11 +108,11 @@ function AppContent() {
 
   // Helper functions to update property setup data
   const updatePropertySetupData = (updates: Partial<PropertySetupData>) => {
-    setPropertySetupData(prev => ({ ...prev, ...updates }));
+    setPropertySetupData((prev: PropertySetupData) => ({ ...prev, ...updates }));
   };
 
   const updatePropertyDetails = (updates: Partial<PropertySetupData['propertyDetails']>) => {
-    setPropertySetupData(prev => ({
+    setPropertySetupData((prev: PropertySetupData) => ({
       ...prev,
       propertyDetails: { ...prev.propertyDetails, ...updates }
     }));
@@ -315,7 +123,7 @@ function AppContent() {
     const { propertyType, propertyDetails, amenities, images, additionalNotes } = propertySetupData;
     
     // Convert images to PropertyPhoto format
-    const photos: PropertyPhoto[] = images.map((imageUrl, index) => ({
+    const photos: PropertyPhoto[] = images.map((imageUrl: string, index: number) => ({
       id: `photo-${index}`,
       url: imageUrl,
       filename: `property-photo-${index + 1}.jpg`,
@@ -324,7 +132,7 @@ function AppContent() {
     }));
 
     // Convert documents to PropertyDocument format
-    const documents: PropertyDocument[] = propertyDetails.uploadedDocuments.map((file, index) => ({
+    const documents: PropertyDocument[] = propertyDetails.uploadedDocuments.map((file: File, index: number) => ({
       id: `doc-${index}`,
       name: file.name,
       type: 'other',
@@ -799,7 +607,7 @@ function AppContent() {
       id: Date.now().toString(),
       createdAt: new Date(),
     };
-    setProperties(prev => [...prev, newProperty]);
+    setProperties((prev: Property[]) => [...prev, newProperty]);
     return newProperty.id;
   };
 
@@ -811,13 +619,13 @@ function AppContent() {
       coverPhoto: updates.photos?.find(p => p.isCover)?.filename
     });
     
-    setProperties(prev => 
-      prev.map(p => p.id === propertyId ? { ...p, ...updates } : p)
+    setProperties((prev: Property[]) => 
+      prev.map((p: Property) => p.id === propertyId ? { ...p, ...updates } : p)
     );
     
     if (selectedProperty && selectedProperty.id === propertyId) {
       console.log('📝 Also updating selectedProperty');
-      setSelectedProperty(prev => prev ? { ...prev, ...updates } : null);
+      setSelectedProperty((prev: Property | null) => prev ? { ...prev, ...updates } : null);
     }
     
     console.log('✅ updateProperty complete');
@@ -831,7 +639,7 @@ function AppContent() {
     setSelectedTenant(tenant);
   };
 
-  const selectLandlord = (landlord: any) => {
+  const selectLandlord = (landlord: Landlord) => {
     setSelectedLandlord(landlord);
   };
 
@@ -842,7 +650,7 @@ function AppContent() {
     };
     
     updateProperty(propertyId, {
-      documents: [...(properties.find(p => p.id === propertyId)?.documents || []), newDocument]
+      documents: [...(properties.find((p: Property) => p.id === propertyId)?.documents || []), newDocument]
     });
   };
 
@@ -853,7 +661,7 @@ function AppContent() {
     };
     
     updateProperty(propertyId, {
-      photos: [...(properties.find(p => p.id === propertyId)?.photos || []), newPhoto]
+      photos: [...(properties.find((p: Property) => p.id === propertyId)?.photos || []), newPhoto]
     });
   };
 
@@ -862,18 +670,25 @@ function AppContent() {
       ...tenant,
       id: `tenant-${Date.now()}`
     };
-    setTenants(prev => [...prev, newTenant]);
+    setTenants((prev: Tenant[]) => [...prev, newTenant]);
   };
 
-  const addLandlord = (landlordData: any) => {
+  const addLandlord = (landlordData: Landlord) => {
     // This would typically save to a landlords state or database
     // For now, we'll just log it since we don't have a landlords state
     console.log('New landlord added:', landlordData);
     // In a real app, you'd have: setLandlords(prev => [...prev, newLandlord]);
   };
 
+  // Helper function to export data (mock implementation)
+  const exportData = (data: any[], filename: string, format: string) => {
+    console.log(`Exporting ${data.length} items to ${filename} as ${format}`);
+    // In a real app, this would generate and download a file
+    alert(`Data exported as ${format.toUpperCase()}`);
+  };
+
   const deleteProperty = (property: Property) => {
-    setProperties(prev => prev.filter(p => p.id !== property.id));
+    setProperties((prev: Property[]) => prev.filter((p: Property) => p.id !== property.id));
   };
 
   const archiveProperty = (property: Property) => {
@@ -889,7 +704,7 @@ function AppContent() {
       address: `${property.address} (Copy)`,
       createdAt: new Date()
     };
-    setProperties(prev => [...prev, duplicatedProperty]);
+    setProperties((prev: Property[]) => [...prev, duplicatedProperty]);
   };
 
   const exportProperties = (propertiesToExport: Property[], format: string) => {
@@ -1000,15 +815,15 @@ function AppContent() {
               navigateToScreen('photo-management');
             }}
             onViewInsights={() => navigateToScreen('portfolio-insights')}
-            onViewVacancyAlert={(alertId) => {
-              const alert = vacancyAlerts.find(a => a.id === alertId);
+            onViewVacancyAlert={(alertId: string) => {
+              const alert = vacancyAlerts.find((a: VacancyRiskAlert) => a.id === alertId);
               if (alert) {
                 setSelectedVacancyAlert(alert);
                 navigateToScreen('vacancy-prevention');
               }
             }}
-            onViewArrearsAlert={(alertId) => {
-              const alert = arrearsAlerts.find(a => a.id === alertId);
+            onViewArrearsAlert={(alertId: string) => {
+              const alert = arrearsAlerts.find((a: ArrearsAlert) => a.id === alertId);
               if (alert) {
                 setSelectedArrearsAlert(alert);
                 navigateToScreen('arrears-management');
@@ -1067,15 +882,15 @@ function AppContent() {
               selectProperty(property);
               navigateToScreen('document-management');
             }}
-            onDeleteDocuments={(documentIds) => {
+            onDeleteDocuments={(documentIds: string[]) => {
               // In real app, this would delete documents from properties
               console.log('Delete documents:', documentIds);
             }}
-            onArchiveDocuments={(documentIds) => {
+            onArchiveDocuments={(documentIds: string[]) => {
               // In real app, this would archive documents
               console.log('Archive documents:', documentIds);
             }}
-            onExportDocuments={(format) => {
+            onExportDocuments={(format: string) => {
               // In real app, this would export document data
               console.log('Export documents as:', format);
             }}
@@ -1103,27 +918,27 @@ function AppContent() {
               selectLandlord(landlord);
               navigateToScreen('landlord-details');
             }}
-            onDeleteTenant={(tenantId) => {
-              setTenants(prev => prev.filter(t => t.id !== tenantId));
+            onDeleteTenant={(tenantId: string) => {
+              setTenants((prev: Tenant[]) => prev.filter((t: Tenant) => t.id !== tenantId));
             }}
-            onArchiveTenant={(tenantId) => {
-              setTenants(prev => prev.map(t => 
-                t.id === tenantId ? { ...t, status: 'archived' as any } : t
+            onArchiveTenant={(tenantId: string) => {
+              setTenants((prev: Tenant[]) => prev.map((t: Tenant) => 
+                t.id === tenantId ? { ...t, status: 'ended' } : t
               ));
             }}
-            onExportTenants={(format) => {
+            onExportTenants={(format: string) => {
               const selectedTenants = tenants; // In real app, this would be the selected tenants
               exportData(selectedTenants, `tenants.${format}`, format);
             }}
-            onDeleteLandlord={(landlordId) => {
+            onDeleteLandlord={(landlordId: string) => {
               // In real app, this would delete from landlord state
               console.log('Delete landlord:', landlordId);
             }}
-            onArchiveLandlord={(landlordId) => {
+            onArchiveLandlord={(landlordId: string) => {
               // In real app, this would archive the landlord
               console.log('Archive landlord:', landlordId);
             }}
-            onExportLandlords={(format) => {
+            onExportLandlords={(format: string) => {
               // In real app, this would export landlord data
               console.log('Export landlords as:', format);
             }}
@@ -1166,15 +981,15 @@ function AppContent() {
               navigateToScreen('photo-management');
             }}
             onViewInsights={() => navigateToScreen('portfolio-insights')}
-            onViewVacancyAlert={(alertId) => {
-              const alert = vacancyAlerts.find(a => a.id === alertId);
+            onViewVacancyAlert={(alertId: string) => {
+              const alert = vacancyAlerts.find((a: VacancyRiskAlert) => a.id === alertId);
               if (alert) {
                 setSelectedVacancyAlert(alert);
                 navigateToScreen('vacancy-prevention');
               }
             }}
-            onViewArrearsAlert={(alertId) => {
-              const alert = arrearsAlerts.find(a => a.id === alertId);
+            onViewArrearsAlert={(alertId: string) => {
+              const alert = arrearsAlerts.find((a: ArrearsAlert) => a.id === alertId);
               if (alert) {
                 setSelectedArrearsAlert(alert);
                 navigateToScreen('arrears-management');
@@ -1328,7 +1143,7 @@ function AppContent() {
               } else {
                 // Adding new property
                 const propertyId = addProperty(property);
-                const newProperty = properties.find(p => p.id === propertyId) || 
+                const newProperty = properties.find((p: Property) => p.id === propertyId) || 
                   { ...property, id: propertyId, createdAt: new Date() } as Property;
                 setSelectedProperty(newProperty);
                 if (isOnboarding) {
@@ -1389,8 +1204,8 @@ function AppContent() {
             onManageDocuments={() => navigateToScreen('document-management')}
             onManagePhotos={() => navigateToScreen('photo-management')}
             updateProperty={updateProperty}
-            onViewTenant={(tenantId) => {
-              const tenant = tenants.find(t => t.id === tenantId);
+            onViewTenant={(tenantId: string) => {
+              const tenant = tenants.find((t: Tenant) => t.id === tenantId);
               if (tenant) {
                 selectTenant(tenant);
                 navigateToScreen('tenant-details');
@@ -1473,8 +1288,8 @@ function AppContent() {
             onBack={() => navigateToScreen('main-app')}
             onInitiatePreMarketing={(alert, assets) => {
               // Update alert status and handle pre-marketing initiation
-              setVacancyAlerts(prev => 
-                prev.map(a => a.id === alert.id ? { ...a, status: 'pre-marketing' } : a)
+              setVacancyAlerts((prev: VacancyRiskAlert[]) => 
+                prev.map((a: VacancyRiskAlert) => a.id === alert.id ? { ...a, status: 'pre-marketing' } : a)
               );
               navigateToScreen('main-app');
             }}
@@ -1505,8 +1320,8 @@ function AppContent() {
             onBack={() => navigateToScreen('main-app')}
             onInitiateWorkflow={(workflowType, details) => {
               // Handle workflow initiation
-              setArrearsAlerts(prev => 
-                prev.map(a => a.id === selectedArrearsAlert?.id ? 
+              setArrearsAlerts((prev: ArrearsAlert[]) => 
+                prev.map((a: ArrearsAlert) => a.id === selectedArrearsAlert?.id ? 
                   { ...a, status: workflowType === 'reminder' ? 'reminder-sent' : 
                            workflowType === 'payment-plan' ? 'payment-plan' : 'legal-action' } : a)
               );
@@ -1536,7 +1351,7 @@ function AppContent() {
               // Convert setup data to property and add to properties list
               const newProperty = createPropertyFromSetupData();
               const propertyId = addProperty(newProperty);
-              const createdProperty = properties.find(p => p.id === propertyId) || 
+              const createdProperty = properties.find((p: Property) => p.id === propertyId) || 
                 { ...newProperty, id: propertyId, createdAt: new Date() } as Property;
               setSelectedProperty(createdProperty);
               navigateToScreen('property-details');

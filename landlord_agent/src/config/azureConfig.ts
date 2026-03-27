@@ -1,4 +1,4 @@
-import { Configuration, PopupRequest } from '@azure/msal-browser';
+import { Configuration, PopupRequest, LogLevel } from '@azure/msal-browser';
 
 // Development mode dummy client ID
 const DEV_CLIENT_ID = '00000000-0000-0000-0000-000000000000';
@@ -23,16 +23,16 @@ export const msalConfig: Configuration = {
           return;
         }
         switch (level) {
-          case 'Error':
+          case LogLevel.Error:
             console.error(message);
             return;
-          case 'Info':
+          case LogLevel.Info:
             console.info(message);
             return;
-          case 'Verbose':
+          case LogLevel.Verbose:
             console.debug(message);
             return;
-          case 'Warning':
+          case LogLevel.Warning:
             console.warn(message);
             return;
         }

@@ -36,7 +36,7 @@ import {
   Mail,
   CheckCircle2,
 } from "lucide-react";
-import { Property, UserProfile, MarketInsight } from "../App";
+import { Property, UserProfile, MarketInsight, VacancyRiskAlert, ArrearsAlert } from "../types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,8 +69,8 @@ interface DashboardProps {
   onViewVacancyAlert?: (alertId: string) => void;
   onViewArrearsAlert?: (alertId: string) => void;
   marketInsights: MarketInsight[];
-  vacancyAlerts?: any[];
-  arrearsAlerts?: any[];
+  vacancyAlerts?: VacancyRiskAlert[];
+  arrearsAlerts?: ArrearsAlert[];
 }
 
 export function Dashboard({
@@ -130,16 +130,16 @@ export function Dashboard({
 
   const totalProperties = mockProperties.length;
   const occupiedProperties = mockProperties.filter(
-    (p) => p.status === "occupied",
+    (p: Property) => p.status === "occupied",
   ).length;
   const vacantProperties = mockProperties.filter(
-    (p) => p.status === "vacant",
+    (p: Property) => p.status === "vacant",
   ).length;
   const expiringDocuments = mockProperties.reduce(
-    (count, p) =>
+    (count: number, p: Property) =>
       count +
       p.documents.filter(
-        (d) =>
+        (d: any) =>
           d.status === "expiring-soon" ||
           d.status === "expired",
       ).length,
@@ -431,12 +431,12 @@ export function Dashboard({
                 style={{
                   boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
                 }}
-                onMouseEnter={(e) => {
+                onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
                   e.currentTarget.style.boxShadow = '0 8px 20px rgba(255, 248, 220, 0.6), 0 4px 10px rgba(0, 0, 0, 0.1)';
                   e.currentTarget.style.transform = 'translateY(-1px)';
                   e.currentTarget.style.background = 'linear-gradient(135deg, #F3FFDD 0%, #EEFFFF 100%)';
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
                   e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
                   e.currentTarget.style.transform = 'translateY(0px)';
                   e.currentTarget.style.background = 'white';
@@ -463,12 +463,12 @@ export function Dashboard({
                   minWidth: '180px',
                   background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)'
                 }}
-                onMouseEnter={(e) => {
+                onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
                   e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
                   e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
                   e.currentTarget.style.transform = 'translateY(-2px)';
                 }}
-                onMouseLeave={(e) => {
+                onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
                   e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
                   e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
                   e.currentTarget.style.transform = 'translateY(0px)';
@@ -885,103 +885,93 @@ export function Dashboard({
                   </Button>
                 </div>
               </div>
-              
-              <div className="flex-1 min-h-0">
+                           <div className="flex-1 min-h-0 relative">
                 {currentChart && currentChart.data && currentChart.data.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    {/* Pie Chart */}
-                    {currentChart.type === "pie" && (
-                      <PieChart>
-                        <Pie
-                          data={currentChart.data}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, value }) => `${name}: ${value}`}
-                        >
-                          {currentChart.data.map((entry: any, index: number) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    )}
-                    
-                    {/* Bar Chart */}
-                    {currentChart.type === "bar" && (
-                      <BarChart data={currentChart.data}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip formatter={(value) => [`£${value}`, 'Rent']} />
-                        <Bar dataKey="rent" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    )}
-                    
-                    {/* Donut Chart */}
-                    {currentChart.type === "donut" && (
-                      <PieChart>
-                        <Pie
-                          data={currentChart.data}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={40}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, value }) => `${name}: ${value}`}
-                        >
-                          {currentChart.data.map((entry: any, index: number) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    )}
-                    
-                    {/* Line Chart */}
-                    {currentChart.type === "line" && (
-                      <>
+                  <>
+                    <ResponsiveContainer width="100%" height="100%">
+                      {currentChart.type === "pie" ? (
+                        <PieChart>
+                          <Pie
+                            data={currentChart.data}
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                            label={({ name, value }: { name: string; value: number }) => `${name}: ${value}`}
+                          >
+                            {currentChart.data.map((entry: any, index: number) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      ) : currentChart.type === "bar" ? (
+                        <BarChart data={currentChart.data}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis />
+                          <Tooltip formatter={(value: number) => [`£${value}`, 'Rent']} />
+                          <Bar dataKey="rent" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      ) : currentChart.type === "donut" ? (
+                        <PieChart>
+                          <Pie
+                            data={currentChart.data}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={40}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                            label={({ name, value }: { name: string; value: number }) => `${name}: ${value}`}
+                          >
+                            {currentChart.data.map((entry: any, index: number) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      ) : currentChart.type === "line" ? (
                         <LineChart data={currentChart.data}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="month" />
                           <YAxis />
-                          <Tooltip formatter={(value) => [`£${value}`, 'Revenue']} />
+                          <Tooltip formatter={(value: number) => [`£${value}`, 'Revenue']} />
                           <Line 
                             type="monotone" 
                             dataKey="revenue" 
-                                      stroke="#22c55e"
+                            stroke="#22c55e"
                             strokeWidth={3}
                             dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }}
                             activeDot={{ r: 6, stroke: '#22c55e', strokeWidth: 2 }}
                           />
                         </LineChart>
-                        {currentChart.title === "Revenue Trend" && (() => {
-                          const nonZeroMonths = currentChart.data.filter((d: any) => d.revenue > 0).length;
-                          const allZero = currentChart.data.every((d: any) => d.revenue === 0);
-                          
-                          if (allZero || nonZeroMonths < 2) {
-                            return (
-                              <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded">
-                                <div className="text-center px-4">
-                                  <TrendingUp className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                                  <p className="text-sm font-medium text-gray-700 mb-1">Building Your Revenue History</p>
-                                  <p className="text-xs text-gray-500">
-                                    {allZero 
-                                      ? "Add properties and tenants to start tracking revenue"
-                                      : "This graph will show meaningful trends after 2+ months of usage"}
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </>
-                    )}
-                  </ResponsiveContainer>
+                      ) : null as any}
+                    </ResponsiveContainer>
+                    
+                    {currentChart.type === "line" && currentChart.title === "Revenue Trend" && (() => {
+                      const nonZeroMonths = currentChart.data.filter((d: any) => d.revenue > 0).length;
+                      const allZero = currentChart.data.every((d: any) => d.revenue === 0);
+                      
+                      if (allZero || nonZeroMonths < 2) {
+                        return (
+                          <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded">
+                            <div className="text-center px-4">
+                              <TrendingUp className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                              <p className="text-sm font-medium text-gray-700 mb-1">Building Your Revenue History</p>
+                              <p className="text-xs text-gray-500">
+                                {allZero 
+                                  ? "Add properties and tenants to start tracking revenue"
+                                  : "This graph will show meaningful trends after 2+ months of usage"}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </>
                 ) : (
                   <div className="flex items-center justify-center h-full text-muted-foreground">
                     <div className="text-center">
@@ -1215,7 +1205,7 @@ export function Dashboard({
                     <div className="flex flex-wrap gap-1 mb-4">
                       {property.amenities
                         .slice(0, 3)
-                        .map((amenity) => (
+                        .map((amenity: string) => (
                           <Badge
                             key={amenity}
                             variant="secondary"

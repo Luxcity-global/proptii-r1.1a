@@ -84,7 +84,7 @@ export function OnboardingOptions({
                 className={`relative transition-all duration-200 hover:shadow-lg ${
                   option.recommended ? 'ring-1 shadow-md' : ''
                 }`}
-                style={option.recommended ? { borderColor: '#136C9E', ringColor: '#136C9E' } : {}}
+                style={option.recommended ? { borderColor: '#136C9E', '--tw-ring-color': '#136C9E' } as any : {}}
               >
                 {option.recommended && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">

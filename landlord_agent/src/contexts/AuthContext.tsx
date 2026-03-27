@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { loginRequest, graphConfig } from '../config/azureConfig';
-import { UserProfile } from '../App';
+import { UserProfile } from '../types';
 
 interface AuthContextType {
   user: UserProfile | null;

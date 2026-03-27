@@ -27,7 +27,7 @@ import {
   ChevronRight,
   Sparkles
 } from 'lucide-react';
-import { Property, Tenant } from '../App';
+import { Property, Tenant } from '../types';
 
 interface AddTenantProps {
   properties: Property[];
@@ -64,9 +64,9 @@ interface TenantFormData {
   rentAmount: string;
   leaseStart: string;
   leaseEnd: string;
-  status: 'active' | 'pending' | 'inactive';
-  referencingStatus: 'not-started' | 'in-progress' | 'completed' | 'failed';
-  paymentStatus: 'current' | 'overdue' | 'partial';
+  status: 'active' | 'pending' | 'ended';
+  referencingStatus: 'not-started' | 'in-progress' | 'complete';
+  paymentStatus: 'current' | 'overdue' | 'payment-plan';
   emergencyContactName: string;
   emergencyContactPhone: string;
   emergencyContactRelationship: string;
@@ -686,8 +686,8 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
         propertyId: state.formData.propertyId,
         propertyAddress: state.formData.propertyAddress,
         rentAmount: parseFloat(state.formData.rentAmount) || 0,
-        leaseStart: state.formData.leaseStart,
-        leaseEnd: state.formData.leaseEnd,
+        leaseStart: state.formData.leaseStart ? new Date(state.formData.leaseStart) : new Date(),
+        leaseEnd: state.formData.leaseEnd ? new Date(state.formData.leaseEnd) : new Date(),
         status: state.formData.status,
         referencingStatus: state.formData.referencingStatus,
         paymentStatus: state.formData.paymentStatus,
@@ -810,7 +810,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                 <h1 className="text-3xl font-bold" style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}>
                   {step.description}
                   {step.required && <span className="text-red-500 ml-1">*</span>}
-                  {!step.required && step.id !== 'welcome' && step.id !== 'review' && step.id !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
+                  {!step.required && (step.id as string) !== 'welcome' && (step.id as string) !== 'review' && (step.id as string) !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
                 </h1>
                 <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>This will help us personalize their experience</p>
               </div>
@@ -830,11 +830,11 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                   } ${state.errors.name ? 'border-red-500 animate-shake' : ''}`}
                     style={{ 
                       fontFamily: 'Archivo, sans-serif',
-                      borderColor: state.focusedField === 'name' || state.formData.name ? '#4E97CC' : undefined,
+                      borderColor: (state.focusedField === (step?.id || '') || (state.formData as any)[step?.id || '']) ? '#4E97CC' : undefined,
                       outline: 'none',
                       '--tw-ring-color': '#8FCDFF',
                       '--tw-ring-opacity': '0.5'
-                    }}
+                    } as React.CSSProperties}
                     placeholder="Enter full name"
                   />
                 {state.formData.name && (
@@ -867,7 +867,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                 <h1 className="text-3xl font-bold" style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}>
                   {step.description}
                   {step.required && <span className="text-red-500 ml-1">*</span>}
-                  {!step.required && step.id !== 'welcome' && step.id !== 'review' && step.id !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
+                  {!step.required && (step.id as string) !== 'welcome' && (step.id as string) !== 'review' && (step.id as string) !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
                 </h1>
                 <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>We'll use this for important communications</p>
               </div>
@@ -877,7 +877,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                   id="email"
                   type="email"
                   value={state.formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('email', e.target.value)}
                   onFocus={() => handleInputFocus('email')}
                   onBlur={() => handleInputBlur()}
                     className={`w-full text-lg py-6 px-6 border-2 transition-all duration-300 rounded-2xl focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none ${
@@ -887,11 +887,11 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                   } ${state.errors.email ? 'border-red-500 animate-shake' : ''}`}
                     style={{ 
                       fontFamily: 'Archivo, sans-serif',
-                      borderColor: state.focusedField === 'email' || state.formData.email ? '#4E97CC' : undefined,
+                      borderColor: (state.focusedField === 'email' || state.formData.email) ? '#4E97CC' : undefined,
                       outline: 'none',
                       '--tw-ring-color': '#8FCDFF',
                       '--tw-ring-opacity': '0.5'
-                    }}
+                    } as React.CSSProperties}
                     placeholder="Enter email address"
                   />
                 {state.formData.email && (
@@ -924,7 +924,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                 <h1 className="text-3xl font-bold" style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}>
                   {step.description}
                   {step.required && <span className="text-red-500 ml-1">*</span>}
-                  {!step.required && step.id !== 'welcome' && step.id !== 'review' && step.id !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
+                  {!step.required && (step.id as string) !== 'welcome' && (step.id as string) !== 'review' && (step.id as string) !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
                 </h1>
                 <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Include country code for international numbers</p>
               </div>
@@ -934,7 +934,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                   id="phone"
                   type="tel"
                   value={state.formData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange('phone', e.target.value)}
                   onFocus={() => handleInputFocus('phone')}
                   onBlur={() => handleInputBlur()}
                     className={`w-full text-lg py-6 px-6 border-2 transition-all duration-300 rounded-2xl focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none ${
@@ -944,11 +944,11 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                   } ${state.errors.phone ? 'border-red-500 animate-shake' : ''}`}
                     style={{ 
                       fontFamily: 'Archivo, sans-serif',
-                      borderColor: state.focusedField === 'phone' || state.formData.phone ? '#4E97CC' : undefined,
+                      borderColor: (state.focusedField === 'phone' || state.formData.phone) ? '#4E97CC' : undefined,
                       outline: 'none',
                       '--tw-ring-color': '#8FCDFF',
                       '--tw-ring-opacity': '0.5'
-                    }}
+                    } as React.CSSProperties}
                     placeholder="Enter phone number"
                   />
                 {state.formData.phone && (
@@ -981,7 +981,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                 <h1 className="text-3xl font-bold" style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}>
                   {step.description}
                   {step.required && <span className="text-red-500 ml-1">*</span>}
-                  {!step.required && step.id !== 'welcome' && step.id !== 'review' && step.id !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
+                  {!step.required && (step.id as string) !== 'welcome' && (step.id as string) !== 'review' && (step.id as string) !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
                 </h1>
                 <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Select the property they'll be renting</p>
               </div>
@@ -1031,7 +1031,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                 <h1 className="text-3xl font-bold" style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}>
                   {step.description}
                   {step.required && <span className="text-red-500 ml-1">*</span>}
-                  {!step.required && step.id !== 'welcome' && step.id !== 'review' && step.id !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
+                  {!step.required && (step.id as string) !== 'welcome' && (step.id as string) !== 'review' && (step.id as string) !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
                 </h1>
                 <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Monthly rent amount in pounds</p>
               </div>
@@ -1056,12 +1056,12 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                     } ${state.errors.rentAmount ? 'border-red-500 animate-shake' : ''}`}
                     style={{ 
                       fontFamily: 'Archivo, sans-serif',
-                      borderColor: state.focusedField === 'rentAmount' || state.formData.rentAmount ? '#4E97CC' : undefined,
+                      borderColor: (state.focusedField === 'rentAmount' || state.formData.rentAmount) ? '#4E97CC' : undefined,
                       outline: 'none',
                       '--tw-ring-color': '#8FCDFF',
                       '--tw-ring-opacity': '0.5',
                       paddingLeft: '38px'
-                    }}
+                    } as React.CSSProperties}
                       placeholder="Enter monthly rent"
                     />
                 </div>
@@ -1140,7 +1140,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                 <h1 className="text-3xl font-bold" style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}>
                   {step.description}
                   {step.required && <span className="text-red-500 ml-1">*</span>}
-                  {!step.required && step.id !== 'welcome' && step.id !== 'review' && step.id !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
+                  {!step.required && (step.id as string) !== 'welcome' && (step.id as string) !== 'review' && (step.id as string) !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
                 </h1>
                 <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Enter the full name of their emergency contact</p>
               </div>
@@ -1160,11 +1160,11 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                     } ${state.errors.emergencyContactName ? 'border-red-500 animate-shake' : ''}`}
                     style={{ 
                       fontFamily: 'Archivo, sans-serif',
-                      borderColor: state.focusedField === 'emergencyContactName' || state.formData.emergencyContactName ? '#4E97CC' : undefined,
+                      borderColor: (state.focusedField === 'emergencyContactName' || state.formData.emergencyContactName) ? '#4E97CC' : undefined,
                       outline: 'none',
                       '--tw-ring-color': '#8FCDFF',
                       '--tw-ring-opacity': '0.5'
-                    }}
+                    } as React.CSSProperties}
                     placeholder="Enter emergency contact name"
                   />
                 {state.formData.emergencyContactName && (
@@ -1192,7 +1192,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                 <h1 className="text-3xl font-bold" style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}>
                   {step.description}
                   {step.required && <span className="text-red-500 ml-1">*</span>}
-                  {!step.required && step.id !== 'welcome' && step.id !== 'review' && step.id !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
+                  {!step.required && (step.id as string) !== 'welcome' && (step.id as string) !== 'review' && (step.id as string) !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
                 </h1>
                 <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Include country code for international numbers</p>
               </div>
@@ -1216,7 +1216,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                       outline: 'none',
                       '--tw-ring-color': '#8FCDFF',
                       '--tw-ring-opacity': '0.5'
-                    }}
+                    } as React.CSSProperties}
                     placeholder="Enter emergency contact phone number"
                   />
                 {state.formData.emergencyContactPhone && (
@@ -1244,7 +1244,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                 <h1 className="text-3xl font-bold" style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}>
                   {step.description}
                   {step.required && <span className="text-red-500 ml-1">*</span>}
-                  {!step.required && step.id !== 'welcome' && step.id !== 'review' && step.id !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
+                  {!step.required && (step.id as string) !== 'welcome' && (step.id as string) !== 'review' && (step.id as string) !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
                 </h1>
                 <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>How are they related to the tenant?</p>
               </div>
@@ -1301,7 +1301,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                 <h1 className="text-3xl font-bold" style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}>
                   {step.description}
                   {step.required && <span className="text-red-500 ml-1">*</span>}
-                  {!step.required && step.id !== 'welcome' && step.id !== 'review' && step.id !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
+                  {!step.required && (step.id as string) !== 'welcome' && (step.id as string) !== 'review' && (step.id as string) !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
                 </h1>
                 <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>What is their current employment status?</p>
               </div>
@@ -1354,7 +1354,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                 <h1 className="text-3xl font-bold" style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}>
                   {step.description}
                   {step.required && <span className="text-red-500 ml-1">*</span>}
-                  {!step.required && step.id !== 'welcome' && step.id !== 'review' && step.id !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
+                  {!step.required && (step.id as string) !== 'welcome' && (step.id as string) !== 'review' && (step.id as string) !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
                 </h1>
                 <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Annual income in pounds</p>
               </div>
@@ -1383,7 +1383,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                         boxShadow: 'none',
                         outline: 'none',
                         paddingLeft: '38px'
-                      }}
+                      } as React.CSSProperties}
                       placeholder="Enter annual income"
                     />
                   </div>
@@ -1409,7 +1409,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                 <h1 className="text-3xl font-bold" style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}>
                   {step.description}
                   {step.required && <span className="text-red-500 ml-1">*</span>}
-                  {!step.required && step.id !== 'welcome' && step.id !== 'review' && step.id !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
+                  {!step.required && (step.id as string) !== 'welcome' && (step.id as string) !== 'review' && (step.id as string) !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
                 </h1>
                 <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Any additional information about the tenant?</p>
               </div>
@@ -1432,7 +1432,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                       outline: 'none',
                       '--tw-ring-color': '#8FCDFF',
                       '--tw-ring-opacity': '0.5'
-                    }}
+                    } as React.CSSProperties}
                     placeholder="Enter any additional notes about the tenant..."
                   />
                 </div>
@@ -1457,7 +1457,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                 <h1 className="text-3xl font-bold" style={{ fontFamily: 'Archivo, sans-serif', color: '#136C9E' }}>
                   {step.description}
                   {step.required && <span className="text-red-500 ml-1">*</span>}
-                  {!step.required && step.id !== 'welcome' && step.id !== 'review' && step.id !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
+                  {!step.required && (step.id as string) !== 'welcome' && (step.id as string) !== 'review' && (step.id as string) !== 'success' && <span className="text-gray-500 ml-2 font-normal">(Optional)</span>}
                 </h1>
                 <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Please review all information before submitting</p>
             </div>
@@ -1554,7 +1554,7 @@ export function AddTenant({ properties, onSave, onBack }: AddTenantProps) {
                       outline: 'none',
                       '--tw-ring-color': '#8FCDFF',
                       '--tw-ring-opacity': '0.5'
-                    }}
+                    } as React.CSSProperties}
                   />
                 {state.formData[step.id as keyof TenantFormData] && (
                   <CheckCircle className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />

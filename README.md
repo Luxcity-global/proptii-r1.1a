@@ -1,164 +1,111 @@
-# Proptii Static Web Application
+# Proptii Enterprise Property Management System
 
-## Overview
-Proptii is a modern web application built with Vite and hosted on Azure Static Web Apps. This application provides a robust frontend interface with Azure AD B2C authentication and CDN integration for optimal performance.
+Proptii is a multi-layered, enterprise-grade property management ecosystem designed for landlords, organizations, and tenants. It leverages a modern cloud-native stack across Azure and Firebase to provide high-performance search, secure document management, and automated landlord workflows.
 
-## 🚀 Quick Start
+## 🏗️ System Architecture
 
-### Prerequisites
-- Node.js (version specified in package.json)
-- Azure CLI
-- Git
+The repository is organized into several specialized sub-projects:
 
-### Installation
+- **Root (Frontend/Website)**: [Vite + React] The main public-facing platform and tenant interface.
+- **[proptii-backend/](proptii-backend/)**: [NestJS] The core API services, handling business logic, database (TypeORM/SQL), and cloud integrations.
+- **[landlord_agent/](landlord_agent/)**: [Vite + React] A dedicated, high-performance dashboard specifically for landlords.
+- **[functions/](functions/)**: [Firebase Cloud Functions] Serverless background tasks and event-driven logic.
+- **[search/](search/)**: Specialized search micro-service for high-speed property discovery.
+- **[scripts/](scripts/)**: Comprehensive DevOps and automation suite (CDN, WAF, Security).
+
+---
+
+## 🚀 Getting Started (Combined Setup)
+
+To run the full Proptii stack locally, follow these steps:
+
+### 1. Prerequisites
+- **Node.js**: v20.11.1 (LTS) - *Required for project consistency*
+- **Azure CLI**: For authentication and cloud resource management.
+- **Firebase CLI**: For local emulators and function management.
+- **Git**: For version control.
+
+### 2. Initial Installation
+Install dependencies for all core components:
 ```bash
-# Clone the repository
-git clone https://github.com/[organization]/proptii-r1.1a-2.git
-cd proptii-r1.1a-2
-
-# Install dependencies
+# Root Frontend
 npm install
 
-# Set up environment variables
-cp .env.example .env.local
-# Edit .env.local with your values
+# Core Backend
+cd proptii-backend && npm install
 
-# Start development server
-npm run dev
+# Landlord Dashboard
+cd ../landlord_agent && npm install
 ```
 
-## 🏗️ Project Structure
-```
-proptii-r1.1a-2/
-├── src/               # Source code
-├── public/            # Static assets
-├── dist/             # Build output
-├── docs/             # Documentation
-│   └── development/  # Development guides
-├── tests/            # Test files
-└── scripts/          # Utility scripts
-```
+### 3. Environment Configuration
+Each component requires its own environment file. Templates are provided:
 
-## 🛠️ Development
+- **Root**: Copy `env.local.template` to `.env.local`
+- **Backend**: Copy `proptii-backend/.env.example` to `proptii-backend/.env`
+- **Landlord Agent**: Copy `landlord_agent/.env.local.template` to `landlord_agent/.env.local`
 
-### Available Scripts
+> [!IMPORTANT]
+> Ensure `VITE_API_URL` in the frontend configs matches your local backend address (default: `http://localhost:3000`).
+
+### 4. Running the App
+The root project provides a convenient script to launch both the frontend and backend simultaneously:
+
 ```bash
-# Development server
-npm run dev
-
-# Production build
-npm run build
-
-# Preview production build
-npm run preview
-
-# Run tests
-npm run test
-
-# Type checking
-npm run type-check
+# From root directory
+npm run start:dev
 ```
 
-### Environment Variables
-Required environment variables:
-- `VITE_APP_URL`: Frontend application URL (e.g., `http://localhost:5173` for local dev, `https://proptii.com` for production)
-- `VITE_API_URL`: Backend API endpoint (e.g., `http://localhost:3000` for local dev)
-- `VITE_AZURE_AD_CLIENT_ID`: Azure AD B2C client ID
-- `VITE_AZURE_STORAGE_URL`: Azure Storage account URL
+To run components individually:
+- **Backend Only**: `npm run start:backend`
+- **Frontend Only**: `npm run start:frontend`
+- **Landlord Dashboard**: `cd landlord_agent && npm run dev`
 
-## 🚀 Deployment
+---
 
-### Automated Deployment
-The application automatically deploys through GitHub Actions:
-- `develop` branch → Development environment
-- `staging` branch → Staging environment
-- `main` branch → Production environment
+## 📁 Repository Map
+
+| Directory | Purpose | Tech Stack |
+|-----------|---------|------------|
+| [`src/`](src/) | Root Frontend Source | React, Vite, MUI |
+| [`proptii-backend/`](proptii-backend/) | Primary API Layer | NestJS, TypeORM, SQL |
+| [`landlord_agent/`](landlord_agent/) | Landlord Workflows | React, Vite, Lucide |
+| [`functions/`](functions/) | Background Jobs | Firebase Functions, TS |
+| [`scripts/`](scripts/) | Infrastructure & DevOps | Node.js, Shell |
+| [`server/`](server/) | Legacy/Auxiliary Proxy | Express |
+| [`docs/`](docs/) | Integration Guides | Markdown |
+
+---
+
+## 🛠️ DevOps & Deployment
 
 ### Manual Deployment
-```bash
-# Build the application
-npm run build
-
-# Deploy to Azure Static Web Apps
-az staticwebapp deploy --source dist
-```
-
-## 🔒 Security
-
-### Authentication
-- Azure AD B2C integration
-- Role-based access control
-- Secure token management
-
-### Environment Security
-- Secrets management through Azure Key Vault
-- Secure environment variable handling
-- HTTPS enforcement
-
-## 📚 Documentation
-- [Setup Instructions](docs/development/DevtoProd-290425/03-Dev%20A-%20Steps/05A02-Setup-Instructions.md)
-- [Resource Documentation](docs/development/DevtoProd-290425/03-Dev%20A-%20Steps/05A01-Resource-Documentation.md)
-- [Azure Static Web Apps Documentation](https://docs.microsoft.com/azure/static-web-apps)
-
-## 🔧 Troubleshooting
-Common issues and solutions are documented in the [Setup Instructions](docs/development/DevtoProd-290425/03-Dev%20A-%20Steps/05A02-Setup-Instructions.md#troubleshooting-steps).
-
-## 📈 Performance
-- CDN integration for static assets
-- Optimized build configuration
-- Caching strategies implemented
-
-## 🤝 Contributing
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📝 License
-[License information to be added]
-
-## 👥 Support
-For support and questions, please contact:
-- Technical Lead: [contact]
-- DevOps Support: [contact]
-- Project Manager: [contact]
-
-## CDN Configuration
-
-The application uses Azure CDN for content delivery. The CDN is configured with the following features:
-
-- Custom domain: proptii.co
-- SSL/TLS encryption
-- Cache optimization
-- Security headers
-- Health monitoring
-
-### CDN Management
-
-The following npm scripts are available for CDN management:
+Proptii uses **Azure Static Web Apps** for frontend hosting and **GitHub Actions** for CI/CD.
 
 ```bash
-# Configure CDN
-npm run configure:cdn
+# Build production bundle
+npm run build:production
 
-# Configure CDN security
-npm run configure:cdn-security
-
-# Configure CDN SSL
-npm run configure:cdn-ssl
-
-# Configure CDN endpoint
-npm run configure:cdn-endpoint
-
-# Monitor CDN health
-npm run monitor:cdn
-
-# Verify CDN setup
-npm run verify:cdn
-
-# Purge CDN cache
-npm run cdn:purge
+# Manual deploy to Azure (requires login)
+npm run deploy:production
 ```
 
-For detailed documentation about the CDN setup, configuration, and operations, please refer to [CDN Documentation](docs/development/CDN-Documentation.md).
+### CDN & Security
+The system includes advanced CDN management via the `scripts/` directory:
+- **Purge Cache**: `npm run cdn:purge`
+- **Verify CDN**: `npm run verify:cdn`
+- **Configure WAF**: `npm run configure:waf`
+
+---
+
+## 📈 Monitoring & Health
+- **Performance**: Real-time Web Vitals monitoring via `performance-monitor.ts`.
+- **Diagnostics**: Detailed bundle analysis available at `landlord_agent/build/bundle-analysis.html` after build.
+- **Staging Monitor**: `npm run monitor:staging` for continuous integration checks.
+
+## 🤝 Contributing & Support
+Please refer to the [Internal Documentation](docs/) for architectural decision records (ADRs) and API specifications.
+
+---
+© 2026 Proptii. All Rights Reserved.
+

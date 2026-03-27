@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
-import { Tenant } from '../App';
+import { Tenant } from '../types';
 
 interface TenantReference {
   id: string;

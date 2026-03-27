@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Upload, User, Building, Mail, Phone, X } from 'lucide-react';
-import { UserRole, UserProfile } from '../App';
+import { UserRole, UserProfile } from '../types';
 
 interface ProfileSetupProps {
   role: UserRole;
@@ -25,10 +25,10 @@ export function ProfileSetup({ role, onProfileComplete, onSkip }: ProfileSetupPr
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleInputChange = (field: keyof UserProfile, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev: UserProfile) => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+      setErrors((prev: Record<string, string>) => ({ ...prev, [field]: '' }));
     }
   };
 
@@ -38,13 +38,13 @@ export function ProfileSetup({ role, onProfileComplete, onSkip }: ProfileSetupPr
       setLogoFile(file);
       // In a real app, you'd upload this to a server
       const logoUrl = URL.createObjectURL(file);
-      setFormData(prev => ({ ...prev, logo: logoUrl }));
+      setFormData((prev: UserProfile) => ({ ...prev, logo: logoUrl }));
     }
   };
 
   const removeLogo = () => {
     setLogoFile(null);
-    setFormData(prev => ({ ...prev, logo: '' }));
+    setFormData((prev: UserProfile) => ({ ...prev, logo: '' }));
   };
 
   const validateForm = () => {

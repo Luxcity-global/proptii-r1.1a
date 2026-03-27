@@ -2,9 +2,18 @@
   import { defineConfig } from 'vite';
   import react from '@vitejs/plugin-react-swc';
   import path from 'path';
+  import { visualizer } from 'rollup-plugin-visualizer';
 
-  export default defineConfig({
-    plugins: [react()],
+  export default defineConfig(({ command }) => ({
+    plugins: [
+      react(),
+      visualizer({
+        filename: 'build/bundle-analysis.html',
+        open: false,
+        gzipSize: true,
+        brotliSize: true,
+      }) as any
+    ],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {
@@ -56,9 +65,21 @@
     build: {
       target: 'esnext',
       outDir: 'build',
+      chunkSizeWarningLimit: 1000,
+      cssCodeSplit: true,
+      minify: 'terser',
+      sourcemap: command !== 'build',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom'],
+            ui: ['@radix-ui/react-dialog', '@radix-ui/react-slot', 'lucide-react', 'recharts'],
+          }
+        }
+      }
     },
     server: {
       port: 3000,
       open: true,
     },
-  });
+  }));

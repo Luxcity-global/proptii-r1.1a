@@ -19,7 +19,7 @@ import {
   Edit3,
   Save
 } from 'lucide-react';
-import { Property, PropertyPhoto } from '../App';
+import { Property, PropertyPhoto } from '../types';
 import { Input } from './ui/input';
 
 interface PhotoManagementProps {

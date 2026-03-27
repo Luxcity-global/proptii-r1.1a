@@ -23,7 +23,7 @@ import {
   Phone,
   Eye
 } from 'lucide-react';
-import { Property } from '../App';
+import { Property } from '../types';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Separator } from './ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -365,11 +365,11 @@ export function PropertyDetails({
                           
                           <div className="text-right">
                             <p className="text-sm">
-                              Issued: {formattedDates.documentDates[document.id]?.issue || 'Unknown'}
+                              Issued: {formattedDates.documentDates?.[document.id]?.issue || 'Unknown'}
                             </p>
                             {document.expiryDate && (
                               <p className="text-sm text-muted-foreground">
-                                Expires: {formattedDates.documentDates[document.id]?.expiry || 'Unknown'}
+                                Expires: {formattedDates.documentDates?.[document.id]?.expiry || 'Unknown'}
                               </p>
                             )}
                           </div>
