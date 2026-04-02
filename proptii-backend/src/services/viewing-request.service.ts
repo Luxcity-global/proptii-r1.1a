@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, Logger } from '@nestjs/common';
 import { CosmosClient, Container } from '@azure/cosmos';
 import { Firestore } from 'firebase-admin/firestore';
 import { CreateViewingRequestDto, UpdateViewingRequestDto } from '../dtos/viewing-request.dto';
 
 @Injectable()
 export class ViewingRequestService {
+  private readonly logger = new Logger(ViewingRequestService.name);
   private container: Container | null = null;
   private firestore: Firestore | null = null;
   private readonly collectionName = 'viewingRequests';
@@ -18,18 +19,18 @@ export class ViewingRequestService {
         const database = this.cosmosClient.database(process.env.COSMOS_DB_DATABASE_NAME || 'proptii-db');
         this.container = database.container('Viewings');
       } catch (error) {
-        console.warn('Failed to initialize Cosmos DB container for Viewings:', error);
+        this.logger.warn('Failed to initialize Cosmos DB container for Viewings: ' + error);
         this.container = null;
       }
     } else {
-      console.warn('Cosmos DB client not available for ViewingRequestService. Some features will be limited.');
+      this.logger.warn('Cosmos DB client not available for ViewingRequestService. Some features will be limited.');
     }
 
     if (this.firestoreInstance) {
       this.firestore = this.firestoreInstance;
-      console.log('✅ Firestore available for ViewingRequestService fallback');
+      this.logger.log('Firestore available for ViewingRequestService fallback');
     } else {
-      console.warn('⚠️ Firestore not available for ViewingRequestService fallback');
+      this.logger.warn('Firestore not available for ViewingRequestService fallback');
     }
   }
 
@@ -131,20 +132,13 @@ export class ViewingRequestService {
             ...viewingRequestData
           };
         } catch (firestoreError: any) {
-          // If Firestore fails (e.g., project ID not set, authentication issues), fall back gracefully
-          console.warn('⚠️ Firestore operation failed, falling back to frontend-only mode:', firestoreError.message);
-          console.warn('   This usually means Firestore is not properly configured on the backend.');
-          console.warn('   The frontend will handle saving the viewing request directly to Firestore.');
-          // Fall through to the fallback below
+          this.logger.warn('Firestore operation failed, falling back to frontend-only mode: ' + firestoreError.message);
+          this.logger.warn('The frontend will handle saving the viewing request directly to Firestore.');
         }
       }
 
-      // Neither database is available
-      // Since the frontend already saves to Firestore directly using the client SDK,
-      // we can return a success response without persisting to the backend database.
-      // This allows the API to work even when backend Firestore is not configured.
-      console.warn('⚠️ No backend database available. Frontend will handle persistence via client SDK.');
-      console.warn('   The viewing request will be saved to Firestore by the frontend.');
+      // Neither database is available — return a success stub so the frontend (which manages its own Firestore) is unblocked.
+      this.logger.warn('No backend database available. Frontend will handle persistence via client SDK.');
 
       // Return a mock success response since frontend handles the actual save
       const mockResponse = {
@@ -182,7 +176,7 @@ export class ViewingRequestService {
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
-    console.warn('No database available. Returning empty array for viewing requests.');
+    this.logger.warn('No database available. Returning empty array for viewing requests.');
     return [];
   }
 
@@ -239,7 +233,7 @@ export class ViewingRequestService {
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
-    console.warn('No database available. Returning empty array for property viewings.');
+    this.logger.warn('No database available. Returning empty array for property viewings.');
     return [];
   }
 
@@ -262,7 +256,7 @@ export class ViewingRequestService {
       return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
-    console.warn('No database available. Returning empty array for agent viewings.');
+    this.logger.warn('No database available. Returning empty array for agent viewings.');
     return [];
   }
 

@@ -1,6 +1,7 @@
 import { Controller, Post, Body, Res, HttpStatus, Logger } from '@nestjs/common';
 import { SheetsService } from './sheets.service';
 import { Response } from 'express';
+import { SubmitSheetsDto } from '../dtos/sheets-submit.dto';
 
 @Controller('sheets')
 export class SheetsController {
@@ -9,7 +10,7 @@ export class SheetsController {
   constructor(private readonly sheetsService: SheetsService) {}
 
   @Post('submit')
-  async submit(@Body() body: any, @Res() res: Response) {
+  async submit(@Body() body: SubmitSheetsDto, @Res() res: Response) {
     try {
       this.logger.log(`Received submission request: ${JSON.stringify(body)}`);
       const { spreadsheetId, data } = body;

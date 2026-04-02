@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import { Resend } from 'resend';
 
@@ -23,6 +23,7 @@ export class ContractEmailService {
   private resend: Resend | null = null;
   private isConfigured: boolean = false;
   private fromAddress: string;
+  private readonly logger = new Logger(ContractEmailService.name);
 
   constructor() {
     // Set from address - prioritize EMAIL_FROM_ADDRESS, fallback to SMTP_FROM_EMAIL or default
@@ -34,7 +35,7 @@ export class ContractEmailService {
       try {
         this.resend = new Resend(resendApiKey);
         this.isConfigured = true;
-        console.log('✅ Contract email service initialized with Resend API');
+        this.logger.log('✅ Contract email service initialized with Resend API');
 
         // If using Resend, determine the best from address
         // Priority: EMAIL_FROM_ADDRESS > verified domain > Resend default
@@ -43,21 +44,21 @@ export class ContractEmailService {
           !process.env.EMAIL_FROM_ADDRESS.endsWith('@resend.dev')) {
           // User has explicitly set EMAIL_FROM_ADDRESS with a custom domain
           this.fromAddress = process.env.EMAIL_FROM_ADDRESS;
-          console.log(`📧 Using from address: ${this.fromAddress}`);
-          console.log('✅ Make sure this domain is verified in your Resend dashboard');
+          this.logger.log(`📧 Using from address: ${this.fromAddress}`);
+          this.logger.log('✅ Make sure this domain is verified in your Resend dashboard');
         } else if (process.env.EMAIL_FROM_ADDRESS) {
           // EMAIL_FROM_ADDRESS is set but might be using resend.dev default
           this.fromAddress = process.env.EMAIL_FROM_ADDRESS;
-          console.log(`📧 Using from address: ${this.fromAddress}`);
+          this.logger.log(`📧 Using from address: ${this.fromAddress}`);
         } else {
           // Use Resend default domain for testing (can only send to verified email)
           this.fromAddress = 'onboarding@resend.dev';
-          console.log('📧 Using Resend default from address: onboarding@resend.dev');
-          console.warn('⚠️  Note: For better deliverability, verify your domain in Resend dashboard');
-          console.warn('   and set EMAIL_FROM_ADDRESS to your verified domain (e.g., noreply@proptii.co)');
+          this.logger.log('📧 Using Resend default from address: onboarding@resend.dev');
+          this.logger.warn('Note: For better deliverability, verify your domain in Resend dashboard');
+          this.logger.warn('   and set EMAIL_FROM_ADDRESS to your verified domain (e.g., noreply@proptii.co)');
         }
       } catch (error) {
-        console.warn('⚠️ Failed to initialize Resend:', error);
+        this.logger.warn('Failed to initialize Resend:', error);
         this.resend = null;
       }
     }
@@ -70,9 +71,9 @@ export class ContractEmailService {
 
       if (missingVars.length > 0) {
         if (!resendApiKey) {
-          console.warn('⚠️ Email service not configured - No RESEND_API_KEY or SMTP credentials set');
-          console.warn('   Set RESEND_API_KEY for Resend API (recommended)');
-          console.warn('   OR set SMTP credentials (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS) for SMTP');
+          this.logger.warn('Email service not configured - No RESEND_API_KEY or SMTP credentials set');
+          this.logger.warn('   Set RESEND_API_KEY for Resend API (recommended)');
+          this.logger.warn('   OR set SMTP credentials (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS) for SMTP');
           this.isConfigured = false;
         }
       } else {
@@ -104,9 +105,9 @@ export class ContractEmailService {
             logger: process.env.NODE_ENV === 'development'
           });
           this.isConfigured = true;
-          console.log('✅ Contract email service initialized with SMTP');
+          this.logger.log('✅ Contract email service initialized with SMTP');
         } catch (error) {
-          console.warn('⚠️ Failed to initialize SMTP:', error);
+          this.logger.warn('Failed to initialize SMTP:', error);
           this.isConfigured = false;
         }
       }
@@ -116,16 +117,16 @@ export class ContractEmailService {
   async verifyConnection() {
     try {
       await this.transporter.verify();
-      console.log('SMTP connection verified successfully');
+      this.logger.log('SMTP connection verified successfully');
       return true;
     } catch (error) {
-      console.error('SMTP connection verification failed:', error);
+      this.logger.error('SMTP connection verification failed:', error);
       return false;
     }
   }
 
   async sendSignedContractEmail(params: SendSignedContractParams, retries = 3) {
-    console.log(`📧 Preparing to send signed contract email:`, {
+    this.logger.log(`📧 Preparing to send signed contract email:`, {
       to: params.to,
       subject: params.subject,
       contractName: params.contractName,
@@ -138,10 +139,10 @@ export class ContractEmailService {
       try {
         return await this.sendSignedContractViaResend(params);
       } catch (resendError) {
-        console.error('❌ Resend API failed:', resendError);
+        this.logger.error('❌ Resend API failed:', resendError);
         // If Resend fails and SMTP is available, try SMTP as fallback
         if (this.transporter) {
-          console.warn('⚠️ Resend failed, trying SMTP as fallback...');
+          this.logger.warn('Resend failed, trying SMTP as fallback...');
           // Continue to SMTP fallback below
         } else {
           throw resendError;
@@ -176,7 +177,7 @@ export class ContractEmailService {
             )
           ]) as any;
 
-          console.log('📧 Signed contract email sent successfully via SMTP:', {
+          this.logger.log('📧 Signed contract email sent successfully via SMTP:', {
             messageId: result.messageId,
             to: params.to,
             subject: params.subject,
@@ -190,7 +191,7 @@ export class ContractEmailService {
 
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error));
-          console.error(`❌ Failed to send signed contract email via SMTP (attempt ${attempt}/${retries}):`, {
+          this.logger.error(`❌ Failed to send signed contract email via SMTP (attempt ${attempt}/${retries}):`, {
             error: lastError.message,
             code: (error as any)?.code,
             errno: (error as any)?.errno,
@@ -205,7 +206,7 @@ export class ContractEmailService {
             (error as any)?.code === 'ECONNREFUSED'
           )) {
             const waitTime = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
-            console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+            this.logger.log(`⏳ Waiting ${waitTime}ms before retry...`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
 
             // Try to recreate transporter on connection errors
@@ -261,10 +262,10 @@ export class ContractEmailService {
     const fromAddress = this.fromAddress;
 
     try {
-      console.log(`📧 Sending signed contract email via Resend API to: ${params.to}`);
-      console.log(`   From: ${fromAddress}`);
-      console.log(`   Subject: ${params.subject}`);
-      console.log(`   Attachment: ${params.attachment.filename} (${params.attachment.content.length} bytes)`);
+      this.logger.log(`📧 Sending signed contract email via Resend API to: ${params.to}`);
+      this.logger.log(`   From: ${fromAddress}`);
+      this.logger.log(`   Subject: ${params.subject}`);
+      this.logger.log(`   Attachment: ${params.attachment.filename} (${params.attachment.content.length} bytes)`);
 
       // Convert attachment to base64 for Resend
       const attachmentBase64 = params.attachment.content.toString('base64');
@@ -283,23 +284,23 @@ export class ContractEmailService {
       // Check if there's an error in the response
       if (result.error) {
         const error = result.error as any;
-        console.error('❌ Resend API returned an error:', result.error);
+        this.logger.error('❌ Resend API returned an error:', result.error);
         throw new Error(error.message || 'Resend API returned an error');
       }
 
       const messageId = result.data?.id;
       if (!messageId) {
-        console.warn('⚠️ Resend API response missing message ID');
+        this.logger.warn('Resend API response missing message ID');
       }
 
-      console.log(`✅ Signed contract email sent successfully via Resend API to ${params.to}${messageId ? ` (ID: ${messageId})` : ''}`);
+      this.logger.log(`✅ Signed contract email sent successfully via Resend API to ${params.to}${messageId ? ` (ID: ${messageId})` : ''}`);
 
       return {
         success: true,
         messageId: messageId || 'resend-email-sent',
       };
     } catch (error: any) {
-      console.error('❌ Resend API error:', error);
+      this.logger.error('❌ Resend API error:', error);
       throw new Error(error.message || 'Failed to send email via Resend');
     }
   }
@@ -314,7 +315,7 @@ export class ContractEmailService {
     senderEmail: string
   ) {
     try {
-      console.log(`📧 Sending signed contract to ${recipients.length} recipients...`);
+      this.logger.log(`📧 Sending signed contract to ${recipients.length} recipients...`);
 
       const emailPromises = recipients.map(async (recipient) => {
         try {
@@ -344,7 +345,7 @@ export class ContractEmailService {
           };
 
         } catch (error) {
-          console.error(`❌ Error sending email to ${recipient.email}:`, error);
+          this.logger.error(`❌ Error sending email to ${recipient.email}:`, error);
           return {
             email: recipient.email,
             success: false,
@@ -369,7 +370,7 @@ export class ContractEmailService {
 
       const allSuccessful = processedResults.every(result => result.success);
 
-      console.log(`📧 Multiple recipient email sending completed. Success: ${allSuccessful}`);
+      this.logger.log(`📧 Multiple recipient email sending completed. Success: ${allSuccessful}`);
 
       return {
         success: allSuccessful,
@@ -377,7 +378,7 @@ export class ContractEmailService {
       };
 
     } catch (error) {
-      console.error('❌ Error sending contract to multiple recipients:', error);
+      this.logger.error('❌ Error sending contract to multiple recipients:', error);
       throw error;
     }
   }

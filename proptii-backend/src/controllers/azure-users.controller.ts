@@ -1,8 +1,13 @@
-import { Controller, Get, Query, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Query, HttpException, HttpStatus, UseGuards, Logger } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { AzureUsersService } from '../services/azure-users.service';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 @Controller('azure-users')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class AzureUsersController {
+  private readonly logger = new Logger(AzureUsersController.name);
   constructor(private readonly azureUsersService: AzureUsersService) {}
 
   @Get()

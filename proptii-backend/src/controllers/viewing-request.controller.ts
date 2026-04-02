@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Body, Put, Param, Delete, HttpCode, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Put, Param, Delete, HttpCode, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { ViewingRequestService } from '../services/viewing-request.service';
 import { CreateViewingRequestDto, UpdateViewingRequestDto } from '../dtos/viewing-request.dto';
 import { ViewingRequest } from '../entities/viewing-request.entity';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 @Controller('viewing-requests')
 export class ViewingRequestController {
@@ -9,6 +11,8 @@ export class ViewingRequestController {
 
   @Post()
   @HttpCode(201)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   async create(@Body() createViewingRequestDto: CreateViewingRequestDto): Promise<ViewingRequest> {
     return await this.viewingRequestService.create(createViewingRequestDto);
   }
@@ -18,11 +22,8 @@ export class ViewingRequestController {
     return await this.viewingRequestService.findAll();
   }
 
-  @Get(':id')
-  async findOne(@Param('id') id: string): Promise<ViewingRequest> {
-    return await this.viewingRequestService.findOne(id);
-  }
-
+  // Static-segment routes MUST come before generic param routes (:id)
+  // to prevent NestJS from matching e.g. /property/abc123 against :id.
   @Get('property/:propertyId')
   async findByProperty(@Param('propertyId') propertyId: string): Promise<ViewingRequest[]> {
     return await this.viewingRequestService.findByProperty(propertyId);
@@ -33,15 +34,14 @@ export class ViewingRequestController {
     return await this.viewingRequestService.findByAgent(agentId);
   }
 
-  /* @Get('available-slots/:propertyId')
-   async getAvailableSlots(
-     @Param('propertyId') propertyId: string,
-     @Query('date') date: string,
-   ): Promise<string[]> {
-     return await this.viewingRequestService.getAvailableSlots(propertyId, new Date(date));
-   }
- */
+  @Get(':id')
+  async findOne(@Param('id') id: string): Promise<ViewingRequest> {
+    return await this.viewingRequestService.findOne(id);
+  }
+
   @Put(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   async update(
     @Param('id') id: string,
     @Body() updateViewingRequestDto: UpdateViewingRequestDto,
@@ -51,7 +51,9 @@ export class ViewingRequestController {
 
   @Delete(':id')
   @HttpCode(204)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   async remove(@Param('id') id: string): Promise<void> {
     await this.viewingRequestService.remove(id);
   }
-} 
+}

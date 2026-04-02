@@ -1,35 +1,39 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { Property } from './property.entity';
-import { Agent } from './agent.entity';
-
-@Entity('ViewingRequests')
+/**
+ * ViewingRequest entity shape — used as the return type for ViewingRequestService and Controller.
+ * The actual data is persisted in Cosmos DB or Firestore, not a relational DB.
+ * TypeORM decorators are intentionally removed since TypeORM is not active in this project.
+ */
 export class ViewingRequest {
-  @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Property, property => property.viewingRequests)
-  @JoinColumn({ name: 'property_id' })
-  property: Property;
+  property: {
+    street: string;
+    city: string;
+    town: string;
+    postcode: string;
+  };
 
-  @ManyToOne(() => Agent, agent => agent.viewingRequests)
-  @JoinColumn({ name: 'agent_id' })
-  agent: Agent;
+  agent: {
+    name: string;
+    email: string;
+    phone: string;
+    company: string;
+  };
 
-  @Column({ type: 'date' })
-  viewing_date: Date;
+  viewing_date: Date | string;
 
-  @Column({ type: 'time' })
   viewing_time: string;
 
-  @Column({ type: 'nvarchar', length: 50 })
   preference: string;
 
-  @Column({ type: 'nvarchar', length: 20, default: 'PENDING' })
+  whatsappNumber: string;
+
   status: string;
 
-  @CreateDateColumn({ type: 'datetime2' })
-  created_at: Date;
+  type?: string;
 
-  @UpdateDateColumn({ type: 'datetime2' })
-  updated_at: Date;
-} 
+  createdAt?: string;
+
+  updatedAt?: string;
+}
+ 

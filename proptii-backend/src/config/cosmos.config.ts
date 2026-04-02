@@ -43,7 +43,7 @@ if (cosmosConfig.endpoint && cosmosConfig.key) {
     consistencyLevel: "Session"
   });
 } else {
-  console.warn('Cosmos DB configuration is incomplete. Some features may not work.');
+  logger.warn('Cosmos DB configuration is incomplete. Some features may not work.');
 }
 
 export { cosmosClient };

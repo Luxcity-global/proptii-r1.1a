@@ -4,11 +4,13 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { HttpExceptionFilter } from './filters/http-exception.filter';
 import { initializeCosmosDB } from './config/cosmos.config';
+import { validateEnv } from './config/env.validation';
 import * as express from 'express';
 import * as dotenv from 'dotenv';
 
-// Load environment variables from .env file
+// Load environment variables from .env file first, then validate.
 dotenv.config();
+validateEnv(); // exits process with clear error if required vars are missing
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -29,21 +31,50 @@ async function bootstrap() {
     logger.warn('Continuing without Cosmos DB - some features may not work');
   }
 
+  const isProd = process.env.NODE_ENV === 'production';
   const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'debug', 'log', 'verbose'],
+    // Structured log levels: quiet in production, verbose in development.
+    logger: isProd ? ['warn', 'error'] : ['log', 'debug', 'verbose', 'warn', 'error'],
   });
 
-  // Configure body parser to handle larger payloads for base64 file uploads
-  app.use(express.json({ limit: '100mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '100mb' }));
-  
+  // Apply logger level via app.useLogger as well for runtime control.
+  app.useLogger(isProd ? ['warn', 'error'] : ['log', 'debug', 'verbose', 'warn', 'error']);
+
+  // Body limit: 10 MB covers base64-encoded referencing documents up to ~7.5 MB raw.
+  // For larger file uploads, use multipart/form-data with FileInterceptor instead.
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
   // Set global prefix for all routes except root
   app.setGlobalPrefix('api', {
     exclude: ['/'],
   });
-  
+
+  // Explicit CORS allowlist — origin:true (reflect-any) is a security risk.
+  const allowedOrigins = [
+    'https://proptii.co',
+    'https://www.proptii.co',
+    'https://proptii-r1-1a-new.onrender.com',
+    'https://proptii-frontend.onrender.com',
+    ...(process.env.NODE_ENV !== 'production'
+      ? ['http://localhost:5173', 'http://localhost:4173', 'http://localhost:3000']
+      : []),
+  ];
+
   app.enableCors({
-    origin: true,
+    origin: (origin, callback) => {
+      // Allow server-to-server / mobile requests that send no Origin header.
+      if (!origin) return callback(null, true);
+      const isAllowed =
+        allowedOrigins.includes(origin) ||
+        /\.onrender\.com$/.test(origin) ||
+        /\.proptii\.co$/.test(origin);
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin '${origin}' is not allowed`));
+      }
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
     exposedHeaders: ['Content-Range', 'X-Content-Range'],
@@ -86,6 +117,7 @@ async function bootstrap() {
 }
 
 bootstrap().catch(err => {
-  console.error('Bootstrap failed:', err);
+  const logger = new Logger('Bootstrap');
+  logger.error('Bootstrap failed:', err);
   process.exit(1);
 });

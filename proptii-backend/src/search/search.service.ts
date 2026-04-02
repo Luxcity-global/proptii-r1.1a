@@ -230,12 +230,22 @@ export class SearchService {
   }
 
   /**
-   * Returns mock search results when Azure OpenAI is not configured
+   * Returns mock search results when Azure OpenAI is not configured.
+   * In production deployments this throws an error to prevent fake data reaching users.
    */
   private getMockSearchResults(query: string): any[] {
-    this.logger.log(`Returning mock search results for query: "${query}"`);
-    
-    // Return some sample properties based on common search terms
+    if (process.env.NODE_ENV === 'production') {
+      this.logger.error(
+        'Mock search results requested in production — Azure OpenAI is not configured. ' +
+        'Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and AZURE_OPENAI_DEPLOYMENT_NAME.'
+      );
+      throw new Error(
+        'Search service is not configured. Please contact support.'
+      );
+    }
+
+    this.logger.warn(`Returning MOCK search results for query: "${query}". Do NOT use in production.`);
+
     const mockProperties = [
       {
         title: "Modern 2 Bedroom Flat in Islington",
@@ -243,7 +253,8 @@ export class SearchService {
         location: "Islington, London",
         bedrooms: 2,
         propertyType: "Flat",
-        description: "A bright and spacious flat near the station with modern amenities."
+        description: "A bright and spacious flat near the station with modern amenities.",
+        source: "mock",
       },
       {
         title: "Spacious 3 Bedroom House in Walthamstow",
@@ -251,7 +262,8 @@ export class SearchService {
         location: "Walthamstow, London",
         bedrooms: 3,
         propertyType: "House",
-        description: "A family home with a large garden and modern kitchen."
+        description: "A family home with a large garden and modern kitchen.",
+        source: "mock",
       },
       {
         title: "1 Bedroom Studio in Canary Wharf",
@@ -259,7 +271,8 @@ export class SearchService {
         location: "Canary Wharf, London",
         bedrooms: 1,
         propertyType: "Studio",
-        description: "A stylish studio apartment in a prime location."
+        description: "A stylish studio apartment in a prime location.",
+        source: "mock",
       },
       {
         title: "2 Bedroom Apartment in Camden",
@@ -267,7 +280,8 @@ export class SearchService {
         location: "Camden, London",
         bedrooms: 2,
         propertyType: "Apartment",
-        description: "Contemporary apartment in vibrant Camden with excellent transport links."
+        description: "Contemporary apartment in vibrant Camden with excellent transport links.",
+        source: "mock",
       },
       {
         title: "4 Bedroom Family Home in Richmond",
@@ -275,11 +289,11 @@ export class SearchService {
         location: "Richmond, London",
         bedrooms: 4,
         propertyType: "House",
-        description: "Beautiful family home with garden and parking in desirable Richmond."
-      }
+        description: "Beautiful family home with garden and parking in desirable Richmond.",
+        source: "mock",
+      },
     ];
 
-    // Filter results based on query keywords if possible
     const queryLower = query.toLowerCase();
     if (queryLower.includes('studio') || queryLower.includes('1 bed')) {
       return mockProperties.filter(p => p.bedrooms === 1);
@@ -291,6 +305,6 @@ export class SearchService {
       return mockProperties.filter(p => p.bedrooms === 4);
     }
 
-    return mockProperties.slice(0, 3); // Return first 3 properties by default
+    return mockProperties.slice(0, 3);
   }
-} 
+}

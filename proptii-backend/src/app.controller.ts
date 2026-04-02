@@ -1,10 +1,11 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Logger } from '@nestjs/common';
 import { AppService } from './app.service';
 
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {
-    console.log('AppController initialized');
+    const logger = new Logger(AppController.name);
+    logger.log('AppController initialized');
   }
 
   @Get()
@@ -21,7 +22,8 @@ export class AppController {
 
   @Get('health')
   healthCheck() {
-    console.log('Health check endpoint called');
+    const logger = new Logger(AppController.name);
+    logger.log('Health check endpoint called');
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),

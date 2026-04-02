@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { randomUUID } from 'crypto';
 import { scrape, scrapeInternet } from './scraper';
 import { scrapeRightmove, buildRightmoveUrl } from './scrapers/rightmove-scraper';
@@ -61,6 +62,31 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Global Rate Limiter: 100 requests per minute per IP
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too many requests',
+    message: 'Global rate limit exceeded. Please try again later.'
+  }
+});
+app.use(globalLimiter);
+
+// Search Endpoints Rate Limiter: 10 requests per minute per IP
+const searchLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Search rate limit exceeded',
+    message: 'Too many search requests. Please slow down.'
+  }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -108,7 +134,14 @@ app.post('/scrape-fallback', async (req, res) => {
 });
 
 // API-based property search endpoint (no browser automation required)
-app.post('/scrape-api', async (req, res) => {
+app.post('/scrape-api', searchLimiter, async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    res.status(503).json({
+      error: 'Scrape API mock unavailable in production',
+      message: 'This endpoint currently returns mock data and is disabled in production.'
+    });
+    return;
+  }
   try {
     const { query } = req.body;
 
@@ -153,7 +186,7 @@ app.post('/scrape-api', async (req, res) => {
           phone: '0113 123 4567',
           website: 'https://example.com'
         },
-        source: 'API Search',
+        source: 'mock',
         url: `https://example.com/property/${location.toLowerCase().replace(/\s+/g, '-')}`,
         apiBased: true
       },
@@ -175,7 +208,7 @@ app.post('/scrape-api', async (req, res) => {
           phone: '0113 456 7890',
           website: 'https://modernproperties.com'
         },
-        source: 'API Search',
+        source: 'mock',
         url: `https://modernproperties.com/apartment/${location.toLowerCase().replace(/\s+/g, '-')}`,
         apiBased: true
       },
@@ -197,7 +230,7 @@ app.post('/scrape-api', async (req, res) => {
           phone: '0113 789 0123',
           website: 'https://familyhomes.com'
         },
-        source: 'API Search',
+        source: 'mock',
         url: `https://familyhomes.com/property/${location.toLowerCase().replace(/\s+/g, '-')}`,
         apiBased: true
       }
@@ -216,7 +249,14 @@ app.post('/scrape-api', async (req, res) => {
 });
 
 // Internet search endpoint (fallback for when OnTheMarket fails)
-app.post('/scrape-internet', async (req, res) => {
+app.post('/scrape-internet', searchLimiter, async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    res.status(503).json({
+      error: 'Scrape Internet mock unavailable in production',
+      message: 'This endpoint currently returns mock data and is disabled in production.'
+    });
+    return;
+  }
   try {
     const { query } = req.body;
 
@@ -261,7 +301,7 @@ app.post('/scrape-internet', async (req, res) => {
           phone: '0113 123 4567',
           website: 'https://internetproperties.com'
         },
-        source: 'Internet Search',
+        source: 'mock',
         url: `https://internetproperties.com/property/${location.toLowerCase().replace(/\s+/g, '-')}`,
         internetBased: true
       },
@@ -283,7 +323,7 @@ app.post('/scrape-internet', async (req, res) => {
           phone: '0113 456 7890',
           website: 'https://moderninternetproperties.com'
         },
-        source: 'Internet Search',
+        source: 'mock',
         url: `https://moderninternetproperties.com/apartment/${location.toLowerCase().replace(/\s+/g, '-')}`,
         internetBased: true
       }
@@ -302,7 +342,7 @@ app.post('/scrape-internet', async (req, res) => {
 });
 
 // Real internet search endpoint using scrapeInternet function
-app.post('/scrape-internet-real', async (req, res) => {
+app.post('/scrape-internet-real', searchLimiter, async (req, res) => {
   try {
     const { query } = req.body;
     const apiKey = 'BSAWosDbp01p_PwWH6hIabPIYLYFcNp';
@@ -329,7 +369,7 @@ app.post('/scrape-internet-real', async (req, res) => {
   }
 });
 
-app.post('/scrape', async (req, res) => {
+app.post('/scrape', searchLimiter, async (req, res) => {
   try {
 
     const { url } = req.body;
@@ -482,7 +522,7 @@ app.post('/scrape', async (req, res) => {
   }
 });
 
-app.post('/scrape-rightmove', async (req, res) => {
+app.post('/scrape-rightmove', searchLimiter, async (req, res) => {
   try {
     const { query, locationIdentifier: overrideId } = req.body;
     const apiKey = 'BSAWosDbp01p_PwWH6hIabPIYLYFcNp';
@@ -529,7 +569,7 @@ app.post('/scrape-rightmove', async (req, res) => {
   }
 });
 
-app.post('/scrape-openrent', async (req, res) => {
+app.post('/scrape-openrent', searchLimiter, async (req, res) => {
   try {
     const { query } = req.body;
     const apiKey = 'BSAWosDbp01p_PwWH6hIabPIYLYFcNp';

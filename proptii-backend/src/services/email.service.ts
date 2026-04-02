@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import { Resend } from 'resend';
 
@@ -41,6 +41,7 @@ export class EmailService {
   private resend: Resend | null = null;
   private isConfigured: boolean = false;
   private fromAddress: string;
+  private readonly logger = new Logger(EmailService.name);
   private isCloudPlatform: boolean = false;
 
   constructor() {
@@ -62,7 +63,7 @@ export class EmailService {
       try {
         this.resend = new Resend(resendApiKey);
         this.isConfigured = true;
-        console.log('✅ Email service initialized with Resend API');
+        this.logger.log('✅ Email service initialized with Resend API');
 
         // If using Resend, determine the best from address
         // Priority: EMAIL_FROM_ADDRESS > verified domain > Resend default
@@ -71,22 +72,22 @@ export class EmailService {
           !process.env.EMAIL_FROM_ADDRESS.endsWith('@resend.dev')) {
           // User has explicitly set EMAIL_FROM_ADDRESS with a custom domain
           this.fromAddress = process.env.EMAIL_FROM_ADDRESS;
-          console.log(`📧 Using from address: ${this.fromAddress}`);
-          console.log('✅ Make sure this domain is verified in your Resend dashboard');
+          this.logger.log(`📧 Using from address: ${this.fromAddress}`);
+          this.logger.log('✅ Make sure this domain is verified in your Resend dashboard');
         } else if (process.env.EMAIL_FROM_ADDRESS) {
           // EMAIL_FROM_ADDRESS is set but might be using resend.dev default
           this.fromAddress = process.env.EMAIL_FROM_ADDRESS;
-          console.log(`📧 Using from address: ${this.fromAddress}`);
+          this.logger.log(`📧 Using from address: ${this.fromAddress}`);
         } else {
           // Use Resend default domain for testing (can only send to verified email)
           this.fromAddress = 'onboarding@resend.dev';
-          console.log('📧 Using Resend default from address: onboarding@resend.dev');
-          console.warn('⚠️  Note: Default address can only send to your verified email address');
-          console.warn('   For production, verify your domain in Resend and set:');
-          console.warn('   EMAIL_FROM_ADDRESS=noreply@proptii.co');
+          this.logger.log('📧 Using Resend default from address: onboarding@resend.dev');
+          this.logger.warn('Note: Default address can only send to your verified email address');
+          this.logger.warn('   For production, verify your domain in Resend and set:');
+          this.logger.warn('   EMAIL_FROM_ADDRESS=noreply@proptii.co');
         }
       } catch (error) {
-        console.warn('⚠️ Failed to initialize Resend:', error);
+        this.logger.warn('Failed to initialize Resend:', error);
         this.resend = null;
       }
     }
@@ -143,39 +144,39 @@ export class EmailService {
           } as any);
           this.isConfigured = true;
           if (usePort !== port) {
-            console.log(`✅ Email service initialized with SMTP (${smtpHost}:${usePort}, auto-switched from ${port} for cloud compatibility)`);
-            console.log(`   Using STARTTLS on port ${usePort} (more reliable on cloud platforms)`);
+            this.logger.log(`✅ Email service initialized with SMTP (${smtpHost}:${usePort}, auto-switched from ${port} for cloud compatibility)`);
+            this.logger.log(`   Using STARTTLS on port ${usePort} (more reliable on cloud platforms)`);
           } else {
-            console.log(`✅ Email service initialized with SMTP (${smtpHost}:${usePort})`);
+            this.logger.log(`✅ Email service initialized with SMTP (${smtpHost}:${usePort})`);
           }
-          console.log(`   Connection pooling: ${!this.isCloudPlatform ? 'enabled' : 'disabled (cloud platform)'}`);
-          console.log(`   Timeouts: connection=${60000}ms, socket=${60000}ms, greeting=${30000}ms, dns=${30000}ms`);
+          this.logger.log(`   Connection pooling: ${!this.isCloudPlatform ? 'enabled' : 'disabled (cloud platform)'}`);
+          this.logger.log(`   Timeouts: connection=${60000}ms, socket=${60000}ms, greeting=${30000}ms, dns=${30000}ms`);
 
           // Verify SMTP connection on startup (optional, with timeout)
           if (this.isCloudPlatform) {
-            console.log('🔍 Verifying SMTP connection...');
+            this.logger.log('🔍 Verifying SMTP connection...');
             this.transporter.verify((error, success) => {
               if (error) {
-                console.error('❌ SMTP verification failed:', error.message);
-                console.error('   This might be due to:');
-                console.error('   1. Invalid SMTP credentials (check SMTP_USER and SMTP_PASS)');
-                console.error('   2. Gmail App Password expired or revoked');
-                console.error('   3. Network/firewall blocking SMTP');
-                console.error('   4. Email account security settings changed');
+                this.logger.error('❌ SMTP verification failed:', error.message);
+                this.logger.error('   This might be due to:');
+                this.logger.error('   1. Invalid SMTP credentials (check SMTP_USER and SMTP_PASS)');
+                this.logger.error('   2. Gmail App Password expired or revoked');
+                this.logger.error('   3. Network/firewall blocking SMTP');
+                this.logger.error('   4. Email account security settings changed');
               } else {
-                console.log('✅ SMTP connection verified successfully');
+                this.logger.log('✅ SMTP connection verified successfully');
               }
             });
           }
         } catch (error) {
-          console.warn('⚠️ Failed to initialize SMTP:', error);
+          this.logger.warn('Failed to initialize SMTP:', error);
           this.isConfigured = false;
         }
       } else {
         if (!resendApiKey) {
-          console.warn('⚠️ Email service not configured - No RESEND_API_KEY or SMTP credentials set');
-          console.warn('   Set RESEND_API_KEY for Resend API (recommended)');
-          console.warn('   OR set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS for SMTP');
+          this.logger.warn('Email service not configured - No RESEND_API_KEY or SMTP credentials set');
+          this.logger.warn('   Set RESEND_API_KEY for Resend API (recommended)');
+          this.logger.warn('   OR set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS for SMTP');
           this.isConfigured = false;
         }
       }
@@ -444,7 +445,7 @@ export class EmailService {
               day: 'numeric'
             });
           } catch (error) {
-            console.error('Error formatting date:', error);
+            this.logger.error('Error formatting date:', error);
           }
         }
 
@@ -504,7 +505,7 @@ export class EmailService {
               day: 'numeric'
             });
           } catch (error) {
-            console.error('Error formatting date:', error);
+            this.logger.error('Error formatting date:', error);
           }
         }
 
@@ -671,22 +672,25 @@ export class EmailService {
     let htmlContent = emailData.html;
     if (!htmlContent && emailData.formData && emailData.emailType) {
       try {
-        console.log(`[EmailService] Generating template for emailType: ${emailData.emailType}`);
-        console.log(`[EmailService] FormData keys:`, Object.keys(emailData.formData || {}));
+        this.logger.log(`[EmailService] Generating template for emailType: ${emailData.emailType}`);
+        this.logger.log(`[EmailService] FormData keys:`, Object.keys(emailData.formData || {}));
         htmlContent = this.generateEmailTemplate(emailData.formData, emailData.emailType);
         if (!htmlContent || htmlContent.trim() === '') {
-          console.warn(`[EmailService] Template generation returned empty content for ${emailData.emailType}`);
+          this.logger.warn(`[EmailService] Template generation returned empty content for ${emailData.emailType}`);
         } else {
-          console.log(`[EmailService] Template generated successfully (${htmlContent.length} chars)`);
+          this.logger.log(`[EmailService] Template generated successfully (${htmlContent.length} chars)`);
         }
       } catch (templateError) {
-        console.error(`[EmailService] Error generating email template:`, templateError);
-        console.error(`[EmailService] Template error stack:`, templateError instanceof Error ? templateError.stack : 'No stack trace');
+        this.logger.error(`[EmailService] Error generating email template:`, templateError);
+        this.logger.error(
+          `[EmailService] Template error stack:`,
+          templateError instanceof Error ? templateError.stack : 'No stack trace',
+        );
         // Continue with fallback - don't throw, let it use the fallback body
       }
     } else {
       if (!htmlContent) {
-        console.warn(`[EmailService] No HTML content and missing formData or emailType. formData: ${!!emailData.formData}, emailType: ${emailData.emailType}`);
+        this.logger.warn(`[EmailService] No HTML content and missing formData or emailType. formData: ${!!emailData.formData}, emailType: ${emailData.emailType}`);
       }
     }
 
@@ -703,10 +707,10 @@ export class EmailService {
       try {
         return await this.sendEmailViaResend(emailData);
       } catch (resendError) {
-        console.error('❌ Resend API failed:', resendError);
+        this.logger.error('❌ Resend API failed:', resendError);
         // If Resend fails and SMTP is available, try SMTP as fallback
         if (this.transporter) {
-          console.warn('⚠️ Resend failed, trying SMTP as fallback...');
+          this.logger.warn('Resend failed, trying SMTP as fallback...');
           // Continue to SMTP fallback below
         } else {
           return {
@@ -730,9 +734,9 @@ export class EmailService {
             attachments: emailData.attachments || [],
           };
 
-          console.log(`📧 Sending email via SMTP to: ${emailData.to} (attempt ${attempt}/${retries})`);
+          this.logger.log(`📧 Sending email via SMTP to: ${emailData.to} (attempt ${attempt}/${retries})`);
           const result = await this.transporter.sendMail(mailOptions);
-          console.log(`✅ Email sent successfully via SMTP to ${emailData.to}`);
+          this.logger.log(`✅ Email sent successfully via SMTP to ${emailData.to}`);
 
           return {
             success: true,
@@ -743,13 +747,13 @@ export class EmailService {
           const errorCode = (error as any)?.code;
           const errorMessage = error instanceof Error ? error.message : String(error);
 
-          console.error(`❌ SMTP error while sending email (attempt ${attempt}/${retries}):`, error);
-          console.error(`   Error code: ${errorCode || 'UNKNOWN'}`);
-          console.error(`   Error message: ${errorMessage}`);
+          this.logger.error(`❌ SMTP error while sending email (attempt ${attempt}/${retries}):`, error);
+          this.logger.error(`   Error code: ${errorCode || 'UNKNOWN'}`);
+          this.logger.error(`   Error message: ${errorMessage}`);
 
           // On cloud platforms, log timeout but don't assume SMTP is blocked (it works on Render)
           if (this.isCloudPlatform && errorCode === 'ETIMEDOUT') {
-            console.warn('⚠️ SMTP connection timeout on cloud platform. Retrying...');
+            this.logger.warn('SMTP connection timeout on cloud platform. Retrying...');
           }
 
           // Check if it's a retryable error
@@ -761,7 +765,7 @@ export class EmailService {
 
           if (attempt < retries && isRetryable) {
             const waitTime = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
-            console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+            this.logger.log(`⏳ Waiting ${waitTime}ms before retry...`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
 
             // Try to recreate transporter on connection errors
@@ -826,9 +830,9 @@ export class EmailService {
       };
     } else {
       // Neither Resend nor SMTP configured
-      console.warn('⚠️ Email service not configured.');
-      console.warn('   Set RESEND_API_KEY for Resend API (recommended)');
-      console.warn('   OR set SMTP credentials (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS) for SMTP');
+      this.logger.warn('Email service not configured.');
+      this.logger.warn('   Set RESEND_API_KEY for Resend API (recommended)');
+      this.logger.warn('   OR set SMTP credentials (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS) for SMTP');
       return {
         success: false,
         error: 'Email service not configured',
@@ -848,9 +852,9 @@ export class EmailService {
     const fromAddress = this.fromAddress;
 
     try {
-      console.log(`📧 Sending email via Resend API to: ${emailData.to}`);
-      console.log(`   From: ${fromAddress}`);
-      console.log(`   Subject: ${emailData.subject}`);
+      this.logger.log(`📧 Sending email via Resend API to: ${emailData.to}`);
+      this.logger.log(`   From: ${fromAddress}`);
+      this.logger.log(`   Subject: ${emailData.subject}`);
 
       // Convert attachments to Resend format if present
       const attachments = emailData.attachments?.map(att => {
@@ -891,17 +895,17 @@ export class EmailService {
 
       if (attachments.length > 0) {
         emailPayload.attachments = attachments;
-        console.log(`   Attachments: ${attachments.length} file(s)`);
+        this.logger.log(`   Attachments: ${attachments.length} file(s)`);
       }
 
       const result = await this.resend.emails.send(emailPayload);
 
       // Log the full response for debugging
-      console.log(`📧 Resend API response:`, JSON.stringify(result, null, 2));
+      this.logger.log(`📧 Resend API response:`, JSON.stringify(result, null, 2));
 
       // Check if there's an error in the response
       if (result.error) {
-        console.error('❌ Resend API returned an error:', result.error);
+        this.logger.error('❌ Resend API returned an error:', result.error);
 
         // Provide helpful guidance for common errors
         // Type-safe check: Resend error can have statusCode or name
@@ -909,16 +913,16 @@ export class EmailService {
         if (error.statusCode === 403 || error.name === 'validation_error') {
           const errorMsg = error.message || '';
           if (errorMsg.includes('only send testing emails to your own email address')) {
-            console.error('');
-            console.error('⚠️  RESEND DOMAIN VERIFICATION REQUIRED');
-            console.error('   Resend is limiting emails to your verified email address only.');
-            console.error('   To send emails to other recipients:');
-            console.error('   1. Go to https://resend.com/domains');
-            console.error('   2. Verify your domain (e.g., theluxcity.co.uk)');
-            console.error('   3. Set EMAIL_FROM_ADDRESS environment variable to use your verified domain');
-            console.error('      Example: EMAIL_FROM_ADDRESS=noreply@theluxcity.co.uk');
-            console.error('   4. Restart your backend service');
-            console.error('');
+            this.logger.error('');
+            this.logger.error('⚠️  RESEND DOMAIN VERIFICATION REQUIRED');
+            this.logger.error('   Resend is limiting emails to your verified email address only.');
+            this.logger.error('   To send emails to other recipients:');
+            this.logger.error('   1. Go to https://resend.com/domains');
+            this.logger.error('   2. Verify your domain (e.g., theluxcity.co.uk)');
+            this.logger.error('   3. Set EMAIL_FROM_ADDRESS environment variable to use your verified domain');
+            this.logger.error('      Example: EMAIL_FROM_ADDRESS=noreply@theluxcity.co.uk');
+            this.logger.error('   4. Restart your backend service');
+            this.logger.error('');
           }
         }
 
@@ -930,19 +934,19 @@ export class EmailService {
       const messageId = result.data?.id;
 
       if (!messageId) {
-        console.warn('⚠️ Resend API response missing message ID. Full response:', JSON.stringify(result, null, 2));
-        console.warn('   This might indicate the email was not actually sent. Check Resend dashboard for details.');
+        this.logger.warn('Resend API response missing message ID. Full response:', JSON.stringify(result, null, 2));
+        this.logger.warn('   This might indicate the email was not actually sent. Check Resend dashboard for details.');
       }
 
-      console.log(`✅ Email sent successfully via Resend API to ${emailData.to}${messageId ? ` (ID: ${messageId})` : ' (no ID returned)'}`);
+      this.logger.log(`✅ Email sent successfully via Resend API to ${emailData.to}${messageId ? ` (ID: ${messageId})` : ' (no ID returned)'}`);
 
       return {
         success: true,
         messageId: messageId || 'resend-email-sent',
       };
     } catch (error: any) {
-      console.error('❌ Resend API error:', error);
-      console.error('   Error details:', {
+      this.logger.error('❌ Resend API error:', error);
+      this.logger.error('   Error details:', {
         message: error.message,
         name: error.name,
         code: error.code,
@@ -952,7 +956,7 @@ export class EmailService {
 
       // If it's a Resend API error with more details, include them
       if (error.response?.data) {
-        console.error('   Resend API error response:', JSON.stringify(error.response.data, null, 2));
+        this.logger.error('   Resend API error response:', JSON.stringify(error.response.data, null, 2));
         throw new Error(error.response.data.message || error.message || 'Failed to send email via Resend');
       }
 
@@ -972,7 +976,7 @@ export class EmailService {
 
       // 1. Send email to user
       if (formData.identity?.email) {
-        console.log('📧 Sending email to user...');
+        this.logger.log('📧 Sending email to user...');
         results.user = await this.sendEmail({
           to: formData.identity.email,
           subject: 'Your Referencing Application Has Been Submitted',
@@ -983,7 +987,7 @@ export class EmailService {
 
       // 2. Send email to agent
       if (formData.agentDetails?.email) {
-        console.log('📧 Sending email to agent...');
+        this.logger.log('📧 Sending email to agent...');
         results.agent = await this.sendEmail({
           to: formData.agentDetails.email,
           subject: 'New Referencing Application Received',
@@ -994,7 +998,7 @@ export class EmailService {
 
       // 3. Send email to referee
       if (formData.employment?.referenceEmail) {
-        console.log('📧 Sending email to referee...');
+        this.logger.log('📧 Sending email to referee...');
         results.referee = await this.sendEmail({
           to: formData.employment.referenceEmail,
           subject: 'Reference Request for Rental Application',
@@ -1005,7 +1009,7 @@ export class EmailService {
 
       // 4. Send email to guarantor
       if (formData.guarantor?.email) {
-        console.log('📧 Sending email to guarantor...');
+        this.logger.log('📧 Sending email to guarantor...');
         results.guarantor = await this.sendEmail({
           to: formData.guarantor.email,
           subject: 'Guarantor Request for Rental Application',
@@ -1022,7 +1026,7 @@ export class EmailService {
         submissionId,
       };
     } catch (error) {
-      console.error('❌ Error sending multiple emails:', error);
+      this.logger.error('❌ Error sending multiple emails:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

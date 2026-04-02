@@ -1,4 +1,4 @@
-import { Controller, Post, UseInterceptors, UploadedFile, Body } from '@nestjs/common';
+import { Body, Controller, Logger, Post, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ContractEmailService } from '../services/contract-email.service';
 
@@ -16,6 +16,7 @@ interface SendSignedContractDto {
 @Controller('contracts')
 export class ContractController {
   constructor(private readonly contractEmailService: ContractEmailService) {}
+  private readonly logger = new Logger(ContractController.name);
 
   @Post('send-signed-contract')
   @UseInterceptors(FileInterceptor('attachment'))
@@ -24,7 +25,7 @@ export class ContractController {
     @Body() body: SendSignedContractDto
   ) {
     try {
-      console.log('📧 Received contract email request:', {
+      this.logger.log('📧 Received contract email request:', {
         to: body.to,
         contractName: body.contractName,
         recipientName: body.recipientName,
@@ -53,7 +54,7 @@ export class ContractController {
       return result;
 
     } catch (error) {
-      console.error('❌ Error in contract controller:', error);
+      this.logger.error('❌ Error in contract controller:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'

@@ -6,13 +6,18 @@ import {
   Post,
   ServiceUnavailableException,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { StorageService } from '../services/storage.service';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('property')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
 export class PropertyDocumentController {
   private readonly logger = new Logger(PropertyDocumentController.name);
 

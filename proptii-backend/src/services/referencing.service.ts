@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, Logger } from '@nestjs/common';
 import { CosmosClient, Container } from '@azure/cosmos';
 import { Firestore } from 'firebase-admin/firestore';
 import { EmailService } from './email.service';
@@ -7,6 +7,7 @@ import { EmailService } from './email.service';
 export class ReferencingService {
   private container: Container | null = null;
   private firestore: Firestore | null = null;
+  private readonly logger = new Logger(ReferencingService.name);
 
   constructor(
     @Inject('COSMOS_CLIENT') private readonly cosmosClient: CosmosClient | null,
@@ -18,21 +19,21 @@ export class ReferencingService {
       try {
         const database = this.cosmosClient.database(process.env.COSMOS_DB_DATABASE_NAME || 'proptii-db');
         this.container = database.container('References');
-        console.log('✅ Cosmos DB container initialized');
+        this.logger.log('✅ Cosmos DB container initialized');
       } catch (error) {
-        console.warn('Failed to initialize Cosmos DB container:', error);
+        this.logger.warn('Failed to initialize Cosmos DB container:', error);
         this.container = null;
       }
     } else {
-      console.warn('Cosmos DB client not available.');
+      this.logger.warn('Cosmos DB client not available.');
     }
 
     // Initialize Firestore (preferred)
     if (this.firestoreClient) {
       this.firestore = this.firestoreClient;
-      console.log('✅ Firestore initialized in referencing service');
+      this.logger.log('✅ Firestore initialized in referencing service');
     } else {
-      console.warn('Firestore client not available.');
+      this.logger.warn('Firestore client not available.');
     }
   }
 
@@ -43,11 +44,11 @@ export class ReferencingService {
       }
 
       if (!this.container) {
-        console.warn('Cosmos DB not available. Skipping identity data save.');
+        this.logger.warn('Cosmos DB not available. Skipping identity data save.');
         return { success: true, data: { id: `identity_${data.userId}`, ...data } };
       }
 
-      console.log('Saving identity data:', data);
+      this.logger.log('Saving identity data:', data);
 
       const documentId = `identity_${data.userId}`;
       const newData = {
@@ -59,11 +60,11 @@ export class ReferencingService {
       };
 
       const { resource } = await this.container.items.upsert(newData);
-      console.log('Identity data saved successfully:', resource.id);
+      this.logger.log('Identity data saved successfully:', resource.id);
       return { success: true, data: resource };
 
     } catch (error) {
-      console.error('Error saving identity data:', error);
+      this.logger.error('Error saving identity data:', error);
       throw error;
     }
   }
@@ -75,11 +76,11 @@ export class ReferencingService {
       }
 
       if (!this.container) {
-        console.warn('Cosmos DB not available. Skipping employment data save.');
+        this.logger.warn('Cosmos DB not available. Skipping employment data save.');
         return { success: true, data: { id: `employment_${data.userId}`, ...data } };
       }
 
-      console.log('Saving employment data:', data);
+      this.logger.log('Saving employment data:', data);
 
       const documentId = `employment_${data.userId}`;
       const newData = {
@@ -91,11 +92,11 @@ export class ReferencingService {
       };
 
       const { resource } = await this.container.items.upsert(newData);
-      console.log('Employment data saved successfully:', resource.id);
+      this.logger.log('Employment data saved successfully:', resource.id);
       return { success: true, data: resource };
 
     } catch (error) {
-      console.error('Error saving employment data:', error);
+      this.logger.error('Error saving employment data:', error);
       throw error;
     }
   }
@@ -107,11 +108,11 @@ export class ReferencingService {
       }
 
       if (!this.container) {
-        console.warn('Cosmos DB not available. Skipping residential data save.');
+        this.logger.warn('Cosmos DB not available. Skipping residential data save.');
         return { success: true, data: { id: `residential_${data.userId}`, ...data } };
       }
 
-      console.log('Saving residential data:', data);
+      this.logger.log('Saving residential data:', data);
 
       const documentId = `residential_${data.userId}`;
       const newData = {
@@ -123,11 +124,11 @@ export class ReferencingService {
       };
 
       const { resource } = await this.container.items.upsert(newData);
-      console.log('Residential data saved successfully:', resource.id);
+      this.logger.log('Residential data saved successfully:', resource.id);
       return { success: true, data: resource };
 
     } catch (error) {
-      console.error('Error saving residential data:', error);
+      this.logger.error('Error saving residential data:', error);
       throw error;
     }
   }
@@ -139,11 +140,11 @@ export class ReferencingService {
       }
 
       if (!this.container) {
-        console.warn('Cosmos DB not available. Skipping financial data save.');
+        this.logger.warn('Cosmos DB not available. Skipping financial data save.');
         return { success: true, data: { id: `financial_${data.userId}`, ...data } };
       }
 
-      console.log('Saving financial data:', data);
+      this.logger.log('Saving financial data:', data);
 
       const documentId = `financial_${data.userId}`;
       const newData = {
@@ -155,11 +156,11 @@ export class ReferencingService {
       };
 
       const { resource } = await this.container.items.upsert(newData);
-      console.log('Financial data saved successfully:', resource.id);
+      this.logger.log('Financial data saved successfully:', resource.id);
       return { success: true, data: resource };
 
     } catch (error) {
-      console.error('Error saving financial data:', error);
+      this.logger.error('Error saving financial data:', error);
       throw error;
     }
   }
@@ -171,11 +172,11 @@ export class ReferencingService {
       }
 
       if (!this.container) {
-        console.warn('Cosmos DB not available. Skipping guarantor data save.');
+        this.logger.warn('Cosmos DB not available. Skipping guarantor data save.');
         return { success: true, data: { id: `guarantor_${data.userId}`, ...data } };
       }
 
-      console.log('Saving guarantor data:', data);
+      this.logger.log('Saving guarantor data:', data);
 
       const documentId = `guarantor_${data.userId}`;
       const newData = {
@@ -187,11 +188,11 @@ export class ReferencingService {
       };
 
       const { resource } = await this.container.items.upsert(newData);
-      console.log('Guarantor data saved successfully:', resource.id);
+      this.logger.log('Guarantor data saved successfully:', resource.id);
       return { success: true, data: resource };
 
     } catch (error) {
-      console.error('Error saving guarantor data:', error);
+      this.logger.error('Error saving guarantor data:', error);
       throw error;
     }
   }
@@ -203,11 +204,11 @@ export class ReferencingService {
       }
 
       if (!this.container) {
-        console.warn('Cosmos DB not available. Skipping agent details data save.');
+        this.logger.warn('Cosmos DB not available. Skipping agent details data save.');
         return { success: true, data: { id: `agent_details_${data.userId}`, ...data } };
       }
 
-      console.log('Saving agent details data:', data);
+      this.logger.log('Saving agent details data:', data);
 
       const documentId = `agent_details_${data.userId}`;
       const newData = {
@@ -219,11 +220,11 @@ export class ReferencingService {
       };
 
       const { resource } = await this.container.items.upsert(newData);
-      console.log('Agent details saved successfully:', resource.id);
+      this.logger.log('Agent details saved successfully:', resource.id);
       return { success: true, data: resource };
 
     } catch (error) {
-      console.error('Error saving agent details:', error);
+      this.logger.error('Error saving agent details:', error);
       throw error;
     }
   }
@@ -237,7 +238,7 @@ export class ReferencingService {
       // If Cosmos DB is not available, return empty data structure
       // The frontend uses Firestore, so this is fine
       if (!this.container) {
-        console.log('Cosmos DB not available. Returning empty form data (frontend uses Firestore).');
+        this.logger.log('Cosmos DB not available. Returning empty form data (frontend uses Firestore).');
         return {
           success: true,
           data: {
@@ -251,7 +252,7 @@ export class ReferencingService {
         };
       }
 
-      console.log('Fetching form data for user:', userId);
+      this.logger.log('Fetching form data for user:', userId);
 
       // Query all documents for this user
       const querySpec = {
@@ -271,11 +272,11 @@ export class ReferencingService {
         agentDetails: resources.find(r => r.type === 'agent_details')
       };
 
-      console.log('Form data retrieved successfully');
+      this.logger.log('Form data retrieved successfully');
       return { success: true, data: formData };
 
     } catch (error) {
-      console.error('Error getting form data:', error);
+      this.logger.error('Error getting form data:', error);
       // Return empty data structure instead of throwing error
       // Frontend uses Firestore anyway
       return {
@@ -298,7 +299,7 @@ export class ReferencingService {
         throw new BadRequestException('User ID is required');
       }
 
-      console.log('Submitting application for user:', userId);
+      this.logger.log('Submitting application for user:', userId);
 
       // Extract formData from the request
       const formData = data.formData || data;
@@ -312,7 +313,7 @@ export class ReferencingService {
             sections.map(async (section) => {
               const sectionData = formData[section];
               if (!sectionData) {
-                console.warn(`Missing ${section} data in submission`);
+                this.logger.warn(`Missing ${section} data in submission`);
                 return null;
               }
               try {
@@ -321,16 +322,16 @@ export class ReferencingService {
                   userId
                 });
               } catch (error) {
-                console.error(`Error saving ${section} data:`, error);
+                this.logger.error(`Error saving ${section} data:`, error);
                 return null;
               }
             })
           );
         } catch (error) {
-          console.warn('Failed to save sections to Cosmos DB:', error);
+          this.logger.warn('Failed to save sections to Cosmos DB:', error);
         }
       } else {
-        console.warn('Skipping Cosmos DB save - Cosmos DB not configured');
+        this.logger.warn('Skipping Cosmos DB save - Cosmos DB not configured');
       }
 
       // Create submission record (only if Cosmos DB is available)
@@ -354,9 +355,9 @@ export class ReferencingService {
           const { resource } = await this.container.items.upsert(submissionData);
           submission = resource;
           submissionId = resource.id;
-          console.log('Application submitted successfully to Cosmos DB:', submission.id);
+          this.logger.log('Application submitted successfully to Cosmos DB:', submission.id);
         } catch (error) {
-          console.warn('Failed to save submission to Cosmos DB:', error);
+          this.logger.warn('Failed to save submission to Cosmos DB:', error);
         }
       }
 
@@ -376,9 +377,9 @@ export class ReferencingService {
           attachments,
           submissionId: submissionId
         });
-        console.log('Emails sent successfully:', emailResults);
+        this.logger.log('Emails sent successfully:', emailResults);
       } catch (emailError) {
-        console.error('Error sending emails:', emailError);
+        this.logger.error('Error sending emails:', emailError);
         // Don't throw - allow submission to succeed even if email fails
         emailResults = {
           success: false,
@@ -395,7 +396,7 @@ export class ReferencingService {
       };
 
     } catch (error) {
-      console.error('Error submitting application:', error);
+      this.logger.error('Error submitting application:', error);
       throw error;
     }
   }
@@ -404,7 +405,7 @@ export class ReferencingService {
     try {
       return await this.emailService.sendEmail(emailData);
     } catch (error) {
-      console.error('Error sending email:', error);
+      this.logger.error('Error sending email:', error);
       throw error;
     }
   }
@@ -413,7 +414,7 @@ export class ReferencingService {
     try {
       return await this.emailService.sendMultipleEmails(emailData);
     } catch (error) {
-      console.error('Error sending multiple emails:', error);
+      this.logger.error('Error sending multiple emails:', error);
       throw error;
     }
   }
@@ -446,7 +447,7 @@ export class ReferencingService {
         }
       };
     } catch (error) {
-      console.error('Error checking email config:', error);
+      this.logger.error('Error checking email config:', error);
       throw error;
     }
   }
@@ -475,7 +476,7 @@ export class ReferencingService {
         sentTo: email
       };
     } catch (error) {
-      console.error('Error sending test email:', error);
+      this.logger.error('Error sending test email:', error);
       throw error;
     }
   }
@@ -496,7 +497,7 @@ export class ReferencingService {
         updatedAt: new Date().toISOString()
       };
 
-      console.log('💾 Preparing to save response with data:', {
+      this.logger.log('💾 Preparing to save response with data:', {
         documentId,
         type: responseData.type,
         tenantEmail: responseData.tenantEmail,
@@ -510,16 +511,16 @@ export class ReferencingService {
         try {
           const collectionRef = this.firestore.collection('referee_guarantor_responses');
           await collectionRef.doc(documentId).set(responseData);
-          console.log(`✅ ${data.responseType} response saved to Firestore:`, documentId);
-          console.log(`📧 Stored with tenantEmail: ${responseData.tenantEmail}`);
+          this.logger.log(`✅ ${data.responseType} response saved to Firestore:`, documentId);
+          this.logger.log(`📧 Stored with tenantEmail: ${responseData.tenantEmail}`);
           
           // Send notification email to agent about the response
           await this.sendResponseNotificationEmail(data);
           
           return { success: true, data: responseData };
         } catch (error) {
-          console.error(`❌ Error saving ${data.responseType} response to Firestore:`, error);
-          console.error('Full error:', error);
+          this.logger.error(`❌ Error saving ${data.responseType} response to Firestore:`, error);
+          this.logger.error('Full error:', error);
           // Continue even if Firestore save fails
         }
       }
@@ -528,19 +529,19 @@ export class ReferencingService {
       if (this.container) {
         try {
           const { resource } = await this.container.items.upsert(responseData);
-          console.log(`${data.responseType} response saved to Cosmos DB:`, resource.id);
+          this.logger.log(`${data.responseType} response saved to Cosmos DB:`, resource.id);
           
           // Send notification email to agent about the response
           await this.sendResponseNotificationEmail(data);
           
           return { success: true, data: resource };
         } catch (error) {
-          console.error(`Error saving ${data.responseType} response to Cosmos DB:`, error);
+          this.logger.error(`Error saving ${data.responseType} response to Cosmos DB:`, error);
           // Continue even if Cosmos DB save fails
         }
       }
 
-      console.warn('⚠️ No database available. Response logged but not persisted.');
+      this.logger.warn('⚠️ No database available. Response logged but not persisted.');
       
       // Send notification email even if DB save fails
       await this.sendResponseNotificationEmail(data);
@@ -552,7 +553,7 @@ export class ReferencingService {
       };
 
     } catch (error) {
-      console.error('Error saving referee/guarantor response:', error);
+      this.logger.error('Error saving referee/guarantor response:', error);
       throw error;
     }
   }
@@ -607,8 +608,8 @@ export class ReferencingService {
 
       // In a production environment, you would get the agent's email from the application data
       // For now, we'll log it. You may need to query the database for the agent's email
-      console.log(`Would send ${responseTypeLabel} response notification email`);
-      console.log('Notification email HTML:', notificationHtml);
+      this.logger.log(`Would send ${responseTypeLabel} response notification email`);
+      this.logger.log('Notification email HTML:', notificationHtml);
       
       // TODO: Get agent email from application data and send notification
       // await this.emailService.sendEmail({
@@ -619,7 +620,7 @@ export class ReferencingService {
       // });
 
     } catch (error) {
-      console.error('Error sending response notification email:', error);
+      this.logger.error('Error sending response notification email:', error);
       // Don't throw - this is a non-critical operation
     }
   }
@@ -630,23 +631,23 @@ export class ReferencingService {
         throw new BadRequestException('Tenant email is required');
       }
 
-      console.log('Fetching referee/guarantor responses for tenant:', tenantEmail);
+      this.logger.log('Fetching referee/guarantor responses for tenant:', tenantEmail);
 
       // Try Firestore first (preferred)
       if (this.firestore) {
         try {
-          console.log(`🔍 Querying Firestore for responses (tenantEmail: ${tenantEmail})...`);
+          this.logger.log(`🔍 Querying Firestore for responses (tenantEmail: ${tenantEmail})...`);
           const collectionRef = this.firestore.collection('referee_guarantor_responses');
           
           // Get all responses and filter in memory to avoid index requirement
-          console.log('📥 Fetching all referee_guarantor_responses from Firestore...');
+          this.logger.log('📥 Fetching all referee_guarantor_responses from Firestore...');
           const allSnapshot = await collectionRef.get();
-          console.log(`📊 Total responses in collection: ${allSnapshot.size}`);
+          this.logger.log(`📊 Total responses in collection: ${allSnapshot.size}`);
           
           // Log some sample data for debugging
           if (allSnapshot.size > 0) {
             const firstDoc = allSnapshot.docs[0].data();
-            console.log('📄 Sample response structure:', {
+            this.logger.log('📄 Sample response structure:', {
               id: firstDoc.id,
               type: firstDoc.type,
               tenantEmail: firstDoc.tenantEmail,
@@ -674,11 +675,11 @@ export class ReferencingService {
               return dateB - dateA; // Descending order
             });
           
-          console.log(`✅ Found ${refereeResponses.length} referee and ${guarantorResponses.length} guarantor responses from Firestore`);
+          this.logger.log(`✅ Found ${refereeResponses.length} referee and ${guarantorResponses.length} guarantor responses from Firestore`);
           
           // Log the found responses for debugging
           if (refereeResponses.length > 0 || guarantorResponses.length > 0) {
-            console.log('📋 Found responses:', {
+            this.logger.log('📋 Found responses:', {
               referees: refereeResponses.map(r => ({ email: r.email, consent: r.consent })),
               guarantors: guarantorResponses.map(r => ({ email: r.email, consent: r.consent }))
             });
@@ -692,15 +693,15 @@ export class ReferencingService {
             }
           };
         } catch (error) {
-          console.error('❌ Error querying Firestore for responses:', error);
-          console.error('Error details:', error.message || error);
+          this.logger.error('❌ Error querying Firestore for responses:', error);
+          this.logger.error('Error details:', error.message || error);
           // Continue to Cosmos DB fallback
         }
       }
 
       // Fallback to Cosmos DB if Firestore is not available
       if (!this.container) {
-        console.warn('Neither Firestore nor Cosmos DB available. Returning empty responses.');
+        this.logger.warn('Neither Firestore nor Cosmos DB available. Returning empty responses.');
         return {
           success: true,
           data: {
@@ -710,7 +711,7 @@ export class ReferencingService {
         };
       }
 
-      console.log('Querying Cosmos DB for responses...');
+      this.logger.log('Querying Cosmos DB for responses...');
 
       // Query for referee responses
       const refereeQuery = {
@@ -733,7 +734,7 @@ export class ReferencingService {
       const { resources: refereeResponses } = await this.container.items.query(refereeQuery).fetchAll();
       const { resources: guarantorResponses } = await this.container.items.query(guarantorQuery).fetchAll();
 
-      console.log(`Found ${refereeResponses.length} referee and ${guarantorResponses.length} guarantor responses from Cosmos DB`);
+      this.logger.log(`Found ${refereeResponses.length} referee and ${guarantorResponses.length} guarantor responses from Cosmos DB`);
 
       return {
         success: true,
@@ -744,7 +745,7 @@ export class ReferencingService {
       };
 
     } catch (error) {
-      console.error('Error fetching referee/guarantor responses:', error);
+      this.logger.error('Error fetching referee/guarantor responses:', error);
       // Return empty responses instead of throwing error
       return {
         success: true,
