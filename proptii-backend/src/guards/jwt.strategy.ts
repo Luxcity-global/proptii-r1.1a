@@ -30,9 +30,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ...(isJestTestEnv
         ? { secretOrKey: process.env.JWT_TEST_SECRET ?? 'test-jwt-secret' }
         : (() => {
-            if (!jwksUri) {
+            if (!jwksUri || !jwksUri.startsWith('http')) {
               const logger = new Logger('JwtStrategy');
-              logger.warn('MSAL_AUTHORITY is not configured. JWT authentication will be disabled for protected routes.');
+              logger.warn(`MSAL_AUTHORITY is missconfigured or missing. Value: "${authority}". JWT auth disabled.`);
               return { secretOrKey: 'missing-jwks-secret-fallback' };
             }
             // eslint-disable-next-line @typescript-eslint/no-var-requires

@@ -42,7 +42,7 @@ const envSchema = z.object({
 
   // ── Azure AD B2C / MSAL ─────────────────────────────────────────────────────
   MSAL_CLIENT_ID: z.string().min(1, 'MSAL_CLIENT_ID is required for Azure AD B2C authentication'),
-  MSAL_AUTHORITY: z.string().min(1, 'MSAL_AUTHORITY is required for Azure AD B2C authentication'),
+  MSAL_AUTHORITY: z.string().url('MSAL_AUTHORITY must be a valid absolute URL (e.g., https://<tenant>.b2clogin.com/...)'),
   MSAL_REDIRECT_URI: z.string().optional(),
 
   // ── CORS / Frontend ─────────────────────────────────────────────────────────
