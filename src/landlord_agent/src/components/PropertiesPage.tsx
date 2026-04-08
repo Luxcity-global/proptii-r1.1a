@@ -7,7 +7,8 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Property, Tenant, ArrearsAlert } from '../App';
+import { Property, Tenant, ArrearsAlert, UserProfile } from '../App';
+import { LandlordEmptyState } from './LandlordEmptyState';
 
 interface PropertiesPageProps {
   properties: Property[];
@@ -24,6 +25,7 @@ interface PropertiesPageProps {
   onDuplicateProperty?: (property: Property) => void;
   onExportProperties?: (properties: Property[], format: string) => void;
   onImportProperties?: (properties: Property[]) => void;
+  userProfile?: UserProfile | null;
 }
 
 export function PropertiesPage({
@@ -41,6 +43,7 @@ export function PropertiesPage({
   onDuplicateProperty,
   onExportProperties,
   onImportProperties: handleImportProperties,
+  userProfile,
 }: PropertiesPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -51,6 +54,24 @@ export function PropertiesPage({
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+
+  if (!userProfile) {
+    return (
+      <div className="max-w-7xl mx-auto px-3 md:px-6 py-6 space-y-6">
+        <div>
+          <h1 style={{ color: '#374957' }}>Properties</h1>
+          <p className="text-muted-foreground">Manage all your properties in one place</p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1 text-sm">Occupied</p><p className="text-2xl font-semibold text-green-600">0</p></div><div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center"><Users className="w-6 h-6 text-green-600" /></div></div></Card>
+          <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1">Average Rent</p><p className="text-2xl font-semibold">£0</p><p className="text-xs text-muted-foreground">Per month</p></div><div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center"><PoundSterling className="w-6 h-6 text-blue-600" /></div></div></Card>
+          <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1">Tenancies Ending Soon</p><p className="text-2xl font-semibold text-orange-600">0</p><p className="text-xs text-muted-foreground">Within 90 days</p></div><div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center"><Calendar className="w-6 h-6 text-orange-600" /></div></div></Card>
+          <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1">Overdue Rent</p><p className="text-2xl font-semibold text-red-600">0</p><p className="text-xs text-muted-foreground">£0 outstanding</p></div><div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center"><AlertTriangle className="w-6 h-6 text-red-600" /></div></div></Card>
+        </div>
+        <LandlordEmptyState />
+      </div>
+    );
+  }
 
   const filteredAndSortedProperties = useMemo(() => {
     const now = new Date();

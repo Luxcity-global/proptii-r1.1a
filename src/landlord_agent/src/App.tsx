@@ -458,6 +458,9 @@ function AppContent() {
             logo: undefined
           });
           console.log('✅ Updated userProfile with authentication data:', userInfo);
+        } else {
+          // Important: clear stale profile so guests never see authenticated data
+          setUserProfile(null);
         }
       }
     };
@@ -492,6 +495,10 @@ function AppContent() {
             logo: undefined
           });
           console.log('✅ Received AUTH_STATE from parent, updated userProfile:', user);
+        } else {
+          // Explicit unauthenticated state from parent should clear profile
+          setUserProfile(null);
+          console.log('ℹ️ Received unauthenticated AUTH_STATE, cleared userProfile');
         }
         setIsAuthLoading(false);
       }
@@ -523,28 +530,6 @@ function AppContent() {
     };
 
     window.addEventListener('message', handleMessage);
-
-    // Fallback: read cached auth state if present
-    try {
-      const cached = localStorage.getItem('proptii_auth_state');
-      if (cached) {
-        const authState = JSON.parse(cached);
-        if (authState?.isAuthenticated && authState?.user) {
-          const user = authState.user;
-          setUserProfile({
-            name: user.name || user.givenName || '',
-            email: user.email || '',
-            phone: user.phone || '+44 7911 123456',
-            companyName: 'Proptii',
-            logo: undefined
-          });
-          console.log('✅ Loaded auth state from localStorage and updated userProfile:', user);
-          setIsAuthLoading(false);
-        }
-      }
-    } catch (err) {
-      // ignore parse errors
-    }
 
     // Set a timeout to stop loading if no auth state is received
     const timer = setTimeout(() => {
@@ -2173,20 +2158,6 @@ function AppContent() {
     console.log('🔄 renderMainAppScreen called with navigationScreen:', navigationScreen);
     switch (navigationScreen) {
       case 'dashboard':
-        if (!userProfile) {
-          return (
-            <LandlordEmptyState
-              onSignIn={() => {
-                if (window.self !== window.top) {
-                  window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: {} }, '*');
-                } else {
-                  sessionStorage.setItem('redirectAfterLogin', '/landlord');
-                  window.location.href = '/landlord?signin=1';
-                }
-              }}
-            />
-          );
-        }
         return (
           <Dashboard
             properties={properties}
@@ -2286,6 +2257,7 @@ function AppContent() {
             onDuplicateProperty={duplicateProperty}
             onExportProperties={exportProperties}
             onImportProperties={importProperties}
+            userProfile={userProfile}
           />
         );
 
@@ -2533,27 +2505,17 @@ function AppContent() {
                 alert('Failed to export documents. Please try again.');
               }
             }}
+            userProfile={userProfile}
           />
         );
 
       case 'viewings':
-        console.log('🔴🔴🔴 App.tsx: VIEWINGS CASE HIT 🔴🔴🔴');
-        console.log('🔴 App.tsx: Rendering ViewingsPage');
-        console.log('🔴 userProfile:', userProfile);
-        console.log('🔴 userProfile?.email:', userProfile?.email);
-        console.log('🔴 resolveManagerId():', resolveManagerId());
-        
-        // Get email from URL query params as fallback
-        const params = new URLSearchParams(window.location.search);
-        const emailFromQuery = params.get('email');
-        
-        const managerEmailValue = userProfile?.email || emailFromQuery;
-        console.log('🔴 managerEmailValue being passed:', managerEmailValue);
         return (
           <ViewingsPage
-            managerId={resolveManagerId()}
+            managerId={userProfile ? resolveManagerId() : null}
             managerName={userProfile?.name}
-            managerEmail={managerEmailValue}
+            managerEmail={userProfile?.email}
+            userProfile={userProfile}
           />
         );
 
@@ -2622,6 +2584,7 @@ function AppContent() {
               // In real app, this would export landlord data
               console.log('Export landlords as:', format);
             }}
+            userProfile={userProfile}
           />
         );
 

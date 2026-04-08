@@ -3,15 +3,24 @@ import { LogIn } from 'lucide-react';
 import { Button } from './ui/button';
 
 interface LandlordEmptyStateProps {
-  onSignIn: () => void;
+  onSignIn?: () => void;
 }
+
+const defaultSignIn = () => {
+  if (window.self !== window.top) {
+    window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: {} }, '*');
+  } else {
+    sessionStorage.setItem('redirectAfterLogin', '/landlord');
+    window.location.href = '/landlord?signin=1';
+  }
+};
 
 /**
  * Inline empty state for the dashboard content area.
  * Shows when user is not signed in - displays scout mascot, message, and sign-in button
  * in place of the data table, so users can still see the dashboard layout.
  */
-export function LandlordEmptyState({ onSignIn }: LandlordEmptyStateProps) {
+export function LandlordEmptyState({ onSignIn = defaultSignIn }: LandlordEmptyStateProps) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8 min-h-[400px]">
       <div className="flex flex-col md:flex-row items-center gap-8 max-w-2xl">

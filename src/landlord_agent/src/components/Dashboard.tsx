@@ -39,6 +39,7 @@ import {
 import { useIsMobile } from "./ui/use-mobile";
 import { Property, UserProfile, MarketInsight, Tenant } from "../App";
 import { trackEvent } from "../../../utils/analytics";
+import { LandlordEmptyState } from "./LandlordEmptyState";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -74,6 +75,7 @@ interface DashboardProps {
   marketInsights: MarketInsight[];
   vacancyAlerts?: any[];
   arrearsAlerts?: any[];
+  onSignIn?: () => void;
 }
 
 export function Dashboard({
@@ -90,6 +92,7 @@ export function Dashboard({
   marketInsights,
   vacancyAlerts = [],
   arrearsAlerts = [],
+  onSignIn,
 }: DashboardProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -493,6 +496,94 @@ export function Dashboard({
         return status;
     }
   };
+
+  // For unauthenticated users: show header, 4 summary cards (all 0), and empty state mascot only
+  if (!userProfile) {
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7' }}>
+        {/* Minimal Header for unauthenticated state */}
+        <div className="max-w-7xl mx-auto mt-4 md:mt-8 px-4 md:px-0">
+          <div
+            className="bg-white shadow-lg rounded-xl px-4 md:px-8 py-4 md:py-6"
+            style={{ fontFamily: 'Archivo, sans-serif' }}
+          >
+            <h1 className="text-xl font-semibold" style={{ color: '#374957' }}>Dashboard</h1>
+            <p className="text-sm text-muted-foreground mt-1">Sign in to manage your portfolio</p>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-3 py-6">
+          {/* Overview Section */}
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+              Overview
+            </h2>
+          </div>
+
+          {/* Summary Cards - all 0 since no properties */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-sm">Total Properties</p>
+                  <p className="text-lg font-semibold">{totalProperties}</p>
+                </div>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <Building2 className="w-6 h-6 text-primary" />
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-6 flex-1">
+                  <div className="text-center">
+                    <p className="text-muted-foreground mb-1 text-sm">Occupied</p>
+                    <p className="text-lg font-semibold text-green-600">{occupiedProperties}</p>
+                  </div>
+                  <div className="w-px h-12 bg-gray-200"></div>
+                  <div className="text-center">
+                    <p className="text-muted-foreground mb-1 text-sm">Vacant</p>
+                    <p className="text-lg font-semibold text-orange-600">{vacantProperties}</p>
+                  </div>
+                </div>
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-sm">Monthly rental revenue</p>
+                  <p className="text-lg font-semibold">£{totalRent.toLocaleString()}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <PoundSterling className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-sm">Document Alerts</p>
+                  <p className="text-lg font-semibold text-orange-600">{expiringDocuments}</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-orange-600" />
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Empty State Sign-in */}
+          <LandlordEmptyState onSignIn={onSignIn} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7' }}>

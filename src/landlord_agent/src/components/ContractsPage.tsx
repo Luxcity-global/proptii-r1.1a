@@ -36,6 +36,8 @@ import {
 } from './ui/dropdown-menu';
 import { SendContractModal } from './SendContractModal';
 import { contractService } from '../services/contractService';
+import { LandlordEmptyState } from './LandlordEmptyState';
+import { UserProfile } from '../App';
 
 export interface Contract {
   id: string;
@@ -56,9 +58,10 @@ export interface Contract {
 interface ContractsPageProps {
   tenants?: Array<{ id: string; name: string; email: string; propertyId?: string }>;
   onBack?: () => void;
+  userProfile?: UserProfile | null;
 }
 
-export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
+export function ContractsPage({ tenants = [], onBack, userProfile }: ContractsPageProps) {
   const [activeTab, setActiveTab] = useState<'sent' | 'unsigned' | 'signed'>('sent');
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -66,6 +69,7 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [landlordEmail, setLandlordEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [isAuthChecked, setIsAuthChecked] = useState(false);
   const [showSuccessScreen, setShowSuccessScreen] = useState(false);
   const [successData, setSuccessData] = useState<{ recipientName: string; recipientEmail: string; fileName: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,6 +87,11 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
   // Get landlord email and userId from localStorage/auth on component mount
   useEffect(() => {
     const getUserInfo = () => {
+      // Also seed from userProfile prop if available
+      if (userProfile?.email) {
+        setLandlordEmail(userProfile.email);
+      }
+
       // Try to get from localStorage (set during login/registration)
       const storedEmail = localStorage.getItem('landlordEmail');
       if (storedEmail) {
@@ -118,17 +127,29 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
         console.log('✅ Found userId in query param:', uidFromQuery);
         setUserId(uidFromQuery);
       }
+
+      // Mark auth check as complete
+      setIsAuthChecked(true);
     };
 
     getUserInfo();
-  }, []);
+  }, [userProfile]);
 
   // Load contracts when tab changes or landlordEmail/userId is set
+  // Wait until auth check is complete to avoid loading all contracts for unauthenticated users
   useEffect(() => {
+    if (!isAuthChecked) return;
     loadContracts();
-  }, [activeTab, landlordEmail, userId]);
+  }, [activeTab, landlordEmail, userId, isAuthChecked]);
 
   const loadContracts = async () => {
+    // Do not load contracts if user is not authenticated
+    if (!userId && !landlordEmail) {
+      setContracts([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -156,10 +177,6 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
       if (landlordEmail) {
         filters.landlordEmail = landlordEmail;
         console.log('🔍 Loading contracts with landlordEmail filter:', landlordEmail);
-      }
-      
-      if (!userId && !landlordEmail) {
-        console.log('⚠️ No userId or landlordEmail - loading all contracts');
       }
       
       const fetchedContracts = await contractService.getContracts(filters);
@@ -1116,6 +1133,76 @@ export function ContractsPage({ tenants = [], onBack }: ContractsPageProps) {
             </Button>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
+
+  // Show 4 cards + empty state for unauthenticated users
+  if (isAuthChecked && !userId && !landlordEmail) {
+    return (
+      <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#F7F7F7' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full">
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
+              Contracts
+            </h1>
+            <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
+              Manage your property contracts and agreements
+            </p>
+          </div>
+
+          {/* Overview Cards - all 0 values */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Sent Contracts</p>
+                  <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <FileText className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Contracts expiring soon</p>
+                  <p className="text-2xl font-semibold text-orange-600" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-orange-600" />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Pending Signature</p>
+                  <p className="text-2xl font-semibold text-yellow-600" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
+                </div>
+                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-yellow-600" />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Signed Contracts</p>
+                  <p className="text-2xl font-semibold text-green-600" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
+                </div>
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Empty State Sign-in */}
+          <LandlordEmptyState />
+        </div>
       </div>
     );
   }

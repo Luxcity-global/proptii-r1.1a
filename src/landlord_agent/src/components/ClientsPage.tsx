@@ -8,8 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { Tenant, Property, ArrearsAlert, UserRole } from '../App';
+import { Tenant, Property, ArrearsAlert, UserRole, UserProfile } from '../App';
 import { referencingService } from '../services/referencingService';
+import { LandlordEmptyState } from './LandlordEmptyState';
 
 
 
@@ -48,10 +49,11 @@ interface ClientsPageProps {
   onExportTenants?: (format: 'json' | 'csv' | 'excel' | 'pdf') => void;
   onDeleteLandlord?: (landlordId: string) => void;
   onArchiveLandlord?: (landlordId: string) => void;
+  userProfile?: UserProfile | null;
   onExportLandlords?: (format: 'json' | 'csv' | 'excel' | 'pdf') => void;
 }
 
-export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onViewTenant, onViewProperty, onAddTenant, onAddLandlord, onViewLandlord, onDeleteTenant, onArchiveTenant, onExportTenants, onDeleteLandlord, onArchiveLandlord, onExportLandlords }: ClientsPageProps) {
+export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onViewTenant, onViewProperty, onAddTenant, onAddLandlord, onViewLandlord, onDeleteTenant, onArchiveTenant, onExportTenants, onDeleteLandlord, onArchiveLandlord, onExportLandlords, userProfile }: ClientsPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('tenants');
   const [tenantFilter, setTenantFilter] = useState('all');
@@ -71,6 +73,10 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
   // Fetch referencing statuses for all tenants
   useEffect(() => {
     const fetchReferencingStatuses = async () => {
+      if (!userProfile) {
+        setReferencingStatuses(new Map());
+        return;
+      }
       if (tenants.length === 0) return;
       
       setIsLoadingReferencingStatuses(true);
@@ -88,7 +94,25 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
     };
 
     fetchReferencingStatuses();
-  }, [tenants]);
+  }, [tenants, userProfile]);
+
+  if (!userProfile) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+        <div>
+          <h1 className="text-lg sm:text-2xl md:text-3xl" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>Your Tenants</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>Manage your tenants and landlords</p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1">Total Tenants</p><p className="text-2xl font-semibold">0</p><p className="text-xs text-muted-foreground">0 current, 0 overdue</p></div><div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center"><Users className="w-6 h-6 text-primary" /></div></div></Card>
+          <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1">Rent Arrears</p><p className="text-2xl font-semibold text-red-600">£0</p><p className="text-xs text-muted-foreground">0 tenants behind</p></div><div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center"><AlertTriangle className="w-6 h-6 text-red-600" /></div></div></Card>
+          <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1">Leases Expiring</p><p className="text-2xl font-semibold text-orange-600">0</p><p className="text-xs text-muted-foreground">Next 3 months</p></div><div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center"><Clock className="w-6 h-6 text-orange-600" /></div></div></Card>
+          <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1">Avg Risk Score</p><p className="text-2xl font-semibold text-green-600">0%</p><p className="text-xs text-muted-foreground">Default risk level</p></div><div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center"><Shield className="w-6 h-6 text-green-600" /></div></div></Card>
+        </div>
+        <LandlordEmptyState />
+      </div>
+    );
+  }
 
   const getPropertyForTenant = (tenantId: string) => {
     const tenant = tenants.find(t => t.id === tenantId);

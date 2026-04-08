@@ -26,7 +26,10 @@ import emailService from '../../../services/emailService';
 import landlordUserService from '../../../services/landlordUserService';
 import { useIsMobile } from './ui/use-mobile';
 import { Button } from './ui/button';
+import { Card } from './ui/card';
 import { trackEvent } from '../../../utils/analytics';
+import { LandlordEmptyState } from './LandlordEmptyState';
+import { UserProfile } from '../App';
 
 // ViewingsPage component for managing property viewings and requests
 
@@ -36,6 +39,7 @@ interface ViewingsPageProps {
   managerId: string | null;
   managerName?: string;
   managerEmail?: string;
+  userProfile?: UserProfile | null;
 }
 
 interface ScheduleFormState {
@@ -97,10 +101,9 @@ function formatTime(time: string) {
   }
 }
 
-const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, managerEmail }) => {
+const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, managerEmail, userProfile }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isRedirecting, setIsRedirecting] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>('requests');
   const [requests, setRequests] = useState<BookViewingRequest[]>([]);
   const [bookings, setBookings] = useState<ViewingBooking[]>([]);
@@ -120,6 +123,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   const [selectedViewings, setSelectedViewings] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
+  const isAuthenticatedUser = Boolean(userProfile);
   
   // Pagination state for each tab
   const [currentRequestsPage, setCurrentRequestsPage] = useState<number>(1);
@@ -129,45 +133,14 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   
   const ITEMS_PER_PAGE = 10;
 
-  // Check authentication and redirect if not authenticated - IMMEDIATELY on mount
-  useEffect(() => {
-    if (!managerId && !managerEmail) {
-      setIsRedirecting(true);
-      // User is not authenticated - redirect to login IMMEDIATELY
-      // Use the full path including /landlord prefix
-      const redirectPath = encodeURIComponent('/landlord/viewings');
-      
-      // Since we're in an iframe, redirect the parent window
-      // Try to access parent window, fallback to current window if in same origin
-      try {
-        if (window.top && window.top !== window.self) {
-          // We're in an iframe - redirect parent window IMMEDIATELY
-          window.top.location.href = `/login?redirect=${redirectPath}`;
-        } else {
-          // Not in iframe or same origin - redirect current window IMMEDIATELY
-          window.location.href = `/login?redirect=${redirectPath}`;
-        }
-      } catch (e) {
-        // Cross-origin iframe - use postMessage to request redirect
-        if (window.parent) {
-          window.parent.postMessage({
-            type: 'REDIRECT_TO_LOGIN',
-            payload: { redirect: '/landlord/viewings' }
-          }, '*');
-        }
-        // Fallback: redirect current window
-        window.location.href = `/login?redirect=${redirectPath}`;
-      }
-    }
-  }, [managerId, managerEmail]);
-
   useEffect(() => {
     let unsubscribeBookings: (() => void) | undefined;
     let unsubscribeRequests: (() => void) | undefined;
     let unsubscribeStats: (() => void) | undefined;
 
-    if (!managerId && !managerEmail) {
-      // Don't proceed if not authenticated (redirect should have happened above)
+    if (!isAuthenticatedUser) {
+      // Don't proceed if not authenticated - empty state is shown instead
+      setLoading(false);
       return;
     }
 
@@ -195,10 +168,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         }
 
         if (!managerEmail) {
-          // Don't set error if we're redirecting - just return
-          if (!isRedirecting) {
-            setError('Unable to determine your email. Please sign in again.');
-          }
+          setError('Unable to determine your email. Please sign in again.');
           setLoading(false);
           return;
         }
@@ -409,7 +379,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
       unsubscribeRequests?.();
       unsubscribeStats?.();
     };
-  }, [managerId, managerEmail]);
+  }, [managerId, managerEmail, isAuthenticatedUser]);
 
   // Function to check if a viewing date/time has passed
   const isViewingDatePassed = (viewing: ViewingBooking): boolean => {
@@ -1047,17 +1017,67 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
     }
   };
 
-  // Show redirecting message if not authenticated
-  if (isRedirecting || (!managerId && !managerEmail)) {
+  // Show 4 summary cards + empty state for unauthenticated users
+  if (!isAuthenticatedUser) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center max-w-md mx-auto px-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E65D24] mx-auto mb-4"></div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Redirecting to Sign In</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Please sign in to access your viewing requests. If you don't have an account yet, you can create one during sign-in.
-          </p>
-          <p className="text-xs text-gray-500">If you're not redirected automatically, <a href="/login?redirect=/landlord/viewings" className="text-[#E65D24] underline">click here</a>.</p>
+      <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#F7F7F7' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full">
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold mb-1" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Viewings</h1>
+            <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Manage property viewing requests and bookings</p>
+          </div>
+
+          {/* Summary Cards - all 0 values */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Pending Requests</p>
+                  <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Mail className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Scheduled Viewings</p>
+                  <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <Calendar className="w-6 h-6 text-orange-600" />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Completed Viewings</p>
+                  <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
+                </div>
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Cancelled Viewings</p>
+                  <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
+                </div>
+                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                  <X className="w-6 h-6 text-red-600" />
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Empty State Sign-in */}
+          <LandlordEmptyState />
         </div>
       </div>
     );
@@ -1075,41 +1095,17 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   }
 
   if (error) {
-    // If error is about authentication, show a sign-in prompt instead
+    // If error is about authentication, keep users inside the unauthenticated empty state
     if (error.includes('Unable to determine your email') || error.includes('sign in') || error.includes('sign-in')) {
-      const handleSignIn = () => {
-        const currentPath = window.location.pathname + window.location.search;
-        const redirectPath = encodeURIComponent(currentPath);
-        
-        try {
-          if (window.top && window.top !== window.self) {
-            window.top.location.href = `/login?redirect=${redirectPath}`;
-          } else {
-            window.location.href = `/login?redirect=${redirectPath}`;
-          }
-        } catch (e) {
-          if (window.parent) {
-            window.parent.postMessage({
-              type: 'REDIRECT_TO_LOGIN',
-              payload: { redirect: currentPath }
-            }, '*');
-          }
-          window.location.href = `/login?redirect=${redirectPath}`;
-        }
-      };
-
       return (
-        <div className="max-w-4xl mx-auto bg-white border border-orange-200 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-orange-700 mb-2">Authentication Required</h2>
-          <p className="text-sm text-orange-600 mb-4">
-            Please sign in to access your viewing requests. If you don't have an account yet, you can create one during sign-in.
-          </p>
-          <button
-            className="px-6 py-2 bg-[#E65D24] text-white rounded-lg hover:bg-opacity-90 transition-all"
-            onClick={handleSignIn}
-          >
-            Sign In to Continue
-          </button>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+            <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1 text-sm">Pending Requests</p><p className="text-2xl font-semibold">0</p></div><div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center"><Mail className="w-6 h-6 text-blue-600" /></div></div></Card>
+            <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1 text-sm">Scheduled Viewings</p><p className="text-2xl font-semibold">0</p></div><div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center"><Calendar className="w-6 h-6 text-orange-600" /></div></div></Card>
+            <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1 text-sm">Completed Viewings</p><p className="text-2xl font-semibold">0</p></div><div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center"><CheckCircle className="w-6 h-6 text-green-600" /></div></div></Card>
+            <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1 text-sm">Cancelled Viewings</p><p className="text-2xl font-semibold">0</p></div><div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center"><X className="w-6 h-6 text-red-600" /></div></div></Card>
+          </div>
+          <LandlordEmptyState />
         </div>
       );
     }
