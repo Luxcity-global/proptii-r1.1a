@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Put, Param, Delete, HttpCode, UseGuards } 
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { ViewingRequestService } from '../services/viewing-request.service';
 import { CreateViewingRequestDto, UpdateViewingRequestDto } from '../dtos/viewing-request.dto';
-import { ViewingRequest } from '../entities/viewing-request.entity';
+import { ViewingRequest } from '../models/viewing-request.model';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 @Controller('viewing-requests')

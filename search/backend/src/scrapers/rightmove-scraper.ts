@@ -2,6 +2,9 @@ import puppeteer from 'puppeteer';
 import type { LaunchOptions } from 'puppeteer';
 import * as cheerio from 'cheerio';
 import { Property, getChromeExecutablePath } from '../scraper';
+import { Logger } from '../utils/logger';
+
+const logger = new Logger('RightmoveScraper');
 
 /**
  * Scrapes property listings from Rightmove
@@ -18,14 +21,14 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
   try {
     // Clean up and validate the URL
     const cleanUrl = url.replace(/manchester-under/, 'manchester');
-    console.log('Original URL:', url);
-    console.log('Cleaned URL:', cleanUrl);
+    logger.info('Original URL:', url);
+    logger.info('Cleaned URL:', cleanUrl);
     
-    console.log('Launching browser...');
+    logger.info('Launching browser...');
     // Get Chrome executable path dynamically
     const chromeExecutablePath = await getChromeExecutablePath();
     if (chromeExecutablePath) {
-      console.log('Using Chrome executable for Rightmove:', chromeExecutablePath);
+      logger.info('Using Chrome executable for Rightmove:', chromeExecutablePath);
     }
     
     // Launch browser with robust error handling
@@ -68,7 +71,7 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
 
     browser = await puppeteer.launch(launchOptions);
 
-    console.log('Creating new page...');
+    logger.info('Creating new page...');
     const page = await browser.newPage();
 
     // Set viewport and modern user agent
@@ -105,7 +108,7 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
       } catch {}
     } catch {}
 
-    console.log('Navigating to URL...');
+    logger.info('Navigating to URL...');
     // Navigate to URL with retry logic
     let retries = 3;
     while (retries > 0) {
@@ -118,14 +121,14 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
         });
         break;
       } catch (error) {
-        console.error(`Navigation failed, retries left: ${retries - 1}`, error);
+        logger.error(`Navigation failed, retries left: ${retries - 1}`, error);
         retries--;
         if (retries === 0) throw error;
         await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds before retry
       }
     }
 
-    console.log('Waiting for content to load...');
+    logger.info('Waiting for content to load...');
     // Wait for initial page load
     await new Promise(resolve => setTimeout(resolve, 3000));
     
@@ -137,18 +140,18 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
       page.waitForSelector('.searchHeader-resultCount', { timeout: 20000 }).catch(() => null),
       page.waitForSelector('#l-container', { timeout: 20000 }).catch(() => null)
     ]).catch(() => {
-      console.log('Initial property selectors not found, waiting longer...');
+      logger.info('Initial property selectors not found, waiting longer...');
     });
 
     // Additional wait for dynamic content and lazy loading
-    console.log('Waiting for dynamic content to render...');
+    logger.info('Waiting for dynamic content to render...');
     await new Promise(resolve => setTimeout(resolve, 5000));
     
     // Wait for images and other assets to start loading by checking if the page has loaded
     try {
       await page.waitForFunction(() => document.readyState === 'complete', { timeout: 10000 });
     } catch {
-      console.log('Page complete state not reached within timeout, continuing...');
+      logger.info('Page complete state not reached within timeout, continuing...');
     }
     
     // Additional wait specifically for Rightmove's JavaScript to populate data
@@ -157,7 +160,7 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
     // Sprint 2 Phase 2: skip scroll when SEARCH_OPT_DISABLE_SCROLLING=true to save time
     const disableScrolling = process.env.SEARCH_OPT_DISABLE_SCROLLING === 'true';
     if (!disableScrolling) {
-      console.log('Scrolling to load all images...');
+      logger.info('Scrolling to load all images...');
       // Scroll down to trigger lazy loading of images and content
       await page.evaluate(() => {
         return new Promise((resolve) => {
@@ -177,29 +180,29 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
         });
       });
       // Additional wait after scrolling for content to stabilize
-      console.log('Waiting for content to stabilize after scrolling...');
+      logger.info('Waiting for content to stabilize after scrolling...');
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
 
-    console.log('Getting page content...');
+    logger.info('Getting page content...');
     // Get page content
     const content = await page.content();
     const $ = cheerio.load(content);
     
-    console.log('Page title:', $('title').text());
+    logger.info('Page title:', $('title').text());
     
     // Page loaded successfully
     
     // Check for error pages
     const pageTitle = $('title').text().toLowerCase();
     if (pageTitle.includes("couldn't find") || pageTitle.includes("error") || pageTitle.includes("not found")) {
-      console.log('Error page detected. URL may be invalid or location not found.');
-      console.log('Current URL:', await page.url());
+      logger.info('Error page detected. URL may be invalid or location not found.');
+      logger.info('Current URL:', await page.url());
       
       // Try to extract any helpful error messages
       const errorMessage = $('body').text();
       if (errorMessage.includes('location')) {
-        console.log('Location-related error detected. Check location identifier.');
+        logger.info('Location-related error detected. Check location identifier.');
       }
       
       return [];
@@ -229,32 +232,32 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
       propertyCards = $('[class*="property"]');
     }
     
-    console.log(`Found ${propertyCards.length} property cards`);
+    logger.info(`Found ${propertyCards.length} property cards`);
 
     if (propertyCards.length === 0) {
-      console.log('No property cards found. Checking page structure...');
+      logger.info('No property cards found. Checking page structure...');
       
       // Log some key elements to understand page structure
-      console.log('Available elements with "property" in class:', $('[class*="property"]').length);
-      console.log('Available elements with "result" in class:', $('[class*="result"]').length);
-      console.log('Available elements with "card" in class:', $('[class*="card"]').length);
+      logger.info('Available elements with "property" in class:', $('[class*="property"]').length);
+      logger.info('Available elements with "result" in class:', $('[class*="result"]').length);
+      logger.info('Available elements with "card" in class:', $('[class*="card"]').length);
       
       // Check for specific Rightmove elements
-      console.log('Elements with "propertyCard":', $('.propertyCard').length);
-      console.log('Elements with "searchResult":', $('.searchResult').length);
-      console.log('Elements with "listing":', $('.listing').length);
+      logger.info('Elements with "propertyCard":', $('.propertyCard').length);
+      logger.info('Elements with "searchResult":', $('.searchResult').length);
+      logger.info('Elements with "listing":', $('.listing').length);
       
       // Log some sample classes
       const sampleClasses = $('div[class*="property"], div[class*="result"], div[class*="card"], div[class*="listing"]')
         .map((i, el) => $(el).attr('class'))
         .get()
         .slice(0, 15);
-      console.log('Sample classes:', sampleClasses);
+      logger.info('Sample classes:', sampleClasses);
       
       // Check if there's a "no results" message
       const noResultsText = $('body').text().toLowerCase();
       if (noResultsText.includes('no properties') || noResultsText.includes('no results') || noResultsText.includes('0 properties')) {
-        console.log('No results message detected in page content');
+        logger.info('No results message detected in page content');
       }
       
       return [];
@@ -493,7 +496,7 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
             detailTargets.push({ index: propertyIndex, url: listingUrl });
           }
           
-          console.log('Added property:', {
+          logger.info('Added property:', {
             title: cleanTitle || 'No title',
             price: price || 'No price',
             location: cleanLocation || 'No location',
@@ -501,10 +504,10 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
             imageUrls: validImageUrls.length > 0 ? `Found ${validImageUrls.length} images` : 'No images found'
           });
         } else {
-          console.log(`Skipped property ${_i + 1} - insufficient data (title: ${title?.length || 0} chars, location: ${location?.length || 0} chars, price: ${price ? 'found' : 'missing'})`);
+          logger.info(`Skipped property ${_i + 1} - insufficient data (title: ${title?.length || 0} chars, location: ${location?.length || 0} chars, price: ${price ? 'found' : 'missing'})`);
         }
       } catch (itemError) {
-        console.error('Error processing property item:', itemError);
+        logger.error('Error processing property item:', itemError);
       }
     });
 
@@ -514,7 +517,7 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
     for (const target of targetsToEnrich) {
       const { index, url: detailUrl } = target;
       try {
-        console.log(`Enriching property [${index}] from detail page: ${detailUrl}`);
+        logger.info(`Enriching property [${index}] from detail page: ${detailUrl}`);
         await page.goto(detailUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
         // Give the page a moment to render dynamic sections
@@ -581,7 +584,7 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
         };
 
       } catch (enrichErr) {
-        console.warn(`Failed to enrich property at ${detailUrl}:`, enrichErr);
+        logger.warn(`Failed to enrich property at ${detailUrl}:`, enrichErr);
       }
     }
 
@@ -594,19 +597,19 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
     }
     const uniqueList = Array.from(uniqueMap.values());
 
-    console.log(`Successfully scraped ${uniqueList.length} properties from Rightmove`);
+    logger.info(`Successfully scraped ${uniqueList.length} properties from Rightmove`);
     return uniqueList;
 
   } catch (error) {
-    console.error('Error scraping Rightmove:', error);
+    logger.error('Error scraping Rightmove:', error);
     throw error;
   } finally {
     if (browser) {
       try {
-        console.log('Closing browser...');
+        logger.info('Closing browser...');
         await browser.close();
       } catch (closeError) {
-        console.error('Error closing browser:', closeError);
+        logger.error('Error closing browser:', closeError);
       }
     }
   }
@@ -699,6 +702,5 @@ export function buildRightmoveUrl(query: string, resolvedLocationIdentifier?: st
     ? 'https://www.rightmove.co.uk/property-to-rent/find.html'
     : 'https://www.rightmove.co.uk/property-for-sale/find.html';
   const url = `${base}?${params.toString()}`;
-  console.log('Generated dynamic Rightmove URL:', url);
   return url;
 }

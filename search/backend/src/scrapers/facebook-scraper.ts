@@ -1,5 +1,8 @@
 import { chromium } from 'playwright';
 import type { Property } from '../scraper';
+import { Logger } from '../utils/logger';
+
+const logger = new Logger('FacebookScraper');
 
 /**
  * Scrapes property listings from Facebook Marketplace
@@ -13,8 +16,8 @@ export async function scrapeFacebookMarketplace(location: string, maxPrice: numb
   let browser;
 
   try {
-    console.log('Starting Facebook Marketplace scraper...');
-    console.log(`Searching for properties in ${location}, max £${maxPrice}, ${bedrooms} bedrooms`);
+    logger.info('Starting Facebook Marketplace scraper...');
+    logger.info(`Searching for properties in ${location}, max £${maxPrice}, ${bedrooms} bedrooms`);
 
     browser = await chromium.launch({
       headless: true,
@@ -32,14 +35,14 @@ export async function scrapeFacebookMarketplace(location: string, maxPrice: numb
     const searchQuery = encodeURIComponent(`${bedrooms} bed flat rent ${location} UK £`);
     const fbUrl = `https://www.facebook.com/marketplace/${location.toLowerCase()}/search/?query=${searchQuery}&type=rentals&propertyType=rentals`;
     
-    console.log('Navigating to Facebook Marketplace:', fbUrl);
+    logger.info('Navigating to Facebook Marketplace:', fbUrl);
     await page.goto(fbUrl, { waitUntil: 'domcontentloaded' });
 
     // Wait for listings to load with reduced timeout for speed
     try {
       await page.waitForSelector('[data-testid="marketplace-product-item"], .marketplace-list-item', { timeout: 6000 });
     } catch {
-      console.log('No Facebook listings found or page structure changed');
+      logger.info('No Facebook listings found or page structure changed');
       return properties;
     }
 
@@ -51,7 +54,7 @@ export async function scrapeFacebookMarketplace(location: string, maxPrice: numb
 
     // Extract property listings
     const listingElements = await page.$$('[data-testid="marketplace-product-item"], .marketplace-list-item, [role="article"]');
-    console.log(`Found ${listingElements.length} potential Facebook listings`);
+    logger.info(`Found ${listingElements.length} potential Facebook listings`);
 
     let validCount = 0;
     for (let i = 0; i < listingElements.length && validCount < 3; i++) {
@@ -78,7 +81,7 @@ export async function scrapeFacebookMarketplace(location: string, maxPrice: numb
             }
           }
         } catch (error) {
-          console.warn(`Failed to extract image for Facebook listing ${i + 1}`);
+          logger.warn(`Failed to extract image for Facebook listing ${i + 1}`);
         }
 
         // Extract listing URL
@@ -92,7 +95,7 @@ export async function scrapeFacebookMarketplace(location: string, maxPrice: numb
             }
           }
         } catch (error) {
-          console.warn(`Failed to extract URL for Facebook listing ${i + 1}`);
+          logger.warn(`Failed to extract URL for Facebook listing ${i + 1}`);
         }
 
         // Filter for rental properties and validate data with location check
@@ -118,7 +121,7 @@ export async function scrapeFacebookMarketplace(location: string, maxPrice: numb
                            !title.toLowerCase().includes('facebook');
 
         if (hasValidData) {
-          console.log(`Adding Facebook listing ${i + 1}: ${title.substring(0, 50)}...`);
+          logger.info(`Adding Facebook listing ${i + 1}: ${title.substring(0, 50)}...`);
           validCount++;
           
           properties.push({
@@ -136,20 +139,20 @@ export async function scrapeFacebookMarketplace(location: string, maxPrice: numb
           });
         }
       } catch (error) {
-        console.warn(`Error processing Facebook listing ${i + 1}:`, error);
+        logger.warn(`Error processing Facebook listing ${i + 1}:`, error);
       }
     }
 
-    console.log(`Successfully scraped ${properties.length} properties from Facebook Marketplace`);
+    logger.info(`Successfully scraped ${properties.length} properties from Facebook Marketplace`);
     return properties;
 
   } catch (error) {
-    console.error('Error scraping Facebook Marketplace:', error);
+    logger.error('Error scraping Facebook Marketplace:', error);
     return properties; // Return partial results
   } finally {
     if (browser) {
       await browser.close();
-      console.log('Browser closed');
+      logger.info('Browser closed');
     }
   }
 }

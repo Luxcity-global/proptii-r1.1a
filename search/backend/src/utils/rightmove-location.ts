@@ -1,65 +1,68 @@
 import axios from 'axios';
+import { Logger } from './logger';
+
+const logger = new Logger('RightmoveLocation');
 
 function extractRegionCodeFromHtml(html: string): string | undefined {
-  console.log('[Rightmove] Extracting from HTML, length:', html.length);
+  logger.info('[Rightmove] Extracting from HTML, length:', html.length);
   
   // Try JSON patterns (most common in modern pages)
   const jsonMatch = html.match(/"locationIdentifier"\s*:\s*"REGION\^(\d+)"/i);
   if (jsonMatch) {
-    console.log('[Rightmove] Found via JSON pattern:', `REGION^${jsonMatch[1]}`);
+    logger.info('[Rightmove] Found via JSON pattern:', `REGION^${jsonMatch[1]}`);
     return `REGION^${jsonMatch[1]}`;
   }
 
   // Try URL-encoded patterns in current URL or redirects
   const encMatch = html.match(/locationIdentifier=REGION%5E(\d+)/i);
   if (encMatch) {
-    console.log('[Rightmove] Found via URL-encoded pattern:', `REGION^${encMatch[1]}`);
+    logger.info('[Rightmove] Found via URL-encoded pattern:', `REGION^${encMatch[1]}`);
     return `REGION^${encMatch[1]}`;
   }
 
   // Try hidden input fields
   const inputMatch = html.match(/name=\"locationIdentifier\"[^>]*value=\"REGION\^(\d+)\"/i);
   if (inputMatch) {
-    console.log('[Rightmove] Found via hidden input:', `REGION^${inputMatch[1]}`);
+    logger.info('[Rightmove] Found via hidden input:', `REGION^${inputMatch[1]}`);
     return `REGION^${inputMatch[1]}`;
   }
 
   // Try canonical link
   const canonicalMatch = html.match(/<link[^>]*rel=\"canonical\"[^>]*href=\"[^\"]*locationIdentifier=REGION%5E(\d+)[^\"]*\"/i);
   if (canonicalMatch) {
-    console.log('[Rightmove] Found via canonical link:', `REGION^${canonicalMatch[1]}`);
+    logger.info('[Rightmove] Found via canonical link:', `REGION^${canonicalMatch[1]}`);
     return `REGION^${canonicalMatch[1]}`;
   }
 
   // Try data attributes
   const dataMatch = html.match(/data-[^=]*locationidentifier[^=]*=\"REGION\^(\d+)\"/i);
   if (dataMatch) {
-    console.log('[Rightmove] Found via data attribute:', `REGION^${dataMatch[1]}`);
+    logger.info('[Rightmove] Found via data attribute:', `REGION^${dataMatch[1]}`);
     return `REGION^${dataMatch[1]}`;
   }
 
   // Try window/global variables
   const windowMatch = html.match(/window\.[^=]*locationIdentifier[^=]*=\s*['"](REGION\^\d+)['"]/i);
   if (windowMatch) {
-    console.log('[Rightmove] Found via window variable:', windowMatch[1]);
+    logger.info('[Rightmove] Found via window variable:', windowMatch[1]);
     return windowMatch[1];
   }
 
   // Try more flexible JSON patterns
   const flexJsonMatch = html.match(/['"](REGION\^\d+)['"][^}]*location/i);
   if (flexJsonMatch) {
-    console.log('[Rightmove] Found via flexible JSON:', flexJsonMatch[1]);
+    logger.info('[Rightmove] Found via flexible JSON:', flexJsonMatch[1]);
     return flexJsonMatch[1];
   }
 
-  console.log('[Rightmove] No locationIdentifier patterns found in HTML');
+  logger.info('[Rightmove] No locationIdentifier patterns found in HTML');
   return undefined;
 }
 
 export async function resolveRightmoveLocationIdentifier(locationPhrase: string, isRental: boolean): Promise<string | undefined> {
-  console.log('[Rightmove] Starting location resolution for:', locationPhrase, 'isRental:', isRental);
+  logger.info('[Rightmove] Starting location resolution for:', locationPhrase, 'isRental:', isRental);
   if (!locationPhrase || locationPhrase.trim().length === 0) {
-    console.log('[Rightmove] Empty location phrase, returning undefined');
+    logger.info('[Rightmove] Empty location phrase, returning undefined');
     return undefined;
   }
 
@@ -86,7 +89,7 @@ export async function resolveRightmoveLocationIdentifier(locationPhrase: string,
         const baseRunUrl = apifyActorId
           ? `https://api.apify.com/v2/acts/${encodeURIComponent(apifyActorId)}/runs?token=${encodeURIComponent(apifyToken)}&waitForFinish=120`
           : `https://api.apify.com/v2/actor-tasks/${encodeURIComponent(apifyTaskId as string)}/runs?token=${encodeURIComponent(apifyToken)}&waitForFinish=120`;
-        console.log('[Rightmove] Resolving location via Apify', apifyActorId ? `(actor ${apifyActorId})` : `(task ${apifyTaskId})`, `for: "${locationPhrase}"`);
+        logger.info('[Rightmove] Resolving location via Apify', apifyActorId ? `(actor ${apifyActorId})` : `(task ${apifyTaskId})`, `for: "${locationPhrase}"`);
         const runResp = await axios.post(baseRunUrl, { location: locationPhrase, isRental }, {
           headers: { 'content-type': 'application/json' },
           timeout: 20000,
@@ -94,13 +97,13 @@ export async function resolveRightmoveLocationIdentifier(locationPhrase: string,
         const runData = runResp.data?.data;
         const storeId: string | undefined = runData?.defaultKeyValueStoreId;
         const status: string | undefined = runData?.status;
-        console.log('[Rightmove] Apify run status:', status);
+        logger.info('[Rightmove] Apify run status:', status);
         if (status === 'SUCCEEDED' && storeId) {
           const outputUrl = `https://api.apify.com/v2/key-value-stores/${encodeURIComponent(storeId)}/records/OUTPUT?token=${encodeURIComponent(apifyToken)}`;
           const outResp = await axios.get(outputUrl, { timeout: 12000 });
           const id = (outResp.data && (outResp.data.locationIdentifier || outResp.data.id)) as string | undefined;
           if (id && /^REGION\^\d+$/.test(id)) {
-            console.log('[Rightmove] Apify resolved locationIdentifier:', id);
+            logger.info('[Rightmove] Apify resolved locationIdentifier:', id);
             return id;
           }
         }
@@ -129,7 +132,7 @@ export async function resolveRightmoveLocationIdentifier(locationPhrase: string,
     // Try redirect/canonical via Location header (no redirects)
     try {
       const headUrl = `${base}?useLocationIdentifier=true&searchLocation=${encodeURIComponent(locationPhrase)}&radius=0.0`;
-      console.log('[Rightmove] Trying redirect-based resolution for:', headUrl);
+      logger.info('[Rightmove] Trying redirect-based resolution for:', headUrl);
       const redirectResp = await axios.get(headUrl, {
         maxRedirects: 0,
         validateStatus: (s) => s >= 200 && s < 400,
@@ -141,11 +144,11 @@ export async function resolveRightmoveLocationIdentifier(locationPhrase: string,
       });
       const locHeader: string | undefined = (redirectResp.headers?.location as string | undefined);
       if (locHeader) {
-        console.log('[Rightmove] Redirect Location header:', locHeader);
+        logger.info('[Rightmove] Redirect Location header:', locHeader);
         const m = locHeader.match(/locationIdentifier=REGION%5E(\d+)/i);
         if (m) {
           const id = `REGION^${m[1]}`;
-          console.log('[Rightmove] Redirect resolved locationIdentifier:', id);
+          logger.info('[Rightmove] Redirect resolved locationIdentifier:', id);
           return id;
         }
       }
@@ -156,19 +159,19 @@ export async function resolveRightmoveLocationIdentifier(locationPhrase: string,
         const m2 = finalUrl.match(/locationIdentifier=REGION%5E(\d+)/i);
         if (m2) {
           const id = `REGION^${m2[1]}`;
-          console.log('[Rightmove] Final URL resolved locationIdentifier:', id);
+          logger.info('[Rightmove] Final URL resolved locationIdentifier:', id);
           return id;
         }
       }
     } catch (e) {
-      console.log('[Rightmove] Redirect-based resolution failed:', e instanceof Error ? e.message : String(e));
+      logger.info('[Rightmove] Redirect-based resolution failed:', e instanceof Error ? e.message : String(e));
     }
 
     // Try Rightmove search URL approach to extract locationIdentifier from redirects/canonical
     try {
-      console.log('[Rightmove] Trying search page approach for:', locationPhrase);
+      logger.info('[Rightmove] Trying search page approach for:', locationPhrase);
       const searchUrl = `${base}?searchLocation=${encodeURIComponent(locationPhrase)}&radius=0.0`;
-      console.log('[Rightmove] Search URL:', searchUrl);
+      logger.info('[Rightmove] Search URL:', searchUrl);
       const searchResp = await axios.get(searchUrl, {
         headers: {
           'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
@@ -179,17 +182,17 @@ export async function resolveRightmoveLocationIdentifier(locationPhrase: string,
       });
       const extracted = extractRegionCodeFromHtml(searchResp.data);
       if (extracted) {
-        console.log('[Rightmove] Search page resolved locationIdentifier:', extracted);
+        logger.info('[Rightmove] Search page resolved locationIdentifier:', extracted);
         return extracted;
       } else {
-        console.log('[Rightmove] No locationIdentifier found in search page HTML');
+        logger.info('[Rightmove] No locationIdentifier found in search page HTML');
       }
     } catch (e) {
       console.log('[Rightmove] Search page approach failed:', e instanceof Error ? e.message : String(e));
     }
 
     // All approaches failed
-    console.log('[Rightmove] All resolution approaches failed for:', locationPhrase);
+    logger.info('[Rightmove] All resolution approaches failed for:', locationPhrase);
     return undefined;
   } catch {
     return undefined;

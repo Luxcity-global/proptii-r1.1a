@@ -16,20 +16,20 @@ This document provides a concrete migration blueprint for re-architecting Propti
 
 ## 1. Component-by-Component Migration Map
 
-### 1.1 Database: Cosmos DB → PostgreSQL with Prisma/TypeORM
+### 1.1 Database: Cosmos DB → PostgreSQL (Future Migration)
 
 | Aspect | Details |
 |--------|---------|
 | **Current usage** | Cosmos DB stores: Properties, Agents, Viewings, Users, References, Contracts, Dashboard. Used by `proptii-backend` (BaseService, referencing, viewing-request) and `api` (Azure Functions). |
 | **Recommended replacement** | **PostgreSQL** (self-hosted or managed: Supabase, Neon, Railway, or self-hosted) |
-| **Compatibility layer** | Use **Prisma** or **TypeORM** (already referenced in docs). Prisma is preferred for schema clarity and migrations. |
+| **Compatibility layer** | Use **Prisma** (preferred for schema clarity and migrations). TypeORM was previously considered but has been removed from the project. |
 | **Effort** | 4–6 weeks (1 developer) |
 | **Risk** | Medium — schema redesign, migration scripts, and query adaptation required |
 | **Cost impact** | Cosmos DB: ~$25+/month (basic tiers). PostgreSQL: $0–25/month (Supabase free tier, Neon free tier, or self-hosted). |
 
 **Key files to change:**
 - `proptii-backend/src/config/cosmos.config.ts` — replace with DB config
-- `proptii-backend/src/services/base.service.ts` — switch from Cosmos operations to Prisma/TypeORM
+- `proptii-backend/src/services/base.service.ts` — switch from Cosmos operations to Prisma
 - `proptii-backend/src/services/referencing.service.ts`, `viewing-request.service.ts`, `property.service.ts`, `agent.service.ts`
 - `api/src/shared/services/BaseService.ts`, `PropertyService.ts`, `ViewingService.ts`, `UserService.ts`
 - All Cosmos container names map to PostgreSQL tables

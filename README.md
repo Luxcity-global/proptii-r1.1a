@@ -7,7 +7,7 @@ Proptii is a multi-layered, enterprise-grade property management ecosystem desig
 The repository is organized into several specialized sub-projects:
 
 - **Root (Frontend/Website)**: [Vite + React] The main public-facing platform and tenant interface.
-- **[proptii-backend/](proptii-backend/)**: [NestJS] The core API services, handling business logic, database (TypeORM/SQL), and cloud integrations.
+- **[proptii-backend/](proptii-backend/)**: [NestJS] The core API services, handling business logic, Firestore/Cosmos DB, and cloud integrations.
 - **[landlord_agent/](landlord_agent/)**: [Vite + React] A dedicated, high-performance dashboard specifically for landlords.
 - **[functions/](functions/)**: [Firebase Cloud Functions] Serverless background tasks and event-driven logic.
 - **[search/](search/)**: Specialized search micro-service for high-speed property discovery.
@@ -68,7 +68,7 @@ To run components individually:
 | Directory | Purpose | Tech Stack |
 |-----------|---------|------------|
 | [`src/`](src/) | Root Frontend Source | React, Vite, MUI |
-| [`proptii-backend/`](proptii-backend/) | Primary API Layer | NestJS, TypeORM, SQL |
+| [`proptii-backend/`](proptii-backend/) | Primary API Layer | NestJS, Firestore, Cosmos DB |
 | [`landlord_agent/`](landlord_agent/) | Landlord Workflows | React, Vite, Lucide |
 | [`functions/`](functions/) | Background Jobs | Firebase Functions, TS |
 | [`scripts/`](scripts/) | Infrastructure & DevOps | Node.js, Shell |

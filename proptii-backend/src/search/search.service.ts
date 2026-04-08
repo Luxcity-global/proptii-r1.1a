@@ -254,7 +254,7 @@ export class SearchService {
         bedrooms: 2,
         propertyType: "Flat",
         description: "A bright and spacious flat near the station with modern amenities.",
-        source: "mock",
+        source: "Mock",
       },
       {
         title: "Spacious 3 Bedroom House in Walthamstow",
@@ -263,7 +263,7 @@ export class SearchService {
         bedrooms: 3,
         propertyType: "House",
         description: "A family home with a large garden and modern kitchen.",
-        source: "mock",
+        source: "Mock",
       },
       {
         title: "1 Bedroom Studio in Canary Wharf",
@@ -272,7 +272,7 @@ export class SearchService {
         bedrooms: 1,
         propertyType: "Studio",
         description: "A stylish studio apartment in a prime location.",
-        source: "mock",
+        source: "Mock",
       },
       {
         title: "2 Bedroom Apartment in Camden",
@@ -281,7 +281,7 @@ export class SearchService {
         bedrooms: 2,
         propertyType: "Apartment",
         description: "Contemporary apartment in vibrant Camden with excellent transport links.",
-        source: "mock",
+        source: "Mock",
       },
       {
         title: "4 Bedroom Family Home in Richmond",
@@ -290,7 +290,7 @@ export class SearchService {
         bedrooms: 4,
         propertyType: "House",
         description: "Beautiful family home with garden and parking in desirable Richmond.",
-        source: "mock",
+        source: "Mock",
       },
     ];
 

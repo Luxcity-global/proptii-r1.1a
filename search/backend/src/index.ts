@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { randomUUID } from 'crypto';
+import { Logger } from './utils/logger';
 import { scrape, scrapeInternet } from './scraper';
 import { scrapeRightmove, buildRightmoveUrl } from './scrapers/rightmove-scraper';
 import { extractLocationPhraseFromQuery, resolveRightmoveLocationIdentifier } from './utils/rightmove-location';
@@ -11,21 +12,23 @@ import { scrapeOpenRent, buildOpenRentUrl, parseOpenRentQuery } from './scrapers
 
 const app = express();
 const port = process.env.PORT || 3001;
+const logger = new Logger('Main');
 
-// Global error handlers to prevent crashes
+// Global error handlers to prevent crashes and ensure process restart
 process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION:', err);
-  // Don't exit the process in production if possible, or let Render restart it
+  logger.error('UNCAUGHT EXCEPTION:', err);
+  process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('UNHANDLED REJECTION:', reason);
+  logger.error('UNHANDLED REJECTION:', reason);
+  process.exit(1);
 });
 
 // Log memory usage
 const logMemory = () => {
   const used = process.memoryUsage();
-  console.log(`Memory usage: rss=${Math.round(used.rss / 1024 / 1024)}MB, heapTotal=${Math.round(used.heapTotal / 1024 / 1024)}MB, heapUsed=${Math.round(used.heapUsed / 1024 / 1024)}MB`);
+  logger.info(`Memory usage: rss=${Math.round(used.rss / 1024 / 1024)}MB, heapTotal=${Math.round(used.heapTotal / 1024 / 1024)}MB, heapUsed=${Math.round(used.heapUsed / 1024 / 1024)}MB`);
 };
 setInterval(logMemory, 30000); // Log every 30s
 
@@ -49,7 +52,7 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1 || /\.onrender\.com$/.test(origin) || /\.proptii\.co$/.test(origin)) {
       callback(null, true);
     } else {
-      console.log(`Blocked by CORS: ${origin}`);
+      logger.warn(`Blocked by CORS: ${origin}`);
       // For debugging, you might want to allow it anyway temporarily:
       // callback(null, true); 
       callback(new Error('Not allowed by CORS'));
@@ -117,7 +120,7 @@ app.post('/scrape-fallback', async (req, res) => {
           phone: '0113 123 4567',
           website: 'https://example.com'
         },
-        source: 'Fallback',
+        source: 'Mock',
         url: 'https://example.com/property',
         fallback: true
       }
@@ -125,7 +128,7 @@ app.post('/scrape-fallback', async (req, res) => {
 
     res.json(mockProperties);
   } catch (error) {
-    console.error('Error in fallback endpoint:', error);
+    logger.error('Error in fallback endpoint:', error);
     res.status(500).json({
       error: 'Internal server error',
       message: error instanceof Error ? error.message : 'An unexpected error occurred'
@@ -152,7 +155,7 @@ app.post('/scrape-api', searchLimiter, async (req, res) => {
       });
     }
 
-    console.log('API-based search query:', query);
+    logger.info('API-based search query:', query);
 
     // Extract location from query
     const locationMatch = query.match(/in\s+([a-zA-Z\s,]+)/i);
@@ -186,7 +189,7 @@ app.post('/scrape-api', searchLimiter, async (req, res) => {
           phone: '0113 123 4567',
           website: 'https://example.com'
         },
-        source: 'mock',
+        source: 'Mock',
         url: `https://example.com/property/${location.toLowerCase().replace(/\s+/g, '-')}`,
         apiBased: true
       },
@@ -208,7 +211,7 @@ app.post('/scrape-api', searchLimiter, async (req, res) => {
           phone: '0113 456 7890',
           website: 'https://modernproperties.com'
         },
-        source: 'mock',
+        source: 'Mock',
         url: `https://modernproperties.com/apartment/${location.toLowerCase().replace(/\s+/g, '-')}`,
         apiBased: true
       },
@@ -230,17 +233,17 @@ app.post('/scrape-api', searchLimiter, async (req, res) => {
           phone: '0113 789 0123',
           website: 'https://familyhomes.com'
         },
-        source: 'mock',
+        source: 'Mock',
         url: `https://familyhomes.com/property/${location.toLowerCase().replace(/\s+/g, '-')}`,
         apiBased: true
       }
     ];
 
-    console.log(`API search completed: ${sampleProperties.length} properties found`);
+    logger.info(`API search completed: ${sampleProperties.length} properties found`);
     res.json(sampleProperties);
 
   } catch (error) {
-    console.error('Error in /scrape-api endpoint:', error);
+    logger.error('Error in /scrape-api endpoint:', error);
     res.status(500).json({
       error: 'Internal server error',
       message: error instanceof Error ? error.message : 'An unexpected error occurred'
@@ -267,7 +270,7 @@ app.post('/scrape-internet', searchLimiter, async (req, res) => {
       });
     }
 
-    console.log('Internet search query:', query);
+    logger.info('Internet search query:', query);
 
     // Extract location from query
     const locationMatch = query.match(/in\s+([a-zA-Z\s,]+)/i);
@@ -301,7 +304,7 @@ app.post('/scrape-internet', searchLimiter, async (req, res) => {
           phone: '0113 123 4567',
           website: 'https://internetproperties.com'
         },
-        source: 'mock',
+        source: 'Mock',
         url: `https://internetproperties.com/property/${location.toLowerCase().replace(/\s+/g, '-')}`,
         internetBased: true
       },
@@ -323,17 +326,17 @@ app.post('/scrape-internet', searchLimiter, async (req, res) => {
           phone: '0113 456 7890',
           website: 'https://moderninternetproperties.com'
         },
-        source: 'mock',
+        source: 'Mock',
         url: `https://moderninternetproperties.com/apartment/${location.toLowerCase().replace(/\s+/g, '-')}`,
         internetBased: true
       }
     ];
 
-    console.log(`Internet search completed: ${internetProperties.length} properties found`);
+    logger.info(`Internet search completed: ${internetProperties.length} properties found`);
     res.json(internetProperties);
 
   } catch (error) {
-    console.error('Error in /scrape-internet endpoint:', error);
+    logger.error('Error in /scrape-internet endpoint:', error);
     res.status(500).json({
       error: 'Internal server error',
       message: error instanceof Error ? error.message : 'An unexpected error occurred'
@@ -345,7 +348,7 @@ app.post('/scrape-internet', searchLimiter, async (req, res) => {
 app.post('/scrape-internet-real', searchLimiter, async (req, res) => {
   try {
     const { query } = req.body;
-    const apiKey = 'BSAWosDbp01p_PwWH6hIabPIYLYFcNp';
+    const apiKey = process.env.BRAVE_API_KEY || '';
 
     if (!query) {
       return res.status(400).json({
@@ -354,14 +357,14 @@ app.post('/scrape-internet-real', searchLimiter, async (req, res) => {
       });
     }
 
-    console.log('Real internet search query:', query);
+    logger.info('Real internet search query:', query);
 
     // Use the real scrapeInternet function from scraper.ts
     const results = await scrapeInternet(query, apiKey);
     res.json(results);
 
   } catch (error) {
-    console.error('Error in /scrape-internet-real endpoint:', error);
+    logger.error('Error in /scrape-internet-real endpoint:', error);
     res.status(500).json({
       error: 'Internal server error',
       message: error instanceof Error ? error.message : 'An unexpected error occurred'
@@ -373,7 +376,7 @@ app.post('/scrape', searchLimiter, async (req, res) => {
   try {
 
     const { url } = req.body;
-    const apiKey = 'BSAWosDbp01p_PwWH6hIabPIYLYFcNp';
+    const apiKey = process.env.BRAVE_API_KEY || '';
 
     if (!url) {
       return res.status(400).json({
@@ -382,23 +385,23 @@ app.post('/scrape', searchLimiter, async (req, res) => {
       });
     }
 
-    console.log('Fetching URL:', url);
+    logger.info('Fetching URL:', url);
 
     // Route to appropriate scraper based on URL
     if (url.includes('openrent.co.uk')) {
-      console.log('Detected OpenRent URL, using OpenRent scraper');
+      logger.info('Detected OpenRent URL, using OpenRent scraper');
       const results = await scrapeOpenRent(url, apiKey);
       res.json(results);
     } else if (url.includes('rightmove.co.uk')) {
-      console.log('Detected Rightmove URL, using Rightmove scraper');
+      logger.info('Detected Rightmove URL, using Rightmove scraper');
       const results = await scrapeRightmove(url, apiKey);
       res.json(results);
     } else if (url.includes('rentola.co.uk')) {
-      console.log('Detected Rentola URL, using Rentola scraper');
+      logger.info('Detected Rentola URL, using Rentola scraper');
       const results = await scrapeRentola(url, apiKey);
       res.json(results);
     } else {
-      console.log('Using OnTheMarket scraper for URL:', url);
+      logger.info('Using OnTheMarket scraper for URL:', url);
       const correlationId = (req.body && typeof req.body.correlationId === 'string' ? req.body.correlationId : null)
         ?? (req.headers['x-correlation-id'] && typeof req.headers['x-correlation-id'] === 'string' ? req.headers['x-correlation-id'] : null)
         ?? randomUUID();
@@ -406,12 +409,12 @@ app.post('/scrape', searchLimiter, async (req, res) => {
         const results = await scrape(url, apiKey, correlationId);
         res.json(results);
       } catch (onTheMarketError) {
-        console.error('OnTheMarket scraping failed:', onTheMarketError);
+        logger.error('OnTheMarket scraping failed:', onTheMarketError);
 
         // Only fallback if it's NOT a timeout error
         const errorMessage = onTheMarketError instanceof Error ? onTheMarketError.message : '';
         if (errorMessage.includes('TimeoutError') || errorMessage.includes('timed out')) {
-          console.log('Timeout error detected, NOT falling back to other providers to avoid irrelevant results.');
+          logger.info('Timeout error detected, NOT falling back to other providers to avoid irrelevant results.');
           throw onTheMarketError;
         }
 
@@ -422,7 +425,7 @@ app.post('/scrape', searchLimiter, async (req, res) => {
           const location = pathParts[pathParts.length - 2]; // Extract location from path
 
           if (location && location !== 'property') {
-            console.log('Attempting fallback to Rentola with location:', location);
+            logger.info('Attempting fallback to Rentola with location:', location);
 
             // Build a basic search query for Rentola
             const searchQuery = `property in ${location.replace(/-/g, ' ')}`;
@@ -432,23 +435,23 @@ app.post('/scrape', searchLimiter, async (req, res) => {
             // Mark results as fallback
             const fallbackResults = rentolaResults.map(prop => ({
               ...prop,
-              source: 'Rentola (Fallback)',
+              source: 'Fallback: Rentola',
               fallback: true
             }));
 
-            console.log(`Fallback search completed: ${fallbackResults.length} properties found`);
+            logger.info(`Fallback search completed: ${fallbackResults.length} properties found`);
             res.json(fallbackResults);
           } else {
             throw onTheMarketError; // Re-throw if we can't extract location
           }
         } catch (fallbackError) {
-          console.error('Fallback search also failed:', fallbackError);
+          logger.error('Fallback search also failed:', fallbackError);
           throw onTheMarketError; // Re-throw original error
         }
       }
     }
   } catch (error) {
-    console.error('Error in /scrape endpoint:', error);
+    logger.error('Error in /scrape endpoint:', error);
 
     // Handle specific error types
     if (error && typeof error === 'object' && 'response' in error) {
@@ -472,7 +475,7 @@ app.post('/scrape', searchLimiter, async (req, res) => {
 
     // Handle other errors
     if (errorMessage.includes('Could not find Chrome') || errorMessage.includes('Executable doesn\'t exist') || errorMessage.includes('Failed to launch browser')) {
-      console.log('Browser automation failed, using fallback endpoint');
+      logger.warn('Browser automation failed, using fallback endpoint');
       // Extract location from URL for fallback
       try {
         const { url } = req.body; // Get URL from request body
@@ -495,7 +498,7 @@ app.post('/scrape', searchLimiter, async (req, res) => {
           }
         }
       } catch (fallbackError) {
-        console.error('Fallback endpoint also failed:', fallbackError);
+        logger.error('Fallback endpoint also failed:', fallbackError);
       }
 
       // If URL extraction failed, use a generic fallback
@@ -511,7 +514,7 @@ app.post('/scrape', searchLimiter, async (req, res) => {
           return res.json(fallbackData);
         }
       } catch (genericFallbackError) {
-        console.error('Generic fallback also failed:', genericFallbackError);
+        logger.error('Generic fallback also failed:', genericFallbackError);
       }
     }
 
@@ -525,7 +528,7 @@ app.post('/scrape', searchLimiter, async (req, res) => {
 app.post('/scrape-rightmove', searchLimiter, async (req, res) => {
   try {
     const { query, locationIdentifier: overrideId } = req.body;
-    const apiKey = 'BSAWosDbp01p_PwWH6hIabPIYLYFcNp';
+    const apiKey = process.env.BRAVE_API_KEY || '';
 
     if (!query) {
       return res.status(400).json({
@@ -534,22 +537,22 @@ app.post('/scrape-rightmove', searchLimiter, async (req, res) => {
       });
     }
 
-    console.log('Rightmove search query:', query);
+    logger.info('Rightmove search query:', query);
     // Resolve location identifier dynamically from Rightmove if possible (allow override)
     const { phrase, isRental } = extractLocationPhraseFromQuery(query);
     let resolvedId: string | undefined = overrideId;
     if (!resolvedId && phrase) {
       resolvedId = await resolveRightmoveLocationIdentifier(phrase, isRental);
     }
-    console.log('Resolved Rightmove locationIdentifier:', resolvedId || '(none)', 'Override:', overrideId ? 'yes' : 'no');
+    logger.info('Resolved Rightmove locationIdentifier:', resolvedId || '(none)', 'Override:', overrideId ? 'yes' : 'no');
     // Build Rightmove URL from the query (prefer resolved identifier when available)
     const rightmoveUrl = buildRightmoveUrl(query, resolvedId);
-    console.log('Generated Rightmove URL:', rightmoveUrl);
+    logger.info('Generated Rightmove URL:', rightmoveUrl);
 
     const results = await scrapeRightmove(rightmoveUrl, apiKey);
     res.json(results);
   } catch (error) {
-    console.error('Error in /scrape-rightmove endpoint:', error);
+    logger.error('Error in /scrape-rightmove endpoint:', error);
 
     // Handle specific error types
     if (error && typeof error === 'object' && 'response' in error) {
@@ -572,8 +575,7 @@ app.post('/scrape-rightmove', searchLimiter, async (req, res) => {
 app.post('/scrape-openrent', searchLimiter, async (req, res) => {
   try {
     const { query } = req.body;
-    const apiKey = 'BSAWosDbp01p_PwWH6hIabPIYLYFcNp';
-
+    const apiKey = process.env.BRAVE_API_KEY || '';
     if (!query) {
       return res.status(400).json({
         error: 'Missing required parameters',
@@ -581,20 +583,20 @@ app.post('/scrape-openrent', searchLimiter, async (req, res) => {
       });
     }
 
-    console.log('OpenRent search query:', query);
+    logger.info('OpenRent search query:', query);
 
     // Parse the query to extract location and filters
     const { location, maxPrice, bedrooms, propertyType } = parseOpenRentQuery(query);
-    console.log('Parsed OpenRent query:', { location, maxPrice, bedrooms, propertyType });
+    logger.info('Parsed OpenRent query:', { location, maxPrice, bedrooms, propertyType });
 
     // Build OpenRent URL from the query
     const openRentUrl = buildOpenRentUrl(location, { maxPrice, bedrooms, propertyType });
-    console.log('Generated OpenRent URL:', openRentUrl);
+    logger.info('Generated OpenRent URL:', openRentUrl);
 
     const results = await scrapeOpenRent(openRentUrl, apiKey);
     res.json(results);
   } catch (error) {
-    console.error('Error in /scrape-openrent endpoint:', error);
+    logger.error('Error in /scrape-openrent endpoint:', error);
 
     // Handle specific error types
     if (error && typeof error === 'object' && 'response' in error) {
@@ -615,8 +617,8 @@ app.post('/scrape-openrent', searchLimiter, async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Backend server listening at http://localhost:${port}`);
-  console.log('[Rightmove] Apify config:', {
+  logger.info(`Backend server listening at http://localhost:${port}`);
+  logger.info('[Rightmove] Apify config:', {
     hasToken: !!process.env.APIFY_TOKEN,
     actor: process.env.APIFY_RIGHTMOVE_ACTOR_ID || '(none)',
     task: process.env.APIFY_RIGHTMOVE_TASK_ID || '(none)',
@@ -626,7 +628,7 @@ app.listen(port, () => {
   // Check for browser installation and install if missing (mostly for Render native environment)
   const checkAndInstallBrowsers = async () => {
     try {
-      console.log('Checking for browser installations...');
+      logger.info('Checking for browser installations...');
       const fs = await import('fs');
       const path = await import('path');
       const os = await import('os');
@@ -636,37 +638,37 @@ app.listen(port, () => {
 
       // Check Puppeteer Cache
       const puppeteerCacheDir = process.env.PUPPETEER_CACHE_DIR || path.join(os.homedir(), '.cache', 'puppeteer');
-      console.log(`Puppeteer cache dir: ${puppeteerCacheDir}`);
+      logger.info(`Puppeteer cache dir: ${puppeteerCacheDir}`);
 
       if (!fs.existsSync(puppeteerCacheDir) || fs.readdirSync(puppeteerCacheDir).length === 0) {
-        console.log('Puppeteer cache missing or empty. Installing Chrome...');
+        logger.info('Puppeteer cache missing or empty. Installing Chrome...');
         try {
           await execAsync('npx puppeteer browsers install chrome');
-          console.log('Puppeteer Chrome installed successfully');
+          logger.info('Puppeteer Chrome installed successfully');
         } catch (e) {
-          console.error('Failed to install Puppeteer Chrome:', e);
+          logger.error('Failed to install Puppeteer Chrome:', e);
         }
       } else {
-        console.log('Puppeteer cache exists.');
+        logger.info('Puppeteer cache exists.');
       }
 
       // Check Playwright Browsers
       const playwrightBrowsersPath = process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(os.homedir(), '.cache', 'ms-playwright');
-      console.log(`Playwright browsers path: ${playwrightBrowsersPath}`);
+      logger.info(`Playwright browsers path: ${playwrightBrowsersPath}`);
 
       if (!fs.existsSync(playwrightBrowsersPath) || fs.readdirSync(playwrightBrowsersPath).length === 0) {
-        console.log('Playwright browsers missing or empty. Installing Chromium...');
+        logger.info('Playwright browsers missing or empty. Installing Chromium...');
         try {
           await execAsync('npx playwright install chromium');
-          console.log('Playwright Chromium installed successfully');
+          logger.info('Playwright Chromium installed successfully');
         } catch (e) {
-          console.error('Failed to install Playwright Chromium:', e);
+          logger.error('Failed to install Playwright Chromium:', e);
         }
       } else {
-        console.log('Playwright browsers exist.');
+        logger.info('Playwright browsers exist.');
       }
     } catch (error) {
-      console.error('Error checking/installing browsers:', error);
+      logger.error('Error checking/installing browsers:', error);
     }
   };
 

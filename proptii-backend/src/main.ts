@@ -42,8 +42,8 @@ async function bootstrap() {
 
   // Body limit: 10 MB covers base64-encoded referencing documents up to ~7.5 MB raw.
   // For larger file uploads, use multipart/form-data with FileInterceptor instead.
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  app.use(express.json({ limit: '5mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
   // Set global prefix for all routes except root
   app.setGlobalPrefix('api', {

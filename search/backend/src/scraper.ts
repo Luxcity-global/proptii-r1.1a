@@ -4,6 +4,9 @@ import * as cheerio from 'cheerio';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
+import { Logger } from './utils/logger';
+
+const logger = new Logger('Scraper');
 
 export interface Property {
   title: string;
@@ -44,18 +47,18 @@ export async function getChromeExecutablePath(): Promise<string | undefined> {
   try {
     const executablePath = puppeteer.executablePath();
     if (executablePath && fs.existsSync(executablePath)) {
-      console.log('Found Chrome via Puppeteer executablePath:', executablePath);
+      logger.info('Found Chrome via Puppeteer executablePath:', executablePath);
       return executablePath;
     }
   } catch (error) {
-    console.log('Puppeteer executablePath() failed, trying alternatives...');
+    logger.info('Puppeteer executablePath() failed, trying alternatives...');
   }
 
   // Method 2: Check environment variable
   if (process.env.CHROME_BIN) {
     const envPath = process.env.CHROME_BIN;
     if (fs.existsSync(envPath)) {
-      console.log('Found Chrome via CHROME_BIN env var:', envPath);
+      logger.info('Found Chrome via CHROME_BIN env var:', envPath);
       return envPath;
     }
   }
@@ -64,7 +67,7 @@ export async function getChromeExecutablePath(): Promise<string | undefined> {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     const puppeteerEnvPath = process.env.PUPPETEER_EXECUTABLE_PATH;
     if (fs.existsSync(puppeteerEnvPath)) {
-      console.log('Found Chrome via PUPPETEER_EXECUTABLE_PATH env var:', puppeteerEnvPath);
+      logger.info('Found Chrome via PUPPETEER_EXECUTABLE_PATH env var:', puppeteerEnvPath);
       return puppeteerEnvPath;
     }
   }
@@ -92,7 +95,7 @@ export async function getChromeExecutablePath(): Promise<string | undefined> {
         if (entry.isDirectory()) {
           const chromePath = path.join(cacheDir, entry.name, 'chrome');
           if (fs.existsSync(chromePath) && fs.statSync(chromePath).isFile()) {
-            console.log('Found Chrome by scanning cache directory:', chromePath);
+            logger.info('Found Chrome by scanning cache directory:', chromePath);
             return chromePath;
           }
           // Check nested directories
@@ -102,7 +105,7 @@ export async function getChromeExecutablePath(): Promise<string | undefined> {
               if (subEntry.isDirectory()) {
                 const nestedChromePath = path.join(cacheDir, entry.name, subEntry.name, 'chrome');
                 if (fs.existsSync(nestedChromePath) && fs.statSync(nestedChromePath).isFile()) {
-                  console.log('Found Chrome in nested directory:', nestedChromePath);
+                  logger.info('Found Chrome in nested directory:', nestedChromePath);
                   return nestedChromePath;
                 }
               }
@@ -114,12 +117,12 @@ export async function getChromeExecutablePath(): Promise<string | undefined> {
       }
     }
   } catch (error) {
-    console.log('Error scanning cache directory:', error);
+    logger.info('Error scanning cache directory:', error);
   }
 
   for (const possiblePath of possiblePaths) {
     if (fs.existsSync(possiblePath)) {
-      console.log('Found Chrome in cache directory:', possiblePath);
+      logger.info('Found Chrome in cache directory:', possiblePath);
       return possiblePath;
     }
   }
@@ -134,26 +137,26 @@ export async function getChromeExecutablePath(): Promise<string | undefined> {
         cacheDir: cacheDir
       });
       if (fs.existsSync(computedPath)) {
-        console.log('Found Chrome via browsers API:', computedPath);
+        logger.info('Found Chrome via browsers API:', computedPath);
         return computedPath;
       }
     }
   } catch (error) {
-    console.log('Browsers API not available or failed');
+    logger.info('Browsers API not available or failed');
   }
 
   // Method 6: Check Playwright's chromium installation as fallback
-  console.log('Checking for Playwright chromium as fallback...');
+  logger.info('Checking for Playwright chromium as fallback...');
   const playwrightPath = process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(os.homedir(), '.cache', 'ms-playwright');
-  console.log(`Checking Playwright path: ${playwrightPath}`);
+  logger.info(`Checking Playwright path: ${playwrightPath}`);
   
   try {
     if (fs.existsSync(playwrightPath)) {
       const playwrightEntries = fs.readdirSync(playwrightPath, { withFileTypes: true });
-      console.log(`Found ${playwrightEntries.length} entries in Playwright path`);
+      logger.info(`Found ${playwrightEntries.length} entries in Playwright path`);
       for (const entry of playwrightEntries) {
         if (entry.isDirectory() && entry.name.startsWith('chromium')) {
-          console.log(`Checking chromium entry: ${entry.name}`);
+          logger.info(`Checking chromium entry: ${entry.name}`);
           // Try common chromium executable paths
           const chromiumPaths = [
             path.join(playwrightPath, entry.name, 'chrome-linux', 'chrome'),
@@ -162,22 +165,22 @@ export async function getChromeExecutablePath(): Promise<string | undefined> {
           ];
           
           for (const chromiumPath of chromiumPaths) {
-            console.log(`Checking path: ${chromiumPath}`);
+            logger.info(`Checking path: ${chromiumPath}`);
             if (fs.existsSync(chromiumPath)) {
-              console.log('Found Playwright Chromium:', chromiumPath);
+              logger.info('Found Playwright Chromium:', chromiumPath);
               return chromiumPath;
             }
           }
         }
       }
     } else {
-      console.log('Playwright path does not exist');
+      logger.info('Playwright path does not exist');
     }
   } catch (error) {
-    console.log('Error checking Playwright browsers:', error);
+    logger.info('Error checking Playwright browsers:', error);
   }
 
-  console.warn('Could not find Chrome executable, Puppeteer will try to download it');
+  logger.warn('Could not find Chrome executable, Puppeteer will try to download it');
   return undefined;
 }
 
@@ -324,7 +327,7 @@ async function scrapeEmailsFromWebsite(url: string, browser: Browser): Promise<s
   try {
     // Basic check if browser is connected
     if (!browser.isConnected()) {
-      console.error('Browser is disconnected, cannot scrape emails');
+      logger.error('Browser is disconnected, cannot scrape emails');
       return [];
     }
     
@@ -364,12 +367,12 @@ async function scrapeEmailsFromWebsite(url: string, browser: Browser): Promise<s
       if (response) {
         const contentType = response.headers()['content-type'];
         if (contentType && !contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
-          console.log(`Skipping non-HTML content: ${contentType}`);
+          logger.info(`Skipping non-HTML content: ${contentType}`);
           return [];
         }
       }
     } catch (navError) {
-      console.log(`Navigation to ${url} failed or timed out:`, navError);
+      logger.info(`Navigation to ${url} failed or timed out:`, navError);
       return [];
     }
 
@@ -386,7 +389,7 @@ async function scrapeEmailsFromWebsite(url: string, browser: Browser): Promise<s
     const validEmails = emailList.filter(isValidEmail);
     return prioritizeEmails(validEmails);
   } catch (e) {
-    console.error(`Error scraping emails from ${url}:`, e);
+    logger.error(`Error scraping emails from ${url}:`, e);
     return [];
   } finally {
     if (page) {
@@ -485,7 +488,7 @@ async function searchCompanyWebsiteWithBraveAPI(companyName: string, apiKey: str
           
           // Return first result with high confidence match
           if (matchScore >= 10) {
-            console.log(`Found company website for ${companyName}: ${link} (score: ${matchScore})`);
+            logger.info(`Found company website for ${companyName}: ${link} (score: ${matchScore})`);
             return link;
           }
         }
@@ -500,7 +503,7 @@ async function searchCompanyWebsiteWithBraveAPI(companyName: string, apiKey: str
                              'zoopla.com', 'primelocation.co.uk', 'gumtree.com', 'shpock.com'];
           
           if (!skipDomains.some(domain => link.includes(domain))) {
-            console.log(`Returning best-guess website for ${companyName}: ${link}`);
+            logger.info(`Returning best-guess website for ${companyName}: ${link}`);
             return link;
           }
         }
@@ -510,11 +513,11 @@ async function searchCompanyWebsiteWithBraveAPI(companyName: string, apiKey: str
       await new Promise(resolve => setTimeout(resolve, 1000));
       
     } catch (error: any) {
-      console.error(`Error searching for company website with query "${query}":`, error.message);
+      logger.error(`Error searching for company website with query "${query}":`, error.message);
       
       // If we hit rate limit, wait longer before next request
       if (error.response && error.response.status === 429) {
-        console.log('Rate limit hit, waiting 5 seconds...');
+        logger.info('Rate limit hit, waiting 5 seconds...');
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
     }
@@ -570,7 +573,7 @@ async function searchEmailWithInternet(companyName: string, apiKey: string, maxQ
         allEmails.push(...emails);
         // If we found emails, no need to continue searching
         if (allEmails.length > 0) {
-          console.log(`Found ${allEmails.length} emails after ${queriesAttempted} queries`);
+          logger.info(`Found ${allEmails.length} emails after ${queriesAttempted} queries`);
           break;
         }
       }
@@ -579,11 +582,11 @@ async function searchEmailWithInternet(companyName: string, apiKey: string, maxQ
       await new Promise(resolve => setTimeout(resolve, 1000));
       
     } catch (error: any) {
-      console.error(`Error searching for query "${query}":`, error.message);
+      logger.error(`Error searching for query "${query}":`, error.message);
       
       // If we hit rate limit, wait longer before next request
       if (error.response && error.response.status === 429) {
-        console.log('Rate limit hit, waiting 5 seconds...');
+        logger.info('Rate limit hit, waiting 5 seconds...');
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
       // For timeouts or other errors, just continue to next query
@@ -618,7 +621,7 @@ async function searchEmailWithInternet(companyName: string, apiKey: string, maxQ
     return hasCompanyWords || hasRealEstateDomain || !isGenericDomain;
   });
   
-  console.log(`Internet search found ${validEmails.length} valid emails, ${relevantEmails.length} relevant for ${companyName}`);
+  logger.info(`Internet search found ${validEmails.length} valid emails, ${relevantEmails.length} relevant for ${companyName}`);
   return prioritizeEmails(relevantEmails.length > 0 ? relevantEmails : validEmails);
 }
 
@@ -651,22 +654,22 @@ async function findEmailForAgent(
   // This avoids timeout issues and is more reliable
   
   // 1. First, try internet search (fastest and most reliable)
-  console.log(`Searching internet for contact email: ${companyName}`);
+  logger.info(`Searching internet for contact email: ${companyName}`);
   try {
     const internetEmails = await searchEmailWithInternet(companyName, apiKey, maxQueries);
     if (internetEmails.length > 0) {
-      console.log(`Found email via internet search: ${internetEmails[0]}`);
+      logger.info(`Found email via internet search: ${internetEmails[0]}`);
       // Still try to get the official website for reference
       const companyWebsite = await searchCompanyWebsiteWithBraveAPI(companyName, apiKey);
       return { email: internetEmails[0], website: companyWebsite || website || undefined };
     }
   } catch (error) {
-    console.error(`Internet email search failed for ${companyName}:`, error);
+    logger.error(`Internet email search failed for ${companyName}:`, error);
   }
 
   // 2. If internet search fails, try the provided website (if not OTM)
   if (website && !website.includes('onthemarket.com')) {
-    console.log(`Trying provided website: ${website}`);
+    logger.info(`Trying provided website: ${website}`);
     // Only try homepage and /contact to save time
     const quickPaths = ['', '/contact'];
     for (const path of quickPaths) {
@@ -674,7 +677,7 @@ async function findEmailForAgent(
         const url = path ? (website.endsWith('/') ? website + path.slice(1) : website + path) : website;
         const emails = await scrapeEmailsFromWebsite(url, browser);
         if (emails.length > 0) {
-          console.log(`Found emails on website ${path || '/'}: ${emails[0]}`);
+          logger.info(`Found emails on website ${path || '/'}: ${emails[0]}`);
           return { email: emails[0], website };
         }
       } catch {}
@@ -682,10 +685,10 @@ async function findEmailForAgent(
   }
 
   // 3. Search for company website and try scraping
-  console.log(`Searching for company website: ${companyName}`);
+  logger.info(`Searching for company website: ${companyName}`);
   const companyWebsite = await searchCompanyWebsiteWithBraveAPI(companyName, apiKey);
   if (companyWebsite) {
-    console.log(`Found company website: ${companyWebsite}`);
+    logger.info(`Found company website: ${companyWebsite}`);
     // Only try homepage and /contact to save time
     const quickPaths = ['', '/contact'];
     for (const path of quickPaths) {
@@ -693,19 +696,19 @@ async function findEmailForAgent(
         const url = path ? (companyWebsite.endsWith('/') ? companyWebsite + path.slice(1) : companyWebsite + path) : companyWebsite;
         const emails = await scrapeEmailsFromWebsite(url, browser);
         if (emails.length > 0) {
-          console.log(`Found emails on company website ${path || '/'}: ${emails[0]}`);
+          logger.info(`Found emails on company website ${path || '/'}: ${emails[0]}`);
           return { email: emails[0], website: companyWebsite };
         }
       } catch {}
     }
   }
   
-  console.log(`No email found for: ${companyName}`);
+  logger.info(`No email found for: ${companyName}`);
   return { email: null, website: companyWebsite || website || undefined };
 }
 
 export async function scrapeInternet(query: string, apiKey: string): Promise<Property[]> {
-  console.log(`Starting internet search for: "${query}"`);
+  logger.info(`Starting internet search for: "${query}"`);
   
   try {
     // Optimized search for speed - focus on most productive sources
@@ -724,7 +727,7 @@ export async function scrapeInternet(query: string, apiKey: string): Promise<Pro
     
     for (const searchQuery of searchQueries) {
       try {
-        console.log(`Searching for: ${searchQuery}`);
+        logger.info(`Searching for: ${searchQuery}`);
         
         const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
           params: {

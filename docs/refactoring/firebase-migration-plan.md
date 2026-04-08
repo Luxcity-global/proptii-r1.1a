@@ -173,10 +173,12 @@ This document outlines the comprehensive plan for migrating from TypeORM/Azure S
 ## Current Codebase Analysis
 Based on the current codebase, the following key areas need attention:
 
-1. TypeORM Dependencies:
-   - Remove all `@nestjs/typeorm` imports
-   - Remove TypeORM entity decorators
-   - Update repository patterns
+1. TypeORM Dependencies (Fully Purged):
+   - [x] Remove all `@nestjs/typeorm` imports from root
+   - [x] Remove TypeORM entity decorators
+   - [x] Prune package-lock.json and node_modules (Done)
+   - [x] Remove `tedious` (SQL driver) from package.json (Done)
+   - [x] Update repository patterns to use Cosmos/Firestore
 
 2. Azure Storage:
    - Replace `@azure/storage-blob` with Firebase Storage
@@ -188,10 +190,10 @@ Based on the current codebase, the following key areas need attention:
    - Update authentication middleware
    - Implement proper token validation
 
-4. Data Models:
-   - Convert TypeORM entities to Firestore collections
-   - Update DTOs and validation
-   - Implement proper data relationships
+4. Data Models (Completed):
+   - [x] Convert TypeORM entities to plain models/Firestore collections
+   - [x] Update DTOs and validation
+   - [x] Implement proper data relationships
 
 ## Next Steps
 1. Create Firebase project

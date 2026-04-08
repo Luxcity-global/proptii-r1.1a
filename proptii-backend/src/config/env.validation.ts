@@ -23,6 +23,8 @@ const envSchema = z.object({
 
   // ── Azure Storage ───────────────────────────────────────────────────────────
   AZURE_STORAGE_ACCOUNT_NAME: z.string().optional(),
+  AZURE_STORAGE_CONTAINER_NAME: z.string().optional(),
+  AZURE_STORAGE_SAS_TOKEN: z.string().optional(),
 
   // ── Email Service (Azure Communication Services / SMTP) ────────────────────
   EMAIL_SERVICE_ENDPOINT: z.string().optional(),
@@ -44,6 +46,11 @@ const envSchema = z.object({
   MSAL_CLIENT_ID: z.string().min(1, 'MSAL_CLIENT_ID is required for Azure AD B2C authentication'),
   MSAL_AUTHORITY: z.string().url('MSAL_AUTHORITY must be a valid absolute URL (e.g., https://<tenant>.b2clogin.com/...)'),
   MSAL_REDIRECT_URI: z.string().optional(),
+
+  // ── Azure AD B2C (Direct Graph API / Admin) ─────────────────────────────────
+  AZURE_AD_B2C_CLIENT_ID: z.string().optional(),
+  AZURE_AD_B2C_CLIENT_SECRET: z.string().optional(),
+  AZURE_AD_B2C_TENANT_ID: z.string().optional(),
 
   // ── CORS / Frontend ─────────────────────────────────────────────────────────
   FRONTEND_URL: z.string().optional(),

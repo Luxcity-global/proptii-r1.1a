@@ -1,5 +1,8 @@
 import { chromium } from 'playwright';
 import type { Property } from '../scraper';
+import { Logger } from '../utils/logger';
+
+const logger = new Logger('RentolaScraper');
 
 /**
  * Scrapes property listings from Rentola UK
@@ -12,8 +15,8 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
   let browser;
 
   try {
-    console.log('Starting Rentola scraper...');
-    console.log('Target URL:', url);
+    logger.info('Starting Rentola scraper...');
+    logger.info('Target URL:', url);
 
     browser = await chromium.launch({
       headless: true,
@@ -58,28 +61,28 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
     
     // Navigate to the page
     await page.goto(url, { waitUntil: 'domcontentloaded' });
-    console.log('Page loaded successfully');
+    logger.info('Page loaded successfully');
 
     // Get page title and URL to debug
     const pageTitle = await page.title();
     const currentUrl = page.url();
-    console.log('Page title:', pageTitle);
-    console.log('Current URL:', currentUrl);
+    logger.info('Page title:', pageTitle);
+    logger.info('Current URL:', currentUrl);
 
     // Wait for page content to load properly
     try {
       // First wait for any content to load
       await page.waitForLoadState('networkidle', { timeout: 10000 });
-      console.log('Page network idle, looking for property content...');
+      logger.info('Page network idle, looking for property content...');
     } catch {
-      console.log('Timeout waiting for network idle, proceeding anyway...');
+      logger.info('Timeout waiting for network idle, proceeding anyway...');
     }
     
     // Give additional time for dynamic content
     await page.waitForTimeout(2000);
     
     // Try multiple approaches to find Rentola property listings
-    console.log('Looking for Rentola property listings...');
+    logger.info('Looking for Rentola property listings...');
     
     // Let's try a simpler, more direct approach for Rentola
     // Based on typical Rentola structure and focusing on what works
@@ -113,7 +116,7 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
     for (const selector of possibleSelectors) {
       try {
         const elements = await page.$$(selector);
-        console.log(`Selector "${selector}": found ${elements.length} elements`);
+        logger.info(`Selector "${selector}": found ${elements.length} elements`);
         
         if (elements.length > maxElements) {
           maxElements = elements.length;
@@ -121,20 +124,20 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
           bestSelector = selector;
         }
       } catch (error) {
-        console.warn(`Error with selector "${selector}":`, error);
+        logger.warn(`Error with selector "${selector}":`, error);
       }
     }
     
-    console.log(`Best selector: "${bestSelector}" with ${maxElements} elements`);
+    logger.info(`Best selector: "${bestSelector}" with ${maxElements} elements`);
     
     // Debug: If we're not finding many elements, let's see what's on the page
     if (propertyElements.length < 10) {
-      console.log('Debugging page content to find property elements...');
+      logger.info('Debugging page content to find property elements...');
       
       // Try to find elements with £ symbol which usually indicates prices
       try {
         const elementsWithPounds = await page.$$('::-p-text(£)');
-        console.log(`Found ${elementsWithPounds.length} elements containing £ symbol`);
+        logger.info(`Found ${elementsWithPounds.length} elements containing £ symbol`);
         
         if (elementsWithPounds.length > propertyElements.length) {
           // Get parent elements of price elements as they're likely property containers
@@ -151,24 +154,24 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
           }
           
           if (parentElements.length > propertyElements.length) {
-            console.log(`Using ${parentElements.length} parent elements of price indicators`);
+            logger.info(`Using ${parentElements.length} parent elements of price indicators`);
             propertyElements = parentElements;
             bestSelector = 'price parent elements';
           }
         }
       } catch (error) {
-        console.warn('Error finding elements with £ symbol:', error);
+        logger.warn('Error finding elements with £ symbol:', error);
       }
     }
     
     // If we still have very few elements, try one more focused approach
     if (propertyElements.length < 5) {
-      console.log('Few elements found, trying focused content search...');
+      logger.info('Few elements found, trying focused content search...');
       
       try {
         // Try a more targeted approach - look for links that might be individual properties
         const propertyLinks = await page.$$('a');
-        console.log(`Found ${propertyLinks.length} links, filtering for property-related ones...`);
+        logger.info(`Found ${propertyLinks.length} links, filtering for property-related ones...`);
         
         const propertyRelatedLinks = [];
         // Check first 50 links to avoid timeout
@@ -188,18 +191,18 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
         }
         
         if (propertyRelatedLinks.length > propertyElements.length) {
-          console.log(`Found ${propertyRelatedLinks.length} property-related links`);
+          logger.info(`Found ${propertyRelatedLinks.length} property-related links`);
           propertyElements = propertyRelatedLinks;
           bestSelector = 'property links';
         }
       } catch (error) {
-        console.warn('Error with focused content search:', error);
+        logger.warn('Error with focused content search:', error);
       }
     }
 
     // Try one scroll to load more properties if we have fewer than 10
     if (propertyElements.length < 10) {
-      console.log('Scrolling once to load more properties...');
+      logger.info('Scrolling once to load more properties...');
       await page.evaluate(() => {
         window.scrollTo(0, document.body.scrollHeight);
       });
@@ -210,26 +213,26 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
         if (bestSelector) {
           const newElements = await page.$$(bestSelector);
           if (newElements.length > propertyElements.length) {
-            console.log(`After scroll: found ${newElements.length} elements (was ${propertyElements.length})`);
+            logger.info(`After scroll: found ${newElements.length} elements (was ${propertyElements.length})`);
             propertyElements = newElements;
           }
         }
       } catch (error) {
-        console.warn('Error checking for new elements after scroll:', error);
+        logger.warn('Error checking for new elements after scroll:', error);
       }
     }
 
-    console.log(`Processing ${propertyElements.length} potential property elements...`);
+    logger.info(`Processing ${propertyElements.length} potential property elements...`);
 
     // If no property elements found, return empty array (no mock data)
     if (propertyElements.length === 0) {
-      console.log('No property elements found on Rentola page');
+      logger.info('No property elements found on Rentola page');
       return [];
     }
     
     // Process found property elements (aim for 15-20 results)
     const maxProperties = Math.min(propertyElements.length, 30); // Process up to 30 to get 15-20 good ones
-    console.log(`Processing up to ${maxProperties} elements to extract 15-20 quality properties...`);
+    logger.info(`Processing up to ${maxProperties} elements to extract 15-20 quality properties...`);
     
     for (let i = 0; i < maxProperties; i++) {
       const element = propertyElements[i];
@@ -276,7 +279,7 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
             title = lines[0] || '';
           }
         } catch (error) {
-          console.warn('Error extracting title:', error);
+          logger.warn('Error extracting title:', error);
         }
         
         // Extract price with comprehensive patterns
@@ -295,7 +298,7 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
                 const priceText = await priceElement.textContent();
                 if (priceText && (priceText.includes('£') || priceText.match(/\d+/))) {
                   price = priceText.trim();
-                  console.log(`Found price with selector ${selector}: ${price}`);
+                  logger.info(`Found price with selector ${selector}: ${price}`);
                   break;
                 }
               }
@@ -323,13 +326,13 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
               const match = elementText.match(regex);
               if (match) {
                 price = match[0].includes('£') ? match[0] : `£${match[0]}`;
-                console.log(`Found price with regex: ${price}`);
+                logger.info(`Found price with regex: ${price}`);
                 break;
               }
             }
           }
         } catch (error) {
-          console.warn('Error extracting price:', error);
+          logger.warn('Error extracting price:', error);
         }
         
         // Clean up price format
@@ -410,7 +413,7 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
             }
           }
         } catch (error) {
-          console.warn(`Failed to extract images for property ${i + 1}`);
+          logger.warn(`Failed to extract images for property ${i + 1}`);
         }
         
         // Get property detail link
@@ -433,7 +436,7 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
         const hasValidLocation = location && location.length > 5 && location !== 'Location not specified';
         
         if (hasValidTitle && (hasValidPrice || hasValidLocation)) {
-          console.log(`Adding real Rentola property ${i + 1}: ${title.substring(0, 50)}...`);
+          logger.info(`Adding real Rentola property ${i + 1}: ${title.substring(0, 50)}...`);
           
           properties.push({
             title: title.substring(0, 200),
@@ -449,44 +452,44 @@ export async function scrapeRentola(url: string, apiKey: string): Promise<Proper
             }
           });
         } else {
-          console.log(`Skipping property ${i + 1} - insufficient real data (title: ${hasValidTitle}, price: ${hasValidPrice}, location: ${hasValidLocation})`);
+          logger.info(`Skipping property ${i + 1} - insufficient real data (title: ${hasValidTitle}, price: ${hasValidPrice}, location: ${hasValidLocation})`);
         }
         
         // Early termination if we have enough good properties
         if (properties.length >= 20) {
-          console.log(`Reached target of 20 properties, stopping processing at element ${i + 1}`);
+          logger.info(`Reached target of 20 properties, stopping processing at element ${i + 1}`);
           break;
         }
       } catch (error) {
-        console.warn(`Error processing Rentola property ${i + 1}:`, error);
+        logger.warn(`Error processing Rentola property ${i + 1}:`, error);
       }
     }
     
     // If we have fewer than 5 properties, that might indicate an issue
     if (properties.length < 5) {
-      console.warn(`Only found ${properties.length} properties. This might indicate:`);
-      console.warn('- Page structure has changed');
-      console.warn('- Selectors need updating');
-      console.warn('- Properties don\'t match search criteria');
+      logger.warn(`Only found ${properties.length} properties. This might indicate:`);
+      logger.warn('- Page structure has changed');
+      logger.warn('- Selectors need updating');
+      logger.warn('- Properties don\'t match search criteria');
     }
 
-    console.log(`Successfully scraped ${properties.length} properties from Rentola`);
+    logger.info(`Successfully scraped ${properties.length} properties from Rentola`);
     
     // Return only real scraped data (no mock data fallback)
-    console.log(`Returning ${properties.length} real Rentola properties (no mock data)`);
+    logger.info(`Returning ${properties.length} real Rentola properties (no mock data)`);
     
     return properties;
 
   } catch (error) {
-    console.error('Error scraping Rentola:', error);
+    logger.error('Error scraping Rentola:', error);
     throw error;
   } finally {
     if (browser) {
       try {
         await browser.close();
-        console.log('Rentola browser closed');
+        logger.info('Rentola browser closed');
       } catch (error) {
-        console.warn('Error closing Rentola browser:', error);
+        logger.warn('Error closing Rentola browser:', error);
       }
     }
   }
@@ -535,6 +538,6 @@ export function buildRentolaUrl(query: string): string {
   const baseUrl = 'https://rentola.co.uk/property-to-rent';
   const finalUrl = `${baseUrl}?${params.toString()}`;
   
-  console.log(`Built Rentola URL: ${finalUrl}`);
+  logger.info(`Built Rentola URL: ${finalUrl}`);
   return finalUrl;
 }

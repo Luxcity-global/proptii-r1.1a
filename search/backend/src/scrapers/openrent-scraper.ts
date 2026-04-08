@@ -1,6 +1,9 @@
 import { chromium } from 'playwright';
 import type { Property } from '../scraper';
 import axios from 'axios';
+import { Logger } from '../utils/logger';
+
+const logger = new Logger('OpenRentScraper');
 
 /**
  * Scrapes property listings from OpenRent
@@ -13,10 +16,10 @@ export async function scrapeOpenRent(url: string, apiKey: string): Promise<Prope
   let browser;
 
   try {
-    console.log('Starting OpenRent scraper...');
-    console.log('Target URL:', url);
+    logger.info('Starting OpenRent scraper...');
+    logger.info('Target URL:', url);
 
-    console.log('Launching browser...');
+    logger.info('Launching browser...');
     browser = await chromium.launch({
       headless: true,
       args: [
@@ -26,18 +29,18 @@ export async function scrapeOpenRent(url: string, apiKey: string): Promise<Prope
         '--disable-blink-features=AutomationControlled'
       ]
     });
-    console.log('Browser launched successfully');
+    logger.info('Browser launched successfully');
 
     const context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
       viewport: { width: 1920, height: 1080 }
     });
 
-    console.log('Creating browser page...');
+    logger.info('Creating browser page...');
     const page = await context.newPage();
     
     // Navigate to the page
-    console.log('Navigating to URL...');
+    logger.info('Navigating to URL...');
     await page.goto(url, { 
       waitUntil: 'networkidle', 
       timeout: 60000 
@@ -47,28 +50,28 @@ export async function scrapeOpenRent(url: string, apiKey: string): Promise<Prope
     // Get page title and URL to debug
     const pageTitle = await page.title();
     const currentUrl = page.url();
-    console.log('Page title:', pageTitle);
-    console.log('Current URL:', currentUrl);
+    logger.info('Page title:', pageTitle);
+    logger.info('Current URL:', currentUrl);
 
     // Wait for property listings to load
     try {
       await page.waitForLoadState('networkidle', { timeout: 10000 });
-      console.log('Page network idle, looking for property content...');
+      logger.info('Page network idle, looking for property content...');
     } catch {
-      console.log('Timeout waiting for network idle, proceeding anyway...');
+      logger.info('Timeout waiting for network idle, proceeding anyway...');
     }
     
     // Give additional time for dynamic content to load
     await page.waitForTimeout(3000);
     
-    console.log('Looking for OpenRent property listings...');
+    logger.info('Looking for OpenRent property listings...');
     
     // First, let's debug what's actually on the page
     const htmlContent = await page.content();
-    console.log('Page HTML length:', htmlContent.length);
-    console.log('Page contains "pli":', htmlContent.includes('pli'));
-    console.log('Page contains "property":', htmlContent.includes('property'));
-    console.log('Page contains "rent":', htmlContent.includes('rent'));
+    logger.info('Page HTML length:', htmlContent.length);
+    logger.info('Page contains "pli":', htmlContent.includes('pli'));
+    logger.info('Page contains "property":', htmlContent.includes('property'));
+    logger.info('Page contains "rent":', htmlContent.includes('rent'));
     
     // OpenRent uses a specific class structure for property listings
     // Based on the HTML analysis, properties are in elements with class starting with "pli"
@@ -88,35 +91,35 @@ export async function scrapeOpenRent(url: string, apiKey: string): Promise<Prope
       try {
         const elements = await page.$$eval(selector, (elements) => elements.length);
         if (elements > 0) {
-          console.log(`Found ${elements} elements with selector: ${selector}`);
+          logger.info(`Found ${elements} elements with selector: ${selector}`);
           propertyElements = await page.$$(selector);
           selectorUsed = selector;
           break;
         }
       } catch (error) {
-        console.log(`Selector ${selector} not found, trying next...`);
+        logger.info(`Selector ${selector} not found, trying next...`);
       }
     }
 
     if (propertyElements.length === 0) {
-      console.log('No property listings found with standard selectors, trying alternative approach...');
+      logger.info('No property listings found with standard selectors, trying alternative approach...');
       
       // Alternative approach: look for any links containing property URLs
       const alternativeElements = await page.$$('a[href*="/properties/"], a[href*="/property/"], a[href^="/"]');
       
       if (alternativeElements.length > 0) {
-        console.log(`Found ${alternativeElements.length} potential property links`);
+        logger.info(`Found ${alternativeElements.length} potential property links`);
         propertyElements = alternativeElements.slice(0, 20); // Limit to first 20 for performance
         selectorUsed = 'alternative property links';
       }
     }
 
     if (propertyElements.length === 0) {
-      console.log('No property listings found. Page might be loading or structure changed.');
+      logger.info('No property listings found. Page might be loading or structure changed.');
       return properties;
     }
 
-    console.log(`Found ${propertyElements.length} property listings using: ${selectorUsed}`);
+    logger.info(`Found ${propertyElements.length} property listings using: ${selectorUsed}`);
 
     // Process each property listing
     let validCount = 0;
@@ -266,7 +269,7 @@ export async function scrapeOpenRent(url: string, apiKey: string): Promise<Prope
                             !propertyData.title.toLowerCase().includes('sign in');
 
         if (hasValidData) {
-          console.log(`Adding OpenRent listing ${i + 1}: ${propertyData.title.substring(0, 50)}...`);
+          logger.info(`Adding OpenRent listing ${i + 1}: ${propertyData.title.substring(0, 50)}...`);
           validCount++;
           
           properties.push({
@@ -283,23 +286,23 @@ export async function scrapeOpenRent(url: string, apiKey: string): Promise<Prope
             }
           });
         } else {
-          console.log(`Skipped OpenRent listing ${i + 1} - insufficient data or invalid content`);
+          logger.info(`Skipped OpenRent listing ${i + 1} - insufficient data or invalid content`);
         }
       } catch (error) {
-        console.warn(`Error processing OpenRent listing ${i + 1}:`, error);
+        logger.warn(`Error processing OpenRent listing ${i + 1}:`, error);
       }
     }
 
-    console.log(`Successfully scraped ${properties.length} properties from OpenRent`);
+    logger.info(`Successfully scraped ${properties.length} properties from OpenRent`);
     return properties;
 
   } catch (error) {
-    console.error('Error scraping OpenRent:', error);
+    logger.error('Error scraping OpenRent:', error);
     return properties; // Return partial results
   } finally {
     if (browser) {
       await browser.close();
-      console.log('Browser closed');
+      logger.info('Browser closed');
     }
   }
 }
