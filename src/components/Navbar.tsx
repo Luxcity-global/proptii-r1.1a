@@ -130,6 +130,11 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
       setLoginError(null);
       setLoginInProgress(true);
 
+      // From homepage, default post-auth destination to dashboard.
+      if (pathname === '/' || pathname === '/home-v2' || pathname === '/home-legacy' || pathname === '/home') {
+        sessionStorage.setItem('redirectAfterLogin', '/dashboard');
+      }
+
       // Inform the user that they might be redirected
       console.log("Starting login process. You may be redirected to the login page.");
 

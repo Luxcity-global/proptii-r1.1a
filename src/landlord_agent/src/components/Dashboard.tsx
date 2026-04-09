@@ -65,6 +65,7 @@ interface DashboardProps {
   properties: Property[];
   tenants?: Tenant[];
   userProfile: UserProfile | null;
+  isAuthenticated?: boolean;
   onAddProperty: () => void;
   onViewProperty: (property: Property) => void;
   onManageDocuments: (property: Property) => void;
@@ -82,6 +83,7 @@ export function Dashboard({
   properties,
   tenants = [],
   userProfile,
+  isAuthenticated,
   onAddProperty,
   onViewProperty,
   onManageDocuments,
@@ -94,6 +96,7 @@ export function Dashboard({
   arrearsAlerts = [],
   onSignIn,
 }: DashboardProps) {
+  const isUserAuthenticated = isAuthenticated ?? Boolean(userProfile);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [complianceFilter, setComplianceFilter] =
@@ -242,6 +245,14 @@ export function Dashboard({
       return p.status === 'occupied' || hasTenant;
     })
     .reduce((sum, p) => sum + (p.rent || 0), 0);
+
+  const guestSummary = {
+    totalProperties: 0,
+    occupiedProperties: 0,
+    vacantProperties: 0,
+    totalRent: 0,
+    expiringDocuments: 0,
+  };
 
   // Chart data processing
   const getOccupancyData = () => {
@@ -498,7 +509,7 @@ export function Dashboard({
   };
 
   // For unauthenticated users: show header, 4 summary cards (all 0), and empty state mascot only
-  if (!userProfile) {
+  if (!isUserAuthenticated || !userProfile) {
     return (
       <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7' }}>
         {/* Minimal Header for unauthenticated state */}
@@ -526,7 +537,7 @@ export function Dashboard({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground mb-1 text-sm">Total Properties</p>
-                  <p className="text-lg font-semibold">{totalProperties}</p>
+                  <p className="text-lg font-semibold">{guestSummary.totalProperties}</p>
                 </div>
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
                   <Building2 className="w-6 h-6 text-primary" />
@@ -539,12 +550,12 @@ export function Dashboard({
                 <div className="flex items-center space-x-6 flex-1">
                   <div className="text-center">
                     <p className="text-muted-foreground mb-1 text-sm">Occupied</p>
-                    <p className="text-lg font-semibold text-green-600">{occupiedProperties}</p>
+                    <p className="text-lg font-semibold text-green-600">{guestSummary.occupiedProperties}</p>
                   </div>
                   <div className="w-px h-12 bg-gray-200"></div>
                   <div className="text-center">
                     <p className="text-muted-foreground mb-1 text-sm">Vacant</p>
-                    <p className="text-lg font-semibold text-orange-600">{vacantProperties}</p>
+                    <p className="text-lg font-semibold text-orange-600">{guestSummary.vacantProperties}</p>
                   </div>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -557,7 +568,7 @@ export function Dashboard({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-muted-foreground mb-1 text-sm">Monthly rental revenue</p>
-                  <p className="text-lg font-semibold">£{totalRent.toLocaleString()}</p>
+                  <p className="text-lg font-semibold">£{guestSummary.totalRent.toLocaleString()}</p>
                 </div>
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                   <PoundSterling className="w-6 h-6 text-blue-600" />
@@ -569,7 +580,7 @@ export function Dashboard({
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-muted-foreground mb-1 text-sm">Document Alerts</p>
-                  <p className="text-lg font-semibold text-orange-600">{expiringDocuments}</p>
+                  <p className="text-lg font-semibold text-orange-600">{guestSummary.expiringDocuments}</p>
                 </div>
                 <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
                   <AlertTriangle className="w-6 h-6 text-orange-600" />

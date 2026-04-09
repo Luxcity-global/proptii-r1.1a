@@ -1,6 +1,16 @@
 import { Logger } from '@nestjs/common';
 import { z } from 'zod';
 
+function applyEnvAliases(): void {
+  // Backward-compatible aliases for older environment naming conventions.
+  process.env.MSAL_CLIENT_ID ||= process.env.AZURE_AD_B2C_CLIENT_ID;
+  process.env.MSAL_AUTHORITY ||= process.env.AZURE_AD_B2C_AUTHORITY;
+
+  process.env.AZURE_OPENAI_DEPLOYMENT_NAME ||= process.env.AZURE_OPENAI_DEPLOYMENT;
+  process.env.COSMOS_DB_CONNECTION_STRING ||= process.env.COSMOS_DB_ENDPOINT;
+  process.env.COSMOS_DB_DATABASE_NAME ||= process.env.COSMOS_DB_NAME;
+}
+
 /**
  * Zod schema for all required environment variables.
  * Called before NestFactory.create() in main.ts.
@@ -17,9 +27,9 @@ const envSchema = z.object({
   COSMOS_DB_DATABASE_NAME: z.string().default('proptii-db'),
 
   // ── Azure OpenAI ────────────────────────────────────────────────────────────
-  AZURE_OPENAI_API_KEY: z.string().min(1, 'AZURE_OPENAI_API_KEY is required'),
-  AZURE_OPENAI_ENDPOINT: z.string().url('AZURE_OPENAI_ENDPOINT must be a valid URL'),
-  AZURE_OPENAI_DEPLOYMENT_NAME: z.string().min(1, 'AZURE_OPENAI_DEPLOYMENT_NAME is required'),
+  AZURE_OPENAI_API_KEY: z.string().optional(),
+  AZURE_OPENAI_ENDPOINT: z.string().url('AZURE_OPENAI_ENDPOINT must be a valid URL').or(z.literal('')).optional(),
+  AZURE_OPENAI_DEPLOYMENT_NAME: z.string().optional(),
 
   // ── Azure Storage ───────────────────────────────────────────────────────────
   AZURE_STORAGE_ACCOUNT_NAME: z.string().optional(),
@@ -41,8 +51,8 @@ const envSchema = z.object({
   FIREBASE_CLIENT_EMAIL: z.string().email().or(z.literal('')).optional(),
 
   // ── Azure AD B2C / MSAL ─────────────────────────────────────────────────────
-  MSAL_CLIENT_ID: z.string().min(1, 'MSAL_CLIENT_ID is required for Azure AD B2C authentication'),
-  MSAL_AUTHORITY: z.string().url('MSAL_AUTHORITY must be a valid absolute URL (e.g., https://<tenant>.b2clogin.com/...)'),
+  MSAL_CLIENT_ID: z.string().optional(),
+  MSAL_AUTHORITY: z.string().url('MSAL_AUTHORITY must be a valid absolute URL (e.g., https://<tenant>.b2clogin.com/...)').or(z.literal('')).optional(),
   MSAL_REDIRECT_URI: z.string().optional(),
 
   // ── CORS / Frontend ─────────────────────────────────────────────────────────
@@ -66,6 +76,7 @@ export type Env = z.infer<typeof envSchema>;
  * Exits the process with code 1 on failure, listing all missing/invalid vars.
  */
 export function validateEnv(): Env {
+  applyEnvAliases();
   const result = envSchema.safeParse(process.env);
 
   if (!result.success) {

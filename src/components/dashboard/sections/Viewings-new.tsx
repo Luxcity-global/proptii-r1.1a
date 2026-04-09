@@ -12,7 +12,7 @@ import { useIsMobile } from '../ui/use-mobile';
  * Viewings section - redesigned to follow style guide
  */
 const Viewings: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('upcoming');
   const [viewingStats, setViewingStats] = useState<ViewingStats>({
@@ -358,6 +358,10 @@ const Viewings: React.FC = () => {
 
   const currentViewings = activeTab === 'upcoming' ? upcomingViewings : pastViewings;
   const currentSelections = propertySelections;
+  const summaryUpcomingCount = isAuthenticated ? upcomingViewings.length : 0;
+  const summaryCompletedCount = isAuthenticated ? viewingStats.completed : 0;
+  const summaryRescheduledCount = isAuthenticated ? viewingStats.rescheduled : 0;
+  const summaryTotalCount = isAuthenticated ? viewingStats.total : 0;
 
   // Pagination calculations
   const totalUpcomingPages = Math.ceil(upcomingViewings.length / ITEMS_PER_PAGE);
@@ -808,7 +812,7 @@ const Viewings: React.FC = () => {
           </div>
           <div className="mb-3">
               <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {upcomingViewings.length}
+              {summaryUpcomingCount}
               </p>
             </div>
           <div>
@@ -826,7 +830,7 @@ const Viewings: React.FC = () => {
           </div>
           <div className="mb-3">
               <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {viewingStats.completed}
+              {summaryCompletedCount}
               </p>
             </div>
           <div>
@@ -844,7 +848,7 @@ const Viewings: React.FC = () => {
           </div>
           <div className="mb-3">
             <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {viewingStats.rescheduled}
+              {summaryRescheduledCount}
             </p>
           </div>
             <div>
@@ -862,7 +866,7 @@ const Viewings: React.FC = () => {
           </div>
           <div className="mb-3">
               <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {viewingStats.total}
+              {summaryTotalCount}
               </p>
             </div>
           <div>

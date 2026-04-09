@@ -131,16 +131,18 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
     }
   };
 
-  const handleAgentCta = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    
+  const handleTenantJoinCta = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (isAuthenticated) {
-      navigate('/Agent');
-      return;
+      e.preventDefault();
+      navigate('/dashboard');
     }
+  };
 
-    // For anonymous users, send to registration and preserve destination.
-    navigate('/register?role=agent&redirect=%2FAgent');
+  const handleAgentJoinCta = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (isAuthenticated) {
+      e.preventDefault();
+      navigate('/Agent');
+    }
   };
 
   // --- Pillbox toggle state ---
@@ -559,7 +561,8 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-start items-center mb-6 md:mb-8">
               <Link
-                to="/register?role=tenant"
+                to={isAuthenticated ? '/dashboard' : '/register?role=tenant&redirect=%2Fdashboard'}
+                onClick={handleTenantJoinCta}
                 onMouseEnter={() => setCtaHover('tenant')}
                 onMouseLeave={() => setCtaHover('tenant')}
                 className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full font-semibold text-base md:text-lg transition-all duration-200 focus:outline-none focus-visible:outline-none text-white border-2 border-transparent bg-gradient-to-r from-[#DC5F12] to-[#F47A1A] shadow-md -translate-y-0.5 hover:shadow-lg hover:-translate-y-1"
@@ -567,7 +570,8 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                 Join as a Tenant / Buyer
               </Link>
               <Link
-                to="/register?role=agent"
+                to={isAuthenticated ? '/Agent' : '/register?role=agent&redirect=%2FAgent'}
+                onClick={handleAgentJoinCta}
                 onMouseEnter={() => setCtaHover('agent')}
                 onMouseLeave={() => setCtaHover('tenant')}
                 className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full border-2 border-[#136C9E] text-[#136C9E] font-semibold text-base md:text-lg bg-transparent transition-all duration-200 hover:text-white hover:border-transparent hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#F47A1A] hover:shadow-lg hover:-translate-y-1 focus:outline-none focus-visible:outline-none"

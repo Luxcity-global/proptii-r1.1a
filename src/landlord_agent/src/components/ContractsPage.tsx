@@ -38,6 +38,7 @@ import { SendContractModal } from './SendContractModal';
 import { contractService } from '../services/contractService';
 import { LandlordEmptyState } from './LandlordEmptyState';
 import { UserProfile } from '../App';
+import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 
 export interface Contract {
   id: string;
@@ -371,9 +372,7 @@ export function ContractsPage({ tenants = [], onBack, userProfile }: ContractsPa
       
       console.log('Sending email to:', contractData.recipientEmail);
       
-      const API_BASE_URL = window.location.hostname === 'localhost'
-        ? 'http://localhost:3000/api'
-        : 'https://proptii-r11a-production-0c93.up.railway.app/api';
+      const API_BASE_URL = PRIMARY_API_BASE_URL;
       
       if (contractData.file) {
         // Convert file to base64 and send email with attachment

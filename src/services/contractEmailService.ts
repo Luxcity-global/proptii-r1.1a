@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { PRIMARY_API_BASE_URL } from '../utils/apiEndpoints';
 
 interface ContractEmailParams {
   to: string;
@@ -16,13 +17,7 @@ interface ContractEmailResponse {
   error?: string;
 }
 
-const API_BASE_URL = (() => {
-  // Prefer configured URL from Vite env
-  const envBase = (import.meta as any)?.env?.VITE_API_URL as string | undefined;
-  const base = (envBase || (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://proptii-r11a-production-0c93.up.railway.app'))
-    .replace(/\/$/, '');
-  return `${base}/api`;
-})();
+const API_BASE_URL = PRIMARY_API_BASE_URL;
 
 class ContractEmailService {
   private readonly API_URL = API_BASE_URL;

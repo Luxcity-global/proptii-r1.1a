@@ -9,6 +9,7 @@ import { ArrowLeft, Mail, Send, CheckCircle, AlertCircle, Plus } from 'lucide-re
 import { Property } from '../App';
 import axios from 'axios';
 import { trackEvent } from '../../../utils/analytics';
+import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 
 interface InviteTenantProps {
   properties: Property[];
@@ -216,27 +217,7 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
       console.log('📧 Recipient:', formData.email);
       console.log('🏠 Property:', selectedProperty.address);
 
-      // Determine API base URL - try multiple endpoints with fallback
-      const getApiBaseUrl = () => {
-        // Priority 1: Use environment variable if set
-        if (import.meta.env.VITE_API_URL) {
-          console.log('✅ Using VITE_API_URL:', import.meta.env.VITE_API_URL);
-          return import.meta.env.VITE_API_URL;
-        }
-        
-        // Priority 2: Check hostname
-        const hostname = window.location.hostname;
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
-          console.log('✅ Using localhost API');
-          return 'http://localhost:3000';
-        }
-        
-        // Priority 3: Production URL
-        console.log('✅ Using production API');
-        return 'https://proptii-r11a-production-0c93.up.railway.app';
-      };
-
-      const API_BASE_URL = getApiBaseUrl();
+      const API_BASE_URL = PRIMARY_API_BASE_URL.replace(/\/api$/, '');
       const emailEndpoint = `${API_BASE_URL}/api/email/send`;
 
       console.log('📡 API Endpoint:', emailEndpoint);

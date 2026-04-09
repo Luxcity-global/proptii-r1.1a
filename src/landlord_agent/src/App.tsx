@@ -360,6 +360,7 @@ function AppContent() {
     }
   };
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>('landlord');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -450,6 +451,7 @@ function AppContent() {
       if (typeof window.getUserInfo === 'function') {
         const userInfo = window.getUserInfo();
         if (userInfo && userInfo.isAuthenticated) {
+          setIsAuthenticated(true);
           setUserProfile({
             name: userInfo.name,
             email: userInfo.email,
@@ -459,8 +461,15 @@ function AppContent() {
           });
           console.log('✅ Updated userProfile with authentication data:', userInfo);
         } else {
+          setIsAuthenticated(false);
           // Important: clear stale profile so guests never see authenticated data
           setUserProfile(null);
+          setProperties([]);
+          setTenants([]);
+          setVacancyAlerts([]);
+          setArrearsAlerts([]);
+          setAlerts([]);
+          setMarketInsights([]);
         }
       }
     };
@@ -487,6 +496,7 @@ function AppContent() {
       if (data && data.type === 'AUTH_STATE' && data.payload) {
         const { isAuthenticated, user } = data.payload;
         if (isAuthenticated && user) {
+          setIsAuthenticated(true);
           setUserProfile({
             name: user.name || user.givenName || '',
             email: user.email || '',
@@ -496,8 +506,15 @@ function AppContent() {
           });
           console.log('✅ Received AUTH_STATE from parent, updated userProfile:', user);
         } else {
+          setIsAuthenticated(false);
           // Explicit unauthenticated state from parent should clear profile
           setUserProfile(null);
+          setProperties([]);
+          setTenants([]);
+          setVacancyAlerts([]);
+          setArrearsAlerts([]);
+          setAlerts([]);
+          setMarketInsights([]);
           console.log('ℹ️ Received unauthenticated AUTH_STATE, cleared userProfile');
         }
         setIsAuthLoading(false);
@@ -2163,6 +2180,7 @@ function AppContent() {
             properties={properties}
             tenants={tenants}
             userProfile={userProfile}
+            isAuthenticated={isAuthenticated}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');
@@ -2611,6 +2629,7 @@ function AppContent() {
           <Dashboard
             properties={properties}
             userProfile={userProfile}
+            isAuthenticated={isAuthenticated}
             onAddProperty={() => {
               trackEvent('landlord_add_property_clicked');
               navigateToScreen('property-setup-step1');

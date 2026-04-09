@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 
 interface ContractEmailParams {
   to: string;
@@ -17,9 +18,7 @@ interface SendEmailResponse {
   error?: string;
 }
 
-const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:3000/api'
-  : 'https://proptii-r11a-production-0c93.up.railway.app/api';
+const API_BASE_URL = PRIMARY_API_BASE_URL;
 
 class ContractEmailService {
   private readonly API_URL = API_BASE_URL;

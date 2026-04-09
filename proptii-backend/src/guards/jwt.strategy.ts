@@ -8,14 +8,14 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
  *   https://<tenant>.b2clogin.com/<tenant>.onmicrosoft.com/<policy>/discovery/v2.0/keys
  *
  * Required env vars:
- *   MSAL_AUTHORITY  – e.g. https://proptii.b2clogin.com/proptii.onmicrosoft.com/B2C_1_signupsignin
- *   MSAL_CLIENT_ID  – Azure AD B2C application (client) ID
+ *   MSAL_AUTHORITY (or AZURE_AD_B2C_AUTHORITY)  – e.g. https://proptii.b2clogin.com/proptii.onmicrosoft.com/B2C_1_signupsignin
+ *   MSAL_CLIENT_ID (or AZURE_AD_B2C_CLIENT_ID)  – Azure AD B2C application (client) ID
  */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor() {
-    const authority = process.env.MSAL_AUTHORITY ?? '';
-    const clientId = process.env.MSAL_CLIENT_ID ?? '';
+    const authority = process.env.MSAL_AUTHORITY ?? process.env.AZURE_AD_B2C_AUTHORITY ?? '';
+    const clientId = process.env.MSAL_CLIENT_ID ?? process.env.AZURE_AD_B2C_CLIENT_ID ?? '';
 
     // IMPORTANT: `jwks-rsa` pulls in `jose` which is ESM.
     // Jest (CommonJS) can't parse it by default, breaking e2e tests.

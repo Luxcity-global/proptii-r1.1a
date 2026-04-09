@@ -23,6 +23,7 @@ import {
 import { Property, PropertyDocument } from '../App';
 import { propertyService } from '../services/propertyService';
 import axios from 'axios';
+import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 
 interface SelectedDocumentForm {
   file: File;
@@ -161,9 +162,7 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
 
     try {
       // Upload file to backend (which handles Azure Storage upload)
-        const API_BASE_URL = window.location.hostname === 'localhost'
-          ? 'http://localhost:3000/api'
-          : 'https://proptii-r11a-production-0c93.up.railway.app/api';
+      const API_BASE_URL = PRIMARY_API_BASE_URL;
 
       const uploadedCount = selectedDocuments.length;
 

@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { PRIMARY_API_BASE_URL } from '../utils/apiEndpoints';
 
 // Get the API URL from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://proptii-r11a-production-0c93.up.railway.app/api';
+const API_BASE_URL = PRIMARY_API_BASE_URL;
 
 console.log('Review Service using API URL:', API_BASE_URL);
 

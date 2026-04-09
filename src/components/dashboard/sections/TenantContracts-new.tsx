@@ -8,7 +8,7 @@ import { useIsMobile } from '../ui/use-mobile';
 
 const TenantContracts: React.FC = () => {
   const { signedContracts, isLoading, clearAllContracts, addSignedContract, removeSignedContract } = useSignedContracts();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const isMobile = useIsMobile();
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [firestoreContracts, setFirestoreContracts] = useState<any[]>([]);
@@ -111,6 +111,9 @@ const TenantContracts: React.FC = () => {
     requested: 0, // No requested contracts
     expiring: 0 // No expiring contracts (since we removed mock data)
   };
+  const summaryTotalContracts = isAuthenticated ? contractStats.total : 0;
+  const summarySignedContracts = isAuthenticated ? contractStats.signed : 0;
+  const summaryExpiringContracts = isAuthenticated ? contractStats.expiring : 0;
 
   // Default to signed tab since requested is disabled
   const [activeTab, setActiveTab] = useState('signed');
@@ -325,7 +328,7 @@ const TenantContracts: React.FC = () => {
           </div>
           <div className={isMobile ? 'mb-2' : 'mb-3'}>
             <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {contractStats.total}
+              {summaryTotalContracts}
             </p>
           </div>
           <div>
@@ -343,7 +346,7 @@ const TenantContracts: React.FC = () => {
           </div>
           <div className={isMobile ? 'mb-2' : 'mb-3'}>
             <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {contractStats.signed}
+              {summarySignedContracts}
             </p>
           </div>
           <div>
@@ -381,7 +384,7 @@ const TenantContracts: React.FC = () => {
           </div>
           <div className={isMobile ? 'mb-2' : 'mb-3'}>
             <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {contractStats.expiring}
+              {summaryExpiringContracts}
             </p>
           </div>
           <div>

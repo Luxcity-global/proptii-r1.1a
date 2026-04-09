@@ -14,7 +14,7 @@ import { trackEvent } from '../../../utils/analytics';
  */
 const SavedProperties: React.FC = () => {
   const { savedProperties, unsaveProperty } = useSavedProperties();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(6);
@@ -317,6 +317,11 @@ const SavedProperties: React.FC = () => {
     });
   }, [savedProperties, searchQuery]);
 
+  const summarySavedCount = isAuthenticated ? savedProperties.length : 0;
+  const summaryViewingsCount = isAuthenticated ? (viewingStats.total || 0) : 0;
+  const summaryReferencingCount = isAuthenticated ? completedSections.size : 0;
+  const summaryContractsCount = isAuthenticated ? (signedContractsCount || 0) : 0;
+
   const displayedProperties = useMemo(() => {
     return filteredProperties.slice(0, visibleCount);
   }, [filteredProperties, visibleCount]);
@@ -449,12 +454,12 @@ const SavedProperties: React.FC = () => {
           </div>
           <div className={isMobile ? 'mb-2' : 'mb-3'}>
             <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {savedProperties.length}
+              {summarySavedCount}
             </p>
           </div>
           <div>
             <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>
-              {savedProperties.length === 1 ? 'Saved property' : 'Saved properties'}
+              {summarySavedCount === 1 ? 'Saved property' : 'Saved properties'}
             </p>
           </div>
         </div>
@@ -469,7 +474,7 @@ const SavedProperties: React.FC = () => {
           </div>
           <div className={isMobile ? 'mb-2' : 'mb-3'}>
             <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {viewingStats.total || 0}
+              {summaryViewingsCount}
             </p>
           </div>
           <div>
@@ -487,7 +492,7 @@ const SavedProperties: React.FC = () => {
           </div>
           <div className={isMobile ? 'mb-2' : 'mb-3'}>
             <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {completedSections.size}/6
+              {summaryReferencingCount}/6
             </p>
           </div>
           <div>
@@ -505,7 +510,7 @@ const SavedProperties: React.FC = () => {
           </div>
           <div className={isMobile ? 'mb-2' : 'mb-3'}>
             <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {signedContractsCount || 0}
+              {summaryContractsCount}
             </p>
           </div>
           <div>

@@ -77,7 +77,7 @@ interface FormData {
  * Tenant Referencing page - matches the exact design from the image
  */
 const TenantReferencing: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const isMobile = useIsMobile();
   const [formData, setFormData] = useState<FormData | null>(null);
   const [stepStatus, setStepStatus] = useState<{ [key: number]: 'empty' | 'partial' | 'complete' }>({});
@@ -166,6 +166,10 @@ const TenantReferencing: React.FC = () => {
   };
 
   const progress = calculateProgress();
+  const summaryOverallProgress = isAuthenticated ? progress.overall : 0;
+  const summaryCompleted = isAuthenticated ? progress.completed : 0;
+  const summaryPending = isAuthenticated ? progress.pending : 0;
+  const summaryDocuments = isAuthenticated ? progress.documents : 0;
 
   // Modal functions
   const openReferencingModal = (step: number) => {
@@ -246,10 +250,10 @@ const TenantReferencing: React.FC = () => {
             </div>
           </div>
           <div className={isMobile ? 'mb-2' : 'mb-3'}>
-            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>{progress.overall}%</p>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>{summaryOverallProgress}%</p>
           </div>
           <div>
-            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>{progress.completed} of 6 sections</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>{summaryCompleted} of 6 sections</p>
           </div>
         </div>
 
@@ -262,7 +266,7 @@ const TenantReferencing: React.FC = () => {
             </div>
           </div>
           <div className={isMobile ? 'mb-2' : 'mb-3'}>
-            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>{progress.completed}</p>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>{summaryCompleted}</p>
           </div>
           <div>
             <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Sections verified</p>
@@ -278,7 +282,7 @@ const TenantReferencing: React.FC = () => {
             </div>
           </div>
           <div className={isMobile ? 'mb-2' : 'mb-3'}>
-            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>{progress.pending}</p>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>{summaryPending}</p>
           </div>
           <div>
             <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Awaiting completion</p>
@@ -294,7 +298,7 @@ const TenantReferencing: React.FC = () => {
             </div>
           </div>
           <div className={isMobile ? 'mb-2' : 'mb-3'}>
-            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>{progress.documents}</p>
+            <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>{summaryDocuments}</p>
           </div>
           <div>
             <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>Total files</p>

@@ -11,6 +11,7 @@ import { Property, Tenant } from '../App';
 import { tenantService } from '../services/tenantService';
 import { trackEvent } from '../../../utils/analytics';
 import axios from 'axios';
+import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 
 interface AzureUser {
   id: string;
@@ -48,19 +49,7 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
       setIsLoadingUsers(true);
       setError(null);
       try {
-        // Determine API base URL - same pattern as InviteTenant for consistency
-        const getApiBaseUrl = () => {
-          if (import.meta.env.VITE_API_URL) {
-            return import.meta.env.VITE_API_URL;
-          }
-          const hostname = window.location.hostname;
-          if (hostname === 'localhost' || hostname === '127.0.0.1') {
-            return 'http://localhost:3000';
-          }
-          return 'https://proptii-r11a-production-0c93.up.railway.app';
-        };
-
-        const API_BASE_URL = getApiBaseUrl();
+        const API_BASE_URL = PRIMARY_API_BASE_URL.replace(/\/api$/, '');
         const endpoint = `${API_BASE_URL}/api/azure-users`;
         
         console.log('🔍 Fetching Azure AD B2C users from:', endpoint);
