@@ -381,6 +381,40 @@ function AppContent() {
   const [editingPropertyId, setEditingPropertyId] = useState<string | null>(null);
   const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
 
+  const clearSignInQueryParam = useCallback(() => {
+    try {
+      const currentUrl = new URL(window.location.href);
+      if (!currentUrl.searchParams.has('signin')) return;
+      currentUrl.searchParams.delete('signin');
+      window.history.replaceState({}, '', `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
+    } catch (error) {
+      console.warn('Failed to clear signin query param:', error);
+    }
+  }, []);
+
+  const getCachedAuthUser = useCallback((): { name?: string; email?: string; phone?: string; isAuthenticated: boolean } | null => {
+    try {
+      const raw = localStorage.getItem('proptii_auth_state');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const user = parsed?.user ?? parsed;
+      const isAuthed =
+        parsed?.isAuthenticated === true ||
+        user?.isAuthenticated === true ||
+        Boolean(user?.email);
+      if (!isAuthed) return null;
+      return {
+        name: user?.name || user?.givenName || user?.displayName || '',
+        email: user?.email || user?.username || '',
+        phone: user?.phone || '+44 7911 123456',
+        isAuthenticated: true,
+      };
+    } catch (error) {
+      console.warn('Failed to parse cached auth state:', error);
+      return null;
+    }
+  }, []);
+
   const resolveManagerId = useCallback((): string | null => {
     try {
       if (userProfile && (userProfile as any).id) {
@@ -447,7 +481,7 @@ function AppContent() {
   // Listen for authentication changes from the bridge script
   React.useEffect(() => {
     const handleAuthStateChange = () => {
-      // Check if authentication bridge functions are available
+      // Check authentication bridge first
       if (typeof window.getUserInfo === 'function') {
         const userInfo = window.getUserInfo();
         if (userInfo && userInfo.isAuthenticated) {
@@ -459,19 +493,41 @@ function AppContent() {
             companyName: 'Proptii',
             logo: undefined
           });
+          clearSignInQueryParam();
+          setIsAuthLoading(false);
           console.log('✅ Updated userProfile with authentication data:', userInfo);
-        } else {
-          setIsAuthenticated(false);
-          // Important: clear stale profile so guests never see authenticated data
-          setUserProfile(null);
-          setProperties([]);
-          setTenants([]);
-          setVacancyAlerts([]);
-          setArrearsAlerts([]);
-          setAlerts([]);
-          setMarketInsights([]);
+          return;
         }
       }
+
+      // Fallback to cached auth state when bridge has not hydrated yet
+      const cachedUser = getCachedAuthUser();
+      if (cachedUser) {
+        setIsAuthenticated(true);
+        setUserProfile({
+          name: cachedUser.name || '',
+          email: cachedUser.email || '',
+          phone: cachedUser.phone || '+44 7911 123456',
+          companyName: 'Proptii',
+          logo: undefined
+        });
+        clearSignInQueryParam();
+        setIsAuthLoading(false);
+        console.log('✅ Restored auth state from localStorage cache');
+        return;
+      }
+
+      // No authenticated state found
+      setIsAuthenticated(false);
+      // Important: clear stale profile so guests never see authenticated data
+      setUserProfile(null);
+      setProperties([]);
+      setTenants([]);
+      setVacancyAlerts([]);
+      setArrearsAlerts([]);
+      setAlerts([]);
+      setMarketInsights([]);
+      setIsAuthLoading(false);
     };
 
     // Listen for authentication state changes
@@ -485,7 +541,7 @@ function AppContent() {
       window.removeEventListener('authStateChanged', handleAuthStateChange);
       window.removeEventListener('userAuthenticated', handleAuthStateChange);
     };
-  }, []);
+  }, [clearSignInQueryParam, getCachedAuthUser]);
 
   // Listen for AUTH_STATE and NAVIGATE messages from the embedding tenant app (bridge)
   React.useEffect(() => {
@@ -496,6 +552,12 @@ function AppContent() {
       if (data && data.type === 'AUTH_STATE' && data.payload) {
         const { isAuthenticated, user } = data.payload;
         if (isAuthenticated && user) {
+          try {
+            localStorage.setItem('proptii_auth_state', JSON.stringify({ isAuthenticated: true, user }));
+          } catch (error) {
+            console.warn('Failed to cache AUTH_STATE:', error);
+          }
+
           setIsAuthenticated(true);
           setUserProfile({
             name: user.name || user.givenName || '',
@@ -504,6 +566,7 @@ function AppContent() {
             companyName: 'Proptii',
             logo: undefined
           });
+          clearSignInQueryParam();
           console.log('✅ Received AUTH_STATE from parent, updated userProfile:', user);
         } else {
           setIsAuthenticated(false);
@@ -557,7 +620,7 @@ function AppContent() {
       window.removeEventListener('message', handleMessage);
       clearTimeout(timer);
     };
-  }, []);
+  }, [clearSignInQueryParam]);
 
   // Check localStorage for role selection (from AgentHome)
   React.useEffect(() => {

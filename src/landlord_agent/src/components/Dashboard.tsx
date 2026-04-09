@@ -508,8 +508,9 @@ export function Dashboard({
     }
   };
 
-  // For unauthenticated users: show header, 4 summary cards (all 0), and empty state mascot only
-  if (!isUserAuthenticated || !userProfile) {
+  // For unauthenticated users: show header, 4 summary cards (all 0), and empty state mascot only.
+  // Authenticated users can render with partial profile data while identity hydration finishes.
+  if (!isUserAuthenticated) {
     return (
       <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7' }}>
         {/* Minimal Header for unauthenticated state */}

@@ -1,16 +1,22 @@
-import axios from 'axios';
+import apiService from './api';
 
-// Get the API URL from environment variables and ensure it has /api suffix
-const envApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-const baseUrl = envApiUrl.replace(/\/$/, ''); // Remove trailing slash
-const API_BASE_URL = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
+/**
+ * Path segment for referencing routes, aligned with apiService baseURL (VITE_API_URL).
+ * If the env URL already ends with `/api`, paths are `/referencing/...`; otherwise `/api/referencing/...`.
+ */
+function referencingPath(suffix: string): string {
+  const raw = (import.meta.env.VITE_API_URL || 'http://localhost:3002').replace(/\/$/, '');
+  const baseHasApi = raw.endsWith('/api');
+  const prefix = baseHasApi ? '' : '/api';
+  return `${prefix}/referencing/${suffix}`;
+}
 
-console.log('Using API URL:', API_BASE_URL);
+console.log('Using API URL:', import.meta.env.VITE_API_URL || 'http://localhost:3002');
 
 class ReferencingService {
   async saveIdentityData(data: any) {
     try {
-      const response = await axios.post(`${API_BASE_URL}/referencing/identity`, data);
+      const response = await apiService.post(referencingPath('identity'), data);
       return response.data;
     } catch (error) {
       console.error('Error saving identity data:', error);
@@ -20,7 +26,7 @@ class ReferencingService {
 
   async saveEmploymentData(data: any) {
     try {
-      const response = await axios.post(`${API_BASE_URL}/referencing/employment`, data);
+      const response = await apiService.post(referencingPath('employment'), data);
       return response.data;
     } catch (error) {
       console.error('Error saving employment data:', error);
@@ -30,7 +36,7 @@ class ReferencingService {
 
   async saveResidentialData(data: any) {
     try {
-      const response = await axios.post(`${API_BASE_URL}/referencing/residential`, data);
+      const response = await apiService.post(referencingPath('residential'), data);
       return response.data;
     } catch (error) {
       console.error('Error saving residential data:', error);
@@ -40,7 +46,7 @@ class ReferencingService {
 
   async saveFinancialData(data: any) {
     try {
-      const response = await axios.post(`${API_BASE_URL}/referencing/financial`, data);
+      const response = await apiService.post(referencingPath('financial'), data);
       return response.data;
     } catch (error) {
       console.error('Error saving financial data:', error);
@@ -50,7 +56,7 @@ class ReferencingService {
 
   async saveGuarantorData(data: any) {
     try {
-      const response = await axios.post(`${API_BASE_URL}/referencing/guarantor`, data);
+      const response = await apiService.post(referencingPath('guarantor'), data);
       return response.data;
     } catch (error) {
       console.error('Error saving guarantor data:', error);
@@ -60,7 +66,7 @@ class ReferencingService {
 
   async saveAgentDetailsData(data: any) {
     try {
-      const response = await axios.post(`${API_BASE_URL}/referencing/agentDetails`, data);
+      const response = await apiService.post(referencingPath('agentDetails'), data);
       return response.data;
     } catch (error) {
       console.error('Error saving agent details:', error);
@@ -70,7 +76,7 @@ class ReferencingService {
 
   async submitApplication(userId: string, data: any) {
     try {
-      const response = await axios.post(`${API_BASE_URL}/referencing/${userId}/submit`, data);
+      const response = await apiService.post(referencingPath(`${userId}/submit`), data);
       return response.data;
     } catch (error) {
       console.error('Error submitting application:', error);
