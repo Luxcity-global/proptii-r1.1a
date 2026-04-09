@@ -76,6 +76,7 @@ export class SecurityMiddleware {
             'https://*.azure.com',
             // Always include known backend origins
             'https://proptii-r1-1a-1.onrender.com',
+            'https://proptii-r1-1a-new-backend.onrender.com',
             'https://proptii-backend.onrender.com',
             'https://demo.docusign.net',
             'https://www.docusign.net',
