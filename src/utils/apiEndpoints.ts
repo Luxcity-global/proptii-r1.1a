@@ -5,7 +5,6 @@ export const CANONICAL_PROD_API_BASE_URL =
 
 const REMOTE_FALLBACKS = [
   CANONICAL_PROD_API_BASE_URL,
-  'https://proptii-backend.onrender.com/api',
   'https://proptii-r1-1a-1.onrender.com/api',
   'https://api.proptii.com',
   'https://api-staging.proptii.com'
