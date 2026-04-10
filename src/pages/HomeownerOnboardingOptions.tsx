@@ -20,7 +20,7 @@ const HomeownerOnboardingOptions: React.FC<HomeownerOnboardingOptionsProps> = ({
     setShowResumeModal(false);
     setOnboardingCompleted();
     onDismiss?.();
-    if (!onDismiss) navigate('/home-v2');
+    if (!onDismiss) navigate('/');
   };
 
   const handleScheduleMaintenance = () => {

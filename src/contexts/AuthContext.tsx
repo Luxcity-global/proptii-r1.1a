@@ -428,9 +428,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const loginRequestWithState = {
         ...loginRequest,
         // Store redirect path in state to survive the auth flow
-        state: redirectPath ? JSON.stringify({ redirect: redirectPath }) : undefined,
-        // Use redirect flow instead of popup for better reliability with Azure B2C signup
-        redirectStartPage: window.location.href
+        state: redirectPath ? JSON.stringify({ redirect: redirectPath }) : undefined
       };
 
       // Try popup login first
@@ -514,7 +512,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const loginRequestWithState = {
         ...loginRequest,
         // Store redirect path in state to survive the auth flow
-        state: redirectPath ? JSON.stringify({ redirect: redirectPath }) : undefined
+        state: redirectPath ? JSON.stringify({ redirect: redirectPath }) : undefined,
+        // Ensure redirect fallback returns user to the current page context.
+        redirectStartPage: window.location.href
       };
 
       // Try redirect login as fallback - this is more reliable for Azure B2C signup

@@ -48,8 +48,9 @@ import ProcessSimulator from './pages/tools/ProcessSimulator';
 import TimelineGenerator from './pages/tools/TimelineGenerator';
 import KnowYourRights from './pages/tools/KnowYourRights';
 import { AuthAnalyticsBridge } from './components/analytics/AuthAnalyticsBridge';
+import ComingSoon from './pages/ComingSoon';
 
-/** Default landing: onboarding flow first. Home pages at /home-v2 and /home-legacy. */
+/** Default landing: onboarding flow first. Home v2 lives at / with /home-v2 as alias. */
 
 export const App: React.FC = () => {
   return (
@@ -62,11 +63,11 @@ export const App: React.FC = () => {
               <AuthAnalyticsBridge />
               <AuthRedirectHandler />
               <Routes>
-            {/* Public Routes - home-v2 is default landing; onboarding shows as modal overlay */}
-            <Route path="/" element={<Navigate to="/home-v2" replace />} />
-            <Route path="/home-v2" element={<HomeVariant />} />
+            {/* Public Routes - / is default landing; onboarding shows as modal overlay */}
+            <Route path="/" element={<HomeVariant />} />
+            <Route path="/home-v2" element={<Navigate to="/" replace />} />
             <Route path="/home-legacy" element={<HomeLegacy />} />
-            <Route path="/home" element={<Navigate to="/home-v2" replace />} />
+            <Route path="/home" element={<Navigate to="/" replace />} />
             <Route path="/tenant-onboarding" element={<OnboardingOptionsModalRoute type="tenant" />} />
             <Route path="/landlord-onboarding" element={<OnboardingOptionsModalRoute type="landlord" />} />
             <Route path="/homeowner-onboarding" element={<OnboardingOptionsModalRoute type="homeowner" />} />
@@ -126,6 +127,7 @@ export const App: React.FC = () => {
             <Route path="/tools/process-simulator" element={<ProcessSimulator />} />
             <Route path="/tools/timeline-generator" element={<TimelineGenerator />} />
             <Route path="/tools/know-your-rights" element={<KnowYourRights />} />
+            <Route path="/coming-soon" element={<ComingSoon />} />
 
             {/* Listings routes */}
             <Route path="/listings" element={<Listings />} />

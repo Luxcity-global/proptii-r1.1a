@@ -30,7 +30,7 @@ const PAUSE_AFTER_DELETING_MS = 400;
 const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, login } = useAuth();
   const [, forceOnboardingRefresh] = useState(0);
 
   // Typing/deleting animation for hero headline
@@ -131,18 +131,28 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
     }
   };
 
-  const handleTenantJoinCta = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleTenantJoinCta = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+
     if (isAuthenticated) {
-      e.preventDefault();
       navigate('/dashboard');
+      return;
     }
+
+    sessionStorage.setItem('redirectAfterLogin', '/dashboard');
+    await login();
   };
 
-  const handleAgentJoinCta = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleAgentJoinCta = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+
     if (isAuthenticated) {
-      e.preventDefault();
       navigate('/Agent');
+      return;
     }
+
+    sessionStorage.setItem('redirectAfterLogin', '/Agent');
+    await login();
   };
 
   // --- Pillbox toggle state ---
@@ -166,12 +176,16 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const navigateToLandlordSection = (section: 'dashboard' | 'properties' | 'clients') => {
-    if (isAuthenticated) {
-      navigate('/Agent');
+  const navigateToLandlordAction = (action: 'add-property' | 'clients' | 'coming-soon') => {
+    if (action === 'add-property') {
+      navigate('/landlord?start=property-setup-step1');
       return;
     }
-    navigate(`/landlord/${section}`);
+    if (action === 'clients') {
+      navigate('/landlord/clients');
+      return;
+    }
+    navigate('/coming-soon');
   };
 
   function handleModeSwitch(mode: 'search' | 'list') {
@@ -192,10 +206,10 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
   ];
 
   const listMenuItems = [
-    { icon: <Building2 className="h-4 w-4" />, label: 'List Property', description: 'Advertise your property to verified tenants', action: () => { setIsDropdownOpen(false); navigateToLandlordSection('properties'); } },
-    { icon: <Users className="h-4 w-4" />, label: 'Manage Tenants', description: 'Tenant communication and management tools', action: () => { setIsDropdownOpen(false); navigateToLandlordSection('clients'); } },
-    { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance and enquiries', action: () => { setIsDropdownOpen(false); navigateToLandlordSection('dashboard'); } },
-    { icon: <Shield className="h-4 w-4" />, label: 'Verify Tenants', description: 'Run background and credit checks securely', action: () => { setIsDropdownOpen(false); navigateToLandlordSection('clients'); } },
+    { icon: <Building2 className="h-4 w-4" />, label: 'List Property', description: 'Advertise your property to verified tenants', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('add-property'); } },
+    { icon: <Users className="h-4 w-4" />, label: 'Manage Tenants', description: 'Tenant communication and management tools', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('clients'); } },
+    { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance and enquiries', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('coming-soon'); } },
+    { icon: <Shield className="h-4 w-4" />, label: 'Verify Tenants', description: 'Run background and credit checks securely', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('coming-soon'); } },
     { icon: <Wrench className="h-4 w-4" />, label: 'Tools', description: 'Free rental tools and official documents for landlords and tenants', action: () => { setIsDropdownOpen(false); navigate('/tools'); } },
   ];
 
@@ -242,7 +256,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full py-8 md:py-0">
           {/* Primary CTAs – HeroToggle horizontal pill with dropdown (fixed vertical position) */}
-          <div className="absolute left-1/2 top-[5rem] w-full max-w-2xl -translate-x-1/2 -translate-y-[192px] flex justify-center px-4 md:top-[6rem]">
+          <div className="absolute left-1/2 top-[5rem] z-30 w-full max-w-2xl -translate-x-1/2 -translate-y-[192px] flex justify-center px-4 md:top-[6rem]">
             <div className="relative inline-flex flex-col items-center">
               {/* Toggle Pill Container */}
               <div ref={toggleRef} className="relative">
@@ -307,9 +321,6 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                       />
                     )}
                   </button>
-
-                  {/* Divider */}
-                  <div className="my-2.5 w-px bg-white/10" />
 
                   {/* List / Landlords Button */}
                   <button
@@ -487,7 +498,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                         if (activeMode === 'search') {
                           handleSearchCta();
                         } else {
-                          navigateToLandlordSection('properties');
+                          navigateToLandlordAction('add-property');
                         }
                       }}
                       className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold tracking-wide uppercase transition-all duration-300"
@@ -532,7 +543,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
           </p>
 
           {/* Search Bar */}
-          <div ref={searchBarRef} className="max-w-3xl mx-auto px-4 md:px-0">
+          <div ref={searchBarRef} className="relative z-10 max-w-3xl mx-auto px-4 md:px-0">
             <SearchInput
               onHeightChange={handleSearchInputHeightChange}
               value={prefilledSearchQuery}
@@ -561,7 +572,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-start items-center mb-6 md:mb-8">
               <Link
-                to={isAuthenticated ? '/dashboard' : '/register?role=tenant&redirect=%2Fdashboard'}
+                to={isAuthenticated ? '/dashboard' : '/login'}
                 onClick={handleTenantJoinCta}
                 onMouseEnter={() => setCtaHover('tenant')}
                 onMouseLeave={() => setCtaHover('tenant')}
@@ -570,7 +581,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                 Join as a Tenant / Buyer
               </Link>
               <Link
-                to={isAuthenticated ? '/Agent' : '/register?role=agent&redirect=%2FAgent'}
+                to={isAuthenticated ? '/Agent' : '/login'}
                 onClick={handleAgentJoinCta}
                 onMouseEnter={() => setCtaHover('agent')}
                 onMouseLeave={() => setCtaHover('tenant')}
@@ -580,7 +591,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
               </Link>
             </div>
             <p className="text-sm md:text-base">
-              After your trial, plans start from [price TBD]/month. We'll notify you before any charges.
+              After your trial, plans start from [price TBD] / month. We'll notify you before any charges.
             </p>
           </div>
 

@@ -14,7 +14,9 @@ export const msalConfig: Configuration = {
     authority: `https://proptii.b2clogin.com/${tenantName}/${policyName}`,
     knownAuthorities: ["proptii.b2clogin.com"],
     redirectUri: redirectUri,
-    navigateToLoginRequestUrl: true,
+    // Prevent popup flows from re-navigating to request URL in the popup window.
+    // This avoids blank popup/modal states when the SPA router mutates the landing path.
+    navigateToLoginRequestUrl: false,
     postLogoutRedirectUri: postLogoutRedirectUri,
   },
   cache: {

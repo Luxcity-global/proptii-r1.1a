@@ -5,9 +5,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faLinkedinIn,
   faInstagram,
-  faTiktok,
-  faYoutube,
-  faDribbble
+  faYoutube
 } from "@fortawesome/free-brands-svg-icons";
 //import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
@@ -150,12 +148,6 @@ function Footer() {
             <a href="https://www.linkedin.com/company/luxcity-global/?viewAsMember=true" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
               <FontAwesomeIcon icon={faLinkedinIn} />
             </a>
-            <a href="#" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
-              <FontAwesomeIcon icon={faTiktok} />
-            </a>
-            <a href="https://dribbble.com/dev-one" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
-              <FontAwesomeIcon icon={faDribbble} />
-            </a>
           </div>
 
           {/* Copyright */}
@@ -248,14 +240,8 @@ function Footer() {
             <a href="https://www.instagram.com/luxcity_tech/" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
               <FontAwesomeIcon icon={faInstagram} />
             </a>
-            <a href="#" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
-              <FontAwesomeIcon icon={faTiktok} />
-            </a>
             <a href="https://www.youtube.com/@Luxcity-v1" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
               <FontAwesomeIcon icon={faYoutube} />
-            </a>
-            <a href="https://dribbble.com/dev-one" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
-              <FontAwesomeIcon icon={faDribbble} />
             </a>
           </div>
         </div>

@@ -14,7 +14,7 @@ export function OnboardingOptionsModalRoute({ type }: OnboardingOptionsModalRout
   const navigate = useNavigate();
 
   const handleDismiss = () => {
-    navigate('/home-v2', { replace: true });
+    navigate('/', { replace: true });
   };
 
   return (

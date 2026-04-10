@@ -14,7 +14,7 @@ const TENANT_SERVICE_LABELS: Record<TenantServiceRoute, string> = {
 };
 
 const TENANT_SERVICE_MENU_ITEMS: { path: string; label: string; icon: React.ReactNode }[] = [
-  { path: '/home-v2', label: 'Search Properties Free', icon: <Home className="h-4 w-4" /> },
+  { path: '/', label: 'Search Properties Free', icon: <Home className="h-4 w-4" /> },
   { path: '/bookviewing', label: 'Book Viewing', icon: <CalendarCheck className="h-4 w-4" /> },
   { path: '/referencing', label: 'Referencing', icon: <FileCheck className="h-4 w-4" /> },
   { path: '/contracts', label: 'Sign Contracts', icon: <FileSignature className="h-4 w-4" /> },
@@ -44,12 +44,16 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
   const currentServiceRoute = (TENANT_SERVICE_ROUTES.find((r) => pathname === r || pathname.startsWith(r + '/')) ?? '/bookviewing') as TenantServiceRoute;
   const currentServiceLabel = TENANT_SERVICE_LABELS[currentServiceRoute];
 
-  const navigateToLandlordSection = (section: 'dashboard' | 'properties' | 'clients') => {
-    if (isAuthenticated) {
-      navigate('/Agent');
+  const navigateToLandlordAction = (action: 'add-property' | 'clients' | 'coming-soon') => {
+    if (action === 'add-property') {
+      navigate('/landlord?start=property-setup-step1');
       return;
     }
-    navigate(`/landlord/${section}`);
+    if (action === 'clients') {
+      navigate('/landlord/clients');
+      return;
+    }
+    navigate('/coming-soon');
   };
 
   const handleServiceModeSwitch = (mode: 'search' | 'list') => {
@@ -63,17 +67,17 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
   };
 
   const searchServiceMenuItems = [
-    { icon: <Home className="h-4 w-4" />, label: 'Search Properties', description: 'AI-powered property search', action: () => { setIsServiceDropdownOpen(false); navigate('/home-v2'); } },
+    { icon: <Home className="h-4 w-4" />, label: 'Search Properties', description: 'AI-powered property search', action: () => { setIsServiceDropdownOpen(false); navigate('/'); } },
     { icon: <CalendarCheck className="h-4 w-4" />, label: 'Book Viewings', description: 'Schedule and manage property viewings', action: () => { setIsServiceDropdownOpen(false); navigate('/bookviewing'); } },
     { icon: <FileCheck className="h-4 w-4" />, label: 'Referencing', description: 'Complete tenant referencing online', action: () => { setIsServiceDropdownOpen(false); navigate('/referencing'); } },
     { icon: <FileSignature className="h-4 w-4" />, label: 'Sign Contracts', description: 'Digital contract signing', action: () => { setIsServiceDropdownOpen(false); navigate('/contracts'); } },
   ];
 
   const listServiceMenuItems = [
-    { icon: <Building2 className="h-4 w-4" />, label: 'List Property', description: 'Advertise your property to verified tenants', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordSection('properties'); } },
-    { icon: <Users className="h-4 w-4" />, label: 'Manage Tenants', description: 'Tenant communication and management', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordSection('clients'); } },
-    { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordSection('dashboard'); } },
-    { icon: <Shield className="h-4 w-4" />, label: 'Verify Tenants', description: 'Run background and credit checks', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordSection('clients'); } },
+    { icon: <Building2 className="h-4 w-4" />, label: 'List Property', description: 'Advertise your property to verified tenants', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordAction('add-property'); } },
+    { icon: <Users className="h-4 w-4" />, label: 'Manage Tenants', description: 'Tenant communication and management', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordAction('clients'); } },
+    { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordAction('coming-soon'); } },
+    { icon: <Shield className="h-4 w-4" />, label: 'Verify Tenants', description: 'Run background and credit checks', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordAction('coming-soon'); } },
   ];
 
   const serviceMenuItems = activeServiceMode === 'search' ? searchServiceMenuItems : listServiceMenuItems;
@@ -294,7 +298,6 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                         <div className="pointer-events-none absolute inset-0 rounded-full" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 50%)' }} />
                       )}
                     </button>
-                    <div className="my-1.5 w-px bg-white/10 shrink-0" aria-hidden />
                     {/* List / Landlords side (gold) */}
                     <button
                       type="button"
@@ -406,9 +409,9 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                           onClick={() => {
                             setIsServiceDropdownOpen(false);
                             if (activeServiceMode === 'search') {
-                              navigate('/home-v2');
+                              navigate('/');
                             } else {
-                              navigateToLandlordSection('properties');
+                              navigateToLandlordAction('add-property');
                             }
                           }}
                           className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold uppercase tracking-wide transition-all"
@@ -614,7 +617,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                         navigate(item.path);
                       }}
                       className={`block w-full px-3 py-2 text-left text-sm ${
-                        pathname === item.path || (item.path !== '/home-v2' && pathname.startsWith(item.path))
+                        pathname === item.path || (item.path !== '/' && pathname.startsWith(item.path))
                           ? 'text-[#E76F51] font-bold'
                           : 'text-white hover:text-[#E76F51] transition-colors'
                       }`}

@@ -122,14 +122,14 @@ const Tools: React.FC = () => {
 
   const navigateToAgent = () => {
     if (isAuthenticated) {
-      navigate('/Agent');
-    } else {
-      navigate('/register?role=agent&redirect=%2FAgent');
+      navigate('/landlord?start=property-setup-step1');
+      return;
     }
+    navigate('/landlord?start=property-setup-step1');
   };
 
   const handleSearchCta = () => {
-    navigate('/home-v2');
+    navigate('/');
   };
 
   useEffect(() => {
@@ -214,7 +214,7 @@ const Tools: React.FC = () => {
       description: 'Tenant communication and management tools',
       action: () => {
         setIsDropdownOpen(false);
-        navigateToAgent();
+        navigate('/landlord/clients');
       },
     },
     {
@@ -223,7 +223,7 @@ const Tools: React.FC = () => {
       description: 'Track listing performance and enquiries',
       action: () => {
         setIsDropdownOpen(false);
-        navigateToAgent();
+        navigate('/coming-soon');
       },
     },
     {
@@ -232,7 +232,7 @@ const Tools: React.FC = () => {
       description: 'Run background and credit checks securely',
       action: () => {
         setIsDropdownOpen(false);
-        navigateToAgent();
+        navigate('/coming-soon');
       },
     },
     {
@@ -436,8 +436,6 @@ const Tools: React.FC = () => {
                         />
                       )}
                     </button>
-
-                    <div className="my-2.5 w-px bg-white/10" />
 
                     {/* List / landlords button */}
                     <button

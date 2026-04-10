@@ -35,7 +35,7 @@ function isStepStored(app: GettingStartedApp, stepId: string): boolean {
 
 /** Steps for the home landing page – search, book viewing, referencing, etc. */
 const HOME_STEPS: Omit<ProgressStep, 'completed'>[] = [
-  { id: 'search', label: 'Search for properties', path: '/home-v2', tourParam: 'tour=search' },
+  { id: 'search', label: 'Search for properties', path: '/', tourParam: 'tour=search' },
   { id: 'book-viewing', label: 'Book a viewing', path: '/bookviewing', tourParam: 'tour=viewing' },
   { id: 'referencing', label: 'Complete referencing', path: '/referencing', tourParam: 'tour=referencing' },
   { id: 'contracts', label: 'Sign contracts', path: '/contracts', tourParam: 'tour=contracts' },
@@ -43,13 +43,13 @@ const HOME_STEPS: Omit<ProgressStep, 'completed'>[] = [
   { id: 'profile', label: 'Complete your profile', path: '/profile', tourParam: 'tour=profile' },
   { id: 'register', label: 'Create an account', path: '/register', tourParam: 'tour=register' },
   { id: 'agent', label: 'Try landlord features', path: '/Agent', tourParam: 'tour=agent' },
-  { id: 'faq', label: 'Read the FAQ', path: '/home-v2#faq', tourParam: 'tour=faq' },
+  { id: 'faq', label: 'Read the FAQ', path: '/#faq', tourParam: 'tour=faq' },
 ];
 
 /** Steps for tenant / landlord / homeowner dashboards – generic set. */
 const DASHBOARD_STEPS: Omit<ProgressStep, 'completed'>[] = [
   { id: 'overview', label: 'View your dashboard overview', path: '/', tourParam: 'tour=overview' },
-  { id: 'search', label: 'Search for properties', path: '/home-v2', tourParam: 'tour=search' },
+  { id: 'search', label: 'Search for properties', path: '/', tourParam: 'tour=search' },
   { id: 'book-viewing', label: 'Book a viewing', path: '/bookviewing', tourParam: 'tour=viewing' },
   { id: 'referencing', label: 'Complete referencing', path: '/referencing', tourParam: 'tour=referencing' },
   { id: 'contracts', label: 'Sign contracts', path: '/contracts', tourParam: 'tour=contracts' },
