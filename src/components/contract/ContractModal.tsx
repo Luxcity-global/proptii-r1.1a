@@ -125,14 +125,14 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
       console.log('🔄 ContractModal - user:', user);
       console.log('🔄 ContractModal - user?.id:', user?.id);
       
-      // Use a fallback user ID for development if no user is authenticated
-      const userId = user?.id || 'dev-user-123';
-      console.log('🔄 Using user ID:', userId);
-      
-      if (!isOpen) {
-        console.log('❌ Modal not open, skipping template load');
+      // Ensure user is authenticated
+      if (!user?.id) {
+        console.log('❌ User not authenticated, skipping template load');
         return;
       }
+
+      const userId = user.id;
+      console.log('🔄 Loading contract templates from Firestore for user:', userId);
 
       try {
         console.log('🔄 Loading contract templates from Firestore for user:', userId);
@@ -240,7 +240,10 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
 
   // Clear all storage (for testing) - now clears Firestore data
   const handleClearStorage = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      alert('You must be logged in to clear storage.');
+      return;
+    }
     
     try {
       // This would require implementing a bulk delete function in contractService
@@ -351,11 +354,14 @@ const findCustomizedTemplate = () => {
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     console.log("File selected:", file?.name, "Type:", file?.type, "Size:", file?.size);
-    console.log("User object:", user);
-    console.log("User ID:", user?.id);
-    
-    // Use a fallback user ID for development if no user is authenticated
-    const userId = user?.id || 'dev-user-123';
+    // Ensure user is authenticated
+    if (!user?.id) {
+      console.warn("User not authenticated during upload");
+      alert("You must be logged in to upload templates.");
+      return;
+    }
+
+    const userId = user.id;
     console.log("Using user ID for upload:", userId);
     
     if (!file) {

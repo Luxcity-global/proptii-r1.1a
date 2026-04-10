@@ -12,12 +12,11 @@ const AgentContractLanding = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const handleGetStarted = () => {
-        // Commenting out authentication check for now
-        // if (isAuthenticated) {
-        setIsModalOpen(true);
-        // } else {
-        //   login();
-        // }
+        if (isAuthenticated) {
+            setIsModalOpen(true);
+        } else {
+            login();
+        }
     };
 
     return (
@@ -66,7 +65,9 @@ const AgentContractLanding = () => {
                     </p>
 
                     {/* CTA Button */}
-                    <button className="px-8 py-4 bg-[#E65D24] text-white rounded-full text-lg font-semibold hover:bg-opacity-90 transition-all">
+                    <button 
+                        onClick={handleGetStarted}
+                        className="px-8 py-4 bg-[#E65D24] text-white rounded-full text-lg font-semibold hover:bg-opacity-90 transition-all">
                         Get Started
                     </button>
                 </div>
