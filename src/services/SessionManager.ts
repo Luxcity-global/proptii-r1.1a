@@ -102,11 +102,23 @@ export class SessionManager {
             // Store the key as Uint8Array for proper use with crypto.subtle
             this.encryptionKey = keyBytes;
         } else {
-            // Generate a fixed 256-bit key (32 bytes) for development
-            this.encryptionKey = crypto.getRandomValues(new Uint8Array(32));
+            // Without VITE_SESSION_ENCRYPTION_KEY, a random key breaks decryption after every reload
+            // because localStorage was encrypted with the previous key. Use a stable dev-only key.
+            if (import.meta.env.PROD) {
+                console.error(
+                    '[SessionManager] VITE_SESSION_ENCRYPTION_KEY is required in production (64 hex chars = 32 bytes).',
+                );
+            }
+            const devKeyLabel = 'proptii-dev-fixed-32byte-sesskey'; // 32 ASCII bytes — dev/localStorage obfuscation only
+            this.encryptionKey = new TextEncoder().encode(devKeyLabel);
         }
 
-        this.initializeSession();
+        void this.bootstrapSession();
+    }
+
+    /** Constructor cannot be async; session restore and listeners start here. */
+    private async bootstrapSession(): Promise<void> {
+        await this.initializeSession();
         this.setupActivityListeners();
         this.setupTabSync();
     }
@@ -118,8 +130,8 @@ export class SessionManager {
         return SessionManager.instance;
     }
 
-    private initializeSession(): void {
-        const existingSession = this.loadSessionState();
+    private async initializeSession(): Promise<void> {
+        const existingSession = await this.loadSessionState();
         if (existingSession && this.isSessionValid(existingSession)) {
             this.sessionState = existingSession;
             this.updateActivity('authentication', 'Session restored');
@@ -207,17 +219,26 @@ export class SessionManager {
     }
 
     private synchronizeTabs(): void {
-        if (this.sessionState) {
-            const currentState = this.loadSessionState();
-            if (currentState && currentState.sessionId === this.sessionState.sessionId) {
-                // Merge activities from other tabs
-                this.sessionState.activities = this.mergeActivities(
-                    this.sessionState.activities,
-                    currentState.activities
-                );
-                this.saveSessionState();
+        if (!this.sessionState) return;
+
+        void (async () => {
+            try {
+                const currentState = await this.loadSessionState();
+                if (
+                    currentState &&
+                    this.sessionState &&
+                    currentState.sessionId === this.sessionState.sessionId
+                ) {
+                    this.sessionState.activities = this.mergeActivities(
+                        this.sessionState.activities,
+                        currentState.activities,
+                    );
+                    await this.saveSessionState();
+                }
+            } catch {
+                // ignore periodic sync errors
             }
-        }
+        })();
     }
 
     private mergeActivities(local: SessionActivity[], remote: SessionActivity[]): SessionActivity[] {
@@ -235,30 +256,31 @@ export class SessionManager {
         return merged;
     }
 
+    /**
+     * localStorage holds AES-GCM ciphertext (base64), not JSON. Decrypt before merging.
+     */
     private handleStorageChange(newValue: string | null): void {
         if (!newValue || !this.sessionState) return;
+        if (typeof newValue !== 'string' || newValue.trim() === '') return;
 
-        try {
-            // Check if newValue is valid JSON
-            if (!newValue || typeof newValue !== 'string' || newValue.trim() === '') {
-                console.warn('Invalid session state value:', newValue);
-                return;
-            }
-            
-            const newState = JSON.parse(newValue) as SessionState;
-            if (newState.sessionId === this.sessionState.sessionId) {
-                // Update local state with changes from other tabs
+        void (async () => {
+            try {
+                const newState = (await this.decryptData(newValue)) as SessionState;
+                if (!this.sessionState || newState.sessionId !== this.sessionState.sessionId) return;
+
                 this.sessionState.activities = this.mergeActivities(
                     this.sessionState.activities,
-                    newState.activities
+                    newState.activities,
                 );
                 this.sessionState.lastActivity = newState.lastActivity;
                 this.checkSessionValidity();
+            } catch (error) {
+                console.warn(
+                    '[SessionManager] Could not merge session from another tab (stale key or corrupt blob):',
+                    error,
+                );
             }
-        } catch (error) {
-            console.error('Error parsing session state:', error);
-            console.error('Invalid JSON value:', newValue);
-        }
+        })();
     }
 
     public updateActivity(type: SessionActivity['type'], details?: string): void {
@@ -567,6 +589,13 @@ export class SessionManager {
             // Attempt recovery from backup
             if (await this.restoreFromBackup()) {
                 return this.sessionState;
+            }
+
+            // Drop ciphertext encrypted with an old random key or wrong VITE_SESSION_ENCRYPTION_KEY
+            try {
+                localStorage.removeItem(this.storageKey);
+            } catch {
+                /* ignore */
             }
 
             return null;

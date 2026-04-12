@@ -1,12 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { ArrowLeft, ArrowRight, Menu } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from './ui/dropdown-menu';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 
 interface PropertySetupStep1Props {
   onNext: () => void;
@@ -94,16 +88,16 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
             />
           </div>
           {/* Desktop buttons */}
-          <div className="hidden md:flex items-center space-x-3">
+          {/* <div className="hidden md:flex items-center space-x-3">
             <Button variant="outline" className="rounded-full px-4 py-2">
               Questions?
             </Button>
             <Button variant="outline" className="rounded-full px-4 py-2">
               Save & exit
             </Button>
-          </div>
+          </div> */}
           {/* Mobile hamburger menu */}
-          <div className="md:hidden">
+          {/* <div className="md:hidden">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="rounded-full p-2">
@@ -119,7 +113,7 @@ export function PropertySetupStep1({ onNext, onBack, onHome, onSection1, onSecti
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
+          </div> */}
         </div>
 
         {/* Main Content */}

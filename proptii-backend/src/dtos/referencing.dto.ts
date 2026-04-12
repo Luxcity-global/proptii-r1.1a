@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, IsNotEmpty, IsDateString, IsArray } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsNotEmpty, IsDateString, IsArray, Allow, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 /** Common user-identification fields used across referencing sub-forms */
@@ -184,6 +184,15 @@ export class SubmitApplicationDto {
   @IsOptional()
   @IsString()
   type?: string;
+
+  /** Full form payload from the SPA (identity, employment, files as metadata, etc.). Validated loosely — shape varies by client. */
+  @IsOptional()
+  @Allow()
+  formData?: unknown;
+
+  @IsOptional()
+  @IsBoolean()
+  isNewReference?: boolean;
 }
 
 /** POST /referencing/ai-extract */

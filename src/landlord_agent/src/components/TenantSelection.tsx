@@ -104,24 +104,29 @@ export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting
             {options.map((option, index) => {
               const IconComponent = option.icon;
               const iconColors = iconColorSets[index];
+              const isExistingUserDisabled = option.id === 'existing';
               return (
                 <Card
                   key={option.id}
-                  className={`relative cursor-pointer transition-all duration-300 ${
-                    option.recommended ? 'ring-1 shadow-lg' : 'hover:shadow-md'
+                  className={`relative transition-all duration-300 ${
+                    isExistingUserDisabled
+                      ? 'overflow-hidden'
+                      : `cursor-pointer ${option.recommended ? 'ring-1 shadow-lg' : 'hover:shadow-md'}`
                   }`}
                   style={{
                     ...(option.recommended ? { borderColor: '#136C9E', borderWidth: '1px' } : {}),
                   }}
                   onMouseEnter={(e) => {
+                    if (isExistingUserDisabled) return;
                     e.currentTarget.style.transform = 'translateY(-8px)';
                     e.currentTarget.style.boxShadow = '0 20px 40px rgba(231, 242, 255, 0.8), 0 8px 16px rgba(231, 242, 255, 0.6)';
                   }}
                   onMouseLeave={(e) => {
+                    if (isExistingUserDisabled) return;
                     e.currentTarget.style.transform = 'translateY(0px)';
                     e.currentTarget.style.boxShadow = '';
                   }}
-                  onClick={option.onClick}
+                  onClick={isExistingUserDisabled ? undefined : option.onClick}
                 >
                   {option.recommended && (
                     <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
@@ -160,14 +165,22 @@ export function TenantSelection({ onManualInput, onInviteEmail, onSelectExisting
                       className="w-full"
                       size="lg"
                       style={{ fontFamily: 'Archivo, sans-serif' }}
+                      disabled={isExistingUserDisabled}
                       onClick={(e) => {
                         e.stopPropagation();
-                        option.onClick();
+                        if (!isExistingUserDisabled) option.onClick();
                       }}
                     >
                       {option.buttonText}
                     </Button>
                   </CardContent>
+                  {isExistingUserDisabled && (
+                    <div
+                      className="absolute inset-0 z-20 cursor-not-allowed rounded-[inherit] bg-white/45 backdrop-blur-sm"
+                      style={{ WebkitBackdropFilter: 'blur(6px)' }}
+                      aria-hidden="true"
+                    />
+                  )}
                 </Card>
               );
             })}

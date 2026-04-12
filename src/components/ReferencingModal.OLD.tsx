@@ -96,6 +96,31 @@ export interface FormData {
   agentDetails: AgentDetailsData;
 }
 
+/** `<input type="date">` requires `yyyy-MM-dd` or ""; Firestore/JSON may store null as the string `"null"`. */
+function normalizeHtmlDateValue(value: unknown): string {
+  if (value == null) return '';
+  const s = String(value).trim();
+  if (s === '' || s === 'null' || s === 'undefined') return '';
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : '';
+}
+
+function mergeLoadedFormData(prev: FormData, patch: Partial<FormData>): FormData {
+  return {
+    ...prev,
+    ...patch,
+    identity: {
+      ...prev.identity,
+      ...(patch.identity || {}),
+      dateOfBirth: normalizeHtmlDateValue(
+        patch.identity?.dateOfBirth !== undefined
+          ? patch.identity.dateOfBirth
+          : prev.identity.dateOfBirth,
+      ),
+    },
+  };
+}
+
 interface TypingAnimationProps {
   text: string;
   className: string;
@@ -805,10 +830,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
             console.log('✅ Loading form data from Firestore:', firestoreResult.data);
 
             // Set form data from Firestore
-            setFormData(prev => ({
-              ...prev,
-              ...firestoreResult.data!.formData
-            }));
+            setFormData(prev => mergeLoadedFormData(prev, firestoreResult.data!.formData));
 
             // Set current step from Firestore (only if no initialStep provided)
             if (firestoreResult.data.currentStep && !initialStep) {
@@ -842,11 +864,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
         // Load entire form data from localStorage
         const savedFormData = localStorage.getItem(`referencing_${user.id}_formData`);
         if (savedFormData) {
-          const parsedData = JSON.parse(savedFormData);
-          setFormData(prev => ({
-            ...prev,
-            ...parsedData
-          }));
+          const parsedData = JSON.parse(savedFormData) as Partial<FormData>;
+          setFormData(prev => mergeLoadedFormData(prev, parsedData));
         }
 
       } catch (e) {
@@ -888,10 +907,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
             console.log('✅ Loading form data on modal open:', firestoreResult.data);
 
             // Set form data from Firestore
-            setFormData(prev => ({
-              ...prev,
-              ...firestoreResult.data!.formData
-            }));
+            setFormData(prev => mergeLoadedFormData(prev, firestoreResult.data!.formData));
 
             // Set current step - prioritize initialStep prop over saved step
             if (initialStep) {
@@ -909,11 +925,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
             // Fallback to localStorage
             const savedFormData = localStorage.getItem(`referencing_${user.id}_formData`);
             if (savedFormData) {
-              const parsedData = JSON.parse(savedFormData);
-              setFormData(prev => ({
-                ...prev,
-                ...parsedData
-              }));
+              const parsedData = JSON.parse(savedFormData) as Partial<FormData>;
+              setFormData(prev => mergeLoadedFormData(prev, parsedData));
             }
           }
         } catch (error) {
@@ -921,11 +934,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
           // Fallback to localStorage
           const savedFormData = localStorage.getItem(`referencing_${user.id}_formData`);
           if (savedFormData) {
-            const parsedData = JSON.parse(savedFormData);
-            setFormData(prev => ({
-              ...prev,
-              ...parsedData
-            }));
+            const parsedData = JSON.parse(savedFormData) as Partial<FormData>;
+            setFormData(prev => mergeLoadedFormData(prev, parsedData));
           }
         }
       };
@@ -1158,17 +1168,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
         agentEmail: formData.agentDetails?.email
       });
 
-      const submitWithTimeout = Promise.race([
-        referencingService.submitApplication(userId, {
-          formData,
-          isNewReference: true
-        }),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Submission timeout - please try again')), 15000)
-        )
-      ]);
-
-      const result = await submitWithTimeout as any;
+      // Do not use a short Promise.race — the API persists to Cosmos and sends multiple emails
+      // (can exceed 15s). Axios timeout is set on submit in referencingService (120s).
+      const result = await referencingService.submitApplication(userId, {
+        formData,
+        isNewReference: true
+      });
 
       console.log('✅ Backend API submission result:', result);
 

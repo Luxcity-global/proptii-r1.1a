@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useIsMobile } from './ui/use-mobile';
 import { Property, PropertyDocument, UserProfile } from '../App';
 import { LandlordEmptyState } from './LandlordEmptyState';
+import { downloadPropertyDocument } from '../utils/downloadPropertyDocument';
 
 interface DocumentsPageProps {
   properties: Property[];
@@ -33,6 +34,7 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
+  const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
   if (!userProfile) {
@@ -203,6 +205,24 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
 
   const getPropertyByDocument = (propertyId: string) => {
     return properties.find(p => p.id === propertyId);
+  };
+
+  const documentRowKey = (document: DocumentWithProperty) =>
+    `${document.propertyId}-${document.id}`;
+
+  const handleDownloadDocument = async (document: DocumentWithProperty) => {
+    const key = documentRowKey(document);
+    if (!document.url?.trim()) {
+      return;
+    }
+    setDownloadingKey(key);
+    try {
+      await downloadPropertyDocument(document.url, document.name);
+    } catch (e) {
+      console.error('Document download failed:', e);
+    } finally {
+      setDownloadingKey(null);
+    }
   };
 
   return (
@@ -529,10 +549,15 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
                               
                               <TableCell className="min-w-[100px]">
                                 <div className="flex items-center gap-2">
-                                  <Button variant="ghost" size="sm" asChild className="flex-shrink-0">
-                                    <a href={document.url} target="_blank" rel="noopener noreferrer" download>
-                                      <Download className="h-4 w-4" />
-                                    </a>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="flex-shrink-0"
+                                    disabled={!document.url?.trim() || downloadingKey === documentRowKey(document)}
+                                    title="Download"
+                                    onClick={() => handleDownloadDocument(document)}
+                                  >
+                                    <Download className="h-4 w-4" />
                                   </Button>
                                   <Button 
                                     variant="ghost" 
@@ -644,13 +669,12 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
                             <Button 
                               variant="outline" 
                               size="sm" 
-                              asChild
                               className="flex-1"
+                              disabled={!document.url?.trim() || downloadingKey === documentRowKey(document)}
+                              onClick={() => handleDownloadDocument(document)}
                             >
-                              <a href={document.url} target="_blank" rel="noopener noreferrer" download>
-                                <Download className="h-4 w-4 mr-2" />
-                                Download
-                              </a>
+                              <Download className="h-4 w-4 mr-2" />
+                              Download
                             </Button>
                             <Button 
                               variant="ghost" 

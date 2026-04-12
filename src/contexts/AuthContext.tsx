@@ -15,15 +15,17 @@ import SecurityPolicyService from '../services/SecurityPolicyService';
 
 // Singleton pattern for MSAL instance
 let msalInstance: PublicClientApplication | null = null;
+/** First API calls must await this so getAllAccounts / acquireTokenSilent work reliably */
+let msalInitPromise: Promise<void> | null = null;
 
 // Initialize MSAL instance only once
 export const getMsalInstance = () => {
   if (!msalInstance) {
     msalInstance = new PublicClientApplication(msalConfig);
 
-    // Initialize the MSAL instance
-    msalInstance.initialize().catch(error => {
-      console.error("Error initializing MSAL:", error);
+    msalInitPromise = msalInstance.initialize();
+    msalInitPromise.catch((error) => {
+      console.error('Error initializing MSAL:', error);
     });
 
     // Register event callbacks for redirect handling
@@ -44,6 +46,16 @@ export const getMsalInstance = () => {
   }
   return msalInstance;
 };
+
+/** Wait until MSAL `initialize()` has finished (needed before acquireTokenSilent in axios). */
+export async function waitForMsalReady(): Promise<void> {
+  if (!msalInstance) {
+    getMsalInstance();
+  }
+  if (msalInitPromise) {
+    await msalInitPromise;
+  }
+}
 
 // Development mode flag - set to true to bypass authentication for development
 const DEV_MODE = false; // Set to false in production
@@ -230,7 +242,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         // Handle redirect response if any
         const redirectResponse = await instance.handleRedirectPromise();
-        
+        if (redirectResponse?.account) {
+          instance.setActiveAccount(redirectResponse.account);
+        }
+
         // Check if there's a redirect path in the response state
         if (redirectResponse && redirectResponse.state) {
           try {
@@ -247,6 +262,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (accounts.length > 0) {
           const currentAccount = accounts[0];
+          instance.setActiveAccount(currentAccount);
           setIsAuthenticated(true);
           
           // Debug: Log all available claims
@@ -433,6 +449,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Try popup login first
       const result = await instance.loginPopup(loginRequestWithState);
+
+      if (result?.account) {
+        instance.setActiveAccount(result.account);
+      }
 
       if (result) {
         // Extract stable userId from token claims (oid or sub)

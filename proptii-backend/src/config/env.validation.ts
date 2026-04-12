@@ -53,6 +53,7 @@ const envSchema = z.object({
   // ── Azure AD B2C / MSAL ─────────────────────────────────────────────────────
   MSAL_CLIENT_ID: z.string().optional(),
   MSAL_AUTHORITY: z.string().url('MSAL_AUTHORITY must be a valid absolute URL (e.g., https://<tenant>.b2clogin.com/...)').or(z.literal('')).optional(),
+  MSAL_ADDITIONAL_AUDIENCES: z.string().optional(),
   MSAL_REDIRECT_URI: z.string().optional(),
 
   // ── CORS / Frontend ─────────────────────────────────────────────────────────

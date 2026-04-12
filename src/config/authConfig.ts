@@ -56,13 +56,24 @@ export const msalConfig: Configuration = {
   }
 };
 
+/**
+ * Optional extra scopes (space- or comma-separated), e.g. an exposed API scope so the
+ * access token's `aud` matches the backend `MSAL_CLIENT_ID`. Set in `.env` when B2C
+ * returns tokens the Nest JWT guard rejects.
+ */
+const extraScopes = (import.meta.env.VITE_AZURE_AD_EXTRA_SCOPES || "")
+  .trim()
+  .split(/[\s,]+/)
+  .filter(Boolean);
+
 // Add scopes for token request
 export const loginRequest = {
   scopes: [
     "openid",
     "profile",
     "email",
-    "offline_access"
+    "offline_access",
+    ...extraScopes,
   ],
   // Request phone number claim
   claims: JSON.stringify({

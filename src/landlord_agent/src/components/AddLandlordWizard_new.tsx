@@ -1222,8 +1222,27 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, u
               </div>
               <div className="space-y-3">
               <div className="relative group">
-                <div className="relative">
-                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-500 text-lg font-medium pointer-events-none" style={{ fontFamily: 'Archivo, sans-serif' }}>£</span>
+                <div
+                  className={`relative flex w-full items-center rounded-2xl border-2 transition-all duration-300 focus-within:border-[#4E97CC] focus-within:ring-2 focus-within:ring-[#8FCDFF] focus-within:ring-opacity-50 ${
+                    state.focusedField === 'rentAmount' || state.formData.rentAmount
+                      ? 'bg-white shadow-lg '
+                      : 'border-gray-300 bg-gray-50'
+                  } ${state.errors.rentAmount ? 'border-red-500 animate-shake' : ''}`}
+                  style={{
+                    borderColor: state.focusedField === 'rentAmount' || state.formData.rentAmount ? '#4E97CC' : undefined,
+                    outline: 'none',
+                    fontFamily: 'Archivo, sans-serif',
+                    '--tw-ring-color': '#8FCDFF',
+                    '--tw-ring-opacity': '0.5',
+                  } as React.CSSProperties}
+                >
+                  <span
+                    className="shrink-0 pl-6 pr-2 text-lg font-medium text-gray-500 pointer-events-none select-none leading-none flex items-center self-stretch"
+                    style={{ fontFamily: 'Archivo, sans-serif' }}
+                    aria-hidden
+                  >
+                    £
+                  </span>
                   <Input
                     id="rentAmount"
                     type="text"
@@ -1234,27 +1253,20 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, u
                     }}
                     onFocus={() => handleInputFocus('rentAmount')}
                     onBlur={() => handleInputBlur()}
-                      className={`w-full text-lg py-6 pr-6 border-2 transition-all duration-300 rounded-2xl focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none ${
-                      state.focusedField === 'rentAmount' || state.formData.rentAmount
-                          ? 'bg-white shadow-lg '
-                        : 'border-gray-300 bg-gray-50'
-                    } ${state.errors.rentAmount ? 'border-red-500 animate-shake' : ''}`}
-                    style={{ 
+                    className="flex-1 min-w-0 h-auto border-0 bg-transparent text-lg py-6 pr-14 pl-0 shadow-none rounded-none rounded-r-2xl focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none"
+                    style={{
                       fontFamily: 'Archivo, sans-serif',
-                      borderColor: state.focusedField === 'rentAmount' || state.formData.rentAmount ? '#4E97CC' : undefined,
+                      boxShadow: 'none',
                       outline: 'none',
-                      '--tw-ring-color': '#8FCDFF',
-                      '--tw-ring-opacity': '0.5',
-                      paddingLeft: '38px'
                     }}
-                      placeholder="Enter monthly rent"
-                    />
+                    placeholder="Enter monthly rent"
+                  />
                 </div>
                 {state.formData.rentAmount && !state.errors.rentAmount && validateStep('rent') && (
-                  <CheckCircle className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />
+                  <CheckCircle className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />
                 )}
                 {state.errors.rentAmount && (
-                  <div className="absolute right-6 top-1/2 -translate-y-1/2 z-10" style={{ right: '24px' }}>
+                  <div className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 z-10" style={{ right: '24px' }}>
                     <AlertTriangle className="w-5 h-5 text-red-500 animate-shake" />
                   </div>
                 )}
@@ -1642,8 +1654,28 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, u
               </div>
               <div className="space-y-3">
                 <div className="relative group">
-                  <div className="relative">
-                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-500 text-lg font-medium pointer-events-none" style={{ fontFamily: 'Archivo, sans-serif' }}>£</span>
+                  <div
+                    className={`relative flex w-full items-center rounded-2xl border-2 transition-all duration-300 focus-within:border-[#4E97CC] focus-within:ring-2 focus-within:ring-[#8FCDFF] focus-within:ring-opacity-50 ${
+                      state.focusedField === 'annualIncome' || state.formData.annualIncome
+                        ? 'bg-white shadow-lg '
+                        : 'border-gray-300 bg-gray-50'
+                    } ${state.errors.annualIncome ? 'border-red-500 animate-shake' : ''}`}
+                    style={{
+                      borderColor: state.focusedField === 'annualIncome' || state.formData.annualIncome ? '#4E97CC' : undefined,
+                      boxShadow: 'none',
+                      outline: 'none',
+                      fontFamily: 'Archivo, sans-serif',
+                      '--tw-ring-color': '#8FCDFF',
+                      '--tw-ring-opacity': '0.5',
+                    } as React.CSSProperties}
+                  >
+                    <span
+                      className="shrink-0 pl-6 pr-2 text-lg font-medium text-gray-500 pointer-events-none select-none leading-none flex items-center self-stretch"
+                      style={{ fontFamily: 'Archivo, sans-serif' }}
+                      aria-hidden
+                    >
+                      £
+                    </span>
                     <Input
                       id="income"
                       type="text"
@@ -1654,29 +1686,23 @@ export function AddTenant({ properties, onSave, onBack, preselectedPropertyId, u
                       }}
                       onFocus={() => handleInputFocus('annualIncome')}
                       onBlur={() => handleInputBlur()}
-                      className={`w-full text-lg py-6 pr-6 border-2 transition-all duration-300 rounded-2xl focus:border-[#4E97CC] focus:ring-2 focus:ring-[#8FCDFF] focus:ring-opacity-50 focus:outline-none ${
-                        state.focusedField === 'annualIncome' || state.formData.annualIncome
-                          ? 'bg-white shadow-lg '
-                          : 'border-gray-300 bg-gray-50'
-                      } ${state.errors.annualIncome ? 'border-red-500 animate-shake' : ''}`}
-                      style={{ 
+                      className="flex-1 min-w-0 h-auto border-0 bg-transparent text-lg py-6 pr-14 pl-0 shadow-none rounded-none rounded-r-2xl focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none"
+                      style={{
                         fontFamily: 'Archivo, sans-serif',
-                        borderColor: state.focusedField === 'annualIncome' || state.formData.annualIncome ? '#4E97CC' : undefined,
                         boxShadow: 'none',
                         outline: 'none',
-                        paddingLeft: '38px'
                       }}
                       placeholder="Enter annual income"
                     />
-                    {state.formData.annualIncome && !state.errors.annualIncome && validateStep('income') && (
-                      <CheckCircle className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />
-                    )}
-                    {state.errors.annualIncome && (
-                      <div className="absolute right-6 top-1/2 -translate-y-1/2 z-10" style={{ right: '24px' }}>
-                        <AlertTriangle className="w-5 h-5 text-red-500 animate-shake" />
-                      </div>
-                    )}
                   </div>
+                  {state.formData.annualIncome && !state.errors.annualIncome && validateStep('income') && (
+                    <CheckCircle className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500 animate-bounce z-10" style={{ right: '24px' }} />
+                  )}
+                  {state.errors.annualIncome && (
+                    <div className="pointer-events-none absolute right-6 top-1/2 -translate-y-1/2 z-10" style={{ right: '24px' }}>
+                      <AlertTriangle className="w-5 h-5 text-red-500 animate-shake" />
+                    </div>
+                  )}
                 </div>
                 {state.errors.annualIncome && (
                   <p className="text-red-500 text-sm animate-fade-in-up">{state.errors.annualIncome}</p>

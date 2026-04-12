@@ -1,5 +1,5 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { useLayoutEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
 import { MSALProviderWrapper } from './contexts/AuthContext';
 import { SavedPropertiesProvider } from './contexts/SavedPropertiesContext';
@@ -52,6 +52,25 @@ import ComingSoon from './pages/ComingSoon';
 
 /** Default landing: onboarding flow first. Home v2 lives at / with /home-v2 as alias. */
 
+/** Reset window scroll on route change (SPA navigation does not scroll to top by default). */
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useLayoutEffect(() => {
+    const html = document.documentElement;
+    const previous = html.style.scrollBehavior;
+    html.style.scrollBehavior = 'auto';
+    window.scrollTo(0, 0);
+    if (previous) {
+      html.style.scrollBehavior = previous;
+    } else {
+      html.style.removeProperty('scroll-behavior');
+    }
+  }, [pathname]);
+
+  return null;
+}
+
 export const App: React.FC = () => {
   return (
     <ErrorBoundary fallback={<div>Custom fallback UI</div>}>
@@ -62,6 +81,7 @@ export const App: React.FC = () => {
           <SignedContractsProvider>
               <AuthAnalyticsBridge />
               <AuthRedirectHandler />
+              <ScrollToTop />
               <Routes>
             {/* Public Routes - / is default landing; onboarding shows as modal overlay */}
             <Route path="/" element={<HomeVariant />} />

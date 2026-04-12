@@ -1,6 +1,26 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
-import { getMsalInstance } from '../contexts/AuthContext';
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+import axios, {
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosResponse,
+  AxiosError,
+  InternalAxiosRequestConfig,
+} from 'axios';
+import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
+import { getAccessTokenForApiRequest } from './msalAccessToken';
+
+/** Axios 1.x may use AxiosHeaders — set Authorization in a way that always applies. */
+function setBearerAuth(config: InternalAxiosRequestConfig, accessToken: string): void {
+  const value = `Bearer ${accessToken}`;
+  const headers = config.headers;
+  if (!headers) return;
+  if (typeof (headers as { set?: (k: string, v: string) => void }).set === 'function') {
+    (headers as { set: (k: string, v: string) => void }).set('Authorization', value);
+  } else {
+    (headers as Record<string, string>)['Authorization'] = value;
+  }
+}
+
+const API_BASE_URL = getResolvedApiBaseUrl();
 // API response types
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -71,35 +91,12 @@ class ApiService {
       timeout: 30000, // 30 seconds timeout
     });
 
-    // Request interceptor for adding auth token
+    // Request interceptor: attach Bearer token (MSAL silent → popup → auth_token fallback)
     this.api.interceptors.request.use(
-      async (config) => {
-        // Try to get token from MSAL first
-        const msalInstance = getMsalInstance();
-        if (msalInstance) {
-          try {
-            const accounts = msalInstance.getAllAccounts();
-            if (accounts.length > 0) {
-              const silentRequest = {
-                scopes: ['openid', 'profile', 'email'],
-                account: accounts[0]
-              };
-              
-              const response = await msalInstance.acquireTokenSilent(silentRequest);
-              if (response && response.accessToken && config.headers) {
-                config.headers.Authorization = `Bearer ${response.accessToken}`;
-                return config;
-              }
-            }
-          } catch (error) {
-            console.error('Error getting token from MSAL:', error);
-          }
-        }
-        
-        // Fallback to localStorage token if MSAL fails
-        const token = localStorage.getItem('auth_token');
-        if (token && config.headers) {
-          config.headers.Authorization = `Bearer ${token}`;
+      async (config: InternalAxiosRequestConfig) => {
+        const token = await getAccessTokenForApiRequest();
+        if (token) {
+          setBearerAuth(config, token);
         }
         return config;
       },
@@ -134,13 +131,22 @@ class ApiService {
 
       // Handle authentication errors
       if (error.response.status === 401) {
-        // Clear token and redirect to login if needed
         localStorage.removeItem('auth_token');
-        // You might want to redirect to login page or trigger auth refresh
+        if (
+          /missing or invalid bearer token/i.test(apiError.message) ||
+          apiError.message === 'Unauthorized'
+        ) {
+          apiError.message =
+            'Sign in required, or your session expired. Please sign in again and retry this action.';
+        }
       }
     } else if (error.request) {
-      // Request was made but no response received
-      apiError.message = 'No response received from server';
+      const code = (error as AxiosError & { code?: string }).code;
+      if (code === 'ECONNABORTED') {
+        apiError.message = 'Request timed out — the server may still be processing. Try again or wait a moment.';
+      } else {
+        apiError.message = 'No response received from server';
+      }
     }
 
     return Promise.reject(apiError);
@@ -164,9 +170,13 @@ class ApiService {
     return this.request<T>({ method: 'GET', url, params });
   }
 
-  // POST request
-  public async post<T>(url: string, data?: any): Promise<ApiResponse<T>> {
-    return this.request<T>({ method: 'POST', url, data });
+  // POST request (optional Axios overrides, e.g. `{ timeout: 120000 }` for long-running submits)
+  public async post<T>(
+    url: string,
+    data?: any,
+    config?: Omit<AxiosRequestConfig, 'method' | 'url' | 'data'>,
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>({ method: 'POST', url, data, ...config });
   }
 
   // PUT request

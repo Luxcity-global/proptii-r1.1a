@@ -139,20 +139,20 @@ function Footer() {
         {/* Social Media Icons */}
         <div className="px-6 py-6 text-center">
           <div className="flex justify-center space-x-4 mb-6">
-            <a href="https://www.youtube.com/@Luxcity-v1" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
+            <a href="https://www.youtube.com/@Luxcity-v1" target="_blank" rel="noopener noreferrer" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
               <FontAwesomeIcon icon={faYoutube} />
             </a>
-            <a href="https://www.instagram.com/luxcity_tech/" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
+            <a href="https://www.instagram.com/luxcity_tech/" target="_blank" rel="noopener noreferrer" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
               <FontAwesomeIcon icon={faInstagram} />
             </a>
-            <a href="https://www.linkedin.com/company/luxcity-global/?viewAsMember=true" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
+            <a href="https://www.linkedin.com/company/luxcity-global/?viewAsMember=true" target="_blank" rel="noopener noreferrer" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
               <FontAwesomeIcon icon={faLinkedinIn} />
             </a>
           </div>
 
           {/* Copyright */}
           <p className="text-sm opacity-75">
-            Copyright 2024, All Rights Reserved by Proptii
+            Copyright 2026, All Rights Reserved by Proptii
           </p>
         </div>
       </div>
@@ -232,15 +232,15 @@ function Footer() {
 
         {/* Footer Bottom Section */}
         <div className="flex justify-between items-center max-w-6xl mx-auto text-sm opacity-75">
-          <p>&copy; 2025, All Rights Reserved by Proptii</p>
+          <p>&copy; 2026, All Rights Reserved by Proptii</p>
           <div className="flex space-x-4">
-            <a href="https://www.linkedin.com/company/luxcity-global/?viewAsMember=true" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
+            <a href="https://www.linkedin.com/company/luxcity-global/?viewAsMember=true" target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
               <FontAwesomeIcon icon={faLinkedinIn} />
             </a>
-            <a href="https://www.instagram.com/luxcity_tech/" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
+            <a href="https://www.instagram.com/luxcity_tech/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
               <FontAwesomeIcon icon={faInstagram} />
             </a>
-            <a href="https://www.youtube.com/@Luxcity-v1" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
+            <a href="https://www.youtube.com/@Luxcity-v1" target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
               <FontAwesomeIcon icon={faYoutube} />
             </a>
           </div>

@@ -1,23 +1,47 @@
-import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ExecutionContext, UnauthorizedException, Logger } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 
 /**
  * Guard that validates Bearer JWT tokens against Azure AD B2C.
  * Apply to controllers or individual routes with @UseGuards(JwtAuthGuard).
  *
- * If MSAL_AUTHORITY or MSAL_CLIENT_ID is not configured the guard will still
- * reject unauthenticated requests, but will log a warning to aid debugging.
+ * Passport's JWT strategy often returns `user: false` and puts the failure on `info`
+ * while `err` is null — the parent AuthGuard only checks `err` and `user`, so we
+ * must log `info` in development to see "invalid signature", "jwt audience invalid", etc.
  */
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
+  private readonly logger = new Logger(JwtAuthGuard.name);
+
   canActivate(context: ExecutionContext) {
     return super.canActivate(context);
   }
 
-  handleRequest<TUser = unknown>(err: Error | null, user: TUser | false): TUser {
+  handleRequest<TUser = unknown>(
+    err: Error | null,
+    user: TUser | false,
+    info?: unknown,
+    _context?: ExecutionContext,
+    _status?: unknown,
+  ): TUser {
     if (err || !user) {
+      const detail = this.describeJwtFailure(err, info);
+      if (detail && process.env.NODE_ENV !== 'production') {
+        this.logger.warn(`JWT auth failed: ${detail}`);
+      }
       throw err ?? new UnauthorizedException('Missing or invalid Bearer token');
     }
     return user;
+  }
+
+  private describeJwtFailure(err: Error | null, info: unknown): string {
+    if (err?.message) return err.message;
+    if (info == null) return '';
+    if (typeof info === 'string') return info;
+    if (info instanceof Error) return info.message;
+    if (typeof info === 'object' && info !== null && 'message' in info) {
+      return String((info as { message: unknown }).message);
+    }
+    return '';
   }
 }

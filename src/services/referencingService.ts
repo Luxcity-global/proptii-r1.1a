@@ -1,17 +1,18 @@
 import apiService from './api';
+import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
 
 /**
  * Path segment for referencing routes, aligned with apiService baseURL (VITE_API_URL).
  * If the env URL already ends with `/api`, paths are `/referencing/...`; otherwise `/api/referencing/...`.
  */
 function referencingPath(suffix: string): string {
-  const raw = (import.meta.env.VITE_API_URL || 'http://localhost:3002').replace(/\/$/, '');
+  const raw = getResolvedApiBaseUrl().replace(/\/$/, '');
   const baseHasApi = raw.endsWith('/api');
   const prefix = baseHasApi ? '' : '/api';
   return `${prefix}/referencing/${suffix}`;
 }
 
-console.log('Using API URL:', import.meta.env.VITE_API_URL || 'http://localhost:3002');
+console.log('Using API URL:', getResolvedApiBaseUrl());
 
 class ReferencingService {
   async saveIdentityData(data: any) {
@@ -74,9 +75,16 @@ class ReferencingService {
     }
   }
 
+  /** Submit waits on Cosmos writes + multi-email send — allow longer than default 30s axios timeout. */
+  private static readonly SUBMIT_TIMEOUT_MS = 120_000;
+
   async submitApplication(userId: string, data: any) {
     try {
-      const response = await apiService.post(referencingPath(`${userId}/submit`), data);
+      const response = await apiService.post(
+        referencingPath(`${userId}/submit`),
+        data,
+        { timeout: ReferencingService.SUBMIT_TIMEOUT_MS },
+      );
       return response.data;
     } catch (error) {
       console.error('Error submitting application:', error);

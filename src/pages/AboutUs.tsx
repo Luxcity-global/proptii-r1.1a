@@ -45,7 +45,7 @@ const AboutUs = () => {
           </p>
           <div className="flex items-center gap-6">
             <Link
-              to="/"
+              to="/login"
               className="bg-[#E76F51] hover:bg-[#E76F51]/90 text-white font-semibold px-8 py-3 rounded-md transition duration-300"
             >
               Get Started

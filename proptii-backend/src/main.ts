@@ -57,7 +57,13 @@ async function bootstrap() {
     'https://proptii-r1-1a-new.onrender.com',
     'https://proptii-frontend.onrender.com',
     ...(process.env.NODE_ENV !== 'production'
-      ? ['http://localhost:5173', 'http://localhost:4173', 'http://localhost:3000']
+      ? [
+          'http://localhost:5173',
+          'http://localhost:4173',
+          'http://localhost:3000',
+          'http://127.0.0.1:5173',
+          'http://127.0.0.1:4173',
+        ]
       : []),
   ];
 
