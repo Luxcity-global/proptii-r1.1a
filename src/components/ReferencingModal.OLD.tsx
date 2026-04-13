@@ -1111,11 +1111,31 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
     return requiredStepsComplete;
   };
 
+  const getIncompleteSections = () => {
+    const requiredSteps = [
+      { id: 1, name: 'Identity' },
+      { id: 2, name: 'Employment' },
+      { id: 3, name: 'Residential' },
+      { id: 4, name: 'Financial' },
+      { id: 7, name: 'Agent Details' }
+    ];
+    
+    return requiredSteps
+      .filter(step => stepStatus[step.id] !== 'complete')
+      .map(step => step.name);
+  };
+
   // Optimized submission process
   const submitApplication = async (force: boolean = false) => {
     const isComplete = checkFormCompleteness();
 
     if (!isComplete && !force) {
+      const incompleteSections = getIncompleteSections();
+      if (incompleteSections.length > 0) {
+        toast.error(`Required sections incomplete: ${incompleteSections.join(', ')}`, { duration: 5000 });
+      } else {
+        toast.error('Please check your form. Some required fields have not been filled in.', { duration: 4000 });
+      }
       setShowWarningModal(true);
       return;
     }
@@ -1212,6 +1232,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
   const WarningModal = () => {
     if (!showWarningModal) return null;
 
+    const incompleteSections = getIncompleteSections();
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center">
         <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
@@ -1222,9 +1244,16 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
             <h3 className="text-lg font-semibold ml-3">Incomplete Form</h3>
           </div>
 
+          <p className="text-gray-600 mb-2">
+            Your form is incomplete. The following required sections are missing information:
+          </p>
+          <ul className="list-disc pl-5 mb-4 text-orange-600 font-medium">
+            {incompleteSections.map(section => (
+               <li key={section}>{section}</li>
+            ))}
+          </ul>
           <p className="text-gray-600 mb-6">
-            Your form is incomplete. Some information may be missing or incorrect.
-            Are you sure you want to submit anyway?
+            Are you sure you want to submit anyway? This may delay your application process.
           </p>
 
           <div className="flex justify-end space-x-3">
@@ -2282,7 +2311,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
                     <button
                       onClick={() => submitApplication()}
                       className="px-3 sm:px-4 py-2 text-sm bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                      disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck}
+                      disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck || !isFormComplete}
                     >
                       {isSubmitting ? 'Submitting...' : 'Submit Application'}
                     </button>
@@ -2331,7 +2360,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
                   <button
                     onClick={() => submitApplication()}
                     className="px-4 md:px-6 py-2 text-base bg-[#E65D24] text-white rounded-md hover:bg-opacity-90 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck}
+                    disabled={isSubmitting || !formData.agentDetails.hasAgreedToCheck || !isFormComplete}
                   >
                     {isSubmitting ? 'Submitting...' : 'Submit Application'}
                   </button>
