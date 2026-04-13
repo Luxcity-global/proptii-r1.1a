@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { toast } from 'react-hot-toast';
 import { FormSection } from '../../../types/referencing';
 import { useReferencing } from '../context/ReferencingContext';
 import useFormValidation from './useFormValidation';
@@ -37,10 +36,6 @@ export const useReferencingForm = (
       const isValid = await validate(sectionData);
       
       if (!isValid) {
-        toast.error('Please check the form for errors. Some required fields may be missing or invalid.', {
-          duration: 4000,
-          position: 'top-center'
-        });
         return;
       }
       
@@ -56,10 +51,6 @@ export const useReferencingForm = (
       }
     } catch (error) {
       console.error('Error submitting form:', error);
-      toast.error('An error occurred while saving the form. Please try again.', {
-        duration: 4000,
-        position: 'top-center'
-      });
     } finally {
       setIsSubmitting(false);
     }
