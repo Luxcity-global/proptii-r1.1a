@@ -2,10 +2,12 @@ services:
   # Frontend (Vite)
   - type: web
     name: proptii-frontend
-    env: static
+    # Blueprint: static sites use runtime: static (SPA rewrites below require this service type)
+    runtime: static
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
-    pullRequestPreviewsEnabled: true
+    previews:
+      generation: automatic
     envVars:
       - key: NODE_VERSION
         value: 20.11.1
@@ -45,6 +47,8 @@ services:
       - path: /static/*
         name: Cache-Control
         value: public, max-age=31536000, immutable
+    # SPA: rewrite unknown paths to index.html so hard refresh works on client routes.
+    # Render matches /* (not /**) per https://render.com/docs/redirects-rewrites
     routes:
       - type: rewrite
         source: /assets/*
@@ -52,13 +56,13 @@ services:
       - type: rewrite
         source: /static/*
         destination: /static/:splat
-      # Landlord App Routing (Use /** to match nested paths)
+      # Landlord sub-app (basename /landlord)
       - type: rewrite
-        source: /landlord/**
+        source: /landlord/*
         destination: /landlord/index.html
-      # Main App Catch-all (Use /** to match nested paths)
+      # Main Vite app — must be last
       - type: rewrite
-        source: /**
+        source: /*
         destination: /index.html
 
   # Backend (NestJS)
