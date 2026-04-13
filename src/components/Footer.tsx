@@ -5,7 +5,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faLinkedinIn,
   faInstagram,
-  faYoutube
+  faYoutube,
+  faTiktok
 } from "@fortawesome/free-brands-svg-icons";
 //import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
@@ -139,11 +140,14 @@ function Footer() {
         {/* Social Media Icons */}
         <div className="px-6 py-6 text-center">
           <div className="flex justify-center space-x-4 mb-6">
-            <a href="https://www.youtube.com/@Luxcity-v1" target="_blank" rel="noopener noreferrer" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
+            <a href="https://www.youtube.com/channel/UCRlf1dBbLVpuJjlLoNO5Imw" target="_blank" rel="noopener noreferrer" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
               <FontAwesomeIcon icon={faYoutube} />
             </a>
             <a href="https://www.instagram.com/luxcity_tech/" target="_blank" rel="noopener noreferrer" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
               <FontAwesomeIcon icon={faInstagram} />
+            </a>
+            <a href="https://www.tiktok.com/@luxcity.tech" target="_blank" rel="noopener noreferrer" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
+              <FontAwesomeIcon icon={faTiktok} />
             </a>
             <a href="https://www.linkedin.com/company/luxcity-global/?viewAsMember=true" target="_blank" rel="noopener noreferrer" className="w-12 h-12 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl hover:bg-[#2C5B81] transition-colors">
               <FontAwesomeIcon icon={faLinkedinIn} />
@@ -240,8 +244,11 @@ function Footer() {
             <a href="https://www.instagram.com/luxcity_tech/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
               <FontAwesomeIcon icon={faInstagram} />
             </a>
-            <a href="https://www.youtube.com/@Luxcity-v1" target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
+            <a href="https://www.youtube.com/channel/UCRlf1dBbLVpuJjlLoNO5Imw" target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
               <FontAwesomeIcon icon={faYoutube} />
+            </a>
+            <a href="https://www.tiktok.com/@luxcity.tech" target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center border-2 border-[#2C5B81] rounded-full text-white text-xl opacity-100 hover:opacity-75">
+              <FontAwesomeIcon icon={faTiktok} />
             </a>
           </div>
         </div>
