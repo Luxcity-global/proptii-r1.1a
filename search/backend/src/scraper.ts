@@ -4,6 +4,7 @@ import * as cheerio from 'cheerio';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
+import redis from './utils/redis';
 
 export interface Property {
   title: string;
@@ -21,15 +22,49 @@ export interface Property {
 
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 
-// Sprint 2 Phase 3: in-memory cache for agent email results (TTL from SEARCH_OPT_EMAIL_CACHE_TTL_SEC)
+// Sprint 2 Phase 3: Redis-based cache for agent email results and search results
+
+interface CacheEntry<T> {
+  data: T;
+  ts: number;
+}
+
+export class FileCache {
+  static async set<T>(key: string, data: T, ttlSec: number = 3600): Promise<void> {
+    try {
+      const value = JSON.stringify({ data, ts: Date.now() });
+      await redis.set(key, value, 'EX', ttlSec);
+    } catch (e) {
+      console.error('[Redis] Cache set failed:', e);
+    }
+  }
+
+  static async get<T>(key: string): Promise<T | null> {
+    try {
+      const value = await redis.get(key);
+      if (!value) return null;
+      
+      const entry: CacheEntry<T> = JSON.parse(value);
+      return entry.data;
+    } catch (e) {
+      console.error('[Redis] Cache get failed:', e);
+      return null;
+    }
+  }
+}
+
+const AGENT_CACHE_TTL_SEC = 24 * 60 * 60; // 24 hours
+const SEARCH_CACHE_TTL_SEC = 60 * 60; // 1 hour
+
+// Keeping the global map for fast access in-process, but backing it with FileCache
 const agentEmailCacheGlobal = new Map<string, { email: string | null; website?: string | null; ts: number }>();
 const AGENT_CACHE_MAX_SIZE = 500;
 
-function pruneAgentEmailCacheIfNeeded(ttlSec: number): void {
+function pruneAgentEmailCacheIfNeeded(): void {
   if (agentEmailCacheGlobal.size <= AGENT_CACHE_MAX_SIZE) return;
   const now = Date.now();
   for (const [k, v] of agentEmailCacheGlobal.entries()) {
-    if ((now - v.ts) / 1000 > ttlSec) agentEmailCacheGlobal.delete(k);
+    if ((now - v.ts) / 1000 > AGENT_CACHE_TTL_SEC) agentEmailCacheGlobal.delete(k);
   }
 }
 
@@ -630,35 +665,45 @@ async function findEmailForAgent(
   options?: { maxQueries?: number }
 ): Promise<{ email: string | null; website?: string }> {
   const maxQueries = options?.maxQueries ?? 3;
-  // Extract company name from agent name (usually the part after "Marketed by" or similar)
-  // Format: "Marketed by Company Name - Location Phone Email"
+  // Extract company name from agent name
   let companyMatch = agentName.match(/Marketed by\s+([^-]+?)(?:\s*-\s*|$)/i);
   if (!companyMatch) {
-    // Fallback: try to extract any text that looks like a company name
-    // Updated regex to handle numbers and special characters in company names
     companyMatch = agentName.match(/([A-Z][A-Za-z0-9&]+(?:\s+[A-Za-z0-9&]+)*)/);
   }
   
-  // Use the full company name without modification
   let companyName = companyMatch ? companyMatch[1].trim() : agentName.trim();
-  
-  // Clean up company name for better search results
   companyName = cleanCompanyName(companyName);
   
-  console.log(`Looking for email for company: ${companyName}`);
-
-  // STRATEGY: Prioritize fast internet search over slow website scraping
-  // This avoids timeout issues and is more reliable
+  // 0. Check Cache First
+  const cacheKey = `agent_email_v2:${companyName}`;
+  const cached = agentEmailCacheGlobal.get(cacheKey) || await FileCache.get<{ email: string | null; website?: string | null; ts: number }>(cacheKey);
   
+  if (cached) {
+    // Note: Redis handles TTL automatically, but we check TS just in case for in-memory
+    if ((Date.now() - cached.ts) / 1000 < AGENT_CACHE_TTL_SEC) {
+      console.log(`Cache hit for agent: ${companyName} -> ${cached.email}`);
+      return { email: cached.email, website: cached.website || undefined };
+    }
+  }
+
+  console.log(`Looking for email for company (cache miss): ${companyName}`);
+
+  const saveToCache = async (email: string | null, website?: string) => {
+    const entry = { email, website: website || null, ts: Date.now() };
+    agentEmailCacheGlobal.set(cacheKey, entry);
+    await FileCache.set(cacheKey, entry, AGENT_CACHE_TTL_SEC);
+    pruneAgentEmailCacheIfNeeded();
+  };
+
   // 1. First, try internet search (fastest and most reliable)
-  console.log(`Searching internet for contact email: ${companyName}`);
   try {
     const internetEmails = await searchEmailWithInternet(companyName, apiKey, maxQueries);
     if (internetEmails.length > 0) {
       console.log(`Found email via internet search: ${internetEmails[0]}`);
-      // Still try to get the official website for reference
       const companyWebsite = await searchCompanyWebsiteWithBraveAPI(companyName, apiKey);
-      return { email: internetEmails[0], website: companyWebsite || website || undefined };
+      const res = { email: internetEmails[0], website: companyWebsite || website || undefined };
+      await saveToCache(internetEmails[0], res.website);
+      return res;
     }
   } catch (error) {
     console.error(`Internet email search failed for ${companyName}:`, error);
@@ -667,7 +712,6 @@ async function findEmailForAgent(
   // 2. If internet search fails, try the provided website (if not OTM)
   if (website && !website.includes('onthemarket.com')) {
     console.log(`Trying provided website: ${website}`);
-    // Only try homepage and /contact to save time
     const quickPaths = ['', '/contact'];
     for (const path of quickPaths) {
       try {
@@ -675,18 +719,18 @@ async function findEmailForAgent(
         const emails = await scrapeEmailsFromWebsite(url, browser);
         if (emails.length > 0) {
           console.log(`Found emails on website ${path || '/'}: ${emails[0]}`);
-          return { email: emails[0], website };
+          const res = { email: emails[0], website };
+          await saveToCache(res.email, res.website);
+          return res;
         }
       } catch {}
     }
   }
 
   // 3. Search for company website and try scraping
-  console.log(`Searching for company website: ${companyName}`);
   const companyWebsite = await searchCompanyWebsiteWithBraveAPI(companyName, apiKey);
   if (companyWebsite) {
     console.log(`Found company website: ${companyWebsite}`);
-    // Only try homepage and /contact to save time
     const quickPaths = ['', '/contact'];
     for (const path of quickPaths) {
       try {
@@ -694,13 +738,16 @@ async function findEmailForAgent(
         const emails = await scrapeEmailsFromWebsite(url, browser);
         if (emails.length > 0) {
           console.log(`Found emails on company website ${path || '/'}: ${emails[0]}`);
-          return { email: emails[0], website: companyWebsite };
+          const res = { email: emails[0], website: companyWebsite };
+          await saveToCache(res.email, res.website);
+          return res;
         }
       } catch {}
     }
   }
   
   console.log(`No email found for: ${companyName}`);
+  await saveToCache(null, companyWebsite || website);
   return { email: null, website: companyWebsite || website || undefined };
 }
 
@@ -722,7 +769,10 @@ export async function scrapeInternet(query: string, apiKey: string): Promise<Pro
     
     const allResults: Property[] = [];
     
-    for (const searchQuery of searchQueries) {
+    // Parallelize search queries for speed
+    console.log(`Searching across ${searchQueries.length} queries in parallel...`);
+    
+    const queryPromises = searchQueries.map(async (searchQuery) => {
       try {
         console.log(`Searching for: ${searchQuery}`);
         
@@ -736,9 +786,11 @@ export async function scrapeInternet(query: string, apiKey: string): Promise<Pro
           headers: {
             'Accept': 'application/json',
             'X-Subscription-Token': apiKey
-          }
+          },
+          timeout: 10000
         });
         
+        const results: Property[] = [];
         if (response.data.web && response.data.web.results) {
           for (const result of response.data.web.results) {
             // Filter for property-related websites
@@ -748,41 +800,22 @@ export async function scrapeInternet(query: string, apiKey: string): Promise<Pro
             
             // Skip major property portals and focus on alternative platforms
             const skipDomains = [
-              'onthemarket.com',
-              'rightmove.co.uk',
-              'zoopla.co.uk',
-              'primelocation.com',
-              'spareroom.co.uk',
-              'openrent.com',
-              'openrent.co.uk',
-              'purplebricks.co.uk',
-              'boomin.com',
-              'yopa.co.uk',
-              'strike.co.uk',
-              'rentmyhome.co.uk',
-              'nestoria.co.uk',
-              'gumtree.com', // exclude Gumtree as requested
-              'oneroof.co.nz', // safety
-              // generic non-listing domains
+              'onthemarket.com', 'rightmove.co.uk', 'zoopla.co.uk', 'primelocation.com',
+              'spareroom.co.uk', 'openrent.com', 'openrent.co.uk', 'purplebricks.co.uk',
+              'boomin.com', 'yopa.co.uk', 'strike.co.uk', 'rentmyhome.co.uk',
+              'nestoria.co.uk', 'gumtree.com', 'oneroof.co.nz',
               'google.com', 'bing.com', 'wikipedia.org', 'linkedin.com', 'twitter.com', 'instagram.com', 'youtube.com'
             ];
             
-            // Prioritize Facebook and alternative platforms (excluding Gumtree)
             const priorityDomains = [
-              'facebook.com',
-              'preloved.co.uk',
-              'freeads.co.uk',
-              'adzuna.co.uk',
-              'thehouseshop.com',
-              'propertyheads.com',
-              'rentola.co.uk'
+              'facebook.com', 'preloved.co.uk', 'freeads.co.uk', 'adzuna.co.uk',
+              'thehouseshop.com', 'propertyheads.com', 'rentola.co.uk'
             ];
             
             if (skipDomains.some(domain => url.includes(domain))) {
               continue;
             }
             
-            // Look for property-related keywords
             const propertyKeywords = ['property', 'estate', 'house', 'flat', 'apartment', 'home', 
                                     'bedroom', 'rent', 'sale', 'buy', 'letting', 'pcm', '£'];
             
@@ -791,278 +824,51 @@ export async function scrapeInternet(query: string, apiKey: string): Promise<Pro
             );
             
             if (hasPropertyKeywords) {
-              // Store URL for actual scraping later
               const propertyUrl = result.url;
-              if (propertyUrl && !allResults.some(p => p.agent.website === propertyUrl)) {
-                // Prioritize Facebook and alternative platforms
-                const isPriority = priorityDomains.some(domain => url.includes(domain));
-                
+              if (propertyUrl) {
                 const basicProperty: Property = {
-                  title: title || 'Property Listing',
-                  price: 'Loading...',
-                  location: 'Loading...',
-                  bedrooms: 'Loading...',
-                  propertyType: 'Property',
+                  title: title,
+                  price: extractPriceFromText(title + ' ' + description),
+                  location: extractLocationFromText(title + ' ' + description),
+                  bedrooms: extractBedroomsFromText(title + ' ' + description),
+                  propertyType: extractPropertyTypeFromText(title + ' ' + description),
                   imageUrls: [],
                   agent: {
-                    name: isPriority ? `${extractDomainName(url)} (Priority)` : extractDomainName(url),
-                    email: '', // Don't set placeholder email
+                    name: extractAgentNameFromUrl(url),
+                    email: '',
                     website: propertyUrl
                   }
                 };
-                
-                // Add priority listings to the front
-                if (isPriority) {
-                  allResults.unshift(basicProperty);
-                } else {
-                  allResults.push(basicProperty);
-                }
+                results.push(basicProperty);
               }
             }
           }
         }
-        
-        // Reduced delay between API calls for speed
-        await new Promise(resolve => setTimeout(resolve, 500)); // Reduced from 1000 to 500
-        
+        return results;
       } catch (error: any) {
         console.error(`Error in internet search query "${searchQuery}":`, error.message);
         if (error.response && error.response.status === 429) {
           console.log('Rate limit hit, waiting 5 seconds...');
           await new Promise(resolve => setTimeout(resolve, 5000));
         }
+        return [];
+      }
+    });
+
+    const resultsArray = await Promise.all(queryPromises);
+    const allResults = resultsArray.flat();
+    
+    // De-duplicate results by URL
+    const uniqueMap = new Map<string, Property>();
+    for (const p of allResults) {
+      if (p.agent.website && !uniqueMap.has(p.agent.website.toLowerCase())) {
+        uniqueMap.set(p.agent.website.toLowerCase(), p);
       }
     }
+    const uniqueResults = Array.from(uniqueMap.values());
+    console.log(`Internet search found ${uniqueResults.length} unique properties`);
     
-    // Remove duplicates and limit URLs to scrape for speed
-    const uniqueUrls = Array.from(new Map(
-      allResults.map(property => [property.agent.website, property])
-    ).values()).slice(0, 12); // Reduced from 25 to 12 for faster processing
-    
-    console.log(`Found ${uniqueUrls.length} property URLs to scrape. Starting detailed scraping...`);
-    
-    // Now actually scrape each URL for detailed information
-    const scrapedProperties: Property[] = [];
-    let browser: Browser | undefined;
-    
-    try {
-      // Get Chrome executable path dynamically
-      const chromeExecutablePath = await getChromeExecutablePath();
-      if (chromeExecutablePath) {
-        console.log('Using Chrome executable for scrapeInternet:', chromeExecutablePath);
-      }
-      
-      const launchOptions: LaunchOptions = {
-        headless: true,
-        timeout: 60000, // Increased timeout
-        executablePath: chromeExecutablePath,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          "--no-first-run",
-          "--no-zygote",
-          '--disable-gpu',
-          '--disable-gpu-sandbox',
-          '--disable-software-rasterizer',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding',
-          '--disable-features=TranslateUI',
-          '--disable-ipc-flooding-protection',
-          '--disable-background-networking',
-          '--disable-client-side-phishing-detection',
-          '--disable-sync',
-          '--disable-default-apps',
-          '--window-size=1920x1080',
-          '--user-data-dir=' + path.join(os.tmpdir(), 'puppeteer_dev_chrome_profile-' + Math.random().toString(36).substr(2, 9))
-        ]
-      };
-
-      // Try to launch browser with retry logic
-      let browserLaunchRetries = 3;
-      while (browserLaunchRetries > 0) {
-        try {
-          browser = await puppeteer.launch(launchOptions);
-          break;
-        } catch (error) {
-          console.error(`Browser launch failed, retries left: ${browserLaunchRetries - 1}`, error);
-          browserLaunchRetries--;
-          if (browserLaunchRetries === 0) {
-            throw new Error(`Failed to launch browser after 3 attempts: ${error}`);
-          }
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
-        }
-      }
-      
-      for (let i = 0; i < uniqueUrls.length; i++) {
-        const propertyInfo = uniqueUrls[i];
-        const url = propertyInfo.agent.website!;
-        
-        console.log(`Scraping property ${i + 1}/${uniqueUrls.length}: ${url}`);
-        
-        try {
-          const page = await browser!.newPage();
-          await page.setViewport({ width: 1920, height: 1080 });
-          await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-          
-          // Navigate to the property page with faster settings
-          await page.goto(url, { 
-            waitUntil: 'domcontentloaded', 
-            timeout: 8000 // Reduced from 15000 to 8000
-          });
-          
-          // Reduced wait time for content to load
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced from 2000 to 1000
-          
-          // Get page content and extract property information
-          const content = await page.content();
-          const $ = cheerio.load(content);
-          
-          // Extract detailed property information
-          const scrapedProperty = extractPropertyFromPage($, url, propertyInfo.agent.name);
-          
-          if (scrapedProperty) {
-            scrapedProperties.push(scrapedProperty);
-          }
-          
-          await page.close();
-          
-          // Reduced delay between requests for speed
-          await new Promise(resolve => setTimeout(resolve, 500)); // Reduced from 2000 to 500
-          
-        } catch (error) {
-          console.error(`Error scraping ${url}:`, error);
-          // Keep the basic info if scraping fails
-          scrapedProperties.push(propertyInfo);
-        }
-      }
-
-      // Enrich emails for small agencies and filter results
-      const filtered: Property[] = [];
-      const emailCache: Record<string, { email: string | null; website?: string }> = {};
-      const bigBrandDomains = [
-        'onthemarket.com',
-        'rightmove.co.uk',
-        'zoopla.co.uk',
-        'primelocation.com',
-        'spareroom.co.uk',
-        'openrent.com',
-        'openrent.co.uk',
-        'purplebricks.co.uk',
-        'boomin.com',
-        'yopa.co.uk',
-        'strike.co.uk',
-        'rentmyhome.co.uk',
-        'nestoria.co.uk'
-      ];
-
-      for (const prop of scrapedProperties) {
-        const website = prop.agent.website || '';
-        let host = '';
-        try { host = new URL(website).hostname.toLowerCase(); } catch {}
-
-        if (bigBrandDomains.some(d => host.includes(d))) {
-          continue; // never show big brands
-        }
-
-        if (host.includes('facebook.com')) {
-          // For Facebook, we still need to find a valid email for the agent
-          const cacheKey = `${prop.agent.name}|${prop.agent.website || ''}`;
-          if (!emailCache[cacheKey]) {
-            try {
-              if (browser) {
-                const result = await findEmailForAgent(prop.agent.name, prop.agent.website, browser, apiKey);
-                emailCache[cacheKey] = result;
-              } else {
-                emailCache[cacheKey] = { email: null };
-              }
-            } catch {
-              emailCache[cacheKey] = { email: null };
-            }
-          }
-
-          const found = emailCache[cacheKey];
-          if (found && found.email && isValidEmail(found.email)) {
-            prop.agent.email = found.email;
-            if (found.website) prop.agent.website = found.website;
-            filtered.push(prop);
-          } else {
-            console.log(`Excluding Facebook property from ${prop.agent.name} - no valid email found`);
-          }
-          continue;
-        }
-
-        if (host.includes('rentola.co.uk')) {
-          // Rentola properties already have the correct email, no need to search
-          prop.agent.email = 'info@rentola.co.uk';
-          filtered.push(prop);
-          continue;
-        }
-
-        // For small estate companies, require a contact email on their site
-        const existingEmail = prop.agent.email || '';
-        const hasInlineEmail = !!existingEmail.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-
-        if (hasInlineEmail && isValidEmail(existingEmail)) {
-          filtered.push(prop);
-          continue;
-        }
-
-        // Try to find email using company name/website
-        const cacheKey = `${prop.agent.name}|${prop.agent.website || ''}`;
-        if (!emailCache[cacheKey]) {
-          try {
-            if (browser) {
-              const result = await findEmailForAgent(prop.agent.name, prop.agent.website, browser, apiKey);
-              emailCache[cacheKey] = result;
-            } else {
-              emailCache[cacheKey] = { email: null };
-            }
-          } catch {
-            emailCache[cacheKey] = { email: null };
-          }
-        }
-
-        const found = emailCache[cacheKey];
-        if (found && found.email && isValidEmail(found.email)) {
-          prop.agent.email = found.email;
-          if (found.website) prop.agent.website = found.website;
-          filtered.push(prop);
-        } else {
-          console.log(`Excluding property from ${prop.agent.name} - no valid email found`);
-        }
-      }
-
-      // Replace scrapedProperties with the filtered list
-      scrapedProperties.length = 0;
-      scrapedProperties.push(...filtered);
-    } catch (error) {
-      console.error('Error launching browser for internet scraping:', error);
-      return uniqueUrls; // Return basic info if browser fails
-    } finally {
-      if (browser) {
-        try {
-          console.log('Closing browser...');
-          await browser.close();
-          
-                  // Note: Puppeteer should clean up its own processes automatically
-        } catch (closeError) {
-          console.error('Error closing browser:', closeError);
-        }
-      }
-    }
-    
-    console.log(`Internet scraping completed. Successfully scraped ${scrapedProperties.length} properties`);
-    return scrapedProperties;
-    
-  } catch (error) {
-    console.error('Error in internet search:', error);
-    return [];
-  }
-}
-
+    return uniqueResults;
 // Helper functions for extracting information from text
 function extractPriceFromText(text: string): string | null {
   const pricePatterns = [

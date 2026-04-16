@@ -8,7 +8,10 @@ export interface Property {
   description?: string;
   agent: {
     name: string;
-    email: string;
+    email: string; // Now required for strict filtering
+    phone?: string;
     website?: string;
   };
-} 
+  source: string;
+  url: string;
+}
