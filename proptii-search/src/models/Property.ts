@@ -36,7 +36,7 @@ const PropertySchema: Schema = new Schema({
   },
   source: { type: String, required: true },
   url: { type: String, required: true, unique: true },
-  scrapedAt: { type: Date, default: Date.now },
+  scrapedAt: { type: Date, default: Date.now, index: { expires: '30d' } },
   metadata: { type: Object }
 });
 

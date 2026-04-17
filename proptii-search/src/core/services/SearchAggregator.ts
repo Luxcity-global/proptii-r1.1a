@@ -30,19 +30,8 @@ export class SearchAggregator {
       }
     }
 
-    // 2. MongoDB fallback
-    try {
-      console.log(`[Cache Miss] Searching MongoDB for: ${query}`);
-      const mongoResults = await Property.find({ $text: { $search: query } }).limit(50);
-      console.log(`[Aggregator] MongoDB returned ${mongoResults.length} historical results for: ${query}`);
-      if (mongoResults.length > 0) {
-        await this.saveToCache(cacheKey, mongoResults, /* stale */ true);
-        return mongoResults;
-      }
-    } catch (err) {
-      console.error(`[Aggregator] MongoDB search failed:`, err);
-    }
-
+    // 2. MongoDB fallback removed to prevent broad irrelevant hits
+    // Historical results are now only served if they are an exact match in Redis.
     return [];
   }
 

@@ -73,8 +73,13 @@ export const searchProperties: RequestHandler = async (req: Request, res: Respon
       // Apply strict email filter to cached results too, just in case
       const validCached = cachedResults.filter(p => p.agent?.email);
       if (validCached.length > 0) {
+        TRACE(`[SSE] Sending ${validCached.length} valid cached results for: "${query}"`);
         write({ type: 'initial', data: validCached });
+      } else {
+        TRACE(`[SSE] Found ${cachedResults.length} cached results but none had valid emails for: "${query}"`);
       }
+    } else {
+      TRACE(`[SSE] Cache miss (no initial pulse) for: "${query}"`);
     }
 
     // ── 3. Live Scraping + Enrichment ────────
