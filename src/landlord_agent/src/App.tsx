@@ -323,6 +323,7 @@ function AppContent() {
       '/documents': 'documents',
       '/contracts': 'contracts',
       '/clients': 'clients',
+      '/insights': 'insights',
     };
     
     const path = location.pathname;
@@ -597,6 +598,7 @@ function AppContent() {
           '/documents': 'documents',
           '/contracts': 'contracts',
           '/clients': 'clients',
+          '/insights': 'insights',
         };
         
         // Remove leading slash and get the screen
@@ -648,6 +650,7 @@ function AppContent() {
           '/documents': 'documents',
           '/contracts': 'contracts',
           '/clients': 'clients',
+          '/insights': 'insights',
         };
         
         // Normalize the hash path
@@ -670,6 +673,7 @@ function AppContent() {
         '/documents': 'documents',
         '/contracts': 'contracts',
         '/clients': 'clients',
+        '/insights': 'insights',
       };
       
       const path = location.pathname;
@@ -2261,8 +2265,7 @@ function AppContent() {
               selectProperty(property);
               navigateToScreen('photo-management');
             }}
-            // COMMENTED OUT FOR THIS RELEASE - Insights page not in scope
-            onViewInsights={() => {/* navigateToScreen('portfolio-insights') */}}
+            onViewInsights={() => handleNavigation('insights')}
             onViewVacancyAlert={(alertId) => {
               const alert = vacancyAlerts.find(a => a.id === alertId);
               if (alert) {
@@ -2669,23 +2672,15 @@ function AppContent() {
           />
         );
 
-      // COMMENTED OUT FOR THIS RELEASE - Inbox and Insights pages not in scope
-      // case 'inbox':
-      //   return (
-      //     <TenantInbox
-      //       onBack={() => setNavigationScreen('dashboard')}
-      //     />
-      //   );
-
-      // case 'insights':
-      //   return (
-      //     <PortfolioInsights
-      //       properties={properties}
-      //       userProfile={userProfile}
-      //       onBack={() => setNavigationScreen('dashboard')}
-      //       marketInsights={marketInsights}
-      //     />
-      //   );
+      case 'insights':
+        return (
+          <PortfolioInsights
+            properties={properties}
+            userProfile={userProfile}
+            onBack={() => setNavigationScreen('dashboard')}
+            marketInsights={marketInsights}
+          />
+        );
 
       default:
         return (

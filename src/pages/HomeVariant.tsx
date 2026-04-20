@@ -176,13 +176,17 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const navigateToLandlordAction = (action: 'add-property' | 'clients' | 'coming-soon') => {
+  const navigateToLandlordAction = (action: 'add-property' | 'clients' | 'analytics' | 'coming-soon') => {
     if (action === 'add-property') {
       navigate('/landlord?start=property-setup-step1');
       return;
     }
     if (action === 'clients') {
       navigate('/landlord/clients');
+      return;
+    }
+    if (action === 'analytics') {
+      navigate('/landlord/insights');
       return;
     }
     navigate('/coming-soon');
@@ -208,7 +212,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
   const listMenuItems = [
     { icon: <Building2 className="h-4 w-4" />, label: 'List Property', description: 'Advertise your property to verified tenants', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('add-property'); } },
     { icon: <Users className="h-4 w-4" />, label: 'Manage Tenants', description: 'Tenant communication and management tools', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('clients'); } },
-    { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance and enquiries', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('coming-soon'); } },
+    { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance and enquiries', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('analytics'); } },
     { icon: <Shield className="h-4 w-4" />, label: 'Verify Tenants', description: 'Run background and credit checks securely', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('coming-soon'); } },
     { icon: <Wrench className="h-4 w-4" />, label: 'Tools', description: 'Free rental tools and official documents for landlords and tenants', action: () => { setIsDropdownOpen(false); navigate('/tools'); } },
   ];

@@ -480,17 +480,11 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
       icon: Users,
       label: 'Clients',
     },
-    // COMMENTED OUT FOR THIS RELEASE - Inbox and Insights pages not in scope
-    // {
-    //   id: 'inbox' as NavigationScreen,
-    //   icon: Inbox,
-    //   label: 'Inbox',
-    // },
-    // {
-    //   id: 'insights' as NavigationScreen,
-    //   icon: BarChart3,
-    //   label: 'Insights',
-    // },
+    {
+      id: 'insights' as NavigationScreen,
+      icon: BarChart3,
+      label: 'Analytics',
+    },
   ];
 
   return (

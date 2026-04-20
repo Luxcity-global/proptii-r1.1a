@@ -9,9 +9,14 @@ interface LandlordAppBridgeProps {
 
 const LandlordAppBridge: React.FC<LandlordAppBridgeProps> = ({ className, style }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
   const { isAuthenticated, user, isLoading } = useAuth();
-  const iframeSrc = `/landlord/index.html${search}`;
+  const landlordPathPrefix = '/landlord';
+  const relativeLandlordPath = pathname.startsWith(landlordPathPrefix)
+    ? pathname.slice(landlordPathPrefix.length)
+    : '';
+  const hashPath = relativeLandlordPath && relativeLandlordPath !== '/' ? `#${relativeLandlordPath}` : '';
+  const iframeSrc = `/landlord/index.html${search}${hashPath}`;
 
   useEffect(() => {
     const iframe = iframeRef.current;
