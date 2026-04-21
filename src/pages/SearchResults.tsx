@@ -40,6 +40,123 @@ const cleanPropertyPrice = (price: string): string => {
   return cleanedPrice.trim();
 };
 
+// Property Skeleton Component for loading state
+const PropertySkeleton = () => (
+  <div className="bg-white rounded-xl shadow-lg overflow-hidden animate-pulse">
+    <div className="h-48 bg-gray-200"></div>
+    <div className="p-4">
+      <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
+      <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+      <div className="flex justify-between items-center">
+        <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+        <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+      </div>
+      <div className="mt-4 h-10 bg-gray-100 rounded-lg"></div>
+    </div>
+  </div>
+);
+
+// Property Card Component
+const PropertyCard = ({ property, onClick, isSaved, onToggleSave }: { 
+  property: Property, 
+  onClick: () => void,
+  isSaved: boolean,
+  onToggleSave: (e: React.MouseEvent) => void
+}) => {
+  const [imgError, setImgError] = useState(false);
+  
+  // Modern placeholder image
+  const placeholderImage = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800';
+  
+  const hasImage = property.imageUrls && property.imageUrls.length > 0 && !imgError;
+  const imageSrc = hasImage ? property.imageUrls[0] : placeholderImage;
+
+  return (
+    <div
+      className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
+      onClick={onClick}
+    >
+      {/* Property Image */}
+      <div className="relative h-48 overflow-hidden bg-gray-100">
+        <img
+          src={imageSrc}
+          alt={property.title}
+          onError={() => setImgError(true)}
+          className={`w-full h-full object-cover transition-transform duration-500 hover:scale-110 ${
+            !hasImage ? 'opacity-50 grayscale' : ''
+          }`}
+        />
+        
+        {/* Price Badge */}
+        <div className="absolute top-4 left-4 bg-[#E65D24] text-white px-3 py-1 rounded-full font-semibold text-sm shadow-md">
+          {cleanPropertyPrice(property.price)}
+        </div>
+        
+        {/* Heart Button */}
+        <button
+          onClick={onToggleSave}
+          className="absolute top-4 right-4 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
+        >
+          <svg 
+            className={`w-5 h-5 transition-colors ${
+              isSaved ? 'text-red-500 fill-red-500' : 'text-gray-600 hover:text-red-500'
+            }`}
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+        </button>
+        
+        {/* Source Badge */}
+        {property.source && (
+          <div className="absolute bottom-4 left-4 bg-black/70 text-white px-2 py-1 rounded text-xs backdrop-blur-sm">
+            {property.source}
+          </div>
+        )}
+      </div>
+
+      {/* Property Details */}
+      <div className="p-4">
+        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 min-h-[3rem]">{property.title}</h3>
+        
+        <div className="flex items-center gap-2 text-gray-600 mb-3">
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span className="text-sm truncate">{property.location}</span>
+        </div>
+
+        <div className="flex items-center justify-between text-sm text-gray-600 border-t border-gray-100 pt-3 mt-auto">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
+              </svg>
+              <span>{property.bedrooms || '—'}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              <span className="truncate max-w-[80px]">{property.propertyType}</span>
+            </div>
+          </div>
+          
+          {property.agent && (
+            <div className="text-xs text-[#136C9E] font-medium max-w-[100px] truncate">
+              {property.agent.name}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Property Details Modal Component
 interface PropertyDetailsModalProps {
   property: Property | null;
@@ -110,6 +227,9 @@ function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNav
                   src={property.imageUrls[currentImageIndex]}
                   alt={`${property.title} - Image ${currentImageIndex + 1}`}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800';
+                  }}
                 />
               </div>
             
@@ -151,6 +271,9 @@ function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNav
                         src={url}
                         alt={`Thumbnail ${index + 1}`}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=100';
+                        }}
                       />
                     </button>
                   ))}
@@ -647,7 +770,7 @@ const SearchResults = () => {
   const searchTypeParam =
     rawSearchTypeParam === 'proptii' || rawSearchTypeParam === 'onthemarket'
       ? rawSearchTypeParam
-      : 'onthemarket';
+      : 'proptii';
   const searchType = searchTypeParam as 'onthemarket' | 'proptii';
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -1057,7 +1180,6 @@ const SearchResults = () => {
                 // Create unique ID for this property's info window
                 const propertyId = `prop-${index}-${Date.now()}`;
                 const imageUrls = property.imageUrls || [];
-                const imageUrlsJson = JSON.stringify(imageUrls);
                 const firstImageUrl = imageUrls.length > 0 ? imageUrls[0] : '';
                 
                 // Create info window with property details and image navigation
@@ -1157,17 +1279,13 @@ const SearchResults = () => {
                 markersRef.current.push(marker);
                 bounds.extend(location);
                 successfulGeocodes++;
-                
-                console.log(`✓ Geocoded property ${index + 1}/${totalProperties}: ${address} (Total markers: ${markersRef.current.length})`);
-              } else {
-                console.warn(`✗ Failed to geocode address ${index + 1}/${totalProperties}: ${address}`, status);
               }
               
               checkAndFitBounds();
             });
-          }, index * 150); // 150ms delay between each geocode request
+          }, index * 150);
         });
-        }, 500); // Wait 500ms after map initialization before starting geocoding
+      }, 500);
 
         return () => {
           clearTimeout(timeoutId);
@@ -1213,13 +1331,6 @@ const SearchResults = () => {
   const handleMessageClick = async (property: Property) => {
     setIsNavigatingToBooking(true);
     
-    // Log the property data to debug email issue
-    console.log('📧 [SearchResults] Property agent data:', {
-      agent: property.agent,
-      email: property.agent?.email,
-      name: property.agent?.name,
-      source: property.source
-    });
     
     // Prepare property data for BookViewing page
     // Use extended fields if available (from Proptii properties), otherwise parse from location
@@ -1238,12 +1349,6 @@ const SearchResults = () => {
       }
     };
     
-    // Log the prepared property data
-    console.log('📧 [SearchResults] Prepared property data for BookViewing:', {
-      agentEmail: propertyData.agent.email,
-      agentName: propertyData.agent.name,
-      agentId: propertyData.agent.id
-    });
     
     // Store in sessionStorage for BookViewing page
     sessionStorage.setItem('prefilledProperty', JSON.stringify(propertyData));
@@ -1252,7 +1357,7 @@ const SearchResults = () => {
     // when user comes back from BookViewing page
     
     // Small delay for smooth transition
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Navigate to booking page
     navigate('/bookviewing');
@@ -1262,7 +1367,7 @@ const SearchResults = () => {
     navigate('/');
   };
 
-  if (isLoading) {
+  if (isLoading && results.length === 0) {
     return (
       <div className="min-h-screen flex flex-col font-nunito">
         {/* Custom Header with navigation */}
@@ -1401,7 +1506,7 @@ const SearchResults = () => {
                         key={chip.label}
                         onClick={() => {
                           clearCache();
-                          navigate(`/search?q=${encodeURIComponent(chip.query)}&type=${encodeURIComponent(searchTypeParam || 'onthemarket')}`);
+                          navigate(`/search?q=${encodeURIComponent(chip.query)}&type=${encodeURIComponent(searchTypeParam || 'proptii')}`);
                         }}
                         className="px-4 py-2 rounded-full border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors"
                       >
@@ -1450,7 +1555,7 @@ const SearchResults = () => {
                         key={index}
                         onClick={() => {
                           clearCache();
-                          navigate(`/search?q=${encodeURIComponent(example.query)}&type=${encodeURIComponent(searchTypeParam || 'onthemarket')}`);
+                          navigate(`/search?q=${encodeURIComponent(example.query)}&type=${encodeURIComponent(searchTypeParam || 'proptii')}`);
                         }}
                         className="bg-white border border-gray-200 rounded-lg p-4 text-left hover:border-[#E65D24] hover:shadow-md transition-all group"
                       >
@@ -1476,7 +1581,7 @@ const SearchResults = () => {
             <div className="mt-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
               <button
                 onClick={() => {
-                  const currentPlatform = searchTypeParam === 'proptii' ? 'proptii' : 'onthemarket';
+                  const currentPlatform = searchTypeParam === 'proptii' ? 'proptii' : 'proptii';
                   clearCache();
                   navigate(`/?q=${encodeURIComponent(searchQuery)}&type=${currentPlatform}`);
                 }}
@@ -1491,7 +1596,7 @@ const SearchResults = () => {
               {isNetworkError && (
                 <button
                   onClick={() => {
-                    const currentPlatform = searchTypeParam === 'proptii' ? 'proptii' : 'onthemarket';
+                    const currentPlatform = searchTypeParam === 'proptii' ? 'proptii' : 'proptii';
                     clearCache();
                     navigate(`/?q=${encodeURIComponent(searchQuery)}&type=${currentPlatform}`);
                   }}
@@ -1548,12 +1653,6 @@ const SearchResults = () => {
                   <div className="flex items-center">
                     <span className="text-gray-500 font-medium w-20">Query:</span>
                     <span className="text-gray-900 font-semibold">{searchQuery}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="text-gray-500 font-medium w-20">Platform:</span>
-                    <span className="text-gray-900">
-                      {searchTypeParam === 'onthemarket' ? 'On the Market' : 'Proptii'}
-                    </span>
                   </div>
                   <div className="flex items-center">
                     <span className="text-gray-500 font-medium w-20">Results:</span>
@@ -1671,7 +1770,7 @@ const SearchResults = () => {
                 <div className="mt-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
                   <button
                     onClick={() => {
-                      const currentPlatform = searchTypeParam === 'proptii' ? 'proptii' : 'onthemarket';
+                      const currentPlatform = searchTypeParam === 'proptii' ? 'proptii' : 'proptii';
                       clearCache();
                       navigate(`/?q=${encodeURIComponent(searchQuery)}&type=${currentPlatform}`);
                     }}
@@ -1685,7 +1784,7 @@ const SearchResults = () => {
 
                   <button
                     onClick={() => {
-                      const currentPlatform = searchTypeParam === 'proptii' ? 'proptii' : 'onthemarket';
+                      const currentPlatform = searchTypeParam === 'proptii' ? 'proptii' : 'proptii';
                       const nextPlatform = currentPlatform === 'proptii' ? 'onthemarket' : 'proptii';
                       clearCache();
                       navigate(`/?q=${encodeURIComponent(searchQuery)}&type=${nextPlatform}`);
@@ -1724,7 +1823,7 @@ const SearchResults = () => {
                             key={chip.label}
                             onClick={() => {
                               clearCache();
-                              navigate(`/search?q=${encodeURIComponent(chip.query)}&type=${encodeURIComponent(searchTypeParam || 'onthemarket')}`);
+                              navigate(`/search?q=${encodeURIComponent(chip.query)}&type=${encodeURIComponent(searchTypeParam || 'proptii')}`);
                             }}
                             className="px-4 py-2 rounded-full border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors"
                           >
@@ -1744,139 +1843,14 @@ const SearchResults = () => {
                 {showMap ? (
                   // When map is shown, display in single column
                   <div className="grid grid-cols-1 gap-6">
-                    {results.map((property, index) => (
-                <div
-                  key={index}
-                  className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
-                  onClick={() => openModal(property)}
-                >
-                  {/* Property Image */}
-                  <div className="relative h-48 overflow-hidden">
-                    {property.imageUrls && property.imageUrls.length > 0 ? (
-                      <img
-                        src={property.imageUrls[0]}
-                        alt={property.title}
-                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                        <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                    )}
-                    
-                    {/* Price Badge */}
-                    <div className="absolute top-4 left-4 bg-[#E65D24] text-white px-3 py-1 rounded-full font-semibold text-sm">
-                      {cleanPropertyPrice(property.price)}
-                    </div>
-                    
-                    {/* Heart Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const propertyId = `${property.title}-${property.location}-${property.price}`;
-                        const wasSaved = isPropertySaved(propertyId);
-                        toggleSaveProperty(property);
-                        setToastMessage(wasSaved ? 'Property removed from saved' : 'Property saved!');
-                        setShowToast(true);
-                        setTimeout(() => setShowToast(false), 3000);
-                      }}
-                      className="absolute top-4 right-4 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
-                    >
-                      <svg 
-                        className={`w-5 h-5 transition-colors ${
-                          isPropertySaved(`${property.title}-${property.location}-${property.price}`) 
-                            ? 'text-red-500 fill-red-500' 
-                            : 'text-gray-600 hover:text-red-500'
-                        }`}
-                        fill="none" 
-                        stroke="currentColor" 
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                      </svg>
-                    </button>
-                    
-                    {/* Source Badge */}
-                    {property.source && (
-                      <div className="absolute bottom-4 left-4 bg-black/70 text-white px-2 py-1 rounded text-xs">
-                        {property.source}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Property Details */}
-                  <div className="p-4">
-                    <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{property.title}</h3>
-                    
-                    <div className="flex items-center gap-2 text-gray-600 mb-3">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <span className="text-sm">{property.location}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm text-gray-600">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
-                          </svg>
-                          <span>{property.bedrooms}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                          </svg>
-                          <span>{property.propertyType}</span>
-                        </div>
-                      </div>
-                      
-                      {property.agent && (
-                        <div className="text-xs text-gray-500">
-                          {property.agent.name}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-                  </div>
-                ) : (
-                  // When map is hidden, display in grid
-                  results.map((property, index) => (
-                    <div
-                      key={index}
-                      className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
-                      onClick={() => openModal(property)}
-                    >
-                      {/* Property Image */}
-                      <div className="relative h-48 overflow-hidden">
-                        {property.imageUrls && property.imageUrls.length > 0 ? (
-                          <img
-                            src={property.imageUrls[0]}
-                            alt={property.title}
-                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                        )}
-                        
-                        {/* Price Badge */}
-                        <div className="absolute top-4 left-4 bg-[#E65D24] text-white px-3 py-1 rounded-full font-semibold text-sm">
-                          {cleanPropertyPrice(property.price)}
-                        </div>
-                        
-                        {/* Heart Button */}
-                        <button
-                          onClick={(e) => {
+                    <>
+                      {results.map((property, index) => (
+                        <PropertyCard 
+                          key={index} 
+                          property={property} 
+                          onClick={() => openModal(property)}
+                          isSaved={isPropertySaved(`${property.title}-${property.location}-${property.price}`)}
+                          onToggleSave={(e) => {
                             e.stopPropagation();
                             const propertyId = `${property.title}-${property.location}-${property.price}`;
                             const wasSaved = isPropertySaved(propertyId);
@@ -1885,68 +1859,37 @@ const SearchResults = () => {
                             setShowToast(true);
                             setTimeout(() => setShowToast(false), 3000);
                           }}
-                          className="absolute top-4 right-4 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
-                        >
-                          <svg 
-                            className={`w-5 h-5 transition-colors ${
-                              isPropertySaved(`${property.title}-${property.location}-${property.price}`) 
-                                ? 'text-red-500 fill-red-500' 
-                                : 'text-gray-600 hover:text-red-500'
-                            }`}
-                            fill="none" 
-                            stroke="currentColor" 
-                            viewBox="0 0 24 24"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                          </svg>
-                        </button>
-                        
-                        {/* Source Badge */}
-                        {property.source && (
-                          <div className="absolute bottom-4 left-4 bg-black/70 text-white px-2 py-1 rounded text-xs">
-                            {property.source}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Property Details */}
-                      <div className="p-4">
-                        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{property.title}</h3>
-                        
-                        <div className="flex items-center gap-2 text-gray-600 mb-3">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          <span className="text-sm">{property.location}</span>
-                        </div>
-
-                        <div className="flex items-center justify-between text-sm text-gray-600">
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-1">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
-                              </svg>
-                              <span>{property.bedrooms}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                              </svg>
-                              <span>{property.propertyType}</span>
-                            </div>
-                          </div>
-                          
-                          {property.agent && (
-                            <div className="text-xs text-gray-500">
-                              {property.agent.name}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                        />
+                      ))}
+                      {isLoading && [1, 2, 3].map(i => (
+                        <PropertySkeleton key={`skeleton-list-${i}`} />
+                      ))}
+                    </>
+                  </div>
+                ) : (
+                  // When map is hidden, display in grid
+                  <>
+                    {results.map((property, index) => (
+                      <PropertyCard 
+                        key={index} 
+                        property={property} 
+                        onClick={() => openModal(property)}
+                        isSaved={isPropertySaved(`${property.title}-${property.location}-${property.price}`)}
+                        onToggleSave={(e) => {
+                          e.stopPropagation();
+                          const propertyId = `${property.title}-${property.location}-${property.price}`;
+                          const wasSaved = isPropertySaved(propertyId);
+                          toggleSaveProperty(property);
+                          setToastMessage(wasSaved ? 'Property removed from saved' : 'Property saved!');
+                          setShowToast(true);
+                          setTimeout(() => setShowToast(false), 3000);
+                        }}
+                      />
+                    ))}
+                    {isLoading && [1, 2, 3].map(i => (
+                      <PropertySkeleton key={`skeleton-grid-${i}`} />
+                    ))}
+                  </>
                 )}
               </div>
 

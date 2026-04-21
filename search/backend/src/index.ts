@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { randomUUID } from 'crypto';
-import { scrape, scrapeInternet } from './scraper';
+import { scrape, scrapeInternet, Property, FileCache } from './scraper';
 import { scrapeRightmove, buildRightmoveUrl } from './scrapers/rightmove-scraper';
 import { extractLocationPhraseFromQuery, resolveRightmoveLocationIdentifier } from './utils/rightmove-location';
 import { scrapeRentola, buildRentolaUrl } from './scrapers/rentola-scraper';
@@ -30,36 +30,44 @@ const logMemory = () => {
 setInterval(logMemory, 30000); // Log every 30s
 
 // Enable pre-flight requests for all routes
-app.options('*', cors());
+const allowedOrigins = [
+  'https://proptii-r1-1a-new.onrender.com',
+  'https://proptii-frontend.onrender.com',
+  'https://proptii.co',
+  'http://localhost:5173',
+  'http://localhost:4173'
+];
 
-app.use(cors({
+const corsOptions: cors.CorsOptions = {
   origin: function (origin, callback) {
+    console.log(`[CORS Check] Request Origin: ${origin}`);
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 
-    const allowedOrigins = [
-      'https://proptii-r1-1a-new.onrender.com',
-      'https://proptii-frontend.onrender.com',
-      'https://proptii.co',
-      'http://localhost:5173',
-      'http://localhost:4173'
-    ];
-
     // Check if origin is allowed directly or matches .onrender.com or .proptii.co pattern
-    if (allowedOrigins.indexOf(origin) !== -1 || /\.onrender\.com$/.test(origin) || /\.proptii\.co$/.test(origin)) {
+    const isAllowed = allowedOrigins.indexOf(origin) !== -1 || 
+                      /\.onrender\.com$/.test(origin) || 
+                      /\.proptii\.co$/.test(origin) ||
+                      origin.includes('proptii.co'); // Flexible check
+
+    if (isAllowed) {
+      console.log(`[CORS Check] Allowed: ${origin}`);
       callback(null, true);
     } else {
-      console.log(`Blocked by CORS: ${origin}`);
-      // For debugging, you might want to allow it anyway temporarily:
-      // callback(null, true); 
+      console.warn(`[CORS Check] Blocked by policy: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'x-correlation-id'],
   credentials: true,
   optionsSuccessStatus: 200
-}));
+};
+
+// Apply CORS with options to all routes, including pre-flight
+app.use(cors(corsOptions));
+// Specifically handle OPTIONS for all routes with the same options
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
 // Global Rate Limiter: 100 requests per minute per IP
@@ -133,15 +141,8 @@ app.post('/scrape-fallback', async (req, res) => {
   }
 });
 
-// API-based property search endpoint (no browser automation required)
+// API-based property search endpoint - Aggregated Real Search
 app.post('/scrape-api', searchLimiter, async (req, res) => {
-  if (process.env.NODE_ENV === 'production') {
-    res.status(503).json({
-      error: 'Scrape API mock unavailable in production',
-      message: 'This endpoint currently returns mock data and is disabled in production.'
-    });
-    return;
-  }
   try {
     const { query } = req.body;
 
@@ -152,95 +153,54 @@ app.post('/scrape-api', searchLimiter, async (req, res) => {
       });
     }
 
-    console.log('API-based search query:', query);
+    // Check cache first for this aggregated query
+    const cacheKey = `aggregate_search:${query.toLowerCase()}`;
+    const cached = await FileCache.get<Property[]>(cacheKey);
+    if (cached) {
+      console.log('Cache hit for aggregate search:', query);
+      return res.json(cached);
+    }
 
-    // Extract location from query
-    const locationMatch = query.match(/in\s+([a-zA-Z\s,]+)/i);
-    const location = locationMatch ? locationMatch[1].trim() : 'Leeds';
+    console.log('Aggregated search query:', query);
+    const apiKey = 'BSAWosDbp01p_PwWH6hIabPIYLYFcNp';
 
-    // Extract price from query
-    const priceMatch = query.match(/(\d+)(?:k|pcm|\s*pound)/i);
-    const price = priceMatch ? priceMatch[1] : '1200';
+    // 1. Resolve Location and Build URLs
+    const { phrase: locationPhrase, isRental } = extractLocationPhraseFromQuery(query);
+    console.log(`Extracted location: "${locationPhrase}", isRental: ${isRental}`);
+    
+    // Resolve Rightmove ID and build URLs in parallel
+    const [rightmoveId] = await Promise.all([
+      resolveRightmoveLocationIdentifier(locationPhrase, isRental).catch(() => undefined)
+    ]);
 
-    // Extract bedrooms from query
-    const bedroomMatch = query.match(/(\d+)\s*bed/i);
-    const bedrooms = bedroomMatch ? bedroomMatch[1] : '2';
+    const rightmoveUrl = buildRightmoveUrl(query, rightmoveId);
+    const openRentUrl = buildOpenRentUrl(locationPhrase || 'London', {
+      maxPrice: query.includes('under') ? parseInt(query.match(/under\s*£?(\d+)/i)?.[1] || '0') : undefined,
+      bedrooms: query.match(/(\d+)\s*bed/i)?.[1]
+    });
 
-    // Create sample properties based on the query
-    const sampleProperties = [
-      {
-        title: `${bedrooms} Bedroom Property in ${location}`,
-        price: `£${price} pcm`,
-        location: location,
-        bedrooms: parseInt(bedrooms),
-        bathrooms: 1,
-        description: `Beautiful ${bedrooms} bedroom property in ${location}. Available for rent at £${price} per calendar month.`,
-        images: [
-          'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400&h=300&fit=crop',
-          'https://images.unsplash.com/photo-1560448204-603b3fc33ddc?w=400&h=300&fit=crop',
-          'https://images.unsplash.com/photo-1560448204-5c9a73c7d4b8?w=400&h=300&fit=crop'
-        ],
-        agent: {
-          name: 'Property Agent',
-          email: 'agent@example.com',
-          phone: '0113 123 4567',
-          website: 'https://example.com'
-        },
-        source: 'mock',
-        url: `https://example.com/property/${location.toLowerCase().replace(/\s+/g, '-')}`,
-        apiBased: true
-      },
-      {
-        title: `Modern ${bedrooms} Bed Apartment in ${location}`,
-        price: `£${parseInt(price) + 100} pcm`,
-        location: location,
-        bedrooms: parseInt(bedrooms),
-        bathrooms: 2,
-        description: `Contemporary ${bedrooms} bedroom apartment in the heart of ${location}. Modern amenities and great location.`,
-        images: [
-          'https://images.unsplash.com/photo-1560448204-603b3fc33ddc?w=400&h=300&fit=crop',
-          'https://images.unsplash.com/photo-1560448204-5c9a73c7d4b8?w=400&h=300&fit=crop',
-          'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400&h=300&fit=crop'
-        ],
-        agent: {
-          name: 'Modern Properties',
-          email: 'info@modernproperties.com',
-          phone: '0113 456 7890',
-          website: 'https://modernproperties.com'
-        },
-        source: 'mock',
-        url: `https://modernproperties.com/apartment/${location.toLowerCase().replace(/\s+/g, '-')}`,
-        apiBased: true
-      },
-      {
-        title: `Family Home in ${location}`,
-        price: `£${parseInt(price) - 200} pcm`,
-        location: location,
-        bedrooms: parseInt(bedrooms) + 1,
-        bathrooms: 1,
-        description: `Spacious family home in ${location}. Perfect for families looking for extra space and a garden.`,
-        images: [
-          'https://images.unsplash.com/photo-1560448204-5c9a73c7d4b8?w=400&h=300&fit=crop',
-          'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400&h=300&fit=crop',
-          'https://images.unsplash.com/photo-1560448204-603b3fc33ddc?w=400&h=300&fit=crop'
-        ],
-        agent: {
-          name: 'Family Homes Ltd',
-          email: 'family@homes.com',
-          phone: '0113 789 0123',
-          website: 'https://familyhomes.com'
-        },
-        source: 'mock',
-        url: `https://familyhomes.com/property/${location.toLowerCase().replace(/\s+/g, '-')}`,
-        apiBased: true
-      }
-    ];
+    console.log('Generated URLs for aggregation:', { rightmoveUrl, openRentUrl });
 
-    console.log(`API search completed: ${sampleProperties.length} properties found`);
-    res.json(sampleProperties);
+    // 2. Scrape in Parallel
+    const [rightmoveResults, openRentResults] = await Promise.all([
+      scrapeRightmove(rightmoveUrl, apiKey).catch(e => { console.error('Aggregated Rightmove failed:', e); return []; }),
+      scrapeOpenRent(openRentUrl, apiKey).catch(e => { console.error('Aggregated OpenRent failed:', e); return []; })
+    ]);
+
+    // 3. Join and return
+    const combinedResults = [...rightmoveResults, ...openRentResults];
+    
+    // Simple shuffle or sort to mix results
+    const sortedResults = combinedResults.sort(() => Math.random() - 0.5);
+    
+    // Save to cache
+    await FileCache.set(cacheKey, sortedResults, 3600);
+
+    console.log(`Aggregated search completed: ${sortedResults.length} properties found`);
+    res.json(sortedResults);
 
   } catch (error) {
-    console.error('Error in /scrape-api endpoint:', error);
+    console.error('Error in /scrape-api aggregated endpoint:', error);
     res.status(500).json({
       error: 'Internal server error',
       message: error instanceof Error ? error.message : 'An unexpected error occurred'
@@ -354,12 +314,23 @@ app.post('/scrape-internet-real', searchLimiter, async (req, res) => {
       });
     }
 
+    // Check cache first
+    const cacheKey = `search_internet:${query.toLowerCase()}`;
+    const cached = await FileCache.get<Property[]>(cacheKey); // Redis handles TTL
+    if (cached) {
+      console.log('Cache hit for internet search:', query);
+      return res.json(cached);
+    }
+
     console.log('Real internet search query:', query);
 
     // Use the real scrapeInternet function from scraper.ts
     const results = await scrapeInternet(query, apiKey);
+    
+    // Save to cache
+    await FileCache.set(cacheKey, results, 3600);
+    
     res.json(results);
-
   } catch (error) {
     console.error('Error in /scrape-internet-real endpoint:', error);
     res.status(500).json({
@@ -370,32 +341,42 @@ app.post('/scrape-internet-real', searchLimiter, async (req, res) => {
 });
 
 app.post('/scrape', searchLimiter, async (req, res) => {
+  const correlationId = randomUUID();
   try {
+    const { url, apiKey } = req.body;
 
-    const { url } = req.body;
-    const apiKey = 'BSAWosDbp01p_PwWH6hIabPIYLYFcNp';
-
-    if (!url) {
+    if (!url || !apiKey) {
       return res.status(400).json({
         error: 'Missing required parameters',
-        message: 'url is required'
+        message: 'url and apiKey are required'
       });
     }
 
-    console.log('Fetching URL:', url);
+    // Check cache first
+    const cacheKey = `scrape_url:${url.toLowerCase()}`;
+    const cached = await FileCache.get<Property[]>(cacheKey);
+    if (cached) {
+      console.log('Cache hit for URL scrape:', url);
+      return res.json(cached);
+    }
+
+    console.log(`[${correlationId}] Scraping URL:`, url);
 
     // Route to appropriate scraper based on URL
     if (url.includes('openrent.co.uk')) {
       console.log('Detected OpenRent URL, using OpenRent scraper');
       const results = await scrapeOpenRent(url, apiKey);
+      await FileCache.set(cacheKey, results, 3600);
       res.json(results);
     } else if (url.includes('rightmove.co.uk')) {
       console.log('Detected Rightmove URL, using Rightmove scraper');
       const results = await scrapeRightmove(url, apiKey);
+      await FileCache.set(cacheKey, results, 3600); 
       res.json(results);
     } else if (url.includes('rentola.co.uk')) {
       console.log('Detected Rentola URL, using Rentola scraper');
       const results = await scrapeRentola(url, apiKey);
+      await FileCache.set(cacheKey, results, 3600);
       res.json(results);
     } else {
       console.log('Using OnTheMarket scraper for URL:', url);
@@ -404,6 +385,7 @@ app.post('/scrape', searchLimiter, async (req, res) => {
         ?? randomUUID();
       try {
         const results = await scrape(url, apiKey, correlationId);
+        await FileCache.set(cacheKey, results, 3600);
         res.json(results);
       } catch (onTheMarketError) {
         console.error('OnTheMarket scraping failed:', onTheMarketError);

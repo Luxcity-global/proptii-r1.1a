@@ -508,81 +508,111 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
       }
     });
 
-    // Enrich a subset of properties by visiting their detail pages (without changing count)
+    // Enrich a subset of properties by visiting their detail pages in parallel
     const MAX_ENRICH = 15;
+    const CONCURRENCY = 3; // Number of simultaneous pages for enrichment
     const targetsToEnrich = detailTargets.slice(0, MAX_ENRICH);
-    for (const target of targetsToEnrich) {
-      const { index, url: detailUrl } = target;
-      try {
-        console.log(`Enriching property [${index}] from detail page: ${detailUrl}`);
-        await page.goto(detailUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    
+    console.log(`Enriching ${targetsToEnrich.length} properties in parallel (concurrency: ${CONCURRENCY})...`);
+    
+    // Process in chunks to avoid overwhelming the browser/system
+    for (let i = 0; i < targetsToEnrich.length; i += CONCURRENCY) {
+      const chunk = targetsToEnrich.slice(i, i + CONCURRENCY);
+      await Promise.all(chunk.map(async (target) => {
+        const { index, url: detailUrl } = target;
+        let detailPage;
+        try {
+          console.log(`Enriching property [${index}] from detail page: ${detailUrl}`);
+          detailPage = await browser.newPage();
+          
+          // Use same lightweight configurations for enrichment pages
+          await detailPage.setViewport({ width: 1440, height: 900 });
+          await detailPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36');
+          
+          try {
+            await detailPage.setRequestInterception(true);
+            detailPage.on('request', (req) => {
+              const resourceType = req.resourceType();
+              if (['image', 'media', 'font', 'stylesheet'].includes(resourceType)) {
+                req.abort();
+              } else {
+                req.continue();
+              }
+            });
+          } catch {}
 
-        // Give the page a moment to render dynamic sections
-        await new Promise(resolve => setTimeout(resolve, 2000));
+          await detailPage.goto(detailUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-        const detailContent = await page.content();
-        const $$ = cheerio.load(detailContent);
+          // Give the page a moment to render dynamic sections
+          await new Promise(resolve => setTimeout(resolve, 1500));
 
-        const pageText = $$('body').text();
+          const detailContent = await detailPage.content();
+          const $$ = cheerio.load(detailContent);
 
-        // Extract better title, price, location
-        const dTitle = ($$('h1').first().text().trim() || $$('[class*="title"]').first().text().trim());
-        const dPrice = ($$('[class*="price"]').first().text().trim() || pageText.match(/£[\d,]+\s*(?:pcm|pw|per month|per week)?/i)?.[0] || '').trim();
-        const dLocation = ($$('[class*="address"]').first().text().trim() || $$('[class*="location"]').first().text().trim());
+          const pageText = $$('body').text();
 
-        // Bedrooms and property type
-        let dBedrooms: string | undefined;
-        const dBedroomMatch = pageText.match(/(\d+)\s*(?:bed|bedroom)/i);
-        if (dBedroomMatch) {
-          const c = parseInt(dBedroomMatch[1]);
-          dBedrooms = c === 1 ? '1 bedroom' : `${c} bedrooms`;
-        } else if (pageText.toLowerCase().includes('studio')) {
-          dBedrooms = 'Studio';
-        }
+          // Extract better title, price, location
+          const dTitle = ($$('h1').first().text().trim() || $$('[class*="title"]').first().text().trim());
+          const dPrice = ($$('[class*="price"]').first().text().trim() || pageText.match(/£[\d,]+\s*(?:pcm|pw|per month|per week)?/i)?.[0] || '').trim();
+          const dLocation = ($$('[class*="address"]').first().text().trim() || $$('[class*="location"]').first().text().trim());
 
-        let dPropertyType: string | undefined;
-        const typeCandidates = ['house','flat','apartment','bungalow','cottage','villa','townhouse','studio','maisonette','detached','semi-detached','terraced'];
-        const textLower = pageText.toLowerCase();
-        for (const t of typeCandidates) {
-          if (textLower.includes(t)) {
-            dPropertyType = t.charAt(0).toUpperCase() + t.slice(1);
-            break;
+          // Bedrooms and property type
+          let dBedrooms: string | undefined;
+          const dBedroomMatch = pageText.match(/(\d+)\s*(?:bed|bedroom)/i);
+          if (dBedroomMatch) {
+            const c = parseInt(dBedroomMatch[1]);
+            dBedrooms = c === 1 ? '1 bedroom' : `${c} bedrooms`;
+          } else if (pageText.toLowerCase().includes('studio')) {
+            dBedrooms = 'Studio';
+          }
+
+          let dPropertyType: string | undefined;
+          const typeCandidates = ['house','flat','apartment','bungalow','cottage','villa','townhouse','studio','maisonette','detached','semi-detached','terraced'];
+          const textLower = pageText.toLowerCase();
+          for (const t of typeCandidates) {
+            if (textLower.includes(t)) {
+              dPropertyType = t.charAt(0).toUpperCase() + t.slice(1);
+              break;
+            }
+          }
+
+          // Collect gallery images
+          const detailImages: string[] = [];
+          $$('.gallery img, [class*="image"] img, img[data-src], img[src]').each((_i2, imgEl) => {
+            const src = $$(imgEl).attr('src') || $$(imgEl).attr('data-src') || $$(imgEl).attr('data-lazy-src') || '';
+            if (src && !detailImages.includes(src)) {
+              detailImages.push(src);
+            }
+          });
+          const normalizedDetailImages = detailImages
+            .map(u => u.startsWith('//') ? 'https:' + u : (u.startsWith('/') ? 'https://www.rightmove.co.uk' + u : u))
+            .filter(u => u && !u.toLowerCase().includes('logo') && !u.toLowerCase().includes('icon'));
+
+          // Merge into existing property
+          const current = properties[index];
+          if (current) {
+            properties[index] = {
+              ...current,
+              title: current.title && current.title.length > 10 ? current.title : (dTitle || current.title),
+              price: current.price && current.price.includes('£') ? current.price : (dPrice || current.price),
+              location: current.location && current.location !== 'Location not specified' ? current.location : (dLocation || current.location),
+              bedrooms: current.bedrooms !== 'Not specified' ? current.bedrooms : (dBedrooms || current.bedrooms),
+              propertyType: current.propertyType && current.propertyType !== 'Property' ? current.propertyType : (dPropertyType || current.propertyType),
+              imageUrls: Array.from(new Set([...(current.imageUrls || []), ...normalizedDetailImages])).slice(0, 10),
+              agent: {
+                ...current.agent,
+                website: current.agent.website || detailUrl,
+              }
+            };
+          }
+        } catch (enrichErr) {
+          console.warn(`Failed to enrich property at ${detailUrl}:`, enrichErr);
+        } finally {
+          if (detailPage) {
+            await detailPage.close().catch(() => {});
           }
         }
-
-        // Collect gallery images
-        const detailImages: string[] = [];
-        $$('.gallery img, [class*="image"] img, img[data-src], img[src]').each((_i2, imgEl) => {
-          const src = $$(imgEl).attr('src') || $$(imgEl).attr('data-src') || $$(imgEl).attr('data-lazy-src') || '';
-          if (src && !detailImages.includes(src)) {
-            detailImages.push(src);
-          }
-        });
-        const normalizedDetailImages = detailImages
-          .map(u => u.startsWith('//') ? 'https:' + u : (u.startsWith('/') ? 'https://www.rightmove.co.uk' + u : u))
-          .filter(u => u && !u.toLowerCase().includes('logo') && !u.toLowerCase().includes('icon'));
-
-        // Merge into existing property
-        const current = properties[index];
-        if (!current) continue;
-
-        properties[index] = {
-          ...current,
-          title: current.title && current.title.length > 10 ? current.title : (dTitle || current.title),
-          price: current.price && current.price.includes('£') ? current.price : (dPrice || current.price),
-          location: current.location && current.location !== 'Location not specified' ? current.location : (dLocation || current.location),
-          bedrooms: current.bedrooms !== 'Not specified' ? current.bedrooms : (dBedrooms || current.bedrooms),
-          propertyType: current.propertyType && current.propertyType !== 'Property' ? current.propertyType : (dPropertyType || current.propertyType),
-          imageUrls: Array.from(new Set([...(current.imageUrls || []), ...normalizedDetailImages])).slice(0, 10),
-          agent: {
-            ...current.agent,
-            website: current.agent.website || detailUrl,
-          }
-        };
-
-      } catch (enrichErr) {
-        console.warn(`Failed to enrich property at ${detailUrl}:`, enrichErr);
-      }
+      }));
     }
 
     // Final de-duplication: prefer unique agent.website when available, else by title|price|location signature

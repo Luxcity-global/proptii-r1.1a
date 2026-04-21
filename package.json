@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "clean": "rm -rf node_modules/.vite dist",
-    "start:dev": "npm run clean && concurrently \"npm run dev\" \"cd proptii-backend && npm run start:dev\"",
+    "start:dev": "npm run clean && concurrently -n \"frontend,backend,search\" -c \"cyan,magenta,yellow\" \"npm run dev\" \"cd proptii-backend && npm run start:dev\" \"cd proptii-search && npm run dev\"",
     "start:backend": "cd proptii-backend && npm run start:dev",
     "start:frontend": "npm run dev",
     "validate-build": "node scripts/validate-build.cjs",

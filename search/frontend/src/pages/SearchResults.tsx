@@ -36,46 +36,150 @@ const resolveBackendUrl = (): string => {
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
 const cleanPropertyPrice = (price: string): string => {
-  if (!price || typeof price !== 'string') {
-    return price || '';
+  if (!price || typeof price !== 'string') return price || '';
+  const match = price.match(/£?([\d,]+)(?:\s*(?:pcm|pw|per month))?/i);
+  if (match) {
+    const num = parseInt(match[1].replace(/,/g, ''));
+    return `£${num.toLocaleString('en-GB')}${price.toLowerCase().includes('pcm') ? ' pcm' : ''}`;
   }
-  
-  // Remove "Tenancy info" text
-  let cleanedPrice = price.replace(/Tenancy info£?/gi, '');
-  
-  // Remove pw pricing - match patterns like "(£375 pw)" or " (£375 pw)"
-  cleanedPrice = cleanedPrice.replace(/\s*\(£[\d,]+\s*pw\)/gi, '');
-  
-  // Extract only the pcm pricing
-  const pcmMatch = cleanedPrice.match(/£[\d,]+ pcm/i);
-  if (pcmMatch) {
-    return pcmMatch[0];
-  }
-  
-  // If no pcm found, try to add pound sign if missing
-  if (cleanedPrice.trim()) {
-    const trimmedPrice = cleanedPrice.trim();
-    // If it doesn't start with £, add it
-    if (!trimmedPrice.startsWith('£')) {
-      // Check if it's a number or contains numbers
-      if (/\d/.test(trimmedPrice)) {
-        return `£${trimmedPrice}`;
-      }
-    }
-    return trimmedPrice;
-  }
-  
-  return cleanedPrice.trim();
+  return price.trim();
 };
+
+// --- NEW COMPONENT: BookViewingModal ---
+function BookViewingModal({ property, isOpen, onClose }: { property: Property | null; isOpen: boolean; onClose: () => void }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    date: '',
+    message: ''
+  });
+  const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+
+  if (!isOpen || !property) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus('sending');
+
+    try {
+      const response = await fetch(`${resolveBackendUrl()}/api/v1/search/book-viewing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentEmail: property.agent.email,
+          userName: formData.name,
+          userEmail: formData.email,
+          propertyName: property.title,
+          propertyUrl: property.url,
+          preferredDate: formData.date,
+          message: formData.message
+        }),
+      });
+
+      if (response.ok) {
+        setStatus('success');
+        setTimeout(() => {
+          onClose();
+          setStatus('idle');
+          setFormData({ name: '', email: '', date: '', message: '' });
+        }, 2000);
+      } else {
+        setStatus('error');
+      }
+    } catch (err) {
+      setStatus('error');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="proptii-gradient p-8 text-white">
+          <h2 className="text-2xl font-bold mb-1">Book a Viewing</h2>
+          <p className="text-white/80 text-sm">Direct request to {property.agent.name}</p>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="p-8 space-y-5">
+          {status === 'success' ? (
+            <div className="py-10 text-center space-y-4">
+              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto text-2xl">✓</div>
+              <h3 className="text-xl font-bold text-gray-900">Request Sent!</h3>
+              <p className="text-gray-600">The agent will contact you shortly.</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Your Name</label>
+                  <input 
+                    required 
+                    className="proptii-input py-2.5" 
+                    placeholder="John Doe"
+                    value={formData.name}
+                    onChange={e => setFormData({...formData, name: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Your Email</label>
+                  <input 
+                    required 
+                    type="email" 
+                    className="proptii-input py-2.5" 
+                    placeholder="john@example.com"
+                    value={formData.email}
+                    onChange={e => setFormData({...formData, email: e.target.value})}
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Preferred Date</label>
+                <input 
+                  required 
+                  type="date" 
+                  className="proptii-input py-2.5"
+                  value={formData.date}
+                  onChange={e => setFormData({...formData, date: e.target.value})}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Message (Optional)</label>
+                <textarea 
+                  className="proptii-input py-2.5 min-h-[80px]" 
+                  placeholder="Tell the agent more about your requirements..."
+                  value={formData.message}
+                  onChange={e => setFormData({...formData, message: e.target.value})}
+                />
+              </div>
+
+              {status === 'error' && <p className="text-red-500 text-sm">Failed to send request. Please try again.</p>}
+
+              <button 
+                type="submit" 
+                disabled={status === 'sending'}
+                className="book-viewing-btn w-full"
+              >
+                {status === 'sending' ? <div className="proptii-spinner-small" /> : 'Confirm Booking Request'}
+              </button>
+            </>
+          )}
+        </form>
+      </div>
+    </div>
+  );
+}
 
 // Property Details Modal Component
 interface PropertyDetailsModalProps {
   property: Property | null;
   isOpen: boolean;
   onClose: () => void;
+  onBook: (property: Property) => void;
 }
 
-function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDetailsModalProps) {
+function PropertyDetailsModal({ property, isOpen, onClose, onBook }: PropertyDetailsModalProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -248,14 +352,21 @@ function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDetailsModa
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Listed By</h3>
                 <div className="mb-6">
                   <div className="text-lg font-bold text-gray-900">{property.agent.name}</div>
+                  <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="text-[10px] font-bold text-green-600 uppercase mb-1">Direct Contact Email</div>
+                    <div className="text-sm font-black text-gray-900 break-all">{property.agent.email}</div>
+                  </div>
                   {property.agent.website && (
                     <a 
                       href={property.agent.website}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-gray-600 hover:text-gray-800"
+                      className="text-sm text-gray-600 hover:text-gray-800 underline flex items-center gap-1"
                     >
-                      View Agency Website
+                      Visit Official Website
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
                     </a>
                   )}
                 </div>
@@ -265,11 +376,12 @@ function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDetailsModa
                   <button 
                     className="w-full px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
                     style={{ backgroundColor: '#E65D24', color: 'white' }}
+                    onClick={() => onBook(property)}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
-                    Chat
+                    Book Viewing
                   </button>
                   
                   <button className="w-full bg-white border-2 border-gray-300 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
@@ -450,175 +562,107 @@ function SmartSearchBar({ query, onQueryChange, onSearch, loading }: SmartSearch
 }
 
 // Property Card Component
-interface PropertyCardProps {
-  property: Property;
-  onViewDetails: (property: Property) => void;
-}
-
-function PropertyCard({ property, onViewDetails }: PropertyCardProps) {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isFavorite, setIsFavorite] = useState(false);
-
-  const images = property.imageUrls || [];
-  const hasImages = images.length > 0;
-
+function PropertyCard({ property, onBook, onView }: { property: Property; onBook: (p: Property) => void; onView: (p: Property) => void }) {
+  // Explicit log for each property as it renders
+  console.log(`[FRONTEND LOG] Property: "${property.title}" | Email: ${property.agent.email || 'NULL'}`);
   return (
     <div 
-      className="bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer max-w-6xl"
-      style={{ boxShadow: '0 2px 12px rgba(44,62,80,0.10)' }}
-      onClick={() => onViewDetails(property)}
+      onClick={() => onView(property)}
+      className="bg-white rounded-3xl border border-gray-100 overflow-hidden hover:shadow-2xl transition-all duration-300 group flex flex-col md:flex-row shadow-sm cursor-pointer"
     >
-      <div className="md:flex">
-        {/* Image Gallery Section */}
-        <div className="md:w-96 h-60 relative overflow-hidden">
-          {hasImages ? (
-            <>
-              <img
-                src={images[currentImageIndex]}
-                alt={property.title}
-                className="w-full h-full object-cover"
-                style={{ borderRadius: '16px 0 0 16px' }}
-              />
-              
-              {/* Favorite Icon */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsFavorite(!isFavorite);
-                }}
-                className="absolute top-4 right-4 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-colors"
-              >
-                <svg 
-                  className={`w-5 h-5 ${isFavorite ? 'text-red-500 fill-current' : 'text-gray-600'}`} 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-              </button>
-
-              {/* Badges */}
-              <div className="absolute top-4 left-4 space-y-2">
-                <div className="bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-lg">
-                  {cleanPropertyPrice(property.price).includes('pcm') ? 'To Rent' : 'For Sale'}
-                </div>
-                <div className="bg-blue-500 text-white text-xs font-semibold px-3 py-1 rounded-full shadow-lg">
-                  Available Now
-                </div>
-              </div>
-
-              {/* View Label */}
-              <div className="absolute bottom-4 left-4 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                Street View
-              </div>
-
-              {/* Thumbnails */}
-              {images.length > 1 && (
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 space-y-3">
-                  {images.slice(0, 4).map((img, index) => (
-                    <button
-                      key={index}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCurrentImageIndex(index);
-                      }}
-                      className={`w-16 h-12 rounded overflow-hidden border-2 transition-colors ${
-                        index === currentImageIndex ? 'border-white' : 'border-transparent'
-                      }`}
-                    >
-                      <img src={img} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-4xl">
-              🏠
-            </div>
-          )}
+      {/* Property Image Overlay */}
+      <div className="relative md:w-80 h-72 overflow-hidden shrink-0">
+        <img
+          src={property.imageUrls[0] || 'https://via.placeholder.com/400x300?text=Property'}
+          alt={property.title}
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        
+        {/* Price Badge */}
+        <div className="absolute top-4 right-4 bg-white/95 backdrop-blur px-4 py-2 rounded-2xl shadow-lg font-black text-xl text-gray-900">
+          {property.price}
         </div>
 
-        {/* Property Details Section */}
-        <div className="flex-1 p-6">
-          {/* Title and Price */}
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2">
-                {property.title}
-              </h3>
-              <div className="text-2xl font-semibold mb-2" style={{ color: '#E65D24' }}>
-                {cleanPropertyPrice(property.price)}
+        {/* Direct Contact Badge */}
+        {property.agent.email && (
+          <div className="absolute bottom-4 left-4 bg-green-500/90 backdrop-blur text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 border border-white/20">
+            <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+            DIRECT CONTACT
+          </div>
+        )}
+      </div>
+
+      {/* Content Area */}
+      <div className="flex-1 p-8 flex flex-col">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="px-3 py-1 bg-orange-50 text-orange-600 text-[10px] font-bold uppercase tracking-widest rounded-full">
+              {property.propertyType}
+            </span>
+            <div className="flex items-center gap-1.5 text-gray-400 text-xs font-medium">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              </svg>
+              {property.location}
+            </div>
+          </div>
+          
+          <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-orange-600 transition-colors line-clamp-1">
+            {property.title}
+          </h3>
+
+          <div className="flex gap-6 mb-8 text-sm font-semibold text-gray-600">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400">🛏️</div>
+              {property.bedrooms} Beds
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400">📏</div>
+              Verified Listing
+            </div>
+          </div>
+        </div>
+
+        {/* Agent & Actions Section */}
+        <div className="border-t border-gray-100 pt-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="agent-avatar-placeholder">
+              {property.agent.name.charAt(0)}
+            </div>
+            <div>
+              <p className="text-sm font-black text-gray-900 line-clamp-1">{property.agent.name}</p>
+              <div className="flex flex-col">
+                <p className="text-[11px] font-bold text-green-600 uppercase tracking-tight">
+                  Direct Email Found:
+                </p>
+                <p className="text-xs font-black text-gray-900 bg-green-50 px-2 py-0.5 rounded border border-green-100 break-all">
+                  {property.agent.email}
+                </p>
               </div>
             </div>
           </div>
-
-          {/* Address */}
-          <div className="flex items-center gap-2 text-gray-600 mb-4">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span>{property.location}</span>
-          </div>
-
-          {/* Specifications */}
-          <div className="flex items-center gap-6 mb-4 text-gray-600">
-            <div className="flex items-center gap-2">
+          
+          <div className="flex gap-3">
+            <a 
+              href={`tel:${property.agent.phone}`}
+              className="p-3 bg-gray-50 text-gray-600 rounded-xl hover:bg-orange-50 hover:text-orange-600 transition-all border border-gray-100"
+              title="Call Agent"
+              onClick={(e) => e.stopPropagation()}
+            >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v0a2 2 0 002-2h14a2 2 0 002 2v0a2 2 0 00-2 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
               </svg>
-              <span>{property.bedrooms} bed</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
-              </svg>
-              <span>{property.propertyType}</span>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="border-t border-gray-200 pt-4 mb-4"></div>
-
-          {/* Agent Info and Actions */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Listed by</p>
-              <p className="font-semibold text-gray-900">{property.agent.name}</p>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <button 
-                className="px-4 py-2 rounded-lg font-semibold transition-colors"
-                style={{ backgroundColor: '#E65D24', color: 'white' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Handle chat action
-                }}
-              >
-                Chat
-              </button>
-              <button 
-                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Handle call action
-                }}
-              >
-                Call
-              </button>
-              {property.agent.email && property.agent.email !== 'Not found' && (
-                <a
-                  href={`mailto:${property.agent.email}`}
-                  className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Message
-                </a>
-              )}
-            </div>
+            </a>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                onBook(property);
+              }}
+              className="px-8 py-3 bg-gray-900 text-white font-bold rounded-2xl hover:bg-orange-600 transition-all duration-300 shadow-lg shadow-gray-200 btn-pulse"
+            >
+              Book Viewing
+            </button>
           </div>
         </div>
       </div>
@@ -831,7 +875,7 @@ function SearchResults() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const query = searchParams.get('q') || '';
-  const searchType = searchParams.get('type') || 'onthemarket';
+  const searchType = searchParams.get('type') || 'internet';
   
   const [results, setResults] = useState<Property[]>([]);
   const [loading, setLoading] = useState(false);
@@ -839,107 +883,169 @@ function SearchResults() {
   const [newQuery, setNewQuery] = useState(query);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
+  // Progressive streaming state
+  const [providers, setProviders] = useState<string[]>([]);
+  const [completedProviders, setCompletedProviders] = useState<Set<string>>(new Set());
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+
+  const addDebugLog = (msg: string) => {
+    console.log(msg);
+    setDebugLogs(prev => [msg, ...prev].slice(0, 10));
+  };
 
   const resultsPerPage = 10;
   const totalPages = Math.ceil(results.length / resultsPerPage);
   const currentResults = results.slice((currentPage - 1) * resultsPerPage, currentPage * resultsPerPage);
+  const pendingProviders = providers.filter(p => !completedProviders.has(p));
 
   useEffect(() => {
+    const controller = new AbortController();
     if (query) {
-      handleSearch(query);
+      handleSearch(query, controller.signal);
     }
+    return () => controller.abort();
   }, [query]);
 
-  const handleSearch = async (searchQuery: string = newQuery) => {
+  const handleSearch = async (searchQuery: string = newQuery, signal?: AbortSignal) => {
     if (!searchQuery.trim()) return;
-    
+
     setLoading(true);
     setError(null);
-    
+    setResults([]);
+    setProviders([]);
+    setCompletedProviders(new Set());
+    setCurrentPage(1);
+
     try {
-      const isRental = searchQuery.toLowerCase().includes('rent') || searchQuery.toLowerCase().includes('pcm');
-      const locationMatch = searchQuery.match(/in\s+([a-zA-Z\s,]+)/i);
-      let location = locationMatch ? locationMatch[1].trim().toLowerCase() : '';
-      location = location
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-]/g, '')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .replace(/-for|-under/g, '');
-      
-      const priceMatch = searchQuery.match(/(\d+)(?:k|pcm|\s*pound)/i);
-      const priceValue = priceMatch ? priceMatch[1] : '';
-      const bedroomMatch = searchQuery.match(/(\d+)\s*bed/i);
-      const bedrooms = bedroomMatch ? bedroomMatch[1] : '';
-      
-      const params = new URLSearchParams();
-      if (bedrooms) {
-        params.append('min-bedrooms', bedrooms);
-        params.append('max-bedrooms', bedrooms);
-      }
-      if (priceValue) {
-        if (isRental) {
-          params.append('min-price', priceValue);
-        } else {
-          const price = searchQuery.toLowerCase().includes('k') 
-            ? String(parseInt(priceValue) * 1000)
-            : priceValue;
-          params.append('max-price', price);
-        }
-      }
-      params.append('view', 'grid');
-      
-
-      
       const backendBaseUrl = resolveBackendUrl().replace(/\/$/, '');
-      const backendUrl = backendBaseUrl;
-      
-      let endpoint = `${backendUrl}/scrape-api`;
-      
-      // Debug logging
-      console.log('Environment variable VITE_SEARCH_BACKEND_URL:', import.meta.env.VITE_SEARCH_BACKEND_URL);
-      console.log('Backend Base URL:', backendBaseUrl);
-      console.log('Backend URL:', backendUrl);
-      console.log('Final endpoint:', endpoint);
-      let requestBody: any;
-
-      if (searchType === 'internet') {
-        endpoint = `${backendUrl}/scrape-api`;
-        requestBody = { 
-          query: searchQuery
-        };
-      } else {
-        // Default to API-based search
-        requestBody = { 
-          query: searchQuery
-        };
-      }
+      const endpoint = `${backendBaseUrl}/api/v1/search`;
 
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({ query: searchQuery, filters: {} }),
+        signal: signal,
       });
-      
+
       if (!response.ok) {
         throw new Error(`Server responded with status ${response.status}`);
       }
-      
-      const data = await response.json();
-      // Clean the pricing for all properties
-      const cleanedData = Array.isArray(data) ? data.map(property => ({
-        ...property,
-        price: cleanPropertyPrice(property.price)
-      })) : [];
-      setResults(cleanedData);
-      setCurrentPage(1);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
-      setResults([]);
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('ReadableStream not supported');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let allResults: Property[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+        }
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+          
+          try {
+            const event = JSON.parse(trimmed.slice(6));
+            addDebugLog(`[SSE] Received: ${event.type} from ${event.provider || 'system'}`);
+
+            if (event.type === 'providers') {
+              setProviders(event.providers as string[]);
+
+            } else if (event.type === 'initial') {
+              const incoming = (event.data as any[]).map(p => ({
+                ...p,
+                price: cleanPropertyPrice(p.price),
+              }));
+              addDebugLog(`[SSE] Initial valid results: ${incoming.length}`);
+              
+              // Log agent emails for each property
+              incoming.forEach(p => {
+                if (p.agent?.email) {
+                  addDebugLog(`Property Email: ${p.agent.email}`);
+                }
+              });
+
+              setResults(incoming);
+
+            } else if (event.type === 'results') {
+              const incoming = (event.data as any[]).map(p => ({
+                ...p,
+                price: cleanPropertyPrice(p.price),
+              }));
+              
+              setResults(prev => {
+                const seen = new Set(prev.map(r => r.url));
+                const fresh = incoming.filter(p => !seen.has(p.url));
+                
+                if (fresh.length > 0) {
+                  addDebugLog(`[SSE] Added ${fresh.length} new results from ${event.provider}`);
+                  // Log emails for fresh results
+                  fresh.forEach(p => {
+                    if (p.agent?.email) {
+                      addDebugLog(`Property Email: ${p.agent.email}`);
+                    }
+                  });
+                }
+                return [...prev, ...fresh];
+              });
+
+            } else if (event.type === 'provider_done') {
+              setCompletedProviders(prev => new Set([...prev, event.provider as string]));
+
+            } else if (event.type === 'done') {
+              setLoading(false);
+              addDebugLog('[SSE] Search finished');
+
+            } else if (event.type === 'error') {
+              setError(event.message || 'Search failed');
+              setLoading(false);
+            }
+          } catch (parseErr) {
+            console.error('Error parsing SSE event:', parseErr, 'Line was:', trimmed);
+          }
+        }
+        
+        if (done) {
+          // Process any remaining partial line in buffer if it's a complete valid JSON chunk
+          if (buffer.trim().startsWith('data: ')) {
+            try {
+              const event = JSON.parse(buffer.trim().slice(6));
+              if (event.type === 'done') {
+                setLoading(false);
+                addDebugLog('[SSE] Search finished from trailing buffer');
+              }
+            } catch (e) {
+              // Ignore trailing garbage
+            }
+          }
+          addDebugLog(`[SSE] Stream closed by browser (done=true).`);
+          break;
+        }
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        addDebugLog('[SSE] Search aborted (component unmounted).');
+        return;
+      }
+      const msg = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setError(msg);
+      addDebugLog(`[ERROR] Fetch threw: ${msg}`);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
+      addDebugLog(`[SSE] Exited handleSearch flow.`);
     }
   };
 
@@ -1008,6 +1114,12 @@ function SearchResults() {
                 Found {results.length} properties • Page {currentPage} of {totalPages}
               </p>
             )}
+            {loading && results.length > 0 && (
+              <p className="text-sm text-orange-500 mt-1 flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+                {results.length} found so far • {pendingProviders.length} source{pendingProviders.length !== 1 ? 's' : ''} still loading…
+              </p>
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -1037,16 +1149,59 @@ function SearchResults() {
           </div>
         )}
 
-        {/* Loading State */}
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-12 h-12 border-4 border-orange-100 border-t-orange-600 rounded-full animate-spin mb-4"></div>
-            <p style={{ color: '#E65D24' }} className="font-medium">Searching for properties...</p>
+        {/* Loading State — only shown when no results yet */}
+        {loading && results.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+            <div className="w-12 h-12 border-4 border-orange-100 border-t-orange-600 rounded-full animate-spin mb-6"></div>
+            <h2 style={{ color: '#E65D24' }} className="text-xl font-bold mb-2">Searching across multiple portals...</h2>
+            <p className="text-gray-600 mb-8 max-w-md">
+              Results will appear as each source completes — no waiting required.
+            </p>
+            {providers.length > 0 && (
+              <div className="flex flex-wrap gap-3 justify-center">
+                {providers.map(p => (
+                  <div key={p} className="flex items-center gap-2 bg-white border border-orange-100 rounded-full px-4 py-2 text-sm shadow-sm">
+                    <div className="w-3 h-3 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-gray-600">{p}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Property Results */}
-        {!loading && results.length > 0 && (
+        {/* Live Provider Status Banner — shown while loading with some results */}
+        {loading && results.length > 0 && providers.length > 0 && (
+          <div className="mb-6 bg-orange-50 border border-orange-100 rounded-xl px-5 py-3 flex flex-wrap items-center gap-3">
+            <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin shrink-0" />
+            <span className="text-sm font-semibold text-orange-800 mr-1">Still searching:</span>
+            {providers.map(p => {
+              const done = completedProviders.has(p);
+              return (
+                <span
+                  key={p}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                    done
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-white border border-orange-200 text-orange-700'
+                  }`}
+                >
+                  {done ? (
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <div className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+                  )}
+                  {p}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Property Results — shown as soon as ANY results arrive */}
+        {results.length > 0 && (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 mb-8">
               {/* Left Column - Property Listings */}
@@ -1060,17 +1215,14 @@ function SearchResults() {
                         <p><span className="font-medium">Query:</span> {query}</p>
                         <p><span className="font-medium">Platform:</span> {searchType === 'internet' ? 'Internet Search' : 'On the Market'}</p>
                         <p>
-                          <span className="font-medium">Results:</span> {results.length} properties found
-                          {results.length > 0 && (
-                            <a href="#" className="text-orange-600 hover:underline ml-2">cached</a>
-                          )}
+                          <span className="font-medium">Results in state:</span> {results.length}
+                          {loading && <span className="text-orange-500 ml-2 animate-pulse">• scraping...</span>}
                         </p>
                       </div>
                     </div>
-                    <button 
+                    <button
                       className="px-4 py-2 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-colors text-sm"
                       onClick={() => {
-                        // Scroll to map or toggle map visibility
                         const mapElement = document.getElementById('map-container');
                         mapElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                       }}
@@ -1082,17 +1234,46 @@ function SearchResults() {
 
                 {/* Property Listings */}
                 <div className="space-y-4">
-              {currentResults.map((property, index) => (
-                <PropertyCard
-                  key={index}
-                  property={property}
-                      onViewDetails={(prop) => {
-                        handleViewDetails(prop);
-                        // Update map location when property is selected
+                  {currentResults.map((property, index) => (
+                    <PropertyCard
+                      key={index}
+                      property={property}
+                      onBook={(prop) => {
                         setSelectedProperty(prop);
+                        setIsBookingOpen(true);
                       }}
-                />
-              ))}
+                      onView={handleViewDetails}
+                    />
+                  ))}
+
+                  {/* Skeleton cards for pending providers */}
+                  {loading && pendingProviders.map(provider => (
+                    <div key={provider} className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse" style={{ boxShadow: '0 2px 12px rgba(44,62,80,0.06)' }}>
+                      <div className="md:flex">
+                        <div className="md:w-96 h-60 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]" />
+                        <div className="flex-1 p-6 space-y-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-2 h-2 rounded-full bg-orange-300 animate-pulse" />
+                            <div className="text-xs text-orange-500 font-medium">Searching {provider}…</div>
+                          </div>
+                          <div className="h-5 bg-gray-200 rounded w-3/4" />
+                          <div className="h-7 bg-orange-100 rounded w-1/3" />
+                          <div className="h-4 bg-gray-100 rounded w-1/2" />
+                          <div className="flex gap-4 mt-2">
+                            <div className="h-4 bg-gray-100 rounded w-16" />
+                            <div className="h-4 bg-gray-100 rounded w-20" />
+                          </div>
+                          <div className="border-t border-gray-100 pt-4 flex justify-between items-center">
+                            <div className="h-4 bg-gray-100 rounded w-24" />
+                            <div className="flex gap-2">
+                              <div className="h-8 w-16 bg-orange-100 rounded-lg" />
+                              <div className="h-8 w-16 bg-gray-100 rounded-lg" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
             </div>
 
             {/* Pagination */}
@@ -1115,7 +1296,7 @@ function SearchResults() {
                         ? 'text-white'
                         : 'border border-gray-300 hover:bg-gray-50'
                     }`}
-                    style={{ 
+                    style={{
                       backgroundColor: page === currentPage ? '#E65D24' : 'transparent'
                     }}
                   >
@@ -1136,23 +1317,22 @@ function SearchResults() {
 
               {/* Right Sidebar - Map Only */}
               <div className="sticky top-24">
-                <div id="map-container" className="h-[calc(100vh-150px)] min-h-[600px] rounded-lg overflow-hidden border border-gray-200">
-                  <MapComponent 
-                    center={{ lat: 51.5074, lng: -0.1278 }} // Default center for map
-                    properties={results}
-                    selectedProperty={selectedProperty}
-                    onLocationSelect={() => {
-                      // Handle location selection from map
-                    }}
-                  />
-                </div>
+              <div id="map-container" className="h-[calc(100vh-150px)] min-h-[600px] rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                <MapComponent 
+                  properties={currentResults} 
+                  selectedProperty={selectedProperty}
+                  onLocationSelect={(location) => {
+                    // Optional: handle map pin click if needed
+                  }}
+                />
+              </div>
               </div>
             </div>
           </>
         )}
 
-        {/* No Results State */}
-        {!loading && results.length === 0 && !error && query && (
+        {/* No Results State — only after all scrapers have finished */}
+        {!loading && results.length === 0 && !error && query && providers.length > 0 && pendingProviders.length === 0 && (
           <div className="text-center py-20">
             <div className="bg-white rounded-2xl shadow-lg p-10 max-w-md mx-auto">
               <div className="text-6xl mb-4">🔍</div>
@@ -1183,7 +1363,7 @@ function SearchResults() {
         </svg>
       </button>
 
-      {/* Property Details Modal */}
+      {/* Property Details Modal fallback */}
       <PropertyDetailsModal
         property={selectedProperty}
         isOpen={isModalOpen}
@@ -1191,7 +1371,24 @@ function SearchResults() {
           setIsModalOpen(false);
           setSelectedProperty(null);
         }}
+        onBook={(p) => {
+          setIsModalOpen(false);
+          setSelectedProperty(p);
+          setIsBookingOpen(true);
+        }}
       />
+
+      {/* NEW: Book Viewing Modal */}
+      <BookViewingModal
+        property={selectedProperty}
+        isOpen={isBookingOpen}
+        onClose={() => {
+          setIsBookingOpen(false);
+          setSelectedProperty(null);
+        }}
+      />
+
+
     </div>
   );
 }
