@@ -117,185 +117,153 @@ export const useSearchBackend = () => {
     setError(null);
     setQuery(searchQuery);
     setSearchType(type);
+    setResults([]); // Clear previous results for fresh search
+
+    const deduplicationKey = (p: Property) =>
+      `${p.title?.toLowerCase().trim()}|${p.location?.toLowerCase().trim()}`;
 
     try {
-      // Handle Proptii search: query Firestore directly (real data, no mock)
+      // 1. Parallel Firestore (Proptii) search
+      const firestorePromise = (async (): Promise<Property[]> => {
+        try {
+          const { searchProptiiProperties } = await import('../services/proptiiPropertyService');
+          const proptiiResults = await searchProptiiProperties(searchQuery);
+          return proptiiResults.map(property => ({
+            ...property,
+            price: cleanPropertyPrice(property.price)
+          }));
+        } catch (e) {
+          console.warn('[Search] Firestore search failed:', e);
+          return [];
+        }
+      })();
+
+      // Update results immediately when Firestore returns
+      firestorePromise.then(proptiiResults => {
+        if (proptiiResults.length > 0) {
+          setResults(prev => {
+            const seen = new Set(prev.map(deduplicationKey));
+            const unique = proptiiResults.filter(p => !seen.has(deduplicationKey(p)));
+            return [...prev, ...unique];
+          });
+        }
+      });
+
+      // If user ONLY wants Proptii results, we stop here (wait for firestorePromise)
       if (type === 'proptii') {
-        const { searchProptiiProperties } = await import('../services/proptiiPropertyService');
-        const proptiiResults = await searchProptiiProperties(searchQuery);
-
-        const cleanedResults = proptiiResults.map(property => ({
-          ...property,
-          price: cleanPropertyPrice(property.price)
-        }));
-
-        setResults(cleanedResults);
+        const results = await firestorePromise;
+        if (results.length === 0) {
+          throw new Error('No properties found on Proptii. Please try a different search.');
+        }
+        
         sessionStorage.setItem('searchResults', JSON.stringify({
-          results: cleanedResults,
+          results,
           query: searchQuery,
           searchType: 'proptii',
           timestamp: Date.now()
         }));
-        return cleanedResults;
+        setIsLoading(false);
+        return results;
       }
 
-      if (type === 'onthemarket') {
-        // --- Build On The Market scraper URL ---
-        const isRental = searchQuery.toLowerCase().includes('rent') || searchQuery.toLowerCase().includes('pcm');
-        const baseUrl = isRental ? 'to-rent' : 'for-sale';
-
-        const locationMatch = searchQuery.match(/in\s+([a-zA-Z\s,]+)/i);
-        let location = locationMatch ? locationMatch[1].trim().toLowerCase() : '';
-        location = location
-          .replace(/\s+/g, '-')
-          .replace(/[^a-z0-9-]/g, '')
-          .replace(/-+/g, '-')
-          .replace(/^-|-$/g, '')
-          .replace(/-for|-under/g, '');
-
-        const priceMatch = searchQuery.match(/(\d+)(?:k|pcm|\s*pound)/i);
-        const priceValue = priceMatch ? priceMatch[1] : '';
-        const bedroomMatch = searchQuery.match(/(\d+)\s*bed/i);
-        const bedrooms = bedroomMatch ? bedroomMatch[1] : '';
-
-        const params = new URLSearchParams();
-        if (bedrooms) {
-          params.append('min-bedrooms', bedrooms);
-          params.append('max-bedrooms', bedrooms);
-        }
-        if (priceValue) {
-          if (isRental) {
-            params.append('max-price', priceValue);
-          } else {
-            const price = searchQuery.toLowerCase().includes('k')
-              ? String(parseInt(priceValue) * 1000)
-              : priceValue;
-            params.append('max-price', price);
-          }
-        }
-        params.append('view', 'grid');
-
-        const searchUrl = `https://www.onthemarket.com/${baseUrl}/property/${location}/`;
-        const finalUrl = params.toString() ? `${searchUrl}?${params.toString()}` : searchUrl;
-        const correlationId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-          ? crypto.randomUUID()
-          : `fe-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-
-        // --- OTM scraper promise ---
-        const scraperPromise = (async (): Promise<Property[]> => {
-          const response = await fetch(`${searchBackendUrl}/scrape`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: finalUrl, correlationId }),
-          });
-          if (!response.ok) throw new Error(`Scraper responded with ${response.status}`);
-          const data = await response.json();
-          return (Array.isArray(data) ? data : (data?.properties ?? [])) as Property[];
-        })();
-
-        // --- Firestore (Proptii) search promise — runs in parallel with scraper ---
-        const firestorePromise = (async (): Promise<Property[]> => {
-          const { searchProptiiProperties } = await import('../services/proptiiPropertyService');
-          return await searchProptiiProperties(searchQuery);
-        })();
-
-        // Run both in parallel — neither failure cancels the other
-        const [scraperSettled, firestoreSettled] = await Promise.allSettled([scraperPromise, firestorePromise]);
-
-        const scraperResults: Property[] = scraperSettled.status === 'fulfilled' ? scraperSettled.value : [];
-        const firestoreResults: Property[] = firestoreSettled.status === 'fulfilled' ? firestoreSettled.value : [];
-
-        if (scraperSettled.status === 'rejected') {
-          console.warn('[Search] OTM scraper failed:', scraperSettled.reason);
-        }
-        if (firestoreSettled.status === 'rejected') {
-          console.warn('[Search] Firestore search failed:', firestoreSettled.reason);
-        }
-
-        if (scraperResults.length === 0 && firestoreResults.length === 0) {
-          throw new Error('No properties found. Please try a different search.');
-        }
-
-        // Merge: Firestore (Proptii) results first, then unique OTM results
-        const deduplicationKey = (p: Property) =>
-          `${p.title?.toLowerCase().trim()}|${p.location?.toLowerCase().trim()}`;
-        const seenKeys = new Set(firestoreResults.map(deduplicationKey));
-        const uniqueScraper = scraperResults.filter(p => {
-          const key = deduplicationKey(p);
-          if (seenKeys.has(key)) return false;
-          seenKeys.add(key);
-          return true;
-        });
-        const finalResults: Property[] = [...firestoreResults, ...uniqueScraper];
-
-        const cleanedResults = finalResults.map(property => ({
-          ...property,
-          price: cleanPropertyPrice(property.price)
-        }));
-
-        setResults(cleanedResults);
-        sessionStorage.setItem('searchResults', JSON.stringify({
-          results: cleanedResults,
-          query: searchQuery,
-          searchType: type,
-          timestamp: Date.now()
-        }));
-        return cleanedResults;
-      }
-
-      // --- Internet / fallback search ---
-      const response = await fetch(`${searchBackendUrl}/scrape-internet-real`, {
+      // 2. SSE Scraper Search (hits proptii-search port 3001)
+      const response = await fetch(`${searchBackendUrl}/api/v1/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery }),
+        body: JSON.stringify({ query: searchQuery, filters: {} }),
       });
 
       if (!response.ok) {
-        throw new Error(`Search failed: ${response.statusText}`);
+        throw new Error(`Scraper responded with ${response.status}`);
       }
 
-      const data = await response.json();
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('ReadableStream not supported by browser');
 
-      let finalResults: Property[] = [];
-      if (Array.isArray(data)) {
-        finalResults = data;
-      } else if (data.properties) {
-        finalResults = data.properties;
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let allScraped: Property[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data: ')) continue;
+
+          try {
+            const event = JSON.parse(trimmed.slice(6));
+            
+            if (event.type === 'initial' || event.type === 'results') {
+              const incoming = (event.data as any[]).map(p => ({
+                ...p,
+                price: cleanPropertyPrice(p.price)
+              }));
+
+              allScraped = [...allScraped, ...incoming];
+
+              setResults(prev => {
+                const seen = new Set(prev.map(deduplicationKey));
+                const unique = incoming.filter(p => !seen.has(deduplicationKey(p)));
+                return [...prev, ...unique];
+              });
+            } else if (event.type === 'done') {
+              // Scraper is finished
+            }
+          } catch (e) {
+            console.error('Error parsing SSE event:', e);
+          }
+        }
       }
 
-      const cleanedResults = finalResults.map(property => ({
-        ...property,
-        price: cleanPropertyPrice(property.price)
-      }));
+      // Final merge for cache
+      const proptiiResults = await firestorePromise;
+      const seenKeys = new Set(proptiiResults.map(deduplicationKey));
+      const uniqueScraped = allScraped.filter(p => {
+        const key = deduplicationKey(p);
+        if (seenKeys.has(key)) return false;
+        seenKeys.add(key);
+        return true;
+      });
+      
+      const finalResults = [...proptiiResults, ...uniqueScraped];
+      
+      if (finalResults.length === 0) {
+        throw new Error('No properties found. Please try a different search.');
+      }
 
-      setResults(cleanedResults);
       sessionStorage.setItem('searchResults', JSON.stringify({
-        results: cleanedResults,
+        results: finalResults,
         query: searchQuery,
         searchType: type,
         timestamp: Date.now()
       }));
+
       return finalResults;
+
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Search failed';
       
-      // Provide more user-friendly error messages
+      // Provide user-friendly error messages
       let userFriendlyError = errorMessage;
-      if (errorMessage.includes('ERR_NAME_NOT_RESOLVED') || errorMessage.includes('net::')) {
-        userFriendlyError = 'Network connection issue. Please check your internet connection and try again.';
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('ERR_CONNECTION_REFUSED')) {
+        userFriendlyError = 'Network connection issue. Please ensure the search service is running.';
       } else if (errorMessage.includes('timeout')) {
         userFriendlyError = 'Search timed out. Please try again.';
-      } else if (errorMessage.includes('Internal Server Error')) {
-        userFriendlyError = 'Search service temporarily unavailable. Please try again in a few moments.';
       }
       
       setError(userFriendlyError);
-      setResults([]);
+      // We don't necessarily clear results if we have Firestore results but scraper failed
       return [];
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [searchBackendUrl]);
 
   const clearResults = useCallback(() => {
     setResults([]);

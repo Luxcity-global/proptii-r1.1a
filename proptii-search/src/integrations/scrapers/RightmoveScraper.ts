@@ -16,14 +16,14 @@ const LOCATION_IDS: Record<string, string> = {
 };
 
 export class RightmoveScraper implements IScraper {
-  name = 'Rightmove';
+  name = 'Proptii';
 
   async scrape(query: string, _filters: any): Promise<PropertyData[]> {
     const { isRental, locationId, locationName, minBeds, maxBeds, maxPrice } = this.parseQuery(query);
     const url = this.buildUrl(isRental, locationId, minBeds, maxBeds, maxPrice);
 
     try {
-      console.log(`[Rightmove] Fetching ${url}`);
+      console.log(`[Proptii/RM] Fetching ${url}`);
 
       const res = await fetch(url, {
         headers: {
@@ -35,7 +35,7 @@ export class RightmoveScraper implements IScraper {
       });
 
       if (!res.ok) {
-        console.error(`[Rightmove] HTTP ${res.status}`);
+        console.error(`[Proptii/RM] HTTP ${res.status}`);
         return [];
       }
 
@@ -43,7 +43,7 @@ export class RightmoveScraper implements IScraper {
       return this.parseFromHtml(html, locationName, isRental);
 
     } catch (err: any) {
-      console.error(`[Rightmove] Error: ${err.message || err}`);
+      console.error(`[Proptii/RM] Error: ${err.message || err}`);
       return [];
     }
   }
@@ -52,7 +52,7 @@ export class RightmoveScraper implements IScraper {
     const $ = cheerio.load(html);
     const nextData = $('#__NEXT_DATA__').html();
     if (!nextData) {
-      console.log('[Rightmove] No __NEXT_DATA__ found');
+      console.log('[Proptii/RM] No __NEXT_DATA__ found');
       return [];
     }
 
@@ -60,13 +60,13 @@ export class RightmoveScraper implements IScraper {
     try {
       jsonData = JSON.parse(nextData);
     } catch (e) {
-      console.error('[Rightmove] Failed to parse __NEXT_DATA__');
+      console.error('[Proptii/RM] Failed to parse __NEXT_DATA__');
       return [];
     }
 
     const properties = jsonData.props?.pageProps?.searchResults?.properties;
     if (!properties || !Array.isArray(properties)) {
-      console.log('[Rightmove] No property data found in __NEXT_DATA__');
+      console.log('[Proptii/RM] No property data found in __NEXT_DATA__');
       return [];
     }
 
@@ -81,7 +81,7 @@ export class RightmoveScraper implements IScraper {
       const fullUrl = `https://www.rightmove.co.uk${p.propertyUrl}`;
       
       // Extract agent details
-      const agentName = p.customer?.branchDisplayName || p.customer?.branchName || 'Rightmove Agent';
+      const agentName = p.customer?.branchDisplayName || p.customer?.branchName || 'Proptii Agent';
       const agentPhone = p.customer?.contactTelephone || p.customer?.telephone || '';
       const agentWebsite = p.customer?.branchLandingPageUrl 
         ? `https://www.rightmove.co.uk${p.customer.branchLandingPageUrl}` 
@@ -93,18 +93,19 @@ export class RightmoveScraper implements IScraper {
         location:     p.displayAddress,
         bedrooms:     (p.bedrooms !== undefined && p.bedrooms !== null && !isNaN(Number(p.bedrooms))) ? Number(p.bedrooms) : null,
         propertyType: p.propertySubType || 'Property',
-        imageUrls:    p.propertyImages?.mainImage?.src ? [p.propertyImages.mainImage.src] : [],
+        imageUrls:    p.propertyImages?.images?.map((img: any) => img.srcUrl).filter(Boolean).slice(0, 5) || 
+                      (p.propertyImages?.mainImage?.src ? [p.propertyImages.mainImage.src] : []),
         agent: { 
           name: agentName, 
           phone: agentPhone,
           website: agentWebsite
         },
-        source:       'Rightmove',
+        source:       'Proptii',
         url:          fullUrl,
       });
     }
 
-    console.log(`[Rightmove] Parsed ${results.length} properties with agent details`);
+    console.log(`[Proptii/RM] Parsed ${results.length} properties with agent details`);
     return results;
   }
 

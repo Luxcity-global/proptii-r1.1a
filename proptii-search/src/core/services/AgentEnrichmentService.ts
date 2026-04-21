@@ -116,7 +116,7 @@ export class AgentEnrichmentService {
     try {
       // Step A: Find Agency Website
       const searchRes = await axios.get('https://api.search.brave.com/res/v1/web/search', {
-        params: { q: `${agencyName} estate agents official website UK`, count: 5 },
+        params: { q: `${agencyName} estate agents official website UK`, count: 3 }, // Reduced count for speed
         headers: { 
           'X-Subscription-Token': this.apiKey,
           'Accept': 'application/json'
@@ -174,7 +174,7 @@ export class AgentEnrichmentService {
   private async scrapeEmail(url: string): Promise<string | null> {
     try {
       const res = await axios.get(url, { 
-        timeout: 8000, 
+        timeout: 5000, // Reduced from 8000
         headers: { 
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -217,6 +217,7 @@ export class AgentEnrichmentService {
       return null;
     }
   }
+
 
   private cleanAgencyName(name: string): string {
     return name

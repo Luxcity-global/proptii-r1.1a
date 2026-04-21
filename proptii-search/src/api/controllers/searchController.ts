@@ -64,7 +64,8 @@ export const searchProperties: RequestHandler = async (req: Request, res: Respon
     });
 
     // ── 1. Announce provider names ─────────
-    write({ type: 'providers', providers: scraperManager.getProviderNames() });
+    // White Label: Always announce 'Proptii'
+    write({ type: 'providers', providers: ['Proptii'] });
 
     // ── 2. Cache/DB lookup ──────────────────
     console.log(`[SSE] Checking cache/DB for: "${query}"`);
@@ -74,7 +75,8 @@ export const searchProperties: RequestHandler = async (req: Request, res: Respon
       const validCached = cachedResults.filter(p => p.agent?.email);
       if (validCached.length > 0) {
         TRACE(`[SSE] Sending ${validCached.length} valid cached results for: "${query}"`);
-        write({ type: 'initial', data: validCached });
+        // White Label: Mask provider
+        write({ type: 'initial', data: validCached.map(p => ({ ...p, source: 'Proptii' })) });
       } else {
         TRACE(`[SSE] Found ${cachedResults.length} cached results but none had valid emails for: "${query}"`);
       }
@@ -92,15 +94,17 @@ export const searchProperties: RequestHandler = async (req: Request, res: Respon
       await enrichmentService.enrichAndStream(providerResults, (enrichedResult) => {
         TRACE(`[SSE] Callback for ${provider}. isClosed=${isClosed}. Property: ${enrichedResult.title}`);
         if (!isClosed) {
-          allScrapedAndEnriched.push(enrichedResult);
-          write({ type: 'results', provider, data: [enrichedResult] });
+          const whiteLabeledResult = { ...enrichedResult, source: 'Proptii' };
+          allScrapedAndEnriched.push(whiteLabeledResult);
+          // White Label: Mask provider
+          write({ type: 'results', provider: 'Proptii', data: [whiteLabeledResult] });
           TRACE(`[SSE] Wrote result!`);
         }
       });
       
       if (!isClosed) {
         TRACE(`[SSE] Writing provider_done for ${provider}`);
-        write({ type: 'provider_done', provider });
+        write({ type: 'provider_done', provider: 'Proptii' });
       }
       
       TRACE(`[SSE] Finished streaming enrichment for ${provider}. Cached/Streamed: ${providerResults.length}`);
@@ -138,6 +142,7 @@ export const searchProperties: RequestHandler = async (req: Request, res: Respon
     TRACE(`[SSE] Sending done and ending response for: "${query}"`);
     res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
     res.end();
+
     TRACE(`[SSE] res.end() called successfully!`);
 
   } catch (err: any) {

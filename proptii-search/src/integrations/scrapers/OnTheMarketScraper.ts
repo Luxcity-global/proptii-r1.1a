@@ -2,14 +2,14 @@ import * as cheerio from 'cheerio';
 import { IScraper, PropertyData } from '../Scraper';
 
 export class OnTheMarketScraper implements IScraper {
-  name = 'OnTheMarket';
+  name = 'Proptii';
 
   async scrape(query: string, _filters: any): Promise<PropertyData[]> {
     const { location, maxPrice, minBeds, isRental } = this.parseQuery(query);
     const url = this.buildUrl(location, maxPrice, minBeds, isRental);
 
     try {
-      console.log(`[OnTheMarket] Fetching ${url}`);
+      console.log(`[Proptii/OTM] Fetching ${url}`);
 
       const res = await fetch(url, {
         headers: {
@@ -21,7 +21,7 @@ export class OnTheMarketScraper implements IScraper {
       });
 
       if (!res.ok) {
-        console.error(`[OnTheMarket] HTTP ${res.status}`);
+        console.error(`[Proptii/OTM] HTTP ${res.status}`);
         return [];
       }
 
@@ -29,7 +29,7 @@ export class OnTheMarketScraper implements IScraper {
       return this.parseFromHtml(html);
 
     } catch (err: any) {
-      console.error(`[OnTheMarket] Error: ${err.message || err}`);
+      console.error(`[Proptii/OTM] Error: ${err.message || err}`);
       return [];
     }
   }
@@ -49,12 +49,12 @@ export class OnTheMarketScraper implements IScraper {
                    parsed.props?.pageProps?.properties || 
                    [];
       } catch (e) {
-        console.error('[OnTheMarket] Failed to parse __NEXT_DATA__');
+        console.error('[Proptii/OTM] Failed to parse __NEXT_DATA__');
       }
     }
 
     if (!jsonData || !Array.isArray(jsonData)) {
-      console.log('[OnTheMarket] No properties found in JSON');
+      console.log('[Proptii/OTM] No properties found in JSON');
       return [];
     }
 
@@ -66,7 +66,7 @@ export class OnTheMarketScraper implements IScraper {
       const fullUrl = `https://www.onthemarket.com${p['details-url'] || p.otm_url || `/details/${p.id}/`}`;
       
       // Extract agent details from the JSON
-      const agentName = p.agent?.name || p['agent-name'] || 'OnTheMarket Agent';
+      const agentName = p.agent?.name || p['agent-name'] || 'Proptii Agent';
       const agentPhone = p.agent?.telephone || p['agent-telephone'] || '';
       const agentWebsite = (p.agent?.['details-url'] || p.agent?.otm_url || p['agent-otm-url']) 
         ? `https://www.onthemarket.com${p.agent?.['details-url'] || p.agent?.otm_url || p['agent-otm-url']}` 
@@ -84,12 +84,12 @@ export class OnTheMarketScraper implements IScraper {
           phone: agentPhone,
           website: agentWebsite
         },
-        source:       'OnTheMarket',
+        source:       'Proptii',
         url:          fullUrl,
       });
     }
 
-    console.log(`[OnTheMarket] Parsed ${results.length} properties with agent details`);
+    console.log(`[Proptii/OTM] Parsed ${results.length} properties with agent details`);
     return results;
   }
 

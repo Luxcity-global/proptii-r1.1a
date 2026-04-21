@@ -352,9 +352,10 @@ function PropertyDetailsModal({ property, isOpen, onClose, onBook }: PropertyDet
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Listed By</h3>
                 <div className="mb-6">
                   <div className="text-lg font-bold text-gray-900">{property.agent.name}</div>
-                  {property.agent.email && (
-                    <div className="text-sm font-semibold text-green-600 mb-1">{property.agent.email}</div>
-                  )}
+                  <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="text-[10px] font-bold text-green-600 uppercase mb-1">Direct Contact Email</div>
+                    <div className="text-sm font-black text-gray-900 break-all">{property.agent.email}</div>
+                  </div>
                   {property.agent.website && (
                     <a 
                       href={property.agent.website}
@@ -562,6 +563,8 @@ function SmartSearchBar({ query, onQueryChange, onSearch, loading }: SmartSearch
 
 // Property Card Component
 function PropertyCard({ property, onBook, onView }: { property: Property; onBook: (p: Property) => void; onView: (p: Property) => void }) {
+  // Explicit log for each property as it renders
+  console.log(`[FRONTEND LOG] Property: "${property.title}" | Email: ${property.agent.email || 'NULL'}`);
   return (
     <div 
       onClick={() => onView(property)}
@@ -629,13 +632,14 @@ function PropertyCard({ property, onBook, onView }: { property: Property; onBook
             </div>
             <div>
               <p className="text-sm font-black text-gray-900 line-clamp-1">{property.agent.name}</p>
-              {property.agent.email ? (
-                <p className="text-[10px] font-bold text-green-600 uppercase tracking-tight truncate max-w-[120px]">
+              <div className="flex flex-col">
+                <p className="text-[11px] font-bold text-green-600 uppercase tracking-tight">
+                  Direct Email Found:
+                </p>
+                <p className="text-xs font-black text-gray-900 bg-green-50 px-2 py-0.5 rounded border border-green-100 break-all">
                   {property.agent.email}
                 </p>
-              ) : (
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Verified Agent</p>
-              )}
+              </div>
             </div>
           </div>
           
@@ -964,6 +968,14 @@ function SearchResults() {
                 price: cleanPropertyPrice(p.price),
               }));
               addDebugLog(`[SSE] Initial valid results: ${incoming.length}`);
+              
+              // Log agent emails for each property
+              incoming.forEach(p => {
+                if (p.agent?.email) {
+                  addDebugLog(`Property Email: ${p.agent.email}`);
+                }
+              });
+
               setResults(incoming);
 
             } else if (event.type === 'results') {
@@ -975,8 +987,15 @@ function SearchResults() {
               setResults(prev => {
                 const seen = new Set(prev.map(r => r.url));
                 const fresh = incoming.filter(p => !seen.has(p.url));
+                
                 if (fresh.length > 0) {
                   addDebugLog(`[SSE] Added ${fresh.length} new results from ${event.provider}`);
+                  // Log emails for fresh results
+                  fresh.forEach(p => {
+                    if (p.agent?.email) {
+                      addDebugLog(`Property Email: ${p.agent.email}`);
+                    }
+                  });
                 }
                 return [...prev, ...fresh];
               });
