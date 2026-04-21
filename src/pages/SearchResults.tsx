@@ -1357,7 +1357,7 @@ const SearchResults = () => {
     // when user comes back from BookViewing page
     
     // Small delay for smooth transition
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Navigate to booking page
     navigate('/bookviewing');
@@ -1367,7 +1367,7 @@ const SearchResults = () => {
     navigate('/');
   };
 
-  if (isLoading) {
+  if (isLoading && results.length === 0) {
     return (
       <div className="min-h-screen flex flex-col font-nunito">
         {/* Custom Header with navigation */}

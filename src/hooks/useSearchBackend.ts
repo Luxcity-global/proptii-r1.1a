@@ -77,7 +77,7 @@ export const useSearchBackend = () => {
     try {
       const response = await fetch(`${searchBackendUrl}/health`, { 
         method: 'GET',
-        signal: AbortSignal.timeout(5000) // 5 second timeout
+        signal: AbortSignal.timeout(10000) // Increased to 10 seconds
       });
       return response.ok;
     } catch (error) {
@@ -171,6 +171,7 @@ export const useSearchBackend = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: searchQuery, filters: {} }),
+        signal: AbortSignal.timeout(120000) // Increased to 120 seconds for slow scraper streams
       });
 
       if (!response.ok) {
