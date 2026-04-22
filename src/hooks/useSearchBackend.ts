@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 
-/** Search/backend (On The Market scraper) - default port 3001 */
-const DEFAULT_LOCAL_SEARCH_URL = 'http://localhost:3001';
+/** Search/backend (On The Market scraper) - default port 3000 */
+const DEFAULT_LOCAL_SEARCH_URL = 'http://localhost:3000';
 const DEFAULT_RENDER_SEARCH_URL = 'https://proptii-r1-1a-search.onrender.com';
 
 const normalizeBackendUrl = (rawUrl: string | undefined, defaultUrl: string): string => {
@@ -166,7 +166,7 @@ export const useSearchBackend = () => {
         return results;
       }
 
-      // 2. SSE Scraper Search (hits proptii-search port 3001)
+      // 2. SSE Scraper Search (hits proptii-search port 3000)
       const response = await fetch(`${searchBackendUrl}/api/v1/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
