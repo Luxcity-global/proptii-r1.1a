@@ -2,14 +2,14 @@ import * as cheerio from 'cheerio';
 import { IScraper, PropertyData } from '../Scraper';
 
 export class OnTheMarketScraper implements IScraper {
-  name = 'Proptii';
+  name = 'OnTheMarket';
 
   async scrape(query: string, _filters: any): Promise<PropertyData[]> {
     const { location, maxPrice, minBeds, isRental } = this.parseQuery(query);
     const url = this.buildUrl(location, maxPrice, minBeds, isRental);
 
     try {
-      console.log(`[Proptii/OTM] Fetching ${url}`);
+      console.log(`[OnTheMarket] Fetching ${url}`);
 
       const res = await fetch(url, {
         headers: {
@@ -21,7 +21,7 @@ export class OnTheMarketScraper implements IScraper {
       });
 
       if (!res.ok) {
-        console.error(`[Proptii/OTM] HTTP ${res.status}`);
+        console.error(`[OnTheMarket] HTTP ${res.status}`);
         return [];
       }
 
@@ -29,7 +29,7 @@ export class OnTheMarketScraper implements IScraper {
       return this.parseFromHtml(html);
 
     } catch (err: any) {
-      console.error(`[Proptii/OTM] Error: ${err.message || err}`);
+      console.error(`[OnTheMarket] Error: ${err.message || err}`);
       return [];
     }
   }
@@ -49,12 +49,12 @@ export class OnTheMarketScraper implements IScraper {
                    parsed.props?.pageProps?.properties || 
                    [];
       } catch (e) {
-        console.error('[Proptii/OTM] Failed to parse __NEXT_DATA__');
+        console.error('[OnTheMarket] Failed to parse __NEXT_DATA__');
       }
     }
 
     if (!jsonData || !Array.isArray(jsonData)) {
-      console.log('[Proptii/OTM] No properties found in JSON');
+      console.log('[OnTheMarket] No properties found in JSON');
       return [];
     }
 
@@ -84,12 +84,12 @@ export class OnTheMarketScraper implements IScraper {
           phone: agentPhone,
           website: agentWebsite
         },
-        source:       'Proptii',
+        source:       'OnTheMarket',
         url:          fullUrl,
       });
     }
 
-    console.log(`[Proptii/OTM] Parsed ${results.length} properties with agent details`);
+    console.log(`[OnTheMarket] Parsed ${results.length} properties with agent details`);
     return results;
   }
 

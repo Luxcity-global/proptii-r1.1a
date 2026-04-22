@@ -1,6 +1,0 @@
-: keep-alive
-
-data: {"type":"providers","providers":["Rightmove","OnTheMarket"]}
-
-data: {"type":"done"}
-

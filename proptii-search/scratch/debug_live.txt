@@ -1,35 +1,0 @@
-Note: Unnecessary use of -X or --request, POST is already inferred.
-* Host localhost:3001 was resolved.
-* IPv6: ::1
-* IPv4: 127.0.0.1
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying [::1]:3001...
-* Connected to localhost (::1) port 3001
-* using HTTP/1.x
-> POST /api/v1/search HTTP/1.1
-> Host: localhost:3001
-> User-Agent: curl/8.14.1
-> Accept: */*
-> Content-Type: application/json
-> Content-Length: 53
-> 
-} [53 bytes data]
-* upload completely sent off: 53 bytes
-< HTTP/1.1 200 OK
-< X-Powered-By: Express
-< Access-Control-Allow-Origin: *
-< Content-Type: text/event-stream
-< Cache-Control: no-cache
-< Connection: keep-alive
-< X-Accel-Buffering: no
-< Date: Wed, 15 Apr 2026 15:33:09 GMT
-< Transfer-Encoding: chunked
-< 
-{ [93 bytes data]
-100   135    0    82  100    53     68     44  0:00:01  0:00:01 --:--:--   112100   135    0    82  100    53     37     24  0:00:02  0:00:02 --:--:--    61100   135    0    82  100    53     25     16  0:00:03  0:00:03 --:--:--    42100   135    0    82  100    53     19     12  0:00:04  0:00:04 --:--:--    32100   135    0    82  100    53     15     10  0:00:05  0:00:05 --:--:--    25100   135    0    82  100    53     13      8  0:00:06  0:00:06 --:--:--     0100   135    0    82  100    53     11      7  0:00:07  0:00:07 --:--:--     0100   135    0    82  100    53      9      6  0:00:08  0:00:08 --:--:--     0100   135    0    82  100    53      8      5  0:00:10  0:00:09  0:00:01     0100   135    0    82  100    53      8      5  0:00:10  0:00:10 --:--:--     0100   135    0    82  100    53      7      4  0:00:13  0:00:11  0:00:02     0100   135    0    82  100    53      7      4  0:00:13  0:00:11  0:00:02     0
-* Connection #0 to host localhost left intact
-: keep-alive
-
-data: {"type":"providers","providers":["Rightmove","OnTheMarket"]}
-

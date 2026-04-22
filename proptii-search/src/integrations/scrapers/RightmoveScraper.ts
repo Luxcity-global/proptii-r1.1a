@@ -16,14 +16,14 @@ const LOCATION_IDS: Record<string, string> = {
 };
 
 export class RightmoveScraper implements IScraper {
-  name = 'Proptii';
+  name = 'Rightmove';
 
   async scrape(query: string, _filters: any): Promise<PropertyData[]> {
     const { isRental, locationId, locationName, minBeds, maxBeds, maxPrice } = this.parseQuery(query);
     const url = this.buildUrl(isRental, locationId, minBeds, maxBeds, maxPrice);
 
     try {
-      console.log(`[Proptii/RM] Fetching ${url}`);
+      console.log(`[Rightmove] Fetching ${url}`);
 
       const res = await fetch(url, {
         headers: {
@@ -35,7 +35,7 @@ export class RightmoveScraper implements IScraper {
       });
 
       if (!res.ok) {
-        console.error(`[Proptii/RM] HTTP ${res.status}`);
+        console.error(`[Rightmove] HTTP ${res.status}`);
         return [];
       }
 
@@ -43,7 +43,7 @@ export class RightmoveScraper implements IScraper {
       return this.parseFromHtml(html, locationName, isRental);
 
     } catch (err: any) {
-      console.error(`[Proptii/RM] Error: ${err.message || err}`);
+      console.error(`[Rightmove] Error: ${err.message || err}`);
       return [];
     }
   }
@@ -52,7 +52,7 @@ export class RightmoveScraper implements IScraper {
     const $ = cheerio.load(html);
     const nextData = $('#__NEXT_DATA__').html();
     if (!nextData) {
-      console.log('[Proptii/RM] No __NEXT_DATA__ found');
+      console.log('[Rightmove] No __NEXT_DATA__ found');
       return [];
     }
 
@@ -60,13 +60,13 @@ export class RightmoveScraper implements IScraper {
     try {
       jsonData = JSON.parse(nextData);
     } catch (e) {
-      console.error('[Proptii/RM] Failed to parse __NEXT_DATA__');
+      console.error('[Rightmove] Failed to parse __NEXT_DATA__');
       return [];
     }
 
     const properties = jsonData.props?.pageProps?.searchResults?.properties;
     if (!properties || !Array.isArray(properties)) {
-      console.log('[Proptii/RM] No property data found in __NEXT_DATA__');
+      console.log('[Rightmove] No property data found in __NEXT_DATA__');
       return [];
     }
 
@@ -100,12 +100,12 @@ export class RightmoveScraper implements IScraper {
           phone: agentPhone,
           website: agentWebsite
         },
-        source:       'Proptii',
+        source:       'Rightmove',
         url:          fullUrl,
       });
     }
 
-    console.log(`[Proptii/RM] Parsed ${results.length} properties with agent details`);
+    console.log(`[Rightmove] Parsed ${results.length} properties with agent details`);
     return results;
   }
 
