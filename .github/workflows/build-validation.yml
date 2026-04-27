@@ -2,9 +2,9 @@ name: Build Validation
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, new-staging-branch ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, new-staging-branch ]
 
 jobs:
   build:

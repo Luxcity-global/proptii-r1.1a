@@ -3,7 +3,7 @@ name: Staging Deployment
 on:
   push:
     branches:
-      - staging
+      - new-staging-branch
   workflow_dispatch:
   schedule:
     - cron: '*/30 * * * *'  # Run every 30 minutes
@@ -39,6 +39,7 @@ jobs:
           echo "VITE_ENABLE_CSP=true" >> .env.staging
           echo "VITE_ENABLE_HSTS=true" >> .env.staging
           echo "ALERT_WEBHOOK_URL=${{ secrets.ALERT_WEBHOOK_URL }}" >> .env.staging
+          echo "VITE_SEARCH_BACKEND_URL=${{ secrets.VITE_SEARCH_BACKEND_URL_STAGING || secrets.VITE_SEARCH_BACKEND_URL }}" >> .env.staging
 
       - name: Build
         run: npm run build:staging

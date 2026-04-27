@@ -38,6 +38,7 @@ jobs:
           echo "VITE_ENABLE_CSP=true" >> .env.production
           echo "VITE_ENABLE_HSTS=true" >> .env.production
           echo "VITE_ENABLE_CORS=false" >> .env.production
+          echo "VITE_SEARCH_BACKEND_URL=${{ secrets.VITE_SEARCH_BACKEND_URL }}" >> .env.production
 
       - name: Run Validation
         run: npm run verify:production
@@ -74,6 +75,7 @@ jobs:
           echo "VITE_ENABLE_CSP=true" >> .env.production
           echo "VITE_ENABLE_HSTS=true" >> .env.production
           echo "VITE_ENABLE_CORS=false" >> .env.production
+          echo "VITE_SEARCH_BACKEND_URL=${{ secrets.VITE_SEARCH_BACKEND_URL }}" >> .env.production
 
       - name: Build
         run: npm run build:production
