@@ -1,20 +1,14 @@
-import dotenv from 'dotenv';
-dotenv.config();
-
 import app from './app';
 import mongoose from 'mongoose';
 import { Redis } from 'ioredis';
 import './workers/searchWorker'; // Import to start the worker
 
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = process.env.PORT || 3000;
 
 // MongoDB Connection
 const connectDB = async () => {
   try {
-    const mongoUri = process.env.MONGODB_URI;
-    if (!mongoUri) {
-      throw new Error('❌ MONGODB_URI is not defined in environment variables');
-    }
+    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/proptii-search';
     await mongoose.connect(mongoUri);
     console.log('✅ MongoDB Connected');
   } catch (err) {
@@ -23,13 +17,15 @@ const connectDB = async () => {
   }
 };
 
-import { redis } from './infrastructure/redis';
-export { redis };
+// Redis Connection Check
+export const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+redis.on('connect', () => console.log('✅ Redis Connected'));
+redis.on('error', (err) => console.error('❌ Redis error:', err));
 
 const startServer = async () => {
   await connectDB();
   
-  app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, () => {
     console.log(`🚀 Proptii Search Server running on port ${PORT}`);
   });
 };

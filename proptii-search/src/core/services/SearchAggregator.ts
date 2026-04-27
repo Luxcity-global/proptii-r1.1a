@@ -19,11 +19,13 @@ export class SearchAggregator {
     const metaData   = await redis.get(metaKey);
 
     if (cachedData) {
+      console.log(`[Aggregator] Found cached data for: ${query}`);
       const results = JSON.parse(cachedData);
       const meta    = metaData ? JSON.parse(metaData) : { timestamp: 0 };
       const age     = (Date.now() - meta.timestamp) / 1000;
 
       if (age < CACHE_TTL_STALE) {
+        console.log(`[Cache Hit] ${age < CACHE_TTL_FRESH ? 'Fresh' : 'Stale'} results (age: ${Math.round(age)}s) for: ${query}`);
         return results;
       }
     }
@@ -41,6 +43,7 @@ export class SearchAggregator {
     if (results.length === 0) return;
     const cacheKey = `search:${query.toLowerCase().trim()}`;
     await this.saveToCache(cacheKey, results);
+    console.log(`[Aggregator] Saved ${results.length} results to cache for: ${query}`);
   }
 
   /**
@@ -52,6 +55,7 @@ export class SearchAggregator {
     if (cached.length > 0) return cached;
 
     // Total miss — queue a background scrape
+    console.log(`[Total Miss] Triggering background scrape for: ${query}`);
     await this.triggerRevalidation(query, filters);
     return [];
   }

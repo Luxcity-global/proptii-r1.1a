@@ -1,11 +1,11 @@
-import { Worker, Job } from 'bullmq';
+import { Worker } from 'bullmq';
 import { connection as redis } from '../infrastructure/queue';
 import { ScraperManager } from '../integrations/ScraperManager';
 import Property from '../models/Property';
 
 const scraperManager = new ScraperManager();
 
-export const searchWorker = new Worker('search-tasks', async (job: Job) => {
+export const searchWorker = new Worker('search-tasks', async (job) => {
   const { query, filters } = job.data;
   console.log(`[Worker] Processing search job: ${query}`);
 
@@ -56,5 +56,5 @@ export const searchWorker = new Worker('search-tasks', async (job: Job) => {
   }
 }, { connection: redis });
 
-searchWorker.on('completed', (job: Job) => console.log(`[Worker] Job ${job.id} completed`));
-searchWorker.on('failed', (job: Job | undefined, err: Error) => console.error(`[Worker] Job ${job?.id} failed:`, err));
+searchWorker.on('completed', (job) => console.log(`[Worker] Job ${job.id} completed`));
+searchWorker.on('failed', (job, err) => console.error(`[Worker] Job ${job?.id} failed:`, err));

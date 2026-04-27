@@ -1,5 +1,9 @@
 import { Queue, Worker, QueueEvents } from 'bullmq';
-import { redis as connection } from './redis';
+import IORedis from 'ioredis';
+
+const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
+  maxRetriesPerRequest: null,
+});
 
 export const searchQueue = new Queue('search-tasks', { connection });
 

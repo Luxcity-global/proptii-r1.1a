@@ -9,6 +9,7 @@ export class OnTheMarketScraper implements IScraper {
     const url = this.buildUrl(location, maxPrice, minBeds, isRental);
 
     try {
+      console.log(`[OnTheMarket] Fetching ${url}`);
 
       const res = await fetch(url, {
         headers: {
@@ -53,6 +54,7 @@ export class OnTheMarketScraper implements IScraper {
     }
 
     if (!jsonData || !Array.isArray(jsonData)) {
+      console.log('[OnTheMarket] No properties found in JSON');
       return [];
     }
 
@@ -64,7 +66,7 @@ export class OnTheMarketScraper implements IScraper {
       const fullUrl = `https://www.onthemarket.com${p['details-url'] || p.otm_url || `/details/${p.id}/`}`;
       
       // Extract agent details from the JSON
-      const agentName = p.agent?.name || p['agent-name'] || 'Unknown Agent';
+      const agentName = p.agent?.name || p['agent-name'] || 'Proptii Agent';
       const agentPhone = p.agent?.telephone || p['agent-telephone'] || '';
       const agentWebsite = (p.agent?.['details-url'] || p.agent?.otm_url || p['agent-otm-url']) 
         ? `https://www.onthemarket.com${p.agent?.['details-url'] || p.agent?.otm_url || p['agent-otm-url']}` 
@@ -87,6 +89,7 @@ export class OnTheMarketScraper implements IScraper {
       });
     }
 
+    console.log(`[OnTheMarket] Parsed ${results.length} properties with agent details`);
     return results;
   }
 

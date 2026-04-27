@@ -36,6 +36,7 @@ export const searchProperties: RequestHandler = async (req: Request, res: Respon
       'X-Accel-Buffering': 'no',
     });
 
+    console.log(`[SSE] Search started for: "${query}"`);
 
     // ── Heartbeat and Initial Ping ──────────────────────────────────────────
     res.write(': keep-alive\n\n');
@@ -62,6 +63,7 @@ export const searchProperties: RequestHandler = async (req: Request, res: Respon
     write({ type: 'providers', providers: scraperManager.getProviderNames() });
 
     // ── 2. Cache/DB lookup ──────────────────
+    console.log(`[SSE] Checking cache/DB for: "${query}"`);
     const cachedResults = await aggregator.getCachedResults(query);
     if (cachedResults.length > 0) {
       // Apply strict email filter to cached results too, just in case
