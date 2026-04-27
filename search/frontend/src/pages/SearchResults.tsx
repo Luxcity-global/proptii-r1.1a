@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import type { Property } from '../types';
 
 const DEFAULT_LOCAL_SEARCH_URL = 'http://localhost:3001';
-const DEFAULT_RENDER_SEARCH_URL = 'https://proptii-r1-1a-search.onrender.com';
+const DEFAULT_RENDER_SEARCH_URL = 'https://proptii-r1-1a-v39c.onrender.com';
 
 const normalizeBackendUrl = (rawUrl: string | undefined): string => {
   if (!rawUrl) {

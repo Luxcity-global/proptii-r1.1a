@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { SessionManager } from '../services/SessionManager';
 import { ApplicationInsights } from '@microsoft/applicationinsights-web';
 
-const DEFAULT_SEARCH_BACKEND_URL = 'https://proptii-r1-1a-search.onrender.com';
+const DEFAULT_SEARCH_BACKEND_URL = 'https://proptii-r1-1a-v39c.onrender.com';
 
 interface CSRFToken {
     token: string;

@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 
 /** Search/backend (On The Market scraper) - default port 3000 */
 const DEFAULT_LOCAL_SEARCH_URL = 'http://localhost:3000';
-const DEFAULT_RENDER_SEARCH_URL = 'https://proptii-r1-1a-search.onrender.com';
+const DEFAULT_RENDER_SEARCH_URL = 'https://proptii-r1-1a-v39c.onrender.com';
 
 const normalizeBackendUrl = (rawUrl: string | undefined, defaultUrl: string): string => {
   if (!rawUrl || !rawUrl.trim()) {

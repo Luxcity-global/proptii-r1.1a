@@ -24,7 +24,7 @@ services:
       - key: VITE_GOOGLE_SHEETS_API_ENDPOINT
         value: https://proptii-r1-1a-new-backend.onrender.com/api/sheets
       - key: VITE_SEARCH_BACKEND_URL
-        value: https://proptii-r1-1a-search.onrender.com
+        value: https://proptii-r1-1a-v39c.onrender.com
     headers:
       - path: /*
         name: X-Frame-Options
@@ -37,7 +37,7 @@ services:
         value: "1; mode=block"
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; connect-src 'self' https://formsubmit.co https://proptii-r1-1a-new-backend.onrender.com/api/* https://proptii-r1-1a-1.onrender.com/api/* https://proptii-r1-1a-search.onrender.com https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com https://proptii.co https://*.cognitiveservices.azure.com https://*.onrender.com https://*.railway.app http://localhost:10000/api/*; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; frame-ancestors 'none';"
+        value: "default-src 'self'; connect-src 'self' https://formsubmit.co https://proptii-r1-1a-new-backend.onrender.com/api/* https://proptii-r1-1a-1.onrender.com/api/* https://proptii-r1-1a-v39c.onrender.com https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com https://proptii.co https://*.cognitiveservices.azure.com https://*.onrender.com https://*.railway.app http://localhost:10000/api/*; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; frame-ancestors 'none';"
       - path: /*
         name: Cache-Control
         value: no-cache
