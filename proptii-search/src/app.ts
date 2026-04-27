@@ -9,7 +9,25 @@ dotenv.config();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      'https://proptii.co',
+      'https://www.proptii.co',
+      'https://proptii-frontend.onrender.com',
+      'https://proptii-r1-1a-5347.onrender.com',
+      'http://localhost:5173',
+      'http://localhost:4173',
+      'http://localhost:3000',
+    ];
+    if (!origin || allowedOrigins.includes(origin) || /\.onrender\.com$/.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json());
 
 // Routes

@@ -56,6 +56,7 @@ async function bootstrap() {
     'https://www.proptii.co',
     'https://proptii-r1-1a-new.onrender.com',
     'https://proptii-frontend.onrender.com',
+    'https://proptii-r1-1a-5347.onrender.com',
     ...(process.env.NODE_ENV !== 'production'
       ? [
           'http://localhost:5173',

@@ -8,7 +8,8 @@ const normalizeBackendUrl = (rawUrl: string | undefined, defaultUrl: string): st
   if (!rawUrl || !rawUrl.trim()) {
     return defaultUrl;
   }
-  const trimmed = rawUrl.trim();
+  // Trim whitespace and trailing slashes to avoid double slashes in concatenated paths
+  const trimmed = rawUrl.trim().replace(/\/+$/, '');
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 };
 
