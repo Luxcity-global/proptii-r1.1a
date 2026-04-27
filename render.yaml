@@ -25,6 +25,8 @@ services:
         value: https://proptii-r1-1a-new-backend.onrender.com/api/sheets
       - key: VITE_SEARCH_BACKEND_URL
         value: https://proptii-r1-1a-v39c.onrender.com
+      - key: VITE_GA_MEASUREMENT_ID
+        value: G-88HC0TG6JJ
     headers:
       - path: /*
         name: X-Frame-Options
