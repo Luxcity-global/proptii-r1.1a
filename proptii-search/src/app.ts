@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { errorHandler } from './api/controllers/errorController';
@@ -16,11 +16,11 @@ app.use(express.json());
 app.use('/api/v1/search', searchRoutes);
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Error Handling
-app.use(errorHandler);
+app.use(errorHandler as any);
 
 export default app;
