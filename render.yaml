@@ -95,12 +95,18 @@ services:
       - key: GOOGLE_SHEETS_CREDENTIALS_JSON
         sync: false
 
-  # Search Backend (Express)
+  # Search Backend (Node.js)
   - type: web
-    name: proptii-search-backend
-    env: docker
-    dockerfilePath: ./search/backend/Dockerfile
+    name: proptii-search
+    env: node
+    plan: free
+    region: oregon
+    rootDir: proptii-search
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
     healthCheckPath: /health
+    envVarGroups:
+      - name: proptii-env
     envVars:
       - key: NODE_VERSION
         value: 20.11.1

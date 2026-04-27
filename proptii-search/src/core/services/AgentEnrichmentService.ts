@@ -20,7 +20,6 @@ export class AgentEnrichmentService {
    * Only returns properties where an email was successfully found.
    */
   async enrichAndFilter(properties: any[]): Promise<any[]> {
-    console.log(`[Enrichment] Starting enrichment for ${properties.length} properties...`);
     
     // Process in parallel to maintain speed
     const enrichedResults = await Promise.all(
@@ -28,7 +27,6 @@ export class AgentEnrichmentService {
         try {
           const enriched = await this.enrichSingle(p);
           if (enriched?.agent?.email) {
-            console.log(`[Enrichment] ✅ Found email for ${p.agent.name}: ${enriched.agent.email}`);
           }
           return enriched;
         } catch (e) {
@@ -41,7 +39,6 @@ export class AgentEnrichmentService {
     // Strict filter: User wants ONLY results with email
     const filtered = enrichedResults.filter(p => p && p.agent.email);
     
-    console.log(`[Enrichment] Summary: ${filtered.length}/${properties.length} listings kept.`);
     return filtered;
   }
 
@@ -53,7 +50,6 @@ export class AgentEnrichmentService {
     properties: any[], 
     onResult: (p: any) => void
   ): Promise<void> {
-    console.log(`[Enrichment] Starting streaming enrichment for ${properties.length} properties...`);
     
     // Process in parallel with concurrency limit (optional, but Promise.all is fine for batches of 25-50)
     await Promise.all(
@@ -61,10 +57,8 @@ export class AgentEnrichmentService {
         try {
           const enriched = await this.enrichSingle(p);
           if (enriched?.agent?.email) {
-            console.log(`[Enrichment] ✅ Streaming enriched result for ${p.agent?.name || 'Unknown'} (${enriched.agent.email})`);
             onResult(enriched);
           } else {
-            console.log(`[Enrichment] ⏭️ Skipping ${p.agent?.name || 'Unknown'} (No email found)`);
           }
         } catch (e) {
           console.warn(`[Enrichment] ❌ Failed for ${p.agent.name}`);
@@ -72,7 +66,6 @@ export class AgentEnrichmentService {
       })
     );
     
-    console.log(`[Enrichment] Streaming enrichment finished.`);
   }
 
   private async enrichSingle(property: any): Promise<any | null> {
@@ -107,7 +100,6 @@ export class AgentEnrichmentService {
   }
 
   private async discoverContact(agencyName: string): Promise<AgentContact> {
-    console.log(`[Enrichment] Discovering contact for: "${agencyName}"`);
     if (!this.apiKey) {
       console.warn('[Enrichment] BRAVE_API_KEY missing');
       return { email: null };
@@ -124,10 +116,8 @@ export class AgentEnrichmentService {
       });
 
       const results = searchRes.data?.web?.results || [];
-      console.log(`[Enrichment] Brave found ${results.length} results for "${agencyName}"`);
       
       const website = this.pickBestWebsite(results, agencyName);
-      console.log(`[Enrichment] Best website picked: ${website || 'NONE'}`);
       
       if (!website) return { email: null };
 
@@ -136,12 +126,10 @@ export class AgentEnrichmentService {
       
       // Step C: Try contact page if home page fails
       if (!email && website) {
-        console.log(`[Enrichment] No email on home page, trying /contact for ${website}`);
         const contactUrl = website.endsWith('/') ? `${website}contact` : `${website}/contact`;
         email = await this.scrapeEmail(contactUrl);
       }
 
-      console.log(`[Enrichment] Final email for ${agencyName}: ${email || 'NOT_FOUND'}`);
       return { email, website };
 
     } catch (err: any) {

@@ -23,7 +23,6 @@ export class RightmoveScraper implements IScraper {
     const url = this.buildUrl(isRental, locationId, minBeds, maxBeds, maxPrice);
 
     try {
-      console.log(`[Rightmove] Fetching ${url}`);
 
       const res = await fetch(url, {
         headers: {
@@ -52,7 +51,6 @@ export class RightmoveScraper implements IScraper {
     const $ = cheerio.load(html);
     const nextData = $('#__NEXT_DATA__').html();
     if (!nextData) {
-      console.log('[Rightmove] No __NEXT_DATA__ found');
       return [];
     }
 
@@ -66,7 +64,6 @@ export class RightmoveScraper implements IScraper {
 
     const properties = jsonData.props?.pageProps?.searchResults?.properties;
     if (!properties || !Array.isArray(properties)) {
-      console.log('[Rightmove] No property data found in __NEXT_DATA__');
       return [];
     }
 
@@ -81,7 +78,7 @@ export class RightmoveScraper implements IScraper {
       const fullUrl = `https://www.rightmove.co.uk${p.propertyUrl}`;
       
       // Extract agent details
-      const agentName = p.customer?.branchDisplayName || p.customer?.branchName || 'Proptii Agent';
+      const agentName = p.customer?.branchDisplayName || p.customer?.branchName || 'Unknown Agent';
       const agentPhone = p.customer?.contactTelephone || p.customer?.telephone || '';
       const agentWebsite = p.customer?.branchLandingPageUrl 
         ? `https://www.rightmove.co.uk${p.customer.branchLandingPageUrl}` 
@@ -105,7 +102,6 @@ export class RightmoveScraper implements IScraper {
       });
     }
 
-    console.log(`[Rightmove] Parsed ${results.length} properties with agent details`);
     return results;
   }
 

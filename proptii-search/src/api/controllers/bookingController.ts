@@ -22,7 +22,6 @@ export const bookViewing: RequestHandler = async (req: Request, res: Response, n
       });
     }
 
-    console.log(`[Booking] Received request for ${propertyName} from ${userName} to ${agentEmail}`);
 
     await emailService.sendViewingRequest(agentEmail, {
       userName,

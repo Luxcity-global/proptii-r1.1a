@@ -1,10 +1,9 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import mongoose from 'mongoose';
+import { redis } from './infrastructure/redis';
 import { errorHandler } from './api/controllers/errorController';
 import searchRoutes from './api/routes/searchRoutes';
-
-dotenv.config();
 
 const app = express();
 
@@ -16,11 +15,21 @@ app.use(express.json());
 app.use('/api/v1/search', searchRoutes);
 
 // Health check
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', async (req: express.Request, res: express.Response) => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    services: {
+      mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+      redis: redis.status === 'ready' ? 'connected' : 'disconnected'
+    }
+  };
+
+  const isHealthy = health.services.mongodb === 'connected' && health.services.redis === 'connected';
+  res.status(isHealthy ? 200 : 503).json(health);
 });
 
 // Error Handling
-app.use(errorHandler);
+app.use(errorHandler as any);
 
 export default app;

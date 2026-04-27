@@ -63,7 +63,7 @@ export class EmailService {
       }
 
       const info = await this.transporter.sendMail({
-        from: '"Proptii Search" <no-reply@proptii.com>',
+        from: `"Proptii Search" <${process.env.SMTP_FROM_EMAIL || 'no-reply@proptii.com'}>`,
         to: agentEmail,
         subject: `Viewing Request: ${details.propertyName}`,
         html: html,
