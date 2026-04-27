@@ -22,10 +22,10 @@ const resolveSearchBackendUrl = (): string => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname.toLowerCase();
     if (hostname.includes('onrender.com') || hostname.includes('proptii.com')) {
-      return DEFAULT_RENDER_SEARCH_URL;
+      return normalizeBackendUrl(DEFAULT_RENDER_SEARCH_URL, DEFAULT_RENDER_SEARCH_URL);
     }
   }
-  return DEFAULT_LOCAL_SEARCH_URL;
+  return normalizeBackendUrl(DEFAULT_LOCAL_SEARCH_URL, DEFAULT_LOCAL_SEARCH_URL);
 };
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
@@ -76,7 +76,8 @@ export const useSearchBackend = () => {
   // Network connectivity check
   const checkNetworkConnectivity = async (): Promise<boolean> => {
     try {
-      const response = await fetch(`${searchBackendUrl}/health`, { 
+      const fetchUrl = `${searchBackendUrl}/health`;
+      const response = await fetch(fetchUrl, { 
         method: 'GET',
         signal: AbortSignal.timeout(10000) // Increased to 10 seconds
       });
@@ -167,8 +168,12 @@ export const useSearchBackend = () => {
         return results;
       }
 
-      // 2. SSE Scraper Search (hits proptii-search port 3000)
-      const response = await fetch(`${searchBackendUrl}/api/v1/search`, {
+      // 2. SSE Scraper Search (hits proptii-search)
+      // Ensure we don't have double slashes
+      const endpoint = '/api/v1/search';
+      const fetchUrl = `${searchBackendUrl}${endpoint}`;
+      
+      const response = await fetch(fetchUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: searchQuery, filters: {} }),
