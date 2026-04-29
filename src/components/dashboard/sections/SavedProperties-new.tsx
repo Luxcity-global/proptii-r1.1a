@@ -167,8 +167,23 @@ const SavedProperties: React.FC = () => {
                     )}
                   </div>
                   <div className={`${isMobile ? 'mt-3 flex-col' : 'mt-4 flex'} items-center ${isMobile ? 'gap-2' : 'gap-3'}`}>
-                    <button className={`${isMobile ? 'w-full' : 'px-4'} py-2 bg-[#E65D24] text-white rounded-lg ${isMobile ? 'text-sm' : ''}`}>Chat</button>
-                    <button className={`${isMobile ? 'w-full' : 'px-4'} py-2 bg-green-600 text-white rounded-lg ${isMobile ? 'text-sm' : ''}`}>Call</button>
+                    {property.agent.phone ? (
+                      <a 
+                        href={`tel:${property.agent.phone}`}
+                        className={`${isMobile ? 'w-full text-center block' : 'px-4 inline-block'} py-2 bg-green-600 text-white rounded-lg ${isMobile ? 'text-sm' : ''}`}
+                      >
+                        Call
+                      </a>
+                    ) : (
+                      <button 
+                        disabled
+                        aria-disabled="true"
+                        title="Phone number unavailable"
+                        className={`${isMobile ? 'w-full' : 'px-4'} py-2 bg-green-600/50 text-white rounded-lg ${isMobile ? 'text-sm' : ''} cursor-not-allowed`}
+                      >
+                        Call
+                      </button>
+                    )}
                     <button className={`${isMobile ? 'w-full' : 'px-4'} py-2 bg-white border border-gray-300 text-gray-700 rounded-lg ${isMobile ? 'text-sm' : ''}`}>Message</button>
                   </div>
                 </div>

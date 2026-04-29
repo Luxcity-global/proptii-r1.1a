@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, BedDouble, Bath, Square, Phone, Mail, MessageCircle, Building2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { X, MapPin, BedDouble, Bath, Square, Phone, Mail, Building2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 
 interface Property {
   id: string;
@@ -308,15 +308,26 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
               </div>
             </div>
             
-            <div className="grid grid-cols-3 gap-4">
-              <button className="flex items-center justify-center space-x-2 bg-primary text-white py-3 px-4 rounded-lg hover:bg-opacity-90">
-                <MessageCircle className="w-5 h-5" />
-                <span>Chat Now</span>
-              </button>
-              <button className="flex items-center justify-center space-x-2 bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200">
-                <Phone className="w-5 h-5" />
-                <span>Call Agent</span>
-              </button>
+            <div className="grid grid-cols-2 gap-4">
+              {property.agent.phone ? (
+                <a 
+                  href={`tel:${property.agent.phone}`}
+                  className="flex items-center justify-center space-x-2 bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200"
+                >
+                  <Phone className="w-5 h-5" />
+                  <span>Call Agent</span>
+                </a>
+              ) : (
+                <button 
+                  disabled
+                  aria-disabled="true"
+                  title="Phone number unavailable"
+                  className="flex items-center justify-center space-x-2 bg-gray-100 text-gray-400 py-3 px-4 rounded-lg cursor-not-allowed opacity-70"
+                >
+                  <Phone className="w-5 h-5" />
+                  <span>Call Agent</span>
+                </button>
+              )}
               <button className="flex items-center justify-center space-x-2 bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200">
                 <Mail className="w-5 h-5" />
                 <span>Send Email</span>

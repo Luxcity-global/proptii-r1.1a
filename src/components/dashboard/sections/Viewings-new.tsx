@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, Clock, MapPin, User, Mail, CheckCircle, Eye, X, Heart, MessageCircle, Send, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Mail, CheckCircle, Eye, X, Heart, Send, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { viewingService, ViewingBooking, ViewingStats } from '../../../services/viewingService';
 import { bookViewingRequestService, BookViewingRequest } from '../../../services/bookViewingRequestService';
 import { propertySelectionService, PropertySelection, PropertySelectionStats } from '../../../services/propertySelectionService';

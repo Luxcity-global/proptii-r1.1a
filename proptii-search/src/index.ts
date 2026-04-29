@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { Redis } from 'ioredis';
 import './workers/searchWorker'; // Import to start the worker
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // MongoDB Connection
 const connectDB = async () => {

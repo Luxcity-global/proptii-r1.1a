@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, Share2, MapPin, BedDouble, Bath, Square, Phone, Mail, MessageCircle, Building2 } from 'lucide-react';
+import { Heart, Share2, MapPin, BedDouble, Bath, Square, Phone, Mail, Building2 } from 'lucide-react';
 import ListingDetailsModal from './ListingDetailsModal';
 
 interface Property {
@@ -203,26 +203,27 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
               <p>{property.agent.name}</p>
             </div>
             <div className="flex space-x-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Implement chat functionality
-                }}
-                className="flex items-center space-x-1 px-2 py-1 bg-primary text-white rounded-lg hover:bg-opacity-90"
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span className="text-xs">Chat</span>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Implement call functionality
-                }}
-                className="flex items-center space-x-1 px-2 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
-              >
-                <Phone className="w-4 h-4" />
-                <span className="text-xs">Call</span>
-              </button>
+              {property.agent.phone ? (
+                <a
+                  href={`tel:${property.agent.phone}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center space-x-1 px-2 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span className="text-xs">Call</span>
+                </a>
+              ) : (
+                <button
+                  disabled
+                  aria-disabled="true"
+                  title="Phone number unavailable"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center space-x-1 px-2 py-1 bg-gray-100 text-gray-400 rounded-lg cursor-not-allowed opacity-70"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span className="text-xs">Call</span>
+                </button>
+              )}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
