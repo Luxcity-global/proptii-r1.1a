@@ -1,15 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LandlordAppBridge from '../components/LandlordAppBridge';
 import Footer from '../components/Footer';
 import { SignUpPromptModal } from '../components/onboarding/SignUpPromptModal';
+import { MessagingProvider } from '../contexts/MessagingContext';
+import { useMessagingPoller } from '../hooks/useMessagingPoller';
 
-const LandlordDemo: React.FC = () => {
-  const { isAuthenticated, user, isLoading, login } = useAuth();
+/**
+ * Inner component that has access to MessagingContext and starts the poller.
+ * Renders the landlord app bridge for the base /landlord route, or child
+ * routes (e.g. /landlord/messages) via <Outlet />.
+ */
+const LandlordDemoInner: React.FC = () => {
+  const { isLoading, login } = useAuth();
   const { pathname, search } = useLocation();
   const [signUpOpen, setSignUpOpen] = useState(false);
   const [signUpTitle, setSignUpTitle] = useState('Sign up to continue');
+
+  // Start the 30-second polling loop for conversations and unread count
+  useMessagingPoller();
 
   // Auto-open sign-in modal when redirected here with ?signin=1
   // (e.g. from the landlord app running in standalone mode)
@@ -31,8 +41,8 @@ const LandlordDemo: React.FC = () => {
           action === 'publish'
             ? 'Sign up to publish your property'
             : action === 'add-tenant'
-            ? 'Sign up to add a tenant'
-            : 'Sign up to continue'
+              ? 'Sign up to add a tenant'
+              : 'Sign up to continue'
         );
         // Store current path so we can redirect back after login
         sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
@@ -61,6 +71,9 @@ const LandlordDemo: React.FC = () => {
       {/* Landlord App (rendered for both authenticated and guest users) */}
       <LandlordAppBridge />
 
+      {/* Child routes (e.g. /landlord/messages) render here */}
+      <Outlet />
+
       <Footer />
 
       {/* Sign-up gate — appears when the iframe sends REQUIRE_AUTH */}
@@ -79,5 +92,15 @@ const LandlordDemo: React.FC = () => {
     </div>
   );
 };
+
+/**
+ * LandlordDemo — the landlord layout component wrapping all /landlord/* routes.
+ * Provides MessagingContext and starts the polling loop via LandlordDemoInner.
+ */
+const LandlordDemo: React.FC = () => (
+  <MessagingProvider>
+    <LandlordDemoInner />
+  </MessagingProvider>
+);
 
 export default LandlordDemo;

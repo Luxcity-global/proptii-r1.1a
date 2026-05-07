@@ -1,5 +1,6 @@
 import { BaseService } from './BaseService';
 import { z } from 'zod';
+import { normalisePhone } from '../utils/phoneNormaliser';
 
 // Property schema validation
 const propertySchema = z.object({
@@ -19,11 +20,33 @@ const propertySchema = z.object({
     features: z.array(z.string()),
     images: z.array(z.string().url()),
     status: z.enum(['available', 'sold', 'pending']).default('available'),
+    agent: z.object({
+        name: z.string().optional(),
+        company: z.string().optional(),
+        phone: z.string().optional(),
+        email: z.string().optional()
+    }).optional(),
+    /** E.164-normalised phone number derived from agent.phone. Undefined when normalisation fails. */
+    phone: z.string().optional(),
     createdAt: z.string().optional(),
     updatedAt: z.string().optional()
 });
 
 export type Property = z.infer<typeof propertySchema>;
+
+/**
+ * Attempts to normalise the agent.phone field on a raw property document to E.164.
+ * Returns the document with a top-level `phone` field set to the E.164 string on
+ * success, or `undefined` when the raw value is absent or cannot be parsed.
+ */
+function applyPhoneNormalisation<T extends Record<string, unknown>>(doc: T): T & { phone?: string } {
+    const agentPhone = (doc as { agent?: { phone?: string } }).agent?.phone;
+    if (!agentPhone) {
+        return { ...doc, phone: undefined };
+    }
+    const result = normalisePhone(agentPhone, 'agent.phone');
+    return { ...doc, phone: result.success ? result.e164 : undefined };
+}
 
 export class PropertyService extends BaseService {
     constructor() {
@@ -50,11 +73,13 @@ export class PropertyService extends BaseService {
     }
 
     async getAll(): Promise<Property[]> {
-        return this.query<Property>('SELECT * FROM c');
+        const docs = await this.query<Record<string, unknown>>('SELECT * FROM c');
+        return docs.map(applyPhoneNormalisation) as Property[];
     }
 
     async getPropertyById(id: string): Promise<Property> {
-        return super.getById<Property>(id, id);
+        const doc = await super.getById<Record<string, unknown>>(id, id);
+        return applyPhoneNormalisation(doc) as Property;
     }
 
     async deleteProperty(id: string): Promise<void> {

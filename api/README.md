@@ -24,4 +24,53 @@ While the main NestJS backend handles core business logic, this API provides:
 - **`package.json`**: Dependencies and deployment scripts.
 
 ---
+
+## ⚙️ Environment Configuration
+
+### Local Development
+
+1. Copy the template and fill in your values:
+   ```bash
+   # local.settings.json is already created with all required variables
+   # Edit api/local.settings.json and replace placeholder values
+   ```
+
+2. Required variables (already populated from existing credentials):
+   - `COSMOS_DB_CONNECTION_STRING` ✅
+   - `COSMOS_DB_KEY` ✅
+   - `COSMOS_DB_DATABASE_NAME` ✅
+   - `AZURE_AD_B2C_*` ✅
+
+3. Variables needing your input:
+   - `BLOB_STORAGE_CONNECTION_STRING` — get from Azure Portal → Storage Accounts → proptiir11a → Access Keys
+   - `APPINSIGHTS_INSTRUMENTATIONKEY` — get from Azure Portal → Application Insights
+   - `DOCUSIGN_*` — get from DocuSign Developer Portal
+
+### Messaging System Setup
+
+Before the messaging system works, create these Cosmos DB containers:
+
+| Container | Partition Key | TTL |
+|---|---|---|
+| `conversations` | `/tenantId` | — |
+| `messages` | `/conversationId` | — |
+| `message_attachments` | `/conversationId` | — |
+| `conversation_participants` | `/conversationId` | — |
+| `notification_log` | `/recipientId` | 90 days |
+| `audit_log` | `/actorId` | — |
+
+See `MESSAGING_SETUP_GUIDE.md` in the root directory for full instructions.
+
+### Running Locally
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+API runs on `http://localhost:7071`
+
+---
+
 © 2026 Proptii. All Rights Reserved.

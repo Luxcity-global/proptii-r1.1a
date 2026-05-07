@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, BedDouble, Bath, Square, Phone, Mail, Building2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { X, MapPin, BedDouble, Bath, Square, Phone, MessageSquare, Building2, ChevronLeft, ChevronRight, Check, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { useMessagingContext } from '../../contexts/MessagingContext';
+import communicationService from '../../services/communicationService';
 
 interface Property {
   id: string;
@@ -33,6 +37,10 @@ interface Property {
     transport: string[];
     shops: string[];
   };
+  /** E.164-normalised phone number derived from agent.phone on the backend. */
+  phone?: string;
+  /** Landlord user ID, used to initiate a conversation. */
+  landlordId?: string;
   createdAt: string;
   updatedAt: string;
   isAvailableNow?: boolean;
@@ -51,6 +59,43 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(initialImageIndex);
   const [showMap, setShowMap] = useState(false);
+  const [isMessaging, setIsMessaging] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
+
+  const navigate = useNavigate();
+  const { user, isAuthenticated, login } = useAuth();
+  const { setActiveConversationId } = useMessagingContext();
+
+  const handleMessageClick = async () => {
+    setMessageError(null);
+
+    if (!isAuthenticated || !user) {
+      sessionStorage.setItem('redirectAfterLogin', window.location.pathname + window.location.search);
+      await login();
+      return;
+    }
+
+    if (!property.landlordId) {
+      setMessageError('Unable to message: landlord information unavailable.');
+      return;
+    }
+
+    setIsMessaging(true);
+    try {
+      const conversation = await communicationService.getOrCreateConversation({
+        propertyId: property.id,
+        tenantId: user.id,
+        landlordId: property.landlordId,
+      });
+      setActiveConversationId(conversation.id);
+      onClose();
+      navigate('/dashboard/messages');
+    } catch {
+      setMessageError('Failed to start conversation. Please try again.');
+    } finally {
+      setIsMessaging(false);
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -77,11 +122,11 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
 
   const navigateImages = (direction: 'prev' | 'next') => {
     if (direction === 'prev') {
-      setCurrentImageIndex((prev) => 
+      setCurrentImageIndex((prev) =>
         prev === 0 ? property.images.length - 1 : prev - 1
       );
     } else {
-      setCurrentImageIndex((prev) => 
+      setCurrentImageIndex((prev) =>
         prev === property.images.length - 1 ? 0 : prev + 1
       );
     }
@@ -100,14 +145,13 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
               loading={currentImageIndex === 0 ? "eager" : "lazy"}
               sizes="(max-width: 768px) 100vw, 75vw"
             />
-            
+
             {/* Property Type and Availability Badges */}
             <div className="absolute top-4 left-4 flex gap-2">
-              <span className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                property.type === 'rent' 
-                  ? 'bg-blue-500 text-white' 
-                  : 'bg-purple-500 text-white'
-              }`}>
+              <span className={`px-4 py-2 rounded-full text-sm font-semibold ${property.type === 'rent'
+                ? 'bg-blue-500 text-white'
+                : 'bg-purple-500 text-white'
+                }`}>
                 {property.type === 'rent' ? 'To Rent' : 'For Sale'}
               </span>
               {property.isAvailableNow && (
@@ -143,11 +187,10 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
               <button
                 key={index}
                 onClick={() => setCurrentImageIndex(index)}
-                className={`relative w-20 h-20 rounded-lg overflow-hidden transition-all ${
-                  currentImageIndex === index
-                    ? 'ring-2 ring-primary ring-offset-2'
-                    : 'opacity-75 hover:opacity-100'
-                }`}
+                className={`relative w-20 h-20 rounded-lg overflow-hidden transition-all ${currentImageIndex === index
+                  ? 'ring-2 ring-primary ring-offset-2'
+                  : 'opacity-75 hover:opacity-100'
+                  }`}
               >
                 <img
                   src={image.src}
@@ -307,18 +350,18 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
                 </div>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
-              {property.agent.phone ? (
-                <a 
-                  href={`tel:${property.agent.phone}`}
+              {property.phone ? (
+                <a
+                  href={`tel:${property.phone}`}
                   className="flex items-center justify-center space-x-2 bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200"
                 >
                   <Phone className="w-5 h-5" />
                   <span>Call Agent</span>
                 </a>
               ) : (
-                <button 
+                <button
                   disabled
                   aria-disabled="true"
                   title="Phone number unavailable"
@@ -328,11 +371,29 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
                   <span>Call Agent</span>
                 </button>
               )}
-              <button className="flex items-center justify-center space-x-2 bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200">
-                <Mail className="w-5 h-5" />
-                <span>Send Email</span>
+              <button
+                onClick={handleMessageClick}
+                disabled={isMessaging}
+                aria-disabled={isMessaging}
+                title={messageError ?? 'Message agent'}
+                className={`flex items-center justify-center space-x-2 py-3 px-4 rounded-lg transition-colors ${isMessaging
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-primary text-white hover:bg-primary-dark'
+                  }`}
+              >
+                {isMessaging ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <MessageSquare className="w-5 h-5" />
+                )}
+                <span>Message</span>
               </button>
             </div>
+            {messageError && (
+              <div className="mt-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">
+                {messageError}
+              </div>
+            )}
           </div>
         </div>
       </div>

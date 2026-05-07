@@ -3,6 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { DASHBOARD_SECTIONS } from "../Dashboard";
 import { ChevronLeft, ChevronRight, Home, User } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useMessagingContext } from '../../../contexts/MessagingContext';
+
+// ---------------------------------------------------------------------------
+// Badge helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the badge label for a given unread count:
+ *   0        → null (badge hidden)
+ *   1–99     → numeric string
+ *   100+     → "99+"
+ */
+export function getUnreadBadgeLabel(count: number): string | null {
+  if (count <= 0) return null;
+  if (count > 99) return '99+';
+  return String(count);
+}
 
 interface DashboardSidebarProps {
   activeSection: string;
@@ -19,6 +36,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { unreadCount } = useMessagingContext();
 
   const handleNavClick = (sectionId: string, path: string) => {
     onSectionChange(sectionId);
@@ -30,14 +48,14 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   };
 
   return (
-    <div 
+    <div
       className="group peer hidden md:block"
       style={{ color: '#374957' }}
     >
       {/* Sidebar Container */}
-      <div 
+      <div
         className="fixed inset-y-0 left-0 z-10 h-screen transition-all duration-300 ease-out bg-white border-r"
-        style={{ 
+        style={{
           width: isCollapsed ? '56px' : '200px',
           borderColor: '#ebebeb',
           fontFamily: 'Archivo, sans-serif'
@@ -49,17 +67,17 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
             <div className={`pt-2 pb-2 ${isCollapsed ? 'px-2' : 'pl-4 pr-2'}`}>
               <div className={`flex items-center h-8 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
                 {isCollapsed ? (
-                  <img 
-                    src="/images/Proptii ico.png" 
-                    alt="Proptii Logo" 
+                  <img
+                    src="/images/Proptii ico.png"
+                    alt="Proptii Logo"
                     className="w-8 h-8 object-contain flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={handleLogoClick}
                     title="Go to Home"
                   />
                 ) : (
-                  <img 
-                    src="/images/proptii-logo.png" 
-                    alt="Proptii Logo" 
+                  <img
+                    src="/images/proptii-logo.png"
+                    alt="Proptii Logo"
                     className="h-8 object-contain cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={handleLogoClick}
                     title="Go to Home"
@@ -75,6 +93,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
               <div className="space-y-3">
                 {DASHBOARD_SECTIONS.map((section) => {
                   const isActive = activeSection === section?.id;
+                  const badgeLabel = section?.id === 'messages' ? getUnreadBadgeLabel(unreadCount) : null;
                   return (
                     <button
                       key={section?.id ?? ''}
@@ -83,7 +102,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                         w-full flex items-center h-10 px-3 rounded-md text-sm font-medium transition-colors
                         ${isCollapsed ? 'justify-center' : 'justify-start'}
                       `}
-                      style={{ 
+                      style={{
                         alignItems: 'center',
                         color: isActive ? '#136C9E' : '#374957',
                         backgroundColor: isActive ? '#E6F3FF' : 'transparent'
@@ -101,6 +120,31 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                     >
                       <div className="relative flex-shrink-0">
                         {section?.icon?.(isActive)}
+                        {badgeLabel !== null && (
+                          <span
+                            data-testid="unread-badge"
+                            style={{
+                              position: 'absolute',
+                              top: '-6px',
+                              right: '-8px',
+                              backgroundColor: '#ef4444',
+                              color: '#ffffff',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              lineHeight: 1,
+                              minWidth: '16px',
+                              height: '16px',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '0 3px',
+                              pointerEvents: 'none',
+                            }}
+                          >
+                            {badgeLabel}
+                          </span>
+                        )}
                       </div>
                       {!isCollapsed && (
                         <span className="ml-2 truncate">{section?.label ?? ''}</span>
@@ -149,10 +193,10 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                   <ChevronLeft className="h-4 w-4" style={{ color: '#374957' }} />
                 )}
               </button>
-              
+
               {/* Proptii Home Button */}
               {isCollapsed ? (
-                <button 
+                <button
                   onClick={handleLogoClick}
                   className="w-full flex items-center justify-center h-8 px-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors"
                   title="Go to Home"
@@ -160,7 +204,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                   <Home className="h-4 w-4" />
                 </button>
               ) : (
-                <button 
+                <button
                   onClick={handleLogoClick}
                   className="w-full flex items-center justify-center h-8 px-2 rounded-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 transition-colors text-sm font-medium"
                   title="Go to Home"
@@ -173,9 +217,9 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           </div>
         </div>
       </div>
-      
+
       {/* Spacer for content */}
-      <div 
+      <div
         className="transition-all duration-300 ease-out"
         style={{
           width: isCollapsed ? '56px' : '200px'

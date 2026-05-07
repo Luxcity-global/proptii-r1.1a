@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
-import { Heart, Share2, MapPin, BedDouble, Bath, Square, Phone, Mail, Building2 } from 'lucide-react';
+import { Heart, Share2, MapPin, BedDouble, Bath, Square, Phone, MessageSquare, Building2, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import ListingDetailsModal from './ListingDetailsModal';
+import { useAuth } from '../../contexts/AuthContext';
+import { useMessagingContext } from '../../contexts/MessagingContext';
+import communicationService from '../../services/communicationService';
 
 interface Property {
   id: string;
@@ -34,6 +38,10 @@ interface Property {
     transport: string[];
     shops: string[];
   };
+  /** E.164-normalised phone number derived from agent.phone on the backend. */
+  phone?: string;
+  /** Landlord user ID, used to initiate a conversation. */
+  landlordId?: string;
   createdAt: string;
   updatedAt: string;
   isAvailableNow?: boolean;
@@ -48,6 +56,44 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [isMessaging, setIsMessaging] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
+
+  const navigate = useNavigate();
+  const { user, isAuthenticated, login } = useAuth();
+  const { setActiveConversationId } = useMessagingContext();
+
+  const handleMessageClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMessageError(null);
+
+    if (!isAuthenticated || !user) {
+      // Store the current listing URL so we can return after login
+      sessionStorage.setItem('redirectAfterLogin', window.location.pathname + window.location.search);
+      await login();
+      return;
+    }
+
+    if (!property.landlordId) {
+      setMessageError('Unable to message: landlord information unavailable.');
+      return;
+    }
+
+    setIsMessaging(true);
+    try {
+      const conversation = await communicationService.getOrCreateConversation({
+        propertyId: property.id,
+        tenantId: user.id,
+        landlordId: property.landlordId,
+      });
+      setActiveConversationId(conversation.id);
+      navigate('/dashboard/messages');
+    } catch {
+      setMessageError('Failed to start conversation. Please try again.');
+    } finally {
+      setIsMessaging(false);
+    }
+  };
 
   // Placeholder image paths - these will be replaced with actual images
   const imagePaths = {
@@ -96,8 +142,8 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
             />
             <div className="absolute top-2 left-2 flex flex-col gap-2">
               <span className={`px-3 py-1 rounded-full text-xs font-semibold ${property.type === 'rent'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-purple-500 text-white'
+                ? 'bg-blue-500 text-white'
+                : 'bg-purple-500 text-white'
                 }`}>
                 {property.type === 'rent' ? 'To Rent' : 'For Sale'}
               </span>
@@ -203,9 +249,9 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
               <p>{property.agent.name}</p>
             </div>
             <div className="flex space-x-2">
-              {property.agent.phone ? (
+              {property.phone ? (
                 <a
-                  href={`tel:${property.agent.phone}`}
+                  href={`tel:${property.phone}`}
                   onClick={(e) => e.stopPropagation()}
                   className="flex items-center space-x-1 px-2 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
                 >
@@ -225,17 +271,29 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
                 </button>
               )}
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Implement email functionality
-                }}
-                className="flex items-center space-x-1 px-2 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
+                onClick={handleMessageClick}
+                disabled={isMessaging}
+                aria-disabled={isMessaging}
+                title={messageError ?? 'Message agent'}
+                className={`flex items-center space-x-1 px-2 py-1 rounded-lg transition-colors ${isMessaging
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-primary text-white hover:bg-primary-dark'
+                  }`}
               >
-                <Mail className="w-4 h-4" />
-                <span className="text-xs">Email</span>
+                {isMessaging ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <MessageSquare className="w-4 h-4" />
+                )}
+                <span className="text-xs">Message</span>
               </button>
             </div>
           </div>
+          {messageError && (
+            <div className="mt-2 text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+              {messageError}
+            </div>
+          )}
         </div>
       </div>
     </div>

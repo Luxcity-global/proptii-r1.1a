@@ -20,6 +20,8 @@ import Viewings from './components/dashboard/sections/Viewings-new';
 import TenantContracts from './components/dashboard/sections/TenantContracts-new';
 import FileTable from './components/dashboard/sections/YourFiles-new';
 import TenantReferencing from './components/dashboard/sections/TenantReferencing-new';
+import TenantMessages from './pages/dashboard/TenantMessages';
+import LandlordMessages from './pages/landlord/LandlordMessages';
 import AgentHome from './pages/AgentHome';
 import HomeownerHome from './pages/HomeownerHome';
 import HomeownerHomeVariantB from './pages/HomeownerHomeVariantB';
@@ -78,108 +80,111 @@ export const App: React.FC = () => {
       <MSALProviderWrapper>
         <SavedPropertiesProvider>
           <OnboardingSessionProvider>
-          <SignedContractsProvider>
+            <SignedContractsProvider>
               <AuthAnalyticsBridge />
               <AuthRedirectHandler />
               <ScrollToTop />
               <Routes>
-            {/* Public Routes - / is default landing; onboarding shows as modal overlay */}
-            <Route path="/" element={<HomeVariant />} />
-            <Route path="/home-v2" element={<Navigate to="/" replace />} />
-            <Route path="/home-legacy" element={<HomeLegacy />} />
-            <Route path="/home" element={<Navigate to="/" replace />} />
-            <Route path="/tenant-onboarding" element={<OnboardingOptionsModalRoute type="tenant" />} />
-            <Route path="/landlord-onboarding" element={<OnboardingOptionsModalRoute type="landlord" />} />
-            <Route path="/homeowner-onboarding" element={<OnboardingOptionsModalRoute type="homeowner" />} />
-            <Route path="/search" element={<SearchResults />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/unauthorized" element={<UnauthorizedPage />} />
-            <Route path="/about-us" element={<AboutUs />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/terms-of-service" element={<TermsOfService />} />
-            <Route path="/faq" element={<FAQ />} />
-            <Route path="/pricing" element={<Pricing />} />
+                {/* Public Routes - / is default landing; onboarding shows as modal overlay */}
+                <Route path="/" element={<HomeVariant />} />
+                <Route path="/home-v2" element={<Navigate to="/" replace />} />
+                <Route path="/home-legacy" element={<HomeLegacy />} />
+                <Route path="/home" element={<Navigate to="/" replace />} />
+                <Route path="/tenant-onboarding" element={<OnboardingOptionsModalRoute type="tenant" />} />
+                <Route path="/landlord-onboarding" element={<OnboardingOptionsModalRoute type="landlord" />} />
+                <Route path="/homeowner-onboarding" element={<OnboardingOptionsModalRoute type="homeowner" />} />
+                <Route path="/search" element={<SearchResults />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/unauthorized" element={<UnauthorizedPage />} />
+                <Route path="/about-us" element={<AboutUs />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/terms-of-service" element={<TermsOfService />} />
+                <Route path="/faq" element={<FAQ />} />
+                <Route path="/pricing" element={<Pricing />} />
 
-            {/* Legacy / marketing URL redirects */}
-            <Route path="/about" element={<Navigate to="/about-us" replace />} />
-            <Route path="/contract" element={<Navigate to="/contracts" replace />} />
-            <Route path="/booking" element={<Navigate to="/bookviewing" replace />} />
-            <Route path="/book-viewing" element={<Navigate to="/bookviewing" replace />} />
+                {/* Legacy / marketing URL redirects */}
+                <Route path="/about" element={<Navigate to="/about-us" replace />} />
+                <Route path="/contract" element={<Navigate to="/contracts" replace />} />
+                <Route path="/booking" element={<Navigate to="/bookviewing" replace />} />
+                <Route path="/book-viewing" element={<Navigate to="/bookviewing" replace />} />
 
-            {/* Protected Routes */}
-            <Route path="/agent" element={
-              <ProtectedRoute>
-                <AgentHome />
-              </ProtectedRoute>
-            } />
-            <Route path="/Agent" element={
-              <ProtectedRoute>
-                <AgentHome />
-              </ProtectedRoute>
-            } />
-            <Route path="/landlord" element={<LandlordDemo />} />
-            <Route path="/landlord/*" element={<LandlordDemo />} />
+                {/* Protected Routes */}
+                <Route path="/agent" element={
+                  <ProtectedRoute>
+                    <AgentHome />
+                  </ProtectedRoute>
+                } />
+                <Route path="/Agent" element={
+                  <ProtectedRoute>
+                    <AgentHome />
+                  </ProtectedRoute>
+                } />
+                <Route path="/landlord" element={<LandlordDemo />} />
+                <Route path="/landlord/*" element={<LandlordDemo />}>
+                  <Route path="messages" element={<LandlordMessages />} />
+                </Route>
 
-            {/* Homeowner landing: use Variant B as default */}
-            <Route path="/homeowner" element={<HomeownerHomeVariantB />} />
-            <Route path="/Homeowner" element={<HomeownerHomeVariantB />} />
-            {/* Keep alternate hero image available under /variant-b */}
-            <Route path="/homeowner/variant-b" element={<HomeownerHome />} />
-            <Route path="/Homeowner/variant-b" element={<HomeownerHome />} />
-            <Route path="/homeowner/dashboard" element={<HomeownerDashboard />} />
-            <Route path="/Homeowner/dashboard" element={<HomeownerDashboard />} />
-            <Route path="/public-worker" element={<PublicWorkerHome />} />
-            <Route path="/Public-worker" element={<PublicWorkerHome />} />
-            <Route path="/landlord-demo" element={<LandlordDemo />} />
+                {/* Homeowner landing: use Variant B as default */}
+                <Route path="/homeowner" element={<HomeownerHomeVariantB />} />
+                <Route path="/Homeowner" element={<HomeownerHomeVariantB />} />
+                {/* Keep alternate hero image available under /variant-b */}
+                <Route path="/homeowner/variant-b" element={<HomeownerHome />} />
+                <Route path="/Homeowner/variant-b" element={<HomeownerHome />} />
+                <Route path="/homeowner/dashboard" element={<HomeownerDashboard />} />
+                <Route path="/Homeowner/dashboard" element={<HomeownerDashboard />} />
+                <Route path="/public-worker" element={<PublicWorkerHome />} />
+                <Route path="/Public-worker" element={<PublicWorkerHome />} />
+                <Route path="/landlord-demo" element={<LandlordDemo />} />
 
-            <Route path="/referencing" element={<Referencing />} />
+                <Route path="/referencing" element={<Referencing />} />
 
-            <Route path="/contracts" element={<ContractsPage />} />
+                <Route path="/contracts" element={<ContractsPage />} />
 
-            <Route path="/bookviewing" element={<BookViewing />} />
+                <Route path="/bookviewing" element={<BookViewing />} />
 
-            {/* Tools routes */}
-            <Route path="/tools" element={<Tools />} />
-            <Route path="/tools/readiness-checker" element={<ReadinessChecker />} />
-            <Route path="/tools/document-tracker" element={<DocumentTracker />} />
-            <Route path="/tools/viewing-tracker" element={<ViewingTracker />} />
-            <Route path="/tools/process-simulator" element={<ProcessSimulator />} />
-            <Route path="/tools/timeline-generator" element={<TimelineGenerator />} />
-            <Route path="/tools/know-your-rights" element={<KnowYourRights />} />
-            <Route path="/coming-soon" element={<ComingSoon />} />
+                {/* Tools routes */}
+                <Route path="/tools" element={<Tools />} />
+                <Route path="/tools/readiness-checker" element={<ReadinessChecker />} />
+                <Route path="/tools/document-tracker" element={<DocumentTracker />} />
+                <Route path="/tools/viewing-tracker" element={<ViewingTracker />} />
+                <Route path="/tools/process-simulator" element={<ProcessSimulator />} />
+                <Route path="/tools/timeline-generator" element={<TimelineGenerator />} />
+                <Route path="/tools/know-your-rights" element={<KnowYourRights />} />
+                <Route path="/coming-soon" element={<ComingSoon />} />
 
-            {/* Listings routes */}
-            <Route path="/listings" element={<Listings />} />
-            <Route path="/listings/new" element={
-              <ProtectedRoute requiredRoles={['agent', 'tenant']}>
-                <NewListingPage />
-              </ProtectedRoute>
-            } />
+                {/* Listings routes */}
+                <Route path="/listings" element={<Listings />} />
+                <Route path="/listings/new" element={
+                  <ProtectedRoute requiredRoles={['agent', 'tenant']}>
+                    <NewListingPage />
+                  </ProtectedRoute>
+                } />
 
-            {/* Dashboard Routes */}
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }>
-              <Route index element={<DashboardHome />} />
-              <Route path="saved-searches" element={<SavedProperties />} />
-              <Route path="viewings" element={<Viewings />} />
-              <Route path="tenant-contracts" element={<TenantContracts />} />
-              <Route path="your-files" element={<FileTable />} />
-              <Route path="tenant-referencing" element={<TenantReferencing />} />
-            </Route>
+                {/* Dashboard Routes */}
+                <Route path="/dashboard" element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }>
+                  <Route index element={<DashboardHome />} />
+                  <Route path="saved-searches" element={<SavedProperties />} />
+                  <Route path="viewings" element={<Viewings />} />
+                  <Route path="tenant-contracts" element={<TenantContracts />} />
+                  <Route path="your-files" element={<FileTable />} />
+                  <Route path="tenant-referencing" element={<TenantReferencing />} />
+                  <Route path="messages" element={<TenantMessages />} />
+                </Route>
 
-            {/* New agent contract route */}
-            {/* <Route path="/agent-contracts" element={<AgentContractLanding />} /> */}
+                {/* New agent contract route */}
+                {/* <Route path="/agent-contracts" element={<AgentContractLanding />} /> */}
 
-            {/* Catch-all route for 404 */}
-            <Route path="*" element={<NotFoundPage />} />
+                {/* Catch-all route for 404 */}
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </SignedContractsProvider>
-            </OnboardingSessionProvider>
-          </SavedPropertiesProvider>
+          </OnboardingSessionProvider>
+        </SavedPropertiesProvider>
       </MSALProviderWrapper>
     </ErrorBoundary>
   );

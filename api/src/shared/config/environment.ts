@@ -14,6 +14,20 @@ const envSchema = z.object({
     APPINSIGHTS_INSTRUMENTATIONKEY: z.string(),
     API_PREFIX: z.string(),
     ALLOWED_ORIGINS: z.string(),
+    // Messaging / Phase 2 — optional to avoid breaking existing deployments
+    BLOB_STORAGE_CONNECTION_STRING: z.string().optional(),
+    BLOB_STORAGE_CONTAINER_NAME: z.string().optional(),
+    ATTACHMENT_SAS_EXPIRY_SECONDS: z.coerce.number().default(3600),
+    EMAIL_FROM_ADDRESS: z.string().email().optional(),
+    ACTIVE_USER_THRESHOLD_SECONDS: z.coerce.number().default(300),
+    EMAIL_DEDUP_WINDOW_SECONDS: z.coerce.number().default(900),
+    // Email transport — Resend API (primary)
+    RESEND_API_KEY: z.string().optional(),
+    // Email transport — SMTP fallback
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.coerce.number().optional(),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASS: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
