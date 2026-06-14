@@ -73,6 +73,8 @@ export class SecurityMiddleware {
         const connectSources = new Set<string>([
             'https://formsubmit.co',
             'https://proptii.b2clogin.com',
+            'https://api.stripe.com',
+            'https://*.stripe.com',
             'https://*.azure.com',
             // Always include known backend origins
             'https://proptii-r1-1a-1.onrender.com',
@@ -96,26 +98,28 @@ export class SecurityMiddleware {
             connectSources.add(searchBackendOrigin);
         }
 
-        // Add localhost for development
+        // Local API in dev (Nest on :3000, search on :3001). Include 127.0.0.1 — Windows
+        // often breaks on localhost (::1); billing uses 127.0.0.1 explicitly.
         if (isDevelopment) {
             connectSources.add('http://localhost:*');
+            connectSources.add('http://127.0.0.1:*');
         }
-        
-        // Always add baseUrl if provided (for custom API URLs)
-        if (baseUrl) {
-            connectSources.add(baseUrl);
+
+        const apiOrigin = this.sanitizeOrigin(apiUrl) ?? this.sanitizeOrigin(baseUrl);
+        if (apiOrigin) {
+            connectSources.add(apiOrigin);
         }
 
         const connectSrc = ["'self'", ...connectSources].join(' ');
 
         return [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com https://maps.googleapis.com https://*.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com https://js.stripe.com https://maps.googleapis.com https://*.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' https://fonts.gstatic.com data:",
             "img-src 'self' data: https: blob:",
             `connect-src ${connectSrc}`,
-            "frame-src 'self' https://proptii.b2clogin.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net https://*.google.com",
+            "frame-src 'self' https://proptii.b2clogin.com https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://*.stripe.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net https://*.google.com",
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",

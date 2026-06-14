@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proptii — Skip the trial</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500;6..12,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="flow-shared.css">
+<style>
+.wrap { max-width: 540px; margin: 48px auto 32px; padding: 0 20px; }
+.card { background: #fff; border: 1px solid var(--border); border-radius: 24px; padding: 36px; }
+.card h1 { font-family: 'Archivo'; font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 6px; }
+.card .lead { font-size: 14px; color: var(--muted); margin-bottom: 24px; }
+.summary { background: var(--cream); border-radius: 14px; padding: 18px 20px; margin-bottom: 22px; }
+.summary-row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; padding: 6px 0; color: var(--navy); }
+.summary-row .lbl { color: var(--muted); }
+.summary-divider { height: 1px; background: var(--border-strong); margin: 8px 0; }
+.summary-due { font-size: 17px; font-weight: 700; }
+.summary-due .amt { font-family: 'Archivo'; font-size: 22px; color: var(--orange); }
+
+.method-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 22px; }
+.method-btn { padding: 14px 8px; border: 1.5px solid var(--border-strong); background: #fff; border-radius: 14px; font-size: 13px; font-weight: 600; color: var(--navy); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; transition: all .15s; }
+.method-btn:hover { border-color: var(--navy); }
+.method-btn.active { border: 2px solid var(--orange); padding: 13px 7px; background: var(--orange-light); }
+.method-btn .ic { font-size: 18px; }
+
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field input { border-radius: 12px; }
+
+.back-link { display: block; text-align: center; margin-top: 14px; font-size: 12px; color: var(--muted); text-decoration: none; }
+.back-link:hover { color: var(--navy); text-decoration: underline; }
+
+.trust { display: flex; justify-content: center; gap: 24px; margin-top: 26px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.trust span { display: inline-flex; align-items: center; gap: 6px; }
+.trust svg { width: 13px; height: 13px; stroke: var(--green); stroke-width: 2; fill: none; }
+</style></head><body>
+
+<div id="nav-mount"></div>
+
+<main>
+  <div class="wrap fade-in">
+    <div class="card">
+      <h1>Skip the trial — start your plan today.</h1>
+      <p class="lead">Pay now and your subscription begins immediately.</p>
+
+      <div class="summary">
+        <div class="summary-row"><span class="lbl">Plan</span><span>Renter Pro</span></div>
+        <div class="summary-row"><span class="lbl">Billing</span><span>Annual</span></div>
+        <div class="summary-row"><span class="lbl">Price</span><span>£99 / year</span></div>
+        <div class="summary-divider"></div>
+        <div class="summary-row summary-due"><span>Due today</span><span class="amt">£99</span></div>
+      </div>
+
+      <div class="method-row">
+        <button class="method-btn active" onclick="setMethod(this,'card')"><span class="ic">💳</span>Card</button>
+        <button class="method-btn" onclick="setMethod(this,'apple')"><span class="ic"></span>Apple Pay</button>
+        <button class="method-btn" onclick="setMethod(this,'google')"><span class="ic">G</span>Google Pay</button>
+      </div>
+
+      <div id="card-fields">
+        <div class="field"><label>Card number</label><input type="text" placeholder="1234 5678 9012 3456" inputmode="numeric"></div>
+        <div class="row-2">
+          <div class="field"><label>Expiry</label><input type="text" placeholder="MM / YY"></div>
+          <div class="field"><label>CVC</label><input type="text" placeholder="123" inputmode="numeric"></div>
+        </div>
+        <div class="field"><label>Name on card</label><input type="text" placeholder="As shown on card"></div>
+      </div>
+
+      <a href="screen-8-confirmed.html" class="btn btn-primary btn-block">Pay £99 and start now</a>
+      <a href="screen-4-arrival.html" class="back-link">← Actually, I'd prefer the free month</a>
+
+      <div class="trust">
+        <span><svg viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" rx="1"/><path d="M5 7V5a3 3 0 1 1 6 0v2"/></svg>Secured by Stripe</span>
+        <span><svg viewBox="0 0 16 16"><path d="M8 1l6 2v5c0 4-3 6-6 7-3-1-6-3-6-7V3z"/></svg>PCI compliant</span>
+        <span><svg viewBox="0 0 16 16"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>Cancel anytime</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="flow-partials.js"></script>
+<script>
+document.getElementById('nav-mount').innerHTML = window.proptiiPartials.nav('');
+function setMethod(el, m) {
+  document.querySelectorAll('.method-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('card-fields').style.display = m==='card' ? 'block' : 'none';
+}
+flowBind();
+flowTimeout();
+</script>
+</body></html>

@@ -13,10 +13,13 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { StorageService } from '../services/storage.service';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { SubscriptionGuard } from '../guards/subscription.guard';
+import { RequiresActiveSubscription } from '../decorators/requires-active-subscription.decorator';
 import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('property')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, SubscriptionGuard)
+@RequiresActiveSubscription()
 @ApiBearerAuth()
 export class PropertyDocumentController {
   private readonly logger = new Logger(PropertyDocumentController.name);

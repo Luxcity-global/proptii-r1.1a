@@ -5,8 +5,21 @@ import ContractModal from '../../contract/ContractModal';
 import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useIsMobile } from '../ui/use-mobile';
+import { useBillingStatus } from '../../../hooks/useBillingStatus';
+import { canAccessSection, sectionUpgradeLabel } from '../../../utils/planAccess';
+import PlanUpgradeWall from '../PlanUpgradeWall';
 
 const TenantContracts: React.FC = () => {
+  const { plan, status } = useBillingStatus();
+  if (!canAccessSection('tenant-contracts', plan, status)) {
+    return (
+      <PlanUpgradeWall
+        featureName="Contracts"
+        upgradeLabel={sectionUpgradeLabel('tenant-contracts')}
+        segment="renters"
+      />
+    );
+  }
   const { signedContracts, isLoading, clearAllContracts, addSignedContract, removeSignedContract } = useSignedContracts();
   const { user, isAuthenticated } = useAuth();
   const isMobile = useIsMobile();

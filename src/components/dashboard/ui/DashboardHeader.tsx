@@ -2,6 +2,7 @@ import React from 'react';
 import { Phone, Mail, Sparkles } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useIsMobile } from './use-mobile';
+import PlanBadgePopover from '../PlanBadgePopover';
 
 interface DashboardHeaderProps {
   userName: string;
@@ -49,15 +50,14 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName, userEmail, 
           <div className="flex items-center space-x-2">
             <div
               className="bg-white rounded-lg border border-gray-200 px-4 py-2 cursor-pointer transition-all duration-300 flex items-center justify-center flex-1"
-              style={{
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-              }}
+              style={{ boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' }}
             >
               <div className="flex items-center space-x-2">
                 <Sparkles className="w-4 h-4" style={{ color: '#136C9E' }} />
                 <span className="text-sm font-medium" style={{ color: '#374957' }}>PropWise</span>
               </div>
             </div>
+            <PlanBadgePopover />
           </div>
         </div>
       ) : (
@@ -114,13 +114,11 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName, userEmail, 
             </div>
           </div>
           
-          {/* Right Column - PropWise Button */}
-          <div className="flex justify-end items-center">
+          {/* Right Column - PropWise + Plan Badge */}
+          <div className="flex justify-end items-center gap-3">
             <div
               className="bg-white rounded-2xl border border-gray-200 px-6 py-4 cursor-pointer transition-all duration-300 min-h-[3.5rem] flex items-center justify-center flex-shrink-0"
-              style={{
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-              }}
+              style={{ boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.boxShadow = '0 8px 20px rgba(255, 248, 220, 0.6), 0 4px 10px rgba(0, 0, 0, 0.1)';
                 e.currentTarget.style.transform = 'translateY(-1px)';
@@ -137,7 +135,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName, userEmail, 
                   <p className="text-sm leading-tight font-medium" style={{ color: '#374957' }}>PropWise</p>
                   <p className="text-xs leading-tight" style={{ color: '#717182' }}>AI Powered</p>
                 </div>
-                <div 
+                <div
                   className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: '#136C9E' }}
                 >
@@ -145,6 +143,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName, userEmail, 
                 </div>
               </div>
             </div>
+            <PlanBadgePopover />
           </div>
         </div>
       )}

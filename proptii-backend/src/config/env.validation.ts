@@ -68,6 +68,29 @@ const envSchema = z.object({
 
   // ── Test email (dev only) ───────────────────────────────────────────────────
   TEST_EMAIL_RECIPIENT: z.string().email().or(z.literal('')).optional(),
+
+  // ── Stripe (billing module — Sprint 1) ──────────────────────────────────────
+  // All optional at startup — the billing module logs warnings if missing.
+  // Use sk_test_* in dev/staging, sk_live_* in production only.
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  PROMO_FREE_MONTH_ACTIVE: z.enum(['true', 'false']).default('true'),
+
+  // Stripe price IDs — one per plan per billing cadence (14 total; no Enterprise)
+  STRIPE_PRICE_RENTER_PRO_MONTHLY: z.string().optional(),
+  STRIPE_PRICE_RENTER_PRO_ANNUAL: z.string().optional(),
+  STRIPE_PRICE_BUYER_PRO_MONTHLY: z.string().optional(),
+  STRIPE_PRICE_BUYER_PRO_ANNUAL: z.string().optional(),
+  STRIPE_PRICE_STARTER_MONTHLY: z.string().optional(),
+  STRIPE_PRICE_STARTER_ANNUAL: z.string().optional(),
+  STRIPE_PRICE_LANDLORD_PRO_MONTHLY: z.string().optional(),
+  STRIPE_PRICE_LANDLORD_PRO_ANNUAL: z.string().optional(),
+  STRIPE_PRICE_ELITE_MONTHLY: z.string().optional(),
+  STRIPE_PRICE_ELITE_ANNUAL: z.string().optional(),
+  STRIPE_PRICE_INDEPENDENT_MONTHLY: z.string().optional(),
+  STRIPE_PRICE_INDEPENDENT_ANNUAL: z.string().optional(),
+  STRIPE_PRICE_AGENT_PRO_MONTHLY: z.string().optional(),
+  STRIPE_PRICE_AGENT_PRO_ANNUAL: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

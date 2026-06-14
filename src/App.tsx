@@ -8,7 +8,6 @@ import { OnboardingSessionProvider } from './contexts/OnboardingSessionContext';
 import { OnboardingOptionsModalRoute } from './pages/OnboardingOptionsModalRoute';
 import HomeLegacy from './pages/HomeLegacy';
 import { LoginPage } from './pages/Login';
-import { RegisterPage } from './pages/Register';
 import { NotFoundPage } from './pages/NotFound';
 import Referencing from './pages/Referencing';
 import ContractsPage from './pages/Contracts';
@@ -20,6 +19,7 @@ import Viewings from './components/dashboard/sections/Viewings-new';
 import TenantContracts from './components/dashboard/sections/TenantContracts-new';
 import FileTable from './components/dashboard/sections/YourFiles-new';
 import TenantReferencing from './components/dashboard/sections/TenantReferencing-new';
+import DashboardSettings from './components/dashboard/sections/DashboardSettings';
 import AgentHome from './pages/AgentHome';
 import HomeownerHome from './pages/HomeownerHome';
 import HomeownerHomeVariantB from './pages/HomeownerHomeVariantB';
@@ -37,9 +37,19 @@ import TermsOfService from './pages/TermsOfService';
 import FAQ from './pages/FAQ';
 // import AgentContractLanding from './pages/AgentContractLanding';
 import { AuthRedirectHandler } from './components/common/AuthRedirectHandler';
+import { StripeCheckoutReturnHandler } from './components/common/StripeCheckoutReturnHandler';
 import SearchResults from './pages/SearchResults';
 import HomeVariant from './pages/HomeVariant';
-import Pricing from './pages/Pricing';
+import Pricing from './pages/pricing';
+import SignupModalPage from './pages/signup';
+import CreateAccountPage from './pages/signup/create-account';
+import SignupWelcomePage from './pages/signup/welcome';
+import PlanSelected from './pages/pricing/PlanSelected';
+import PricingArrival from './pages/pricing/PricingArrival';
+import PayNowPage from './pages/billing/pay-now';
+import BillingConfirmedPage from './pages/billing/confirmed';
+import BillingActivatePage from './pages/billing/activate';
+import BillingStatusBanner from './components/billing/BillingStatusBanner';
 import Tools from './pages/Tools';
 import ReadinessChecker from './pages/tools/ReadinessChecker';
 import DocumentTracker from './pages/tools/DocumentTracker';
@@ -80,7 +90,9 @@ export const App: React.FC = () => {
           <OnboardingSessionProvider>
           <SignedContractsProvider>
               <AuthAnalyticsBridge />
+              <StripeCheckoutReturnHandler />
               <AuthRedirectHandler />
+              <BillingStatusBanner />
               <ScrollToTop />
               <Routes>
             {/* Public Routes - / is default landing; onboarding shows as modal overlay */}
@@ -93,13 +105,56 @@ export const App: React.FC = () => {
             <Route path="/homeowner-onboarding" element={<OnboardingOptionsModalRoute type="homeowner" />} />
             <Route path="/search" element={<SearchResults />} />
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/register" element={<Navigate to="/pricing" replace />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
             <Route path="/about-us" element={<AboutUs />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-of-service" element={<TermsOfService />} />
             <Route path="/faq" element={<FAQ />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/signup" element={<SignupModalPage />} />
+            <Route path="/signup/create-account" element={<CreateAccountPage />} />
+            <Route
+              path="/signup/welcome"
+              element={<SignupWelcomePage />}
+            />
+            <Route
+              path="/signup/pay-now"
+              element={
+                <ProtectedRoute>
+                  <PayNowPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/billing/confirmed"
+              element={
+                <ProtectedRoute>
+                  <BillingConfirmedPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/billing/activate"
+              element={
+                <ProtectedRoute>
+                  <BillingActivatePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/account/settings"
+              element={<Navigate to="/dashboard/settings" replace />}
+            />
+            <Route
+              path="/account/billing"
+              element={<Navigate to="/dashboard/settings" replace />}
+            />
+            <Route path="/pricing/plan-selected" element={<PlanSelected />} />
+            <Route path="/pricing/arrival" element={<Navigate to="/signup/welcome" replace />} />
+            <Route path="/pricing/pay-now" element={<Navigate to="/signup/pay-now" replace />} />
+            <Route path="/pricing/billing" element={<Navigate to="/billing/activate" replace />} />
+            <Route path="/pricing/confirmed" element={<Navigate to="/billing/confirmed" replace />} />
 
             {/* Legacy / marketing URL redirects */}
             <Route path="/about" element={<Navigate to="/about-us" replace />} />
@@ -169,6 +224,7 @@ export const App: React.FC = () => {
               <Route path="tenant-contracts" element={<TenantContracts />} />
               <Route path="your-files" element={<FileTable />} />
               <Route path="tenant-referencing" element={<TenantReferencing />} />
+              <Route path="settings" element={<DashboardSettings />} />
             </Route>
 
             {/* New agent contract route */}

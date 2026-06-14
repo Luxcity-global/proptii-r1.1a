@@ -15,6 +15,7 @@ export interface CosmosConfig {
     references: string;
     contracts: string;
     dashboard: string;
+    billingEvents: string;
   };
 }
 
@@ -29,7 +30,8 @@ export const cosmosConfig: CosmosConfig = {
     users: 'Users',
     references: 'References',
     contracts: 'Contracts',
-    dashboard: 'Dashboard'
+    dashboard: 'Dashboard',
+    billingEvents: 'BillingEvents'
   }
 };
 
@@ -68,7 +70,8 @@ export async function initializeCosmosDB() {
       { id: cosmosConfig.containers.users, partitionKey: "/id" },
       { id: cosmosConfig.containers.references, partitionKey: "/id" },
       { id: cosmosConfig.containers.contracts, partitionKey: "/id" },
-      { id: cosmosConfig.containers.dashboard, partitionKey: "/userId" }
+      { id: cosmosConfig.containers.dashboard, partitionKey: "/userId" },
+      { id: cosmosConfig.containers.billingEvents, partitionKey: "/id" },
     ];
 
     // Create containers if they don't exist

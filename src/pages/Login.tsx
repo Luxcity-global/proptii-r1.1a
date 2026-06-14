@@ -16,6 +16,11 @@ export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isAuthenticated, isLoading } = useAuth();
+
+  useEffect(() => {
+    sessionStorage.removeItem('redirect_in_progress');
+    sessionStorage.removeItem('last_redirect_path');
+  }, []);
   const [error, setError] = useState('');
   const [autoLoginTriggered, setAutoLoginTriggered] = useState(false);
   const hasRedirectedRef = useRef(false);
@@ -172,7 +177,7 @@ export const LoginPage: React.FC = () => {
               variant="text"
               onClick={() => {
                 const search = location.search;
-                navigate(`/register${search}`);
+                navigate(`/pricing${search}`);
               }}
             >
               Don't have an account? Sign Up

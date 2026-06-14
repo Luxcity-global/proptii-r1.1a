@@ -266,7 +266,7 @@ export function PortfolioInsights({ properties, userProfile }: PortfolioInsights
                   <span className="rounded-full bg-[#EAFBF0] px-2 py-0.5 text-xs font-semibold text-[#1F9D64]">+12.5%</span>
                 </div>
                 <p className="mt-5 text-xs font-semibold tracking-[0.12em] text-[#6B7280]">TOTAL REVENUE</p>
-                <p className="mt-2 text-[40px] font-semibold leading-none text-[#1F2937]">£482,950</p>
+                <p className="mt-2 text-3xl sm:text-[40px] font-semibold leading-none text-[#1F2937] break-words">£482,950</p>
               </article>
 
               <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
@@ -277,7 +277,7 @@ export function PortfolioInsights({ properties, userProfile }: PortfolioInsights
                   <span className="rounded-full bg-[#FFF0E6] px-2 py-0.5 text-xs font-semibold text-[#D96A1D]">HIGH ALERT</span>
                 </div>
                 <p className="mt-5 text-xs font-semibold tracking-[0.12em] text-[#6B7280]">OUTSTANDING RENT</p>
-                <p className="mt-2 text-[40px] font-semibold leading-none text-[#1F2937]">£14,200</p>
+                <p className="mt-2 text-3xl sm:text-[40px] font-semibold leading-none text-[#1F2937] break-words">£14,200</p>
               </article>
 
               <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
@@ -285,7 +285,7 @@ export function PortfolioInsights({ properties, userProfile }: PortfolioInsights
                   <TrendingUp className="h-4 w-4 text-[#1776B6]" />
                 </div>
                 <p className="mt-5 text-xs font-semibold tracking-[0.12em] text-[#6B7280]">MOM GROWTH</p>
-                <p className="mt-2 text-[40px] font-semibold leading-none text-[#1F2937]">4.8%</p>
+                <p className="mt-2 text-3xl sm:text-[40px] font-semibold leading-none text-[#1F2937] break-words">4.8%</p>
               </article>
 
               <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
@@ -293,18 +293,18 @@ export function PortfolioInsights({ properties, userProfile }: PortfolioInsights
                   <Building2 className="h-4 w-4 text-[#1776B6]" />
                 </div>
                 <p className="mt-5 text-xs font-semibold tracking-[0.12em] text-[#6B7280]">AVG RENT / UNIT</p>
-                <p className="mt-2 text-[40px] font-semibold leading-none text-[#1F2937]">£2,450</p>
+                <p className="mt-2 text-3xl sm:text-[40px] font-semibold leading-none text-[#1F2937] break-words">£2,450</p>
               </article>
             </section>
 
             <section className="grid grid-cols-1 gap-4 xl:grid-cols-[2fr_1fr]">
-              <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
-                <div className="mb-4 flex items-start justify-between">
+              <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm min-w-0">
+                <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <h3 className="text-[32px] font-semibold leading-none text-[#1F2937]">Revenue Trends</h3>
-                    <p className="mt-1 text-sm text-[#9CA3AF]">Collected vs Projected Monthly Performance</p>
+                    <h3 className="text-2xl sm:text-[32px] font-semibold leading-none text-[#1F2937]">Revenue Trends</h3>
+                    <p className="mt-1 text-xs sm:text-sm text-[#9CA3AF]">Collected vs Projected Monthly Performance</p>
                   </div>
-                  <div className="flex items-center gap-5 text-xs font-semibold text-[#6B7280]">
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-xs font-semibold text-[#6B7280]">
                     <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#1776B6]" />COLLECTED</span>
                     <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#F6B27D]" />PROJECTED</span>
                   </div>
@@ -323,14 +323,14 @@ export function PortfolioInsights({ properties, userProfile }: PortfolioInsights
                 </div>
               </article>
 
-              <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
-                <h3 className="text-[32px] font-semibold leading-none text-[#1F2937]">Revenue by Property</h3>
+              <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm min-w-0">
+                <h3 className="text-2xl sm:text-[32px] font-semibold leading-none text-[#1F2937]">Revenue by Property</h3>
                 <div className="mt-6 space-y-6">
                   {revenueByProperty.map((row) => (
                     <div key={row.name}>
-                      <div className="mb-1 flex items-center justify-between text-xs font-semibold text-[#374957]">
-                        <span>{row.name}</span>
-                        <span className="text-[#1776B6]">£{row.value}K</span>
+                      <div className="mb-1 flex items-center justify-between gap-2 text-xs font-semibold text-[#374957]">
+                        <span className="truncate">{row.name}</span>
+                        <span className="shrink-0 text-[#1776B6]">£{row.value}K</span>
                       </div>
                       <div className="h-3 rounded-full bg-[#EDF2F7]">
                         <div
@@ -350,9 +350,9 @@ export function PortfolioInsights({ properties, userProfile }: PortfolioInsights
               </article>
             </section>
 
-            <section className="rounded-2xl border border-[#E7EBF0] bg-white shadow-sm">
+            <section className="rounded-2xl border border-[#E7EBF0] bg-white shadow-sm min-w-0">
               <div className="flex flex-col gap-3 border-b border-[#EEF1F5] p-5 md:flex-row md:items-center md:justify-between">
-                <h3 className="text-[32px] font-semibold leading-none text-[#1F2937]">Rent Payment Status</h3>
+                <h3 className="text-2xl sm:text-[32px] font-semibold leading-none text-[#1F2937]">Rent Payment Status</h3>
                 <div className="relative w-full md:w-64">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF]" />
                   <input

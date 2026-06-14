@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proptii — Day 27 reminder email</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500;6..12,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="flow-shared.css">
+<style>
+body { background: #ECEEF1; }
+.email-shell { max-width: 720px; margin: 48px auto; padding: 0 20px; }
+.mail-meta { background: #fff; border-radius: 14px 14px 0 0; padding: 20px 28px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.mail-meta-row { display: flex; gap: 12px; margin-bottom: 6px; }
+.mail-meta-row .k { color: var(--muted); width: 60px; flex: 0 0 60px; font-weight: 500; }
+.mail-meta-row .v { color: var(--navy); font-weight: 600; }
+.mail-subject { font-family: 'Archivo'; font-size: 22px; font-weight: 700; color: var(--navy); margin-top: 10px; letter-spacing: -.01em; }
+
+.email-body { background: #fff; border-radius: 0 0 14px 14px; padding: 48px 56px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); }
+.email-logo { display: flex; justify-content: center; margin-bottom: 36px; }
+.email-body h1 { font-family: 'Archivo'; font-size: 28px; font-weight: 800; letter-spacing: -.02em; text-align: center; line-height: 1.2; margin-bottom: 24px; }
+.email-body p { font-size: 16px; color: var(--navy); opacity: .85; line-height: 1.65; margin-bottom: 18px; }
+.email-body .plan-line { background: var(--cream); border-radius: 12px; padding: 18px 20px; margin: 24px 0; font-size: 15px; }
+.email-body .plan-line .row { display: flex; justify-content: space-between; padding: 4px 0; }
+.email-body .plan-line .row .lbl { color: var(--muted); }
+.email-cta { text-align: center; margin: 32px 0 18px; }
+.email-cta .btn { padding: 14px 36px; }
+.cancel-link { display: block; text-align: center; font-size: 14px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.cancel-link:hover { color: var(--navy); }
+.signoff { margin-top: 36px; font-size: 15px; color: var(--navy); opacity: .85; }
+.email-foot { text-align: center; font-size: 12px; color: var(--muted); margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
+.email-foot a { color: var(--muted); }
+</style></head><body>
+
+<div class="email-shell">
+  <div class="mail-meta">
+    <div class="mail-meta-row"><span class="k">From</span><span class="v">Proptii &lt;hello@proptii.com&gt;</span></div>
+    <div class="mail-meta-row"><span class="k">To</span><span class="v" id="mail-to">your inbox</span></div>
+    <div class="mail-subject">Your free month ends in 3 days</div>
+  </div>
+
+  <div class="email-body">
+    <div class="email-logo">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="logo-mark" style="width:34px;height:38px"><svg viewBox="0 0 30 34" fill="none">
+          <path d="M15 2 L4 11 L4 32 L26 32 L26 11 Z" stroke="#E8622A" stroke-width="3" stroke-linejoin="round"/>
+          <path d="M11 32 L11 19 L19 19 L19 32" stroke="#14385C" stroke-width="3" stroke-linejoin="round"/>
+        </svg></div>
+        <span class="logo-text">proptii</span>
+      </div>
+    </div>
+
+    <h1>Your free month ends in 3 days</h1>
+
+    <p>Hi <span id="mail-name">there</span>,</p>
+    <p>Quick note — your free month of Proptii is winding down. On <strong>5 June 2026</strong>, your <strong>Renter Pro</strong> plan will continue at <strong>£10/month</strong> (or £99 if you switched to annual).</p>
+    <p>Nothing to do today. We just wanted you to know what's coming so there are no surprises.</p>
+
+    <div class="plan-line">
+      <div class="row"><span class="lbl">Plan</span><span><strong>Renter Pro</strong></span></div>
+      <div class="row"><span class="lbl">Renews on</span><span><strong>5 June 2026</strong></span></div>
+      <div class="row"><span class="lbl">Amount</span><span><strong>£10 / month</strong></span></div>
+    </div>
+
+    <div class="email-cta">
+      <a href="screen-7-billing.html" class="btn btn-primary">Review your plan</a>
+    </div>
+    <a href="#" class="cancel-link">Cancel before day 30 — no charge</a>
+
+    <div class="signoff">
+      Thanks for trying Proptii,<br>
+      <strong>The Proptii team</strong>
+    </div>
+
+    <div class="email-foot">
+      You're receiving this because you started a free trial on 9 May 2026.<br>
+      <a href="#">Manage email preferences</a> · <a href="#">Unsubscribe</a> · Proptii Ltd, London, UK
+    </div>
+  </div>
+</div>
+
+<script src="flow-partials.js"></script>
+<script>
+  const s = flowState.get();
+  if (s.email) document.getElementById('mail-to').textContent = s.email;
+  if (s.name) document.getElementById('mail-name').textContent = s.name.split(' ')[0];
+  flowTimeout();
+</script>
+
+</body></html>

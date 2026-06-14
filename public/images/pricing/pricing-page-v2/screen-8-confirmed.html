@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proptii — You're all set</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500;6..12,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="flow-shared.css">
+<style>
+.confirmed { max-width: 560px; margin: 80px auto 40px; padding: 0 24px; text-align: center; }
+.check {
+  width: 88px; height: 88px; border-radius: 50%;
+  background: var(--green-light);
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-bottom: 28px;
+  animation: pop .55s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes pop { from {opacity:0; transform: scale(.6);} to {opacity:1; transform: scale(1);} }
+.check svg { width: 40px; height: 40px; stroke: var(--green-dark); stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+.confirmed h1 { font-family: 'Archivo'; font-size: 36px; font-weight: 800; letter-spacing: -.025em; line-height: 1.1; margin-bottom: 12px; }
+.confirmed .sub { font-size: 16px; color: var(--muted); margin-bottom: 32px; }
+.confirmed .sub strong { color: var(--navy); font-weight: 600; }
+
+.summary { background: var(--cream); border-radius: 16px; padding: 22px 26px; text-align: left; margin-bottom: 32px; }
+.summary-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 14px; }
+.summary-row .lbl { color: var(--muted); }
+.summary-row .v { color: var(--navy); font-weight: 600; }
+.summary-row.amt .v { font-family: 'Archivo'; font-size: 18px; font-weight: 800; color: var(--orange); }
+
+.foot-line { font-size: 13px; color: var(--muted); margin-top: 18px; line-height: 1.7; }
+.foot-line a { color: var(--orange); text-decoration: none; font-weight: 600; }
+</style></head><body>
+
+<div id="nav-mount"></div>
+
+<main>
+  <div class="confirmed fade-in">
+    <div class="check"><svg viewBox="0 0 24 24"><polyline points="5,12 10,17 19,7"/></svg></div>
+    <h1>You're all set.</h1>
+    <p class="sub">Your <strong>Renter Pro</strong> subscription is now active.</p>
+
+    <div class="summary">
+      <div class="summary-row"><span class="lbl">Plan</span><span class="v">Renter Pro</span></div>
+      <div class="summary-row"><span class="lbl">Billing cycle</span><span class="v">Annual</span></div>
+      <div class="summary-row amt"><span class="lbl">Amount charged</span><span class="v">£99.00</span></div>
+      <div class="summary-row"><span class="lbl">Next billing date</span><span class="v">9 June 2027</span></div>
+    </div>
+
+    <a href="#" class="btn btn-primary">Go to your dashboard →</a>
+
+    <p class="foot-line">A receipt has been sent to <strong id="receipt-email" style="color:var(--navy)">your inbox</strong>.<br>Manage your billing any time in <a href="#">account settings</a>.</p>
+  </div>
+</main>
+
+<script src="flow-partials.js"></script>
+<script>
+  document.getElementById('nav-mount').innerHTML = window.proptiiPartials.nav('');
+  const s = flowState.get();
+  if (s.email) document.getElementById('receipt-email').textContent = s.email;
+  flowTimeout();
+</script>
+</body></html>

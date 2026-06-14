@@ -10,9 +10,9 @@ export interface SignUpPromptModalProps {
   title: string;
   /** Reassurance line (e.g. "Don't worry, you won't have to go through the entire search process again."). */
   reassurance?: string;
-  /** Called when user chooses "Sign up with email"; default navigates to /register. */
+  /** Called when user chooses "Sign up with email"; default navigates to /pricing. */
   onSignUpEmail?: () => void;
-  /** Called when user chooses "Social Media sign up"; default navigates to /register (or could open OAuth). */
+  /** Called when user chooses "Social Media sign up"; default navigates to /pricing. */
   onSignUpSocial?: () => void;
   /** When true, show "Explore more features" as the secondary button instead of "Social Media sign up". */
   showExploreFeaturesAsSecondary?: boolean;
@@ -40,7 +40,7 @@ export function SignUpPromptModal({
     if (onSignUpEmail) {
       onSignUpEmail();
     } else {
-      navigate('/register', { state: { from: 'demo' } });
+      navigate('/pricing', { state: { from: 'demo' } });
     }
     onClose();
   };
@@ -49,7 +49,7 @@ export function SignUpPromptModal({
     if (onSignUpSocial) {
       onSignUpSocial();
     } else {
-      navigate('/register', { state: { from: 'demo', tab: 'social' } });
+      navigate('/pricing', { state: { from: 'demo', tab: 'social' } });
     }
     onClose();
   };

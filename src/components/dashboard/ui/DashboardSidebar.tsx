@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DASHBOARD_SECTIONS } from "../Dashboard";
-import { ChevronLeft, ChevronRight, Home, User } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Home, User, Lock } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useBillingStatus } from '../../../hooks/useBillingStatus';
+import { canAccessSection, sectionUpgradeLabel } from '../../../utils/planAccess';
 
 interface DashboardSidebarProps {
   activeSection: string;
@@ -19,6 +21,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { plan, status } = useBillingStatus();
 
   const handleNavClick = (sectionId: string, path: string) => {
     onSectionChange(sectionId);
@@ -74,11 +77,53 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
             <div className="pt-2 pb-2 pl-4 pr-2">
               <div className="space-y-3">
                 {DASHBOARD_SECTIONS.map((section) => {
-                  const isActive = activeSection === section?.id;
+                  if (!section) return null;
+                  const isActive = activeSection === section.id;
+                  const hasAccess = canAccessSection(section.id, plan, status);
+                  const upgradeLabel = sectionUpgradeLabel(section.id);
+
+                  if (!hasAccess) {
+                    return (
+                      <div key={section.id} className="relative group/locked">
+                        <button
+                          type="button"
+                          onClick={() => navigate('/pricing')}
+                          title={isCollapsed ? upgradeLabel : undefined}
+                          className={`
+                            w-full flex items-center h-10 px-3 rounded-md text-sm font-medium
+                            opacity-50 cursor-pointer transition-opacity hover:opacity-70
+                            ${isCollapsed ? 'justify-center' : 'justify-start'}
+                          `}
+                          style={{ color: '#374957' }}
+                        >
+                          <div className="relative flex-shrink-0">
+                            {section.icon?.(false)}
+                            <Lock
+                              className="absolute -bottom-1 -right-1 w-2.5 h-2.5 text-gray-500 bg-white rounded-full"
+                              aria-hidden
+                            />
+                          </div>
+                          {!isCollapsed && (
+                            <>
+                              <span className="ml-2 truncate">{section.label}</span>
+                              <Lock className="w-3 h-3 ml-auto shrink-0 text-gray-400" aria-hidden />
+                            </>
+                          )}
+                        </button>
+                        {/* Tooltip for locked item (expanded sidebar) */}
+                        {!isCollapsed && (
+                          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-50 hidden group-hover/locked:flex w-52 bg-gray-900 text-white text-xs rounded-lg p-2.5 leading-relaxed shadow-lg pointer-events-none">
+                            <span>{upgradeLabel}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
                   return (
                     <button
-                      key={section?.id ?? ''}
-                      onClick={() => section && handleNavClick(section.id, section.path)}
+                      key={section.id}
+                      onClick={() => handleNavClick(section.id, section.path)}
                       className={`
                         w-full flex items-center h-10 px-3 rounded-md text-sm font-medium transition-colors
                         ${isCollapsed ? 'justify-center' : 'justify-start'}
@@ -89,21 +134,17 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                         backgroundColor: isActive ? '#E6F3FF' : 'transparent'
                       }}
                       onMouseEnter={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.backgroundColor = '#F3F4F6';
-                        }
+                        if (!isActive) e.currentTarget.style.backgroundColor = '#F3F4F6';
                       }}
                       onMouseLeave={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }
+                        if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                     >
                       <div className="relative flex-shrink-0">
-                        {section?.icon?.(isActive)}
+                        {section.icon?.(isActive)}
                       </div>
                       {!isCollapsed && (
-                        <span className="ml-2 truncate">{section?.label ?? ''}</span>
+                        <span className="ml-2 truncate">{section.label}</span>
                       )}
                     </button>
                   );

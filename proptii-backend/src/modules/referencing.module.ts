@@ -4,8 +4,10 @@ import { ReferencingController } from '../controllers/referencing.controller';
 import { EmailService } from '../services/email.service';
 import { EmailController } from '../controllers/email.controller';
 import { AIExtractionService } from '../services/ai-extraction.service';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
+  imports: [BillingModule],
   controllers: [ReferencingController, EmailController],
   providers: [ReferencingService, EmailService, AIExtractionService],
   exports: [ReferencingService, EmailService, AIExtractionService],

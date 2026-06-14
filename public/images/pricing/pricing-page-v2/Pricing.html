@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proptii — Pricing</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=Nunito+Sans:ital,opsz,wght@0,6..12,300;0,6..12,400;0,6..12,500;0,6..12,600;1,6..12,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy: #14385C;
+  --navy-deep: #0E2B47;
+  --navy-soft: #1B4570;
+  --orange: #E8622A;
+  --orange-hover: #C9501C;
+  --orange-light: #FFF0E6;
+  --orange-mid: #B0481E;
+  --white: #ffffff;
+  --cream: #F7F2E8;
+  --cream-deep: #F3ECDD;
+  --off-white: #FAF7F0;
+  --muted: #8A8F9A;
+  --muted-soft: #B4B7BD;
+  --border: rgba(20,56,92,0.10);
+  --border-strong: rgba(20,56,92,0.16);
+  --green: #1D9E75;
+  --green-light: #E6F2EB;
+  --green-dark: #1A6A4A;
+  --amber: #BA7517;
+  --amber-light: #FAEEDA;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { background: var(--cream); }
+body {
+  font-family: 'Nunito Sans', sans-serif;
+  color: var(--navy);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  font-size: 17px;
+}
+
+/* ── DECORATIVE BLOBS (behind page) ── */
+.bg-blobs {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(2px);
+  opacity: .55;
+}
+.blob-1 {
+  width: 380px; height: 380px;
+  background: #FBE7D0;
+  top: 320px; left: -140px;
+}
+.blob-2 {
+  width: 280px; height: 280px;
+  background: #F8DDC0;
+  top: 720px; right: -120px;
+}
+.blob-3 {
+  width: 320px; height: 320px;
+  background: #FBE7D0;
+  top: 1480px; left: -100px;
+  opacity: .4;
+}
+
+main, nav, .early-banner, footer { position: relative; z-index: 1; }
+
+/* ── EARLY ACCESS BANNER ── */
+.early-banner {
+  background: var(--navy-deep);
+  color: #fff;
+  text-align: center;
+  padding: 11px 24px;
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+.early-banner strong { color: var(--orange); font-weight: 600; }
+.early-banner .pill {
+  display: inline-block;
+  background: var(--orange);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+
+/* ── NAV (Proptii style) ── */
+nav {
+  background: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 56px;
+  height: 76px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid rgba(20,56,92,0.06);
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.logo-mark {
+  width: 30px; height: 34px;
+  position: relative;
+}
+.logo-mark svg { width: 100%; height: 100%; }
+.logo-text {
+  font-family: 'Archivo', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--orange);
+  letter-spacing: -.01em;
+  line-height: 1;
+}
+.nav-links { display: flex; align-items: center; gap: 32px; }
+.nav-links a {
+  font-size: 18px;
+  color: var(--navy);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color .15s;
+}
+.nav-links a:hover { color: var(--orange); }
+.nav-links a.active { color: var(--orange); }
+.nav-cta {
+  background: var(--orange);
+  color: #fff !important;
+  padding: 11px 28px;
+  border-radius: 30px;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  text-decoration: none;
+  transition: background .15s !important;
+  box-shadow: 0 2px 0 rgba(176, 72, 30, 0.3);
+}
+.nav-cta:hover { background: var(--orange-hover) !important; }
+
+/* ── HERO ── */
+.hero {
+  text-align: center;
+  padding: 80px 24px 40px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--orange);
+  background: var(--white);
+  padding: 6px 14px;
+  border-radius: 30px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 2px rgba(20,56,92,0.04);
+}
+.hero h1 {
+  font-family: 'Archivo', sans-serif;
+  font-size: clamp(44px, 5.8vw, 64px);
+  font-weight: 800;
+  color: var(--navy);
+  letter-spacing: -.03em;
+  line-height: 1.05;
+  margin-bottom: 20px;
+}
+.hero h1 em { color: var(--orange); font-style: normal; }
+.hero p {
+  font-size: 21px;
+  color: var(--navy);
+  opacity: .65;
+  line-height: 1.6;
+  font-weight: 400;
+  max-width: 540px;
+  margin: 0 auto 40px;
+}
+
+/* ── BILLING TOGGLE ── */
+.billing-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 40px;
+  padding: 5px;
+  gap: 2px;
+  box-shadow: 0 2px 8px rgba(20,56,92,0.04);
+}
+.toggle-btn {
+  padding: 10px 24px;
+  border-radius: 36px;
+  border: none;
+  background: transparent;
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--navy);
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.toggle-btn.active {
+  background: var(--navy);
+  color: #fff;
+  font-weight: 600;
+}
+.save-badge {
+  font-size: 14px;
+  color: #fff;
+  background: var(--orange);
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.save-badge { background: var(--green-light) !important; color: var(--green-dark) !important; }
+.toggle-btn.active .save-badge { background: var(--green-light) !important; color: var(--green-dark) !important; }
+
+/* ── AUDIENCE TABS ── */
+.audience-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: var(--white);
+  border-radius: 40px;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(20,56,92,0.04);
+}
+.aud-tab {
+  padding: 10px 22px;
+  border-radius: 30px;
+  border: none;
+  background: transparent;
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--navy);
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.aud-tab.active {
+  background: var(--navy);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ── PRICING GRID ── */
+.pricing-section {
+  padding: 0 32px 100px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.pricing-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: stretch;
+}
+
+@media (max-width: 920px) {
+  .pricing-grid { grid-template-columns: 1fr; }
+  nav { padding: 16px 24px; }
+  .nav-links { display: none; }
+  .nav-links.cta-only { display: flex; gap: 0; }
+}
+
+/* ── PLAN CARD ── */
+.plan-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 28px 28px 24px;
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: transform .25s, box-shadow .25s;
+  box-shadow: 0 1px 2px rgba(20,56,92,0.03);
+}
+.plan-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 36px rgba(20,56,92,0.08);
+}
+.plan-card.featured {
+  background: var(--white);
+  border: 2px solid var(--green-dark);
+  box-shadow: 0 14px 40px rgba(26, 106, 74, 0.16);
+  margin-top: 0;
+  padding: 36px 30px 32px;
+}
+.plan-card.featured:hover { transform: translateY(-3px); }
+.plan-card.dark {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+
+.featured-badge {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--green-light);
+  color: var(--green-dark);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 6px 16px;
+  border-radius: 30px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(26, 106, 74, 0.15);
+}
+
+.plan-audience {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 10px;
+}
+.plan-card.dark .plan-audience { color: #FFB084; }
+
+.plan-name {
+  font-family: 'Archivo', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--navy);
+  letter-spacing: -.02em;
+  margin-bottom: 6px;
+}
+.plan-card.dark .plan-name { color: #fff; }
+
+.plan-desc {
+  font-size: 17px;
+  color: var(--navy);
+  opacity: .6;
+  line-height: 1.55;
+  margin-bottom: 24px;
+  font-weight: 400;
+}
+.plan-card.dark .plan-desc { color: rgba(255,255,255,.6); opacity: 1; }
+
+.plan-price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.price-currency {
+  font-family: 'Archivo', sans-serif;
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--navy);
+  margin-top: 6px;
+}
+.plan-card.dark .price-currency { color: #fff; }
+.price-amount {
+  font-family: 'Archivo', sans-serif;
+  font-size: 56px;
+  font-weight: 800;
+  color: var(--navy);
+  letter-spacing: -.04em;
+  line-height: 1;
+}
+.plan-card.dark .price-amount { color: #fff; }
+.price-period { font-size: 17px; color: var(--muted); margin-left: 2px; }
+.plan-card.dark .price-period { color: rgba(255,255,255,.5); }
+
+.price-annual-note {
+  font-size: 16px;
+  color: var(--green-dark);
+  background: var(--green-light);
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+  margin-top: 8px;
+  margin-bottom: 22px;
+  align-self: flex-start;
+  min-height: 22px;
+}
+.plan-card.dark .price-annual-note { color: #5DCAA5; background: rgba(93, 202, 165, 0.12); }
+.price-annual-note.empty { background: transparent; padding: 3px 0; }
+
+.plan-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0 0 22px;
+}
+.plan-card.dark .plan-divider { border-color: rgba(255,255,255,.12); }
+
+.feature-list { list-style: none; flex: 1; margin-bottom: 28px; }
+.feature-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 18px;
+  color: var(--navy);
+  line-height: 1.5;
+  margin-bottom: 12px;
+  font-weight: 400;
+}
+.plan-card.dark .feature-list li { color: rgba(255,255,255,.85); }
+.feature-list li.dimmed { color: var(--muted); }
+.plan-card.dark .feature-list li.dimmed { color: rgba(255,255,255,.4); }
+
+.check-icon {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--orange-light);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.check-icon svg { width: 10px; height: 10px; stroke: var(--orange); stroke-width: 2.5; fill: none; }
+.check-icon.dim { background: rgba(20,56,92,0.06); }
+.check-icon.dim svg { stroke: var(--muted); }
+.plan-card.dark .check-icon { background: rgba(255,176,132,0.18); }
+.plan-card.dark .check-icon svg { stroke: #FFB084; }
+.plan-card.dark .check-icon.dim { background: rgba(255,255,255,.06); }
+.plan-card.dark .check-icon.dim svg { stroke: rgba(255,255,255,.35); }
+
+.soon-tag {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--amber);
+  background: var(--amber-light);
+  padding: 2px 7px;
+  border-radius: 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.plan-cta {
+  display: block;
+  width: 100%;
+  padding: 14px 22px;
+  border-radius: 40px;
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  border: none;
+  transition: all .18s;
+  text-decoration: none;
+  letter-spacing: .01em;
+}
+.plan-card.featured .plan-cta.primary {
+  background: #ffffff;
+  color: var(--orange);
+  border: 1.5px solid var(--orange);
+  box-shadow: 0 4px 14px rgba(232, 98, 42, 0.10);
+}
+.plan-card.featured .plan-cta.primary:hover {
+  background: var(--orange);
+  color: #fff;
+  border-color: var(--orange);
+  box-shadow: 0 6px 18px rgba(232, 98, 42, 0.30);
+}
+.plan-cta.primary {
+  background: var(--orange);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(232, 98, 42, 0.25);
+}
+.plan-cta.primary:hover { background: var(--orange-hover); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(232, 98, 42, 0.32); }
+.plan-cta.secondary {
+  background: transparent;
+  color: var(--navy);
+  border: 1.5px solid var(--navy);
+}
+.plan-cta.secondary:hover { background: var(--navy); color: #fff; }
+.plan-cta.white {
+  background: #fff;
+  color: var(--navy);
+}
+.plan-cta.white:hover { background: var(--orange); color: #fff; }
+
+.trial-note {
+  text-align: center;
+  font-size: 15px;
+  color: var(--muted);
+  margin-top: 10px;
+  font-weight: 500;
+}
+.plan-card.dark .trial-note { color: rgba(255,255,255,.45); }
+
+/* ── QUOTA EXPLAINER ── */
+.quota-note {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px 24px;
+  font-size: 17px;
+  color: var(--navy);
+  opacity: .8;
+  line-height: 1.65;
+  margin-top: 20px;
+}
+.quota-note strong { color: var(--orange); font-weight: 700; opacity: 1; }
+
+/* ── EARLY ACCESS BOX (Proptii navy panel style) ── */
+.early-access-wrap {
+  padding: 0 32px;
+  max-width: 1180px;
+  margin: 0 auto 80px;
+}
+.early-access-box {
+  background: var(--navy);
+  border-radius: 32px;
+  padding: 56px 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  flex-wrap: wrap;
+  position: relative;
+  overflow: hidden;
+}
+.early-access-box::before {
+  content: '';
+  position: absolute;
+  width: 320px; height: 320px;
+  border-radius: 50%;
+  background: rgba(232, 98, 42, 0.12);
+  top: -100px; right: -80px;
+}
+.ea-left { position: relative; max-width: 600px; }
+.ea-eyebrow {
+  display: inline-block;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--orange);
+  background: rgba(232, 98, 42, 0.14);
+  padding: 5px 12px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+}
+.ea-title {
+  font-family: 'Archivo', sans-serif;
+  font-size: 38px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -.02em;
+  margin-bottom: 12px;
+  line-height: 1.1;
+}
+.ea-title em { color: var(--orange); font-style: normal; }
+.ea-desc {
+  font-size: 19px;
+  color: rgba(255,255,255,.7);
+  font-weight: 400;
+  line-height: 1.55;
+  max-width: 520px;
+}
+.ea-right { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; position: relative; }
+.ea-terms { font-size: 16px; color: rgba(255,255,255,.4); text-align: right; line-height: 1.5; }
+.ea-cta {
+  background: var(--orange);
+  color: #fff;
+  padding: 16px 36px;
+  border-radius: 40px;
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 19px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(232, 98, 42, 0.3);
+}
+.ea-cta:hover { background: var(--orange-hover); transform: translateY(-1px); }
+
+/* ── COMPARE TABLE ── */
+.compare-section {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 32px 100px;
+}
+.compare-toggle {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.compare-toggle button {
+  background: var(--white);
+  border: 1px solid var(--border-strong);
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--navy);
+  cursor: pointer;
+  padding: 12px 28px;
+  border-radius: 30px;
+  transition: all .2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.compare-toggle button:hover { background: var(--navy); color: #fff; border-color: var(--navy); }
+.compare-toggle button svg { transition: transform .2s; }
+.compare-toggle.open button svg { transform: rotate(180deg); }
+
+.compare-table-wrap {
+  display: none;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+}
+.compare-table-wrap.visible { display: block; }
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 18px;
+}
+.compare-table th {
+  font-family: 'Archivo', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--navy);
+  text-align: left;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--cream);
+}
+.compare-table th:not(:first-child) { text-align: center; }
+.compare-table td {
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  color: var(--navy);
+}
+.compare-table td:not(:first-child) { text-align: center; }
+.compare-table tr:last-child td { border-bottom: none; }
+.compare-table .feature-name { color: var(--navy); opacity: .8; font-size: 18px; font-weight: 500; }
+.compare-table .yes { color: var(--orange); font-size: 22px; font-weight: 700; }
+.compare-table .no { color: var(--muted-soft); font-size: 20px; }
+.compare-table .partial { font-size: 16px; color: var(--navy); font-weight: 600; background: var(--cream-deep); padding: 4px 10px; border-radius: 20px; display: inline-block; }
+.compare-table .section-row td {
+  background: var(--cream-deep);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--orange);
+  padding: 10px 24px;
+}
+
+/* ── FAQ SECTION (navy panel style) ── */
+.faq-wrap {
+  background: var(--navy);
+  padding: 80px 32px;
+  margin-top: 40px;
+  position: relative;
+}
+.faq-section {
+  max-width: 920px;
+  margin: 0 auto;
+}
+.faq-section h3 {
+  font-family: 'Archivo', sans-serif;
+  font-size: 40px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -.02em;
+  margin-bottom: 14px;
+  text-align: center;
+}
+.faq-section .sub {
+  font-size: 19px;
+  color: rgba(255,255,255,.65);
+  text-align: center;
+  margin-bottom: 48px;
+  max-width: 540px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.faq-item {
+  background: var(--white);
+  border-radius: 16px;
+  padding: 20px 24px;
+  transition: box-shadow .2s;
+}
+.faq-item:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
+.faq-q {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--navy);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  font-family: 'Archivo', sans-serif;
+}
+.faq-icon {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--orange-light);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background .2s, transform .2s;
+}
+.faq-icon svg { width: 14px; height: 14px; stroke: var(--orange); stroke-width: 2.5; fill: none; }
+.faq-item.open .faq-icon { background: var(--orange); transform: rotate(45deg); }
+.faq-item.open .faq-icon svg { stroke: #fff; }
+.faq-a {
+  font-size: 18px;
+  color: var(--navy);
+  opacity: .7;
+  line-height: 1.7;
+  font-weight: 400;
+  margin-top: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .3s ease, margin-top .3s, padding-top .3s;
+}
+.faq-item.open .faq-a {
+  max-height: 320px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── FOOTER ── */
+footer {
+  background: var(--navy-deep);
+  color: #fff;
+  padding: 64px 32px 28px;
+}
+.footer-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+.footer-top {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 48px;
+  padding-bottom: 48px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.footer-brand .logo-text { color: var(--orange); font-size: 28px; }
+.footer-brand p {
+  font-size: 17px;
+  color: rgba(255,255,255,.55);
+  line-height: 1.65;
+  margin-top: 16px;
+  max-width: 320px;
+}
+.footer-col h4 {
+  font-family: 'Archivo', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 18px;
+}
+.footer-col a {
+  display: block;
+  font-size: 17px;
+  color: rgba(255,255,255,.55);
+  text-decoration: none;
+  margin-bottom: 10px;
+  transition: color .15s;
+}
+.footer-col a:hover { color: var(--orange); }
+.footer-bottom {
+  padding-top: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.copyright { font-size: 16px; color: rgba(255,255,255,.45); }
+.socials { display: flex; gap: 10px; }
+.social-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.18);
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,.65);
+  text-decoration: none;
+  transition: all .15s;
+}
+.social-btn:hover { background: var(--orange); border-color: var(--orange); color: #fff; }
+.social-btn svg { width: 14px; height: 14px; fill: currentColor; }
+
+@media (max-width: 920px) {
+  .footer-top { grid-template-columns: 1fr 1fr; gap: 32px; }
+  .early-access-box { padding: 36px 28px; }
+  .ea-title { font-size: 26px; }
+  .faq-wrap { padding: 56px 20px; }
+  .faq-section h3 { font-size: 28px; }
+  .hero { padding-top: 48px; }
+  .audience-tabs { flex-wrap: wrap; }
+  .billing-toggle { flex-wrap: wrap; }
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes fadeUpFeatured {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.plan-card { animation: fadeUp .55s cubic-bezier(.2,.7,.2,1) both; }
+.plan-card:nth-child(1) { animation-delay: .08s; }
+.plan-card:nth-child(2) { animation-delay: .18s; }
+.plan-card:nth-child(3) { animation-delay: .28s; }
+.plan-card.featured { animation: fadeUpFeatured .55s cubic-bezier(.2,.7,.2,1) both; animation-delay: .18s; }
+
+.reveal { opacity: 0; transform: translateY(24px) scale(0.985); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
+.reveal.in { opacity: 1; transform: translateY(0) scale(1); }
+
+.early-banner, nav { animation: fadeIn .5s ease-out both; }
+nav { animation-delay: .05s; }
+.hero { animation: fadeIn .7s cubic-bezier(.2,.7,.2,1) both; animation-delay: .1s; }
+
+/* button micro-interactions */
+.toggle-btn, .aud-tab, .plan-cta, .ea-cta, .nav-cta, .compare-toggle button, .social-btn, .faq-icon {
+  transition: all .22s cubic-bezier(.2,.7,.2,1);
+}
+.toggle-btn:hover:not(.active), .aud-tab:hover:not(.active) { background: rgba(20,56,92,0.05); transform: translateY(-1px); }
+.ea-cta:active, .plan-cta:active, .nav-cta:active { transform: translateY(1px) scale(0.98); }
+.featured-badge { animation: badgePulse 2.4s ease-in-out infinite; }
+@keyframes badgePulse {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.04); }
+}
+.faq-item { transition: transform .2s, box-shadow .2s; }
+.faq-item:hover { transform: translateY(-2px); }
+.check-icon { transition: transform .2s; }
+.feature-list li:hover .check-icon { transform: scale(1.15) rotate(-6deg); }
+.plan-card .price-amount { transition: transform .25s; }
+.plan-card:hover .price-amount { transform: scale(1.04); transform-origin: left center; }
+</style>
+</head>
+<body>
+
+<!-- Decorative background blobs -->
+<div class="bg-blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
+<!-- Early access banner -->
+<div class="early-banner">
+  <span class="pill">Limited offer</span>
+  Sign up before <strong>31 July 2026</strong> — get your first month completely free, no questions asked.
+</div>
+
+<!-- Nav -->
+<nav>
+  <a href="#" class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 30 34" xmlns="http://www.w3.org/2000/svg" fill="none">
+        <path d="M15 2 L4 11 L4 32 L26 32 L26 11 Z" stroke="#E8622A" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M11 32 L11 19 L19 19 L19 32" stroke="#14385C" stroke-width="3" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <span class="logo-text">proptii</span>
+  </a>
+  <div class="nav-links">
+    <a href="#">How it works</a>
+    <a href="#">Features</a>
+    <a href="#" class="active">Pricing</a>
+    <a href="#">FAQ</a>
+    <a href="#" class="nav-cta">Sign In</a>
+  </div>
+</nav>
+
+<main>
+
+<!-- Hero -->
+<section class="hero">
+  <h1>The right plan for<br><em>every move.</em></h1>
+  <p>Start free. Upgrade when it makes sense.<br>All paid plans include your first month free when you sign up before 31 July 2026.</p>
+
+  <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:36px;margin-bottom:36px">
+    <div class="billing-toggle">
+      <button class="toggle-btn" id="monthly-btn" onclick="setBilling('monthly')">Pay monthly</button>
+      <button class="toggle-btn active" id="annual-btn" onclick="setBilling('annual')">Pay annually <span class="save-badge">Save 20%</span></button>
+    </div>
+    <div id="billing-hint" style="font-size:14px;color:var(--muted);font-weight:500">Showing annual prices · billed once per year</div>
+  </div>
+
+  <div class="audience-tabs" style="margin-bottom:36px">
+    <button class="aud-tab active" onclick="setAudience('renters')">Renters &amp; buyers</button>
+    <button class="aud-tab" onclick="setAudience('landlords')">Landlords</button>
+    <button class="aud-tab" onclick="setAudience('agents')">Estate agents</button>
+  </div>
+</section>
+
+<!-- Pricing cards -->
+<section class="pricing-section">
+
+  <!-- RENTERS -->
+  <div class="pricing-grid" id="renters-grid">
+    <!-- Free -->
+    <div class="plan-card">
+      <div class="plan-audience">For renters &amp; buyers</div>
+      <div class="plan-name">Explorer</div>
+      <div class="plan-desc">Start your search and understand your fit — no card needed.</div>
+      <div class="plan-price">
+        <span class="price-currency">£</span>
+        <span class="price-amount">0</span>
+        <span class="price-period">/ month</span>
+      </div>
+      <div class="price-annual-note empty">&nbsp;</div>
+      <hr class="plan-divider">
+      <ul class="feature-list">
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Property search &amp; viewings</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Basic fit indicators</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>5 saved searches</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Referencing tracker</li>
+        <li class="dimmed"><span class="check-icon dim"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Full fit reports <span class="soon-tag">June</span></li>
+        <li class="dimmed"><span class="check-icon dim"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Financial readiness tools</li>
+      </ul>
+      <a href="#" class="plan-cta secondary">Get started free</a>
+    </div>
+
+    <!-- Renter Pro -->
+    <div class="plan-card featured">
+      <div class="featured-badge">Most popular</div>
+      <div class="plan-audience">For renters</div>
+      <div class="plan-name">Renter Pro</div>
+      <div class="plan-desc">For active movers who want full clarity before every application.</div>
+      <div class="plan-price">
+        <span class="price-currency">£</span>
+        <span class="price-amount" id="rp-price">10</span>
+        <span class="price-period">/ month</span>
+      </div>
+      <div class="price-annual-note" id="rp-note">Billed £99/yr · save £21</div>
+      <hr class="plan-divider">
+      <ul class="feature-list">
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Everything in Explorer</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Unlimited fit reports <span class="soon-tag">June</span></li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Full referencing suite</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Unlimited saved searches</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Report history &amp; alerts</li>
+        <li class="dimmed"><span class="check-icon dim"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Financial readiness tools</li>
+      </ul>
+      <a href="#" class="plan-cta primary">Start free trial</a>
+      <div class="trial-note">First month free · cancel anytime</div>
+    </div>
+
+    <!-- Buyer Pro -->
+    <div class="plan-card">
+      <div class="plan-audience">For buyers</div>
+      <div class="plan-name">Buyer Pro</div>
+      <div class="plan-desc">For buyers who want intelligence before they make an offer.</div>
+      <div class="plan-price">
+        <span class="price-currency">£</span>
+        <span class="price-amount" id="bp-price">16</span>
+        <span class="price-period">/ month</span>
+      </div>
+      <div class="price-annual-note" id="bp-note">Billed £159/yr · save £33</div>
+      <hr class="plan-divider">
+      <ul class="feature-list">
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Everything in Renter Pro</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Property intelligence reports</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Title register &amp; risk data</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Area intelligence</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Conveyancer matching</li>
+        <li class="dimmed"><span class="check-icon dim"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Mortgage readiness <span class="soon-tag">Q3</span></li>
+      </ul>
+      <a href="#" class="plan-cta secondary">Start free trial</a>
+      <div class="trial-note">First month free · cancel anytime</div>
+    </div>
+  </div>
+
+  <!-- LANDLORDS -->
+  <div class="pricing-grid" id="landlords-grid" style="display:none">
+    <div class="plan-card">
+      <div class="plan-audience">For landlords</div>
+      <div class="plan-name">Starter</div>
+      <div class="plan-desc">For landlords with 1–2 properties getting started.</div>
+      <div class="plan-price">
+        <span class="price-currency">£</span>
+        <span class="price-amount" id="ls-price">24</span>
+        <span class="price-period">/ month</span>
+      </div>
+      <div class="price-annual-note" id="ls-note">Billed £249/yr · save £39</div>
+      <hr class="plan-divider">
+      <ul class="feature-list">
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Up to 2 properties</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Tenant fit checks</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Digital contracts (AST)</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Basic dashboard</li>
+        <li class="dimmed"><span class="check-icon dim"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Fit reports for applicants <span class="soon-tag">June</span></li>
+      </ul>
+      <a href="#" class="plan-cta secondary">Start free trial</a>
+      <div class="trial-note">First month free · cancel anytime</div>
+    </div>
+
+    <div class="plan-card featured">
+      <div class="featured-badge">Most popular</div>
+      <div class="plan-audience">For landlords</div>
+      <div class="plan-name">Landlord Pro</div>
+      <div class="plan-desc">For portfolio landlords who want the complete toolkit.</div>
+      <div class="plan-price">
+        <span class="price-currency">£</span>
+        <span class="price-amount" id="lp-price">40</span>
+        <span class="price-period">/ month</span>
+      </div>
+      <div class="price-annual-note" id="lp-note">Billed £399/yr · save £81</div>
+      <hr class="plan-divider">
+      <ul class="feature-list">
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Up to 10 properties</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Unlimited tenant fit checks</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Full contract suite</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Portfolio dashboard &amp; alerts</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Priority support</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Fit reports <span class="soon-tag">June</span></li>
+      </ul>
+      <a href="#" class="plan-cta primary">Start free trial</a>
+      <div class="trial-note">First month free · cancel anytime</div>
+    </div>
+
+    <div class="plan-card dark">
+      <div class="plan-audience">For landlords</div>
+      <div class="plan-name">Elite</div>
+      <div class="plan-desc">For large portfolios that need power, analytics, and API access.</div>
+      <div class="plan-price">
+        <span class="price-currency">£</span>
+        <span class="price-amount" id="le-price">80</span>
+        <span class="price-period">/ month</span>
+      </div>
+      <div class="price-annual-note" id="le-note">Billed £799/yr · save £161</div>
+      <hr class="plan-divider">
+      <ul class="feature-list">
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Unlimited properties</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Bulk applicant fit checks</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Analytics &amp; revenue forecasting</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>API access</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>White-label reports on request</li>
+      </ul>
+      <a href="#" class="plan-cta white">Start free trial</a>
+      <div class="trial-note">First month free · cancel anytime</div>
+    </div>
+  </div>
+
+  <!-- AGENTS -->
+  <div class="pricing-grid" id="agents-grid" style="display:none">
+    <div class="plan-card">
+      <div class="plan-audience">For estate agents</div>
+      <div class="plan-name">Independent</div>
+      <div class="plan-desc">Solo agents and small branches. One user, clear monthly quota.</div>
+      <div class="plan-price">
+        <span class="price-currency">£</span>
+        <span class="price-amount" id="ai-price">64</span>
+        <span class="price-period">/ month</span>
+      </div>
+      <div class="price-annual-note" id="ai-note">Billed £759/yr · save £9/mo</div>
+      <hr class="plan-divider">
+      <ul class="feature-list">
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>1 user</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>20 fit checks/month included</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>£4 per check above quota</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Client pipeline view</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Digital contracts</li>
+        <li class="dimmed"><span class="check-icon dim"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Intelligence reports <span class="soon-tag">June</span></li>
+      </ul>
+      <a href="#" class="plan-cta secondary">Start free trial</a>
+      <div class="trial-note">First month free · cancel anytime</div>
+    </div>
+
+    <div class="plan-card featured">
+      <div class="featured-badge">Recommended</div>
+      <div class="plan-audience">For estate agents</div>
+      <div class="plan-name">Agent Pro</div>
+      <div class="plan-desc">For growing agencies. Team access, higher quota, compliance tools.</div>
+      <div class="plan-price">
+        <span class="price-currency">£</span>
+        <span class="price-amount" id="ap-price">120</span>
+        <span class="price-period">/ month</span>
+      </div>
+      <div class="price-annual-note" id="ap-note">Billed £1,430/yr · save £30/mo</div>
+      <hr class="plan-divider">
+      <ul class="feature-list">
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Up to 5 users</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>100 fit checks/month included</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>£3 per check above quota</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Client CRM &amp; pipeline</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Material info compliance pack</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Intelligence reports <span class="soon-tag">June</span></li>
+      </ul>
+      <a href="#" class="plan-cta primary">Start free trial</a>
+      <div class="trial-note">First month free · cancel anytime</div>
+    </div>
+
+    <div class="plan-card dark">
+      <div class="plan-audience">For estate agents</div>
+      <div class="plan-name">Enterprise</div>
+      <div class="plan-desc">Multi-branch and franchise networks. Custom volume, white-label, API.</div>
+      <div class="plan-price" style="align-items:center">
+        <span class="price-amount" style="font-size:36px">Custom</span>
+      </div>
+      <div class="price-annual-note" style="color:rgba(255,255,255,.7); background:rgba(255,255,255,0.08)">Annual contract · volume licence</div>
+      <hr class="plan-divider">
+      <ul class="feature-list">
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Unlimited users</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Bulk fit check volume pricing</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>White-label reports</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>API integration</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>Dedicated CSM &amp; onboarding</li>
+        <li><span class="check-icon"><svg viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></span>SLA + priority support</li>
+      </ul>
+      <a href="#" class="plan-cta white">Talk to us</a>
+      <div class="trial-note">First month free for new accounts</div>
+    </div>
+  </div>
+
+  <!-- Agent quota note -->
+  <div class="quota-note" id="agent-quota-note" style="display:none">
+    <strong>How agent quotas work:</strong> Your monthly plan includes a set number of fit checks. Go over your quota in any month and you're billed a simple per-check rate — £4 (Independent) or £3 (Agent Pro) — added to your next invoice. No surprises, no plan changes needed.
+  </div>
+
+</section>
+
+<!-- Early access box -->
+<section class="early-access-wrap">
+  <div class="early-access-box">
+    <div class="ea-left">
+      <div class="ea-eyebrow">Early access · May to July 2026 only</div>
+      <div class="ea-title">Your <em>first month</em>, on us.</div>
+      <div class="ea-desc">Sign up to any paid plan before 31 July 2026 and your first month is completely free. No promo code needed. No questions asked. Cancel before the month ends and pay nothing.</div>
+    </div>
+    <div class="ea-right">
+      <button class="ea-cta">Claim your free month</button>
+      <div class="ea-terms">Offer applies to first-time subscribers only.<br>Available on monthly and annual plans.</div>
+    </div>
+  </div>
+</section>
+
+<!-- Compare table -->
+<section class="compare-section">
+  <div class="compare-toggle" id="compare-toggle-wrap">
+    <button onclick="toggleCompare()">
+      Compare all features in detail
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,5 7,9 11,5"/></svg>
+    </button>
+  </div>
+  <div class="compare-table-wrap" id="compare-table-wrap">
+    <table class="compare-table" id="compare-table">
+      <thead>
+        <tr>
+          <th style="width:36%">Feature</th>
+          <th>Explorer</th>
+          <th>Renter Pro</th>
+          <th>Buyer Pro</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="section-row"><td colspan="4">Search &amp; viewings</td></tr>
+        <tr><td class="feature-name">Property search</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td class="feature-name">Viewing booking</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td class="feature-name">Saved searches</td><td><span class="partial">1 only</span></td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr class="section-row"><td colspan="4">Fit &amp; referencing</td></tr>
+        <tr><td class="feature-name">Basic fit indicators</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td class="feature-name">Full fit reports</td><td><span class="partial">1 only</span></td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td class="feature-name">Full referencing suite</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td class="feature-name">Report history &amp; alerts</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr class="section-row"><td colspan="4">Buyer tools</td></tr>
+        <tr><td class="feature-name">Property intelligence reports</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="feature-name">Title register &amp; risk data</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="feature-name">Area intelligence</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="feature-name">Conveyancer matching</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</main>
+
+<!-- FAQ -->
+<section class="faq-wrap">
+  <div class="faq-section">
+    <h3>Frequently Asked Questions</h3>
+    <p class="sub">Get quick answers to all your questions about our pricing and plans. Whether as a tenant, landlord, or agent, we have an answer waiting for you.</p>
+
+    <div class="faq-list">
+      <div class="faq-item open">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          What does the early access free month mean?
+          <span class="faq-icon"><svg viewBox="0 0 14 14"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg></span>
+        </div>
+        <div class="faq-a">If you sign up to any paid plan before 30 June 2026, your first full month is free — no credit card charge, no catch. You can cancel at any time during that month and you won't pay a thing. After your free month, you'll move onto your chosen plan at the regular price.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          Is annual billing really worth it?
+          <span class="faq-icon"><svg viewBox="0 0 14 14"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg></span>
+        </div>
+        <div class="faq-a">Yes — you save 20% versus monthly billing. For Landlord Pro, that's over £80 a year. You're billed once upfront and your plan renews at the same rate. If anything changes mid-year, we'll work something out — we don't believe in locking people in unfairly.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          What are fit reports and when do they launch?
+          <span class="faq-icon"><svg viewBox="0 0 14 14"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg></span>
+        </div>
+        <div class="faq-a">Fit reports are Proptii's core intelligence product — they tell renters, buyers, landlords, and agents how well a tenant or buyer profile matches a property or financial requirement, before anyone commits time. They launch in May 2026 and will be available automatically on all paid plans at no extra cost.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          How do agent quota overages work?
+          <span class="faq-icon"><svg viewBox="0 0 14 14"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg></span>
+        </div>
+        <div class="faq-a">Each agent plan includes a monthly quota of fit checks. If you exceed it, you're charged a flat per-check rate (£4 for Independent, £3 for Agent Pro) added to your next invoice. There's no manual upgrade required — you just keep working, and the bill reflects your actual usage.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          Can I switch plans later?
+          <span class="faq-icon"><svg viewBox="0 0 14 14"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg></span>
+        </div>
+        <div class="faq-a">Yes, always. Upgrade at any time and the difference is prorated. Downgrade at the end of your billing cycle. We don't make this difficult.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          Are tenants really free forever?
+          <span class="faq-icon"><svg viewBox="0 0 14 14"><line x1="7" y1="2" x2="7" y2="12"/><line x1="2" y1="7" x2="12" y2="7"/></svg></span>
+        </div>
+        <div class="faq-a">Core search, viewings, and basic fit indicators are free forever for renters and buyers. The paid tiers unlock the full fit report suite, complete referencing, report alerts, and buyer intelligence tools. We believe renters shouldn't have to pay just to find a home — the paid features are for people who want the full picture.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a href="#" class="logo">
+          <div class="logo-mark">
+            <svg viewBox="0 0 30 34" xmlns="http://www.w3.org/2000/svg" fill="none">
+              <path d="M15 2 L4 11 L4 32 L26 32 L26 11 Z" stroke="#E8622A" stroke-width="3" stroke-linejoin="round"/>
+              <path d="M11 32 L11 19 L19 19 L19 32" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <span class="logo-text">proptii</span>
+        </a>
+        <p>Revolutionizing real estate with AI to streamline the journey from discovery to completion for renters and buyers.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Home</h4>
+        <a href="#">Book Viewings</a>
+        <a href="#">Referencing</a>
+        <a href="#">Contracts</a>
+        <a href="#">Pricing</a>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <a href="#">About Us</a>
+        <a href="#">FAQ</a>
+        <a href="#">Privacy Policy</a>
+      </div>
+      <div class="footer-col">
+        <h4>Contact</h4>
+        <a href="#">Contact Us</a>
+        <a href="#">Terms of Service</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="copyright">© 2026, All Rights Reserved by Proptii</div>
+      <div class="socials">
+        <a href="#" class="social-btn" aria-label="LinkedIn"><svg viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg></a>
+        <a href="#" class="social-btn" aria-label="Instagram"><svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></a>
+        <a href="#" class="social-btn" aria-label="YouTube"><svg viewBox="0 0 24 24"><path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/></svg></a>
+        <a href="#" class="social-btn" aria-label="TikTok"><svg viewBox="0 0 24 24"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg></a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+let billing = 'annual';
+let audience = 'renters';
+
+const prices = {
+  rp: { monthly: 12, annual: 10 },
+  bp: { monthly: 19, annual: 16 },
+  ls: { monthly: 29, annual: 24 },
+  lp: { monthly: 49, annual: 40 },
+  le: { monthly: 99, annual: 80 },
+  ai: { monthly: 79, annual: 64 },
+  ap: { monthly: 149, annual: 120 }
+};
+
+const annualNotes = {
+  rp: 'Billed £99/yr · save £21',
+  bp: 'Billed £159/yr · save £33',
+  ls: 'Billed £249/yr · save £39',
+  lp: 'Billed £399/yr · save £81',
+  le: 'Billed £799/yr · save £161',
+  ai: 'Billed £759/yr · save £9/mo',
+  ap: 'Billed £1,430/yr · save £30/mo'
+};
+
+function setBilling(b) {
+  billing = b;
+  document.getElementById('monthly-btn').classList.toggle('active', b === 'monthly');
+  document.getElementById('annual-btn').classList.toggle('active', b === 'annual');
+  const hint = document.getElementById('billing-hint');
+  if (hint) hint.textContent = b === 'annual'
+    ? 'Showing annual prices · billed once per year'
+    : 'Showing monthly prices · billed each month';
+  updatePrices();
+}
+
+function setAudience(a) {
+  audience = a;
+  document.querySelectorAll('.aud-tab').forEach((t,i) => {
+    t.classList.toggle('active', ['renters','landlords','agents'][i] === a);
+  });
+  document.getElementById('renters-grid').style.display = a === 'renters' ? 'grid' : 'none';
+  document.getElementById('landlords-grid').style.display = a === 'landlords' ? 'grid' : 'none';
+  document.getElementById('agents-grid').style.display = a === 'agents' ? 'grid' : 'none';
+  document.getElementById('agent-quota-note').style.display = a === 'agents' ? 'block' : 'none';
+  updateCompareTable(a);
+}
+
+function updatePrices() {
+  const b = billing;
+  Object.keys(prices).forEach(key => {
+    const el = document.getElementById(key + '-price');
+    const noteEl = document.getElementById(key + '-note');
+    if (el) el.textContent = prices[key][b];
+    if (noteEl) {
+      noteEl.textContent = b === 'annual' ? annualNotes[key] : 'Billed monthly · no commitment';
+      noteEl.classList.toggle('empty', b !== 'annual');
+    }
+  });
+}
+
+function toggleCompare() {
+  const t = document.getElementById('compare-table-wrap');
+  const w = document.getElementById('compare-toggle-wrap');
+  t.classList.toggle('visible');
+  w.classList.toggle('open');
+}
+
+function updateCompareTable(a) {
+  const t = document.getElementById('compare-table');
+  const bodies = {
+    renters: `<thead><tr><th style="width:36%">Feature</th><th>Explorer</th><th>Renter Pro</th><th>Buyer Pro</th></tr></thead><tbody><tr class="section-row"><td colspan="4">Search &amp; viewings</td></tr><tr><td class="feature-name">Property search</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td class="feature-name">Viewing booking</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td class="feature-name">Saved searches</td><td><span class="partial">5 only</span></td><td class="yes">✓</td><td class="yes">✓</td></tr><tr class="section-row"><td colspan="4">Fit &amp; referencing</td></tr><tr><td class="feature-name">Basic fit indicators</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td class="feature-name">Full fit reports</td><td><span class="partial">1 only</span></td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td class="feature-name">Full referencing suite</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td class="feature-name">Report history &amp; alerts</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr class="section-row"><td colspan="4">Buyer tools</td></tr><tr><td class="feature-name">Property intelligence reports</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr><tr><td class="feature-name">Title register &amp; risk data</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr><tr><td class="feature-name">Area intelligence</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr><tr><td class="feature-name">Conveyancer matching</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr></tbody>`,
+    landlords: `<thead><tr><th style="width:36%">Feature</th><th>Starter</th><th>Landlord Pro</th><th>Elite</th></tr></thead><tbody><tr class="section-row"><td colspan="4">Properties</td></tr><tr><td class="feature-name">Properties managed</td><td><span class="partial">Up to 2</span></td><td><span class="partial">Up to 10</span></td><td class="yes">Unlimited</td></tr><tr><td class="feature-name">Tenant fit checks</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td class="feature-name">Unlimited fit checks</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr class="section-row"><td colspan="4">Contracts &amp; documents</td></tr><tr><td class="feature-name">AST digital contracts</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td class="feature-name">Full contract suite</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr class="section-row"><td colspan="4">Dashboard &amp; analytics</td></tr><tr><td class="feature-name">Portfolio dashboard</td><td><span class="partial">Basic</span></td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td class="feature-name">Revenue forecasting</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr><tr><td class="feature-name">API access</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr></tbody>`,
+    agents: `<thead><tr><th style="width:36%">Feature</th><th>Independent</th><th>Agent Pro</th><th>Enterprise</th></tr></thead><tbody><tr class="section-row"><td colspan="4">Users &amp; quota</td></tr><tr><td class="feature-name">Users</td><td><span class="partial">1</span></td><td><span class="partial">Up to 5</span></td><td class="yes">Unlimited</td></tr><tr><td class="feature-name">Monthly fit checks</td><td><span class="partial">20 included</span></td><td><span class="partial">100 included</span></td><td class="yes">Custom</td></tr><tr><td class="feature-name">Overage rate</td><td><span class="partial">£4/check</span></td><td><span class="partial">£3/check</span></td><td><span class="partial">Volume rate</span></td></tr><tr class="section-row"><td colspan="4">Tools &amp; compliance</td></tr><tr><td class="feature-name">Client pipeline view</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td class="feature-name">Digital contracts</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td class="feature-name">Material info compliance</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td class="feature-name">Intelligence reports</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr class="section-row"><td colspan="4">Enterprise</td></tr><tr><td class="feature-name">White-label reports</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr><tr><td class="feature-name">API integration</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr><tr><td class="feature-name">Dedicated CSM</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr></tbody>`
+  };
+  t.innerHTML = bodies[a] || bodies.renters;
+}
+
+function toggleFaq(el) {
+  el.closest('.faq-item').classList.toggle('open');
+}
+
+updatePrices();
+</script>
+</body>
+</html>
