@@ -2,6 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { SessionManager } from '../services/SessionManager';
 import { ApplicationInsights } from '@microsoft/applicationinsights-web';
+import { KNOWN_API_ORIGINS } from '../utils/apiEndpoints';
 
 const DEFAULT_SEARCH_BACKEND_URL = 'https://proptii-r1-1a-search.onrender.com';
 
@@ -77,8 +78,7 @@ export class SecurityMiddleware {
             'https://*.stripe.com',
             'https://*.azure.com',
             // Always include known backend origins
-            'https://proptii-r1-1a-1.onrender.com',
-            'https://proptii-r1-1a-new-backend.onrender.com',
+            ...KNOWN_API_ORIGINS,
             'https://proptii-backend.onrender.com',
             'https://demo.docusign.net',
             'https://www.docusign.net',

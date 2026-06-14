@@ -6,9 +6,21 @@ export const CANONICAL_PROD_API_BASE_URL =
 /** Nest global prefix — use this for billing and other /api/* routes in local dev. */
 export const DEV_LOCAL_API_BASE = 'http://127.0.0.1:3000/api';
 
-const REMOTE_FALLBACKS = [
+const RENDER_REMOTE_FALLBACKS = [
   CANONICAL_PROD_API_BASE_URL,
   'https://proptii-r1-1a-1.onrender.com/api',
+];
+
+/** Legacy custom domains — only tried from localhost dev (CSP + routing differ on deployed hosts). */
+const LEGACY_REMOTE_FALLBACKS = [
+  'https://api.proptii.com',
+  'https://api-staging.proptii.com',
+];
+
+/** Origins allowed in CSP connect-src for any API base we may call. */
+export const KNOWN_API_ORIGINS = [
+  'https://proptii-r1-1a-new-backend.onrender.com',
+  'https://proptii-r1-1a-1.onrender.com',
   'https://api.proptii.com',
   'https://api-staging.proptii.com',
 ];
@@ -49,14 +61,18 @@ const buildCandidateList = () => {
    * forces the browser to call production from http://localhost — which triggers CORS unless the
    * remote server lists your origin. Prefer local Nest/API bases first; remote URL remains as fallback.
    */
+  const remoteFallbacks = isLocalDevOrigin
+    ? [...RENDER_REMOTE_FALLBACKS, ...LEGACY_REMOTE_FALLBACKS]
+    : RENDER_REMOTE_FALLBACKS;
+
   let candidates: string[];
   if (isLocalDevOrigin && envUrl && !isLocalApiUrl(envUrl)) {
-    candidates = [...LOCAL_FALLBACKS, envUrl, ...REMOTE_FALLBACKS];
+    candidates = [...LOCAL_FALLBACKS, envUrl, ...remoteFallbacks];
   } else {
     candidates = [
       ...(envUrl ? [envUrl] : []),
       ...(isLocalDevOrigin ? LOCAL_FALLBACKS : []),
-      ...REMOTE_FALLBACKS,
+      ...remoteFallbacks,
       ...(!isLocalDevOrigin && (import.meta as any)?.env?.DEV ? LOCAL_FALLBACKS : []),
     ];
   }
