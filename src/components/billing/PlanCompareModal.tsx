@@ -4,12 +4,12 @@ import { X, Check, Minus, Zap } from 'lucide-react';
 import {
   getPlansForAudienceTab,
   getDisplayPrice,
-  getStripePriceId,
   type PlanConfig,
   type PlanId,
 } from '../../config/plans';
 import {
   createCheckoutSession,
+  resolveStripePriceId,
   setPendingPlan,
 } from '../../services/billingService';
 import { markPendingStripeCheckout } from '../../utils/pricingRoutes';
@@ -250,7 +250,7 @@ const PlanCompareModal: React.FC<Props> = ({
   const plans = getPlansForAudienceTab(audience);
 
   const handleUpgrade = async (plan: PlanConfig) => {
-    const priceId = getStripePriceId(plan, cycle);
+    const priceId = await resolveStripePriceId(plan.id, cycle);
     if (!priceId) {
       /* No Stripe price yet — fall through to pricing page */
       navigate(`/pricing?plan=${plan.id}&cycle=${cycle}`);

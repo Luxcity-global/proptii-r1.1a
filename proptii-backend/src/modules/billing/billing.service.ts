@@ -97,9 +97,13 @@ export class BillingService {
         .item(userId, userId)
         .read<UserDocument>();
       return resource ?? null;
-    } catch (err: any) {
-      if (err?.code === 404) return null;
-      throw err;
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'code' in err && (err as { code: number }).code === 404) {
+        return null;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`getUserDoc failed for userId=${userId}: ${message}`);
+      return null;
     }
   }
 
@@ -329,6 +333,10 @@ export class BillingService {
   // ── S1-04: GET /api/billing/status ───────────────────────────────────────
 
   async getBillingStatus(userId: string): Promise<BillingStatusDto> {
+    if (!userId?.trim()) {
+      throw new BadRequestException('User ID not found in access token (oid/sub missing)');
+    }
+
     const doc = await this.getUserDoc(userId);
 
     return {

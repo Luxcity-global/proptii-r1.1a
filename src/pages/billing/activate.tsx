@@ -7,12 +7,10 @@ import { usePlan } from '../../hooks/usePlan';
 import {
   createCheckoutSession,
   downgradeToFreePlan,
+  resolveStripePriceId,
+  CHECKOUT_NOT_CONFIGURED_MSG,
 } from '../../services/billingService';
-import {
-  getPlanById,
-  getStripePriceId,
-  type PlanId,
-} from '../../config/plans';
+import { getPlanById, type PlanId } from '../../config/plans';
 import type { BillingCycle } from '../../components/pricing/PricingBillingToggle';
 import '../../styles/pricing.css';
 
@@ -39,9 +37,9 @@ const BillingActivatePage: React.FC = () => {
     e.preventDefault();
     if (!planConfig) return;
 
-    const priceId = getStripePriceId(planConfig, cycle);
+    const priceId = await resolveStripePriceId(planId, cycle);
     if (!priceId) {
-      setError('Checkout is not configured for this plan.');
+      setError(CHECKOUT_NOT_CONFIGURED_MSG);
       return;
     }
 

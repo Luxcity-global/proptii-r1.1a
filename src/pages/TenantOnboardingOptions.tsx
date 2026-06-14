@@ -26,7 +26,7 @@ const TenantOnboardingOptions: React.FC<TenantOnboardingOptionsProps> = ({ asMod
   const content = (
     <div
       className={`relative flex flex-col items-center justify-center px-6 py-12 md:px-10 md:py-16 bg-cover bg-center bg-no-repeat ${asModal ? 'rounded-2xl overflow-hidden' : 'min-h-screen'}`}
-      style={{ backgroundImage: 'url(/images/addtenbg.png)', ...textStyle }}
+      style={{ backgroundImage: 'url(/assets/add_prp_slide/addtenbg.png)', ...textStyle }}
     >
       {/* Close button: top-right (fixed when full-screen, absolute when modal) */}
       <button

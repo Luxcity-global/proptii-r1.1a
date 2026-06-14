@@ -8,13 +8,11 @@ import { useBillingStatus } from '../../hooks/useBillingStatus';
 import { usePlan } from '../../hooks/usePlan';
 import {
   createCheckoutSession,
+  resolveStripePriceId,
   setPendingPlan,
+  CHECKOUT_NOT_CONFIGURED_MSG,
 } from '../../services/billingService';
-import {
-  getPlanById,
-  getStripePriceId,
-  type PlanId,
-} from '../../config/plans';
+import { getPlanById, type PlanId } from '../../config/plans';
 import {
   getPricingFlow,
   hasPendingStripeCheckout,
@@ -77,9 +75,9 @@ const WelcomeContent: React.FC = () => {
 
     const runCheckout = async () => {
       checkoutStarted.current = true;
-      const priceId = getStripePriceId(plan!, cycle);
+      const priceId = await resolveStripePriceId(planId, cycle);
       if (!priceId) {
-        setCheckoutError('Billing is not configured for this plan yet.');
+        setCheckoutError(CHECKOUT_NOT_CONFIGURED_MSG);
         return;
       }
 

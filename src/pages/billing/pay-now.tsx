@@ -3,11 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 import OrderSummary from '../../components/billing/OrderSummary';
 import PaymentForm from '../../components/billing/PaymentForm';
-import { getPlanById, getStripePriceId, type PlanId } from '../../config/plans';
 import {
   createCheckoutSession,
+  resolveStripePriceId,
   setPendingPlan,
+  CHECKOUT_NOT_CONFIGURED_MSG,
 } from '../../services/billingService';
+import { getPlanById, type PlanId } from '../../config/plans';
 import {
   markPendingStripeCheckout,
   setPricingFlow,
@@ -39,9 +41,9 @@ const PayNowPage: React.FC = () => {
     e.preventDefault();
     if (!plan) return;
 
-    const priceId = getStripePriceId(plan, cycle);
+    const priceId = await resolveStripePriceId(planId, cycle);
     if (!priceId) {
-      setError('This plan is not configured for checkout yet.');
+      setError(CHECKOUT_NOT_CONFIGURED_MSG);
       return;
     }
 

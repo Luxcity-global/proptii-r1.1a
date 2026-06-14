@@ -186,5 +186,5 @@ export const fetchBillingWithApiFallback = (
   fetchWithApiFallback(path, init, {
     bases: getBillingApiBaseCandidates(),
     retryOnNotFound: !import.meta.env.DEV || !isBrowserLocalDevOrigin(),
-    retryOnHttpErrors: !import.meta.env.DEV || !isBrowserLocalDevOrigin(),
+    retryOnHttpErrors: false,
   });

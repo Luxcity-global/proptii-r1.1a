@@ -1,6 +1,11 @@
 import { fetchBillingWithApiFallback } from '../utils/apiEndpoints';
 import { getAccessTokenForApiRequest } from './msalAccessToken';
-import type { PlanId } from '../config/plans';
+import {
+  getPlanById,
+  getStripePriceId,
+  type PlanConfig,
+  type PlanId,
+} from '../config/plans';
 
 export interface BillingStatus {
   plan: string;
@@ -142,6 +147,61 @@ export async function fetchBillingPlans(): Promise<unknown> {
   if (!response.ok) throw new Error('Failed to load plans');
   return response.json();
 }
+
+type BillingPlanFromApi = Pick<
+  PlanConfig,
+  'id' | 'stripePriceIdMonthly' | 'stripePriceIdAnnual'
+> & { id: string };
+
+let plansCache: BillingPlanFromApi[] | null = null;
+let plansCacheAt = 0;
+const PLANS_CACHE_MS = 5 * 60 * 1000;
+
+function apiPlanIdForFrontend(planId: PlanId): string {
+  return planId === 'explorer' ? 'free' : planId;
+}
+
+async function loadPlansFromApi(): Promise<BillingPlanFromApi[]> {
+  if (plansCache && Date.now() - plansCacheAt < PLANS_CACHE_MS) {
+    return plansCache;
+  }
+  const data = await fetchBillingPlans();
+  plansCache = Array.isArray(data) ? (data as BillingPlanFromApi[]) : [];
+  plansCacheAt = Date.now();
+  return plansCache;
+}
+
+/**
+ * Resolve Stripe price ID for checkout.
+ * Uses VITE_STRIPE_PRICE_* when present (local/dev); otherwise loads from GET /api/billing/plans
+ * so Render only needs STRIPE_PRICE_* on the backend.
+ */
+export async function resolveStripePriceId(
+  planId: PlanId,
+  cycle: 'monthly' | 'annual',
+): Promise<string | null> {
+  const plan = getPlanById(planId);
+  if (!plan) return null;
+
+  const fromBuildEnv = getStripePriceId(plan, cycle);
+  if (fromBuildEnv) return fromBuildEnv;
+
+  try {
+    const apiPlans = await loadPlansFromApi();
+    const apiPlan = apiPlans.find(
+      (p) => p.id === apiPlanIdForFrontend(planId),
+    );
+    if (!apiPlan) return null;
+    return cycle === 'annual'
+      ? apiPlan.stripePriceIdAnnual
+      : apiPlan.stripePriceIdMonthly;
+  } catch {
+    return null;
+  }
+}
+
+export const CHECKOUT_NOT_CONFIGURED_MSG =
+  'This plan is not configured for checkout yet. Set STRIPE_PRICE_* on the backend (Render) or VITE_STRIPE_PRICE_* on the frontend build, then redeploy.';
 
 export async function createBillingPortalSession(): Promise<{ portalUrl: string }> {
   const headers = await authHeaders();
