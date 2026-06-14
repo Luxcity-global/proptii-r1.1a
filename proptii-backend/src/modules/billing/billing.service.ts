@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { CosmosClient, Container } from '@azure/cosmos';
-import { createStripeClient } from './stripe.client';
+import { createStripeClientOptional } from './stripe.client';
 import {
   getSubscriptionCurrentPeriodEndIso,
   getSubscriptionTrialEndIso,
@@ -28,15 +28,34 @@ export class BillingService {
   private readonly logger = new Logger(BillingService.name);
   // Type inferred from constructor — avoids TS2709 namespace-vs-type conflict
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private readonly stripe: any;
+  private readonly stripe: any | null;
   private usersContainer: Container | null = null;
   private eventsContainer: Container | null = null;
 
   constructor(
     @Inject('COSMOS_CLIENT') private readonly cosmosClient: CosmosClient | null,
   ) {
-    this.stripe = createStripeClient(process.env.STRIPE_SECRET_KEY ?? '');
+    const stripeKey = process.env.STRIPE_SECRET_KEY ?? '';
+    this.stripe = createStripeClientOptional(stripeKey);
+    if (!this.stripe) {
+      const hint = stripeKey.startsWith('whsec_')
+        ? 'STRIPE_SECRET_KEY is set to the webhook secret (whsec_...). Use sk_test_... or sk_live_... from Stripe Dashboard → Developers → API keys.'
+        : stripeKey
+          ? 'STRIPE_SECRET_KEY must start with sk_test_ or sk_live_.'
+          : 'STRIPE_SECRET_KEY is not set — checkout and webhooks are disabled.';
+      this.logger.warn(`Stripe not configured: ${hint}`);
+    }
     this.initContainers();
+  }
+
+  /** Stripe-dependent routes call this; read-only routes work without Stripe. */
+  private requireStripe(): any {
+    if (!this.stripe) {
+      throw new BadRequestException(
+        'Stripe is not configured on this server. Set STRIPE_SECRET_KEY=sk_test_... (or sk_live_...) in environment variables — not the webhook secret (whsec_...).',
+      );
+    }
+    return this.stripe;
   }
 
   private initContainers(): void {
@@ -126,6 +145,7 @@ export class BillingService {
     dto: CheckoutDto,
   ): Promise<{ checkoutUrl: string }> {
     try {
+      const stripe = this.requireStripe();
       const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
       const promoActive = process.env.PROMO_FREE_MONTH_ACTIVE === 'true';
       const trialDays = dto.trialEnabled && promoActive ? 30 : 0;
@@ -156,7 +176,7 @@ export class BillingService {
         },
       };
 
-      const session = await this.stripe.checkout.sessions.create(sessionParams);
+      const session = await stripe.checkout.sessions.create(sessionParams);
 
       if (!session.url) {
         throw new BadRequestException('Stripe did not return a checkout URL');
@@ -181,11 +201,12 @@ export class BillingService {
     userEmail: string,
     createIfMissing = true,
   ): Promise<string> {
+    const stripe = this.requireStripe();
     let customerId = (await this.getUserDoc(userId))?.stripe_customer_id ?? null;
 
     if (customerId) {
       try {
-        await this.stripe.customers.retrieve(customerId);
+        await stripe.customers.retrieve(customerId);
         return customerId;
       } catch (err: unknown) {
         if (!this.isStripeResourceModeMismatch(err, 'customer')) {
@@ -204,7 +225,7 @@ export class BillingService {
       );
     }
 
-    const customer = await this.stripe.customers.create({
+    const customer = await stripe.customers.create({
       email: userEmail,
       metadata: { userId },
     });
@@ -270,6 +291,7 @@ export class BillingService {
     userEmail: string,
   ): Promise<{ portalUrl: string }> {
     try {
+      const stripe = this.requireStripe();
       const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
       const customerId = await this.resolveStripeCustomerId(
         userId,
@@ -277,7 +299,7 @@ export class BillingService {
         false,
       );
 
-      const session = await this.stripe.billingPortal.sessions.create({
+      const session = await stripe.billingPortal.sessions.create({
         customer: customerId,
         return_url: `${frontendUrl}/account/billing`,
       });
@@ -336,6 +358,7 @@ export class BillingService {
     },
     options?: { priceId?: string },
   ): Promise<void> {
+    const stripe = this.requireStripe();
     const subscriptionRef = session.subscription;
     const subscriptionId =
       typeof subscriptionRef === 'string'
@@ -351,7 +374,7 @@ export class BillingService {
         ? customerRef
         : customerRef?.id ?? null;
 
-    const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     const priceId =
       options?.priceId ?? subscription.items.data[0]?.price.id ?? '';
     const priceMap = buildPriceIdMap();
@@ -406,7 +429,8 @@ export class BillingService {
     sessionId: string,
   ): Promise<BillingStatusDto> {
     try {
-      const session = await this.stripe.checkout.sessions.retrieve(sessionId, {
+      const stripe = this.requireStripe();
+      const session = await stripe.checkout.sessions.retrieve(sessionId, {
         expand: ['subscription'],
       });
 
@@ -431,7 +455,7 @@ export class BillingService {
         );
       }
 
-      const lineItems = await this.stripe.checkout.sessions.listLineItems(
+      const lineItems = await stripe.checkout.sessions.listLineItems(
         sessionId,
         { limit: 1 },
       );
@@ -455,7 +479,7 @@ export class BillingService {
   async downgradeToFree(userId: string): Promise<void> {
     const doc = await this.getUserDoc(userId);
 
-    if (doc?.stripe_subscription_id) {
+    if (doc?.stripe_subscription_id && this.stripe) {
       try {
         await this.stripe.subscriptions.cancel(doc.stripe_subscription_id);
       } catch (err) {
@@ -534,7 +558,7 @@ export class BillingService {
       const newlyOver = Math.max(0, newUsed - quota) - previouslyOver;
       const overageCount = Math.min(dto.checksUsed, newlyOver);
 
-      if (overageCount > 0 && overageRate > 0) {
+      if (overageCount > 0 && overageRate > 0 && this.stripe) {
         const overageAmount = Math.round(overageCount * overageRate * 100);
         await this.stripe.invoiceItems.create({
           customer: doc.stripe_customer_id,

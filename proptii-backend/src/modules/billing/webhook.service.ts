@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { Container } from '@azure/cosmos';
 import { BillingService } from './billing.service';
 import { EmailService } from '../../services/email.service';
@@ -26,7 +26,7 @@ interface BillingEventDoc {
 export class WebhookService {
   private readonly logger = new Logger(WebhookService.name);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private readonly stripe: any;
+  private readonly stripe: any | null;
   private eventsContainer: Container | null = null;
 
   constructor(
@@ -39,6 +39,12 @@ export class WebhookService {
   // ── S1-07 / S1-08: Verify and dispatch ───────────────────────────────────
 
   async processWebhook(rawBody: Buffer, signature: string): Promise<void> {
+    if (!this.stripe) {
+      throw new BadRequestException(
+        'Stripe webhooks are disabled — STRIPE_SECRET_KEY is not configured on this server.',
+      );
+    }
+
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? '';
 
     let event: any;
