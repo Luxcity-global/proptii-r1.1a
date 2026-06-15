@@ -5,6 +5,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { CosmosClient, Container } from '@azure/cosmos';
@@ -122,7 +123,18 @@ export class BillingService {
       id: userId,
       updatedAt: new Date().toISOString(),
     };
-    await this.usersContainer.items.upsert(updated);
+    try {
+      await this.usersContainer.items.upsert(updated);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`updateUserDoc failed for userId=${userId}: ${message}`);
+      if (/unauthorized|authorization token|401/i.test(message)) {
+        throw new ServiceUnavailableException(
+          'Database credentials are invalid. Check COSMOS_DB_CONNECTION_STRING (AccountEndpoint URL only) and COSMOS_DB_KEY on the server.',
+        );
+      }
+      throw new ServiceUnavailableException('Could not save user billing data.');
+    }
   }
 
   async getUserByStripeCustomerId(customerId: string): Promise<UserDocument | null> {
@@ -156,8 +168,8 @@ export class BillingService {
 
       const customerId = await this.resolveStripeCustomerId(userId, userEmail, true);
       const userDoc = await this.getUserDoc(userId);
-      const pendingPlan = userDoc?.pending_plan ?? '';
-      const pendingCycle = userDoc?.pending_cycle ?? '';
+      const pendingPlan = dto.planId ?? userDoc?.pending_plan ?? '';
+      const pendingCycle = dto.cycle ?? userDoc?.pending_cycle ?? '';
 
       const sessionParams = {
         customer: customerId,
@@ -518,16 +530,28 @@ export class BillingService {
     planId: string,
     cycle: 'monthly' | 'annual',
   ): Promise<void> {
+    if (!userId?.trim()) {
+      throw new BadRequestException('User ID not found in access token (oid/sub missing)');
+    }
+
     const planConfig = getPlanConfig(planId as PlanId);
     if (!planConfig && planId !== 'explorer') {
       throw new BadRequestException(`Unknown plan: ${planId}`);
     }
 
-    await this.updateUserDoc(userId, {
-      email: userEmail || undefined,
-      pending_plan: planId,
-      pending_cycle: cycle,
-    });
+    try {
+      await this.updateUserDoc(userId, {
+        email: userEmail || undefined,
+        pending_plan: planId,
+        pending_cycle: cycle,
+      });
+    } catch (err: unknown) {
+      if (err instanceof BadRequestException) throw err;
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `setPendingPlan could not persist (checkout can continue via checkout body): ${message}`,
+      );
+    }
   }
 
   // ── S1-05: GET /api/billing/plans ────────────────────────────────────────

@@ -50,14 +50,21 @@ const PayNowPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      await setPendingPlan(planId, cycle);
+      try {
+        await setPendingPlan(planId, cycle);
+      } catch {
+        /* Best-effort — plan/cycle are sent on checkout request */
+      }
       markPendingStripeCheckout('pay_now');
       trackEvent('billing_checkout_started', {
         plan_id: planId,
         cycle,
         trial_enabled: false,
       });
-      const { checkoutUrl } = await createCheckoutSession(priceId, false);
+      const { checkoutUrl } = await createCheckoutSession(priceId, false, {
+        planId,
+        cycle,
+      });
       window.location.href = checkoutUrl;
     } catch (err) {
       setError(

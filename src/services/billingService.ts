@@ -88,6 +88,7 @@ const CHECKOUT_TIMEOUT_MS = 25_000;
 export async function createCheckoutSession(
   priceId: string,
   trialEnabled: boolean,
+  options?: { planId?: string; cycle?: 'monthly' | 'annual' },
 ): Promise<{ checkoutUrl: string }> {
   const headers = await authHeaders();
   const controller = new AbortController();
@@ -97,7 +98,12 @@ export async function createCheckoutSession(
     const { response, url } = await fetchBillingWithApiFallback('/billing/checkout', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ priceId, trialEnabled }),
+      body: JSON.stringify({
+        priceId,
+        trialEnabled,
+        ...(options?.planId ? { planId: options.planId } : {}),
+        ...(options?.cycle ? { cycle: options.cycle } : {}),
+      }),
       signal: controller.signal,
     });
     if (!response.ok) {

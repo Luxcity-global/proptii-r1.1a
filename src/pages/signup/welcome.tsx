@@ -82,14 +82,21 @@ const WelcomeContent: React.FC = () => {
       }
 
       try {
-        await setPendingPlan(planId, cycle);
+        try {
+          await setPendingPlan(planId, cycle);
+        } catch {
+          /* best-effort */
+        }
         markPendingStripeCheckout('trial');
         trackEvent('billing_checkout_started', {
           plan_id: planId,
           cycle,
           trial_enabled: true,
         });
-        const { checkoutUrl } = await createCheckoutSession(priceId, true);
+        const { checkoutUrl } = await createCheckoutSession(priceId, true, {
+          planId,
+          cycle,
+        });
         window.location.href = checkoutUrl;
       } catch (e) {
         checkoutStarted.current = false;

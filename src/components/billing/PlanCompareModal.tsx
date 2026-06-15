@@ -260,7 +260,11 @@ const PlanCompareModal: React.FC<Props> = ({
     setUpgrading(plan.id);
     setUpgradeError(null);
     try {
-      await setPendingPlan(plan.id, cycle);
+      try {
+        await setPendingPlan(plan.id, cycle);
+      } catch {
+        /* best-effort */
+      }
       markPendingStripeCheckout('pay_now');
       trackEvent('billing_checkout_started', {
         plan_id: plan.id,
@@ -268,7 +272,10 @@ const PlanCompareModal: React.FC<Props> = ({
         trial_enabled: false,
         source: 'settings_plan_modal',
       });
-      const { checkoutUrl } = await createCheckoutSession(priceId, false);
+      const { checkoutUrl } = await createCheckoutSession(priceId, false, {
+        planId: plan.id,
+        cycle,
+      });
       window.location.href = checkoutUrl;
     } catch (err) {
       setUpgradeError(

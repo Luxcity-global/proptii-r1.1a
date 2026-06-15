@@ -46,7 +46,10 @@ const BillingActivatePage: React.FC = () => {
     setBusy(true);
     setError(null);
     try {
-      const { checkoutUrl } = await createCheckoutSession(priceId, false);
+      const { checkoutUrl } = await createCheckoutSession(priceId, false, {
+        planId,
+        cycle,
+      });
       window.location.href = checkoutUrl;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Checkout failed');
