@@ -5,7 +5,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
-  ServiceUnavailableException,
+  HttpException,
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { CosmosClient, Container } from '@azure/cosmos';
@@ -127,13 +127,9 @@ export class BillingService {
       await this.usersContainer.items.upsert(updated);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(`updateUserDoc failed for userId=${userId}: ${message}`);
-      if (/unauthorized|authorization token|401/i.test(message)) {
-        throw new ServiceUnavailableException(
-          'Database credentials are invalid. Check COSMOS_DB_CONNECTION_STRING (AccountEndpoint URL only) and COSMOS_DB_KEY on the server.',
-        );
-      }
-      throw new ServiceUnavailableException('Could not save user billing data.');
+      this.logger.warn(
+        `updateUserDoc failed (checkout/billing continues without DB persist) userId=${userId}: ${message}`,
+      );
     }
   }
 
@@ -264,6 +260,9 @@ export class BillingService {
   }
 
   private mapStripeError(err: unknown, operation: string): never {
+    if (err instanceof HttpException) {
+      throw err;
+    }
     const message = err instanceof Error ? err.message : String(err);
     if (
       message.includes('STRIPE_SECRET_KEY must be') ||
