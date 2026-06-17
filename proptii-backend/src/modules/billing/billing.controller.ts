@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Body,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -15,6 +16,7 @@ import { CheckoutDto } from './dto/checkout.dto';
 import { QuotaReportDto } from './dto/quota-report.dto';
 import { SetPendingPlanDto } from './dto/pending-plan.dto';
 import { ConfirmCheckoutDto } from './dto/confirm-checkout.dto';
+import { parseBillingDashboard } from './billing-dashboard.utils';
 import { SubscriptionGuard } from '../../guards/subscription.guard';
 import { RequiresActiveSubscription } from '../../decorators/requires-active-subscription.decorator';
 
@@ -75,8 +77,14 @@ export class BillingController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get billing status for current user' })
-  getStatus(@CurrentUser() user: Record<string, unknown>) {
-    return this.billingService.getBillingStatus(userId(user));
+  getStatus(
+    @CurrentUser() user: Record<string, unknown>,
+    @Query('dashboard') dashboard?: string,
+  ) {
+    return this.billingService.getBillingStatus(
+      userId(user),
+      parseBillingDashboard(dashboard),
+    );
   }
 
   /**
@@ -151,7 +159,13 @@ export class BillingController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Downgrade to free Explorer plan' })
-  downgradeToFree(@CurrentUser() user: Record<string, unknown>) {
-    return this.billingService.downgradeToFree(userId(user));
+  downgradeToFree(
+    @CurrentUser() user: Record<string, unknown>,
+    @Query('dashboard') dashboard?: string,
+  ) {
+    return this.billingService.downgradeToFree(
+      userId(user),
+      parseBillingDashboard(dashboard),
+    );
   }
 }

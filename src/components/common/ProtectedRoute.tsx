@@ -73,20 +73,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     location.search.includes('session_id=');
 
   if (!isAuthenticated && isStripeSuccessReturn) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '50vh',
-        fontFamily: 'Archivo, sans-serif',
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p style={{ color: '#666' }}>Completing your subscription…</p>
-        </div>
-      </div>
-    );
+    return <>{children}</>;
   }
 
   if (!isAuthenticated) {

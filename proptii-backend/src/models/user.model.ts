@@ -33,6 +33,24 @@ export type SubscriptionStatus =
   | 'canceled'
   | 'unpaid';
 
+/** Billing state scoped to one dashboard (renter/buyer vs landlord/agent). */
+export interface DashboardBillingState {
+  stripe_subscription_id?: string | null;
+  stripe_price_id?: string | null;
+  plan?: PlanId;
+  billing_cadence?: BillingCadence | null;
+  subscription_status?: SubscriptionStatus | null;
+  trial_ends_at?: string | null;
+  current_period_end?: string | null;
+  cancel_at_period_end?: boolean;
+  fit_checks_used?: number | null;
+  fit_checks_quota?: number | null;
+  pending_plan?: string | null;
+  pending_cycle?: BillingCadence | null;
+  payment_failed_at?: string | null;
+  trial_ending_soon?: boolean;
+}
+
 // ── User document ────────────────────────────────────────────────────────────
 
 /**
@@ -176,4 +194,10 @@ export class UserDocument {
    * Used to conditionally render the in-app trial-ending-soon banner.
    */
   trial_ending_soon?: boolean;
+
+  /** Renter/buyer dashboard subscription (isolated from landlord/agent billing). */
+  billing_consumer?: DashboardBillingState;
+
+  /** Landlord/agent dashboard subscription (isolated from renter/buyer billing). */
+  billing_landlord?: DashboardBillingState;
 }

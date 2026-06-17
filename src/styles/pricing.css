@@ -874,6 +874,14 @@
   padding: 0 24px;
   text-align: center;
 }
+.pr-confirmed-card {
+  background: var(--pr-white);
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgba(20, 56, 92, 0.08);
+  border: 1px solid var(--pr-border);
+  padding: 48px 32px 40px;
+  max-width: 520px;
+}
 .pr-confirmed h1 {
   font-family: 'Archivo', sans-serif;
   font-size: 34px;

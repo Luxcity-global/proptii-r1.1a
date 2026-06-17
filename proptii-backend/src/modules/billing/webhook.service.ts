@@ -4,6 +4,14 @@ import { BillingService } from './billing.service';
 import { EmailService } from '../../services/email.service';
 import { buildPriceIdMap, getPlanConfig } from './config/plans.config';
 import {
+  dashboardForPlanId,
+  dashboardForSubscriptionId,
+  getDashboardBilling,
+  mergeDashboardBillingUpdate,
+  parseBillingDashboard,
+} from './billing-dashboard.utils';
+import { resolveFrontendBaseUrl } from './frontend-url.utils';
+import {
   getSubscriptionCurrentPeriodEndIso,
   getSubscriptionTrialEndIso,
 } from './stripe-subscription.utils';
@@ -129,6 +137,7 @@ export class WebhookService {
   private async handleSubscriptionUpdated(event: any): Promise<void> {
     const subscription = event.data.object as any;
     const customerId = subscription.customer as string;
+    const subscriptionId = subscription.id as string;
 
     const userDoc = await this.billingService.getUserByStripeCustomerId(customerId);
     if (!userDoc) {
@@ -136,22 +145,33 @@ export class WebhookService {
       return;
     }
 
+    const dashboard =
+      dashboardForSubscriptionId(userDoc, subscriptionId) ??
+      dashboardForPlanId(
+        buildPriceIdMap().get(subscription.items.data[0]?.price.id ?? '')?.planId,
+      );
+
     const priceId = subscription.items.data[0]?.price.id ?? '';
     const priceMap = buildPriceIdMap();
     const planInfo = priceMap.get(priceId);
+    const current = getDashboardBilling(userDoc, dashboard);
 
     await this.billingService.updateUserDoc(userDoc.id, {
-      plan: (planInfo?.planId ?? userDoc.plan) as PlanId,
-      stripe_price_id: priceId,
-      subscription_status: subscription.status as SubscriptionStatus,
-      billing_cadence: planInfo?.cadence ?? (userDoc.billing_cadence as BillingCadence),
-      current_period_end: getSubscriptionCurrentPeriodEndIso(subscription),
-      trial_ends_at: getSubscriptionTrialEndIso(subscription),
-      cancel_at_period_end: subscription.cancel_at_period_end,
+      ...mergeDashboardBillingUpdate(userDoc, dashboard, {
+        plan: (planInfo?.planId ?? current.plan ?? 'free') as PlanId,
+        stripe_subscription_id: subscriptionId,
+        stripe_price_id: priceId,
+        subscription_status: subscription.status as SubscriptionStatus,
+        billing_cadence:
+          planInfo?.cadence ?? (current.billing_cadence as BillingCadence),
+        current_period_end: getSubscriptionCurrentPeriodEndIso(subscription),
+        trial_ends_at: getSubscriptionTrialEndIso(subscription),
+        cancel_at_period_end: subscription.cancel_at_period_end,
+      }),
     });
 
     this.logger.log(
-      `Subscription updated — userId=${userDoc.id} status=${subscription.status}`,
+      `Subscription updated — userId=${userDoc.id} dashboard=${dashboard} status=${subscription.status}`,
     );
   }
 
@@ -160,6 +180,7 @@ export class WebhookService {
   private async handleSubscriptionDeleted(event: any): Promise<void> {
     const subscription = event.data.object as any;
     const customerId = subscription.customer as string;
+    const subscriptionId = subscription.id as string;
 
     const userDoc = await this.billingService.getUserByStripeCustomerId(customerId);
     if (!userDoc) {
@@ -167,20 +188,33 @@ export class WebhookService {
       return;
     }
 
-    await this.billingService.updateUserDoc(userDoc.id, {
-      plan: 'free' as PlanId,
-      subscription_status: 'canceled' as SubscriptionStatus,
-      stripe_subscription_id: null,
-      stripe_price_id: null,
-      billing_cadence: null,
-      current_period_end: null,
-      cancel_at_period_end: false,
-      trial_ends_at: null,
-      fit_checks_used: null,
-      fit_checks_quota: null,
-    });
+    const dashboard =
+      dashboardForSubscriptionId(userDoc, subscriptionId) ??
+      parseBillingDashboard(subscription.metadata?.dashboard) ??
+      dashboardForPlanId(
+        buildPriceIdMap().get(subscription.items?.data?.[0]?.price?.id ?? '')
+          ?.planId,
+      );
 
-    this.logger.log(`Subscription deleted — userId=${userDoc.id} downgraded to free`);
+    await this.billingService.updateUserDoc(
+      userDoc.id,
+      mergeDashboardBillingUpdate(userDoc, dashboard, {
+        plan: 'free' as PlanId,
+        subscription_status: 'canceled' as SubscriptionStatus,
+        stripe_subscription_id: null,
+        stripe_price_id: null,
+        billing_cadence: null,
+        current_period_end: null,
+        cancel_at_period_end: false,
+        trial_ends_at: null,
+        fit_checks_used: null,
+        fit_checks_quota: null,
+      }),
+    );
+
+    this.logger.log(
+      `Subscription deleted — userId=${userDoc.id} dashboard=${dashboard} downgraded to free`,
+    );
   }
 
   // ── S1-13: invoice.payment_succeeded ─────────────────────────────────────
@@ -188,6 +222,7 @@ export class WebhookService {
   private async handlePaymentSucceeded(event: any): Promise<void> {
     const invoice = event.data.object as any;
     const customerId = invoice.customer as string;
+    const subscriptionId = invoice.subscription as string | null;
 
     const userDoc = await this.billingService.getUserByStripeCustomerId(customerId);
     if (!userDoc) {
@@ -195,18 +230,20 @@ export class WebhookService {
       return;
     }
 
-    const updates: Partial<UserDocument> = {
+    const dashboard = subscriptionId
+      ? dashboardForSubscriptionId(userDoc, subscriptionId) ?? 'consumer'
+      : 'consumer';
+    const state = getDashboardBilling(userDoc, dashboard);
+
+    const patch = mergeDashboardBillingUpdate(userDoc, dashboard, {
       payment_failed_at: null,
       subscription_status: 'active' as SubscriptionStatus,
-    };
+      ...(state.plan === 'independent' || state.plan === 'agent_pro'
+        ? { fit_checks_used: 0 }
+        : {}),
+    });
 
-    // Reset fit-check counter for agent plans on each billing cycle
-    const isAgentPlan = userDoc.plan === 'independent' || userDoc.plan === 'agent_pro';
-    if (isAgentPlan) {
-      updates.fit_checks_used = 0;
-    }
-
-    await this.billingService.updateUserDoc(userDoc.id, updates);
+    await this.billingService.updateUserDoc(userDoc.id, patch);
 
     // Send receipt email
     const userEmail = userDoc.email;
@@ -218,7 +255,7 @@ export class WebhookService {
         subject: `Payment confirmed — ${formattedAmount} received`,
         html: this.buildReceiptEmailHtml({
           firstName: userDoc.givenName ?? userDoc.name ?? 'there',
-          planName: this.getPlanName(userDoc.plan),
+          planName: this.getPlanName(state.plan),
           amount: formattedAmount,
           invoiceUrl: invoice.hosted_invoice_url ?? '',
         }),
@@ -233,6 +270,7 @@ export class WebhookService {
   private async handlePaymentFailed(event: any): Promise<void> {
     const invoice = event.data.object as any;
     const customerId = invoice.customer as string;
+    const subscriptionId = invoice.subscription as string | null;
 
     const userDoc = await this.billingService.getUserByStripeCustomerId(customerId);
     if (!userDoc) {
@@ -240,24 +278,32 @@ export class WebhookService {
       return;
     }
 
-    await this.billingService.updateUserDoc(userDoc.id, {
-      subscription_status: 'past_due' as SubscriptionStatus,
-      payment_failed_at: new Date().toISOString(),
-    });
+    const dashboard = subscriptionId
+      ? dashboardForSubscriptionId(userDoc, subscriptionId) ?? 'consumer'
+      : 'consumer';
+    const state = getDashboardBilling(userDoc, dashboard);
+
+    await this.billingService.updateUserDoc(
+      userDoc.id,
+      mergeDashboardBillingUpdate(userDoc, dashboard, {
+        subscription_status: 'past_due' as SubscriptionStatus,
+        payment_failed_at: new Date().toISOString(),
+      }),
+    );
 
     // Send payment-failed email (S1-19)
     const userEmail = userDoc.email;
     if (userEmail) {
       const amountDue = invoice.amount_due ?? 0;
       const formattedAmount = `£${(amountDue / 100).toFixed(2)}`;
-      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
+      const frontendUrl = resolveFrontendBaseUrl();
 
       await this.emailService.sendEmail({
         to: userEmail,
         subject: 'Action needed: payment failed on your Proptii subscription',
         html: this.buildPaymentFailedEmailHtml({
           firstName: userDoc.givenName ?? userDoc.name ?? 'there',
-          planName: this.getPlanName(userDoc.plan),
+          planName: this.getPlanName(state.plan),
           amountDue: formattedAmount,
           billingPortalUrl: `${frontendUrl}/account/billing`,
         }),
@@ -272,6 +318,7 @@ export class WebhookService {
   private async handleTrialWillEnd(event: any): Promise<void> {
     const subscription = event.data.object as any;
     const customerId = subscription.customer as string;
+    const subscriptionId = subscription.id as string;
 
     const userDoc = await this.billingService.getUserByStripeCustomerId(customerId);
     if (!userDoc) {
@@ -279,7 +326,18 @@ export class WebhookService {
       return;
     }
 
-    await this.billingService.updateUserDoc(userDoc.id, { trial_ending_soon: true });
+    const dashboard =
+      dashboardForSubscriptionId(userDoc, subscriptionId) ??
+      parseBillingDashboard(subscription.metadata?.dashboard) ??
+      'consumer';
+    const state = getDashboardBilling(userDoc, dashboard);
+
+    await this.billingService.updateUserDoc(
+      userDoc.id,
+      mergeDashboardBillingUpdate(userDoc, dashboard, {
+        trial_ending_soon: true,
+      }),
+    );
 
     // Send day-27 reminder email (S1-18)
     const userEmail = userDoc.email;
@@ -302,14 +360,14 @@ export class WebhookService {
           : `£${planCfg.monthlyPrice}`
         : 'your subscription amount';
 
-      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
+      const frontendUrl = resolveFrontendBaseUrl();
 
       await this.emailService.sendEmail({
         to: userEmail,
         subject: 'Your free month ends in 3 days',
         html: this.buildTrialEndingEmailHtml({
           firstName: userDoc.givenName ?? userDoc.name ?? 'there',
-          planName: this.getPlanName(userDoc.plan),
+          planName: this.getPlanName(state.plan),
           renewalDate,
           renewalAmount,
           activateUrl: `${frontendUrl}/billing/activate`,

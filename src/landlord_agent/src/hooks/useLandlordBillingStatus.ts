@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import {
   fetchBillingStatus,
   type BillingStatus,
-} from '../services/billingService';
-import type { BillingDashboard } from '../config/plans';
+} from '../../../services/billingService';
 
-export function useBillingStatus(dashboard: BillingDashboard = 'consumer') {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+/** Billing status for the landlord/agent app (no AuthContext dependency). */
+export function useLandlordBillingStatus(isAuthenticated: boolean) {
   const [data, setData] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +19,7 @@ export function useBillingStatus(dashboard: BillingDashboard = 'consumer') {
     setLoading(true);
     setError(null);
     try {
-      const status = await fetchBillingStatus(dashboard);
+      const status = await fetchBillingStatus('landlord');
       setData(status);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load billing status');
@@ -29,12 +27,11 @@ export function useBillingStatus(dashboard: BillingDashboard = 'consumer') {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, dashboard]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    if (authLoading) return;
     refresh();
-  }, [authLoading, refresh]);
+  }, [refresh]);
 
   return {
     plan: data?.plan ?? null,
@@ -48,7 +45,7 @@ export function useBillingStatus(dashboard: BillingDashboard = 'consumer') {
     fitChecksUsed: data?.fitChecksUsed ?? null,
     fitChecksQuota: data?.fitChecksQuota ?? null,
     hasStripeCustomer: data?.hasStripeCustomer ?? false,
-    loading: authLoading || loading,
+    loading,
     error,
     refresh,
   };

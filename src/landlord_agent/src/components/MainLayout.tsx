@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature, CalendarDays, Menu } from 'lucide-react';
+import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature, CalendarDays, Menu, Settings } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -36,7 +36,7 @@ const requestSignIn = () => {
   }
 };
 
-export type NavigationScreen = 'dashboard' | 'properties' | 'documents' | 'viewings' | 'clients' | 'insights' | 'inbox' | 'contracts';
+export type NavigationScreen = 'dashboard' | 'properties' | 'documents' | 'viewings' | 'clients' | 'insights' | 'inbox' | 'contracts' | 'settings';
 
 interface MainLayoutProps {
   currentScreen: NavigationScreen;
@@ -112,11 +112,10 @@ function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
     'clients': '/clients',
     'insights': '/insights',
     'inbox': '/inbox',
+    'settings': '/settings',
   };
 
   const handleNavigation = (screen: NavigationScreen) => {
-    const path = screenToPath[screen] || '/dashboard';
-    navigate(path);
     onNavigate(screen);
   };
 
@@ -338,11 +337,10 @@ function MobileSidebar({
     'clients': '/clients',
     'insights': '/insights',
     'inbox': '/inbox',
+    'settings': '/settings',
   };
 
   const handleNavigate = (screen: NavigationScreen) => {
-    const path = screenToPath[screen] || '/dashboard';
-    navigate(path);
     onNavigate(screen);
     onOpenChange(false);
   };
@@ -484,6 +482,11 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
       id: 'insights' as NavigationScreen,
       icon: BarChart3,
       label: 'Analytics',
+    },
+    {
+      id: 'settings' as NavigationScreen,
+      icon: Settings,
+      label: 'Settings',
     },
   ];
 

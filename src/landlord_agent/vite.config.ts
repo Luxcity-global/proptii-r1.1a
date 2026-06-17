@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => {
     envDir: rootEnvDir,
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
+      dedupe: ['react', 'react-dom'],
       alias: {
         'vaul@1.1.2': 'vaul',
         'sonner@2.0.3': 'sonner',

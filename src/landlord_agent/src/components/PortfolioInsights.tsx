@@ -20,17 +20,65 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
 } from 'recharts';
+import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
+import { isNewPortfolioUser } from '../utils/portfolioStatus';
 
 interface PortfolioInsightsProps {
   properties: Property[];
   userProfile: UserProfile | null;
   onBack: () => void;
   marketInsights: MarketInsight[];
+  onAddProperty?: () => void;
+  isAuthenticated?: boolean;
 }
 
-export function PortfolioInsights({ properties, userProfile }: PortfolioInsightsProps) {
+export function PortfolioInsights({
+  properties,
+  userProfile,
+  onAddProperty,
+  isAuthenticated = false,
+}: PortfolioInsightsProps) {
+  const isUserAuthenticated = isAuthenticated || Boolean(userProfile);
+
+  if (!isUserAuthenticated) {
+    return <LandlordPageEmptyShell page="insights" variant="guest" />;
+  }
+
+  if (isNewPortfolioUser(properties)) {
+    return (
+      <LandlordPageEmptyShell
+        page="insights"
+        variant="new-user"
+        onAddProperty={onAddProperty}
+        userName={userProfile?.name}
+      />
+    );
+  }
+
+  return (
+    <PortfolioInsightsContent
+      properties={properties}
+      userProfile={userProfile}
+      onAddProperty={onAddProperty}
+    />
+  );
+}
+
+function PortfolioInsightsContent({
+  properties,
+  userProfile,
+}: Pick<PortfolioInsightsProps, 'properties' | 'userProfile' | 'onAddProperty'>) {
   const [range, setRange] = useState('30d');
   const [activeTab, setActiveTab] = useState('overview');
+
+  const yieldRows = useMemo(() => {
+    const seedRows = ['Testing with', 'Cliffside', 'A testing', 'Leeds'];
+    const propertyNames = properties.slice(0, 4).map((p) => p.address.split(',')[0].trim());
+    const labels = propertyNames.length > 0 ? [...propertyNames, ...seedRows].slice(0, 4) : seedRows;
+    const values = [9.6, 7.2, 12, 9.6];
+
+    return labels.map((label, index) => ({ label, value: values[index] ?? 0 }));
+  }, [properties]);
 
   const months = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
   const revenueSeries = [5000, 5100, 4950, 5150, 5100, 7000];
@@ -53,15 +101,6 @@ export function PortfolioInsights({ properties, userProfile }: PortfolioInsights
     { week: 'W3', enquiries: 3, viewings: 0.8, offers: 0.3 },
     { week: 'W4', enquiries: 7, viewings: 3, offers: 1.2 },
   ];
-
-  const yieldRows = useMemo(() => {
-    const seedRows = ['Testing with', 'Cliffside', 'A testing', 'Leeds'];
-    const propertyNames = properties.slice(0, 4).map((p) => p.address.split(',')[0].trim());
-    const labels = propertyNames.length > 0 ? [...propertyNames, ...seedRows].slice(0, 4) : seedRows;
-    const values = [9.6, 7.2, 12, 9.6];
-
-    return labels.map((label, index) => ({ label, value: values[index] ?? 0 }));
-  }, [properties]);
 
   const revenueTrendData = [
     { month: 'JAN', collected: 96, projected: 122 },

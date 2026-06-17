@@ -41,6 +41,7 @@ import { propertyService } from './services/propertyService';
 import { tenantService } from './services/tenantService';
 import { marketInsightService } from './services/marketInsightService';
 import ViewingsPage from './components/ViewingsPage';
+import LandlordAgentSettingsPage from './components/LandlordAgentSettingsPage';
 import { storage, db } from './config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, query, where, onSnapshot, Unsubscribe, doc, updateDoc, Timestamp } from 'firebase/firestore';
@@ -306,6 +307,44 @@ interface PropertySetupData {
   pendingTenants?: Omit<Tenant, 'id'>[]; // Tenants added before property is published
 }
 
+// Map URL paths to main-app navigation screens (shared by routing helpers below)
+const PATH_TO_NAV_SCREEN: Record<string, NavigationScreen> = {
+  '/': 'dashboard',
+  '/dashboard': 'dashboard',
+  '/viewings': 'viewings',
+  '/properties': 'properties',
+  '/documents': 'documents',
+  '/contracts': 'contracts',
+  '/clients': 'clients',
+  '/insights': 'insights',
+  '/settings': 'settings',
+};
+
+const SCREEN_TO_PATH: Record<NavigationScreen, string> = {
+  dashboard: '/dashboard',
+  viewings: '/viewings',
+  properties: '/properties',
+  documents: '/documents',
+  contracts: '/contracts',
+  clients: '/clients',
+  insights: '/insights',
+  inbox: '/inbox',
+  settings: '/settings',
+};
+
+function screenFromPathname(pathname: string): NavigationScreen | null {
+  if (pathname === '/index.html') return 'dashboard';
+  return PATH_TO_NAV_SCREEN[pathname] ?? null;
+}
+
+function isEmbeddedInParent(): boolean {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
 // Main App Content Component (wrapped by Routes)
 function AppContent() {
   const navigate = useNavigate();
@@ -313,49 +352,35 @@ function AppContent() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('main-app');
   const [navigationScreen, setNavigationScreen] = useState<NavigationScreen>('dashboard');
   
-  // Sync URL to navigation state
+  // Sync URL pathname → navigation state (do not depend on navigationScreen to avoid races)
   useEffect(() => {
-    const pathToScreen: Record<string, NavigationScreen> = {
-      '/': 'dashboard',
-      '/dashboard': 'dashboard',
-      '/viewings': 'viewings',
-      '/properties': 'properties',
-      '/documents': 'documents',
-      '/contracts': 'contracts',
-      '/clients': 'clients',
-      '/insights': 'insights',
-    };
-    
-    const path = location.pathname;
-    const targetScreen = pathToScreen[path] || 'dashboard';
-    
-    if (targetScreen !== navigationScreen) {
-      console.log('🧭 URL changed, updating navigationScreen to:', targetScreen);
+    const targetScreen = screenFromPathname(location.pathname);
+    if (targetScreen) {
       setNavigationScreen(targetScreen);
       setCurrentScreen('main-app');
     }
-  }, [location.pathname, navigationScreen]);
+  }, [location.pathname]);
   
   // Wrapper function to log navigation changes and update URL
   const handleNavigation = (screen: NavigationScreen) => {
     trackEvent('landlord_nav_click', { section: screen });
-    console.log('🧭 Navigation triggered to:', screen);
-    console.log('🧭 Current navigationScreen before change:', navigationScreen);
+    setCurrentScreen('main-app');
     setNavigationScreen(screen);
-    
-    // Update URL
-    const screenToPath: Record<NavigationScreen, string> = {
-      'dashboard': '/dashboard',
-      'viewings': '/viewings',
-      'properties': '/properties',
-      'documents': '/documents',
-      'contracts': '/contracts',
-      'clients': '/clients',
-      'insights': '/insights',
-      'inbox': '/inbox',
-    };
-    
-    const path = screenToPath[screen] || '/dashboard';
+
+    const path = SCREEN_TO_PATH[screen] || '/dashboard';
+
+    // Inside the parent iframe, stay on index.html and use hash routing only.
+    // navigate() to /landlord/settings would load the parent SPA in the iframe (blank page).
+    if (isEmbeddedInParent()) {
+      try {
+        const base = `${window.location.pathname}${window.location.search}`;
+        window.history.replaceState(null, '', `${base}#${path}`);
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+
     if (location.pathname !== path) {
       navigate(path);
     }
@@ -589,21 +614,9 @@ function AppContent() {
         const { path } = data.payload;
         console.log('🧭 Received NAVIGATE message with path:', path);
         
-        // Map URL paths to navigation screens
-        const pathToScreen: Record<string, NavigationScreen> = {
-          '/': 'dashboard',
-          '/dashboard': 'dashboard',
-          '/viewings': 'viewings',
-          '/properties': 'properties',
-          '/documents': 'documents',
-          '/contracts': 'contracts',
-          '/clients': 'clients',
-          '/insights': 'insights',
-        };
-        
         // Remove leading slash and get the screen
         const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-        const targetScreen = pathToScreen[normalizedPath] || 'dashboard';
+        const targetScreen = PATH_TO_NAV_SCREEN[normalizedPath] || 'dashboard';
         
         console.log('🧭 Navigating to screen:', targetScreen);
         setCurrentScreen('main-app');
@@ -634,69 +647,24 @@ function AppContent() {
     }
   }, []);
 
-  // Handle URL hash navigation (from iframe src hash) and initial path
+  // Handle URL hash navigation (from iframe src hash on initial load)
   React.useEffect(() => {
     const handleHashNavigation = () => {
-      const hash = window.location.hash.slice(1); // Remove the '#'
-      if (hash) {
-        console.log('🧭 Detected hash in URL:', hash);
-        
-        // Map URL paths to navigation screens
-        const pathToScreen: Record<string, NavigationScreen> = {
-          '/': 'dashboard',
-          '/dashboard': 'dashboard',
-          '/viewings': 'viewings',
-          '/properties': 'properties',
-          '/documents': 'documents',
-          '/contracts': 'contracts',
-          '/clients': 'clients',
-          '/insights': 'insights',
-        };
-        
-        // Normalize the hash path
-        const normalizedPath = hash.startsWith('/') ? hash : `/${hash}`;
-        const targetScreen = pathToScreen[normalizedPath] || 'dashboard';
-        
-        console.log('🧭 Navigating to screen from hash:', targetScreen);
-        setCurrentScreen('main-app');
-        setNavigationScreen(targetScreen);
-      }
+      const hash = window.location.hash.slice(1);
+      if (!hash) return;
+
+      const normalizedPath = hash.startsWith('/') ? hash : `/${hash}`;
+      const targetScreen = PATH_TO_NAV_SCREEN[normalizedPath];
+      if (!targetScreen) return;
+
+      setCurrentScreen('main-app');
+      setNavigationScreen(targetScreen);
     };
 
-    // Also check the actual pathname (for direct navigation)
-    const handlePathnameNavigation = () => {
-      const pathToScreen: Record<string, NavigationScreen> = {
-        '/': 'dashboard',
-        '/dashboard': 'dashboard',
-        '/viewings': 'viewings',
-        '/properties': 'properties',
-        '/documents': 'documents',
-        '/contracts': 'contracts',
-        '/clients': 'clients',
-        '/insights': 'insights',
-      };
-      
-      const path = location.pathname;
-      const targetScreen = pathToScreen[path] || 'dashboard';
-      
-      if (targetScreen !== navigationScreen) {
-        console.log('🧭 Navigating to screen from pathname:', targetScreen);
-        setCurrentScreen('main-app');
-        setNavigationScreen(targetScreen);
-      }
-    };
-
-    // Check both hash and pathname on initial load
     handleHashNavigation();
-    handlePathnameNavigation();
-
-    // Listen for hash changes
     window.addEventListener('hashchange', handleHashNavigation);
-
-    return () => {
-      window.removeEventListener('hashchange', handleHashNavigation);
-    };
-  }, [location.pathname, navigationScreen]);
+    return () => window.removeEventListener('hashchange', handleHashNavigation);
+  }, []);
 
   // Optional deep-link: start directly at specific flows when requested
   React.useEffect(() => {
@@ -2349,6 +2317,10 @@ function AppContent() {
         return (
           <DocumentsPage
             properties={properties}
+            onAddProperty={() => {
+              trackEvent('landlord_add_property_clicked');
+              navigateToScreen('property-setup-step1');
+            }}
             onViewProperty={(property) => {
               trackEvent('landlord_property_viewed', { property_address: property.address });
               selectProperty(property);
@@ -2600,6 +2572,11 @@ function AppContent() {
             managerName={userProfile?.name}
             managerEmail={userProfile?.email}
             userProfile={userProfile}
+            properties={properties}
+            onAddProperty={() => {
+              trackEvent('landlord_add_property_clicked');
+              navigateToScreen('property-setup-step1');
+            }}
           />
         );
 
@@ -2608,6 +2585,11 @@ function AppContent() {
           <ContractsPage
             tenants={tenants}
             userProfile={userProfile}
+            properties={properties}
+            onAddProperty={() => {
+              trackEvent('landlord_add_property_clicked');
+              navigateToScreen('property-setup-step1');
+            }}
             onBack={() => setNavigationScreen('dashboard')}
           />
         );
@@ -2619,6 +2601,10 @@ function AppContent() {
             properties={properties}
             arrearsAlerts={arrearsAlerts}
             userRole={userRole}
+            onAddProperty={() => {
+              trackEvent('landlord_add_property_clicked');
+              navigateToScreen('property-setup-step1');
+            }}
             onViewTenant={(tenant) => {
               selectTenant(tenant);
               navigateToScreen('tenant-details');
@@ -2677,8 +2663,22 @@ function AppContent() {
           <PortfolioInsights
             properties={properties}
             userProfile={userProfile}
+            isAuthenticated={isAuthenticated}
             onBack={() => setNavigationScreen('dashboard')}
             marketInsights={marketInsights}
+            onAddProperty={() => {
+              trackEvent('landlord_add_property_clicked');
+              navigateToScreen('property-setup-step1');
+            }}
+          />
+        );
+
+      case 'settings':
+        return (
+          <LandlordAgentSettingsPage
+            userProfile={userProfile}
+            userRole={userRole}
+            isAuthenticated={isAuthenticated}
           />
         );
 

@@ -19,7 +19,10 @@ export function StripeCheckoutReturnHandler() {
     sessionStorage.removeItem('pending_stripe_checkout');
 
     const targetPath = '/billing/confirmed';
-    const target = `${targetPath}?session_id=${encodeURIComponent(sessionId)}`;
+    const dashboard = params.get('dashboard');
+    const dashboardQuery =
+      dashboard === 'landlord' ? '&dashboard=landlord' : '';
+    const target = `${targetPath}?session_id=${encodeURIComponent(sessionId)}${dashboardQuery}`;
     const current = location.pathname + location.search;
 
     if (current !== target && !current.startsWith(`${targetPath}?`)) {

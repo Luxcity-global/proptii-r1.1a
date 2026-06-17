@@ -1,21 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { X, Check, Minus, Zap } from 'lucide-react';
 import {
   getPlansForAudienceTab,
   getDisplayPrice,
   type PlanConfig,
   type PlanId,
-} from '../../config/plans';
+} from '../../../config/plans';
 import {
   createCheckoutSession,
   resolveStripePriceId,
   setPendingPlan,
-} from '../../services/billingService';
-import { markPendingStripeCheckout } from '../../utils/pricingRoutes';
-import { trackEvent } from '../../utils/analytics';
-
-/* ─────────────────────── types ─────────────────────── */
+} from '../../../services/billingService';
+import { markPendingStripeCheckout } from '../../../utils/pricingRoutes';
+import { trackEvent } from '../../../utils/analytics';
+import { openInParentApp } from '../utils/authBridge';
 
 type Audience = 'renters' | 'landlords' | 'agents';
 type Cycle = 'monthly' | 'annual';
@@ -23,22 +21,16 @@ type Cycle = 'monthly' | 'annual';
 interface Props {
   open: boolean;
   onClose: () => void;
-  /** The user's current plan ID so we can badge it */
   currentPlanId: PlanId | string | null;
-  /** Pre-select the audience tab based on user's segment */
   defaultAudience?: Audience;
-  /** When set (e.g. landlord iframe), navigation opens in parent/top window */
-  onExternalNavigate?: (url: string) => void;
 }
 
-/* ─────────────────── helpers ─────────────────────── */
-
 function inferAudience(planId: PlanId | string | null): Audience {
-  if (!planId || planId === 'explorer') return 'renters';
+  if (!planId || planId === 'explorer' || planId === 'free') return 'landlords';
   if (['renter_pro', 'buyer_pro'].includes(planId)) return 'renters';
   if (['starter', 'landlord_pro', 'elite'].includes(planId)) return 'landlords';
   if (['independent', 'agent_pro', 'enterprise'].includes(planId)) return 'agents';
-  return 'renters';
+  return 'landlords';
 }
 
 function formatPrice(amount: number | null): string {
@@ -46,8 +38,6 @@ function formatPrice(amount: number | null): string {
   if (amount === 0) return 'Free';
   return `£${amount}`;
 }
-
-/* ─────────────────── PlanCard ─────────────────────── */
 
 interface PlanCardProps {
   plan: PlanConfig;
@@ -81,7 +71,6 @@ const PlanCard: React.FC<PlanCardProps> = ({
         position: 'relative',
       }}
     >
-      {/* Popular badge */}
       {plan.isPopular && !isCurrent && (
         <div
           className="absolute top-0 right-0 text-white text-[10px] font-bold px-2.5 py-1 rounded-bl-xl"
@@ -91,7 +80,6 @@ const PlanCard: React.FC<PlanCardProps> = ({
         </div>
       )}
 
-      {/* Current plan badge */}
       {isCurrent && (
         <div
           className="absolute top-0 right-0 text-white text-[10px] font-bold px-2.5 py-1 rounded-bl-xl"
@@ -102,7 +90,6 @@ const PlanCard: React.FC<PlanCardProps> = ({
       )}
 
       <div className="p-5 flex flex-col flex-1">
-        {/* Plan name */}
         <p
           className="text-sm font-bold mb-1"
           style={{ color: plan.isDark ? '#ffffff' : '#1a2332' }}
@@ -110,7 +97,6 @@ const PlanCard: React.FC<PlanCardProps> = ({
           {plan.name}
         </p>
 
-        {/* Price */}
         <div className="mb-1">
           {plan.isContactSales ? (
             <p className="text-2xl font-bold" style={{ color: plan.isDark ? '#ffffff' : '#1a2332' }}>
@@ -131,10 +117,8 @@ const PlanCard: React.FC<PlanCardProps> = ({
           </p>
         </div>
 
-        {/* Divider */}
         <div className="my-3 border-t" style={{ borderColor: plan.isDark ? '#374957' : '#f3f4f6' }} />
 
-        {/* CTA */}
         {isCurrent ? (
           <button
             type="button"
@@ -180,7 +164,6 @@ const PlanCard: React.FC<PlanCardProps> = ({
           </button>
         )}
 
-        {/* Features */}
         <ul className="space-y-2 flex-1">
           {plan.features.map((f, i) => (
             <li key={i} className="flex items-start gap-2">
@@ -214,16 +197,13 @@ const PlanCard: React.FC<PlanCardProps> = ({
   );
 };
 
-/* ────────────────── main modal ───────────────────── */
-
-const PlanCompareModal: React.FC<Props> = ({
+/** Plan compare modal for landlord/agent settings (no parent-app React Router). */
+const LandlordPlanCompareModal: React.FC<Props> = ({
   open,
   onClose,
   currentPlanId,
   defaultAudience,
-  onExternalNavigate,
 }) => {
-  const navigate = useNavigate();
   const overlayRef = useRef<HTMLDivElement>(null);
   const [audience, setAudience] = useState<Audience>(
     defaultAudience ?? inferAudience(currentPlanId),
@@ -232,7 +212,6 @@ const PlanCompareModal: React.FC<Props> = ({
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
 
-  /* Reset tab when modal opens */
   useEffect(() => {
     if (open) {
       setAudience(defaultAudience ?? inferAudience(currentPlanId));
@@ -240,7 +219,6 @@ const PlanCompareModal: React.FC<Props> = ({
     }
   }, [open, currentPlanId, defaultAudience]);
 
-  /* Close on Escape */
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -255,12 +233,7 @@ const PlanCompareModal: React.FC<Props> = ({
   const handleUpgrade = async (plan: PlanConfig) => {
     const priceId = await resolveStripePriceId(plan.id, cycle);
     if (!priceId) {
-      const pricingPath = `/pricing?plan=${plan.id}&cycle=${cycle}`;
-      if (onExternalNavigate) {
-        onExternalNavigate(pricingPath);
-      } else {
-        navigate(pricingPath);
-      }
+      openInParentApp(`/pricing?plan=${plan.id}&cycle=${cycle}`);
       onClose();
       return;
     }
@@ -277,17 +250,13 @@ const PlanCompareModal: React.FC<Props> = ({
         plan_id: plan.id,
         cycle,
         trial_enabled: false,
-        source: 'settings_plan_modal',
+        source: 'landlord_settings_plan_modal',
       });
       const { checkoutUrl } = await createCheckoutSession(priceId, false, {
         planId: plan.id,
         cycle,
       });
-      if (onExternalNavigate) {
-        onExternalNavigate(checkoutUrl);
-      } else {
-        window.location.href = checkoutUrl;
-      }
+      openInParentApp(checkoutUrl);
     } catch (err) {
       setUpgradeError(
         err instanceof Error ? err.message : 'Could not start checkout.',
@@ -303,14 +272,12 @@ const PlanCompareModal: React.FC<Props> = ({
   ];
 
   return (
-    /* Overlay */
     <div
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
       onClick={(e) => e.target === overlayRef.current && onClose()}
     >
-      {/* Panel */}
       <div
         className="relative bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
         style={{
@@ -321,7 +288,6 @@ const PlanCompareModal: React.FC<Props> = ({
           boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(220,95,18,0.08)',
         }}
       >
-        {/* Accent stripe */}
         <div
           className="h-1 w-full flex-shrink-0"
           style={{
@@ -329,7 +295,6 @@ const PlanCompareModal: React.FC<Props> = ({
           }}
         />
 
-        {/* Header */}
         <div className="flex items-start justify-between px-6 pt-6 pb-4">
           <div className="flex items-center gap-2">
             <div
@@ -349,7 +314,6 @@ const PlanCompareModal: React.FC<Props> = ({
           </div>
 
           <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-            {/* Billing toggle */}
             <div
               className="flex items-center rounded-lg border p-0.5 text-xs"
               style={{ borderColor: '#e5e7eb' }}
@@ -381,7 +345,6 @@ const PlanCompareModal: React.FC<Props> = ({
               ))}
             </div>
 
-            {/* Close */}
             <button
               type="button"
               onClick={onClose}
@@ -392,7 +355,6 @@ const PlanCompareModal: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Audience tabs */}
         <div className="px-6 pb-0 flex justify-center gap-1 border-b" style={{ borderColor: '#f3f4f6' }}>
           {TABS.map((tab) => (
             <button
@@ -416,7 +378,6 @@ const PlanCompareModal: React.FC<Props> = ({
           ))}
         </div>
 
-        {/* Plan columns — centered, scrollable on small screens */}
         <div
           className="flex-1 overflow-y-auto"
           style={{ background: 'linear-gradient(180deg, #fffaf7 0%, #ffffff 120px)' }}
@@ -433,7 +394,10 @@ const PlanCompareModal: React.FC<Props> = ({
                     cycle={cycle}
                     isCurrent={
                       plan.id === currentPlanId ||
-                      (plan.isFree && (!currentPlanId || currentPlanId === 'free' || currentPlanId === 'explorer'))
+                      (plan.isFree &&
+                        (!currentPlanId ||
+                          currentPlanId === 'free' ||
+                          currentPlanId === 'explorer'))
                     }
                     onUpgrade={handleUpgrade}
                     upgrading={upgrading}
@@ -444,7 +408,6 @@ const PlanCompareModal: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* Error + footer */}
         <div className="px-6 py-4 border-t" style={{ borderColor: '#f3f4f6' }}>
           {upgradeError && (
             <p className="text-xs mb-2" style={{ color: '#b91c1c' }}>
@@ -453,13 +416,14 @@ const PlanCompareModal: React.FC<Props> = ({
           )}
           <p className="text-xs text-center" style={{ color: '#9ca3af' }}>
             All plans include a 1-month free trial.{' '}
-            <a
-              href="/pricing"
+            <button
+              type="button"
               className="underline font-medium hover:opacity-80"
-              style={{ color: '#DC5F12' }}
+              style={{ color: '#DC5F12', background: 'none', border: 'none', cursor: 'pointer', fontSize: 'inherit' }}
+              onClick={() => openInParentApp(`/pricing?segment=${audience === 'agents' ? 'agents' : audience === 'landlords' ? 'landlords' : 'renters'}`)}
             >
               Full pricing page →
-            </a>
+            </button>
           </p>
         </div>
       </div>
@@ -467,4 +431,4 @@ const PlanCompareModal: React.FC<Props> = ({
   );
 };
 
-export default PlanCompareModal;
+export default LandlordPlanCompareModal;

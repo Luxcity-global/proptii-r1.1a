@@ -10,7 +10,12 @@ import {
   createBillingPortalSession,
 } from '../../services/billingService';
 import { trackEvent } from '../../utils/analytics';
-import { getPlanById } from '../../config/plans';
+import {
+  getPlanById,
+  getDashboardForPlanId,
+  getDashboardHomePath,
+  type BillingDashboard,
+} from '../../config/plans';
 import {
   clearPendingStripeCheckout,
   clearPostStripeCheckout,
@@ -49,6 +54,8 @@ function formatMoney(
 const BillingConfirmedPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const dashboardFromUrl: BillingDashboard =
+    searchParams.get('dashboard') === 'landlord' ? 'landlord' : 'consumer';
   const {
     plan,
     status,
@@ -58,7 +65,9 @@ const BillingConfirmedPage: React.FC = () => {
     pendingPlan,
     loading,
     refresh,
-  } = useBillingStatus();
+  } = useBillingStatus(dashboardFromUrl);
+  const [syncedDashboard, setSyncedDashboard] =
+    useState<BillingDashboard>(dashboardFromUrl);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
 
@@ -97,6 +106,9 @@ const BillingConfirmedPage: React.FC = () => {
         }
         try {
           const synced = await confirmCheckoutSession(sessionId);
+          setSyncedDashboard(
+            synced.dashboard === 'landlord' ? 'landlord' : dashboardFromUrl,
+          );
           await refresh();
           trackEvent('billing_checkout_completed', {
             plan: synced.plan,
@@ -127,6 +139,9 @@ const BillingConfirmedPage: React.FC = () => {
     displayCycle === 'monthly' ? 'Monthly' : 'Annual';
   const planName = planConfig?.name ?? displayPlanId ?? 'your plan';
   const showLoading = loading || syncing;
+  const homeDashboard: BillingDashboard =
+    syncedDashboard || getDashboardForPlanId(displayPlanId || plan);
+  const dashboardHome = getDashboardHomePath(homeDashboard);
 
   const handleManageBilling = async () => {
     try {
@@ -147,7 +162,7 @@ const BillingConfirmedPage: React.FC = () => {
       <Navbar hideServiceLinks />
 
       <main className="pr-content flex-1">
-        <div className="pr-confirmed pr-fade-in">
+        <div className="pr-confirmed pr-confirmed-card pr-fade-in">
           <CheckAnimation />
 
           <h1>You&apos;re all set.</h1>
@@ -204,7 +219,7 @@ const BillingConfirmedPage: React.FC = () => {
           </div>
 
           <Link
-            to="/dashboard"
+            to={dashboardHome}
             className="pr-btn pr-btn-primary"
             style={{ padding: '14px 28px' }}
             onClick={() => {

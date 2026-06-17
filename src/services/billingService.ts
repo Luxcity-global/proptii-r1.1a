@@ -3,11 +3,13 @@ import { getAccessTokenForApiRequest } from './msalAccessToken';
 import {
   getPlanById,
   getStripePriceId,
+  type BillingDashboard,
   type PlanConfig,
   type PlanId,
 } from '../config/plans';
 
 export interface BillingStatus {
+  dashboard?: BillingDashboard;
   plan: string;
   status: string | null;
   trialEndsAt: string | null;
@@ -58,11 +60,17 @@ export async function confirmCheckoutSession(
   return response.json();
 }
 
-export async function fetchBillingStatus(): Promise<BillingStatus | null> {
+export async function fetchBillingStatus(
+  dashboard: BillingDashboard = 'consumer',
+): Promise<BillingStatus | null> {
   const headers = await authHeaders();
   if (!('Authorization' in headers)) return null;
 
-  const { response } = await fetchBillingWithApiFallback('/billing/status', { headers });
+  const query = `?dashboard=${encodeURIComponent(dashboard)}`;
+  const { response } = await fetchBillingWithApiFallback(
+    `/billing/status${query}`,
+    { headers },
+  );
   if (!response.ok) return null;
   return response.json();
 }
@@ -88,11 +96,19 @@ const CHECKOUT_TIMEOUT_MS = 25_000;
 export async function createCheckoutSession(
   priceId: string,
   trialEnabled: boolean,
-  options?: { planId?: string; cycle?: 'monthly' | 'annual' },
+  options?: {
+    planId?: string;
+    cycle?: 'monthly' | 'annual';
+    returnBaseUrl?: string;
+  },
 ): Promise<{ checkoutUrl: string }> {
   const headers = await authHeaders();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), CHECKOUT_TIMEOUT_MS);
+
+  const returnBaseUrl =
+    options?.returnBaseUrl ??
+    (typeof window !== 'undefined' ? window.location.origin : undefined);
 
   try {
     const { response, url } = await fetchBillingWithApiFallback('/billing/checkout', {
@@ -103,6 +119,7 @@ export async function createCheckoutSession(
         trialEnabled,
         ...(options?.planId ? { planId: options.planId } : {}),
         ...(options?.cycle ? { cycle: options.cycle } : {}),
+        ...(returnBaseUrl ? { returnBaseUrl } : {}),
       }),
       signal: controller.signal,
     });
@@ -223,12 +240,18 @@ export async function createBillingPortalSession(): Promise<{ portalUrl: string 
 }
 
 /** S3-14 — Downgrade to Explorer (free) after trial ends. */
-export async function downgradeToFreePlan(): Promise<void> {
+export async function downgradeToFreePlan(
+  dashboard: BillingDashboard = 'consumer',
+): Promise<void> {
   const headers = await authHeaders();
-  const { response } = await fetchBillingWithApiFallback('/billing/downgrade', {
-    method: 'POST',
-    headers,
-  });
+  const query = `?dashboard=${encodeURIComponent(dashboard)}`;
+  const { response } = await fetchBillingWithApiFallback(
+    `/billing/downgrade${query}`,
+    {
+      method: 'POST',
+      headers,
+    },
+  );
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || 'Downgrade failed');

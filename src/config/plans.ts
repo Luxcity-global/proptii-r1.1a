@@ -13,6 +13,9 @@
 
 export type UserSegment = 'renter' | 'buyer' | 'landlord' | 'agent';
 
+/** Which product dashboard a subscription belongs to. */
+export type BillingDashboard = 'consumer' | 'landlord';
+
 export type PlanId =
   | 'explorer'
   | 'renter_pro'
@@ -375,4 +378,28 @@ export function getStripePriceId(
   return cycle === 'annual'
     ? plan.stripePriceIdAnnual
     : plan.stripePriceIdMonthly;
+}
+
+const LANDLORD_PLAN_IDS: PlanId[] = [
+  'starter',
+  'landlord_pro',
+  'elite',
+  'independent',
+  'agent_pro',
+  'enterprise',
+];
+
+/** Maps a plan to the dashboard that owns its subscription. */
+export function getDashboardForPlanId(
+  planId: string | null | undefined,
+): BillingDashboard {
+  if (planId && LANDLORD_PLAN_IDS.includes(planId as PlanId)) {
+    return 'landlord';
+  }
+  return 'consumer';
+}
+
+/** Post-checkout home route for a billing dashboard. */
+export function getDashboardHomePath(dashboard: BillingDashboard): string {
+  return dashboard === 'landlord' ? '/landlord' : '/dashboard';
 }

@@ -218,8 +218,8 @@ const DashboardSettings: React.FC = () => {
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); editProfile(); }}
-              className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-gray-50"
-              style={{ color: '#136C9E', borderColor: '#136C9E' }}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-orange-50"
+              style={{ color: '#DC5F12', borderColor: '#DC5F12' }}
             >
               Edit
             </button>
@@ -277,8 +277,8 @@ const DashboardSettings: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPlansModal(true)}
-                  className="text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors hover:bg-gray-50"
-                  style={{ color: '#136C9E', borderColor: '#136C9E', whiteSpace: 'nowrap' }}
+                  className="text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors hover:bg-orange-50"
+                  style={{ color: '#DC5F12', borderColor: '#DC5F12', whiteSpace: 'nowrap' }}
                 >
                   View plans
                 </button>
@@ -298,7 +298,7 @@ const DashboardSettings: React.FC = () => {
                 onClick={() => setShowPlansModal(true)}
                 className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors hover:opacity-90"
                 style={{
-                  backgroundColor: '#136C9E',
+                  backgroundColor: '#DC5F12',
                   color: '#ffffff',
                   whiteSpace: 'nowrap',
                 }}
@@ -375,8 +375,8 @@ const DashboardSettings: React.FC = () => {
                 type="button"
                 disabled={portalBusy}
                 onClick={(e) => { e.stopPropagation(); openPortal(); }}
-                className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-gray-50 disabled:opacity-50"
-                style={{ color: '#136C9E', borderColor: '#136C9E', whiteSpace: 'nowrap' }}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-orange-50 disabled:opacity-50"
+                style={{ color: '#DC5F12', borderColor: '#DC5F12', whiteSpace: 'nowrap' }}
               >
                 {portalBusy ? 'Opening…' : 'Open portal'}
               </button>

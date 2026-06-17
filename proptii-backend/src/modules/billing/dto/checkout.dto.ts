@@ -20,9 +20,17 @@ export class CheckoutDto {
   @IsOptional()
   @IsIn(['monthly', 'annual'])
   cycle?: 'monthly' | 'annual';
+
+  /** Browser origin at checkout time — ensures Stripe redirects back to the live site. */
+  @ApiPropertyOptional({ example: 'https://proptii.co' })
+  @IsOptional()
+  @IsString()
+  returnBaseUrl?: string;
 }
 
 export class BillingStatusDto {
+  /** Which dashboard this status applies to (`consumer` = renter/buyer, `landlord` = landlord/agent). */
+  dashboard: string;
   plan: string;
   status: string | null;
   trialEndsAt: string | null;

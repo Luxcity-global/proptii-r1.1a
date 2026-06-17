@@ -17,6 +17,17 @@ import {
 import { CheckoutDto, BillingStatusDto } from './dto/checkout.dto';
 import { QuotaReportDto, QuotaStatusDto } from './dto/quota-report.dto';
 import { getPlans, getPlanConfig, buildPriceIdMap } from './config/plans.config';
+import {
+  type BillingDashboard,
+  buildLegacyMigrationPatch,
+  dashboardForPlanId,
+  getDashboardBilling,
+  mergeDashboardBillingUpdate,
+  parseBillingDashboard,
+  pendingPlanForDashboard,
+  toBillingStatusDto,
+} from './billing-dashboard.utils';
+import { resolveFrontendBaseUrl } from './frontend-url.utils';
 import type {
   UserDocument,
   PlanId,
@@ -158,30 +169,39 @@ export class BillingService {
   ): Promise<{ checkoutUrl: string }> {
     try {
       const stripe = this.requireStripe();
-      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
+      const frontendUrl = resolveFrontendBaseUrl(dto.returnBaseUrl);
       const promoActive = process.env.PROMO_FREE_MONTH_ACTIVE === 'true';
       const trialDays = dto.trialEnabled && promoActive ? 30 : 0;
 
       const customerId = await this.resolveStripeCustomerId(userId, userEmail, true);
       const userDoc = await this.getUserDoc(userId);
-      const pendingPlan = dto.planId ?? userDoc?.pending_plan ?? '';
-      const pendingCycle = dto.cycle ?? userDoc?.pending_cycle ?? '';
+
+      const priceMap = buildPriceIdMap();
+      const pricePlan = priceMap.get(dto.priceId);
+      const dashboard: BillingDashboard = dashboardForPlanId(
+        dto.planId ?? userDoc?.pending_plan ?? pricePlan?.planId,
+      );
+      const pending = pendingPlanForDashboard(userDoc, dashboard);
+      const pendingPlan = dto.planId ?? pending.planId ?? '';
+      const pendingCycle = dto.cycle ?? pending.cycle ?? '';
 
       const sessionParams = {
         customer: customerId,
         payment_method_types: ['card'],
         line_items: [{ price: dto.priceId, quantity: 1 }],
         mode: 'subscription',
-        success_url: `${frontendUrl}/billing/confirmed?session_id={CHECKOUT_SESSION_ID}`,
+        success_url: `${frontendUrl}/billing/confirmed?session_id={CHECKOUT_SESSION_ID}&dashboard=${dashboard}`,
         cancel_url: `${frontendUrl}/pricing`,
         metadata: {
           userId,
+          dashboard,
           ...(pendingPlan ? { planId: pendingPlan } : {}),
           ...(pendingCycle ? { cycle: pendingCycle } : {}),
         },
         subscription_data: {
           metadata: {
             userId,
+            dashboard,
             ...(pendingPlan ? { planId: pendingPlan } : {}),
           },
           ...(trialDays > 0 ? { trial_period_days: trialDays } : {}),
@@ -307,7 +327,7 @@ export class BillingService {
   ): Promise<{ portalUrl: string }> {
     try {
       const stripe = this.requireStripe();
-      const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
+      const frontendUrl = resolveFrontendBaseUrl();
       const customerId = await this.resolveStripeCustomerId(
         userId,
         userEmail,
@@ -326,12 +346,16 @@ export class BillingService {
     }
   }
 
-  /** S4-01 / S4-04 — Whether user may call paid-feature APIs. */
-  async userHasFeatureAccess(userId: string): Promise<boolean> {
+  /** S4-01 / S4-04 — Whether user may call paid-feature APIs for a dashboard. */
+  async userHasFeatureAccess(
+    userId: string,
+    dashboard: BillingDashboard = 'consumer',
+  ): Promise<boolean> {
     const doc = await this.getUserDoc(userId);
     if (!doc) return true;
-    const plan = doc.plan ?? 'free';
-    const status = doc.subscription_status ?? null;
+    const state = getDashboardBilling(doc, dashboard);
+    const plan = state.plan ?? 'free';
+    const status = state.subscription_status ?? null;
     if (plan === 'free') return true;
     if (!status) return false;
     return (
@@ -341,28 +365,29 @@ export class BillingService {
     );
   }
 
+  private async ensureLegacyBillingMigrated(userId: string): Promise<UserDocument | null> {
+    const doc = await this.getUserDoc(userId);
+    if (!doc) return null;
+    const migration = buildLegacyMigrationPatch(doc);
+    if (migration) {
+      await this.updateUserDoc(userId, migration);
+      return this.getUserDoc(userId);
+    }
+    return doc;
+  }
+
   // ── S1-04: GET /api/billing/status ───────────────────────────────────────
 
-  async getBillingStatus(userId: string): Promise<BillingStatusDto> {
+  async getBillingStatus(
+    userId: string,
+    dashboard: BillingDashboard = 'consumer',
+  ): Promise<BillingStatusDto> {
     if (!userId?.trim()) {
       throw new BadRequestException('User ID not found in access token (oid/sub missing)');
     }
 
-    const doc = await this.getUserDoc(userId);
-
-    return {
-      plan: doc?.plan ?? 'free',
-      status: doc?.subscription_status ?? null,
-      trialEndsAt: doc?.trial_ends_at ?? null,
-      currentPeriodEnd: doc?.current_period_end ?? null,
-      cancelAtPeriodEnd: doc?.cancel_at_period_end ?? false,
-      fitChecksUsed: doc?.fit_checks_used ?? null,
-      fitChecksQuota: doc?.fit_checks_quota ?? null,
-      pendingPlan: doc?.pending_plan ?? null,
-      pendingCycle: doc?.pending_cycle ?? null,
-      billingCadence: doc?.billing_cadence ?? null,
-      hasStripeCustomer: Boolean(doc?.stripe_customer_id),
-    };
+    const doc = await this.ensureLegacyBillingMigrated(userId);
+    return toBillingStatusDto(doc, dashboard);
   }
 
   /**
@@ -373,7 +398,7 @@ export class BillingService {
     session: {
       customer?: string | { id?: string } | null;
       subscription?: string | { id?: string } | null;
-      metadata?: { planId?: string; cycle?: string };
+      metadata?: { planId?: string; cycle?: string; dashboard?: string };
     },
     options?: { priceId?: string },
   ): Promise<void> {
@@ -415,28 +440,32 @@ export class BillingService {
     }
     if (!planId) planId = 'free';
 
+    const dashboard: BillingDashboard = session.metadata?.dashboard
+      ? parseBillingDashboard(session.metadata.dashboard)
+      : dashboardForPlanId(planId);
+
     const planCfg = getPlanConfig(planId as PlanId);
-    const updates: Partial<UserDocument> = {
+    const dashboardUpdates: Partial<UserDocument> = {
       stripe_customer_id: customerId ?? doc?.stripe_customer_id ?? undefined,
-      stripe_subscription_id: subscription.id,
-      stripe_price_id: priceId,
-      plan: planId as PlanId,
-      subscription_status: subscription.status as SubscriptionStatus,
-      billing_cadence: cadence,
-      current_period_end: getSubscriptionCurrentPeriodEndIso(subscription),
-      trial_ends_at: getSubscriptionTrialEndIso(subscription),
-      pending_plan: null,
-      pending_cycle: null,
+      ...mergeDashboardBillingUpdate(doc, dashboard, {
+        stripe_subscription_id: subscription.id,
+        stripe_price_id: priceId,
+        plan: planId as PlanId,
+        subscription_status: subscription.status as SubscriptionStatus,
+        billing_cadence: cadence,
+        current_period_end: getSubscriptionCurrentPeriodEndIso(subscription),
+        trial_ends_at: getSubscriptionTrialEndIso(subscription),
+        pending_plan: null,
+        pending_cycle: null,
+        ...(planCfg?.fitChecksQuota != null
+          ? { fit_checks_quota: planCfg.fitChecksQuota, fit_checks_used: 0 }
+          : {}),
+      }),
     };
 
-    if (planCfg?.fitChecksQuota != null) {
-      updates.fit_checks_quota = planCfg.fitChecksQuota;
-      updates.fit_checks_used = 0;
-    }
-
-    await this.updateUserDoc(userId, updates);
+    await this.updateUserDoc(userId, dashboardUpdates);
     this.logger.log(
-      `Plan activated — userId=${userId} plan=${planId} status=${subscription.status}`,
+      `Plan activated — userId=${userId} dashboard=${dashboard} plan=${planId} status=${subscription.status}`,
     );
   }
 
@@ -479,9 +508,15 @@ export class BillingService {
         { limit: 1 },
       );
       const priceId = lineItems.data[0]?.price?.id ?? '';
+      const priceMap = buildPriceIdMap();
 
       await this.activateFromCheckoutSession(userId, session, { priceId });
-      return this.getBillingStatus(userId);
+      const dashboard = session.metadata?.dashboard
+        ? parseBillingDashboard(session.metadata.dashboard)
+        : dashboardForPlanId(
+            priceMap.get(priceId)?.planId ?? session.metadata?.planId,
+          );
+      return this.getBillingStatus(userId, dashboard);
     } catch (err: unknown) {
       if (
         err instanceof ForbiddenException ||
@@ -495,30 +530,42 @@ export class BillingService {
 
   // ── S3-14: Downgrade to free (Explorer) ────────────────────────────────────
 
-  async downgradeToFree(userId: string): Promise<void> {
+  async downgradeToFree(
+    userId: string,
+    dashboard: BillingDashboard = 'consumer',
+  ): Promise<void> {
     const doc = await this.getUserDoc(userId);
+    const state = getDashboardBilling(doc, dashboard);
 
-    if (doc?.stripe_subscription_id && this.stripe) {
+    if (state.stripe_subscription_id && this.stripe) {
       try {
-        await this.stripe.subscriptions.cancel(doc.stripe_subscription_id);
+        await this.stripe.subscriptions.cancel(state.stripe_subscription_id);
       } catch (err) {
         this.logger.warn(
-          `Stripe cancel failed for ${doc.stripe_subscription_id}`,
+          `Stripe cancel failed for ${state.stripe_subscription_id}`,
           err,
         );
       }
     }
 
-    await this.updateUserDoc(userId, {
-      plan: 'free',
-      subscription_status: 'canceled',
-      stripe_subscription_id: null,
-      pending_plan: null,
-      pending_cycle: null,
-      trial_ending_soon: false,
-    });
+    await this.updateUserDoc(
+      userId,
+      mergeDashboardBillingUpdate(doc, dashboard, {
+        plan: 'free',
+        subscription_status: 'canceled',
+        stripe_subscription_id: null,
+        stripe_price_id: null,
+        billing_cadence: null,
+        current_period_end: null,
+        pending_plan: null,
+        pending_cycle: null,
+        trial_ending_soon: false,
+        fit_checks_used: null,
+        fit_checks_quota: null,
+      }),
+    );
 
-    this.logger.log(`User downgraded to free — userId=${userId}`);
+    this.logger.log(`User downgraded to free — userId=${userId} dashboard=${dashboard}`);
   }
 
   // ── S2-15: Store plan selection before Stripe checkout ─────────────────────
@@ -538,11 +585,15 @@ export class BillingService {
       throw new BadRequestException(`Unknown plan: ${planId}`);
     }
 
+    const dashboard = dashboardForPlanId(planId);
+
     try {
       await this.updateUserDoc(userId, {
         email: userEmail || undefined,
-        pending_plan: planId,
-        pending_cycle: cycle,
+        ...mergeDashboardBillingUpdate(await this.getUserDoc(userId), dashboard, {
+          pending_plan: planId,
+          pending_cycle: cycle,
+        }),
       });
     } catch (err: unknown) {
       if (err instanceof BadRequestException) throw err;
@@ -566,8 +617,9 @@ export class BillingService {
 
     if (!doc) throw new NotFoundException('User not found');
 
+    const state = getDashboardBilling(doc, 'landlord');
     const isAgentPlan =
-      doc.plan === 'independent' || doc.plan === 'agent_pro';
+      state.plan === 'independent' || state.plan === 'agent_pro';
 
     if (!isAgentPlan) {
       throw new ForbiddenException(
@@ -575,15 +627,20 @@ export class BillingService {
       );
     }
 
-    const quota = doc.fit_checks_quota ?? 0;
-    const currentUsed = doc.fit_checks_used ?? 0;
+    const quota = state.fit_checks_quota ?? 0;
+    const currentUsed = state.fit_checks_used ?? 0;
     const newUsed = currentUsed + dto.checksUsed;
 
-    await this.updateUserDoc(userId, { fit_checks_used: newUsed });
+    await this.updateUserDoc(
+      userId,
+      mergeDashboardBillingUpdate(doc, 'landlord', {
+        fit_checks_used: newUsed,
+      }),
+    );
 
     // S4-07 — Bill only checks in this request that cross the quota (avoid duplicate invoice items)
     if (doc.stripe_customer_id && quota > 0 && newUsed > quota) {
-      const planCfg = getPlanConfig(doc.plan as PlanId);
+      const planCfg = getPlanConfig(state.plan as PlanId);
       const overageRate = planCfg?.fitChecksOverageRate ?? 0;
       const previouslyOver = Math.max(0, currentUsed - quota);
       const newlyOver = Math.max(0, newUsed - quota) - previouslyOver;
