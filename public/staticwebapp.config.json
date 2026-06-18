@@ -3,6 +3,14 @@
     {
       "route": "/landlord*",
       "rewrite": "/landlord/index.html"
+    },
+    {
+      "route": "/billing/*",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/signup/*",
+      "rewrite": "/index.html"
     }
   ],
   "navigationFallback": {
@@ -19,5 +27,11 @@
       "/500.html",
       "/rate-limit-exceeded.html"
     ]
+  },
+  "responseOverrides": {
+    "404": {
+      "rewrite": "/index.html",
+      "statusCode": 200
+    }
   }
 }

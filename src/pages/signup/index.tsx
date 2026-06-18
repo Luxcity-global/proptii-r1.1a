@@ -34,8 +34,22 @@ const SignupModalPage: React.FC = () => {
   useEffect(() => {
     if (isLoading || !isAuthenticated || !planId) return;
 
-    if (hasPostStripeCheckout() || hasPendingStripeCheckout()) {
+    const sessionId = searchParams.get('session_id');
+    if (sessionId) {
+      navigate(
+        `/billing/confirmed?session_id=${encodeURIComponent(sessionId)}`,
+        { replace: true },
+      );
+      return;
+    }
+
+    if (hasPostStripeCheckout()) {
       navigate('/billing/confirmed', { replace: true });
+      return;
+    }
+
+    if (hasPendingStripeCheckout() && getPricingFlow() === 'pay_now') {
+      navigate(payNowUrl(planId, cycle), { replace: true });
       return;
     }
 

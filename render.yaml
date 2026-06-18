@@ -60,6 +60,13 @@ services:
       - type: rewrite
         source: /landlord/*
         destination: /landlord/index.html
+      # Main Vite app — billing/signup checkout return paths (Stripe success_url)
+      - type: rewrite
+        source: /billing/*
+        destination: /index.html
+      - type: rewrite
+        source: /signup/*
+        destination: /index.html
       # Main Vite app — must be last
       - type: rewrite
         source: /*

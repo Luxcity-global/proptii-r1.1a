@@ -1,5 +1,12 @@
 const PRODUCTION_FRONTEND_FALLBACK = 'https://proptii.co';
 
+const BLOCKED_SUCCESS_ORIGINS = new Set([
+  'https://api.proptii.com',
+  'https://api-staging.proptii.com',
+  'https://proptii-r1-1a-new-backend.onrender.com',
+  'https://proptii-r1-1a-1.onrender.com',
+]);
+
 const LOCAL_DEV_ORIGINS = new Set([
   'http://localhost:5173',
   'http://127.0.0.1:5173',
@@ -29,7 +36,19 @@ function configuredFrontendOrigin(): string | null {
   return parseOrigin(fromEnv) ?? normalizeOrigin(fromEnv);
 }
 
+function isBlockedSuccessOrigin(origin: string): boolean {
+  if (BLOCKED_SUCCESS_ORIGINS.has(origin)) return true;
+  try {
+    const { hostname } = new URL(origin);
+    if (hostname.startsWith('api.') || hostname.includes('-backend')) return true;
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 function isAllowedReturnOrigin(origin: string): boolean {
+  if (isBlockedSuccessOrigin(origin)) return false;
   if (LOCAL_DEV_ORIGINS.has(origin)) return true;
 
   const configured = configuredFrontendOrigin();
@@ -63,7 +82,7 @@ export function resolveFrontendBaseUrl(returnBaseUrl?: string): string {
   }
 
   const fromEnv = configuredFrontendOrigin();
-  if (fromEnv) return fromEnv;
+  if (fromEnv && !isBlockedSuccessOrigin(fromEnv)) return fromEnv;
 
   if (process.env.NODE_ENV === 'production') {
     return PRODUCTION_FRONTEND_FALLBACK;

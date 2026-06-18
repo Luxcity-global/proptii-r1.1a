@@ -25,7 +25,12 @@ export function StripeCheckoutReturnHandler() {
     const target = `${targetPath}?session_id=${encodeURIComponent(sessionId)}${dashboardQuery}`;
     const current = location.pathname + location.search;
 
-    if (current !== target && !current.startsWith(`${targetPath}?`)) {
+    // Stripe success_url is /billing/confirmed; also recover from legacy /pricing/confirmed.
+    const onConfirmedPath =
+      location.pathname === targetPath ||
+      location.pathname === '/pricing/confirmed';
+
+    if (!onConfirmedPath || current !== target) {
       navigate(target, { replace: true });
     }
   }, [location.pathname, location.search, navigate]);

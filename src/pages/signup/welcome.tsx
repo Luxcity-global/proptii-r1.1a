@@ -15,7 +15,6 @@ import {
 import { getPlanById, type PlanId } from '../../config/plans';
 import {
   getPricingFlow,
-  hasPendingStripeCheckout,
   hasPostStripeCheckout,
   markPendingStripeCheckout,
   payNowUrl,
@@ -32,6 +31,7 @@ const WelcomeContent: React.FC = () => {
   const { pendingPlan, pendingCycle, status, loading } = useBillingStatus();
   const checkoutStarted = useRef(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [redirectingToStripe, setRedirectingToStripe] = useState(false);
 
   const planId =
     (searchParams.get('plan') as PlanId) ||
@@ -55,7 +55,7 @@ const WelcomeContent: React.FC = () => {
       return;
     }
 
-    if (hasPostStripeCheckout() || hasPendingStripeCheckout()) {
+    if (hasPostStripeCheckout()) {
       navigate('/billing/confirmed', { replace: true });
       return;
     }
@@ -75,8 +75,10 @@ const WelcomeContent: React.FC = () => {
 
     const runCheckout = async () => {
       checkoutStarted.current = true;
+      setRedirectingToStripe(true);
       const priceId = await resolveStripePriceId(planId, cycle);
       if (!priceId) {
+        setRedirectingToStripe(false);
         setCheckoutError(CHECKOUT_NOT_CONFIGURED_MSG);
         return;
       }
@@ -100,6 +102,7 @@ const WelcomeContent: React.FC = () => {
         window.location.href = checkoutUrl;
       } catch (e) {
         checkoutStarted.current = false;
+        setRedirectingToStripe(false);
         setCheckoutError(
           e instanceof Error ? e.message : 'Could not start checkout',
         );
@@ -119,6 +122,19 @@ const WelcomeContent: React.FC = () => {
       <Navbar hideServiceLinks />
 
       <main className="pr-content flex-1">
+        {redirectingToStripe ? (
+          <div className="pr-confirmed pr-fade-in" style={{ textAlign: 'center' }}>
+            <div
+              className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-6"
+              aria-hidden="true"
+            />
+            <h1>Redirecting to secure checkout…</h1>
+            <p className="sub">
+              You&apos;ll confirm your <strong>{planName}</strong> free month on
+              Stripe in a moment.
+            </p>
+          </div>
+        ) : (
         <div className="pr-confirmed pr-fade-in">
           <CheckAnimation />
 
@@ -202,6 +218,7 @@ const WelcomeContent: React.FC = () => {
             </button>
           )}
         </div>
+        )}
       </main>
     </div>
   );
