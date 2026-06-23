@@ -44,6 +44,8 @@ import ViewingsPage from './components/ViewingsPage';
 import { storage, db } from './config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, query, where, onSnapshot, Unsubscribe, doc, updateDoc, Timestamp } from 'firebase/firestore';
+import AuthContext, { useAuth } from '../../contexts/AuthContext';
+import { MessagingProvider } from '../../contexts/MessagingContext';
 import { trackEvent } from '../../utils/analytics';
 
 export type UserRole = 'landlord' | 'agent';
@@ -256,7 +258,7 @@ export interface AIMarketingAssets {
   };
 }
 
-export type Screen = 
+export type Screen =
   | 'welcome'
   | 'role-selection'
   | 'profile-setup'
@@ -307,12 +309,13 @@ interface PropertySetupData {
 }
 
 // Main App Content Component (wrapped by Routes)
-function AppContent() {
+export function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user: hostUser, isAuthenticated: hostIsAuthenticated, isLoading: hostIsLoading } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('main-app');
   const [navigationScreen, setNavigationScreen] = useState<NavigationScreen>('dashboard');
-  
+
   // Sync URL to navigation state
   useEffect(() => {
     const pathToScreen: Record<string, NavigationScreen> = {
@@ -323,38 +326,49 @@ function AppContent() {
       '/documents': 'documents',
       '/contracts': 'contracts',
       '/clients': 'clients',
+      '/messages': 'messages',
+      '/landlord': 'dashboard',
+      '/landlord/': 'dashboard',
+      '/landlord/dashboard': 'dashboard',
+      '/landlord/viewings': 'viewings',
+      '/landlord/properties': 'properties',
+      '/landlord/documents': 'documents',
+      '/landlord/contracts': 'contracts',
+      '/landlord/clients': 'clients',
+      '/landlord/messages': 'messages',
     };
-    
+
     const path = location.pathname;
     const targetScreen = pathToScreen[path] || 'dashboard';
-    
+
     if (targetScreen !== navigationScreen) {
       console.log('🧭 URL changed, updating navigationScreen to:', targetScreen);
       setNavigationScreen(targetScreen);
       setCurrentScreen('main-app');
     }
   }, [location.pathname, navigationScreen]);
-  
+
   // Wrapper function to log navigation changes and update URL
   const handleNavigation = (screen: NavigationScreen) => {
     trackEvent('landlord_nav_click', { section: screen });
     console.log('🧭 Navigation triggered to:', screen);
     console.log('🧭 Current navigationScreen before change:', navigationScreen);
     setNavigationScreen(screen);
-    
+
     // Update URL
     const screenToPath: Record<NavigationScreen, string> = {
-      'dashboard': '/dashboard',
-      'viewings': '/viewings',
-      'properties': '/properties',
-      'documents': '/documents',
-      'contracts': '/contracts',
-      'clients': '/clients',
-      'insights': '/insights',
-      'inbox': '/inbox',
+      'dashboard': '/landlord/dashboard',
+      'viewings': '/landlord/viewings',
+      'properties': '/landlord/properties',
+      'documents': '/landlord/documents',
+      'contracts': '/landlord/contracts',
+      'clients': '/landlord/clients',
+      'insights': '/landlord/insights',
+      'inbox': '/landlord/inbox',
+      'messages': '/landlord/messages',
     };
-    
-    const path = screenToPath[screen] || '/dashboard';
+
+    const path = screenToPath[screen] || '/landlord/dashboard';
     if (location.pathname !== path) {
       navigate(path);
     }
@@ -447,7 +461,7 @@ function AppContent() {
     }
     return null;
   }, [userProfile]);
-  
+
   // Property setup state
   const [propertySetupData, setPropertySetupData] = useState<PropertySetupData>({
     propertyType: null,
@@ -478,48 +492,24 @@ function AppContent() {
     }));
   };
 
-  // Listen for authentication changes from the bridge script
+  // Sync with host authentication context
   React.useEffect(() => {
-    const handleAuthStateChange = () => {
-      // Check authentication bridge first
-      if (typeof window.getUserInfo === 'function') {
-        const userInfo = window.getUserInfo();
-        if (userInfo && userInfo.isAuthenticated) {
-          setIsAuthenticated(true);
-          setUserProfile({
-            name: userInfo.name,
-            email: userInfo.email,
-            phone: '+44 7911 123456', // Default phone, could be enhanced later
-            companyName: 'Proptii',
-            logo: undefined
-          });
-          clearSignInQueryParam();
-          setIsAuthLoading(false);
-          console.log('✅ Updated userProfile with authentication data:', userInfo);
-          return;
-        }
-      }
-
-      // Fallback to cached auth state when bridge has not hydrated yet
-      const cachedUser = getCachedAuthUser();
-      if (cachedUser) {
-        setIsAuthenticated(true);
-        setUserProfile({
-          name: cachedUser.name || '',
-          email: cachedUser.email || '',
-          phone: cachedUser.phone || '+44 7911 123456',
-          companyName: 'Proptii',
-          logo: undefined
-        });
-        clearSignInQueryParam();
-        setIsAuthLoading(false);
-        console.log('✅ Restored auth state from localStorage cache');
-        return;
-      }
-
-      // No authenticated state found
-      setIsAuthenticated(false);
-      // Important: clear stale profile so guests never see authenticated data
+    setIsAuthLoading(hostIsLoading);
+    setIsAuthenticated(hostIsAuthenticated);
+    if (hostIsAuthenticated && hostUser) {
+      setUserProfile(prev => {
+        const existingCompanyProfile = prev?.companyProfile;
+        return {
+          id: hostUser.id,
+          name: hostUser.name || `${hostUser.givenName || ''} ${hostUser.familyName || ''}`.trim() || 'Landlord',
+          email: hostUser.email,
+          phone: hostUser.phone || '+44 7911 123456',
+          companyProfile: existingCompanyProfile,
+          companyName: prev?.companyName || 'Proptii',
+          logo: prev?.logo
+        } as any;
+      });
+    } else {
       setUserProfile(null);
       setProperties([]);
       setTenants([]);
@@ -527,100 +517,8 @@ function AppContent() {
       setArrearsAlerts([]);
       setAlerts([]);
       setMarketInsights([]);
-      setIsAuthLoading(false);
-    };
-
-    // Listen for authentication state changes
-    window.addEventListener('authStateChanged', handleAuthStateChange);
-    window.addEventListener('userAuthenticated', handleAuthStateChange);
-
-    // Also check immediately
-    handleAuthStateChange();
-
-    return () => {
-      window.removeEventListener('authStateChanged', handleAuthStateChange);
-      window.removeEventListener('userAuthenticated', handleAuthStateChange);
-    };
-  }, [clearSignInQueryParam, getCachedAuthUser]);
-
-  // Listen for AUTH_STATE and NAVIGATE messages from the embedding tenant app (bridge)
-  React.useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const data: any = (event as any).data;
-      
-      // Handle AUTH_STATE messages
-      if (data && data.type === 'AUTH_STATE' && data.payload) {
-        const { isAuthenticated, user } = data.payload;
-        if (isAuthenticated && user) {
-          try {
-            localStorage.setItem('proptii_auth_state', JSON.stringify({ isAuthenticated: true, user }));
-          } catch (error) {
-            console.warn('Failed to cache AUTH_STATE:', error);
-          }
-
-          setIsAuthenticated(true);
-          setUserProfile({
-            name: user.name || user.givenName || '',
-            email: user.email || '',
-            phone: user.phone || '+44 7911 123456',
-            companyName: 'Proptii',
-            logo: undefined
-          });
-          clearSignInQueryParam();
-          console.log('✅ Received AUTH_STATE from parent, updated userProfile:', user);
-        } else {
-          setIsAuthenticated(false);
-          // Explicit unauthenticated state from parent should clear profile
-          setUserProfile(null);
-          setProperties([]);
-          setTenants([]);
-          setVacancyAlerts([]);
-          setArrearsAlerts([]);
-          setAlerts([]);
-          setMarketInsights([]);
-          console.log('ℹ️ Received unauthenticated AUTH_STATE, cleared userProfile');
-        }
-        setIsAuthLoading(false);
-      }
-      
-      // Handle NAVIGATE messages
-      if (data && data.type === 'NAVIGATE' && data.payload) {
-        const { path } = data.payload;
-        console.log('🧭 Received NAVIGATE message with path:', path);
-        
-        // Map URL paths to navigation screens
-        const pathToScreen: Record<string, NavigationScreen> = {
-          '/': 'dashboard',
-          '/dashboard': 'dashboard',
-          '/viewings': 'viewings',
-          '/properties': 'properties',
-          '/documents': 'documents',
-          '/contracts': 'contracts',
-          '/clients': 'clients',
-        };
-        
-        // Remove leading slash and get the screen
-        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-        const targetScreen = pathToScreen[normalizedPath] || 'dashboard';
-        
-        console.log('🧭 Navigating to screen:', targetScreen);
-        setCurrentScreen('main-app');
-        setNavigationScreen(targetScreen);
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-
-    // Set a timeout to stop loading if no auth state is received
-    const timer = setTimeout(() => {
-        setIsAuthLoading(false);
-    }, 2000);
-
-    return () => {
-      window.removeEventListener('message', handleMessage);
-      clearTimeout(timer);
-    };
-  }, [clearSignInQueryParam]);
+    }
+  }, [hostUser, hostIsAuthenticated, hostIsLoading]);
 
   // Check localStorage for role selection (from AgentHome)
   React.useEffect(() => {
@@ -638,7 +536,7 @@ function AppContent() {
       const hash = window.location.hash.slice(1); // Remove the '#'
       if (hash) {
         console.log('🧭 Detected hash in URL:', hash);
-        
+
         // Map URL paths to navigation screens
         const pathToScreen: Record<string, NavigationScreen> = {
           '/': 'dashboard',
@@ -649,11 +547,11 @@ function AppContent() {
           '/contracts': 'contracts',
           '/clients': 'clients',
         };
-        
+
         // Normalize the hash path
         const normalizedPath = hash.startsWith('/') ? hash : `/${hash}`;
         const targetScreen = pathToScreen[normalizedPath] || 'dashboard';
-        
+
         console.log('🧭 Navigating to screen from hash:', targetScreen);
         setCurrentScreen('main-app');
         setNavigationScreen(targetScreen);
@@ -670,11 +568,21 @@ function AppContent() {
         '/documents': 'documents',
         '/contracts': 'contracts',
         '/clients': 'clients',
+        '/messages': 'messages',
+        '/landlord': 'dashboard',
+        '/landlord/': 'dashboard',
+        '/landlord/dashboard': 'dashboard',
+        '/landlord/viewings': 'viewings',
+        '/landlord/properties': 'properties',
+        '/landlord/documents': 'documents',
+        '/landlord/contracts': 'contracts',
+        '/landlord/clients': 'clients',
+        '/landlord/messages': 'messages',
       };
-      
+
       const path = location.pathname;
       const targetScreen = pathToScreen[path] || 'dashboard';
-      
+
       if (targetScreen !== navigationScreen) {
         console.log('🧭 Navigating to screen from pathname:', targetScreen);
         setCurrentScreen('main-app');
@@ -819,9 +727,9 @@ function AppContent() {
     if (imageFiles.length === 0) {
       return [];
     }
-    
+
     console.log(`Processing ${imageFiles.length} images...`);
-    
+
     const convertFileToBase64 = (file: File): Promise<string> => {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -830,7 +738,7 @@ function AppContent() {
         reader.readAsDataURL(file);
       });
     };
-    
+
     const photoPromises = imageFiles.map(async (file, index) => {
       try {
         const timestamp = Date.now();
@@ -840,9 +748,9 @@ function AppContent() {
           processedFile = await compressImage(file, 150);
         }
         const base64Url = await convertFileToBase64(processedFile);
-        
+
         console.log(`✅ Processed image ${index + 1}/${imageFiles.length} to base64`);
-        
+
         return {
           id: `photo-${timestamp}-${index}`,
           url: base64Url,
@@ -855,7 +763,7 @@ function AppContent() {
         throw error;
       }
     });
-    
+
     const uploadedPhotos = await Promise.all(photoPromises);
     console.log(`✅ All ${uploadedPhotos.length} images processed successfully`);
     return uploadedPhotos;
@@ -881,9 +789,9 @@ function AppContent() {
       try {
         const timestamp = Date.now();
         const base64Url = await convertFileToBase64(file);
-        
+
         console.log(`✅ Processed document ${index + 1}/${documentFiles.length}: ${file.name}`);
-        
+
         return {
           id: `doc-${timestamp}-${index}`,
           name: file.name,
@@ -906,7 +814,7 @@ function AppContent() {
   // Convert property setup data to Property object
   const createPropertyFromSetupData = (): Property => {
     const { propertyType, propertyDetails, amenities, images, additionalNotes, pendingTenants } = propertySetupData;
-    
+
     // Convert images to PropertyPhoto format
     const photos: PropertyPhoto[] = images.map((imageUrl, index) => ({
       id: `photo-${index}`,
@@ -934,17 +842,17 @@ function AppContent() {
 
     // Preserve original property status when editing, otherwise default to 'vacant'
     // First try propertySetupData.status (most reliable), then selectedProperty, then default to 'vacant'
-    const preservedStatus = propertySetupData.status 
+    const preservedStatus = propertySetupData.status
       || (isEditing && selectedProperty ? selectedProperty.status : undefined)
       || 'vacant';
 
     // Convert pending tenants to Tenant format with temporary IDs for preview
-    const tenantForPreview = pendingTenants && pendingTenants.length > 0 
+    const tenantForPreview = pendingTenants && pendingTenants.length > 0
       ? {
-          ...pendingTenants[0],
-          id: 'pending-tenant',
-          propertyId: 'setup-property'
-        } as Tenant
+        ...pendingTenants[0],
+        id: 'pending-tenant',
+        propertyId: 'setup-property'
+      } as Tenant
       : undefined;
 
     const propertyData: any = {
@@ -1389,14 +1297,14 @@ function AppContent() {
     setTimeout(() => {
       setCurrentScreen(screen);
       setIsTransitioning(false);
-      
+
       // Persist current screen to sessionStorage (survives reload within same tab)
       try {
         sessionStorage.setItem('proptii_current_screen', screen);
       } catch (e) {
         // Ignore storage errors
       }
-      
+
       // Clear selected property when navigating to certain screens
       if (screen === 'main-app' || screen === 'property-setup') {
         if (screen === 'property-setup' && currentScreen === 'main-app') {
@@ -1425,7 +1333,7 @@ function AppContent() {
               console.log('🔍 UserId from userProfile.id:', uid);
               return uid;
             }
-            
+
             // PRIORITY 2: Query parameter
             const params = new URLSearchParams(window.location.search);
             const uidFromQuery = params.get('uid');
@@ -1433,7 +1341,7 @@ function AppContent() {
               console.log('🔍 UserId from query param:', uidFromQuery);
               return uidFromQuery;
             }
-            
+
             // PRIORITY 3: getUserInfo function
             if (typeof (window as any).getUserInfo === 'function') {
               const info = (window as any).getUserInfo();
@@ -1444,7 +1352,7 @@ function AppContent() {
                 return uid;
               }
             }
-            
+
             // PRIORITY 4: localStorage auth state
             const cached = localStorage.getItem('proptii_auth_state');
             if (cached) {
@@ -1460,7 +1368,7 @@ function AppContent() {
           } catch (e) {
             console.error('🔍 Error extracting userId:', e);
           }
-          
+
           // FALLBACK: Email
           const emailFallback = userProfile?.email;
           console.log('🔍 Using email as userId fallback:', emailFallback);
@@ -1468,11 +1376,11 @@ function AppContent() {
         };
 
         const currentUserId = getCurrentUserId();
-        
+
         if (!currentUserId) {
           console.warn('⚠️ No userId found');
         }
-        
+
         const fetchedProperties = await propertyService.getProperties(currentUserId ? { userId: currentUserId } : undefined);
         setProperties(fetchedProperties);
       } catch (error) {
@@ -1618,20 +1526,20 @@ function AppContent() {
     let isGeneratingAlerts = false;
     let lastAlertGenerationTime = 0;
     const ALERT_GENERATION_COOLDOWN = 10000; // 10 seconds minimum between generations
-    
+
     // Throttled function to prevent too many rapid alert generations
     let alertGenerationTimeout: NodeJS.Timeout | null = null;
     const debouncedGenerateAlerts = () => {
       if (isGeneratingAlerts) {
         return; // Skip if already generating to prevent loops
       }
-      
+
       // Check cooldown period
       const now = Date.now();
       if (now - lastAlertGenerationTime < ALERT_GENERATION_COOLDOWN) {
         return; // Skip if cooldown period hasn't passed
       }
-      
+
       if (alertGenerationTimeout) {
         clearTimeout(alertGenerationTimeout);
       }
@@ -1657,7 +1565,7 @@ function AppContent() {
         collection(db, 'tenants'),
         where('userId', '==', currentUserId)
       );
-      const tenantsUnsubscribe = onSnapshot(tenantsQuery, 
+      const tenantsUnsubscribe = onSnapshot(tenantsQuery,
         async (snapshot) => {
           if (shouldLogRealtimeDebug) {
             console.log('👥 Real-time tenant update detected:', snapshot.docChanges().length, 'changes');
@@ -1780,17 +1688,17 @@ function AppContent() {
   React.useEffect(() => {
     const currentUserId = getCurrentUserId();
     const shouldLogMarketInsights = import.meta.env.DEV && import.meta.env.VITE_MARKET_INSIGHTS_DEBUG === 'true';
-    
+
     if (shouldLogMarketInsights) {
       console.log('📊 Setting up market insights listener');
     }
-    
+
     // Fetch GOV.UK regulatory changes on app load (once per day)
     const lastFetchKey = 'govuk_insights_last_fetch';
     const lastFetch = localStorage.getItem(lastFetchKey);
     const now = Date.now();
     const oneDay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-    
+
     // Only fetch if we haven't fetched in the last 24 hours
     if (!lastFetch || (now - parseInt(lastFetch)) > oneDay) {
       if (shouldLogMarketInsights) {
@@ -1813,7 +1721,7 @@ function AppContent() {
         console.log(`ℹ️  GOV.UK insights fetched ${hoursSinceFetch} hours ago, skipping (fetch once per day)`);
       }
     }
-    
+
     // Set up real-time listener for market insights
     const unsubscribe = marketInsightService.subscribeToInsights(
       (insights) => {
@@ -1861,7 +1769,7 @@ function AppContent() {
   const addProperty = async (property: Omit<Property, 'id' | 'createdAt'>) => {
     // Strip any accidental id/createdAt fields before saving (define outside try-catch for scope)
     const { id: _ignoredId, createdAt: _ignoredCreatedAt, ...safeProperty } = property as any;
-    
+
     try {
       // Save to Firebase (scoped) - use same extraction logic as loading
       const currentUserId = (() => {
@@ -1872,7 +1780,7 @@ function AppContent() {
             console.log('✅ Creating property with userId from userProfile.id:', uid);
             return uid;
           }
-          
+
           // PRIORITY 2: Query parameter
           const params = new URLSearchParams(window.location.search);
           const uidFromQuery = params.get('uid');
@@ -1880,7 +1788,7 @@ function AppContent() {
             console.log('✅ Creating property with userId from query:', uidFromQuery);
             return uidFromQuery;
           }
-          
+
           // PRIORITY 3: getUserInfo
           if (typeof (window as any).getUserInfo === 'function') {
             const info = (window as any).getUserInfo();
@@ -1890,7 +1798,7 @@ function AppContent() {
               return uid;
             }
           }
-          
+
           // PRIORITY 4: localStorage
           const cached = localStorage.getItem('proptii_auth_state');
           if (cached) {
@@ -1908,15 +1816,15 @@ function AppContent() {
         console.warn('⚠️ Using email as userId fallback for property creation:', emailFallback);
         return emailFallback;
       })();
-      
+
       console.log('📝 About to create property with userId:', currentUserId);
       // Get owner email from userProfile for storing in property document
       const ownerEmail = userProfile?.email || (typeof (window as any).getUserInfo === 'function' ? (window as any).getUserInfo()?.email : undefined);
       const propertyId = await propertyService.createProperty(safeProperty, currentUserId, ownerEmail);
-      
+
       // Fetch the created property to get full data with timestamps
       const newProperty = await propertyService.getProperty(propertyId);
-      
+
       if (newProperty) {
         console.log('Retrieved property after creation:', {
           id: newProperty.id,
@@ -1947,7 +1855,7 @@ function AppContent() {
     try {
       // Update in Firebase (exclude id, createdAt, tenant from updates, but include photos/documents if present)
       const { id, createdAt, tenant, ...firebaseUpdates } = updates as any;
-      
+
       // Clean photos array if present - remove undefined values (Firestore doesn't accept undefined)
       if (firebaseUpdates.photos) {
         firebaseUpdates.photos = firebaseUpdates.photos.map((photo: any) => {
@@ -1965,18 +1873,18 @@ function AppContent() {
         });
         console.log('Updating property with photos:', firebaseUpdates.photos.length);
       }
-      
+
       await propertyService.updateProperty(propertyId, firebaseUpdates);
-      
+
       // Update local state
-      setProperties(prev => 
+      setProperties(prev =>
         prev.map(p => p.id === propertyId ? { ...p, ...updates } : p)
       );
       if (selectedProperty && selectedProperty.id === propertyId) {
         setSelectedProperty(prev => prev ? { ...prev, ...updates } : null);
       }
       console.log('Property updated in Firebase:', propertyId);
-      
+
       // Trigger alert regeneration after property update
       const currentUserId = getCurrentUserId();
       if (currentUserId) {
@@ -1988,7 +1896,7 @@ function AppContent() {
     } catch (error) {
       console.error('Error updating property in Firebase:', error);
       // Fallback to local state update if Firebase fails
-      setProperties(prev => 
+      setProperties(prev =>
         prev.map(p => p.id === propertyId ? { ...p, ...updates } : p)
       );
       if (selectedProperty && selectedProperty.id === propertyId) {
@@ -1999,7 +1907,7 @@ function AppContent() {
 
   const selectProperty = (property: Property) => {
     const tenantForProperty = tenants.find(t => t.propertyId === property.id || t.id === (property as any).tenantId);
-    const enriched: Property = tenantForProperty 
+    const enriched: Property = tenantForProperty
       ? { ...property, tenant: tenantForProperty, status: 'occupied' as any }
       : property;
     setSelectedProperty(enriched);
@@ -2018,7 +1926,7 @@ function AppContent() {
       ...document,
       id: Date.now().toString(),
     };
-    
+
     updateProperty(propertyId, {
       documents: [...(properties.find(p => p.id === propertyId)?.documents || []), newDocument]
     });
@@ -2029,7 +1937,7 @@ function AppContent() {
       ...photo,
       id: Date.now().toString(),
     };
-    
+
     updateProperty(propertyId, {
       photos: [...(properties.find(p => p.id === propertyId)?.photos || []), newPhoto]
     });
@@ -2066,17 +1974,17 @@ function AppContent() {
         return userProfile?.email || 'unknown';
       })();
       console.log('📝 [App] Creating tenant with userId:', currentUserId);
-      
+
       const id = await tenantService.createTenant(tenant, currentUserId);
       console.log('✅ [App] Tenant created with id:', id);
-      
+
       const saved = await tenantService.getTenant(id);
       if (saved) {
         console.log('✅ [App] Fetched saved tenant from Firestore:', saved);
         // Ensure userId is preserved when adding to state
         const tenantWithUserId = { ...saved, userId: currentUserId } as any;
         console.log('✅ [App] Adding tenant to state with userId:', currentUserId);
-        
+
         // Trigger alert generation after tenant is created (to check for lease expiry, etc.)
         try {
           console.log('🔄 Triggering alert generation after tenant creation...');
@@ -2085,7 +1993,7 @@ function AppContent() {
         } catch (alertError) {
           console.warn('⚠️ Failed to generate alerts after tenant creation:', alertError);
         }
-        
+
         setTenants(prev => {
           // Check if tenant already exists (avoid duplicates)
           if (prev.some(t => t.id === tenantWithUserId.id)) {
@@ -2149,9 +2057,9 @@ function AppContent() {
 
   const exportProperties = (propertiesToExport: Property[], format: string) => {
     console.log(`Exporting properties as ${format}:`, propertiesToExport);
-    
+
     const timestamp = new Date().toISOString().split('T')[0];
-    
+
     switch (format) {
       case 'json':
         const dataStr = JSON.stringify(propertiesToExport, null, 2);
@@ -2163,7 +2071,7 @@ function AppContent() {
         link.click();
         URL.revokeObjectURL(url);
         break;
-        
+
       case 'csv':
         const csvHeaders = 'Address,Type,Bedrooms,Rent,Status,Amenities,Notes,Created Date\n';
         const csvData = propertiesToExport.map(property => {
@@ -2180,7 +2088,7 @@ function AppContent() {
         csvLink.click();
         URL.revokeObjectURL(csvUrl);
         break;
-        
+
       case 'excel':
         // For Excel, we'll create a CSV that can be opened in Excel
         // In a real app, you'd use a library like xlsx
@@ -2199,12 +2107,12 @@ function AppContent() {
         excelLink.click();
         URL.revokeObjectURL(excelUrl);
         break;
-        
+
       case 'pdf':
         // For PDF, we'll create a simple text representation
         // In a real app, you'd use a library like jsPDF
         const pdfContent = `PROPERTIES EXPORT - ${timestamp}\n\n` +
-          propertiesToExport.map((property, index) => 
+          propertiesToExport.map((property, index) =>
             `${index + 1}. ${property.address}\n` +
             `   Type: ${property.type}\n` +
             `   Bedrooms: ${property.bedrooms}\n` +
@@ -2214,7 +2122,7 @@ function AppContent() {
             `   Notes: ${property.notes || 'None'}\n` +
             `   Created: ${property.createdAt.toLocaleDateString()}\n`
           ).join('\n');
-        
+
         const pdfBlob = new Blob([pdfContent], { type: 'text/plain' });
         const pdfUrl = URL.createObjectURL(pdfBlob);
         const pdfLink = document.createElement('a');
@@ -2223,7 +2131,7 @@ function AppContent() {
         pdfLink.click();
         URL.revokeObjectURL(pdfUrl);
         break;
-        
+
       default:
         console.error('Unsupported export format:', format);
     }
@@ -2262,7 +2170,7 @@ function AppContent() {
               navigateToScreen('photo-management');
             }}
             // COMMENTED OUT FOR THIS RELEASE - Insights page not in scope
-            onViewInsights={() => {/* navigateToScreen('portfolio-insights') */}}
+            onViewInsights={() => {/* navigateToScreen('portfolio-insights') */ }}
             onViewVacancyAlert={(alertId) => {
               const alert = vacancyAlerts.find(a => a.id === alertId);
               if (alert) {
@@ -2359,7 +2267,7 @@ function AppContent() {
               try {
                 // Group documents by property
                 const documentsByProperty = new Map<string, string[]>();
-                
+
                 properties.forEach(property => {
                   property.documents.forEach(doc => {
                     if (documentIds.includes(doc.id)) {
@@ -2378,9 +2286,9 @@ function AppContent() {
 
                   // Filter out deleted documents
                   const updatedDocuments = property.documents.filter(doc => !docIdsToDelete.includes(doc.id));
-                  
+
                   // Update Firebase - convert dates to Timestamps
-                  await propertyService.updateProperty(propertyId, { 
+                  await propertyService.updateProperty(propertyId, {
                     documents: updatedDocuments.map(doc => ({
                       id: doc.id,
                       name: doc.name,
@@ -2391,15 +2299,15 @@ function AppContent() {
                       status: doc.status
                     }))
                   });
-                  
+
                   // Update local state
-                  setProperties(prev => 
-                    prev.map(p => p.id === propertyId 
+                  setProperties(prev =>
+                    prev.map(p => p.id === propertyId
                       ? { ...p, documents: updatedDocuments }
                       : p
                     )
                   );
-                  
+
                   if (selectedProperty && selectedProperty.id === propertyId) {
                     setSelectedProperty(prev => prev ? { ...prev, documents: updatedDocuments } : null);
                   }
@@ -2416,7 +2324,7 @@ function AppContent() {
               try {
                 // Group documents by property
                 const documentsByProperty = new Map<string, string[]>();
-                
+
                 properties.forEach(property => {
                   property.documents.forEach(doc => {
                     if (documentIds.includes(doc.id)) {
@@ -2434,14 +2342,14 @@ function AppContent() {
                   if (!property) return;
 
                   // Mark documents as archived
-                  const updatedDocuments = property.documents.map(doc => 
+                  const updatedDocuments = property.documents.map(doc =>
                     docIdsToArchive.includes(doc.id)
                       ? { ...doc, archived: true }
                       : doc
                   );
-                  
+
                   // Update Firebase - convert dates to Timestamps
-                  await propertyService.updateProperty(propertyId, { 
+                  await propertyService.updateProperty(propertyId, {
                     documents: updatedDocuments.map(doc => ({
                       id: doc.id,
                       name: doc.name,
@@ -2453,15 +2361,15 @@ function AppContent() {
                       archived: (doc as any).archived || false
                     }))
                   });
-                  
+
                   // Update local state
-                  setProperties(prev => 
-                    prev.map(p => p.id === propertyId 
+                  setProperties(prev =>
+                    prev.map(p => p.id === propertyId
                       ? { ...p, documents: updatedDocuments }
                       : p
                     )
                   );
-                  
+
                   if (selectedProperty && selectedProperty.id === propertyId) {
                     setSelectedProperty(prev => prev ? { ...prev, documents: updatedDocuments } : null);
                   }
@@ -2478,7 +2386,7 @@ function AppContent() {
               try {
                 // Get selected documents with property information
                 const selectedDocsWithProperty: Array<PropertyDocument & { propertyAddress: string; propertyId: string }> = [];
-                
+
                 properties.forEach(property => {
                   property.documents.forEach(doc => {
                     if (documentIds.includes(doc.id)) {
@@ -2561,7 +2469,7 @@ function AppContent() {
                     // For PDF, we'll create a simple text representation
                     // In a production app, you'd use a library like jsPDF
                     const pdfContent = `Documents Export\n${'='.repeat(50)}\n\n` +
-                      selectedDocsWithProperty.map((doc, index) => 
+                      selectedDocsWithProperty.map((doc, index) =>
                         `${index + 1}. ${doc.name}\n` +
                         `   Property: ${doc.propertyAddress}\n` +
                         `   Type: ${doc.type}\n` +
@@ -2645,7 +2553,7 @@ function AppContent() {
               setTenants(prev => prev.filter(t => t.id !== tenantId));
             }}
             onArchiveTenant={(tenantId) => {
-              setTenants(prev => prev.map(t => 
+              setTenants(prev => prev.map(t =>
                 t.id === tenantId ? { ...t, status: 'archived' as any } : t
               ));
             }}
@@ -2669,13 +2577,11 @@ function AppContent() {
           />
         );
 
-      // COMMENTED OUT FOR THIS RELEASE - Inbox and Insights pages not in scope
-      // case 'inbox':
-      //   return (
-      //     <TenantInbox
-      //       onBack={() => setNavigationScreen('dashboard')}
-      //     />
-      //   );
+      case 'messages':
+      case 'inbox':
+        return (
+          <TenantInbox />
+        );
 
       // case 'insights':
       //   return (
@@ -2711,7 +2617,7 @@ function AppContent() {
               navigateToScreen('photo-management');
             }}
             // COMMENTED OUT FOR THIS RELEASE - Insights page not in scope
-            onViewInsights={() => {/* navigateToScreen('portfolio-insights') */}}
+            onViewInsights={() => {/* navigateToScreen('portfolio-insights') */ }}
             onViewVacancyAlert={(alertId) => {
               const alert = vacancyAlerts.find(a => a.id === alertId);
               if (alert) {
@@ -2738,7 +2644,7 @@ function AppContent() {
     switch (currentScreen) {
       case 'welcome':
         return <WelcomeScreen onGetStarted={() => navigateToScreen('role-selection')} />;
-      
+
       case 'role-selection':
         return (
           <RoleSelection
@@ -2747,7 +2653,7 @@ function AppContent() {
             onContinue={() => navigateToScreen('profile-setup')}
           />
         );
-      
+
       case 'profile-setup':
         return (
           <ProfileSetup
@@ -2759,7 +2665,7 @@ function AppContent() {
             onSkip={() => navigateToScreen('onboarding-options')}
           />
         );
-      
+
       case 'onboarding-options':
         return (
           <OnboardingOptions
@@ -2776,7 +2682,7 @@ function AppContent() {
             userHasCompanyInfo={!!userProfile?.companyProfile}
           />
         );
-      
+
       case 'company-profile-setup':
         return (
           <CompanyProfileSetup
@@ -2795,7 +2701,7 @@ function AppContent() {
             initialProfile={userProfile?.companyProfile}
           />
         );
-      
+
       case 'property-setup-step1':
         return (
           <PropertySetupStep1
@@ -2814,7 +2720,7 @@ function AppContent() {
             onSection4={() => navigateToScreen('images-notes-selection')}
           />
         );
-      
+
       case 'property-type-selection':
         return (
           <PropertyTypeSelection
@@ -2826,7 +2732,7 @@ function AppContent() {
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
           />
         );
-      
+
       case 'property-details-selection':
         return (
           <PropertyDetailsSelection
@@ -2838,7 +2744,7 @@ function AppContent() {
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
           />
         );
-      
+
       case 'amenities-selection':
         return (
           <AmenitiesSelection
@@ -2850,10 +2756,10 @@ function AppContent() {
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
           />
         );
-      
+
       case 'images-notes-selection':
         return (
-            <ImagesAndNotesSelection
+          <ImagesAndNotesSelection
             uploadedImages={propertySetupData.images}
             additionalNotes={propertySetupData.additionalNotes}
             onImagesChange={(images, imageFiles) => updatePropertySetupData({ images, imageFiles })}
@@ -2864,7 +2770,7 @@ function AppContent() {
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
           />
         );
-      
+
       case 'property-setup':
         return (
           <PropertySetup
@@ -2877,7 +2783,7 @@ function AppContent() {
               } else {
                 // Adding new property
                 const propertyId = await addProperty(property);
-                const newProperty = properties.find(p => p.id === propertyId) || 
+                const newProperty = properties.find(p => p.id === propertyId) ||
                   await propertyService.getProperty(propertyId) ||
                   { ...property, id: propertyId, createdAt: new Date() } as Property;
                 setSelectedProperty(newProperty);
@@ -2901,7 +2807,7 @@ function AppContent() {
             }}
           />
         );
-      
+
       case 'photo-upload':
         return (
           <PhotoUpload
@@ -2915,7 +2821,7 @@ function AppContent() {
             onSkip={completeOnboarding}
           />
         );
-      
+
       case 'main-app':
         return (
           <MainLayout
@@ -2926,7 +2832,7 @@ function AppContent() {
             {renderMainAppScreen()}
           </MainLayout>
         );
-      
+
       case 'property-details':
         return (
           <PropertyDetails
@@ -2975,29 +2881,29 @@ function AppContent() {
             }}
             onSelectExistingTenant={async (tenantId) => {
               if (!selectedProperty) return;
-              
+
               const tenant = tenants.find(t => t.id === tenantId);
               if (!tenant) return;
-              
+
               // Update the property to assign the tenant
               try {
                 await updateProperty(selectedProperty.id, {
                   status: 'occupied',
                   tenantId: tenant.id
                 });
-                
+
                 // Update the tenant's property assignment
                 await tenantService.updateTenant(tenant.id, {
                   propertyId: selectedProperty.id,
                   propertyAddress: selectedProperty.address
                 });
-                
+
                 // Refresh the tenant data
                 const updatedTenant = await tenantService.getTenant(tenant.id);
                 if (updatedTenant) {
                   setTenants(prev => prev.map(t => t.id === tenant.id ? updatedTenant : t));
                 }
-                
+
                 // Update the property with tenant data
                 const updatedProperty = await propertyService.getProperty(selectedProperty.id);
                 if (updatedProperty) {
@@ -3011,14 +2917,14 @@ function AppContent() {
             onRemoveTenant={async (tenantId, propertyId) => {
               try {
                 console.log(`🔄 Removing tenant ${tenantId} from property ${propertyId}`);
-                
+
                 // Remove tenant's property assignment
                 await tenantService.updateTenant(tenantId, {
                   propertyId: '',
                   propertyAddress: ''
                 });
                 console.log(`✅ Updated tenant ${tenantId} to remove property assignment`);
-                
+
                 // Update property: remove tenantId field and set status to vacant
                 const { deleteField } = await import('firebase/firestore');
                 const propertyDocRef = doc(db, 'properties', propertyId);
@@ -3028,42 +2934,42 @@ function AppContent() {
                   updatedAt: Timestamp.now()
                 });
                 console.log(`✅ Updated property ${propertyId} to remove tenantId and set status to vacant`);
-                
+
                 // Update local state immediately
-                setProperties(prev => 
-                  prev.map(p => 
-                    p.id === propertyId 
+                setProperties(prev =>
+                  prev.map(p =>
+                    p.id === propertyId
                       ? { ...p, status: 'vacant' as const, tenantId: undefined, tenant: undefined }
                       : p
                   )
                 );
-                
+
                 if (selectedProperty && selectedProperty.id === propertyId) {
-                  setSelectedProperty(prev => prev ? { 
-                    ...prev, 
-                    status: 'vacant' as const, 
-                    tenantId: undefined, 
-                    tenant: undefined 
+                  setSelectedProperty(prev => prev ? {
+                    ...prev,
+                    status: 'vacant' as const,
+                    tenantId: undefined,
+                    tenant: undefined
                   } : null);
                 }
-                
+
                 // Refresh tenant data
                 const updatedTenant = await tenantService.getTenant(tenantId);
                 if (updatedTenant) {
                   setTenants(prev => prev.map(t => t.id === tenantId ? updatedTenant : t));
                   console.log(`✅ Refreshed tenant data for ${tenantId}`);
                 }
-                
+
                 // Refresh property data from Firestore to ensure consistency
                 const updatedProperty = await propertyService.getProperty(propertyId);
                 if (updatedProperty) {
                   setSelectedProperty(updatedProperty);
-                  setProperties(prev => 
+                  setProperties(prev =>
                     prev.map(p => p.id === propertyId ? updatedProperty : p)
                   );
                   console.log(`✅ Refreshed property data for ${propertyId}`);
                 }
-                
+
                 // Trigger alert regeneration after tenant removal
                 const currentUserId = getCurrentUserId();
                 if (currentUserId) {
@@ -3072,7 +2978,7 @@ function AppContent() {
                     console.warn('⚠️ Failed to regenerate alerts after tenant removal:', error);
                   });
                 }
-                
+
                 console.log(`✅ Successfully removed tenant ${tenantId} from property ${propertyId}`);
               } catch (error) {
                 console.error('❌ Failed to remove tenant from property:', error);
@@ -3081,54 +2987,54 @@ function AppContent() {
             }}
             onChangeTenant={async (propertyId, newTenantId) => {
               if (!selectedProperty) return;
-              
+
               try {
                 const currentTenant = selectedProperty.tenant;
                 const newTenant = tenants.find(t => t.id === newTenantId);
-                
+
                 if (!newTenant) {
                   alert('Selected tenant not found');
                   return;
                 }
-                
+
                 // Remove current tenant's property assignment
                 if (currentTenant?.id) {
                   await tenantService.updateTenant(currentTenant.id, {
                     propertyId: '',
                     propertyAddress: ''
                   });
-                  
+
                   // Refresh current tenant data
                   const updatedCurrentTenant = await tenantService.getTenant(currentTenant.id);
                   if (updatedCurrentTenant) {
                     setTenants(prev => prev.map(t => t.id === currentTenant.id ? updatedCurrentTenant : t));
                   }
                 }
-                
+
                 // Assign new tenant to property
                 await tenantService.updateTenant(newTenantId, {
                   propertyId: propertyId,
                   propertyAddress: selectedProperty.address
                 });
-                
+
                 // Update property with new tenant
                 await updateProperty(propertyId, {
                   status: 'occupied',
                   tenantId: newTenantId
                 });
-                
+
                 // Refresh new tenant data
                 const updatedNewTenant = await tenantService.getTenant(newTenantId);
                 if (updatedNewTenant) {
                   setTenants(prev => prev.map(t => t.id === newTenantId ? updatedNewTenant : t));
                 }
-                
+
                 // Refresh property data
                 const updatedProperty = await propertyService.getProperty(propertyId);
                 if (updatedProperty) {
                   setSelectedProperty(updatedProperty);
                 }
-                
+
                 // Trigger alert regeneration after tenant change
                 const currentUserId = getCurrentUserId();
                 if (currentUserId) {
@@ -3144,7 +3050,7 @@ function AppContent() {
             }}
           />
         );
-      
+
       case 'document-management':
         return (
           <DocumentManagement
@@ -3153,7 +3059,7 @@ function AppContent() {
             onDocumentAdd={addDocumentToProperty}
           />
         );
-      
+
       case 'photo-management':
         return (
           <PhotoManagement
@@ -3163,7 +3069,7 @@ function AppContent() {
             updateProperty={updateProperty}
           />
         );
-      
+
       // COMMENTED OUT FOR THIS RELEASE - Insights pages not in scope
       // case 'portfolio-insights':
       //   return (
@@ -3174,7 +3080,7 @@ function AppContent() {
       //       marketInsights={marketInsights}
       //     />
       //   );
-      
+
       // case 'property-insights':
       //   return (
       //     <PropertyInsights
@@ -3182,7 +3088,7 @@ function AppContent() {
       //       onBack={() => navigateToScreen('property-details')}
       //     />
       //   );
-      
+
       case 'tenant-details':
         return (
           <TenantDetails
@@ -3255,7 +3161,7 @@ function AppContent() {
             }}
           />
         );
-      
+
       case 'vacancy-prevention':
         return (
           <VacancyPrevention
@@ -3263,14 +3169,14 @@ function AppContent() {
             onBack={() => navigateToScreen('main-app')}
             onInitiatePreMarketing={(alert, assets) => {
               // Update alert status and handle pre-marketing initiation
-              setVacancyAlerts(prev => 
+              setVacancyAlerts(prev =>
                 prev.map(a => a.id === alert.id ? { ...a, status: 'pre-marketing' } : a)
               );
               navigateToScreen('main-app');
             }}
           />
         );
-      
+
       case 'arrears-management':
         const tenantForArrears = tenants.find(t => t.id === selectedArrearsAlert?.tenantId);
         if (!tenantForArrears) {
@@ -3289,24 +3195,20 @@ function AppContent() {
             onBack={() => navigateToScreen('main-app')}
             onInitiateWorkflow={(workflowType, details) => {
               // Handle workflow initiation
-              setArrearsAlerts(prev => 
-                prev.map(a => a.id === selectedArrearsAlert?.id ? 
-                  { ...a, status: workflowType === 'reminder' ? 'reminder-sent' : 
-                           workflowType === 'payment-plan' ? 'payment-plan' : 'legal-action' } : a)
+              setArrearsAlerts(prev =>
+                prev.map(a => a.id === selectedArrearsAlert?.id ?
+                  {
+                    ...a, status: workflowType === 'reminder' ? 'reminder-sent' :
+                      workflowType === 'payment-plan' ? 'payment-plan' : 'legal-action'
+                  } : a)
               );
               navigateToScreen('main-app');
             }}
           />
         );
-      
-      // COMMENTED OUT FOR THIS RELEASE - Tenant Inbox page not in scope
-      // case 'tenant-inbox':
-      //   return (
-      //     <TenantInbox
-      //       onBack={() => navigateToScreen('main-app')}
-      //     />
-      //   );
-      
+
+
+
       case 'property-preview':
         console.log('Rendering PropertyPreview component with setup data:', propertySetupData);
         return (
@@ -3315,9 +3217,9 @@ function AppContent() {
             isEditing={isEditing}
             onBack={() => navigateToScreen('images-notes-selection')}
             onEdit={() => navigateToScreen('property-type-selection')}
-            onManageDocuments={() => {}}
-            onManagePhotos={() => {}}
-            updateProperty={() => {}}
+            onManageDocuments={() => { }}
+            onManagePhotos={() => { }}
+            updateProperty={() => { }}
             onHome={() => navigateToScreen('main-app')}
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
             onPublishProperty={async () => {
@@ -3332,7 +3234,7 @@ function AppContent() {
                   imageFilesCount: propertySetupData.imageFiles.length,
                   imagesCount: propertySetupData.images.length
                 });
-                
+
                 // 1. Upload images to Firebase Storage
                 let uploadedPhotos: PropertyPhoto[] = [];
                 if (propertySetupData.imageFiles.length > 0) {
@@ -3342,7 +3244,7 @@ function AppContent() {
                 } else {
                   console.warn('No image files to upload');
                 }
-                
+
                 // 2. Upload documents to Firebase Storage
                 let uploadedDocuments: PropertyDocument[] = [];
                 if (propertySetupData.propertyDetails.uploadedDocuments.length > 0) {
@@ -3353,7 +3255,7 @@ function AppContent() {
 
                 // 3. Convert setup data to property
                 const newProperty = createPropertyFromSetupData();
-                
+
                 // 4. Replace preview URLs with uploaded Firebase Storage URLs
                 if (uploadedPhotos.length > 0) {
                   console.log('Replacing preview URLs with Firebase Storage URLs');
@@ -3362,18 +3264,18 @@ function AppContent() {
                   console.warn('No photos to add to property');
                   newProperty.photos = [];
                 }
-                
+
                 if (uploadedDocuments.length > 0) {
                   newProperty.documents = uploadedDocuments;
                 } else {
                   newProperty.documents = [];
                 }
-                
+
                 if (isEditing && editingPropertyId) {
                   // Fetch the original property to preserve status and other important fields
                   const originalProperty = await propertyService.getProperty(editingPropertyId);
                   const preservedStatus = originalProperty?.status || selectedProperty?.status || 'vacant';
-                  
+
                   // Prepare updates object with all changes, preserving status
                   const updates = {
                     address: newProperty.address,
@@ -3386,23 +3288,23 @@ function AppContent() {
                     notes: newProperty.notes,
                     status: preservedStatus, // Preserve the original status from database
                   };
-                  
+
                   // Update in Firebase directly (bypass updateProperty to avoid double state updates)
                   const { id, createdAt, tenant, photos, documents, ...firebaseUpdates } = updates as any;
-                  
+
                   // Filter out undefined values - Firestore doesn't accept undefined
                   const cleanUpdates = Object.fromEntries(
                     Object.entries(firebaseUpdates).filter(([_, value]) => value !== undefined)
                   ) as any;
-                  
+
                   await propertyService.updateProperty(editingPropertyId, cleanUpdates);
-                  
+
                   // Fetch the updated property from Firebase to get the latest data with proper mapping
                   const updated = await propertyService.getProperty(editingPropertyId);
                   if (updated) {
                     // Enrich property with tenant data if tenant exists (similar to selectProperty)
                     const tenantForProperty = tenants.find(t => t.propertyId === editingPropertyId || t.id === updated.tenantId);
-                    
+
                     // Determine the correct status:
                     // 1. If property has a tenant, it should be 'occupied'
                     // 2. Otherwise, use the preserved status from the original property
@@ -3413,7 +3315,7 @@ function AppContent() {
                       // Use the status from the database if no tenant
                       finalStatus = updated.status;
                     }
-                    
+
                     // Build the complete property object with tenant and correct status
                     const propertyWithPreservedStatus = {
                       ...updated,
@@ -3421,21 +3323,21 @@ function AppContent() {
                       tenant: tenantForProperty || updated.tenant,
                       tenantId: tenantForProperty?.id || updated.tenantId
                     };
-                    
+
                     // Update both selectedProperty and properties array with fetched data
                     // This ensures we have the complete, properly mapped property object
                     setSelectedProperty(propertyWithPreservedStatus);
-                    setProperties(prev => 
+                    setProperties(prev =>
                       prev.map(p => p.id === editingPropertyId ? propertyWithPreservedStatus : p)
                     );
-                    
+
                     console.log('✅ Property updated successfully:', {
                       id: editingPropertyId,
                       status: propertyWithPreservedStatus.status,
                       address: propertyWithPreservedStatus.address,
                       hasTenant: !!tenantForProperty
                     });
-                    
+
                     // Trigger alert regeneration after property update
                     const currentUserId = getCurrentUserId();
                     if (currentUserId) {
@@ -3447,18 +3349,18 @@ function AppContent() {
                   } else {
                     console.error('❌ Failed to fetch updated property after save');
                   }
-                  
+
                   setIsEditing(false);
                   setEditingPropertyId(null);
                   navigateToScreen('property-details');
                 } else {
                   console.log('Creating property with photos:', newProperty.photos.length);
                   console.log('Property photos data:', JSON.stringify(newProperty.photos, null, 2));
-                  
+
                   // 4. Create property in Firebase
                   const propertyId = await addProperty(newProperty);
                   console.log('Property created with ID:', propertyId);
-                  
+
                   // 5. Update pending tenants with the correct propertyId
                   if (propertySetupData.pendingTenants && propertySetupData.pendingTenants.length > 0) {
                     console.log(`Updating ${propertySetupData.pendingTenants.length} pending tenant(s) with propertyId:`, propertyId);
@@ -3471,11 +3373,11 @@ function AppContent() {
                         // Get all tenants for this user and update those matching the property address
                         const allTenants = await tenantService.getTenants(currentUserId);
                         const propertyAddress = newProperty.address;
-                        const tenantsToUpdate = allTenants.filter(t => 
-                          t.propertyAddress === propertyAddress && 
+                        const tenantsToUpdate = allTenants.filter(t =>
+                          t.propertyAddress === propertyAddress &&
                           (!t.propertyId || t.propertyId === 'setup-property' || t.propertyId === 'pending')
                         );
-                        
+
                         for (const tenant of tenantsToUpdate) {
                           await tenantService.updateTenant(tenant.id, {
                             propertyId: propertyId,
@@ -3489,10 +3391,10 @@ function AppContent() {
                       // Don't block property creation if tenant update fails
                     }
                   }
-                  
+
                   // 6. Fetch created property to get full data
                   const createdProperty = await propertyService.getProperty(propertyId);
-                  
+
                   if (createdProperty) {
                     selectProperty(createdProperty);
                     navigateToScreen('property-details');
@@ -3513,7 +3415,7 @@ function AppContent() {
             }}
           />
         );
-      
+
       case 'tenant-selection':
         return (
           <TenantSelection
@@ -3584,7 +3486,7 @@ function AppContent() {
               } else {
                 // Add new tenant
                 addTenant(tenant);
-                
+
                 // If coming from property-preview, also store tenant in propertySetupData for preview
                 if (previousScreen === 'property-preview') {
                   setPropertySetupData(prev => ({
@@ -3652,7 +3554,7 @@ function AppContent() {
             }}
           />
         );
-      
+
       case 'add-landlord':
         if (userRole !== 'agent') {
           navigateToScreen('main-app');
@@ -3673,7 +3575,7 @@ function AppContent() {
             }}
           />
         );
-      
+
       default:
         console.log('🚨 Falling through to default case! Current screen:', currentScreen);
         return <WelcomeScreen onGetStarted={() => navigateToScreen('role-selection')} />;
@@ -3684,25 +3586,36 @@ function AppContent() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="flex flex-col items-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#E65D24] mb-4"></div>
-            <p className="text-gray-600 font-medium">Loading...</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#E65D24] mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading...</p>
         </div>
       </div>
     );
   }
 
+  const authContextValue = {
+    user: userProfile,
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    login: () => {},
+    logout: () => {},
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      <div 
-        className={`transition-all duration-[4ms] ease-out ${
-          isTransitioning 
-            ? 'opacity-0 transform scale-75' 
-            : 'opacity-100 transform scale-100'
-        }`}
-      >
-        {renderScreen()}
-      </div>
-    </div>
+    <AuthContext.Provider value={authContextValue as any}>
+      <MessagingProvider>
+        <div className="min-h-screen bg-background">
+          <div
+            className={`transition-all duration-[4ms] ease-out ${isTransitioning
+                ? 'opacity-0 transform scale-75'
+                : 'opacity-100 transform scale-100'
+              }`}
+          >
+            {renderScreen()}
+          </div>
+        </div>
+      </MessagingProvider>
+    </AuthContext.Provider>
   );
 }
 

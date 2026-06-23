@@ -100,8 +100,10 @@ services:
   # Search Backend (Express)
   - type: web
     name: proptii-search-backend
-    env: docker
-    dockerfilePath: ./search/backend/Dockerfile
+    env: node
+    plan: free
+    buildCommand: cd proptii-search && npm install && npm run build
+    startCommand: cd proptii-search && npm run start
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION

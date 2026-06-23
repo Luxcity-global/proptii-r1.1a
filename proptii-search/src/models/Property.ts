@@ -17,6 +17,7 @@ export interface IProperty extends Document {
   source: string;
   url: string;
   scrapedAt: Date;
+  landlordId?: string | null;
   metadata?: Record<string, any>;
 }
 
@@ -37,10 +38,12 @@ const PropertySchema: Schema = new Schema({
   source: { type: String, required: true },
   url: { type: String, required: true, unique: true },
   scrapedAt: { type: Date, default: Date.now, index: { expires: '30d' } },
+  landlordId: { type: String, default: null },
   metadata: { type: Object }
 });
 
-// Create text index for search
+// Full-text search index
 PropertySchema.index({ title: 'text', description: 'text', location: 'text' });
 
-export default mongoose.model<IProperty>('Property', PropertySchema);
+// Explicit collection name: 'scraped_properties' — shared with the Azure Functions API
+export default mongoose.model<IProperty>('ScrapedProperty', PropertySchema, 'scraped_properties');

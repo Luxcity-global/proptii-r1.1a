@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useSearchBackend, type Property } from '../hooks/useSearchBackend';
+import { useSearchBackend } from '../hooks/useSearchBackend';
+import type { Property } from '../types/property';
+import { useAuth } from '../contexts/AuthContext';
+import { useMessagingContext } from '../contexts/MessagingContext';
+import communicationService from '../services/communicationService';
+import QuickRequestModal from '../components/enquiry/QuickRequestModal';
+
 import { useSavedProperties } from '../contexts/SavedPropertiesContext';
 import Footer from '../components/Footer';
 import { getAmenityIcon } from '../utils/amenityIcons';
@@ -162,13 +168,94 @@ interface PropertyDetailsModalProps {
   property: Property | null;
   isOpen: boolean;
   onClose: () => void;
-  onMessageClick: (property: Property) => void;
-  isNavigatingToBooking: boolean;
 }
 
-function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNavigatingToBooking }: PropertyDetailsModalProps) {
+function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDetailsModalProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isMessaging, setIsMessaging] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
+  const [showUnclaimedConfirm, setShowUnclaimedConfirm] = useState(false);
+  const [showQuickRequestModal, setShowQuickRequestModal] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const { user, isAuthenticated, login } = useAuth();
+  const { setActiveConversationId } = useMessagingContext();
+
+  const isScrapedProperty = property ? (!property.landlordId && !!property.agent?.email) : false;
+
+  useEffect(() => {
+    // reset state when a new property is opened
+    setShowUnclaimedConfirm(false);
+    setMessageError(null);
+    setIsMessaging(false);
+    setCurrentImageIndex(0);
+  }, [property]);
+
+  const handleMessageClick = async () => {
+    setMessageError(null);
+
+    if (!isAuthenticated || !user) {
+      setShowQuickRequestModal(true);
+      return;
+    }
+
+    if (!property?.landlordId && !property?.agent?.email) {
+      setMessageError('Contact information unavailable for this property.');
+      return;
+    }
+
+    if (isScrapedProperty && !showUnclaimedConfirm) {
+      setShowUnclaimedConfirm(true);
+      return;
+    }
+
+    await createConversationAndNavigate();
+  };
+
+  const createConversationAndNavigate = async () => {
+    if (!property || !user) return;
+    setIsMessaging(true);
+    try {
+      const landlordId = property.landlordId || 'UNCLAIMED';
+      const agentEmail = isScrapedProperty ? property.agent?.email : undefined;
+      const propertyTitle = isScrapedProperty ? property.title : undefined;
+
+      const conversation = await communicationService.getOrCreateConversation({
+        propertyId: property.url || property.id || '',
+        tenantId: user.id,
+        landlordId,
+        agentEmail,
+        propertyTitle,
+        scrapedPropertySnapshot: isScrapedProperty && property.agent?.email ? {
+          url: property.url || '',
+          title: property.title || '',
+          location: property.location || '',
+          price: property.price,
+          bedrooms: property.bedrooms,
+          bathrooms: property.bathrooms,
+          propertyType: property.propertyType,
+          imageUrls: property.imageUrls,
+          agent: {
+            name: property.agent?.name,
+            email: property.agent.email,
+            website: property.agent?.website,
+          },
+        } : undefined,
+      });
+      setActiveConversationId(conversation.id);
+      onClose();
+      navigate('/dashboard/messages', {
+        state: {
+          prefilledMessage: !isScrapedProperty ? 'I want to make enquiries concerning this property' : undefined,
+          conversationId: conversation.id
+        }
+      });
+    } catch {
+      setMessageError('Failed to start conversation. Please try again.');
+    } finally {
+      setIsMessaging(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -415,20 +502,66 @@ function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNav
                   </button>
                 )}
                 <button
-                  onClick={() => onMessageClick(property)}
-                  disabled={isNavigatingToBooking}
-                  className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleMessageClick}
+                  disabled={isMessaging}
+                  aria-disabled={isMessaging}
+                  className={`bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${isMessaging ? 'cursor-not-allowed' : ''}`}
                 >
-                  {isNavigatingToBooking ? (
+                  {isMessaging ? (
                     <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                   )}
-                  {isNavigatingToBooking ? 'Loading...' : 'Message'}
+                  {isMessaging ? 'Loading...' : 'Message'}
                 </button>
               </div>
+              {messageError && (
+                <div className="mt-3 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">
+                  {messageError}
+                </div>
+              )}
+              {showUnclaimedConfirm && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+                  <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-gray-200">
+                    <div className="flex items-center gap-3 text-amber-600 mb-3">
+                      <span className="text-2xl">⚠️</span>
+                      <h3 className="text-lg font-bold text-gray-900">External Agent</h3>
+                    </div>
+                    <p className="text-sm text-gray-600 leading-relaxed mb-6">
+                      This agent hasn't joined Proptii yet. Your message will be <strong>forwarded via email</strong> to them directly.
+                      If they join, you'll see their reply in your Messages dashboard.
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={createConversationAndNavigate}
+                        disabled={isMessaging}
+                        className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                      >
+                        {isMessaging ? 'Sending…' : 'Send Anyway'}
+                      </button>
+                      <button
+                        onClick={() => setShowUnclaimedConfirm(false)}
+                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors border border-gray-200 text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <QuickRequestModal
+                isOpen={showQuickRequestModal}
+                onClose={() => setShowQuickRequestModal(false)}
+                listingId={property.url || property.id || ''}
+                listingTitle={property.title}
+                listingSource={property.landlordId ? 'native' : 'scraped'}
+                landlordId={property.landlordId}
+                agentEmail={property.agent?.email}
+                agentName={property.agent?.name}
+                sourcePlatform={property.source}
+              />
             </div>
           </div>
         </div>
@@ -785,7 +918,6 @@ const SearchResults = () => {
   const searchType = searchTypeParam as 'onthemarket' | 'proptii';
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-  const [isNavigatingToBooking, setIsNavigatingToBooking] = useState(false);
 
   const { results, isLoading, error, retry, searchProperties, clearCache } = useSearchBackend();
   const { isPropertySaved, toggleSaveProperty } = useSavedProperties();
@@ -843,8 +975,8 @@ const SearchResults = () => {
       if (cachedData) {
         try {
           const parsed = JSON.parse(cachedData);
-          // Only perform new search if the query or search type has changed
-          if (parsed.query !== searchQuery || parsed.searchType !== searchTypeParam) {
+          // Only perform new search if the query or search type has changed, or if cached results are empty
+          if (parsed.query !== searchQuery || parsed.searchType !== searchTypeParam || !parsed.results || parsed.results.length === 0) {
             searchProperties(searchQuery, searchType);
           }
         } catch (error) {
@@ -858,10 +990,6 @@ const SearchResults = () => {
     }
   }, [searchQuery, searchTypeParam, searchProperties]);
 
-  // Reset navigation state when component mounts (when returning from BookViewing)
-  useEffect(() => {
-    setIsNavigatingToBooking(false);
-  }, []);
 
   // Load Google Maps API script
   useEffect(() => {
@@ -1337,41 +1465,6 @@ const SearchResults = () => {
   const handleNewSearch = () => {
     clearCache(); // Clear cached results when starting a new search
     navigate('/');
-  };
-
-  const handleMessageClick = async (property: Property) => {
-    setIsNavigatingToBooking(true);
-    
-    
-    // Prepare property data for BookViewing page
-    // Use extended fields if available (from Proptii properties), otherwise parse from location
-    const propertyData = {
-      id: property.title || `property-${Date.now()}`, // Generate ID if not available
-      street: property.street || property.location?.split(',')[0]?.trim() || property.location || '',
-      town: property.town || property.location?.split(',')[1]?.trim() || '',
-      city: property.city || property.location?.split(',')[0]?.trim() || property.location || '',
-      postcode: property.postcode || property.location?.split(',')[2]?.trim() || '',
-      agent: {
-        id: property.agent?.id || property.agent?.name || `agent-${Date.now()}`,
-        name: property.agent?.name || property.source || 'Estate Agent',
-        email: property.agent?.email || '',
-        phone: property.agent?.phone || '',
-        company: property.agent?.company || property.source || 'Estate Agency'
-      }
-    };
-    
-    
-    // Store in sessionStorage for BookViewing page
-    sessionStorage.setItem('prefilledProperty', JSON.stringify(propertyData));
-    
-    // Note: We don't clear the search cache here because we want to preserve results
-    // when user comes back from BookViewing page
-    
-    // Small delay for smooth transition
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Navigate to booking page
-    navigate('/bookviewing');
   };
 
   const goToHome = () => {
@@ -1941,8 +2034,6 @@ const SearchResults = () => {
         property={selectedProperty}
         isOpen={isModalOpen}
         onClose={closeModal}
-        onMessageClick={handleMessageClick}
-        isNavigatingToBooking={isNavigatingToBooking}
       />
 
       {/* Toast Notification */}

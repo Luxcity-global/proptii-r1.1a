@@ -26,18 +26,22 @@ interface ResourceMetrics {
 }
 
 export class MonitoringService {
-    private client: CosmosClient;
-    private database: Database;
-    private metricsContainer: Container;
+    private _client: CosmosClient | null = null;
+    private _database: Database | null = null;
+    private _metricsContainer: Container | null = null;
 
-    constructor() {
-        const config = validateEnv();
-        this.client = new CosmosClient({
-            endpoint: config.COSMOS_DB_CONNECTION_STRING,
-            key: process.env.COSMOS_DB_KEY || ''
-        });
-        this.database = this.client.database(config.COSMOS_DB_DATABASE_NAME);
-        this.metricsContainer = this.database.container('Metrics');
+    private get metricsContainer(): Container {
+        if (!this._metricsContainer) {
+            const config = validateEnv();
+            const endpoint = config.COSMOS_DB_CONNECTION_STRING ?? '';
+            if (!endpoint) {
+                throw new AppError(503, 'Cosmos DB is not configured', 'COSMOS_NOT_CONFIGURED');
+            }
+            this._client = new CosmosClient({ endpoint, key: process.env.COSMOS_DB_KEY || config.COSMOS_DB_KEY || '' });
+            this._database = this._client.database(config.COSMOS_DB_DATABASE_NAME ?? '');
+            this._metricsContainer = this._database.container('Metrics');
+        }
+        return this._metricsContainer;
     }
 
     async trackPerformanceMetrics(metrics: PerformanceMetrics): Promise<void> {
@@ -49,6 +53,7 @@ export class MonitoringService {
                 timestamp: new Date().toISOString()
             });
         } catch (error) {
+            if (error instanceof AppError) throw error;
             throw new AppError(500, 'Failed to track performance metrics', 'METRICS_ERROR');
         }
     }
@@ -62,6 +67,7 @@ export class MonitoringService {
                 timestamp: new Date().toISOString()
             });
         } catch (error) {
+            if (error instanceof AppError) throw error;
             throw new AppError(500, 'Failed to track operation metrics', 'METRICS_ERROR');
         }
     }
@@ -75,6 +81,7 @@ export class MonitoringService {
                 timestamp: new Date().toISOString()
             });
         } catch (error) {
+            if (error instanceof AppError) throw error;
             throw new AppError(500, 'Failed to track resource metrics', 'METRICS_ERROR');
         }
     }
@@ -96,6 +103,7 @@ export class MonitoringService {
             }).fetchAll();
             return resources as PerformanceMetrics[];
         } catch (error) {
+            if (error instanceof AppError) throw error;
             throw new AppError(500, 'Failed to get performance metrics', 'METRICS_ERROR');
         }
     }
@@ -117,6 +125,7 @@ export class MonitoringService {
             }).fetchAll();
             return resources as OperationMetrics[];
         } catch (error) {
+            if (error instanceof AppError) throw error;
             throw new AppError(500, 'Failed to get operation metrics', 'METRICS_ERROR');
         }
     }
@@ -138,7 +147,8 @@ export class MonitoringService {
             }).fetchAll();
             return resources as ResourceMetrics[];
         } catch (error) {
+            if (error instanceof AppError) throw error;
             throw new AppError(500, 'Failed to get resource metrics', 'METRICS_ERROR');
         }
     }
-} 
+}

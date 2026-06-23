@@ -1,16 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { useLocation, Outlet } from 'react-router-dom';
+import React, { useEffect, useState, Suspense } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import LandlordAppBridge from '../components/LandlordAppBridge';
-import Footer from '../components/Footer';
 import { SignUpPromptModal } from '../components/onboarding/SignUpPromptModal';
 import { MessagingProvider } from '../contexts/MessagingContext';
 import { useMessagingPoller } from '../hooks/useMessagingPoller';
 
+// Lazy-load the Landlord App component
+const LandlordApp = React.lazy(() => import('../landlord_agent/src/App'));
+
 /**
  * Inner component that has access to MessagingContext and starts the poller.
- * Renders the landlord app bridge for the base /landlord route, or child
- * routes (e.g. /landlord/messages) via <Outlet />.
+ * Renders the lazy-loaded landlord App component.
  */
 const LandlordDemoInner: React.FC = () => {
   const { isLoading, login } = useAuth();
@@ -22,7 +22,6 @@ const LandlordDemoInner: React.FC = () => {
   useMessagingPoller();
 
   // Auto-open sign-in modal when redirected here with ?signin=1
-  // (e.g. from the landlord app running in standalone mode)
   useEffect(() => {
     const params = new URLSearchParams(search);
     if (params.get('signin') === '1') {
@@ -31,27 +30,39 @@ const LandlordDemoInner: React.FC = () => {
     }
   }, [pathname, search]);
 
-  // Listen for REQUIRE_AUTH messages from the landlord iframe
+  // Listen for REQUIRE_AUTH events (both messages and CustomEvents)
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const data = event.data as any;
       if (data?.type === 'REQUIRE_AUTH') {
-        const action = data.payload?.action as string | undefined;
-        setSignUpTitle(
-          action === 'publish'
-            ? 'Sign up to publish your property'
-            : action === 'add-tenant'
-              ? 'Sign up to add a tenant'
-              : 'Sign up to continue'
-        );
-        // Store current path so we can redirect back after login
-        sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
-        setSignUpOpen(true);
+        triggerAuth(data.payload?.action);
       }
     };
 
+    const handleCustomEvent = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      triggerAuth(customEvent.detail?.action);
+    };
+
+    const triggerAuth = (action?: string) => {
+      setSignUpTitle(
+        action === 'publish'
+          ? 'Sign up to publish your property'
+          : action === 'add-tenant'
+            ? 'Sign up to add a tenant'
+            : 'Sign up to continue'
+      );
+      // Store current path so we can redirect back after login
+      sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
+      setSignUpOpen(true);
+    };
+
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    window.addEventListener('require-auth', handleCustomEvent);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('require-auth', handleCustomEvent);
+    };
   }, []);
 
   // While MSAL is resolving auth, show a brief spinner
@@ -68,15 +79,21 @@ const LandlordDemoInner: React.FC = () => {
 
   return (
     <div className="min-h-screen font-nunito">
-      {/* Landlord App (rendered for both authenticated and guest users) */}
-      <LandlordAppBridge />
+      {/* Lazy-loaded Landlord App */}
+      <Suspense
+        fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E65D24] mx-auto"></div>
+              <p className="mt-4 text-base text-gray-600 font-medium">Loading Landlord Dashboard...</p>
+            </div>
+          </div>
+        }
+      >
+        <LandlordApp />
+      </Suspense>
 
-      {/* Child routes (e.g. /landlord/messages) render here */}
-      <Outlet />
-
-      <Footer />
-
-      {/* Sign-up gate — appears when the iframe sends REQUIRE_AUTH */}
+      {/* Sign-up gate — appears when the landlord app dispatches require-auth */}
       <SignUpPromptModal
         isOpen={signUpOpen}
         onClose={() => setSignUpOpen(false)}

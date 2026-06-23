@@ -1,4 +1,4 @@
-import { BaseService } from './BaseService';
+import { CosmosBaseService } from './CosmosBaseService';
 import { z } from 'zod';
 
 // Viewing schema validation
@@ -15,7 +15,7 @@ const viewingSchema = z.object({
 
 export type Viewing = z.infer<typeof viewingSchema>;
 
-export class ViewingService extends BaseService {
+export class ViewingService extends CosmosBaseService {
     constructor() {
         super('Viewings');
     }

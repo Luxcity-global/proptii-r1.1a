@@ -1,7 +1,9 @@
 import { Worker, Job } from 'bullmq';
 import { connection as redis } from '../infrastructure/queue';
 import { ScraperManager } from '../integrations/ScraperManager';
-import Property from '../models/Property';
+// Note: Property model intentionally not imported here.
+// Scraped properties are only persisted to MongoDB when a tenant sends a message.
+// See: api/src/shared/services/ConversationService.ts -> getOrCreateConversation()
 
 const scraperManager = new ScraperManager();
 
@@ -12,26 +14,10 @@ export const searchWorker = new Worker('search-tasks', async (job: Job) => {
   try {
     const results = await scraperManager.scrapeAll(query, filters, async (provider, providerResults) => {
       console.log(`[Worker] Found ${providerResults.length} properties from ${provider}. Publishing...`);
-      
-      // 1. Save to MongoDB incrementally
-      const savePromises = providerResults.map(p => {
-        // Double check types before Mongoose persistence to avoid CastErrors
-        const sanitized = {
-          ...p,
-          bedrooms: (typeof p.bedrooms === 'number') ? p.bedrooms : (p.bedrooms ? parseInt(p.bedrooms as any) : null),
-          bathrooms: (typeof p.bathrooms === 'number') ? p.bathrooms : (p.bathrooms ? parseInt(p.bathrooms as any) : null),
-          scrapedAt: new Date()
-        };
 
-        return Property.findOneAndUpdate(
-          { url: p.url },
-          sanitized,
-          { upsert: true, returnDocument: 'after' }
-        );
-      });
-      await Promise.all(savePromises);
-
-      // 2. Publish to Redis for real-time UI
+      // Publish to Redis for real-time SSE — scraped properties are NOT saved to
+      // MongoDB here. They are persisted on-demand when a tenant sends a message.
+      // See ConversationService.getOrCreateConversation() for the upsert logic.
       const channel = `search:events:${query.toLowerCase().trim()}`;
       await redis.publish(channel, JSON.stringify({
         type: 'results',

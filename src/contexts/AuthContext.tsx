@@ -78,6 +78,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: () => Promise<void>;
+  loginAsMockUser: (id: string, role: string) => void;
   logout: () => Promise<void>;
   editProfile: () => Promise<void>;
   refreshUserData: () => Promise<void>;
@@ -240,6 +241,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        // Check for mock user session first
+        const mockToken = localStorage.getItem('mock_token');
+        if (mockToken && mockToken.startsWith('mock-token-')) {
+          const id = mockToken.replace('mock-token-', '');
+          const role = id.startsWith('tenant') ? 'tenant' : 'landlord';
+          const mockUser: User = {
+            id,
+            email: `${role}@test.proptii.co`,
+            name: `Test ${role.charAt(0).toUpperCase() + role.slice(1)}`,
+            roles: [role],
+          };
+          setUser(mockUser);
+          setIsAuthenticated(true);
+          setIsLoading(false);
+          return;
+        }
         // Handle redirect response if any
         const redirectResponse = await instance.handleRedirectPromise();
         if (redirectResponse?.account) {
@@ -432,6 +449,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('Authentication state updated:', authState);
   }, [isAuthenticated, user, isLoading]);
 
+  // Trigger auto-merge on successful login
+  useEffect(() => {
+    if (isAuthenticated && user?.email) {
+      console.log('🔄 User logged in. Checking for ghost accounts to auto-merge for:', user.email);
+      import('../services/quickRequestService')
+        .then((module) => {
+          const service = module.default;
+          service.autoMerge(user.email)
+            .then((result) => {
+              if (result.success && result.migratedCount > 0) {
+                console.log(`✅ Auto-merged ${result.migratedCount} guest conversations!`);
+              }
+            })
+            .catch((err) => {
+              console.error('Error during automatic guest merge:', err);
+            });
+        })
+        .catch((err) => {
+          console.error('Failed to load quickRequestService for autoMerge:', err);
+        });
+    }
+  }, [isAuthenticated, user?.email]);
+
   const login = async (): Promise<void> => {
     try {
       setIsLoading(true);
@@ -550,6 +590,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Record logout activity before clearing session
       sessionManager.updateActivity('interaction', 'User logout');
 
+      // Clear mock token first
+      localStorage.removeItem('mock_token');
+
+      // If it's a mock user, just clear state
+      if (user?.id.startsWith('tenant-test-') || user?.id.startsWith('landlord-test-')) {
+        setIsAuthenticated(false);
+        setUser(null);
+        localStorage.clear();
+        return;
+      }
+
       await instance.logoutPopup({
         postLogoutRedirectUri: window.location.origin
       });
@@ -568,6 +619,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const loginAsMockUser = (id: string, role: string) => {
+    console.log(`🧪 Logging in as mock ${role}: ${id}`);
+    
+    let name = `Test ${role.charAt(0).toUpperCase() + role.slice(1)}`;
+    let email = `${role}@test.proptii.co`;
+    let givenName = `Test`;
+    let familyName = `${role.charAt(0).toUpperCase() + role.slice(1)}`;
+
+    if (id === 'tenant-test-001') {
+      name = 'Sarah Jones';
+      givenName = 'Sarah';
+      familyName = 'Jones';
+      email = 'tenant@test.proptii.co';
+    } else if (id === 'tenant-test-002') {
+      name = 'Emily Davis';
+      givenName = 'Emily';
+      familyName = 'Davis';
+      email = 'tenant-two@test.proptii.co';
+    } else if (id === 'landlord-test-001') {
+      name = 'John Smith';
+      givenName = 'John';
+      familyName = 'Smith';
+      email = 'landlord@test.proptii.co';
+    } else if (id === 'landlord-test-002') {
+      name = 'Jack Smith';
+      givenName = 'Jack';
+      familyName = 'Smith';
+      email = 'landlord-two@test.proptii.co';
+    }
+
+    const mockUser: User = {
+      id,
+      email,
+      name,
+      givenName,
+      familyName,
+      roles: [role],
+    };
+    
+    // Store mock token in localStorage so axios can use it
+    localStorage.setItem('mock_token', `mock-token-${id}`);
+    
+    setUser(mockUser);
+    setIsAuthenticated(true);
+    setIsLoading(false);
   };
 
   const editProfile = async (): Promise<void> => {
@@ -724,6 +822,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isAuthenticated,
         isLoading,
         login,
+        loginAsMockUser,
         logout,
         editProfile,
         refreshUserData: manualRefreshUserData

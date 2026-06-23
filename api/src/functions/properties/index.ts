@@ -1,135 +1,183 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { PropertyService } from "../../shared/services/PropertyService";
+import { jwtDecode } from 'jwt-decode';
+import { ConversationService } from "../../shared/services/ConversationService";
+import { NativePropertyService } from "../../shared/services/NativePropertyService";
+import { ScrapedPropertyModel, NativePropertyModel } from "../../shared/models/property.model";
+import { withAuth } from "../../shared/middleware/auth";
+
+interface JwtPayload {
+    sub?: string;
+    emails?: string[];
+    email?: string;
+    [key: string]: any;
+}
+
+function extractUserFromToken(request: HttpRequest): { id: string, email: string } | null {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) return null;
+
+    const [scheme, token] = authHeader.split(' ');
+    if (scheme !== 'Bearer' || !token) return null;
+
+    if (process.env.NODE_ENV === 'development' && token.startsWith('mock-token-')) {
+        return { id: token.replace('mock-token-', ''), email: 'test@example.com' };
+    }
+
+    try {
+        const decoded = jwtDecode<JwtPayload>(token);
+        const id = decoded.sub ?? '';
+        const email = decoded.emails?.[0] ?? decoded.email ?? '';
+        return id && email ? { id, email } : null;
+    } catch {
+        return null;
+    }
+}
+
+const json = (body: unknown, status = 200): HttpResponseInit => ({
+    status,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+});
 
 export class PropertiesController {
-    private propertyService: PropertyService;
+    private nativePropertyService = new NativePropertyService();
+    private conversationService = new ConversationService();
 
-    constructor() {
-        this.propertyService = new PropertyService();
-    }
-
-    async createProperty(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    // -------------------------------------------------------------------------
+    // GET /api/properties/search?q=...
+    // Returns native_properties only. Scraped properties are streamed separately
+    // via SSE from proptii-search and are only saved to MongoDB when a tenant
+    // sends a message. See ConversationService.getOrCreateConversation().
+    // -------------------------------------------------------------------------
+    async searchProperties(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
         try {
-            const body = await request.json();
-            const propertyData = body as any;
-            
-            const property = await this.propertyService.createProperty(propertyData);
-            
-            return {
-                status: 201,
-                body: JSON.stringify(property)
-            };
+            const q = request.query.get('q') ?? '';
+            const limit = Math.min(parseInt(request.query.get('limit') ?? '50'), 100);
+
+            if (!q.trim()) {
+                return json({ results: [], total: 0 });
+            }
+
+            const nativeResults = await this.nativePropertyService
+                .searchNativeProperties(q, limit)
+                .then((results: any[]) => results.map((p: any) => ({ ...p, source: 'native' })))
+                .catch(() => []);
+
+            return json({ results: nativeResults, total: nativeResults.length });
+
         } catch (error) {
-            context.error('Error creating property:', error);
-            return {
-                status: 500,
-                body: JSON.stringify({ error: 'Failed to create property' })
-            };
+
+            context.error('Error searching properties:', error);
+            return json({ error: 'Search failed' }, 500);
         }
     }
 
-    async updateProperty(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    // -------------------------------------------------------------------------
+    // POST /api/properties/{propertyId}/claim
+    // Checks scraped_properties first, then native_properties
+    // -------------------------------------------------------------------------
+    async claimProperty(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
         try {
             const propertyId = request.params.propertyId;
-            const body = await request.json();
-            const propertyData = body as any;
-            
-            const property = await this.propertyService.updateProperty(propertyId, propertyData);
-            
-            return {
-                status: 200,
-                body: JSON.stringify(property)
-            };
-        } catch (error) {
-            context.error('Error updating property:', error);
-            return {
-                status: 500,
-                body: JSON.stringify({ error: 'Failed to update property' })
-            };
-        }
-    }
+            const user = extractUserFromToken(request);
 
-    async getProperty(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-        try {
-            const propertyId = request.params.propertyId;
-            const property = await this.propertyService.getPropertyById(propertyId);
-            
-            return {
-                status: 200,
-                body: JSON.stringify(property)
-            };
-        } catch (error) {
-            context.error('Error getting property:', error);
-            return {
-                status: 404,
-                body: JSON.stringify({ error: 'Property not found' })
-            };
-        }
-    }
+            if (!user) {
+                return json({ error: 'Unauthorized' }, 401);
+            }
 
-    async getAllProperties(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-        try {
-            const properties = await this.propertyService.getAll();
-            
-            return {
-                status: 200,
-                body: JSON.stringify(properties)
-            };
-        } catch (error) {
-            context.error('Error getting properties:', error);
-            return {
-                status: 500,
-                body: JSON.stringify({ error: 'Failed to get properties' })
-            };
-        }
-    }
+            const userEmail = user.email.toLowerCase().trim();
 
-    async deleteProperty(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-        try {
-            const propertyId = request.params.propertyId;
-            await this.propertyService.deleteProperty(propertyId);
-            
-            return {
-                status: 204
-            };
+            // 1. Try scraped_properties first (most claim requests come from agents)
+            const scraped = await (ScrapedPropertyModel as any).findOne({
+                $or: [{ _id: propertyId }, { url: propertyId }]
+            }).lean();
+
+            if (scraped) {
+                const agentEmail = (scraped.agent?.email ?? '').toLowerCase().trim();
+
+                // Idempotency guard
+                if (scraped.landlordId === user.id) {
+                    return json({ message: 'Property already claimed by you' });
+                }
+                // Conflict guard
+                if (scraped.landlordId && scraped.landlordId !== 'UNCLAIMED') {
+                    return json({ error: 'This property has already been claimed by another user.' }, 409);
+                }
+                // Email guard
+                if (!agentEmail) {
+                    return json({ error: 'No agent email on record for this property.' }, 403);
+                }
+                if (agentEmail !== userEmail) {
+                    return json({ error: 'Your email does not match the agent email for this property.' }, 403);
+                }
+
+                // Write landlordId to scraped_properties
+                await (ScrapedPropertyModel as any).findOneAndUpdate(
+                    { $or: [{ _id: propertyId }, { url: propertyId }] },
+                    { landlordId: user.id }
+                );
+
+                await this.conversationService.assignShadowConversations(propertyId, user.id);
+                context.log(`[Claim] Scraped property ${propertyId} claimed by ${user.email}`);
+                return json({ message: 'Property claimed successfully' });
+            }
+
+            // 2. Try native_properties
+            const native = await NativePropertyModel.findOne({ id: propertyId }).lean<any>();
+
+            if (native) {
+                const ownerEmail = (native.ownerEmail ?? '').toLowerCase().trim();
+
+                if (native.landlordId === user.id) {
+                    return json({ message: 'Property already claimed by you' });
+                }
+                if (native.landlordId && native.landlordId !== 'UNCLAIMED') {
+                    return json({ error: 'This property has already been claimed by another user.' }, 409);
+                }
+                if (!ownerEmail) {
+                    return json({ error: 'No owner email on record for this property.' }, 403);
+                }
+                if (ownerEmail !== userEmail) {
+                    return json({ error: 'Your email does not match the owner email for this property.' }, 403);
+                }
+
+                await NativePropertyModel.findOneAndUpdate(
+                    { id: propertyId },
+                    { landlordId: user.id, updatedAt: new Date().toISOString() }
+                );
+
+                await this.conversationService.assignShadowConversations(propertyId, user.id);
+                context.log(`[Claim] Native property ${propertyId} claimed by ${user.email}`);
+                return json({ message: 'Property claimed successfully' });
+            }
+
+            return json({ error: 'Property not found' }, 404);
+
         } catch (error) {
-            context.error('Error deleting property:', error);
-            return {
-                status: 500,
-                body: JSON.stringify({ error: 'Failed to delete property' })
-            };
+            context.error('Error claiming property:', error);
+            return json({ error: 'Failed to claim property' }, 500);
         }
     }
 }
 
 const controller = new PropertiesController();
 
-app.http('properties', {
-    methods: ['GET', 'POST'],
+// ---------------------------------------------------------------------------
+// Route: Unified search
+// ---------------------------------------------------------------------------
+app.http('properties-search', {
+    route: 'properties/search',
+    methods: ['GET'],
     authLevel: 'anonymous',
-    handler: async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
-        if (request.method === 'GET') {
-            return controller.getAllProperties(request, context);
-        } else if (request.method === 'POST') {
-            return controller.createProperty(request, context);
-        }
-        
-        return { status: 405, body: 'Method not allowed' };
-    }
+    handler: (req, ctx) => controller.searchProperties(req, ctx),
 });
 
-app.http('properties/{propertyId}', {
-    methods: ['GET', 'PUT', 'DELETE'],
+// ---------------------------------------------------------------------------
+// Route: Claim
+// ---------------------------------------------------------------------------
+app.http('properties-claim', {
+    route: 'properties/{propertyId}/claim',
+    methods: ['POST'],
     authLevel: 'anonymous',
-    handler: async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
-        if (request.method === 'GET') {
-            return controller.getProperty(request, context);
-        } else if (request.method === 'PUT') {
-            return controller.updateProperty(request, context);
-        } else if (request.method === 'DELETE') {
-            return controller.deleteProperty(request, context);
-        }
-        
-        return { status: 405, body: 'Method not allowed' };
-    }
-}); 
+    handler: withAuth((req, ctx) => controller.claimProperty(req, ctx)),
+});

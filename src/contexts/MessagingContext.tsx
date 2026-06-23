@@ -19,6 +19,12 @@ export interface MessagingContextType {
     activeConversationId: string | null;
     setActiveConversationId: (id: string | null) => void;
     refreshConversations: () => Promise<void>;
+    /**
+     * Immediately decrements the unread badge by `by` (clamped to 0).
+     * Called when a conversation is opened so the badge updates in real time
+     * without waiting for the next 30-second poll.
+     */
+    decrementUnreadCount: (by: number) => void;
     /** Internal setter used by useMessagingPoller */
     _setConversations: (conversations: Conversation[]) => void;
     /** Internal setter used by useMessagingPoller */
@@ -35,6 +41,7 @@ export const MessagingContext = createContext<MessagingContextType>({
     activeConversationId: null,
     setActiveConversationId: () => { },
     refreshConversations: async () => { },
+    decrementUnreadCount: () => { },
     _setConversations: () => { },
     _setUnreadCount: () => { },
 });
@@ -61,6 +68,10 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
     }, []);
 
+    const decrementUnreadCount = useCallback((by: number) => {
+        setUnreadCount((prev) => Math.max(0, prev - by));
+    }, []);
+
     return (
         <MessagingContext.Provider
             value={{
@@ -69,6 +80,7 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 activeConversationId,
                 setActiveConversationId,
                 refreshConversations,
+                decrementUnreadCount,
                 _setConversations: setConversations,
                 _setUnreadCount: setUnreadCount,
             }}

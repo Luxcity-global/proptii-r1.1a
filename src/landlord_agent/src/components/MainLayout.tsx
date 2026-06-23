@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature, CalendarDays, Menu } from 'lucide-react';
+import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature, CalendarDays, Menu, MessageSquare } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -29,14 +29,12 @@ const requestSignIn = () => {
     // Running in iframe inside LandlordDemo — delegate auth to parent
     window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: {} }, '*');
   } else {
-    // Running standalone (e.g. /landlord/index.html direct access)
-    // Redirect to the proper /landlord route which has the auth context
-    sessionStorage.setItem('redirectAfterLogin', '/landlord');
-    window.location.href = '/landlord?signin=1';
+    // Running directly embedded in host page or standalone
+    window.dispatchEvent(new CustomEvent('require-auth', { detail: {} }));
   }
 };
 
-export type NavigationScreen = 'dashboard' | 'properties' | 'documents' | 'viewings' | 'clients' | 'insights' | 'inbox' | 'contracts';
+export type NavigationScreen = 'dashboard' | 'properties' | 'documents' | 'viewings' | 'clients' | 'insights' | 'inbox' | 'contracts' | 'messages';
 
 interface MainLayoutProps {
   currentScreen: NavigationScreen;
@@ -64,17 +62,17 @@ function CustomSidebarHeader({ userProfile }: { userProfile: UserProfile | null 
       <div className={`pt-2 pb-2 ${isCollapsed ? 'px-2' : 'pl-4 pr-2'}`}>
         <div className={`flex items-center h-8 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
           {isCollapsed ? (
-            <img 
-              src={proptiiLogoSmall} 
-              alt="Proptii Logo" 
+            <img
+              src={proptiiLogoSmall}
+              alt="Proptii Logo"
               className="w-8 h-8 object-contain flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
               onClick={handleLogoClick}
               title="Go to Tenant App"
             />
           ) : (
-            <img 
-              src={proptiiLogoLarge} 
-              alt="Proptii Logo" 
+            <img
+              src={proptiiLogoLarge}
+              alt="Proptii Logo"
               className="h-8 object-contain cursor-pointer hover:opacity-80 transition-opacity"
               onClick={handleLogoClick}
               title="Go to Tenant App"
@@ -104,17 +102,19 @@ function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
 
   // Map navigation screens to paths
   const screenToPath: Record<NavigationScreen, string> = {
-    'dashboard': '/dashboard',
-    'viewings': '/viewings',
-    'properties': '/properties',
-    'documents': '/documents',
-    'contracts': '/contracts',
-    'clients': '/clients',
-    'insights': '/insights',
-    'inbox': '/inbox',
+    'dashboard': '/landlord/dashboard',
+    'viewings': '/landlord/viewings',
+    'properties': '/landlord/properties',
+    'documents': '/landlord/documents',
+    'contracts': '/landlord/contracts',
+    'clients': '/landlord/clients',
+    'insights': '/landlord/insights',
+    'inbox': '/landlord/inbox',
+    'messages': '/landlord/messages',
   };
 
   const handleNavigation = (screen: NavigationScreen) => {
+
     const path = screenToPath[screen] || '/dashboard';
     navigate(path);
     onNavigate(screen);
@@ -134,7 +134,7 @@ function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
                 w-full flex items-center h-10 px-3 rounded-md text-sm font-medium transition-colors
                 ${isCollapsed ? 'justify-center' : 'justify-start'}
               `}
-              style={{ 
+              style={{
                 alignItems: 'center',
                 color: isActive ? '#136C9E' : '#374957',
                 backgroundColor: isActive ? '#E6F3FF' : 'transparent'
@@ -220,10 +220,10 @@ function CustomSidebarTrigger({ userProfile }: { userProfile: UserProfile | null
           <ChevronLeft className="h-4 w-4" style={{ color: '#374957' }} />
         )}
       </button>
-      
+
       {/* Proptii Home Button */}
       {isCollapsed ? (
-        <button 
+        <button
           onClick={handleProptiiHomeClick}
           className="w-full flex items-center justify-center h-8 px-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors"
           title="Go to Tenant App"
@@ -231,7 +231,7 @@ function CustomSidebarTrigger({ userProfile }: { userProfile: UserProfile | null
           <Home className="h-4 w-4" />
         </button>
       ) : (
-        <button 
+        <button
           onClick={handleProptiiHomeClick}
           className="w-full flex items-center justify-center h-8 px-2 rounded-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 transition-colors text-sm font-medium"
           title="Go to Tenant App"
@@ -245,11 +245,11 @@ function CustomSidebarTrigger({ userProfile }: { userProfile: UserProfile | null
 }
 
 // Main Custom Sidebar Component
-function CustomSidebar({ 
-  navigationItems, 
-  currentScreen, 
-  onNavigate, 
-  userProfile 
+function CustomSidebar({
+  navigationItems,
+  currentScreen,
+  onNavigate,
+  userProfile
 }: {
   navigationItems: Array<{
     id: NavigationScreen;
@@ -266,7 +266,7 @@ function CustomSidebar({
   return (
     <div className="group peer hidden md:block" data-collapsible="icon" style={{ color: '#374957' }}>
       {/* Sidebar Container */}
-      <div 
+      <div
         className="fixed inset-y-0 left-0 z-10 h-screen transition-all duration-300 ease-out bg-white border-r border-sidebar-border"
         style={{
           width: isCollapsed ? 'var(--sidebar-width-collapsed)' : 'var(--sidebar-width)'
@@ -275,26 +275,26 @@ function CustomSidebar({
         <div className="flex flex-col h-full">
           {/* Header */}
           <CustomSidebarHeader userProfile={userProfile} />
-          
+
           {/* Navigation */}
           <div className="flex-1 overflow-auto">
-            <CustomNavigationMenu 
+            <CustomNavigationMenu
               navigationItems={navigationItems}
               currentScreen={currentScreen}
               onNavigate={onNavigate}
             />
           </div>
-          
+
           {/* User Profile */}
           <CustomUserProfile userProfile={userProfile} />
-          
+
           {/* Trigger */}
           <CustomSidebarTrigger userProfile={userProfile} />
         </div>
       </div>
-      
+
       {/* Spacer for content */}
-      <div 
+      <div
         className="transition-all duration-300 ease-out"
         style={{
           width: isCollapsed ? 'var(--sidebar-width-collapsed)' : 'var(--sidebar-width)'
@@ -305,10 +305,10 @@ function CustomSidebar({
 }
 
 // Mobile Sidebar Component
-function MobileSidebar({ 
-  navigationItems, 
-  currentScreen, 
-  onNavigate, 
+function MobileSidebar({
+  navigationItems,
+  currentScreen,
+  onNavigate,
   userProfile,
   open,
   onOpenChange
@@ -330,17 +330,19 @@ function MobileSidebar({
 
   // Map navigation screens to paths
   const screenToPath: Record<NavigationScreen, string> = {
-    'dashboard': '/dashboard',
-    'viewings': '/viewings',
-    'properties': '/properties',
-    'documents': '/documents',
-    'contracts': '/contracts',
-    'clients': '/clients',
-    'insights': '/insights',
-    'inbox': '/inbox',
+    'dashboard': '/landlord/dashboard',
+    'viewings': '/landlord/viewings',
+    'properties': '/landlord/properties',
+    'documents': '/landlord/documents',
+    'contracts': '/landlord/contracts',
+    'clients': '/landlord/clients',
+    'insights': '/landlord/insights',
+    'inbox': '/landlord/inbox',
+    'messages': '/landlord/messages',
   };
 
   const handleNavigate = (screen: NavigationScreen) => {
+
     const path = screenToPath[screen] || '/dashboard';
     navigate(path);
     onNavigate(screen);
@@ -362,15 +364,15 @@ function MobileSidebar({
           {/* Header */}
           <SheetHeader className="border-b border-sidebar-border p-4">
             <div className="flex items-center">
-              <img 
-                src="/images/proptii-logo.png" 
-                alt="Proptii Logo" 
+              <img
+                src="/images/proptii-logo.png"
+                alt="Proptii Logo"
                 className="h-8 object-contain cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={handleLogoClick}
               />
             </div>
           </SheetHeader>
-          
+
           {/* Navigation */}
           <div className="flex-1 overflow-auto pt-4 px-4">
             <div className="space-y-3">
@@ -382,7 +384,7 @@ function MobileSidebar({
                     key={item.id}
                     onClick={() => handleNavigate(item.id)}
                     className="w-full flex items-center h-10 px-3 rounded-md text-sm font-medium transition-colors justify-start"
-                    style={{ 
+                    style={{
                       color: isActive ? '#136C9E' : '#374957',
                       backgroundColor: isActive ? '#E6F3FF' : 'transparent'
                     }}
@@ -409,7 +411,7 @@ function MobileSidebar({
               })}
             </div>
           </div>
-          
+
           {/* User Profile */}
           {userProfile && (
             <div className="border-t border-sidebar-border pt-4 pb-4 px-4">
@@ -427,10 +429,10 @@ function MobileSidebar({
               </div>
             </div>
           )}
-          
+
           {/* Proptii Home Button */}
           <div className="border-t border-sidebar-border pt-4 pb-4 px-4">
-            <button 
+            <button
               onClick={handleLogoClick}
               className="w-full flex items-center justify-center h-10 px-4 rounded-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50 transition-colors text-sm font-medium"
             >
@@ -447,7 +449,7 @@ function MobileSidebar({
 export function MainLayout({ currentScreen, onNavigate, userProfile, children }: MainLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
-  
+
   const navigationItems = [
     {
       id: 'dashboard' as NavigationScreen,
@@ -469,16 +471,21 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
       icon: CalendarDays,
       label: 'Viewings',
     },
-          {
-            id: 'contracts' as NavigationScreen,
-            icon: FileSignature,
-            label: 'Contracts',
-            hasNotification: true, // This would be dynamic based on unsigned contracts
-          },
+    {
+      id: 'contracts' as NavigationScreen,
+      icon: FileSignature,
+      label: 'Contracts',
+      hasNotification: true, // This would be dynamic based on unsigned contracts
+    },
     {
       id: 'clients' as NavigationScreen,
       icon: Users,
       label: 'Clients',
+    },
+    {
+      id: 'messages' as NavigationScreen,
+      icon: MessageSquare,
+      label: 'Messages',
     },
     // COMMENTED OUT FOR THIS RELEASE - Inbox and Insights pages not in scope
     // {
@@ -495,7 +502,7 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
 
   return (
     <SidebarProvider>
-      <div 
+      <div
         className="flex min-h-screen w-full"
         style={{
           '--sidebar-width': '200px',
@@ -513,9 +520,9 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
               >
                 <Menu className="w-6 h-6" style={{ color: '#374957' }} />
               </button>
-              <img 
-                src="/images/proptii-logo.png" 
-                alt="Proptii Logo" 
+              <img
+                src="/images/proptii-logo.png"
+                alt="Proptii Logo"
                 className="h-14 object-contain cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={() => userProfile ? window.location.href = '/' : requestSignIn()}
               />
@@ -525,7 +532,7 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
         )}
 
         {/* Custom Sidebar with Collapse Support - Desktop Only */}
-        <CustomSidebar 
+        <CustomSidebar
           navigationItems={navigationItems}
           currentScreen={currentScreen}
           onNavigate={onNavigate}

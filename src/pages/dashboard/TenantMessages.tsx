@@ -1,52 +1,133 @@
 /**
- * TenantMessages — the tenant inbox page at /dashboard/messages.
- *
- * Two-column layout:
- *   Left  — scrollable list of ConversationListItem rows from MessagingContext
- *   Right — MessageThread + ComposeBox for the active conversation
- *
- * On mount, fetches conversations if the context list is empty (i.e. the
- * poller has not yet fired). Selecting a conversation calls
- * setActiveConversationId. ComposeBox.onSend appends the new message to the
- * thread optimistically via a local state update.
- *
- * Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6
+ * TenantMessages — tenant inbox at /dashboard/messages.
+ * Requirements: 10.1–10.6
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useMessagingContext } from '../../contexts/MessagingContext';
 import { useAuth } from '../../contexts/AuthContext';
 import communicationService from '../../services/communicationService';
 import ConversationListItem from '../../components/messaging/ConversationListItem';
 import MessageThread from '../../components/messaging/MessageThread';
 import ComposeBox from '../../components/messaging/ComposeBox';
-import type { Message } from '../../types/messaging';
+import AttachmentPill from '../../components/messaging/AttachmentPill';
+import type { Conversation, Message } from '../../types/messaging';
 
 // ---------------------------------------------------------------------------
-// Empty-state illustration (inline SVG — no external asset dependency)
+// Types & helpers
 // ---------------------------------------------------------------------------
 
-const EmptyStateIllustration: React.FC = () => (
-    <svg
-        width="120"
-        height="120"
-        viewBox="0 0 120 120"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-    >
-        <circle cx="60" cy="60" r="56" fill="#EFF6FF" />
-        <rect x="28" y="38" width="64" height="44" rx="8" fill="#BFDBFE" />
-        <rect x="36" y="50" width="48" height="6" rx="3" fill="#93C5FD" />
-        <rect x="36" y="62" width="32" height="6" rx="3" fill="#93C5FD" />
-        <circle cx="84" cy="38" r="14" fill="#3B82F6" />
-        <path
-            d="M78 38h12M84 32v12"
-            stroke="#fff"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-        />
+type TabId = 'inbox' | 'read' | 'draft' | 'external';
+
+function getInitials(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function isUnread(conv: Conversation, cursor: string | null): boolean {
+    return conv.lastMessageAt !== null &&
+        (cursor === null || new Date(conv.lastMessageAt) > new Date(cursor));
+}
+
+// ---------------------------------------------------------------------------
+// Icons
+// ---------------------------------------------------------------------------
+const BackIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="15 18 9 12 15 6" />
     </svg>
+);
+
+// ---------------------------------------------------------------------------
+// Tab bar
+// ---------------------------------------------------------------------------
+interface TabBarProps {
+    activeTab: TabId;
+    onTabChange: (t: TabId) => void;
+    counts: Record<TabId, number>;
+}
+
+const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabChange, counts }) => {
+    const tabs: { id: TabId; label: string }[] = [
+        { id: 'inbox', label: 'Inbox' },
+        { id: 'read', label: 'Read' },
+        { id: 'draft', label: 'Draft' },
+        { id: 'external', label: 'External' },
+    ];
+    return (
+        <div style={{
+            display: 'flex',
+            borderBottom: '1px solid #e5e7eb',
+            padding: '0 16px',
+            gap: '4px',
+            flexShrink: 0,
+            background: '#ffffff',
+        }}>
+            {tabs.map(({ id, label }) => {
+                const active = activeTab === id;
+                const count = counts[id];
+                return (
+                    <button
+                        key={id}
+                        type="button"
+                        onClick={() => onTabChange(id)}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '6px',
+                            padding: '10px 4px', background: 'none', border: 'none',
+                            borderBottom: active ? '2px solid #3b82f6' : '2px solid transparent',
+                            marginBottom: '-1px', cursor: 'pointer',
+                            fontSize: '0.8125rem', fontWeight: active ? 700 : 500,
+                            color: active ? '#3b82f6' : '#6b7280',
+                            transition: 'color 0.15s, border-color 0.15s',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        {label}
+                        {count > 0 && (
+                            <span style={{
+                                minWidth: '18px', height: '18px', borderRadius: '9px',
+                                background: active ? '#3b82f6' : '#e5e7eb',
+                                color: active ? '#ffffff' : '#6b7280',
+                                fontSize: '0.65rem', fontWeight: 700,
+                                display: 'inline-flex', alignItems: 'center',
+                                justifyContent: 'center', padding: '0 5px',
+                                transition: 'background 0.15s, color 0.15s',
+                            }}>
+                                {count > 99 ? '99+' : count}
+                            </span>
+                        )}
+                    </button>
+                );
+            })}
+        </div>
+    );
+};
+
+// ---------------------------------------------------------------------------
+// Empty state
+// ---------------------------------------------------------------------------
+const EmptyState: React.FC<{ message: string; sub: string }> = ({ message, sub }) => (
+    <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '40px 24px', gap: '12px', textAlign: 'center',
+    }}>
+        <div style={{
+            width: '64px', height: '64px', borderRadius: '50%',
+            background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+                stroke="#3b82f6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+        </div>
+        <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9375rem', color: '#111827' }}>{message}</p>
+        <p style={{ margin: 0, fontSize: '0.8125rem', color: '#6b7280', maxWidth: '220px' }}>{sub}</p>
+    </div>
 );
 
 // ---------------------------------------------------------------------------
@@ -54,264 +135,280 @@ const EmptyStateIllustration: React.FC = () => (
 // ---------------------------------------------------------------------------
 
 const TenantMessages: React.FC = () => {
-    const {
-        conversations,
-        activeConversationId,
-        setActiveConversationId,
-        _setConversations,
-    } = useMessagingContext();
-
+    const { conversations, activeConversationId, setActiveConversationId, _setConversations, decrementUnreadCount, refreshConversations } = useMessagingContext();
     const { user } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
 
-    // Local optimistic messages appended by ComposeBox before the next poll
-    const [optimisticMessages, setOptimisticMessages] = useState<Record<string, Message[]>>({});
+    const [activeTab, setActiveTab] = useState<TabId>('inbox');
+    const [optimisticMessages, setOptimisticMessages] = useState<Record<string, Array<{ message: Message; file?: File }>>>({});
+    const [readCursors, setReadCursors] = useState<Record<string, string | null>>({});
+    const [prefilledDrafts, setPrefilledDrafts] = useState<Record<string, string>>({});
 
-    // Fetch conversations on mount if the poller hasn't populated them yet
     useEffect(() => {
-        if (conversations.length === 0) {
-            communicationService
-                .getConversations()
-                .then((convs) => {
-                    if (convs.length > 0) {
-                        _setConversations(convs);
-                    }
-                })
-                .catch(() => {
-                    // Silently ignore — the poller will retry
-                });
+        const state = location.state as { prefilledMessage?: string; conversationId?: string } | null;
+        if (state?.conversationId) {
+            setActiveConversationId(state.conversationId);
+            if (state.prefilledMessage) {
+                setPrefilledDrafts((prev) => ({
+                    ...prev,
+                    [state.conversationId!]: state.prefilledMessage!,
+                }));
+            }
+            // Clear history state immediately so refreshing doesn't re-trigger prefilling
+            navigate(location.pathname, { replace: true, state: {} });
         }
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [location.state, location.pathname, navigate, setActiveConversationId]);
 
-    const handleSelectConversation = useCallback(
-        (id: string) => {
-            setActiveConversationId(id);
-            // Clear optimistic messages for this conversation when re-opening
-            // (MessageThread will fetch the real messages)
-            setOptimisticMessages((prev) => ({ ...prev, [id]: [] }));
-        },
-        [setActiveConversationId],
-    );
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const optimisticBottomRef = useRef<HTMLDivElement>(null);
 
-    const handleSend = useCallback(
-        (message: Message) => {
-            if (!activeConversationId) return;
-            setOptimisticMessages((prev) => ({
-                ...prev,
-                [activeConversationId]: [
-                    ...(prev[activeConversationId] ?? []),
-                    message,
-                ],
-            }));
-        },
-        [activeConversationId],
-    );
+    const scrollToBottom = useCallback(() => {
+        optimisticBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, []);
+
+    useEffect(() => {
+        refreshConversations();
+    }, [refreshConversations]);
+
+    useEffect(() => {
+        if (activeConversationId && conversations.length > 0) {
+            const activeConv = conversations.find((c) => c.id === activeConversationId);
+            if (activeConv) {
+                if (activeConv.landlordId === 'UNCLAIMED') {
+                    setActiveTab('external');
+                } else if (!activeConv.lastMessageAt) {
+                    setActiveTab('draft');
+                } else if (isUnread(activeConv, readCursors[activeConv.id] ?? null)) {
+                    setActiveTab('inbox');
+                } else {
+                    setActiveTab('read');
+                }
+            }
+        }
+    }, [activeConversationId, conversations, readCursors]);
+
+    const handleSelect = useCallback((id: string) => {
+        setActiveConversationId(id);
+        setOptimisticMessages((prev) => ({ ...prev, [id]: [] }));
+
+        // Clear the prefilled draft for the active conversation when switching
+        if (activeConversationId) {
+            setPrefilledDrafts((prev) => {
+                const next = { ...prev };
+                delete next[activeConversationId];
+                return next;
+            });
+        }
+
+        const conv = conversations.find((c) => c.id === id);
+        const prevCursor = readCursors[id] ?? null;
+        if (conv && isUnread(conv, prevCursor)) decrementUnreadCount(1);
+        setReadCursors((prev) => ({ ...prev, [id]: new Date().toISOString() }));
+    }, [activeConversationId, setActiveConversationId, conversations, readCursors, decrementUnreadCount]);
+
+    const handleSend = useCallback((message: Message, file?: File) => {
+        if (!activeConversationId) return;
+        setOptimisticMessages((prev) => ({
+            ...prev,
+            [activeConversationId]: [...(prev[activeConversationId] ?? []), { message, file }],
+        }));
+        // Clear prefilled draft for active conversation
+        setPrefilledDrafts((prev) => {
+            const next = { ...prev };
+            delete next[activeConversationId];
+            return next;
+        });
+        setTimeout(scrollToBottom, 0);
+    }, [activeConversationId, scrollToBottom]);
 
     const currentUserId = user?.id ?? '';
+    const userName = (user as any)?.name ?? (user as any)?.displayName ?? 'Tenant';
+    const activeConversation = conversations.find((c) => c.id === activeConversationId);
 
-    // -----------------------------------------------------------------------
-    // Render
-    // -----------------------------------------------------------------------
+    // Bucket into tabs
+    const inboxConvs = conversations.filter((c) => c.landlordId !== 'UNCLAIMED' && isUnread(c, readCursors[c.id] ?? null));
+    const readConvs = conversations.filter((c) => c.landlordId !== 'UNCLAIMED' && c.lastMessageAt && !isUnread(c, readCursors[c.id] ?? null));
+    const draftConvs = conversations.filter((c) => c.landlordId !== 'UNCLAIMED' && !c.lastMessageAt);
+    const externalConvs = conversations.filter((c) => c.landlordId === 'UNCLAIMED');
+
+    const tabCounts: Record<TabId, number> = {
+        inbox: inboxConvs.length,
+        read: readConvs.length,
+        draft: draftConvs.length,
+        external: externalConvs.length,
+    };
+
+    const byTime = (a: Conversation, b: Conversation) =>
+        new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime();
+
+    const visibleConvs: Conversation[] =
+        activeTab === 'inbox' ? [...inboxConvs].sort(byTime) :
+            activeTab === 'read' ? [...readConvs].sort(byTime) :
+                activeTab === 'draft' ? draftConvs :
+                    [...externalConvs].sort(byTime);
+
+    const emptyMessages: Record<TabId, { message: string; sub: string }> = {
+        inbox: { message: 'No unread messages', sub: 'New messages will appear here.' },
+        read: { message: 'No read messages', sub: 'Messages you have read will appear here.' },
+        draft: { message: 'No drafts', sub: 'Conversations without messages will appear here.' },
+        external: { message: 'No external messages', sub: 'Messages to external agents will appear here.' },
+    };
 
     return (
-        <div
-            data-testid="tenant-messages-page"
-            style={{
-                display: 'flex',
-                height: 'calc(100vh - 160px)',
-                minHeight: '500px',
-                borderRadius: '12px',
-                overflow: 'hidden',
-                border: '1px solid #e5e7eb',
-                backgroundColor: '#ffffff',
-                marginTop: '16px',
-            }}
-        >
-            {/* ----------------------------------------------------------------
-                Left column — conversation list
-            ---------------------------------------------------------------- */}
-            <aside
-                aria-label="Conversations"
-                style={{
-                    width: '320px',
-                    flexShrink: 0,
-                    borderRight: '1px solid #e5e7eb',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflowY: 'auto',
-                }}
-            >
-                {/* Header */}
-                <div
-                    style={{
-                        padding: '16px',
-                        borderBottom: '1px solid #e5e7eb',
-                        fontWeight: 700,
-                        fontSize: '1rem',
-                        color: '#111827',
-                        flexShrink: 0,
-                    }}
-                >
-                    Messages
-                </div>
+        <>
+            <style>{`
+                .msg-back-btn:hover { background: #eff6ff !important; color: #2563eb !important; border-color: #bfdbfe !important; }
+            `}</style>
 
-                {/* Conversation list or empty state */}
-                {conversations.length === 0 ? (
-                    <div
-                        data-testid="empty-state"
-                        style={{
-                            flex: 1,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: '32px 16px',
-                            gap: '16px',
-                            color: '#6b7280',
-                            textAlign: 'center',
-                        }}
-                    >
-                        <EmptyStateIllustration />
-                        <p style={{ margin: 0, fontWeight: 600, color: '#374151' }}>
-                            No conversations yet
-                        </p>
-                        <p style={{ margin: 0, fontSize: '0.875rem' }}>
-                            Start a conversation from a property listing.
-                        </p>
-                    </div>
-                ) : (
-                    <div style={{ flex: 1, overflowY: 'auto' }}>
-                        {conversations.map((conversation) => (
-                            <ConversationListItem
-                                key={conversation.id}
-                                conversation={conversation}
-                                isActive={conversation.id === activeConversationId}
-                                onClick={handleSelectConversation}
-                                // Derive display names from conversation metadata.
-                                // The landlord is the "other" participant from the tenant's perspective.
-                                participantName="Landlord"
-                                propertyAddress={conversation.propertyId}
-                            />
-                        ))}
-                    </div>
-                )}
-            </aside>
-
-            {/* ----------------------------------------------------------------
-                Right column — message thread + compose box
-            ---------------------------------------------------------------- */}
-            <main
-                aria-label="Message thread"
+            <div
+                data-testid="tenant-messages-page"
                 style={{
-                    flex: 1,
                     display: 'flex',
-                    flexDirection: 'column',
+                    height: 'calc(100vh - 80px)',
+                    minHeight: '500px',
+                    borderRadius: '16px',
                     overflow: 'hidden',
+                    border: '1px solid #e5e7eb',
+                    backgroundColor: '#ffffff',
+                    marginTop: '16px',
+                    boxShadow: '0 1px 8px rgba(0,0,0,0.06)',
                 }}
             >
-                {activeConversationId ? (
-                    <>
-                        {/* Thread header */}
-                        <div
-                            style={{
-                                padding: '12px 16px',
-                                borderBottom: '1px solid #e5e7eb',
-                                fontWeight: 600,
-                                fontSize: '0.9375rem',
-                                color: '#111827',
-                                flexShrink: 0,
-                            }}
-                        >
-                            {conversations.find((c) => c.id === activeConversationId)?.propertyId ??
-                                'Conversation'}
+                {/* ── Left sidebar ─────────────────────────────────────────── */}
+                <aside aria-label="Conversations" style={{
+                    width: '300px', flexShrink: 0, borderRight: '1px solid #e5e7eb',
+                    display: 'flex', flexDirection: 'column', background: '#ffffff',
+                }}>
+                    {/* Header */}
+                    <div style={{
+                        padding: '16px 16px 14px', borderBottom: '1px solid #f3f4f6',
+                        display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0,
+                    }}>
+                        <div style={{
+                            width: '36px', height: '36px', borderRadius: '50%',
+                            background: '#3b82f6', color: '#fff',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.8125rem', fontWeight: 700, flexShrink: 0,
+                        }}>
+                            {getInitials(userName)}
                         </div>
-
-                        {/* Scrollable message thread */}
-                        <div style={{ flex: 1, overflowY: 'auto' }}>
-                            <MessageThread
-                                conversationId={activeConversationId}
-                                currentUserId={currentUserId}
-                            />
-
-                            {/* Optimistic messages appended immediately after send */}
-                            {(optimisticMessages[activeConversationId] ?? []).map((msg) => (
-                                <div
-                                    key={msg.id}
-                                    data-testid="optimistic-message"
-                                    style={{
-                                        display: 'flex',
-                                        justifyContent: 'flex-end',
-                                        padding: '4px 16px',
-                                    }}
-                                >
-                                    <div
-                                        style={{
-                                            maxWidth: '70%',
-                                            padding: '10px 14px',
-                                            borderRadius: '12px',
-                                            backgroundColor: '#3b82f6',
-                                            color: '#ffffff',
-                                            opacity: 0.85,
-                                        }}
-                                    >
-                                        <p style={{ margin: 0, wordBreak: 'break-word' }}>{msg.body}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Compose box */}
-                        <div style={{ flexShrink: 0, borderTop: '1px solid #e5e7eb' }}>
-                            <ComposeBox
-                                conversationId={activeConversationId}
-                                onSend={handleSend}
-                            />
-                        </div>
-                    </>
-                ) : (
-                    /* No conversation selected */
-                    <div
-                        data-testid="no-conversation-selected"
-                        style={{
-                            flex: 1,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#6b7280',
-                            gap: '12px',
-                            padding: '32px',
-                            textAlign: 'center',
-                        }}
-                    >
-                        <svg
-                            width="64"
-                            height="64"
-                            viewBox="0 0 64 64"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                            aria-hidden="true"
-                        >
-                            <path
-                                d="M8 12C8 9.79 9.79 8 12 8h40c2.21 0 4 1.79 4 4v28c0 2.21-1.79 4-4 4H20l-8 8V12z"
-                                fill="#E5E7EB"
-                            />
-                            <path
-                                d="M20 24h24M20 32h16"
-                                stroke="#9CA3AF"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                            />
-                        </svg>
-                        <p style={{ margin: 0, fontWeight: 600, color: '#374151' }}>
-                            Select a conversation
-                        </p>
-                        <p style={{ margin: 0, fontSize: '0.875rem' }}>
-                            Choose a conversation from the list to view messages.
+                        <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9375rem', color: '#111827' }}>
+                            Messages
                         </p>
                     </div>
-                )}
-            </main>
-        </div>
+
+                    {/* Tabs */}
+                    <TabBar activeTab={activeTab} onTabChange={setActiveTab} counts={tabCounts} />
+
+                    {/* List */}
+                    <div style={{ flex: 1, overflowY: 'auto' }}>
+                        {visibleConvs.length === 0 ? (
+                            <EmptyState {...emptyMessages[activeTab]} />
+                        ) : (
+                            visibleConvs.map((conv) => (
+                                <ConversationListItem
+                                    key={conv.id}
+                                    conversation={conv}
+                                    isActive={conv.id === activeConversationId}
+                                    onClick={handleSelect}
+                                    participantName={conv.landlordId === 'UNCLAIMED' ? 'External Agent' : 'Landlord'}
+                                    propertyAddress={conv.propertyTitle || conv.propertyId}
+                                    lastReadAt={readCursors[conv.id] ?? null}
+                                />
+                            ))
+                        )}
+                    </div>
+
+                    {/* Back button */}
+                    <div style={{ padding: '10px 16px', borderTop: '1px solid #f3f4f6', flexShrink: 0 }}>
+                        <button type="button" className="msg-back-btn" onClick={() => navigate('/dashboard')}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
+                                padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e7eb',
+                                background: '#ffffff', color: '#374151', cursor: 'pointer',
+                                fontSize: '0.8125rem', fontWeight: 500, transition: 'all 0.15s', justifyContent: 'center',
+                            }}>
+                            <BackIcon />
+                            Back to Dashboard
+                        </button>
+                    </div>
+                </aside>
+
+                {/* ── Right panel ──────────────────────────────────────────── */}
+                <main aria-label="Message thread"
+                    style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fafbff' }}>
+                    {activeConversationId ? (
+                        <>
+                            <div style={{
+                                padding: '14px 20px', borderBottom: '1px solid #e5e7eb',
+                                display: 'flex', alignItems: 'center', gap: '12px',
+                                background: '#ffffff', flexShrink: 0,
+                            }}>
+                                <div style={{
+                                    width: '38px', height: '38px', borderRadius: '50%',
+                                    background: '#3b82f6', color: '#fff',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: '0.8125rem', fontWeight: 700, flexShrink: 0,
+                                }}>
+                                    {getInitials('Landlord')}
+                                </div>
+                                <div>
+                                    <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9375rem', color: '#111827' }}>
+                                        {activeConversation?.landlordId === 'UNCLAIMED' ? 'External Agent' : 'Landlord'}
+                                    </p>
+                                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280' }}>{activeConversation?.propertyTitle || activeConversation?.propertyId || ''}</p>
+                                </div>
+                            </div>
+                            
+                            {activeConversation?.landlordId === 'UNCLAIMED' && (
+                                <div style={{
+                                    background: '#fffbeb', padding: '10px 20px', borderBottom: '1px solid #fef3c7',
+                                    display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8125rem', color: '#b45309'
+                                }}>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                    </svg>
+                                    <span>We've forwarded your message via email. We're waiting for the agent to join Proptii to reply directly here.</span>
+                                </div>
+                            )}
+
+                            <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto' }}>
+                                <MessageThread conversationId={activeConversationId} currentUserId={currentUserId} onScrollRequest={scrollToBottom} />
+                                {(optimisticMessages[activeConversationId] ?? []).map(({ message: msg, file }) => (
+                                    <div key={msg.id} data-testid="optimistic-message"
+                                        style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 20px' }}>
+                                        <div style={{
+                                            maxWidth: '70%', padding: '10px 14px', borderRadius: '16px 16px 4px 16px',
+                                            background: '#3b82f6', color: '#fff', opacity: 0.88,
+                                            display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px',
+                                        }}>
+                                            {msg.body ? <p style={{ margin: 0, wordBreak: 'break-word' }}>{msg.body}</p> : null}
+                                            {file && <AttachmentPill url={URL.createObjectURL(file)} fileName={file.name} sizeBytes={file.size} isSent />}
+                                        </div>
+                                    </div>
+                                ))}
+                                <div ref={optimisticBottomRef} />
+                            </div>
+
+                            <ComposeBox 
+                                conversationId={activeConversationId} 
+                                onSend={handleSend} 
+                                senderRole="tenant" 
+                                recipientId={activeConversation?.landlordId} 
+                                agentEmail={activeConversation?.agentEmail}
+                                propertyTitle={activeConversation?.propertyTitle}
+                                initialBody={prefilledDrafts[activeConversationId]}
+                            />
+                        </>
+                    ) : (
+                        <EmptyState message="Select a conversation" sub="Choose a conversation from the list to start messaging." />
+                    )}
+                </main>
+            </div>
+        </>
     );
 };
 

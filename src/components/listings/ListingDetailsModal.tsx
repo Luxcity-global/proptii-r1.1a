@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMessagingContext } from '../../contexts/MessagingContext';
 import communicationService from '../../services/communicationService';
+import QuickRequestModal from '../enquiry/QuickRequestModal';
 
 interface Property {
   id: string;
@@ -61,6 +62,9 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
   const [showMap, setShowMap] = useState(false);
   const [isMessaging, setIsMessaging] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
+  const [showUnclaimedConfirm, setShowUnclaimedConfirm] = useState(false);
+  const [showQuickRequestModal, setShowQuickRequestModal] = useState(false);
+  const isScrapedProperty = !property.landlordId && !!property.agent?.email;
 
   const navigate = useNavigate();
   const { user, isAuthenticated, login } = useAuth();
@@ -70,26 +74,50 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
     setMessageError(null);
 
     if (!isAuthenticated || !user) {
-      sessionStorage.setItem('redirectAfterLogin', window.location.pathname + window.location.search);
-      await login();
+      setShowQuickRequestModal(true);
       return;
     }
 
-    if (!property.landlordId) {
-      setMessageError('Unable to message: landlord information unavailable.');
+    if (!property.landlordId && !property.agent?.email) {
+      setMessageError('Unable to message: contact information unavailable.');
       return;
     }
 
+    // For scraped/unclaimed properties, show a confirmation notice before creating the shadow conversation
+    if (isScrapedProperty && !showUnclaimedConfirm) {
+      setShowUnclaimedConfirm(true);
+      return;
+    }
+
+    await createConversationAndNavigate();
+  };
+
+  const createConversationAndNavigate = async () => {
     setIsMessaging(true);
     try {
+      const landlordId = property.landlordId || 'UNCLAIMED';
+      const isScrapedProperty = !property.landlordId;
+      const agentEmail = isScrapedProperty ? property.agent?.email : undefined;
+      const propertyTitle = isScrapedProperty ? property.title : undefined;
+
+      // Note: ListingDetailsModal shows native (Proptii-listed) properties.
+      // Native properties always have a landlordId set, so isScrapedProperty
+      // will be false here in normal usage. No snapshot is needed.
       const conversation = await communicationService.getOrCreateConversation({
         propertyId: property.id,
-        tenantId: user.id,
-        landlordId: property.landlordId,
+        tenantId: user!.id,
+        landlordId,
+        agentEmail,
+        propertyTitle,
       });
       setActiveConversationId(conversation.id);
       onClose();
-      navigate('/dashboard/messages');
+      navigate('/dashboard/messages', {
+        state: {
+          prefilledMessage: !isScrapedProperty ? 'I want to make enquiries concerning this property' : undefined,
+          conversationId: conversation.id
+        }
+      });
     } catch {
       setMessageError('Failed to start conversation. Please try again.');
     } finally {
@@ -394,6 +422,45 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
                 {messageError}
               </div>
             )}
+            {showUnclaimedConfirm && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+                <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-gray-200">
+                  <div className="flex items-center gap-3 text-amber-600 mb-3">
+                    <span className="text-2xl">⚠️</span>
+                    <h3 className="text-lg font-bold text-gray-900">External Agent</h3>
+                  </div>
+                  <p className="text-sm text-gray-600 leading-relaxed mb-6">
+                    This agent hasn't joined Proptii yet. Your message will be <strong>forwarded via email</strong> to them directly.
+                    If they join, you'll see their reply in your Messages dashboard.
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={createConversationAndNavigate}
+                      disabled={isMessaging}
+                      className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      {isMessaging ? 'Sending…' : 'Send Anyway'}
+                    </button>
+                    <button
+                      onClick={() => setShowUnclaimedConfirm(false)}
+                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors border border-gray-200 text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            <QuickRequestModal
+              isOpen={showQuickRequestModal}
+              onClose={() => setShowQuickRequestModal(false)}
+              listingId={property.id}
+              listingTitle={property.title}
+              listingSource={property.landlordId ? 'native' : 'scraped'}
+              landlordId={property.landlordId}
+              agentEmail={property.agent?.email}
+              agentName={property.agent?.name}
+            />
           </div>
         </div>
       </div>

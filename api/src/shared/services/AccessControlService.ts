@@ -31,22 +31,34 @@ interface UserRole {
 }
 
 export class AccessControlService {
-    private client: CosmosClient;
-    private database: Database;
-    private rolesContainer: Container;
-    private policiesContainer: Container;
-    private userRolesContainer: Container;
+    private _client: CosmosClient | null = null;
+    private _database: Database | null = null;
+    private _rolesContainer: Container | null = null;
+    private _policiesContainer: Container | null = null;
+    private _userRolesContainer: Container | null = null;
 
-    constructor() {
+    private get rolesContainer(): Container {
+        if (!this._rolesContainer) this._init();
+        return this._rolesContainer!;
+    }
+    private get policiesContainer(): Container {
+        if (!this._policiesContainer) this._init();
+        return this._policiesContainer!;
+    }
+    private get userRolesContainer(): Container {
+        if (!this._userRolesContainer) this._init();
+        return this._userRolesContainer!;
+    }
+
+    private _init(): void {
         const config = validateEnv();
-        this.client = new CosmosClient({
-            endpoint: config.COSMOS_DB_CONNECTION_STRING,
-            key: process.env.COSMOS_DB_KEY || ''
-        });
-        this.database = this.client.database(config.COSMOS_DB_DATABASE_NAME);
-        this.rolesContainer = this.database.container('Roles');
-        this.policiesContainer = this.database.container('Policies');
-        this.userRolesContainer = this.database.container('UserRoles');
+        const endpoint = config.COSMOS_DB_CONNECTION_STRING ?? '';
+        if (!endpoint) throw new AppError(503, 'Cosmos DB is not configured', 'COSMOS_NOT_CONFIGURED');
+        this._client = new CosmosClient({ endpoint, key: process.env.COSMOS_DB_KEY || '' });
+        this._database = this._client.database(config.COSMOS_DB_DATABASE_NAME ?? '');
+        this._rolesContainer = this._database.container('Roles');
+        this._policiesContainer = this._database.container('Policies');
+        this._userRolesContainer = this._database.container('UserRoles');
     }
 
     async createRole(role: Omit<Role, 'id'>): Promise<Role> {

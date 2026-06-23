@@ -29,6 +29,9 @@ export interface Conversation {
     lastMessageAt: string | null;
     isDeleted: boolean;
     deletedAt: string | null;
+    /** Optional fields for shadow conversations */
+    agentEmail?: string;
+    propertyTitle?: string;
 }
 
 /**
@@ -143,6 +146,30 @@ export interface CreateConversationDto {
     propertyId: string;
     tenantId: string;
     landlordId: string;
+    agentEmail?: string;
+    propertyTitle?: string;
+    /**
+     * Full property snapshot from the SSE stream, present only when creating a
+     * shadow conversation for a scraped/unclaimed property. The API uses this to
+     * upsert the property into scraped_properties (by URL) before creating the
+     * conversation, so the property only ever enters MongoDB when a tenant sends
+     * a real message about it.
+     */
+    scrapedPropertySnapshot?: {
+        url: string;
+        title: string;
+        location: string;
+        price?: string;
+        bedrooms?: number;
+        bathrooms?: number;
+        propertyType?: string;
+        imageUrls?: string[];
+        agent: {
+            name?: string;
+            email: string;      // required — verified during agent claim flow
+            website?: string;
+        };
+    };
 }
 
 /**
@@ -152,6 +179,10 @@ export interface CreateMessageDto {
     /** Message body — max 4,000 characters */
     body: string;
     attachmentIds?: string[];
+    /** Used for proxy email routing when property is unclaimed */
+    agentEmail?: string;
+    /** Used for proxy email subject when property is unclaimed */
+    propertyTitle?: string;
 }
 
 /**

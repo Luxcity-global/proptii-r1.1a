@@ -5,6 +5,7 @@ import ListingDetailsModal from './ListingDetailsModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMessagingContext } from '../../contexts/MessagingContext';
 import communicationService from '../../services/communicationService';
+import QuickRequestModal from '../enquiry/QuickRequestModal';
 
 interface Property {
   id: string;
@@ -58,6 +59,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isMessaging, setIsMessaging] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
+  const [showQuickRequestModal, setShowQuickRequestModal] = useState(false);
 
   const navigate = useNavigate();
   const { user, isAuthenticated, login } = useAuth();
@@ -68,9 +70,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
     setMessageError(null);
 
     if (!isAuthenticated || !user) {
-      // Store the current listing URL so we can return after login
-      sessionStorage.setItem('redirectAfterLogin', window.location.pathname + window.location.search);
-      await login();
+      setShowQuickRequestModal(true);
       return;
     }
 
@@ -87,7 +87,12 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
         landlordId: property.landlordId,
       });
       setActiveConversationId(conversation.id);
-      navigate('/dashboard/messages');
+      navigate('/dashboard/messages', {
+        state: {
+          conversationId: conversation.id,
+          prefilledMessage: 'I want to make enquiries concerning this property'
+        }
+      });
     } catch {
       setMessageError('Failed to start conversation. Please try again.');
     } finally {
@@ -312,6 +317,16 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
           onClose={() => setShowModal(false)}
         />
       )}
+      <QuickRequestModal
+        isOpen={showQuickRequestModal}
+        onClose={() => setShowQuickRequestModal(false)}
+        listingId={property.id}
+        listingTitle={property.title}
+        listingSource={property.landlordId ? 'native' : 'scraped'}
+        landlordId={property.landlordId}
+        agentEmail={property.agent?.email}
+        agentName={property.agent?.name}
+      />
     </>
   );
 };

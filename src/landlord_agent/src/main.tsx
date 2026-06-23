@@ -4,7 +4,7 @@ import App from "./App.tsx";
 import "./index.css";
 
 createRoot(document.getElementById("root")!).render(
-  <BrowserRouter basename="/landlord">
+  <BrowserRouter basename="/landlord-app">
     <App />
   </BrowserRouter>
 );

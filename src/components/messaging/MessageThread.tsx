@@ -2,17 +2,63 @@
  * MessageThread — renders a conversation's message history in chronological order.
  *
  * - Fetches messages on mount and when conversationId changes.
+ * - Auto-scrolls to the bottom on load and whenever the message list grows.
  * - Marks each unread message as read after fetching.
  * - Sent messages (senderId === currentUserId) are right-aligned.
  * - Received messages are left-aligned.
  * - Shows an inline error banner on fetch failure.
+ * - Renders attachment download links by fetching time-limited SAS URLs.
  *
- * Requirements: 10.3, 10.5, 11.3, 11.5, 12.1
+ * Requirements: 10.3, 10.5, 11.3, 11.5, 12.1, 7.4
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { Message } from '../../types/messaging';
 import communicationService from '../../services/communicationService';
+import AttachmentPill from './AttachmentPill';
+
+// ---------------------------------------------------------------------------
+// AttachmentLoader — fetches a SAS URL then delegates rendering to AttachmentPill
+// ---------------------------------------------------------------------------
+
+interface AttachmentLoaderProps {
+    attachmentId: string;
+    conversationId: string;
+    isSent: boolean;
+}
+
+const AttachmentLoader: React.FC<AttachmentLoaderProps> = ({ attachmentId, conversationId, isSent }) => {
+    const [url, setUrl] = useState<string | null>(null);
+    const [fileName, setFileName] = useState<string>('Attachment');
+    const [isError, setIsError] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        communicationService
+            .getAttachmentUrl(attachmentId, conversationId)
+            .then((sasUrl) => {
+                if (cancelled) return;
+                // Extract filename from the blob path segment of the SAS URL
+                try {
+                    const pathParts = new URL(sasUrl).pathname.split('/');
+                    const name = pathParts[pathParts.length - 1];
+                    if (name) setFileName(decodeURIComponent(name));
+                } catch { /* keep default */ }
+                setUrl(sasUrl);
+            })
+            .catch(() => { if (!cancelled) setIsError(true); });
+        return () => { cancelled = true; };
+    }, [attachmentId, conversationId]);
+
+    return (
+        <AttachmentPill
+            url={url}
+            fileName={fileName}
+            isSent={isSent}
+            isError={isError}
+        />
+    );
+};
 
 // ---------------------------------------------------------------------------
 // Props
@@ -21,16 +67,26 @@ import communicationService from '../../services/communicationService';
 export interface MessageThreadProps {
     conversationId: string;
     currentUserId: string;
+    /** Called after messages are fetched so the parent can scroll its container */
+    onScrollRequest?: () => void;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUserId }) => {
+const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUserId, onScrollRequest }) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+
+    // Sentinel element at the bottom of the list — scrolled into view after every render
+    const bottomRef = useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = useCallback(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+        onScrollRequest?.();
+    }, [onScrollRequest]);
 
     const fetchAndMarkRead = useCallback(async () => {
         if (!conversationId) return;
@@ -65,6 +121,13 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
     useEffect(() => {
         fetchAndMarkRead();
     }, [fetchAndMarkRead]);
+
+    // Scroll to bottom whenever the message list changes (new fetch or new messages)
+    useEffect(() => {
+        if (messages.length > 0) {
+            scrollToBottom();
+        }
+    }, [messages, scrollToBottom]);
 
     return (
         <div
@@ -120,7 +183,32 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                 textAlign: isSent ? 'right' : 'left',
                             }}
                         >
-                            <p style={{ margin: 0, wordBreak: 'break-word' }}>{message.body}</p>
+                            {message.body ? (
+                                <p style={{ margin: 0, wordBreak: 'break-word' }}>{message.body}</p>
+                            ) : null}
+
+                            {/* Attachment download pills */}
+                            {message.attachmentIds && message.attachmentIds.length > 0 && (
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '6px',
+                                        marginTop: message.body ? '8px' : '0',
+                                        alignItems: isSent ? 'flex-end' : 'flex-start',
+                                    }}
+                                >
+                                    {message.attachmentIds.map((attachmentId) => (
+                                        <AttachmentLoader
+                                            key={attachmentId}
+                                            attachmentId={attachmentId}
+                                            conversationId={message.conversationId}
+                                            isSent={isSent}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+
                             <time
                                 dateTime={message.sentAt}
                                 style={{ fontSize: '0.75rem', opacity: 0.7, display: 'block', marginTop: '4px' }}
@@ -144,6 +232,9 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                     No messages yet. Start the conversation!
                 </div>
             )}
+
+            {/* Scroll anchor — always at the bottom of the list */}
+            <div ref={bottomRef} data-testid="scroll-anchor" />
         </div>
     );
 };

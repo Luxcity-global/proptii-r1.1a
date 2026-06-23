@@ -27,20 +27,31 @@ interface PointInTimeRecoveryConfig {
 }
 
 export class BackupService {
-    private client: CosmosClient;
-    private database: Database;
-    private backupContainer: Container;
+    private _client: CosmosClient | null = null;
+    private _database: Database | null = null;
+    private _backupContainer: Container | null = null;
     private config: BackupConfig;
 
     constructor(config: BackupConfig) {
-        const envConfig = validateEnv();
-        this.client = new CosmosClient({
-            endpoint: envConfig.COSMOS_DB_CONNECTION_STRING,
-            key: process.env.COSMOS_DB_KEY || ''
-        });
-        this.database = this.client.database(envConfig.COSMOS_DB_DATABASE_NAME);
-        this.backupContainer = this.database.container('Backups');
         this.config = config;
+    }
+
+    private get backupContainer(): Container {
+        if (!this._backupContainer) {
+            const envConfig = validateEnv();
+            const endpoint = envConfig.COSMOS_DB_CONNECTION_STRING ?? '';
+            if (!endpoint) throw new AppError(503, 'Cosmos DB is not configured', 'COSMOS_NOT_CONFIGURED');
+            this._client = new CosmosClient({ endpoint, key: process.env.COSMOS_DB_KEY || '' });
+            this._database = this._client.database(envConfig.COSMOS_DB_DATABASE_NAME ?? '');
+            this._backupContainer = this._database.container('Backups');
+        }
+        return this._backupContainer;
+    }
+
+    private get database(): Database {
+        // Ensure lazy init has run
+        void this.backupContainer;
+        return this._database!;
     }
 
     async createBackup(containerName: string): Promise<BackupMetadata> {

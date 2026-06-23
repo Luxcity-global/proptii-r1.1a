@@ -10,6 +10,8 @@ import HomeLegacy from './pages/HomeLegacy';
 import { LoginPage } from './pages/Login';
 import { RegisterPage } from './pages/Register';
 import { NotFoundPage } from './pages/NotFound';
+import ClaimListing from './pages/ClaimListing';
+import ClaimAccount from './pages/ClaimAccount';
 import Referencing from './pages/Referencing';
 import ContractsPage from './pages/Contracts';
 import BookViewing from './pages/BookViewing';
@@ -21,7 +23,7 @@ import TenantContracts from './components/dashboard/sections/TenantContracts-new
 import FileTable from './components/dashboard/sections/YourFiles-new';
 import TenantReferencing from './components/dashboard/sections/TenantReferencing-new';
 import TenantMessages from './pages/dashboard/TenantMessages';
-import LandlordMessages from './pages/landlord/LandlordMessages';
+
 import AgentHome from './pages/AgentHome';
 import HomeownerHome from './pages/HomeownerHome';
 import HomeownerHomeVariantB from './pages/HomeownerHomeVariantB';
@@ -51,6 +53,8 @@ import TimelineGenerator from './pages/tools/TimelineGenerator';
 import KnowYourRights from './pages/tools/KnowYourRights';
 import { AuthAnalyticsBridge } from './components/analytics/AuthAnalyticsBridge';
 import ComingSoon from './pages/ComingSoon';
+import GuestThreadPage from './pages/GuestThreadPage';
+import DevAuthToolbar from './components/dev/DevAuthToolbar';
 
 /** Default landing: onboarding flow first. Home v2 lives at / with /home-v2 as alias. */
 
@@ -102,6 +106,9 @@ export const App: React.FC = () => {
                 <Route path="/terms-of-service" element={<TermsOfService />} />
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="/pricing" element={<Pricing />} />
+                <Route path="/claim-listing" element={<ClaimListing />} />
+                <Route path="/claim" element={<ClaimAccount />} />
+                <Route path="/thread/:token" element={<GuestThreadPage />} />
 
                 {/* Legacy / marketing URL redirects */}
                 <Route path="/about" element={<Navigate to="/about-us" replace />} />
@@ -120,9 +127,9 @@ export const App: React.FC = () => {
                     <AgentHome />
                   </ProtectedRoute>
                 } />
-                <Route path="/landlord" element={<LandlordDemo />} />
-                <Route path="/landlord/*" element={<LandlordDemo />}>
-                  <Route path="messages" element={<LandlordMessages />} />
+                <Route path="/landlord" element={<LandlordDemo />}>
+                  <Route index element={null} />
+                  <Route path="*" element={null} />
                 </Route>
 
                 {/* Homeowner landing: use Variant B as default */}
@@ -182,6 +189,8 @@ export const App: React.FC = () => {
                 {/* Catch-all route for 404 */}
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
+              {/* Dev-only mock auth toolbar — stripped from production builds */}
+              <DevAuthToolbar />
             </SignedContractsProvider>
           </OnboardingSessionProvider>
         </SavedPropertiesProvider>

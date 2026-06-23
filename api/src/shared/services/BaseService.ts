@@ -1,155 +1,112 @@
-import { CosmosClient, Container, ItemDefinition, OperationInput, OperationResponse } from '@azure/cosmos';
+import { Model, Document } from 'mongoose';
 import { AppError } from '../middleware/error-handling';
-import { validateEnv } from '../config/environment';
+import { getMongoConnection } from '../config/mongodb';
 
+/**
+ * Abstract base service providing common CRUD operations over a Mongoose model.
+ * All communication services extend this class.
+ */
 export abstract class BaseService {
-    protected container: Container;
-    protected client: CosmosClient;
+    protected model: Model<any>;
 
-    constructor(containerName: string) {
-        const config = validateEnv();
-        this.client = new CosmosClient({
-            endpoint: config.COSMOS_DB_CONNECTION_STRING,
-            key: process.env.COSMOS_DB_KEY || ''
+    constructor(model: Model<any>) {
+        this.model = model;
+        // Ensure the MongoDB connection is established (singleton — safe to call repeatedly)
+        getMongoConnection().catch((err) => {
+            console.error('[BaseService] MongoDB connection error:', err);
         });
-        this.container = this.client.database(config.COSMOS_DB_DATABASE_NAME).container(containerName);
     }
 
-    protected async create<T>(item: T): Promise<T> {
+    protected async create<T extends Record<string, any>>(item: T): Promise<T> {
         try {
-            const { resource } = await this.container.items.create(item as any);
-            return resource as T;
+            await this.model.create(item as any);
+            return item;
         } catch (error) {
             throw new AppError(500, 'Failed to create item', 'CREATE_ERROR');
         }
     }
 
-    protected async getById<T>(id: string, partitionKey: string): Promise<T> {
+    protected async getById<T>(id: string): Promise<T> {
         try {
-            const { resource } = await this.container.item(id, partitionKey).read();
-            if (!resource) {
+            const doc = await this.model.findOne({ id }).lean<T>();
+            if (!doc) {
                 throw new AppError(404, 'Item not found', 'NOT_FOUND');
             }
-            return resource as T;
+            return doc;
         } catch (error) {
             if (error instanceof AppError) throw error;
             throw new AppError(500, 'Failed to get item', 'GET_ERROR');
         }
     }
 
-    protected async update<T>(id: string, partitionKey: string, item: Partial<T>): Promise<T> {
+    protected async update<T>(id: string, item: Partial<T>): Promise<T> {
         try {
-            const { resource } = await this.container.item(id, partitionKey).replace(item as any);
-            return resource as T;
+            const doc = await this.model
+                .findOneAndUpdate({ id }, { $set: item }, { new: true })
+                .lean<T>();
+            if (!doc) {
+                throw new AppError(404, 'Item not found', 'NOT_FOUND');
+            }
+            return doc;
         } catch (error) {
+            if (error instanceof AppError) throw error;
             throw new AppError(500, 'Failed to update item', 'UPDATE_ERROR');
         }
     }
 
-    protected async delete(id: string, partitionKey: string): Promise<void> {
+    protected async delete(id: string): Promise<void> {
         try {
-            await this.container.item(id, partitionKey).delete();
+            await this.model.deleteOne({ id });
         } catch (error) {
             throw new AppError(500, 'Failed to delete item', 'DELETE_ERROR');
         }
     }
 
-    protected async softDelete<T>(id: string, partitionKey: string): Promise<T> {
+    protected async softDelete<T>(id: string): Promise<T> {
         try {
-            const item = await this.getById<T>(id, partitionKey);
-            const updatedItem = {
-                ...item,
-                isDeleted: true,
-                deletedAt: new Date().toISOString()
-            } as T;
-            return this.update(id, partitionKey, updatedItem);
+            const doc = await this.model
+                .findOneAndUpdate(
+                    { id },
+                    { $set: { isDeleted: true, deletedAt: new Date().toISOString() } },
+                    { new: true },
+                )
+                .lean<T>();
+            if (!doc) {
+                throw new AppError(404, 'Item not found', 'NOT_FOUND');
+            }
+            return doc;
         } catch (error) {
             if (error instanceof AppError) throw error;
             throw new AppError(500, 'Failed to soft delete item', 'SOFT_DELETE_ERROR');
         }
     }
 
-    protected async batchCreate<T>(items: T[]): Promise<T[]> {
+    protected async findOne<T>(filter: Record<string, unknown>): Promise<T | null> {
         try {
-            const operations: OperationInput[] = items.map(item => ({
-                operationType: 'Create',
-                resourceBody: item as any,
-                id: (item as any).id,
-                partitionKey: (item as any).id
-            }));
-
-            const response = await this.container.items.bulk(operations);
-            return response.map(r => r.resourceBody as T);
+            return await this.model.findOne(filter).lean<T>();
         } catch (error) {
-            throw new AppError(500, 'Failed to batch create items', 'BATCH_CREATE_ERROR');
+            throw new AppError(500, 'Failed to find item', 'QUERY_ERROR');
         }
     }
 
-    protected async batchUpdate<T>(items: { id: string; partitionKey: string; item: Partial<T> }[]): Promise<T[]> {
+    protected async find<T>(
+        filter: Record<string, unknown>,
+        sort?: Record<string, 1 | -1>,
+    ): Promise<T[]> {
         try {
-            const operations: OperationInput[] = items.map(({ id, partitionKey, item }) => ({
-                operationType: 'Replace',
-                id,
-                partitionKey,
-                resourceBody: item as any
-            }));
-
-            const response = await this.container.items.bulk(operations);
-            return response.map(r => r.resourceBody as T);
-        } catch (error) {
-            throw new AppError(500, 'Failed to batch update items', 'BATCH_UPDATE_ERROR');
-        }
-    }
-
-    protected async batchDelete(items: { id: string; partitionKey: string }[]): Promise<void> {
-        try {
-            const operations: OperationInput[] = items.map(({ id, partitionKey }) => ({
-                operationType: 'Delete',
-                id,
-                partitionKey,
-                resourceBody: {} // Required by type but not used for delete
-            }));
-
-            await this.container.items.bulk(operations);
-        } catch (error) {
-            throw new AppError(500, 'Failed to batch delete items', 'BATCH_DELETE_ERROR');
-        }
-    }
-
-    protected async batchSoftDelete<T>(items: { id: string; partitionKey: string }[]): Promise<T[]> {
-        try {
-            const operations: OperationInput[] = await Promise.all(
-                items.map(async ({ id, partitionKey }) => {
-                    const item = await this.getById<T>(id, partitionKey);
-                    return {
-                        operationType: 'Replace',
-                        id,
-                        partitionKey,
-                        resourceBody: {
-                            ...item,
-                            isDeleted: true,
-                            deletedAt: new Date().toISOString()
-                        } as any
-                    };
-                })
-            );
-
-            const response = await this.container.items.bulk(operations);
-            return response.map(r => r.resourceBody as T);
-        } catch (error) {
-            throw new AppError(500, 'Failed to batch soft delete items', 'BATCH_SOFT_DELETE_ERROR');
-        }
-    }
-
-    protected async query<T>(query: string, parameters: any[] = []): Promise<T[]> {
-        try {
-            const { resources } = await this.container.items.query({
-                query,
-                parameters
-            }).fetchAll();
-            return resources as T[];
+            let query = this.model.find(filter);
+            if (sort) query = query.sort(sort);
+            return await query.lean<T[]>();
         } catch (error) {
             throw new AppError(500, 'Failed to query items', 'QUERY_ERROR');
         }
     }
-} 
+
+    protected async countDocuments(filter: Record<string, unknown>): Promise<number> {
+        try {
+            return await this.model.countDocuments(filter);
+        } catch (error) {
+            throw new AppError(500, 'Failed to count items', 'QUERY_ERROR');
+        }
+    }
+}

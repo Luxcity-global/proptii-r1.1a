@@ -1,4 +1,4 @@
-import { BaseService } from './BaseService';
+import { CosmosBaseService } from './CosmosBaseService';
 import { z } from 'zod';
 import { normalisePhone } from '../utils/phoneNormaliser';
 
@@ -26,6 +26,7 @@ const propertySchema = z.object({
         phone: z.string().optional(),
         email: z.string().optional()
     }).optional(),
+    landlordId: z.string().optional(),
     /** E.164-normalised phone number derived from agent.phone. Undefined when normalisation fails. */
     phone: z.string().optional(),
     createdAt: z.string().optional(),
@@ -48,7 +49,7 @@ function applyPhoneNormalisation<T extends Record<string, unknown>>(doc: T): T &
     return { ...doc, phone: result.success ? result.e164 : undefined };
 }
 
-export class PropertyService extends BaseService {
+export class PropertyService extends CosmosBaseService {
     constructor() {
         super('Properties');
     }
@@ -64,11 +65,13 @@ export class PropertyService extends BaseService {
     }
 
     async updateProperty(id: string, propertyData: Partial<Property>): Promise<Property> {
-        const validatedData = propertySchema.partial().parse({
+        const existing = await this.getPropertyById(id);
+        const merged = {
+            ...existing,
             ...propertyData,
-            updatedAt: new Date().toISOString()
-        });
-
+            updatedAt: new Date().toISOString(),
+        };
+        const validatedData = propertySchema.parse(merged);
         return super.update(id, id, validatedData);
     }
 

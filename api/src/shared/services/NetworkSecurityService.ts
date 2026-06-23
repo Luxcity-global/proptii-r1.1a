@@ -18,20 +18,29 @@ interface PrivateEndpoint {
 }
 
 export class NetworkSecurityService {
-    private client: CosmosClient;
-    private database: Database;
-    private rulesContainer: Container;
-    private endpointsContainer: Container;
+    private _client: CosmosClient | null = null;
+    private _database: Database | null = null;
+    private _rulesContainer: Container | null = null;
+    private _endpointsContainer: Container | null = null;
 
-    constructor() {
+    private get rulesContainer(): Container {
+        if (!this._rulesContainer) this._init();
+        return this._rulesContainer!;
+    }
+
+    private get endpointsContainer(): Container {
+        if (!this._endpointsContainer) this._init();
+        return this._endpointsContainer!;
+    }
+
+    private _init(): void {
         const config = validateEnv();
-        this.client = new CosmosClient({
-            endpoint: config.COSMOS_DB_CONNECTION_STRING,
-            key: process.env.COSMOS_DB_KEY || ''
-        });
-        this.database = this.client.database(config.COSMOS_DB_DATABASE_NAME);
-        this.rulesContainer = this.database.container('NetworkRules');
-        this.endpointsContainer = this.database.container('PrivateEndpoints');
+        const endpoint = config.COSMOS_DB_CONNECTION_STRING ?? '';
+        if (!endpoint) throw new AppError(503, 'Cosmos DB is not configured', 'COSMOS_NOT_CONFIGURED');
+        this._client = new CosmosClient({ endpoint, key: process.env.COSMOS_DB_KEY || '' });
+        this._database = this._client.database(config.COSMOS_DB_DATABASE_NAME ?? '');
+        this._rulesContainer = this._database.container('NetworkRules');
+        this._endpointsContainer = this._database.container('PrivateEndpoints');
     }
 
     async addNetworkRule(rule: Omit<NetworkRule, 'id'>): Promise<NetworkRule> {

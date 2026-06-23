@@ -1,13 +1,18 @@
 /**
  * Frontend API wrapper for the Proptii Communication feature.
  *
- * All calls are routed through the existing `apiService` singleton, which
- * attaches the MSAL Bearer token via its Axios request interceptor.
+ * Calls go directly to the Azure Functions host (VITE_API_ENDPOINT, default
+ * http://localhost:7071) rather than through the NestJS apiService, because
+ * the communication module is an Azure Function — not a NestJS route.
+ *
+ * The MSAL Bearer token (or mock-token-* in dev) is attached manually so the
+ * same auth bypass that works for the NestJS service also works here.
  *
  * Requirements: 3.2, 6.1–6.6, 7.1, 7.4
  */
 
-import apiService from './api';
+import axios from 'axios';
+import { getAccessTokenForApiRequest } from './msalAccessToken';
 import type {
     Conversation,
     Message,
@@ -16,7 +21,26 @@ import type {
     SendMessageDto,
 } from '../types/messaging';
 
-const BASE = '/api/communication';
+// Azure Functions runs on 7071 locally; VITE_API_ENDPOINT overrides this.
+const FUNCTIONS_BASE = (import.meta.env.VITE_API_ENDPOINT || 'http://localhost:7071').replace(/\/$/, '');
+const BASE = `${FUNCTIONS_BASE}/api/communication`;
+
+/** Build an Authorization header using the mock token or MSAL token. */
+async function authHeaders(): Promise<Record<string, string>> {
+    const token = await getAccessTokenForApiRequest();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
+ * Unwrap the Azure Functions response envelope `{ data: T }` → T.
+ * Falls back to the raw body if the envelope is absent (future-proofing).
+ */
+function unwrap<T>(body: any): T {
+    if (body !== null && typeof body === 'object' && 'data' in body) {
+        return body.data as T;
+    }
+    return body as T;
+}
 
 const communicationService = {
     /**
@@ -25,8 +49,8 @@ const communicationService = {
      * Requirements: 6.1
      */
     async getConversations(): Promise<Conversation[]> {
-        const response = await apiService.get<Conversation[]>(`${BASE}/conversations`);
-        return response.data as Conversation[];
+        const { data } = await axios.get(`${BASE}/conversations`, { headers: await authHeaders() });
+        return unwrap<Conversation[]>(data);
     },
 
     /**
@@ -35,8 +59,8 @@ const communicationService = {
      * Requirements: 3.2, 6.2
      */
     async getOrCreateConversation(dto: CreateConversationDto): Promise<Conversation> {
-        const response = await apiService.post<Conversation>(`${BASE}/conversations`, dto);
-        return response.data as Conversation;
+        const { data } = await axios.post(`${BASE}/conversations`, dto, { headers: await authHeaders() });
+        return unwrap<Conversation>(data);
     },
 
     /**
@@ -45,10 +69,10 @@ const communicationService = {
      * Requirements: 6.3
      */
     async getMessages(conversationId: string): Promise<Message[]> {
-        const response = await apiService.get<Message[]>(
-            `${BASE}/conversations/${conversationId}/messages`,
-        );
-        return response.data as Message[];
+        const { data } = await axios.get(`${BASE}/conversations/${conversationId}/messages`, {
+            headers: await authHeaders(),
+        });
+        return unwrap<Message[]>(data);
     },
 
     /**
@@ -57,11 +81,10 @@ const communicationService = {
      * Requirements: 6.4
      */
     async sendMessage(conversationId: string, dto: SendMessageDto): Promise<Message> {
-        const response = await apiService.post<Message>(
-            `${BASE}/conversations/${conversationId}/messages`,
-            dto,
-        );
-        return response.data as Message;
+        const { data } = await axios.post(`${BASE}/conversations/${conversationId}/messages`, dto, {
+            headers: await authHeaders(),
+        });
+        return unwrap<Message>(data);
     },
 
     /**
@@ -70,11 +93,11 @@ const communicationService = {
      * Requirements: 6.5
      */
     async markRead(messageId: string, conversationId: string): Promise<void> {
-        await apiService.request<void>({
-            method: 'PATCH',
-            url: `${BASE}/messages/${messageId}/read`,
-            params: { conversationId },
-        });
+        await axios.patch(
+            `${BASE}/messages/${messageId}/read`,
+            {},
+            { headers: await authHeaders(), params: { conversationId } },
+        );
     },
 
     /**
@@ -83,21 +106,59 @@ const communicationService = {
      * Requirements: 6.6
      */
     async getUnreadCount(): Promise<number> {
-        const response = await apiService.get<number>(`${BASE}/conversations/unread-count`);
-        return response.data as number;
+        const { data } = await axios.get(`${BASE}/conversations/unread-count`, {
+            headers: await authHeaders(),
+        });
+        const result = unwrap<{ unreadCount: number } | number>(data);
+        // Backend returns { unreadCount: N } — unwrap the inner field if needed
+        if (result !== null && typeof result === 'object' && 'unreadCount' in result) {
+            return (result as { unreadCount: number }).unreadCount;
+        }
+        return result as number;
     },
 
     /**
      * Upload a file attachment for a conversation.
      * POST /api/communication/attachments/upload?conversationId={conversationId}
+     *
+     * The API expects JSON with a base64-encoded file body (not multipart/form-data).
      * Requirements: 7.1
      */
     async uploadAttachment(file: File, conversationId: string): Promise<MessageAttachment> {
-        const response = await apiService.uploadFile<MessageAttachment>(
+        // Read file as base64
+        const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = reader.result as string;
+                // Strip the data URL prefix (e.g. "data:application/pdf;base64,")
+                resolve(result.split(',')[1] ?? result);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+
+        // Derive MIME type from the file extension when the browser doesn't provide one.
+        // The API only accepts pdf, doc, docx, and txt — map extensions explicitly.
+        const extensionMimeMap: Record<string, string> = {
+            pdf: 'application/pdf',
+            doc: 'application/msword',
+            docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            txt: 'text/plain',
+        };
+        const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+        const mimeType = file.type || extensionMimeMap[ext] || 'application/octet-stream';
+
+        const { data } = await axios.post(
             `${BASE}/attachments/upload?conversationId=${encodeURIComponent(conversationId)}`,
-            file,
+            {
+                file: base64,
+                fileName: file.name,
+                mimeType,
+                sizeBytes: file.size,
+            },
+            { headers: await authHeaders() },
         );
-        return response.data as MessageAttachment;
+        return unwrap<MessageAttachment>(data);
     },
 
     /**
@@ -106,11 +167,15 @@ const communicationService = {
      * Requirements: 7.4
      */
     async getAttachmentUrl(attachmentId: string, conversationId: string): Promise<string> {
-        const response = await apiService.get<string>(
-            `${BASE}/attachments/${attachmentId}/url`,
-            { conversationId },
-        );
-        return response.data as string;
+        const { data } = await axios.get(`${BASE}/attachments/${attachmentId}/url`, {
+            headers: await authHeaders(),
+            params: { conversationId },
+        });
+        const result = unwrap<{ url: string } | string>(data);
+        if (result !== null && typeof result === 'object' && 'url' in result) {
+            return (result as { url: string }).url;
+        }
+        return result as string;
     },
 };
 

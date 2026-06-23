@@ -3,6 +3,7 @@ import { jwtDecode } from 'jwt-decode';
 import { ConversationService } from '../../shared/services/ConversationService';
 import { AttachmentService } from '../../shared/services/AttachmentService';
 import { NotificationService } from '../../shared/services/NotificationService';
+import { LeadService } from '../../shared/services/LeadService';
 import { MonitoringService } from '../../shared/services/MonitoringService';
 import { withAuth } from '../../shared/middleware/auth';
 import { withParticipantGuard } from '../../shared/middleware/conversationParticipantGuard';
@@ -28,6 +29,11 @@ function extractUserIdFromToken(request: HttpRequest): string | null {
     const [scheme, token] = authHeader.split(' ');
     if (scheme !== 'Bearer' || !token) return null;
 
+    // Support mock authentication in development
+    if (process.env.NODE_ENV === 'development' && token.startsWith('mock-token-')) {
+        return token.replace('mock-token-', '');
+    }
+
     try {
         const decoded = jwtDecode<JwtPayload>(token);
         return decoded.sub ?? null;
@@ -45,6 +51,16 @@ function extractSenderNameFromToken(request: HttpRequest): string {
 
     const [scheme, token] = authHeader.split(' ');
     if (scheme !== 'Bearer' || !token) return 'Unknown';
+
+    // Support mock authentication in development
+    if (process.env.NODE_ENV === 'development' && token.startsWith('mock-token-')) {
+        const id = token.replace('mock-token-', '');
+        if (id === 'tenant-test-001') return 'Sarah Jones';
+        if (id === 'tenant-test-002') return 'Emily Davis';
+        if (id === 'landlord-test-001') return 'John Smith';
+        if (id === 'landlord-test-002') return 'Jack Smith';
+        return 'Test User';
+    }
 
     try {
         const decoded = jwtDecode<JwtPayload>(token);
@@ -81,12 +97,14 @@ export class CommunicationController {
     private conversationService: ConversationService;
     private attachmentService: AttachmentService;
     private notificationService: NotificationService;
+    private leadService: LeadService;
     private monitoringService: MonitoringService;
 
     constructor() {
         this.conversationService = new ConversationService();
         this.attachmentService = new AttachmentService();
         this.notificationService = new NotificationService();
+        this.leadService = new LeadService();
         this.monitoringService = new MonitoringService();
     }
 
@@ -244,9 +262,18 @@ export class CommunicationController {
             // Notify the other participant after successful create
             if (body.recipientId) {
                 const senderName = extractSenderNameFromToken(request);
-                this.notificationService
-                    .notify(body.recipientId, conversationId, senderName)
-                    .catch((err) => context.error('NotificationService.notify failed:', err));
+                if (body.recipientId === 'UNCLAIMED' && body.agentEmail && body.propertyTitle) {
+                    const conversation = await this.conversationService.getConversationById(conversationId);
+                    if (conversation) {
+                        this.leadService
+                            .sendLeadEmail(body.agentEmail, senderName, body.propertyTitle, dto.body, conversation.propertyId)
+                            .catch((err) => context.error('LeadService.sendLeadEmail failed:', err));
+                    }
+                } else if (body.recipientId !== 'UNCLAIMED') {
+                    this.notificationService
+                        .notify(body.recipientId, conversationId, senderName)
+                        .catch((err) => context.error('NotificationService.notify failed:', err));
+                }
             }
 
             return { status: 201, jsonBody: { data: message } };
@@ -372,7 +399,16 @@ export class CommunicationController {
                 }
                 return { status: error.statusCode, jsonBody: { error: { message: error.message, code: error.code } } };
             }
-            return { status: 500, jsonBody: { error: { message: 'Internal server error' } } };
+            const detail = error instanceof Error ? error.message : String(error);
+            return {
+                status: 500,
+                jsonBody: {
+                    error: {
+                        message: process.env.NODE_ENV === 'development' ? detail : 'Internal server error',
+                        code: 'INTERNAL_ERROR',
+                    },
+                },
+            };
         }
     }
 

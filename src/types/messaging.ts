@@ -30,6 +30,9 @@ export interface Conversation {
     lastMessageAt: string | null;
     isDeleted: boolean;
     deletedAt: string | null;
+    /** Optional fields for shadow conversations */
+    agentEmail?: string;
+    propertyTitle?: string;
 }
 
 /**
@@ -144,6 +147,24 @@ export interface CreateConversationDto {
     propertyId: string;
     tenantId: string;
     landlordId: string;
+    agentEmail?: string;
+    propertyTitle?: string;
+    /** Full property snapshot sent when messaging an unclaimed scraped property */
+    scrapedPropertySnapshot?: {
+        url: string;
+        title: string;
+        location: string;
+        price?: string;
+        bedrooms?: number;
+        bathrooms?: number;
+        propertyType?: string;
+        imageUrls?: string[];
+        agent: {
+            name?: string;
+            email: string;
+            website?: string;
+        };
+    };
 }
 
 /**
@@ -153,6 +174,10 @@ export interface CreateMessageDto {
     /** Message body — max 4,000 characters */
     body: string;
     attachmentIds?: string[];
+    /** Used for proxy email routing when property is unclaimed */
+    agentEmail?: string;
+    /** Used for proxy email subject when property is unclaimed */
+    propertyTitle?: string;
 }
 
 /**
@@ -164,4 +189,8 @@ export interface SendMessageDto {
     attachmentIds?: string[];
     senderRole: 'tenant' | 'landlord';
     recipientId?: string;
+    /** Used for proxy email routing when property is unclaimed */
+    agentEmail?: string;
+    /** Used for proxy email subject when property is unclaimed */
+    propertyTitle?: string;
 }

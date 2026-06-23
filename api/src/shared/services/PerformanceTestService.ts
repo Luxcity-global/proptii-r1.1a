@@ -26,20 +26,25 @@ interface TestConfig {
 }
 
 export class PerformanceTestService {
-    private client: CosmosClient;
-    private database: Database;
-    private testContainer: Container;
+    private _client: CosmosClient | null = null;
+    private _database: Database | null = null;
+    private _testContainer: Container | null = null;
     private monitoringService: MonitoringService;
 
     constructor() {
-        const config = validateEnv();
-        this.client = new CosmosClient({
-            endpoint: config.COSMOS_DB_CONNECTION_STRING,
-            key: process.env.COSMOS_DB_KEY || ''
-        });
-        this.database = this.client.database(config.COSMOS_DB_DATABASE_NAME);
-        this.testContainer = this.database.container('PerformanceTests');
         this.monitoringService = new MonitoringService();
+    }
+
+    private get testContainer(): Container {
+        if (!this._testContainer) {
+            const config = validateEnv();
+            const endpoint = config.COSMOS_DB_CONNECTION_STRING ?? '';
+            if (!endpoint) throw new AppError(503, 'Cosmos DB is not configured', 'COSMOS_NOT_CONFIGURED');
+            this._client = new CosmosClient({ endpoint, key: process.env.COSMOS_DB_KEY || '' });
+            this._database = this._client.database(config.COSMOS_DB_DATABASE_NAME ?? '');
+            this._testContainer = this._database.container('PerformanceTests');
+        }
+        return this._testContainer;
     }
 
     async runTest(testName: string, config: TestConfig): Promise<TestResult> {

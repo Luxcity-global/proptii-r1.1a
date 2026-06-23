@@ -69,10 +69,10 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, './src'),
       },
     },
-    base: '/landlord/',
+    base: '/landlord-app/',
     build: {
       target: 'esnext',
-      outDir: '../../public/landlord',
+      outDir: '../../public/landlord-app',
       emptyOutDir: true,
     },
   };

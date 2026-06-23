@@ -4,6 +4,9 @@ import { useState, useCallback, useEffect } from 'react';
 const DEFAULT_LOCAL_SEARCH_URL = 'http://localhost:3000';
 const DEFAULT_RENDER_SEARCH_URL = 'https://proptii-r1-1a-v39c.onrender.com';
 
+/** Azure Functions API base URL */
+const API_BASE = (import.meta.env.VITE_API_ENDPOINT || 'http://localhost:7071').replace(/\/$/, '');
+
 const normalizeBackendUrl = (rawUrl: string | undefined, defaultUrl: string): string => {
   if (!rawUrl || !rawUrl.trim()) {
     return defaultUrl;
@@ -94,14 +97,20 @@ export const useSearchBackend = () => {
     if (cachedData) {
       try {
         const parsed = JSON.parse(cachedData);
-        // Clean the pricing for cached results as well
-        const cleanedCachedResults = (parsed.results || []).map((property: Property) => ({
-          ...property,
-          price: cleanPropertyPrice(property.price)
-        }));
-        setResults(cleanedCachedResults);
-        setQuery(parsed.query || '');
-        setSearchType(parsed.searchType || 'onthemarket');
+        if (parsed.results && parsed.results.length > 0) {
+          // Clean the pricing for cached results as well
+          const cleanedCachedResults = parsed.results.map((property: Property) => ({
+            ...property,
+            price: cleanPropertyPrice(property.price)
+          }));
+          const native = cleanedCachedResults.filter((p: Property) => p.source === 'native');
+          const scraped = cleanedCachedResults.filter((p: Property) => p.source !== 'native');
+          setResults([...native, ...scraped]);
+          setQuery(parsed.query || '');
+          setSearchType(parsed.searchType || 'onthemarket');
+        } else {
+          sessionStorage.removeItem('searchResults');
+        }
       } catch (error) {
         console.error('Error parsing cached search results:', error);
         sessionStorage.removeItem('searchResults');
@@ -125,44 +134,47 @@ export const useSearchBackend = () => {
       `${p.title?.toLowerCase().trim()}|${p.location?.toLowerCase().trim()}`;
 
     try {
-      // 1. Parallel Firestore (Proptii) search
-      const firestorePromise = (async (): Promise<Property[]> => {
+      // 1. Parallel native (Proptii-hosted) property search via API
+      const nativeApiPromise = (async (): Promise<Property[]> => {
         try {
-          const { searchProptiiProperties } = await import('../services/proptiiPropertyService');
-          const proptiiResults = await searchProptiiProperties(searchQuery);
-          return proptiiResults.map(property => ({
-            ...property,
-            price: cleanPropertyPrice(property.price)
+          const res = await fetch(
+            `${API_BASE}/api/properties/search?q=${encodeURIComponent(searchQuery)}&limit=50`,
+            { signal: AbortSignal.timeout(15000) }
+          );
+          if (!res.ok) return [];
+          const data = await res.json();
+          return ((data.results ?? []) as any[]).map(p => ({
+            ...p,
+            price: cleanPropertyPrice(p.price ?? ''),
           }));
         } catch (e) {
-          console.warn('[Search] Firestore search failed:', e);
+          console.warn('[Search] Native API search failed:', e);
           return [];
         }
       })();
 
-      // Update results immediately when Firestore returns
-      firestorePromise.then(proptiiResults => {
-        if (proptiiResults.length > 0) {
+      // Update results immediately when native API returns
+      nativeApiPromise.then(nativeResults => {
+        if (nativeResults.length > 0) {
           setResults(prev => {
             const seen = new Set(prev.map(deduplicationKey));
-            const unique = proptiiResults.filter(p => !seen.has(deduplicationKey(p)));
-            return [...prev, ...unique];
+            const unique = nativeResults.filter(p => !seen.has(deduplicationKey(p)));
+            const combined = [...prev, ...unique];
+            const native = combined.filter(p => p.source === 'native');
+            const scraped = combined.filter(p => p.source !== 'native');
+            return [...native, ...scraped];
           });
         }
       });
 
-      // If user ONLY wants Proptii results, we stop here (wait for firestorePromise)
+      // If user ONLY wants Proptii results, wait for native API only
       if (type === 'proptii') {
-        const results = await firestorePromise;
+        const results = await nativeApiPromise;
         if (results.length === 0) {
           throw new Error('No properties found on Proptii. Please try a different search.');
         }
-        
         sessionStorage.setItem('searchResults', JSON.stringify({
-          results,
-          query: searchQuery,
-          searchType: 'proptii',
-          timestamp: Date.now()
+          results, query: searchQuery, searchType: 'proptii', timestamp: Date.now()
         }));
         setIsLoading(false);
         return results;
@@ -217,7 +229,10 @@ export const useSearchBackend = () => {
               setResults(prev => {
                 const seen = new Set(prev.map(deduplicationKey));
                 const unique = incoming.filter(p => !seen.has(deduplicationKey(p)));
-                return [...prev, ...unique];
+                const combined = [...prev, ...unique];
+                const native = combined.filter(p => p.source === 'native');
+                const scraped = combined.filter(p => p.source !== 'native');
+                return [...native, ...scraped];
               });
             } else if (event.type === 'done') {
               // Scraper is finished
@@ -229,8 +244,8 @@ export const useSearchBackend = () => {
       }
 
       // Final merge for cache
-      const proptiiResults = await firestorePromise;
-      const seenKeys = new Set(proptiiResults.map(deduplicationKey));
+      const nativeResults = await nativeApiPromise;
+      const seenKeys = new Set(nativeResults.map(deduplicationKey));
       const uniqueScraped = allScraped.filter(p => {
         const key = deduplicationKey(p);
         if (seenKeys.has(key)) return false;
@@ -238,20 +253,23 @@ export const useSearchBackend = () => {
         return true;
       });
       
-      const finalResults = [...proptiiResults, ...uniqueScraped];
+      const finalResults = [...nativeResults, ...uniqueScraped];
+      const finalNative = finalResults.filter(p => p.source === 'native');
+      const finalScraped = finalResults.filter(p => p.source !== 'native');
+      const sortedFinalResults = [...finalNative, ...finalScraped];
       
-      if (finalResults.length === 0) {
+      if (sortedFinalResults.length === 0) {
         throw new Error('No properties found. Please try a different search.');
       }
 
       sessionStorage.setItem('searchResults', JSON.stringify({
-        results: finalResults,
+        results: sortedFinalResults,
         query: searchQuery,
         searchType: type,
         timestamp: Date.now()
       }));
 
-      return finalResults;
+      return sortedFinalResults;
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Search failed';

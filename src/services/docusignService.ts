@@ -1,5 +1,3 @@
-import { docusignConfig, validateDocuSignConfig, DOCUSIGN_SCOPES } from '../config/docusign';
-
 export interface DocuSignEnvelope {
   envelopeId: string;
   status: string;
@@ -47,12 +45,6 @@ export class DocuSignService {
   constructor() {
     // Use your existing backend API URL
     this.backendApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:7071/api';
-    
-    // Check if we have valid configuration
-    if (!validateDocuSignConfig()) {
-      console.warn('DocuSign configuration incomplete, using mock mode');
-      this.mockMode = true;
-    }
   }
 
   // Check if running in mock mode

@@ -1,8 +1,8 @@
 {
   "routes": [
     {
-      "route": "/landlord*",
-      "rewrite": "/landlord/index.html"
+      "route": "/landlord-app*",
+      "rewrite": "/landlord-app/index.html"
     }
   ],
   "navigationFallback": {
@@ -12,8 +12,8 @@
       "/chunks/*",
       "/entries/*",
       "/images/*",
-      "/landlord/assets/*",
-      "/landlord/landlord/*",
+      "/landlord-app/assets/*",
+      "/landlord-app/landlord-app/*",
       "/*.{css,js,ico,png,jpg,jpeg,gif,svg,woff,woff2}",
       "/403.html",
       "/500.html",

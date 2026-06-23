@@ -26,6 +26,12 @@ export async function authenticate(request: HttpRequest): Promise<void> {
         throw new AppError(401, 'Invalid authorization header format', 'INVALID_AUTH_FORMAT');
     }
 
+    // Support mock authentication in development mode
+    if (config.NODE_ENV === 'development' && token.startsWith('mock-token-')) {
+        console.log('🧪 Bypassing real auth for mock token in development');
+        return;
+    }
+
     try {
         await validateToken(token, config);
     } catch (error) {
@@ -38,25 +44,32 @@ async function validateToken(token: string, config: any): Promise<void> {
     try {
         // Decode the token to get the header and payload
         const decoded = jwtDecode<JwtPayload>(token);
-        
+
         // Get the issuer from the token
         const issuer = decoded.iss;
         if (!issuer) {
             throw new AppError(401, 'Invalid token: missing issuer', 'INVALID_TOKEN');
         }
 
-        // Get the JWKS endpoint from the issuer
-        const jwksEndpoint = `${issuer}/discovery/v2.0/keys`;
-        
+        // Construct the B2C JWKS endpoint correctly
+        const tenantDomain = config.AZURE_AD_B2C_TENANT_NAME || 'proptii.onmicrosoft.com';
+        const tenantPrefix = tenantDomain.split('.')[0];
+        const policyName = config.AZURE_AD_B2C_POLICY_NAME || 'B2C_1_SignUpandSignInProptii';
+        const jwksEndpoint = `https://${tenantPrefix}.b2clogin.com/${tenantDomain}/${policyName}/discovery/v2.0/keys`;
+
         // Create a JWKS client
         const JWKS = createRemoteJWKSet(new URL(jwksEndpoint));
 
         // Verify the token
         const { payload } = await jwtVerify(token, JWKS, {
-            issuer: config.AZURE_AD_B2C_ISSUER,
             audience: config.AZURE_AD_B2C_CLIENT_ID,
             algorithms: ['RS256']
         });
+
+        // Validate issuer manually since B2C issuer URLs can vary (tenant ID vs domain, policy inclusion)
+        if (!payload.iss || !payload.iss.startsWith(`https://${tenantPrefix}.b2clogin.com/`)) {
+            throw new AppError(401, `Invalid token: issuer mismatch (${payload.iss})`, 'INVALID_TOKEN');
+        }
 
         // Validate required claims
         if (!payload.sub || !payload.aud || !payload.exp) {
@@ -75,14 +88,23 @@ async function validateToken(token: string, config: any): Promise<void> {
         }
 
     } catch (error) {
+        console.error('Token validation failed:', error);
         if (error instanceof AppError) throw error;
-        throw new AppError(401, 'Token validation failed', 'TOKEN_VALIDATION_FAILED');
+        const msg = error instanceof Error ? error.message : String(error);
+        throw new AppError(401, `Token validation failed: ${msg}`, 'TOKEN_VALIDATION_FAILED');
     }
 }
 
 export function withAuth(handler: (request: HttpRequest, context: InvocationContext) => Promise<HttpResponseInit>) {
     return async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
-        await authenticate(request);
+        try {
+            await authenticate(request);
+        } catch (error) {
+            if (error instanceof AppError) {
+                return { status: error.statusCode, jsonBody: { error: { message: error.message, code: error.code } } };
+            }
+            return { status: 401, jsonBody: { error: { message: 'Unauthorized', code: 'UNAUTHORIZED' } } };
+        }
         return handler(request, context);
     };
-} 
+}
