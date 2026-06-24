@@ -17,8 +17,8 @@
       "@/*": ["src/*"]
     },
     "typeRoots": ["./node_modules/@types"],
-    "types": ["node", "express", "cors", "nodemailer", "jest"]
+    "types": ["node", "express", "cors", "nodemailer"]
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "**/*.spec.ts"]
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts", "src/tests/**/*", "src/**/__tests__/**/*"]
 }

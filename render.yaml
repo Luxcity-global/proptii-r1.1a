@@ -105,7 +105,7 @@ services:
     name: proptii-search-backend
     env: node
     plan: free
-    buildCommand: cd proptii-search && npm install && npm run build
+    buildCommand: cd proptii-search && npm install --include=dev && npm run build
     startCommand: cd proptii-search && npm run start
     healthCheckPath: /health
     envVars:
