@@ -74,6 +74,7 @@ export class SecurityMiddleware {
             'https://formsubmit.co',
             'https://proptii.b2clogin.com',
             'https://*.azure.com',
+            'https://*.azurewebsites.net',
             // Always include known backend origins
             'https://proptii-r1-1a-1.onrender.com',
             'https://proptii-r1-1a-new-backend.onrender.com',
