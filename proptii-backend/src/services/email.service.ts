@@ -27,6 +27,7 @@ interface EmailData {
   | 'viewing-reschedule'
   | 'viewing-cancel'
   | 'viewing-cancellation';
+  replyTo?: string;
 }
 
 interface MultiEmailData {
@@ -732,6 +733,7 @@ export class EmailService {
             html: fallbackBody,
             text: emailData.text,
             attachments: emailData.attachments || [],
+            replyTo: emailData.replyTo,
           };
 
           this.logger.log(`📧 Sending email via SMTP to: ${emailData.to} (attempt ${attempt}/${retries})`);
@@ -891,6 +893,7 @@ export class EmailService {
         subject: emailData.subject,
         html: htmlContent,
         text: textContent,
+        reply_to: emailData.replyTo,
       };
 
       if (attachments.length > 0) {

@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { getAccessTokenForApiRequest } from './msalAccessToken';
+import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
 
-const FUNCTIONS_BASE = (import.meta.env.VITE_API_ENDPOINT || 'http://localhost:7071').replace(/\/$/, '');
-const BASE = `${FUNCTIONS_BASE}/api/guest`;
+const BASE = `${getResolvedApiBaseUrl()}/guest`;
 
 async function authHeaders(): Promise<Record<string, string>> {
   const token = await getAccessTokenForApiRequest();

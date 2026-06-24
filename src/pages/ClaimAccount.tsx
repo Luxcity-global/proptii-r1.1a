@@ -78,7 +78,11 @@ const ClaimAccount: React.FC = () => {
         await quickRequestService.confirmClaim(token);
         setClaimSuccess(true);
         setTimeout(() => {
-          navigate('/dashboard/messages');
+          if (claimData?.role === 'ghost_landlord') {
+            navigate('/landlord/messages');
+          } else {
+            navigate('/dashboard/messages');
+          }
         }, 3000);
       } catch (err: any) {
         setError(getCleanErrorMessage(err, 'Failed to link your guest account. Please try again.'));
@@ -185,7 +189,13 @@ const ClaimAccount: React.FC = () => {
               Redirecting you to your messages...
             </p>
             <button
-              onClick={() => navigate('/dashboard/messages')}
+              onClick={() => {
+                if (claimData?.role === 'ghost_landlord') {
+                  navigate('/landlord/messages');
+                } else {
+                  navigate('/dashboard/messages');
+                }
+              }}
               className="w-full bg-[#D95B00] hover:bg-[#c45200] text-white font-semibold py-3 px-4 rounded-xl transition-colors shadow-sm"
             >
               Go to Messages

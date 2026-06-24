@@ -25,6 +25,8 @@ const envSchema = z.object({
   COSMOS_DB_CONNECTION_STRING: z.string().min(1, 'COSMOS_DB_CONNECTION_STRING is required'),
   COSMOS_DB_KEY: z.string().min(1, 'COSMOS_DB_KEY is required'),
   COSMOS_DB_DATABASE_NAME: z.string().default('proptii-db'),
+  MONGODB_URI: z.string().optional(),
+  MONGODB_DB_NAME: z.string().default('proptii-communication'),
 
   // ── Azure OpenAI ────────────────────────────────────────────────────────────
   AZURE_OPENAI_API_KEY: z.string().optional(),

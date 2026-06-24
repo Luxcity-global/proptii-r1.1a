@@ -256,7 +256,7 @@ const GuestThreadPage: React.FC = () => {
 
                   <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} mb-4`}>
                     <div className="text-[10px] text-gray-500 mb-1 px-1">
-                      {isMe ? `${message.sender_name} (you)` : message.sender_name}
+                      {isMe ? `${message.sender_name || 'User'} (you)` : (message.sender_name || 'User')}
                     </div>
                     <div className={`max-w-[75%] rounded-2xl px-5 py-3.5 shadow-sm text-[13px] ${
                       isMe 
@@ -269,7 +269,7 @@ const GuestThreadPage: React.FC = () => {
                     </div>
                     <div className={`flex items-center gap-2 mt-2 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                       <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold ${isMe ? 'bg-[#D95B00]' : 'bg-[#A52A2A]'}`}>
-                        {message.sender_name.charAt(0).toUpperCase()}
+                        {(message.sender_name || 'User').charAt(0).toUpperCase()}
                       </div>
                       <div className="text-[10px] text-gray-400">
                         Today - {formatTime(message.sent_at)}

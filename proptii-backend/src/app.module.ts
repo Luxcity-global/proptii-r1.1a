@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { MongooseModule } from '@nestjs/mongoose';
 import { DatabaseModule } from './modules/database.module';
 import { ViewingRequestModule } from './modules/viewing-request.module';
 import { ReferencingModule } from './modules/referencing.module';
@@ -16,6 +17,7 @@ import { AzureUsersModule } from './modules/azure-users.module';
 import { AuthModule } from './modules/auth.module';
 import { HealthModule } from './health/health.module';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
+import { GuestEnquiryModule } from './modules/guest-enquiry.module';
 
 @Module({
   imports: [
@@ -47,6 +49,10 @@ import { RequestIdMiddleware } from './middleware/request-id.middleware';
     StorageModule,
     AzureUsersModule,
     HealthModule,
+    MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://localhost:27017', {
+      dbName: process.env.MONGODB_DB_NAME || 'proptii-communication',
+    }),
+    GuestEnquiryModule,
   ],
   controllers: [AppController, PropertyDocumentController],
   providers: [
