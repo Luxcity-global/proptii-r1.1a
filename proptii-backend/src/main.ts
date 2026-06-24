@@ -1,3 +1,14 @@
+// Compatibility shim for older Node.js versions lacking process.getBuiltinModule (required by recent bson/mongodb versions)
+if (typeof globalThis.process !== 'undefined' && !globalThis.process.getBuiltinModule) {
+  (globalThis.process as any).getBuiltinModule = (name: string) => {
+    try {
+      return require(name);
+    } catch {
+      return {};
+    }
+  };
+}
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe, Logger } from '@nestjs/common';
