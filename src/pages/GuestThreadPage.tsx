@@ -171,63 +171,62 @@ const GuestThreadPage: React.FC = () => {
       {/* Main Conversation Area */}
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 flex flex-col min-h-0">
         
-        {/* Claim Account Container - Email Version */}
+        {/* Claim Account Container - Compact Banner */}
         {showResendClaim && (
-          <div className="bg-white border border-gray-200 rounded-2xl p-8 mb-8 shadow-sm flex flex-col items-center text-center">
+          <div className="bg-gradient-to-r from-[#FFF8F1] to-white border border-[#FFE4CC] rounded-2xl p-5 mb-6 shadow-sm flex flex-col md:flex-row items-center gap-5 justify-between relative overflow-hidden">
+            {/* Subtle background decoration */}
+            <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-gradient-to-br from-[#FFE4CC]/40 to-transparent rounded-full blur-xl pointer-events-none"></div>
             
-            {/* Centered Logo */}
-            <div className="flex justify-center mb-6">
-              <div className="flex items-center gap-2">
-                <img src="/images/Proptii-logo-icon.png" alt="Proptii Icon" className="h-8 w-auto" />
-                <div className="flex items-center">
-                  <span className="text-3xl font-black text-[#002B49] tracking-tight leading-none">prop</span>
-                  <span className="text-3xl font-black text-[#F15A22] tracking-tight leading-none">tii</span>
+            <div className="flex items-start gap-4 flex-1 z-10 w-full md:w-auto">
+              <div className="bg-[#FFE4CC] p-3 rounded-2xl flex-shrink-0 shadow-sm border border-[#FFD6B3]">
+                <ShieldAlert className="w-6 h-6 text-[#D95B00]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <h3 className="text-base font-bold text-gray-900">Guest Mode</h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#D95B00]/10 text-[#D95B00] uppercase tracking-wider">
+                    Action Required
+                  </span>
                 </div>
+                <p className="text-sm text-gray-600 leading-relaxed max-w-xl">
+                  You are messaging as a guest. To unlock unlimited replies and secure your conversation history, please claim your permanent account.
+                </p>
               </div>
             </div>
 
-            <div className="bg-[#FFF8F1] border border-[#FFE4CC] rounded-xl p-4 flex items-start gap-3 w-full max-w-[500px] text-left mb-8">
-               <ShieldAlert className="w-5 h-5 text-[#E85D04] flex-shrink-0 mt-0.5" />
-               <div>
-                 <h4 className="text-sm font-bold text-[#D95B00]">Guest Communication Mode</h4>
-                 <p className="text-xs text-[#D95B00] mt-0.5">
-                   You are messaging as a guest. Claim your account to unlock unlimited replies.
-                 </p>
-               </div>
+            <div className="w-full md:w-auto shrink-0 mt-2 md:mt-0 z-10">
+              {claimSentStatus === 'success' ? (
+                <div className="px-5 py-3 bg-green-50 border border-green-100 text-green-700 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 shadow-sm transition-all animate-in fade-in zoom-in duration-300">
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span>Link Sent! Check your inbox.</span>
+                </div>
+              ) : (
+                <div className="flex flex-col w-full">
+                  <form onSubmit={handleResendClaim} className="flex flex-col sm:flex-row gap-2.5 w-full">
+                    <input
+                      type="email"
+                      value={emailForClaim}
+                      onChange={(e) => setEmailForClaim(e.target.value)}
+                      placeholder="Enter your email address"
+                      required
+                      className="w-full sm:w-64 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#FFE4CC] focus:border-[#D95B00] transition-all bg-white shadow-sm placeholder:text-gray-400"
+                    />
+                    <button
+                      type="submit"
+                      disabled={claimSentStatus === 'sending'}
+                      className="bg-[#D95B00] hover:bg-[#c45200] text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-all disabled:opacity-50 whitespace-nowrap shadow-sm hover:shadow-md flex items-center justify-center min-w-[120px]"
+                    >
+                      {claimSentStatus === 'sending' ? 'Sending...' : 'Claim Account'}
+                    </button>
+                  </form>
+                  {claimError && (
+                    <p className="text-xs text-red-500 font-medium mt-2 animate-in fade-in slide-in-from-top-1">
+                      {claimError}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
-            
-            <h3 className="text-[22px] font-bold text-gray-900 mb-3">Claim Your Guest Account</h3>
-            <p className="text-sm text-gray-600 mb-8 max-w-[420px] leading-relaxed">
-              We'll send a verification link to your email to merge this guest chat into a permanent Proptii account. Enter the email you used for this enquiry.
-            </p>
-
-            {claimSentStatus === 'success' ? (
-              <div className="p-4 bg-green-50 border border-green-100 text-green-700 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 w-full max-w-[500px]">
-                <CheckCircle2 className="w-5 h-5" />
-                <span>Success! Check your email inbox for the claim link.</span>
-              </div>
-            ) : (
-              <form onSubmit={handleResendClaim} className="flex flex-col sm:flex-row gap-3 w-full max-w-[500px]">
-                <input
-                  type="email"
-                  value={emailForClaim}
-                  onChange={(e) => setEmailForClaim(e.target.value)}
-                  placeholder="name@example.com"
-                  required
-                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#D95B00] transition-colors"
-                />
-                <button
-                  type="submit"
-                  disabled={claimSentStatus === 'sending'}
-                  className="bg-[#D95B00] hover:bg-[#c45200] text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors disabled:opacity-50 whitespace-nowrap"
-                >
-                  {claimSentStatus === 'sending' ? 'Sending...' : 'Send Link'}
-                </button>
-              </form>
-            )}
-            {claimError && (
-              <p className="text-sm text-red-600 mt-4">{claimError}</p>
-            )}
           </div>
         )}
 

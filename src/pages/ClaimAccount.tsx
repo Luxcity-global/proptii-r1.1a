@@ -4,6 +4,28 @@ import { useAuth } from '../contexts/AuthContext';
 import quickRequestService, { ValidateClaimResponse } from '../services/quickRequestService';
 import { Check, AlertCircle, Loader2 } from 'lucide-react';
 
+const getCleanErrorMessage = (err: any, fallback: string): string => {
+  const apiCode = err.response?.data?.error?.code;
+  const apiMessage = err.response?.data?.error?.message;
+
+  if (apiCode === 'CLAIM_TOKEN_EXPIRED') {
+    return 'This claim link has expired (links are valid for 30 days).';
+  }
+  if (apiCode === 'CLAIM_TOKEN_NOT_FOUND') {
+    return 'This claim link is invalid or has already been used.';
+  }
+  if (apiCode === 'GHOST_ACCOUNT_ALREADY_CLAIMED') {
+    return 'This account has already been claimed. Please log in to your Proptii account.';
+  }
+  if (apiMessage) {
+    return apiMessage;
+  }
+  if (err.message && !err.message.includes('status code')) {
+    return err.message;
+  }
+  return fallback;
+};
+
 const ClaimAccount: React.FC = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
@@ -34,7 +56,7 @@ const ClaimAccount: React.FC = () => {
         setClaimData(data);
         setIsLoading(false);
       } catch (err: any) {
-        setError(err.message || 'The claim token is invalid or has expired.');
+        setError(getCleanErrorMessage(err, 'This claim link is invalid or has expired.'));
         setIsLoading(false);
       }
     };
@@ -59,7 +81,7 @@ const ClaimAccount: React.FC = () => {
           navigate('/dashboard/messages');
         }, 3000);
       } catch (err: any) {
-        setError(err.message || 'Failed to link your guest account. Please try again.');
+        setError(getCleanErrorMessage(err, 'Failed to link your guest account. Please try again.'));
         setIsClaiming(false);
       }
     };
@@ -84,7 +106,7 @@ const ClaimAccount: React.FC = () => {
       await quickRequestService.resendClaimToken(emailForResend.trim());
       setResendStatus('success');
     } catch (err: any) {
-      setResendError(err.message || 'Failed to request new claim link.');
+      setResendError(getCleanErrorMessage(err, 'Failed to request new claim link.'));
       setResendStatus('error');
     }
   };
@@ -109,7 +131,7 @@ const ClaimAccount: React.FC = () => {
             </div>
             <h2 className="text-xl font-bold text-white mb-2">Claim Link Invalid</h2>
             <p className="text-gray-300 text-sm mb-6 leading-relaxed">
-              {error} The link may have expired (links are valid for 7 days) or already been used.
+              {error}
             </p>
 
             {/* Resend Claim Token Section */}
