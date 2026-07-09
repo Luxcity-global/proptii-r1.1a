@@ -99,6 +99,18 @@ function validateLandlordBuildOutput() {
         process.exit(1);
     }
 
+    const cssFile = assetFiles.find(file => file.endsWith('.css'));
+    const cssContent = fs.readFileSync(path.join(landlordAssets, cssFile), 'utf8');
+    if (cssContent.includes('@tailwind base') || cssContent.includes('@tailwind utilities')) {
+        console.error(chalk.red('❌ Landlord CSS was not processed by PostCSS/Tailwind'));
+        console.error(chalk.red('   Found unprocessed @tailwind directives in dist/landlord/assets/' + cssFile));
+        process.exit(1);
+    }
+    if (!cssContent.includes('768px')) {
+        console.error(chalk.red('❌ Landlord CSS is missing responsive (md:) utilities'));
+        process.exit(1);
+    }
+
     console.log(chalk.green('✓ Landlord build output validation successful'));
 }
 

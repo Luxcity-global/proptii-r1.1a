@@ -6,7 +6,7 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "build:landlord": "cd src/landlord_agent && npm install && npm run build",
+    "build:landlord": "cd src/landlord_agent && npm install --include=dev && npm run build",
     "build": "npm run build:landlord && vite build && npm run copy-spa-fallbacks && npm run validate-build",
     "build:only": "vite build",
     "preview": "vite preview",
