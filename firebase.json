@@ -21,6 +21,10 @@
     ],
     "rewrites": [
       {
+        "source": "/landlord/assets/**",
+        "destination": "/landlord/assets/**"
+      },
+      {
         "source": "/landlord/**",
         "destination": "/landlord/index.html"
       },

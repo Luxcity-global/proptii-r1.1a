@@ -5,6 +5,7 @@ services:
     # Blueprint: static sites use runtime: static (SPA rewrites below require this service type)
     runtime: static
     buildCommand: npm install && npm run build
+    # build runs build:landlord (src/landlord_agent → public/landlord) then main vite build
     staticPublishPath: ./dist
     previews:
       generation: automatic
@@ -24,6 +25,8 @@ services:
       - key: VITE_GOOGLE_SHEETS_API_ENDPOINT
         value: https://proptii-r1-1a-new-backend.onrender.com/api/sheets
       - key: VITE_SEARCH_BACKEND_URL
+        value: https://proptii-r1-1a-search.onrender.com
+      - key: SEARCH_BACKEND_URL
         value: https://proptii-r1-1a-search.onrender.com
     headers:
       - path: /*
@@ -47,6 +50,9 @@ services:
       - path: /static/*
         name: Cache-Control
         value: public, max-age=31536000, immutable
+      - path: /landlord/assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
     # SPA: rewrite unknown paths to index.html so hard refresh works on client routes.
     # Render matches /* (not /**) per https://render.com/docs/redirects-rewrites
     routes:
@@ -56,6 +62,10 @@ services:
       - type: rewrite
         source: /static/*
         destination: /static/:splat
+      # Landlord sub-app static assets (must precede SPA fallback)
+      - type: rewrite
+        source: /landlord/assets/*
+        destination: /landlord/assets/:splat
       # Landlord sub-app (basename /landlord)
       - type: rewrite
         source: /landlord/*

@@ -3,8 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { SessionManager } from '../services/SessionManager';
 import { ApplicationInsights } from '@microsoft/applicationinsights-web';
 import { KNOWN_API_ORIGINS } from '../utils/apiEndpoints';
-
-const DEFAULT_SEARCH_BACKEND_URL = 'https://proptii-r1-1a-search.onrender.com';
+import { resolveSearchBackendUrl } from '../utils/searchBackendUrl';
 
 interface CSRFToken {
     token: string;
@@ -68,8 +67,7 @@ export class SecurityMiddleware {
         const apiUrl = import.meta.env.VITE_API_URL || '';
         // Remove /api from the end if it exists
         const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
-        const searchBackendOrigin = this.sanitizeOrigin(import.meta.env.VITE_SEARCH_BACKEND_URL) 
-            ?? this.sanitizeOrigin(DEFAULT_SEARCH_BACKEND_URL);
+        const searchBackendOrigin = this.sanitizeOrigin(resolveSearchBackendUrl());
 
         const connectSources = new Set<string>([
             'https://formsubmit.co',

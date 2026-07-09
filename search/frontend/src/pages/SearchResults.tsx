@@ -5,28 +5,43 @@ import type { Property } from '../types';
 const DEFAULT_LOCAL_SEARCH_URL = 'http://localhost:3001';
 const DEFAULT_RENDER_SEARCH_URL = 'https://proptii-r1-1a-search.onrender.com';
 
-const normalizeBackendUrl = (rawUrl: string | undefined): string => {
-  if (!rawUrl) {
-    return DEFAULT_LOCAL_SEARCH_URL;
-  }
+const NON_SEARCH_API_HOST_FRAGMENTS = [
+  'railway.app',
+  'proptii-r1-1a-new-backend.onrender.com',
+  'proptii-r1-1a-1.onrender.com',
+  'api.proptii.com',
+  'api-staging.proptii.com',
+];
 
+const normalizeBackendUrl = (rawUrl: string): string => {
   const trimmed = rawUrl.trim();
   if (!trimmed) {
     return DEFAULT_LOCAL_SEARCH_URL;
   }
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return withProtocol.replace(/\/$/, '');
+};
 
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+const isMisconfiguredSearchBackendUrl = (url: string): boolean => {
+  const lower = url.toLowerCase();
+  return NON_SEARCH_API_HOST_FRAGMENTS.some((fragment) => lower.includes(fragment));
 };
 
 const resolveBackendUrl = (): string => {
-  const envUrl = import.meta.env.VITE_SEARCH_BACKEND_URL;
-  if (envUrl && envUrl.trim()) {
+  const envUrl = (import.meta.env.VITE_SEARCH_BACKEND_URL || '').trim();
+  if (envUrl && !isMisconfiguredSearchBackendUrl(envUrl)) {
     return normalizeBackendUrl(envUrl);
   }
 
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname.toLowerCase();
-    if (hostname.includes('onrender.com') || hostname.includes('proptii.com')) {
+    if (
+      hostname === 'proptii.co' ||
+      hostname.endsWith('.proptii.co') ||
+      hostname === 'proptii.com' ||
+      hostname.endsWith('.proptii.com') ||
+      hostname.includes('onrender.com')
+    ) {
       return DEFAULT_RENDER_SEARCH_URL;
     }
   }

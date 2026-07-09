@@ -117,7 +117,16 @@ export default defineConfig(({ mode = 'development' }) => {
   const isProduction = mode === 'production';
   const isStaging = mode === 'staging';
 
+  // Render dashboard may set SEARCH_BACKEND_URL; Vite only exposes VITE_* to the client.
+  const viteSearchBackendUrl = process.env.VITE_SEARCH_BACKEND_URL?.trim() || '';
+  const aliasSearchBackendUrl = process.env.SEARCH_BACKEND_URL?.trim() || '';
+  const define: Record<string, string> = {};
+  if (!viteSearchBackendUrl && aliasSearchBackendUrl) {
+    define['import.meta.env.VITE_SEARCH_BACKEND_URL'] = JSON.stringify(aliasSearchBackendUrl);
+  }
+
   return {
+    define,
     plugins: [
       react(),
       // Custom plugin to handle SPA fallback for landlord dashboard

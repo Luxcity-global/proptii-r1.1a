@@ -62,6 +62,46 @@ function validateBuildOutput() {
     console.log(chalk.green('✓ Build output validation successful'));
 }
 
+function validateLandlordBuildOutput() {
+    console.log(chalk.blue('Validating landlord build output...'));
+
+    const distPath = path.join(process.cwd(), 'dist');
+    const landlordIndex = path.join(distPath, 'landlord', 'index.html');
+    const landlordAssets = path.join(distPath, 'landlord', 'assets');
+
+    if (!fs.existsSync(landlordIndex)) {
+        console.error(chalk.red('❌ Landlord index not found: dist/landlord/index.html'));
+        console.error(chalk.red('   Run: npm run build:landlord'));
+        process.exit(1);
+    }
+
+    if (!fs.existsSync(landlordAssets)) {
+        console.error(chalk.red('❌ Landlord assets directory not found: dist/landlord/assets/'));
+        process.exit(1);
+    }
+
+    const assetFiles = fs.readdirSync(landlordAssets);
+    const hasJsFile = assetFiles.some(file => file.endsWith('.js'));
+    const hasCssFile = assetFiles.some(file => file.endsWith('.css'));
+
+    if (!hasJsFile || !hasCssFile) {
+        console.error(chalk.red('❌ Landlord build missing JS or CSS in dist/landlord/assets/'));
+        process.exit(1);
+    }
+
+    const indexHtml = fs.readFileSync(landlordIndex, 'utf8');
+    const referencedAssets = [...indexHtml.matchAll(/\/landlord\/assets\/([^"'\s>]+)/g)].map(m => m[1]);
+    const missing = referencedAssets.filter(name => !fs.existsSync(path.join(landlordAssets, name)));
+
+    if (missing.length > 0) {
+        console.error(chalk.red('❌ Landlord index.html references missing assets:'));
+        missing.forEach(name => console.error(chalk.red(`   - ${name}`)));
+        process.exit(1);
+    }
+
+    console.log(chalk.green('✓ Landlord build output validation successful'));
+}
+
 function validateEnvironmentVariables() {
     console.log(chalk.blue('Validating environment variables...'));
 
@@ -92,6 +132,7 @@ function main() {
 
     try {
         validateBuildOutput();
+        validateLandlordBuildOutput();
         validateEnvironmentVariables();
 
         console.log(chalk.green('\n✨ All validations passed successfully!'));

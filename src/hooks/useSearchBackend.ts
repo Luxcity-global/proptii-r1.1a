@@ -1,31 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-
-/** Search/backend (On The Market scraper) - default port 3001 */
-const DEFAULT_LOCAL_SEARCH_URL = 'http://localhost:3001';
-const DEFAULT_RENDER_SEARCH_URL = 'https://proptii-r1-1a-search.onrender.com';
-
-const normalizeBackendUrl = (rawUrl: string | undefined, defaultUrl: string): string => {
-  if (!rawUrl || !rawUrl.trim()) {
-    return defaultUrl;
-  }
-  const trimmed = rawUrl.trim();
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-};
-
-/** URL for search/backend (scraper.ts - On The Market / Rightmove / etc.) */
-const resolveSearchBackendUrl = (): string => {
-  const envUrl = import.meta.env.VITE_SEARCH_BACKEND_URL;
-  if (envUrl && envUrl.trim()) {
-    return normalizeBackendUrl(envUrl, DEFAULT_LOCAL_SEARCH_URL);
-  }
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname.toLowerCase();
-    if (hostname.includes('onrender.com') || hostname.includes('proptii.com')) {
-      return DEFAULT_RENDER_SEARCH_URL;
-    }
-  }
-  return DEFAULT_LOCAL_SEARCH_URL;
-};
+import { resolveSearchBackendUrl } from '../utils/searchBackendUrl';
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
 const cleanPropertyPrice = (price: string): string => {
