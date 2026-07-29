@@ -12,7 +12,7 @@ interface JwtPayload {
     [key: string]: any;
 }
 
-export async function authenticate(request: HttpRequest): Promise<void> {
+export async function authenticate(request: HttpRequest): Promise<any> {
     const config = validateEnv();
     const authHeader = request.headers.get('authorization');
 
@@ -29,18 +29,32 @@ export async function authenticate(request: HttpRequest): Promise<void> {
     // Support mock authentication in development mode
     if (config.NODE_ENV === 'development' && token.startsWith('mock-token-')) {
         console.log('🧪 Bypassing real auth for mock token in development');
-        return;
+        const id = token.replace('mock-token-', '');
+        let name = 'Test User';
+        let email = 'tenant@test.proptii.co';
+        let role = 'tenant';
+        
+        if (id.startsWith('tenant')) {
+            role = 'tenant';
+            if (id === 'tenant-test-001') { name = 'Sarah Jones'; email = 'tenant@test.proptii.co'; }
+            if (id === 'tenant-test-002') { name = 'Emily Davis'; email = 'tenant-two@test.proptii.co'; }
+        } else if (id.startsWith('landlord')) {
+            role = 'landlord';
+            if (id === 'landlord-test-001') { name = 'John Smith'; email = 'landlord@test.proptii.co'; }
+            if (id === 'landlord-test-002') { name = 'Jack Smith'; email = 'landlord-two@test.proptii.co'; }
+        }
+        return { sub: id, name, email, role };
     }
 
     try {
-        await validateToken(token, config);
+        return await validateToken(token, config);
     } catch (error) {
         if (error instanceof AppError) throw error;
         throw new AppError(401, 'Authentication failed', 'AUTH_FAILED');
     }
 }
 
-async function validateToken(token: string, config: any): Promise<void> {
+async function validateToken(token: string, config: any): Promise<any> {
     try {
         // Decode the token to get the header and payload
         const decoded = jwtDecode<JwtPayload>(token);
@@ -87,6 +101,7 @@ async function validateToken(token: string, config: any): Promise<void> {
             throw new AppError(401, 'Invalid token: audience mismatch', 'INVALID_TOKEN');
         }
 
+        return payload;
     } catch (error) {
         console.error('Token validation failed:', error);
         if (error instanceof AppError) throw error;
@@ -98,7 +113,10 @@ async function validateToken(token: string, config: any): Promise<void> {
 export function withAuth(handler: (request: HttpRequest, context: InvocationContext) => Promise<HttpResponseInit>) {
     return async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
         try {
-            await authenticate(request);
+            const payload = await authenticate(request);
+            // Attach the verified payload to the request object so downstream
+            // controllers don't need to re-decode the token.
+            (request as any).user = payload;
         } catch (error) {
             if (error instanceof AppError) {
                 return { status: error.statusCode, jsonBody: { error: { message: error.message, code: error.code } } };

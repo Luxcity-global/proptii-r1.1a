@@ -1,4 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { getFirestore } from '../config/firestore.config';
+
+const roleCache = new Map<string, { role: string; expires: number }>();
+const CACHE_TTL_MS = 5 * 60 * 1000;
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
@@ -99,7 +103,37 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   /** The payload is already verified by passport-jwt; return it as the user. */
-  async validate(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
-    return payload;
+  async validate(payload: Record<string, any>): Promise<Record<string, any>> {
+    let role = 'tenant';
+    const email = payload.emails?.[0] || payload.email || payload.preferred_username;
+    
+    if (email) {
+      const emailLower = email.toLowerCase();
+      const cached = roleCache.get(emailLower);
+      if (cached && cached.expires > Date.now()) {
+        role = cached.role;
+      } else {
+        const firestore = getFirestore();
+        if (firestore) {
+          try {
+            const snapshot = await firestore.collection('landlordUsers')
+              .where('email', '==', emailLower)
+              .limit(1)
+              .get();
+            if (!snapshot.empty) {
+              const docRole = snapshot.docs[0].data().role;
+              if (docRole === 'landlord' || docRole === 'agent') {
+                role = docRole;
+              }
+            }
+            roleCache.set(emailLower, { role, expires: Date.now() + CACHE_TTL_MS });
+          } catch (err) {
+            Logger.error(`Error resolving role for ${email}:`, err, 'JwtStrategy');
+          }
+        }
+      }
+    }
+    
+    return { ...payload, role };
   }
 }

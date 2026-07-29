@@ -18,6 +18,7 @@ import { AuthModule } from './modules/auth.module';
 import { HealthModule } from './health/health.module';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
 import { GuestEnquiryModule } from './modules/guest-enquiry.module';
+import { NativePropertiesModule } from './modules/native-properties.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { GuestEnquiryModule } from './modules/guest-enquiry.module';
       dbName: process.env.MONGODB_DB_NAME || 'proptii-communication',
     }),
     GuestEnquiryModule,
+    NativePropertiesModule,
   ],
   controllers: [AppController, PropertyDocumentController],
   providers: [

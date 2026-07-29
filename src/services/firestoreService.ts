@@ -1,17 +1,4 @@
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  getDocs,
-  serverTimestamp,
-  Timestamp 
-} from 'firebase/firestore';
-import { db } from '../config/firebaseConfig';
+import { getAccessTokenForApiRequest } from './msalAccessToken';
 
 export interface ReferencingFormData {
   identity: {
@@ -108,9 +95,9 @@ export interface ReferencingDocument {
   formData: ReferencingFormData;
   currentStep: number;
   stepStatus: { [key: number]: 'empty' | 'partial' | 'complete' };
-  lastSaved: Timestamp;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  lastSaved?: any;
+  createdAt?: any;
+  updatedAt?: any;
   isSubmitted: boolean;
 }
 
@@ -121,10 +108,10 @@ export interface UserFile {
   category: string;
   type: string;
   size: number;
-  uploadDate: Timestamp;
+  uploadDate: any;
   url: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export interface SupportFormData {
@@ -134,15 +121,32 @@ export interface SupportFormData {
   body: string;
   email: string;
   status: 'pending' | 'in-progress' | 'resolved';
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+const API_BASE = (import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000').replace(/\/$/, '');
+
+async function authHeaders(): Promise<Record<string, string>> {
+  let token = null;
+  try {
+    token = await getAccessTokenForApiRequest();
+  } catch (err) {
+    console.warn('Could not get actual token, falling back to mock or empty', err);
+    token = localStorage.getItem('mock_token');
+  }
+  
+  if (!token) {
+    console.warn('No token available for API request');
+    return { 'Content-Type': 'application/json' };
+  }
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
 }
 
 class FirestoreService {
-  private readonly collectionName = 'referencingForms';
-  private readonly filesCollectionName = 'userFiles';
-  private readonly supportFormsCollectionName = 'supportForms';
-
   /**
    * Clean form data by removing undefined values
    */
@@ -169,7 +173,7 @@ class FirestoreService {
   }
 
   /**
-   * Save referencing form data to Firestore
+   * Save referencing form data to NestJS backend
    */
   async saveReferencingForm(
     userId: string, 
@@ -179,413 +183,158 @@ class FirestoreService {
     stepStatus: { [key: number]: 'empty' | 'partial' | 'complete' }
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // Check if we're online
       if (!navigator.onLine) {
-        console.warn('⚠️ Device is offline, data will be saved when connection is restored');
-        return { 
-          success: false, 
-          error: 'Device is offline. Data will be saved when connection is restored.' 
-        };
+        return { success: false, error: 'Device is offline.' };
       }
 
-      const docId = `${userId}_${propertyId}`;
-      const docRef = doc(db, this.collectionName, docId);
-      
-      // Check if document exists
-      const docSnap = await getDoc(docRef);
-      
-      const documentData: ReferencingDocument = {
-        userId,
-        propertyId,
-        formData: this.cleanFormData(formData), // Clean undefined values
+      const headers = await authHeaders();
+      const payload = {
+        formData: this.cleanFormData(formData),
         currentStep,
-        stepStatus,
-        lastSaved: serverTimestamp() as Timestamp,
-        createdAt: docSnap.exists() ? docSnap.data().createdAt : serverTimestamp() as Timestamp,
-        updatedAt: serverTimestamp() as Timestamp,
-        isSubmitted: docSnap.exists() ? docSnap.data().isSubmitted : false
+        stepStatus
       };
 
-      await setDoc(docRef, documentData, { merge: true });
-      
-      console.log('✅ Referencing form saved to Firestore successfully');
+      const res = await fetch(`${API_BASE}/api/referencing/forms/${propertyId}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to save referencing form: ${res.statusText}`);
+      }
+
+      console.log('✅ Referencing form saved successfully');
       return { success: true };
     } catch (error: any) {
-      console.error('❌ Error saving referencing form to Firestore:', error);
-      
-      // Handle specific Firebase errors
-      if (error.code === 'unavailable') {
-        return { 
-          success: false, 
-          error: 'Firestore is currently unavailable. Please check your internet connection and try again.' 
-        };
-      }
-      
-      if (error.code === 'permission-denied') {
-        console.warn('⚠️ Firestore permission denied - this is expected if Firestore security rules are not configured yet');
-        return { 
-          success: false, 
-          error: 'Firestore access denied. Please configure Firestore security rules or check your Firebase setup.' 
-        };
-      }
-      
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
+      console.error('❌ Error saving referencing form:', error);
+      return { success: false, error: error.message };
     }
   }
 
   /**
-   * Get referencing form data from Firestore
+   * Get referencing form data from NestJS backend
    */
   async getReferencingForm(
     userId: string, 
     propertyId: string
   ): Promise<{ success: boolean; data?: ReferencingDocument; error?: string }> {
     try {
-      const docId = `${userId}_${propertyId}`;
-      console.log(`🔍 Querying Firestore for referencing form: ${this.collectionName}/${docId}`);
-      const docRef = doc(db, this.collectionName, docId);
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        console.log('✅ Found referencing form in Firestore');
-        return { 
-          success: true, 
-          data: docSnap.data() as ReferencingDocument 
-        };
-      } else {
-        console.log('ℹ️ No referencing form found in Firestore for this document ID');
-        return { 
-          success: true, 
-          data: undefined 
-        };
-      }
-    } catch (error: any) {
-      console.error('❌ Error getting referencing form from Firestore:', error);
-      
-      // Handle specific Firebase errors
-      if (error.code === 'permission-denied') {
-        console.warn('⚠️ Firestore permission denied for getReferencingForm');
-        return { 
-          success: false, 
-          error: 'Permission denied. Please configure Firestore security rules.' 
-        };
-      }
-      
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
-    }
-  }
-
-  /**
-   * Update referencing form submission status
-   */
-  async submitReferencingForm(
-    userId: string, 
-    propertyId: string
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const docId = `${userId}_${propertyId}`;
-      const docRef = doc(db, this.collectionName, docId);
-      
-      await updateDoc(docRef, {
-        isSubmitted: true,
-        updatedAt: serverTimestamp(),
-        submittedAt: serverTimestamp()
+      const headers = await authHeaders();
+      const res = await fetch(`${API_BASE}/api/referencing/forms/${propertyId}`, {
+        method: 'GET',
+        headers
       });
-      
-      console.log('✅ Referencing form submitted successfully');
-      return { success: true };
-    } catch (error) {
-      console.error('❌ Error submitting referencing form:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
-    }
-  }
 
-  /**
-   * Get all referencing forms for a user
-   */
-  async getUserReferencingForms(userId: string): Promise<{ success: boolean; data?: ReferencingDocument[]; error?: string }> {
-    try {
-      console.log('🔍 Querying Firestore for all referencing forms for user:', userId);
-      const q = query(
-        collection(db, this.collectionName),
-        where('userId', '==', userId)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const forms: ReferencingDocument[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        forms.push(doc.data() as ReferencingDocument);
-      });
-      
-      console.log(`✅ Found ${forms.length} referencing form(s) for user ${userId}`);
-      return { success: true, data: forms };
-    } catch (error: any) {
-      console.error('❌ Error getting user referencing forms:', error);
-      
-      // Handle specific Firebase errors
-      if (error.code === 'permission-denied') {
-        console.warn('⚠️ Firestore permission denied for getUserReferencingForms');
-        return { 
-          success: false, 
-          error: 'Permission denied. Please configure Firestore security rules.' 
-        };
+      if (!res.ok) {
+        throw new Error(`Failed to fetch form: ${res.statusText}`);
+      }
+
+      const json = await res.json();
+      if (json.success && json.data) {
+        return { success: true, data: json.data as ReferencingDocument };
       }
       
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
+      return { success: true, data: undefined };
+    } catch (error: any) {
+      console.error('❌ Error getting referencing form:', error);
+      return { success: false, error: error.message };
     }
   }
 
   /**
    * Delete referencing form
    */
-  async deleteReferencingForm(
-    userId: string, 
-    propertyId: string
-  ): Promise<{ success: boolean; error?: string }> {
+  async deleteReferencingForm(userId: string, propertyId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const docId = `${userId}_${propertyId}`;
-      const docRef = doc(db, this.collectionName, docId);
-      
-      await deleteDoc(docRef);
-      
-      console.log('✅ Referencing form deleted successfully');
+      const headers = await authHeaders();
+      const res = await fetch(`${API_BASE}/api/referencing/forms/${propertyId}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to delete form: ${res.statusText}`);
+      }
+
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error deleting referencing form:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
+      return { success: false, error: error.message };
     }
   }
 
   /**
-   * Save user file to Firestore
+   * Save user file metadata
    */
   async saveUserFile(
-    userId: string,
-    file: {
-      name: string;
-      category: string;
-      type: string;
-      size: number;
-      url: string;
-    }
+    userId: string, 
+    fileData: Omit<UserFile, 'id' | 'userId' | 'uploadDate' | 'createdAt' | 'updatedAt'>,
+    customId?: string
   ): Promise<{ success: boolean; fileId?: string; error?: string }> {
     try {
-      const fileId = `${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const fileData: UserFile = {
-        id: fileId,
-        userId,
-        name: file.name,
-        category: file.category,
-        type: file.type,
-        size: file.size,
-        uploadDate: serverTimestamp() as Timestamp,
-        url: file.url,
-        createdAt: serverTimestamp() as Timestamp,
-        updatedAt: serverTimestamp() as Timestamp
-      };
+      const headers = await authHeaders();
+      const res = await fetch(`${API_BASE}/api/referencing/files/save`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(fileData)
+      });
 
-      const docRef = doc(db, this.filesCollectionName, fileId);
-      await setDoc(docRef, fileData);
-      
-      return { success: true, fileId };
-    } catch (error) {
-      console.error('❌ Error saving user file to Firestore:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
+      if (!res.ok) {
+        throw new Error(`Failed to save file: ${res.statusText}`);
+      }
+
+      const json = await res.json();
+      return { success: true, fileId: json.id };
+    } catch (error: any) {
+      console.error('❌ Error saving user file:', error);
+      return { success: false, error: error.message };
     }
   }
 
   /**
-   * Get user files from Firestore
+   * Get user files
    */
   async getUserFiles(userId: string): Promise<{ success: boolean; files?: UserFile[]; error?: string }> {
     try {
-      const q = query(
-        collection(db, this.filesCollectionName),
-        where('userId', '==', userId)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const files: UserFile[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        files.push(doc.data() as UserFile);
+      const headers = await authHeaders();
+      const res = await fetch(`${API_BASE}/api/referencing/files/all`, {
+        method: 'GET',
+        headers
       });
-      
-      // Sort by upload date (newest first)
-      files.sort((a, b) => b.uploadDate.toMillis() - a.uploadDate.toMillis());
-      
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch files: ${res.statusText}`);
+      }
+
+      const json = await res.json();
+      const files = json.data || [];
       return { success: true, files };
-    } catch (error) {
-      console.error('❌ Error getting user files from Firestore:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
+    } catch (error: any) {
+      console.error('❌ Error getting user files:', error);
+      return { success: false, error: error.message };
     }
   }
 
   /**
-   * Delete user file from Firestore
+   * Delete user file
    */
   async deleteUserFile(userId: string, fileId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const docRef = doc(db, this.filesCollectionName, fileId);
-      await deleteDoc(docRef);
-      
-      return { success: true };
-    } catch (error) {
-      console.error('❌ Error deleting user file from Firestore:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
-    }
-  }
-
-  /**
-   * Save support form submission to Firestore
-   */
-  async saveSupportForm(
-    formData: {
-      subject: string;
-      heading: string;
-      body: string;
-      email: string;
-    }
-  ): Promise<{ success: boolean; formId?: string; error?: string }> {
-    try {
-      // Check if we're online
-      if (!navigator.onLine) {
-        console.warn('⚠️ Device is offline, data will be saved when connection is restored');
-        return { 
-          success: false, 
-          error: 'Device is offline. Data will be saved when connection is restored.' 
-        };
-      }
-
-      const formId = `support_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const docRef = doc(db, this.supportFormsCollectionName, formId);
-      
-      const supportFormData: SupportFormData = {
-        id: formId,
-        subject: formData.subject,
-        heading: formData.heading,
-        body: formData.body,
-        email: formData.email,
-        status: 'pending',
-        createdAt: serverTimestamp() as Timestamp,
-        updatedAt: serverTimestamp() as Timestamp
-      };
-
-      await setDoc(docRef, supportFormData);
-      
-      console.log('✅ Support form saved to Firestore successfully');
-      return { success: true, formId };
-    } catch (error: any) {
-      console.error('❌ Error saving support form to Firestore:', error);
-      
-      // Handle specific Firebase errors
-      if (error.code === 'unavailable') {
-        return { 
-          success: false, 
-          error: 'Firestore is currently unavailable. Please check your internet connection and try again.' 
-        };
-      }
-      
-      if (error.code === 'permission-denied') {
-        console.warn('⚠️ Firestore permission denied - this is expected if Firestore security rules are not configured yet');
-        return { 
-          success: false, 
-          error: 'Firestore access denied. Please configure Firestore security rules or check your Firebase setup.' 
-        };
-      }
-      
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
-    }
-  }
-
-  /**
-   * Get all support form submissions
-   */
-  async getAllSupportForms(): Promise<{ success: boolean; forms?: SupportFormData[]; error?: string }> {
-    try {
-      console.log('🔍 Querying Firestore for all support forms');
-      const querySnapshot = await getDocs(collection(db, this.supportFormsCollectionName));
-      const forms: SupportFormData[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        forms.push(doc.data() as SupportFormData);
+      const headers = await authHeaders();
+      const res = await fetch(`${API_BASE}/api/referencing/files/${fileId}`, {
+        method: 'DELETE',
+        headers
       });
-      
-      // Sort by creation date (newest first)
-      forms.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-      
-      console.log(`✅ Found ${forms.length} support form(s)`);
-      return { success: true, forms };
-    } catch (error: any) {
-      console.error('❌ Error getting support forms from Firestore:', error);
-      
-      // Handle specific Firebase errors
-      if (error.code === 'permission-denied') {
-        console.warn('⚠️ Firestore permission denied for getAllSupportForms');
-        return { 
-          success: false, 
-          error: 'Permission denied. Please configure Firestore security rules.' 
-        };
-      }
-      
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
-    }
-  }
 
-  /**
-   * Update support form status
-   */
-  async updateSupportFormStatus(
-    formId: string,
-    status: 'pending' | 'in-progress' | 'resolved'
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const docRef = doc(db, this.supportFormsCollectionName, formId);
-      
-      await updateDoc(docRef, {
-        status,
-        updatedAt: serverTimestamp()
-      });
-      
-      console.log('✅ Support form status updated successfully');
+      if (!res.ok) {
+        throw new Error(`Failed to delete file: ${res.statusText}`);
+      }
+
       return { success: true };
-    } catch (error) {
-      console.error('❌ Error updating support form status:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
+    } catch (error: any) {
+      console.error('❌ Error deleting user file:', error);
+      return { success: false, error: error.message };
     }
   }
 
@@ -601,60 +350,39 @@ class FirestoreService {
     error?: string 
   }> {
     try {
-      console.log(`🔍 Querying Firestore for referee/guarantor responses for: ${tenantEmail}`);
-      
-      // Query for all responses linked to this tenant email
-      const q = query(
-        collection(db, 'referee_guarantor_responses'),
-        where('tenantEmail', '==', tenantEmail)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const refereeResponses: any[] = [];
-      const guarantorResponses: any[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.responseType === 'referee' || data.type === 'referee_response') {
-          refereeResponses.push(data);
-        } else if (data.responseType === 'guarantor' || data.type === 'guarantor_response') {
-          guarantorResponses.push(data);
-        }
+      const headers = await authHeaders();
+      const res = await fetch(`${API_BASE}/api/referencing/responses/${encodeURIComponent(tenantEmail)}`, {
+        method: 'GET',
+        headers
       });
-      
-      // Sort by creation date (newest first)
-      const sortByDate = (a: any, b: any) => {
-        const aDate = a.createdAt?.toMillis?.() || new Date(a.submittedAt || a.createdAt).getTime();
-        const bDate = b.createdAt?.toMillis?.() || new Date(b.submittedAt || b.createdAt).getTime();
-        return bDate - aDate;
-      };
-      
-      refereeResponses.sort(sortByDate);
-      guarantorResponses.sort(sortByDate);
-      
-      console.log(`✅ Found ${refereeResponses.length} referee and ${guarantorResponses.length} guarantor responses`);
-      return { 
-        success: true, 
-        refereeResponses, 
-        guarantorResponses 
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch responses: ${res.statusText}`);
+      }
+
+      const json = await res.json();
+      return {
+        success: true,
+        refereeResponses: json.data?.refereeResponses || [],
+        guarantorResponses: json.data?.guarantorResponses || []
       };
     } catch (error: any) {
-      console.error('❌ Error getting referee/guarantor responses from Firestore:', error);
-      
-      // Handle specific Firebase errors
-      if (error.code === 'permission-denied') {
-        console.warn('⚠️ Firestore permission denied for getRefereeGuarantorResponses');
-        return { 
-          success: false, 
-          error: 'Permission denied. Please configure Firestore security rules.' 
-        };
-      }
-      
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
+      console.error('❌ Error getting referee/guarantor responses:', error);
+      return { success: false, error: error.message };
     }
+  }
+  
+  // Legacy support forms (keeping stubs for compilation if used elsewhere)
+  async saveSupportForm(formData: any): Promise<{ success: boolean; formId?: string; error?: string }> {
+    return { success: true, formId: 'mock' };
+  }
+  
+  async getAllSupportForms(): Promise<{ success: boolean; forms?: SupportFormData[]; error?: string }> {
+    return { success: true, forms: [] };
+  }
+
+  async updateSupportFormStatus(formId: string, status: string): Promise<{ success: boolean; error?: string }> {
+    return { success: true };
   }
 }
 

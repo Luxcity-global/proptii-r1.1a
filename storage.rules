@@ -14,7 +14,7 @@ service firebase.storage {
     match /properties/{allPaths=**} {
       allow read: if true; // Public read access
       // For development: allow writes without auth (remove in production)
-      allow write: if true; // TODO: Change to `request.auth != null` in production
+      allow write: if false; // Deny by default
       // allow write: if request.auth != null && 
       //              request.resource.size < 10 * 1024 * 1024; // 10MB limit
     }

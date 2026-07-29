@@ -341,6 +341,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             currentAccount.homeAccountId || 
             '';
           
+          let resolvedRoles = ['tenant'];
+          try {
+            const { default: landlordUserService } = await import('../services/landlordUserService');
+            const roleCheck = await landlordUserService.isLandlordOrAgent(currentAccount.username);
+            if (roleCheck.isLandlord && roleCheck.user?.role) {
+              resolvedRoles = [roleCheck.user.role];
+            }
+          } catch (e) {
+            console.error('Error resolving role:', e);
+          }
+
           setUser({
             id: stableUserId,
             givenName: currentAccount.name?.split(' ')[0],
@@ -348,7 +359,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             email: currentAccount.username,
             name: currentAccount.name,
             phone: phoneNumber,
-            roles: ['tenant'] // Default role for new users
+            roles: resolvedRoles
           });
           
           console.log('👤 User object set with phone:', phoneNumber);
@@ -532,6 +543,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         console.log('📞 Login - Phone number found:', phoneNumber);
         
+        let resolvedRoles = ['tenant'];
+        try {
+          const { default: landlordUserService } = await import('../services/landlordUserService');
+          const emailToCheck = result.account?.username || '';
+          const roleCheck = await landlordUserService.isLandlordOrAgent(emailToCheck);
+          
+          if (roleCheck.isLandlord && roleCheck.user?.role) {
+            resolvedRoles = [roleCheck.user.role];
+            
+            const currentRedirect = sessionStorage.getItem('redirectAfterLogin');
+            if (!currentRedirect || currentRedirect === '/dashboard' || currentRedirect === '/') {
+              sessionStorage.setItem('redirectAfterLogin', '/landlord/index.html');
+            }
+          }
+        } catch (e) {
+          console.error('Error resolving role during login:', e);
+        }
+
         setUser({
           id: stableUserId,
           email: result.account?.username || '',
@@ -539,7 +568,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           givenName: result.account?.name?.split(' ')[0],
           familyName: result.account?.name?.split(' ').slice(1).join(' '),
           phone: phoneNumber,
-          roles: ['tenant'] // Default role for new users
+          roles: resolvedRoles
         });
         
         console.log('👤 Login - User object set:', { id: stableUserId, email: result.account?.username, phone: phoneNumber });

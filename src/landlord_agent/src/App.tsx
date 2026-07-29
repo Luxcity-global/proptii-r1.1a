@@ -497,6 +497,12 @@ export function AppContent() {
     setIsAuthLoading(hostIsLoading);
     setIsAuthenticated(hostIsAuthenticated);
     if (hostIsAuthenticated && hostUser) {
+      if (hostUser.roles?.includes('agent')) {
+        setUserRole('agent');
+      } else if (hostUser.roles?.includes('landlord')) {
+        setUserRole('landlord');
+      }
+      
       setUserProfile(prev => {
         const existingCompanyProfile = prev?.companyProfile;
         return {
@@ -722,44 +728,53 @@ export function AppContent() {
     });
   };
 
-  // Convert images to base64 and return PropertyPhoto objects
+  // Upload images to secure backend endpoint and return PropertyPhoto objects
   const uploadPropertyImages = async (imageFiles: File[]): Promise<PropertyPhoto[]> => {
     if (imageFiles.length === 0) {
       return [];
     }
 
-    console.log(`Processing ${imageFiles.length} images...`);
-
-    const convertFileToBase64 = (file: File): Promise<string> => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    };
+    console.log(`Uploading ${imageFiles.length} images...`);
+    const { getAccessTokenForApiRequest } = await import('../../services/msalAccessToken');
+    const token = await getAccessTokenForApiRequest();
+    const API_URL = import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000';
 
     const photoPromises = imageFiles.map(async (file, index) => {
       try {
         const timestamp = Date.now();
-        // Compress large images before converting to base64
+        // Compress large images before upload
         let processedFile = file;
         if (file.type.startsWith('image/') && file.size > 500 * 1024) {
           processedFile = await compressImage(file, 150);
         }
-        const base64Url = await convertFileToBase64(processedFile);
 
-        console.log(`✅ Processed image ${index + 1}/${imageFiles.length} to base64`);
+        const formData = new FormData();
+        formData.append('photo', processedFile);
+
+        const res = await fetch(`${API_URL}/api/property/upload-photo`, {
+          method: 'POST',
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: formData
+        });
+
+        if (!res.ok) {
+          throw new Error(`Upload failed with status: ${res.status}`);
+        }
+
+        const json = await res.json();
+        console.log(`✅ Uploaded image ${index + 1}/${imageFiles.length}`);
 
         return {
           id: `photo-${timestamp}-${index}`,
-          url: base64Url,
-          filename: file.name,
+          url: json.data?.url || '',
+          filename: json.data?.filename || file.name,
           isCover: index === 0,
           room: index === 0 ? 'Exterior' : undefined
         };
       } catch (error) {
-        console.error(`❌ Error converting image ${index + 1}:`, error);
+        console.error(`❌ Error uploading image ${index + 1}:`, error);
         throw error;
       }
     });
@@ -774,34 +789,43 @@ export function AppContent() {
       return [];
     }
 
-    console.log(`Processing ${documentFiles.length} documents...`);
-
-    const convertFileToBase64 = (file: File): Promise<string> => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    };
+    console.log(`Uploading ${documentFiles.length} documents...`);
+    const { getAccessTokenForApiRequest } = await import('../../services/msalAccessToken');
+    const token = await getAccessTokenForApiRequest();
+    const API_URL = import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000';
 
     const documentPromises = documentFiles.map(async (file, index) => {
       try {
         const timestamp = Date.now();
-        const base64Url = await convertFileToBase64(file);
+        
+        const formData = new FormData();
+        formData.append('document', file);
 
-        console.log(`✅ Processed document ${index + 1}/${documentFiles.length}: ${file.name}`);
+        const res = await fetch(`${API_URL}/api/property/upload-document`, {
+          method: 'POST',
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: formData
+        });
+
+        if (!res.ok) {
+          throw new Error(`Upload failed with status: ${res.status}`);
+        }
+
+        const json = await res.json();
+        console.log(`✅ Uploaded document ${index + 1}/${documentFiles.length}: ${file.name}`);
 
         return {
           id: `doc-${timestamp}-${index}`,
           name: file.name,
           type: 'other', // Default classification; can be refined later
-          url: base64Url, // Store as base64 data URL
+          url: json.data?.url || '', // Secure URL from backend
           issueDate: new Date(),
           status: 'valid'
         } as PropertyDocument;
       } catch (error) {
-        console.error(`❌ Error processing document ${file.name}:`, error);
+        console.error(`❌ Error uploading document ${file.name}:`, error);
         throw error;
       }
     });

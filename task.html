@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Landlord Dashboard Remediation — Task Checklist</title>
+<style>
+  :root{
+    --navy:#1F2A44;
+    --blue:#2E5EAA;
+    --blue-light:#EAF0FB;
+    --critical:#C0392B;
+    --high:#D35400;
+    --medium:#B7950B;
+    --low:#6C7A89;
+    --bg:#F5F6F8;
+    --card:#FFFFFF;
+    --border:#E3E6EA;
+    --text:#1B2333;
+    --text-soft:#5B6472;
+    --done-bg:#F3F7F1;
+    --done-text:#8A9186;
+    --green:#2E7D4F;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    padding:32px 16px 80px;
+  }
+  .wrap{max-width:920px;margin:0 auto;}
+
+  header{margin-bottom:28px;}
+  .eyebrow{
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--blue);
+    margin-bottom:6px;
+  }
+  h1{
+    font-size:26px;
+    margin:0 0 6px;
+    color:var(--navy);
+    letter-spacing:-.01em;
+  }
+  .sub{color:var(--text-soft);font-size:14px;margin:0;}
+
+  /* progress */
+  .progress-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:18px 20px;
+    margin:22px 0 28px;
+    display:flex;
+    align-items:center;
+    gap:20px;
+  }
+  .progress-ring{
+    position:relative;
+    width:64px;height:64px;flex:none;
+  }
+  .progress-ring svg{transform:rotate(-90deg);}
+  .progress-ring circle{fill:none;stroke-width:6;}
+  .ring-bg{stroke:#EEF0F3;}
+  .ring-fg{stroke:var(--blue);stroke-linecap:round;transition:stroke-dashoffset .4s ease;}
+  .ring-label{
+    position:absolute;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:700;color:var(--navy);
+  }
+  .progress-meta{flex:1;}
+  .progress-meta .count{font-size:14px;font-weight:600;color:var(--navy);}
+  .progress-meta .days{font-size:12.5px;color:var(--text-soft);margin-top:2px;}
+  .progress-bar-track{
+    height:6px;border-radius:4px;background:#EEF0F3;margin-top:10px;overflow:hidden;
+  }
+  .progress-bar-fill{
+    height:100%;background:linear-gradient(90deg,var(--blue),var(--navy));
+    width:0%;transition:width .4s ease;
+  }
+  .reset-btn{
+    border:1px solid var(--border);
+    background:var(--card);
+    color:var(--text-soft);
+    font-size:12px;
+    padding:8px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .reset-btn:hover{border-color:var(--critical);color:var(--critical);}
+
+  /* phase */
+  .phase{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    margin-bottom:18px;
+    overflow:hidden;
+  }
+  .phase-head{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:14px 18px;
+    cursor:pointer;
+    user-select:none;
+    border-left:4px solid var(--phase-color, var(--blue));
+  }
+  .phase-head:hover{background:#FAFBFC;}
+  .phase-title{
+    font-size:15px;font-weight:700;color:var(--navy);flex:1;
+  }
+  .phase-title .goal{
+    display:block;font-size:12px;font-weight:400;color:var(--text-soft);margin-top:2px;
+  }
+  .phase-progress{
+    font-size:12px;font-weight:600;color:var(--text-soft);
+    background:#F1F3F6;padding:4px 10px;border-radius:20px;white-space:nowrap;
+  }
+  .phase-progress.complete{background:#E6F4EA;color:var(--green);}
+  .chev{
+    width:18px;height:18px;flex:none;color:var(--text-soft);
+    transition:transform .2s ease;
+  }
+  .phase.open .chev{transform:rotate(90deg);}
+
+  .task-list{
+    max-height:0;
+    overflow:hidden;
+    transition:max-height .25s ease;
+  }
+  .phase.open .task-list{max-height:4000px;}
+
+  .task{
+    display:flex;
+    gap:12px;
+    padding:12px 18px 12px 22px;
+    border-top:1px solid var(--border);
+    align-items:flex-start;
+  }
+  .task.done{background:var(--done-bg);}
+
+  .task input[type=checkbox]{
+    appearance:none;
+    -webkit-appearance:none;
+    width:19px;height:19px;
+    border-radius:5px;
+    border:1.5px solid #C7CDD6;
+    margin-top:2px;
+    flex:none;
+    cursor:pointer;
+    position:relative;
+    background:#fff;
+    transition:background .15s, border-color .15s;
+  }
+  .task input[type=checkbox]:checked{
+    background:var(--green);
+    border-color:var(--green);
+  }
+  .task input[type=checkbox]:checked::after{
+    content:"";
+    position:absolute;
+    left:5px;top:1px;
+    width:6px;height:11px;
+    border:solid white;
+    border-width:0 2px 2px 0;
+    transform:rotate(45deg);
+  }
+
+  .task-body{flex:1;min-width:0;}
+  .task-top{
+    display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:3px;
+  }
+  .task-id{
+    font-size:11px;font-weight:700;color:var(--blue);
+    background:var(--blue-light);padding:1px 7px;border-radius:5px;
+  }
+  .task.done .task-id{color:var(--text-soft);background:#EDEFEF;}
+  .sev-tag{
+    font-size:10.5px;font-weight:700;color:#fff;
+    padding:1px 8px;border-radius:20px;letter-spacing:.02em;
+  }
+  .task.done .sev-tag{opacity:.45;}
+  .task-desc{
+    font-size:13.5px;line-height:1.45;color:var(--text);
+  }
+  .task.done .task-desc{
+    color:var(--done-text);
+    text-decoration:line-through;
+    text-decoration-color:#B9C2CC;
+  }
+  .task-meta{
+    font-size:11.5px;color:var(--text-soft);margin-top:5px;
+    display:flex;flex-wrap:wrap;gap:12px;
+  }
+  .task-meta span b{color:var(--text);font-weight:600;}
+  .task.done .task-meta{color:#AEB6AE;}
+  .task.done .task-meta span b{color:#9AA39A;}
+
+  footer{
+    text-align:center;color:var(--text-soft);font-size:12px;margin-top:30px;
+  }
+
+  @media (max-width:600px){
+    .progress-card{flex-wrap:wrap;}
+    .reset-btn{margin-left:auto;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Proptii · Security Remediation</div>
+    <h1>Landlord Dashboard — Task Checklist</h1>
+    <p class="sub">Tick off each item as it's shipped. Progress is saved automatically in this browser.</p>
+  </header>
+
+  <div class="progress-card">
+    <div class="progress-ring">
+      <svg width="64" height="64" viewBox="0 0 64 64">
+        <circle class="ring-bg" cx="32" cy="32" r="27"></circle>
+        <circle class="ring-fg" id="ringFg" cx="32" cy="32" r="27" stroke-dasharray="169.6" stroke-dashoffset="169.6"></circle>
+      </svg>
+      <div class="ring-label" id="ringLabel">0%</div>
+    </div>
+    <div class="progress-meta">
+      <div class="count" id="overallCount">0 of 24 tasks complete</div>
+      <div class="days" id="overallDays">~20.75 engineer-days remaining</div>
+      <div class="progress-bar-track"><div class="progress-bar-fill" id="overallBar"></div></div>
+    </div>
+    <button class="reset-btn" id="resetBtn" title="Uncheck everything">Reset progress</button>
+  </div>
+
+  <div id="phases"></div>
+
+  <footer>Reference: Landlord Dashboard Login Flow, Redirection &amp; Security Analysis — Gaps A–R</footer>
+</div>
+
+<script>
+const DATA = [
+  { phase:"Phase 1: Emergency Lockdown", color:"#C0392B",
+    goal:"Close every Critical/High issue that needs no more than an auth check.",
+    tasks:[
+      {id:"T1", gap:"Gap R", sev:"High", effort:"M", days:1.5, dep:"—", owner:"Backend",
+        desc:"Fix JWT context handling: have auth middleware attach verified token claims to the request so downstream code never re-decodes an unverified token."},
+      {id:"T2", gap:"Gap M", sev:"Critical", effort:"M", days:1, dep:"—", owner:"Backend",
+        desc:"Lock down Firestore/Storage security rules — replace “allow read, write: if true” with deny-by-default rules."},
+      {id:"T3", gap:"Gap F", sev:"Critical", effort:"S", days:0.5, dep:"—", owner:"Backend",
+        desc:"Add JwtAuthGuard to GET /referencing/:userId and GET /referencing/responses/:tenantEmail."},
+      {id:"T4", gap:"Gap J", sev:"High", effort:"S", days:0.5, dep:"—", owner:"Backend",
+        desc:"Add an authentication guard to POST /contracts/send-signed-contract."},
+      {id:"T5", gap:"Gap K", sev:"High", effort:"S", days:0.5, dep:"—", owner:"Backend",
+        desc:"Add an authentication guard and sender-address validation to POST /email/send and /email/send-base64."},
+      {id:"T6", gap:"Gap G (pt.1)", sev:"High", effort:"S", days:0.5, dep:"—", owner:"Backend",
+        desc:"Add an authentication guard to the public viewing-request GET endpoints."},
+    ]
+  },
+  { phase:"Phase 2: Ownership & Identity Validation", color:"#D35400",
+    goal:"Fix every place the backend trusts an ID from the request instead of the verified token.",
+    tasks:[
+      {id:"T7", gap:"Gap E", sev:"Critical", effort:"M", days:1, dep:"T1", owner:"Backend",
+        desc:"Add an ownership check: compare the userId in referencing identity/employment requests against the authenticated JWT user."},
+      {id:"T8", gap:"Gap G (pt.2)", sev:"High", effort:"S", days:1, dep:"T1", owner:"Backend",
+        desc:"Add ownership checks to viewing-request PUT/DELETE endpoints so only the booking owner can modify or cancel it."},
+      {id:"T9", gap:"Gap L", sev:"High", effort:"S", days:0.5, dep:"T1", owner:"Backend",
+        desc:"Fix the ghost-account auto-merge endpoint to verify the target email against the authenticated user's JWT email claim."},
+      {id:"T10", gap:"Gap O", sev:"High", effort:"M", days:1, dep:"T1", owner:"Backend",
+        desc:"Fix the conversation-creation endpoint to verify the authenticated user matches tenantId or landlordId in the request."},
+      {id:"T11", gap:"Gap P", sev:"Medium", effort:"S", days:0.5, dep:"T1, T10", owner:"Backend",
+        desc:"Fix sender-role spoofing: derive senderRole from ConversationParticipant records, not from the request body."},
+      {id:"T12", gap:"Gap Q", sev:"High", effort:"M", days:1, dep:"—", owner:"Backend",
+        desc:"Add a file type/extension whitelist and a landlord/agent role check to property document uploads."},
+    ]
+  },
+  { phase:"Phase 3: Role-Based Access & Routing", color:"#2E5EAA",
+    goal:"Make the system correctly recognize landlords vs. tenants everywhere, front-end and back-end.",
+    tasks:[
+      {id:"T13", gap:"Gap B", sev:"High", effort:"M", days:1.5, dep:"—", owner:"Backend",
+        desc:"Build database-backed role resolution: check the landlordUsers collection on login instead of defaulting to “tenant.”"},
+      {id:"T14", gap:"Gap A", sev:"High", effort:"S", days:0.5, dep:"T13", owner:"Frontend",
+        desc:"Add a role-based route guard to /landlord restricting access to landlord/agent roles."},
+      {id:"T15", gap:"—", sev:"Medium", effort:"S", days:0.5, dep:"T13", owner:"Frontend",
+        desc:"Add a role-based route guard to /dashboard restricting access to the tenant role only."},
+      {id:"T16", gap:"Gap C", sev:"High", effort:"S", days:0.5, dep:"T13", owner:"Frontend",
+        desc:"Fix the landlord sub-app to read the active role from the main auth context instead of defaulting to “landlord.”"},
+      {id:"T17", gap:"Gap D", sev:"High", effort:"M", days:1, dep:"T13", owner:"Backend",
+        desc:"Add a backend permission check confirming landlord/agent role before property or tenant data can be modified."},
+      {id:"T18", gap:"Gap H", sev:"Medium", effort:"S", days:0.5, dep:"T13", owner:"Backend",
+        desc:"Restrict GET /azure-users to agent/admin roles only."},
+      {id:"T19", gap:"Gap I", sev:"Medium", effort:"S", days:0.25, dep:"—", owner:"Frontend",
+        desc:"Fix the /listings/new route guard so landlords (not just agents/tenants) can create listings."},
+      {id:"T20", gap:"—", sev:"Medium", effort:"S", days:0.5, dep:"T13", owner:"Frontend",
+        desc:"Implement login redirect: send registered landlords/agents to /landlord/dashboard automatically after sign-in."},
+    ]
+  },
+  { phase:"Phase 4: Hardening & Cleanup", color:"#6C7A89",
+    goal:"Remove remaining workarounds and add baseline defenses against future issues.",
+    tasks:[
+      {id:"T21", gap:"Gap M (pt.2)", sev:"Medium", effort:"L", days:3, dep:"T2", owner:"Backend",
+        desc:"Migrate all Firestore/Storage writes behind authenticated backend endpoints; remove the base64-in-Firestore workaround."},
+      {id:"T22", gap:"Gap N", sev:"Low", effort:"S", days:0.25, dep:"—", owner:"Backend",
+        desc:"Register “helmet” middleware globally in the NestJS backend for standard security headers."},
+      {id:"T23", gap:"—", sev:"Low", effort:"M", days:1, dep:"T4, T5, T12", owner:"Backend",
+        desc:"Add rate limiting/monitoring to email-sending and file-upload endpoints to catch future abuse."},
+      {id:"T24", gap:"—", sev:"—", effort:"M", days:2, dep:"T1–T23", owner:"QA/Security",
+        desc:"Full regression and penetration re-test of every endpoint listed in Gaps A–R before sign-off."},
+    ]
+  },
+];
+
+const SEV_COLOR = {
+  "Critical":"#C0392B", "High":"#D35400", "Medium":"#B7950B", "Low":"#6C7A89", "—":"#9AA3AE"
+};
+
+const STORAGE_KEY = "proptii_remediation_checklist_v1";
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  }catch(e){ return {}; }
+}
+function saveState(state){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+}
+
+let state = loadState();
+
+const phasesEl = document.getElementById("phases");
+
+function totalTasks(){ return DATA.reduce((a,p)=>a+p.tasks.length,0); }
+function totalDays(){ return DATA.reduce((a,p)=>a+p.tasks.reduce((b,t)=>b+t.days,0),0); }
+
+function render(){
+  phasesEl.innerHTML = "";
+  DATA.forEach((phase, pIdx) => {
+    const doneCount = phase.tasks.filter(t => state[t.id]).length;
+    const complete = doneCount === phase.tasks.length;
+
+    const phaseDiv = document.createElement("div");
+    phaseDiv.className = "phase" + (state["_open_"+pIdx] !== false ? " open" : "");
+    phaseDiv.style.setProperty("--phase-color", phase.color);
+
+    const head = document.createElement("div");
+    head.className = "phase-head";
+    head.innerHTML = `
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="phase-title">${phase.phase}<span class="goal">${phase.goal}</span></div>
+      <div class="phase-progress${complete ? ' complete' : ''}">${doneCount} / ${phase.tasks.length}${complete ? ' ✓' : ''}</div>
+    `;
+    head.addEventListener("click", () => {
+      const isOpen = phaseDiv.classList.toggle("open");
+      state["_open_"+pIdx] = isOpen;
+      saveState(state);
+    });
+
+    const list = document.createElement("div");
+    list.className = "task-list";
+
+    phase.tasks.forEach(t => {
+      const isDone = !!state[t.id];
+      const row = document.createElement("label");
+      row.className = "task" + (isDone ? " done" : "");
+      row.innerHTML = `
+        <input type="checkbox" ${isDone ? "checked" : ""} data-id="${t.id}">
+        <div class="task-body">
+          <div class="task-top">
+            <span class="task-id">${t.id}</span>
+            <span class="sev-tag" style="background:${SEV_COLOR[t.sev]}">${t.sev}</span>
+          </div>
+          <div class="task-desc">${t.desc}</div>
+          <div class="task-meta">
+            <span>Gap: <b>${t.gap}</b></span>
+            <span>Effort: <b>${t.effort}</b></span>
+            <span>Est: <b>${t.days}d</b></span>
+            <span>Depends on: <b>${t.dep}</b></span>
+            <span>Owner: <b>${t.owner}</b></span>
+          </div>
+        </div>
+      `;
+      const cb = row.querySelector("input");
+      cb.addEventListener("change", (e) => {
+        state[t.id] = e.target.checked;
+        saveState(state);
+        render();
+      });
+      list.appendChild(row);
+    });
+
+    phaseDiv.appendChild(head);
+    phaseDiv.appendChild(list);
+    phasesEl.appendChild(phaseDiv);
+  });
+
+  updateOverall();
+}
+
+function updateOverall(){
+  const total = totalTasks();
+  const done = DATA.reduce((a,p)=>a + p.tasks.filter(t=>state[t.id]).length, 0);
+  const pct = total ? Math.round((done/total)*100) : 0;
+
+  const daysRemaining = DATA.reduce((a,p)=>a + p.tasks.filter(t=>!state[t.id]).reduce((b,t)=>b+t.days,0), 0);
+
+  document.getElementById("overallCount").textContent = `${done} of ${total} tasks complete`;
+  document.getElementById("overallDays").textContent = `~${daysRemaining.toFixed(2).replace(/\.?0+$/,'')} engineer-days remaining`;
+  document.getElementById("overallBar").style.width = pct + "%";
+
+  const circumference = 169.6;
+  const offset = circumference - (pct/100) * circumference;
+  document.getElementById("ringFg").style.strokeDashoffset = offset;
+  document.getElementById("ringLabel").textContent = pct + "%";
+}
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  if(confirm("Uncheck all tasks? This can't be undone.")){
+    state = {};
+    saveState(state);
+    render();
+  }
+});
+
+render();
+</script>
+</body>
+</html>

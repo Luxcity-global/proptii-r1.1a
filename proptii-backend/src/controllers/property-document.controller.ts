@@ -8,15 +8,21 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
+  Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { StorageService } from '../services/storage.service';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { RolesGuard } from '../guards/roles.guard';
+import { Roles } from '../decorators/roles.decorator';
+import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth } from '@nestjs/swagger';
+import { getFirestore } from '../config/firestore.config';
 
 @Controller('property')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class PropertyDocumentController {
   private readonly logger = new Logger(PropertyDocumentController.name);
@@ -24,6 +30,8 @@ export class PropertyDocumentController {
   constructor(private readonly storageService: StorageService) {}
 
   @Post('upload-document')
+  @Roles('landlord', 'agent')
+  @Throttle({ default: { limit: 20, ttl: 60000 } }) // Max 20 uploads per minute per IP
   @UseInterceptors(
     FileInterceptor('document', {
       storage: memoryStorage(),
@@ -32,9 +40,23 @@ export class PropertyDocumentController {
       },
     }),
   )
-  async uploadDocument(@UploadedFile() file?: Express.Multer.File) {
+  async uploadDocument(@Req() req: any, @UploadedFile() file?: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('No document file provided');
+    }
+
+    const allowedMimeTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Invalid file type. Allowed types are: PDF, JPEG, PNG, DOC, DOCX, CSV, XLS, XLSX');
     }
 
     try {
@@ -55,14 +77,49 @@ export class PropertyDocumentController {
         },
       };
     } catch (error) {
-      if (error instanceof Error && error.message === 'STORAGE_NOT_CONFIGURED') {
-        this.logger.error('Failed to upload property document: storage not configured');
-        throw new ServiceUnavailableException('Document storage service is not configured');
-      }
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to upload property document: ${message}`, error as any);
+      this.logger.error('Error uploading document:', error);
       throw new InternalServerErrorException('Failed to upload document');
     }
   }
-}
 
+  @Post('upload-photo')
+  @Roles('landlord', 'agent')
+  @Throttle({ default: { limit: 40, ttl: 60000 } }) // Max 40 photos per minute per IP
+  @UseInterceptors(
+    FileInterceptor('photo', {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit for photos
+      },
+    }),
+  )
+  async uploadPhoto(@Req() req: any, @UploadedFile() file?: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No photo provided');
+    }
+
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Invalid file type. Allowed types are: JPEG, PNG, WEBP');
+    }
+
+    try {
+      const uploaded = await this.storageService.uploadFile(file, 'property-photos');
+
+      return {
+        success: true,
+        message: 'Photo uploaded successfully',
+        data: {
+          url: uploaded.url,
+          filename: uploaded.path.split('/').pop(),
+          originalName: file.originalname,
+          size: file.size,
+          mimetype: file.mimetype,
+        }
+      };
+    } catch (error) {
+      this.logger.error('Error uploading photo:', error);
+      throw new InternalServerErrorException('Failed to upload photo');
+    }
+  }
+}

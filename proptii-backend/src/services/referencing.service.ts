@@ -644,20 +644,10 @@ export class ReferencingService {
           const allSnapshot = await collectionRef.get();
           this.logger.log(`📊 Total responses in collection: ${allSnapshot.size}`);
           
-          // Log some sample data for debugging
-          if (allSnapshot.size > 0) {
-            const firstDoc = allSnapshot.docs[0].data();
-            this.logger.log('📄 Sample response structure:', {
-              id: firstDoc.id,
-              type: firstDoc.type,
-              tenantEmail: firstDoc.tenantEmail,
-              responseType: firstDoc.responseType,
-              applicantEmail: firstDoc.applicantEmail
-            });
-          }
-          
           // Filter and sort in memory
-          const allResponses = allSnapshot.docs.map(doc => doc.data());
+          const allResponses = allSnapshot.docs.map(doc => {
+            return { ...(doc.data() as any), id: doc.id } as any;
+          });
           
           const refereeResponses = allResponses
             .filter(r => r.type === 'referee_response' && r.tenantEmail === tenantEmail)
@@ -677,14 +667,6 @@ export class ReferencingService {
           
           this.logger.log(`✅ Found ${refereeResponses.length} referee and ${guarantorResponses.length} guarantor responses from Firestore`);
           
-          // Log the found responses for debugging
-          if (refereeResponses.length > 0 || guarantorResponses.length > 0) {
-            this.logger.log('📋 Found responses:', {
-              referees: refereeResponses.map(r => ({ email: r.email, consent: r.consent })),
-              guarantors: guarantorResponses.map(r => ({ email: r.email, consent: r.consent }))
-            });
-          }
-          
           return {
             success: true,
             data: {
@@ -692,7 +674,7 @@ export class ReferencingService {
               guarantorResponses: guarantorResponses || []
             }
           };
-        } catch (error) {
+        } catch (error: any) {
           this.logger.error('❌ Error querying Firestore for responses:', error);
           this.logger.error('Error details:', error.message || error);
           // Continue to Cosmos DB fallback
@@ -754,6 +736,206 @@ export class ReferencingService {
           guarantorResponses: []
         }
       };
+    }
+  }
+
+  async getReferencingStatusByEmail(email: string): Promise<any> {
+    try {
+      this.logger.log(`Checking referencing status for email: ${email}`);
+      
+      if (!this.firestore) {
+        this.logger.warn('Firestore not available, returning not-started');
+        return { status: 'not-started' };
+      }
+      
+      const collectionRef = this.firestore.collection('referencingForms');
+      const allSnapshot = await collectionRef.get();
+      const allForms = allSnapshot.docs.map(doc => doc.data());
+      
+      const userForms = allForms
+        .filter(f => f.formData?.identity?.email === email)
+        .sort((a, b) => {
+          const dateA = new Date(a.updatedAt || 0).getTime();
+          const dateB = new Date(b.updatedAt || 0).getTime();
+          return dateB - dateA;
+        });
+        
+      if (userForms.length === 0) {
+        return { status: 'not-started' };
+      }
+      
+      const data = userForms[0];
+      if (data.isSubmitted) {
+        return { status: 'complete', data };
+      } else if (data.currentStep > 0) {
+        return { status: 'in-progress', data };
+      } else {
+        return { status: 'not-started', data };
+      }
+    } catch (error: any) {
+      this.logger.error('Error getting referencing status:', error);
+      return { status: 'not-started', error: error.message };
+    }
+  }
+
+  async deleteResponse(responseId: string): Promise<any> {
+    try {
+      this.logger.log(`Deleting response: ${responseId}`);
+      if (!this.firestore) {
+        throw new Error('Firestore not available');
+      }
+      
+      await this.firestore.collection('referee_guarantor_responses').doc(responseId).delete();
+      return { success: true };
+    } catch (error: any) {
+      this.logger.error('Error deleting response:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // ==========================================
+  // Proxy Methods for Tenant Referencing Flow
+  // ==========================================
+
+  async saveReferencingForm(userId: string, propertyId: string, formPayload: any): Promise<any> {
+    try {
+      this.logger.log(`Saving referencing form for user ${userId}, property ${propertyId}`);
+      if (!this.firestore) {
+        throw new Error('Firestore not available');
+      }
+      
+      const docId = `${userId}_${propertyId}`;
+      const docRef = this.firestore.collection('referencingForms').doc(docId);
+      const docSnap = await docRef.get();
+      
+      const serverTimestamp = require('firebase-admin').firestore.FieldValue.serverTimestamp();
+      
+      const documentData = {
+        userId,
+        propertyId,
+        formData: formPayload.formData,
+        currentStep: formPayload.currentStep,
+        stepStatus: formPayload.stepStatus,
+        lastSaved: serverTimestamp,
+        createdAt: docSnap.exists ? docSnap.data().createdAt : serverTimestamp,
+        updatedAt: serverTimestamp,
+        isSubmitted: docSnap.exists ? docSnap.data().isSubmitted : false
+      };
+
+      await docRef.set(documentData, { merge: true });
+      return { success: true };
+    } catch (error: any) {
+      this.logger.error('Error saving referencing form proxy:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getReferencingForm(userId: string, propertyId: string): Promise<any> {
+    try {
+      if (!this.firestore) {
+        throw new Error('Firestore not available');
+      }
+      const docId = `${userId}_${propertyId}`;
+      const docSnap = await this.firestore.collection('referencingForms').doc(docId).get();
+      if (!docSnap.exists) {
+        return { success: true, data: null };
+      }
+      return { success: true, data: docSnap.data() };
+    } catch (error: any) {
+      this.logger.error('Error getting referencing form proxy:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getUserReferencingForms(userId: string): Promise<any> {
+    try {
+      if (!this.firestore) {
+        throw new Error('Firestore not available');
+      }
+      const snapshot = await this.firestore.collection('referencingForms')
+        .where('userId', '==', userId)
+        .get();
+      
+      const forms = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      return { success: true, data: forms };
+    } catch (error: any) {
+      this.logger.error('Error getting user referencing forms proxy:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async deleteReferencingForm(userId: string, propertyId: string): Promise<any> {
+    try {
+      if (!this.firestore) {
+        throw new Error('Firestore not available');
+      }
+      const docId = `${userId}_${propertyId}`;
+      await this.firestore.collection('referencingForms').doc(docId).delete();
+      return { success: true };
+    } catch (error: any) {
+      this.logger.error('Error deleting referencing form proxy:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async saveUserFile(userId: string, fileData: any): Promise<any> {
+    try {
+      if (!this.firestore) {
+        throw new Error('Firestore not available');
+      }
+      const serverTimestamp = require('firebase-admin').firestore.FieldValue.serverTimestamp();
+      const documentData = {
+        ...fileData,
+        userId,
+        uploadedAt: serverTimestamp
+      };
+      
+      const docRef = await this.firestore.collection('userFiles').add(documentData);
+      return { success: true, id: docRef.id };
+    } catch (error: any) {
+      this.logger.error('Error saving user file proxy:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getUserFiles(userId: string): Promise<any> {
+    try {
+      if (!this.firestore) {
+        throw new Error('Firestore not available');
+      }
+      const snapshot = await this.firestore.collection('userFiles')
+        .where('userId', '==', userId)
+        .get();
+      
+      const files = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      return { success: true, data: files };
+    } catch (error: any) {
+      this.logger.error('Error getting user files proxy:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async deleteUserFile(userId: string, fileId: string): Promise<any> {
+    try {
+      if (!this.firestore) {
+        throw new Error('Firestore not available');
+      }
+      const docRef = this.firestore.collection('userFiles').doc(fileId);
+      const docSnap = await docRef.get();
+      if (docSnap.exists && docSnap.data().userId !== userId) {
+         throw new Error('Unauthorized');
+      }
+      await docRef.delete();
+      return { success: true };
+    } catch (error: any) {
+      this.logger.error('Error deleting user file proxy:', error);
+      return { success: false, error: error.message };
     }
   }
 }

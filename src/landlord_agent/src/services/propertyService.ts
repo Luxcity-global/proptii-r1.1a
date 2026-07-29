@@ -7,7 +7,7 @@
 import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 import { Property, PropertyPhoto, PropertyDocument } from '../App';
 
-const API_BASE = (import.meta.env.VITE_API_ENDPOINT || 'http://localhost:7071').replace(/\/$/, '');
+const API_BASE = (import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000').replace(/\/$/, '');
 
 async function authHeaders(): Promise<Record<string, string>> {
     const token = await getAccessTokenForApiRequest().catch(() => null);

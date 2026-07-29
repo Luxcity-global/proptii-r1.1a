@@ -1,5 +1,5 @@
-import { collection, query, where, getDocs, orderBy, limit, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
+import { ReferencingFormData, ReferencingDocument } from '../../../services/firestoreService';
 
 export interface StoredFile {
   name: string;
@@ -68,7 +68,20 @@ export interface ReferencingDocument {
 }
 
 class ReferencingService {
-  private referencingCollectionName = 'referencingForms';
+  private API_URL = (import.meta.env.VITE_NEST_API_ENDPOINT || "http://localhost:3000").replace(/\/$/, '');
+
+  private async getAuthHeaders(): Promise<Record<string, string>> {
+    try {
+      const token = await getAccessTokenForApiRequest();
+      return {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+    } catch (error) {
+      console.warn('[referencingService] Failed to get access token', error);
+      return { 'Content-Type': 'application/json' };
+    }
+  }
 
   /**
    * Get referencing status for a tenant by their email
@@ -83,68 +96,22 @@ class ReferencingService {
   }> {
     try {
       console.log(`🔍 [landlord_agent] Checking referencing status for email: ${email}`);
-      
-      // Query referencing forms where the identity email matches
-      const q = query(
-        collection(db, this.referencingCollectionName),
-        where('formData.identity.email', '==', email),
-        orderBy('updatedAt', 'desc'),
-        limit(1)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        console.log(`ℹ️ [landlord_agent] No referencing data found for email: ${email}`);
-        return { status: 'not-started' };
-      }
-      
-      const doc = querySnapshot.docs[0];
-      const data = doc.data() as ReferencingDocument;
-      
-      console.log(`✅ [landlord_agent] Found referencing data for ${email}:`, {
-        isSubmitted: data.isSubmitted,
-        currentStep: data.currentStep,
-        updatedAt: data.updatedAt?.toDate?.()
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${this.API_URL}/api/referencing/status/${encodeURIComponent(email)}`, {
+        headers,
       });
-      
-      // Determine status based on submission state
-      if (data.isSubmitted) {
-        return {
-          status: 'complete',
-          data
-        };
-      } else if (data.currentStep > 0) {
-        return {
-          status: 'in-progress',
-          data
-        };
-      } else {
-        return {
-          status: 'not-started',
-          data
-        };
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          return { status: 'not-started', error: 'Permission denied' };
+        }
+        throw new Error(`Failed to get referencing status: ${response.statusText}`);
       }
+
+      const result = await response.json();
+      return result;
     } catch (error: any) {
       console.error('❌ [landlord_agent] Error getting referencing status:', error);
-      
-      // Handle specific Firebase errors
-      if (error.code === 'failed-precondition') {
-        console.log('ℹ️ Firestore index not configured for referencing query');
-        return {
-          status: 'not-started',
-          error: 'Database index required. Please check Firestore console.'
-        };
-      }
-      
-      if (error.code === 'permission-denied') {
-        console.warn('⚠️ [landlord_agent] Firestore permission denied for referencing query');
-        return {
-          status: 'not-started',
-          error: 'Permission denied. Please configure Firestore security rules.'
-        };
-      }
-      
       return {
         status: 'not-started',
         error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -204,58 +171,27 @@ class ReferencingService {
     error?: string 
   }> {
     try {
-      console.log(`🔍 [landlord_agent] Querying Firestore for referee/guarantor responses for: ${tenantEmail}`);
-      
-      // Query for all responses linked to this tenant email
-      const q = query(
-        collection(db, 'referee_guarantor_responses'),
-        where('tenantEmail', '==', tenantEmail)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const refereeResponses: any[] = [];
-      const guarantorResponses: any[] = [];
-      
-      querySnapshot.forEach((document) => {
-        const data = document.data();
-        // Include document ID for delete operations
-        const responseData = { ...data, id: document.id };
-        if (data.responseType === 'referee' || data.type === 'referee_response') {
-          refereeResponses.push(responseData);
-        } else if (data.responseType === 'guarantor' || data.type === 'guarantor_response') {
-          guarantorResponses.push(responseData);
-        }
+      console.log(`🔍 [landlord_agent] Fetching API for referee/guarantor responses for: ${tenantEmail}`);
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${this.API_URL}/api/referencing/responses/${encodeURIComponent(tenantEmail)}`, {
+        headers,
       });
-      
-      // Sort by creation date (newest first)
-      const sortByDate = (a: any, b: any) => {
-        const aDate = a.createdAt?.toMillis?.() || new Date(a.submittedAt || a.createdAt).getTime();
-        const bDate = b.createdAt?.toMillis?.() || new Date(b.submittedAt || b.createdAt).getTime();
-        return bDate - aDate;
-      };
-      
-      refereeResponses.sort(sortByDate);
-      guarantorResponses.sort(sortByDate);
-      
-      console.log(`✅ [landlord_agent] Found ${refereeResponses.length} referee and ${guarantorResponses.length} guarantor responses`);
-      return { 
-        success: true, 
-        refereeResponses, 
-        guarantorResponses 
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          return { success: false, refereeResponses: [], guarantorResponses: [], error: 'Permission denied' };
+        }
+        throw new Error(`Failed to get responses: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      return {
+        success: true,
+        refereeResponses: result?.data?.refereeResponses || [],
+        guarantorResponses: result?.data?.guarantorResponses || [],
       };
     } catch (error: any) {
-      console.error('❌ [landlord_agent] Error getting referee/guarantor responses from Firestore:', error);
-      
-      // Handle specific Firebase errors
-      if (error.code === 'permission-denied') {
-        console.warn('⚠️ [landlord_agent] Firestore permission denied for getRefereeGuarantorResponses');
-        return { 
-          success: false, 
-          refereeResponses: [],
-          guarantorResponses: [],
-          error: 'Permission denied. Please configure Firestore security rules.' 
-        };
-      }
+      console.error('❌ [landlord_agent] Error getting referee/guarantor responses from API:', error);
       
       return { 
         success: false, 
@@ -272,21 +208,23 @@ class ReferencingService {
   async deleteResponse(responseId: string): Promise<{ success: boolean; error?: string }> {
     try {
       console.log(`🗑️ [landlord_agent] Deleting response: ${responseId}`);
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${this.API_URL}/api/referencing/responses/${encodeURIComponent(responseId)}`, {
+        method: 'DELETE',
+        headers,
+      });
       
-      const docRef = doc(db, 'referee_guarantor_responses', responseId);
-      await deleteDoc(docRef);
-      
+      if (!response.ok) {
+        if (response.status === 403) {
+          return { success: false, error: 'Permission denied' };
+        }
+        throw new Error(`Failed to delete response: ${response.statusText}`);
+      }
+
       console.log(`✅ [landlord_agent] Successfully deleted response: ${responseId}`);
       return { success: true };
     } catch (error: any) {
       console.error('❌ [landlord_agent] Error deleting response:', error);
-      
-      if (error.code === 'permission-denied') {
-        return { 
-          success: false, 
-          error: 'Permission denied. Please configure Firestore security rules.' 
-        };
-      }
       
       return { 
         success: false, 

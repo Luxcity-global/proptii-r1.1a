@@ -2,15 +2,18 @@ import { Controller, Get, Query, HttpException, HttpStatus, UseGuards, Logger } 
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { AzureUsersService } from '../services/azure-users.service';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { RolesGuard } from '../guards/roles.guard';
+import { Roles } from '../decorators/roles.decorator';
 
 @Controller('azure-users')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AzureUsersController {
   private readonly logger = new Logger(AzureUsersController.name);
   constructor(private readonly azureUsersService: AzureUsersService) {}
 
   @Get()
+  @Roles('agent', 'admin')
   async getAzureUsers(@Query('search') search?: string) {
     try {
       // Check if service is configured

@@ -1,5 +1,4 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { jwtDecode } from 'jwt-decode';
 import { ConversationService } from '../../shared/services/ConversationService';
 import { AttachmentService } from '../../shared/services/AttachmentService';
 import { NotificationService } from '../../shared/services/NotificationService';
@@ -10,67 +9,27 @@ import { withParticipantGuard } from '../../shared/middleware/conversationPartic
 import { AppError } from '../../shared/middleware/error-handling';
 import { CreateConversationDto, CreateMessageDto, SenderRole } from '../../shared/types/messaging';
 
-interface JwtPayload {
-    sub?: string;
-    name?: string;
-    given_name?: string;
-    family_name?: string;
-    [key: string]: any;
-}
-
 /**
- * Extracts the userId (sub claim) from the Bearer token in the Authorization header.
- * Returns null if the header is missing or malformed.
+ * Extracts the userId (sub claim) from the verified request context.
+ * Returns null if the context is missing.
  */
 function extractUserIdFromToken(request: HttpRequest): string | null {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) return null;
-
-    const [scheme, token] = authHeader.split(' ');
-    if (scheme !== 'Bearer' || !token) return null;
-
-    // Support mock authentication in development
-    if (process.env.NODE_ENV === 'development' && token.startsWith('mock-token-')) {
-        return token.replace('mock-token-', '');
-    }
-
-    try {
-        const decoded = jwtDecode<JwtPayload>(token);
-        return decoded.sub ?? null;
-    } catch {
-        return null;
-    }
+    const user = (request as any).user;
+    return user?.sub ?? null;
 }
 
 /**
- * Extracts the sender display name from the Bearer token.
+ * Extracts the sender display name from the verified request context.
  */
 function extractSenderNameFromToken(request: HttpRequest): string {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) return 'Unknown';
+    const user = (request as any).user;
+    if (!user) return 'Unknown';
 
-    const [scheme, token] = authHeader.split(' ');
-    if (scheme !== 'Bearer' || !token) return 'Unknown';
-
-    // Support mock authentication in development
-    if (process.env.NODE_ENV === 'development' && token.startsWith('mock-token-')) {
-        const id = token.replace('mock-token-', '');
-        if (id === 'tenant-test-001') return 'Sarah Jones';
-        if (id === 'tenant-test-002') return 'Emily Davis';
-        if (id === 'landlord-test-001') return 'John Smith';
-        if (id === 'landlord-test-002') return 'Jack Smith';
-        return 'Test User';
-    }
-
-    try {
-        const decoded = jwtDecode<JwtPayload>(token);
-        if (decoded.name) return decoded.name;
-        const parts = [decoded.given_name, decoded.family_name].filter(Boolean);
-        if (parts.length > 0) return parts.join(' ');
-        return 'Unknown';
-    } catch {
-        return 'Unknown';
-    }
+    if (user.name) return user.name;
+    const parts = [user.given_name, user.family_name].filter(Boolean);
+    if (parts.length > 0) return parts.join(' ');
+    
+    return 'Unknown';
 }
 
 /**
@@ -156,6 +115,12 @@ export class CommunicationController {
             await this.notificationService.updateLastSeen(userId);
 
             const body = (await request.json()) as CreateConversationDto;
+            
+            if (userId !== body.tenantId && userId !== body.landlordId) {
+                logAuthFailure(this.monitoringService, 403, context, request);
+                return { status: 403, jsonBody: { error: { message: 'You can only create conversations for yourself', code: 'FORBIDDEN' } } };
+            }
+
             const { conversation, created } = await this.conversationService.getOrCreateConversation(body);
             return { status: created ? 201 : 200, jsonBody: { data: conversation } };
         } catch (error) {
@@ -248,8 +213,23 @@ export class CommunicationController {
             await this.notificationService.updateLastSeen(userId);
 
             const conversationId = request.params['id'];
-            const body = (await request.json()) as CreateMessageDto & { senderRole?: SenderRole; recipientId?: string };
-            const senderRole: SenderRole = body.senderRole ?? 'tenant';
+            const body = (await request.json()) as CreateMessageDto & { senderRole?: SenderRole; recipientId?: string; agentEmail?: string; propertyTitle?: string; };
+            
+            const conversation = await this.conversationService.getConversationById(conversationId);
+            if (!conversation) {
+                return { status: 404, jsonBody: { error: { message: 'Conversation not found', code: 'NOT_FOUND' } } };
+            }
+
+            let senderRole: SenderRole = 'tenant';
+            if (userId === conversation.landlordId) {
+                senderRole = 'landlord';
+            } else if (userId === conversation.tenantId) {
+                senderRole = 'tenant';
+            } else {
+                logAuthFailure(this.monitoringService, 403, context, request);
+                return { status: 403, jsonBody: { error: { message: 'You are not a participant in this conversation', code: 'FORBIDDEN' } } };
+            }
+
             const dto: CreateMessageDto = { body: body.body, attachmentIds: body.attachmentIds };
 
             const message = await this.conversationService.createMessage(
@@ -263,12 +243,9 @@ export class CommunicationController {
             if (body.recipientId) {
                 const senderName = extractSenderNameFromToken(request);
                 if (body.recipientId === 'UNCLAIMED' && body.agentEmail && body.propertyTitle) {
-                    const conversation = await this.conversationService.getConversationById(conversationId);
-                    if (conversation) {
-                        this.leadService
-                            .sendLeadEmail(body.agentEmail, senderName, body.propertyTitle, dto.body, conversation.propertyId)
-                            .catch((err) => context.error('LeadService.sendLeadEmail failed:', err));
-                    }
+                    this.leadService
+                        .sendLeadEmail(body.agentEmail, senderName, body.propertyTitle, dto.body, conversation.propertyId)
+                        .catch((err) => context.error('LeadService.sendLeadEmail failed:', err));
                 } else if (body.recipientId !== 'UNCLAIMED') {
                     this.notificationService
                         .notify(body.recipientId, conversationId, senderName)

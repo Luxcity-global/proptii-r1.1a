@@ -18,6 +18,7 @@ import { initializeCosmosDB } from './config/cosmos.config';
 import { validateEnv } from './config/env.validation';
 import * as express from 'express';
 import * as dotenv from 'dotenv';
+import helmet from 'helmet';
 
 // Load environment variables from .env file first, then validate.
 dotenv.config();
@@ -50,6 +51,9 @@ async function bootstrap() {
 
   // Apply logger level via app.useLogger as well for runtime control.
   app.useLogger(isProd ? ['warn', 'error'] : ['log', 'debug', 'verbose', 'warn', 'error']);
+
+  // Apply helmet for standard security headers
+  app.use(helmet());
 
   // Body limit: 10 MB covers base64-encoded referencing documents up to ~7.5 MB raw.
   // For larger file uploads, use multipart/form-data with FileInterceptor instead.

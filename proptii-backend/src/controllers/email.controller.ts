@@ -4,10 +4,14 @@ import {
   Controller,
   Post,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { EmailService } from '../services/email.service';
+import { Throttle } from '@nestjs/throttler';
 
 interface SendEmailPayload {
   to?: string;
@@ -37,6 +41,9 @@ export class EmailController {
   constructor(private readonly emailService: EmailService) {}
 
   @Post('send')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // Max 5 emails per minute per IP
   @UseInterceptors(AnyFilesInterceptor())
   async sendEmail(@Body() body: SendEmailPayload) {
     const { to, subject, html, emailType } = body;
@@ -67,6 +74,9 @@ export class EmailController {
   }
 
   @Post('send-base64')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // Max 5 emails per minute per IP
   @UseInterceptors(
     AnyFilesInterceptor({
       storage: memoryStorage(),

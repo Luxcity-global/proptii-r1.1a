@@ -1,36 +1,17 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { jwtDecode } from 'jwt-decode';
 import { ConversationService } from "../../shared/services/ConversationService";
 import { NativePropertyService } from "../../shared/services/NativePropertyService";
 import { ScrapedPropertyModel, NativePropertyModel } from "../../shared/models/property.model";
 import { withAuth } from "../../shared/middleware/auth";
 
-interface JwtPayload {
-    sub?: string;
-    emails?: string[];
-    email?: string;
-    [key: string]: any;
-}
-
 function extractUserFromToken(request: HttpRequest): { id: string, email: string } | null {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) return null;
-
-    const [scheme, token] = authHeader.split(' ');
-    if (scheme !== 'Bearer' || !token) return null;
-
-    if (process.env.NODE_ENV === 'development' && token.startsWith('mock-token-')) {
-        return { id: token.replace('mock-token-', ''), email: 'test@example.com' };
-    }
-
-    try {
-        const decoded = jwtDecode<JwtPayload>(token);
-        const id = decoded.sub ?? '';
-        const email = decoded.emails?.[0] ?? decoded.email ?? '';
-        return id && email ? { id, email } : null;
-    } catch {
-        return null;
-    }
+    const user = (request as any).user;
+    if (!user) return null;
+    
+    const id = user.sub ?? '';
+    const email = user.emails?.[0] ?? user.email ?? '';
+    
+    return id && email ? { id, email } : null;
 }
 
 const json = (body: unknown, status = 200): HttpResponseInit => ({

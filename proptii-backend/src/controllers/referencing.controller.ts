@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param, HttpCode, UseInterceptors, UploadedFiles, UseGuards, Logger } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, HttpCode, UseInterceptors, UploadedFiles, UseGuards, Logger, Req, ForbiddenException, Delete } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { ReferencingService } from '../services/referencing.service';
 import { AIExtractionService } from '../services/ai-extraction.service';
@@ -40,7 +40,10 @@ export class ReferencingController {
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async saveIdentityData(@Body() data: SaveIdentityDto) {
+  async saveIdentityData(@Req() req: any, @Body() data: SaveIdentityDto) {
+    if (data.userId !== req.user?.sub) {
+      throw new ForbiddenException('You can only modify your own referencing data');
+    }
     return await this.referencingService.saveIdentityData(data);
   }
 
@@ -48,7 +51,10 @@ export class ReferencingController {
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async saveEmploymentData(@Body() data: SaveEmploymentDto) {
+  async saveEmploymentData(@Req() req: any, @Body() data: SaveEmploymentDto) {
+    if (data.userId !== req.user?.sub) {
+      throw new ForbiddenException('You can only modify your own referencing data');
+    }
     return await this.referencingService.saveEmploymentData(data);
   }
 
@@ -56,7 +62,10 @@ export class ReferencingController {
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async saveResidentialData(@Body() data: SaveResidentialDto) {
+  async saveResidentialData(@Req() req: any, @Body() data: SaveResidentialDto) {
+    if (data.userId !== req.user?.sub) {
+      throw new ForbiddenException('You can only modify your own referencing data');
+    }
     return await this.referencingService.saveResidentialData(data);
   }
 
@@ -64,7 +73,10 @@ export class ReferencingController {
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async saveFinancialData(@Body() data: SaveFinancialDto) {
+  async saveFinancialData(@Req() req: any, @Body() data: SaveFinancialDto) {
+    if (data.userId !== req.user?.sub) {
+      throw new ForbiddenException('You can only modify your own referencing data');
+    }
     return await this.referencingService.saveFinancialData(data);
   }
 
@@ -72,7 +84,10 @@ export class ReferencingController {
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async saveGuarantorData(@Body() data: SaveGuarantorDto) {
+  async saveGuarantorData(@Req() req: any, @Body() data: SaveGuarantorDto) {
+    if (data.userId !== req.user?.sub) {
+      throw new ForbiddenException('You can only modify your own referencing data');
+    }
     return await this.referencingService.saveGuarantorData(data);
   }
 
@@ -80,13 +95,21 @@ export class ReferencingController {
   @HttpCode(200)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async saveAgentDetailsData(@Body() data: SaveAgentDetailsDto) {
+  async saveAgentDetailsData(@Req() req: any, @Body() data: SaveAgentDetailsDto) {
+    if (data.userId !== req.user?.sub) {
+      throw new ForbiddenException('You can only modify your own referencing data');
+    }
     this.logger.log('Saving agent details data');
     return await this.referencingService.saveAgentDetailsData(data);
   }
 
   @Get(':userId')
-  async getFormData(@Param('userId') userId: string) {
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async getFormData(@Req() req: any, @Param('userId') userId: string) {
+    if (userId !== req.user?.sub) {
+      throw new ForbiddenException('You can only view your own referencing data');
+    }
     return await this.referencingService.getFormData(userId);
   }
 
@@ -95,9 +118,13 @@ export class ReferencingController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   async submitApplication(
+    @Req() req: any,
     @Param('userId') userId: string,
     @Body() formData: SubmitApplicationDto
   ) {
+    if (userId !== req.user?.sub) {
+      throw new ForbiddenException('You can only submit your own referencing data');
+    }
     return await this.referencingService.submitApplication(userId, formData);
   }
 
@@ -173,7 +200,98 @@ export class ReferencingController {
 
   @Get('responses/:tenantEmail')
   @HttpCode(200)
-  async getRefereeGuarantorResponses(@Param('tenantEmail') tenantEmail: string) {
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async getRefereeGuarantorResponses(@Req() req: any, @Param('tenantEmail') tenantEmail: string) {
+    const userEmail = req.user?.emails?.[0] || req.user?.email || req.user?.preferred_username;
+    if (tenantEmail.toLowerCase() !== userEmail?.toLowerCase() && req.user?.role !== 'landlord' && req.user?.role !== 'agent') {
+      throw new ForbiddenException('You do not have permission to view these responses');
+    }
     return await this.referencingService.getRefereeGuarantorResponses(tenantEmail);
+  }
+
+  @Get('status/:tenantEmail')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async getReferencingStatus(@Req() req: any, @Param('tenantEmail') tenantEmail: string) {
+    const userEmail = req.user?.emails?.[0] || req.user?.email || req.user?.preferred_username;
+    if (tenantEmail.toLowerCase() !== userEmail?.toLowerCase() && req.user?.role !== 'landlord' && req.user?.role !== 'agent') {
+      throw new ForbiddenException('You do not have permission to view this referencing status');
+    }
+    return await this.referencingService.getReferencingStatusByEmail(tenantEmail);
+  }
+
+  @Delete('responses/:responseId')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async deleteResponse(@Req() req: any, @Param('responseId') responseId: string) {
+    if (req.user?.role !== 'landlord' && req.user?.role !== 'agent') {
+      throw new ForbiddenException('Only landlords or agents can delete responses');
+    }
+    return await this.referencingService.deleteResponse(responseId);
+  }
+
+  // ==========================================
+  // Proxy Endpoints for Tenant Referencing Flow
+  // ==========================================
+
+  @Get('forms/all')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async getUserReferencingForms(@Req() req: any) {
+    const userId = req.user?.sub;
+    return await this.referencingService.getUserReferencingForms(userId);
+  }
+
+  @Get('forms/:propertyId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async getReferencingForm(@Req() req: any, @Param('propertyId') propertyId: string) {
+    const userId = req.user?.sub;
+    return await this.referencingService.getReferencingForm(userId, propertyId);
+  }
+
+  @Post('forms/:propertyId')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async saveReferencingForm(@Req() req: any, @Param('propertyId') propertyId: string, @Body() formPayload: any) {
+    const userId = req.user?.sub;
+    return await this.referencingService.saveReferencingForm(userId, propertyId, formPayload);
+  }
+
+  @Delete('forms/:propertyId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async deleteReferencingForm(@Req() req: any, @Param('propertyId') propertyId: string) {
+    const userId = req.user?.sub;
+    return await this.referencingService.deleteReferencingForm(userId, propertyId);
+  }
+
+  @Get('files/all')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async getUserFiles(@Req() req: any) {
+    const userId = req.user?.sub;
+    return await this.referencingService.getUserFiles(userId);
+  }
+
+  @Post('files/save')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async saveUserFile(@Req() req: any, @Body() fileData: any) {
+    const userId = req.user?.sub;
+    return await this.referencingService.saveUserFile(userId, fileData);
+  }
+
+  @Delete('files/:fileId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async deleteUserFile(@Req() req: any, @Param('fileId') fileId: string) {
+    const userId = req.user?.sub;
+    return await this.referencingService.deleteUserFile(userId, fileId);
   }
 }

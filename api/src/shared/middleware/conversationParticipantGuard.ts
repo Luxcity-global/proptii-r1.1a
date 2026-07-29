@@ -1,31 +1,11 @@
 import { HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { jwtDecode } from 'jwt-decode';
 import { getMongoConnection } from '../config/mongodb';
 import { ConversationParticipantModel } from '../models/messaging.models';
 import { ConversationParticipant } from '../types/messaging';
 
-interface JwtPayload {
-    sub?: string;
-    [key: string]: any;
-}
-
 function extractUserIdFromToken(request: HttpRequest): string | null {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) return null;
-    const [scheme, token] = authHeader.split(' ');
-    if (scheme !== 'Bearer' || !token) return null;
-
-    // Support mock authentication in development
-    if (process.env.NODE_ENV === 'development' && token.startsWith('mock-token-')) {
-        return token.replace('mock-token-', '');
-    }
-
-    try {
-        const decoded = jwtDecode<JwtPayload>(token);
-        return decoded.sub ?? null;
-    } catch {
-        return null;
-    }
+    const user = (request as any).user;
+    return user?.sub ?? null;
 }
 
 function extractConversationId(request: HttpRequest): string | null {

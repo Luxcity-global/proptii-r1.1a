@@ -25,7 +25,7 @@ service cloud.firestore {
     match /properties/{propertyId} {
       // Development: Allow all reads and writes
       // TODO: Secure this for production - see note above
-      allow read, write: if true;
+      allow read, write: if false;
       
       // Production-ready rule (commented out until Firebase Auth is set up):
       // allow read: if true; // Public read access
@@ -67,7 +67,7 @@ service cloud.firestore {
     match /referencingForms/{documentId} {
       // Development: Allow all reads and writes
       // TODO: Secure this for production - see note above
-      allow read, write: if true;
+      allow read, write: if false;
       
       // Production-ready rule (commented out until Firebase Auth is set up):
       // allow read, write: if request.auth != null && 
@@ -78,7 +78,7 @@ service cloud.firestore {
     match /userFiles/{fileId} {
       // Development: Allow all reads and writes
       // TODO: Secure this for production
-      allow read, write: if true;
+      allow read, write: if false;
       
       // Production-ready rule (commented out until Firebase Auth is set up):
       // allow read, write: if request.auth != null && 
@@ -94,7 +94,7 @@ service cloud.firestore {
     match /bookViewingRequests/{documentId} {
       // Development: Allow all reads and writes
       // TODO: Secure this for production - see note above
-      allow read, write: if true;
+      allow read, write: if false;
       
       // Production-ready rule (commented out until Firebase Auth is set up):
       // allow read: if request.auth != null && 
@@ -116,7 +116,7 @@ service cloud.firestore {
     match /viewingBookings/{documentId} {
       // Development: Allow all reads and writes
       // TODO: Secure this for production - see note above
-      allow read, write: if true;
+      allow read, write: if false;
       
       // Production-ready rule (commented out until Firebase Auth is set up):
       // allow read, write: if request.auth != null && 
@@ -132,7 +132,7 @@ service cloud.firestore {
     match /contractTemplates/{documentId} {
       // Development: Allow all reads and writes
       // TODO: Secure this for production - see note above
-      allow read, write: if true;
+      allow read, write: if false;
       
       // Production-ready rule (commented out until Firebase Auth is set up):
       // allow read, write: if request.auth != null && 
@@ -148,7 +148,7 @@ service cloud.firestore {
     match /signedContracts/{documentId} {
       // Development: Allow all reads and writes
       // TODO: Secure this for production - see note above
-      allow read, write: if true;
+      allow read, write: if false;
       
       // Production-ready rule (commented out until Firebase Auth is set up):
       // allow read, write: if request.auth != null && 
@@ -176,7 +176,7 @@ service cloud.firestore {
     match /alerts/{alertId} {
       // Development: Allow all reads and writes
       // TODO: Secure this for production - see note above
-      allow read, write: if true;
+      allow read, write: if false;
       
       // Production-ready rule (commented out until Firebase Auth is set up):
       // allow read, write: if request.auth != null && 
@@ -192,7 +192,7 @@ service cloud.firestore {
     match /tenants/{tenantId} {
       // Development: Allow all reads and writes
       // TODO: Secure this for production - see note above
-      allow read, write: if true;
+      allow read, write: if false;
       
       // Production-ready rule (commented out until Firebase Auth is set up):
       // allow read, write: if request.auth != null && 
@@ -208,7 +208,7 @@ service cloud.firestore {
     match /contracts/{contractId} {
       // Development: Allow all reads and writes
       // TODO: Secure this for production - see note above
-      allow read, write: if true;
+      allow read, write: if false;
       
       // Production-ready rule (commented out until Firebase Auth is set up):
       // allow read, write: if request.auth != null && 
@@ -224,8 +224,7 @@ service cloud.firestore {
     match /marketInsights/{insightId} {
       // Development: Allow all reads (for users) and writes (for Cloud Functions)
       // TODO: Secure this for production - see note above
-      allow read: if true; // Anyone can read market insights
-      allow write: if true; // Cloud Functions can write (and users can dismiss)
+      allow read, write: if false; // Deny by default
       
       // Production-ready rule (commented out until Firebase Auth is set up):
       // allow read: if true; // Market insights are public

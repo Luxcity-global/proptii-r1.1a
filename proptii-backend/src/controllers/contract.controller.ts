@@ -1,5 +1,7 @@
-import { Body, Controller, Logger, Post, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Body, Controller, Logger, Post, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { ContractEmailService } from '../services/contract-email.service';
 
 interface SendSignedContractDto {
@@ -19,6 +21,8 @@ export class ContractController {
   private readonly logger = new Logger(ContractController.name);
 
   @Post('send-signed-contract')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @UseInterceptors(FileInterceptor('attachment'))
   async sendSignedContract(
     @UploadedFile() file: Express.Multer.File,

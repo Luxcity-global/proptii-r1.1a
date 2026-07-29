@@ -118,16 +118,20 @@ export const App: React.FC = () => {
 
                 {/* Protected Routes */}
                 <Route path="/agent" element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRoles={['landlord', 'agent']}>
                     <AgentHome />
                   </ProtectedRoute>
                 } />
                 <Route path="/Agent" element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRoles={['landlord', 'agent']}>
                     <AgentHome />
                   </ProtectedRoute>
                 } />
-                <Route path="/landlord" element={<LandlordDemo />}>
+                <Route path="/landlord" element={
+                  <ProtectedRoute requiredRoles={['landlord', 'agent']}>
+                    <LandlordDemo />
+                  </ProtectedRoute>
+                }>
                   <Route index element={null} />
                   <Route path="*" element={null} />
                 </Route>
@@ -163,14 +167,14 @@ export const App: React.FC = () => {
                 {/* Listings routes */}
                 <Route path="/listings" element={<Listings />} />
                 <Route path="/listings/new" element={
-                  <ProtectedRoute requiredRoles={['agent', 'tenant']}>
+                  <ProtectedRoute requiredRoles={['landlord', 'agent']}>
                     <NewListingPage />
                   </ProtectedRoute>
                 } />
 
                 {/* Dashboard Routes */}
                 <Route path="/dashboard" element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRoles={['tenant']}>
                     <Dashboard />
                   </ProtectedRoute>
                 }>

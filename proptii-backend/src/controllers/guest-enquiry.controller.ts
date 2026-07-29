@@ -369,6 +369,11 @@ export class GuestEnquiryController {
       throw new AppError(400, 'email is required', 'MISSING_EMAIL');
     }
 
+    const tokenEmail = user?.emails?.[0] || user?.email || user?.preferred_username;
+    if (!tokenEmail || tokenEmail.toLowerCase() !== body.email.trim().toLowerCase()) {
+      throw new AppError(403, 'Email in request does not match authenticated user', 'EMAIL_MISMATCH');
+    }
+
     const ghostAccounts = await this.ghostAccountService.findGhostAccountsByEmail(
       body.email.trim(),
     );
