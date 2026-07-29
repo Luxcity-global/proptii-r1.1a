@@ -48,7 +48,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       if (detail && process.env.NODE_ENV !== 'production') {
         this.logger.warn(`JWT auth failed: ${detail}`);
       }
-      throw err ?? new UnauthorizedException('Missing or invalid Bearer token');
+      throw new UnauthorizedException(
+        detail || 'Missing or invalid Bearer token',
+      );
     }
     return user;
   }

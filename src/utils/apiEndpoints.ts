@@ -3,50 +3,106 @@ const normalizeBaseUrl = (url: string) => url.replace(/\/$/, '');
 export const CANONICAL_PROD_API_BASE_URL =
   'https://proptii-r1-1a-new-backend.onrender.com/api';
 
-const REMOTE_FALLBACKS = [
+/** Nest global prefix — use this for billing and other /api/* routes in local dev. */
+export const DEV_LOCAL_API_BASE = 'http://127.0.0.1:3000/api';
+
+const RENDER_REMOTE_FALLBACKS = [
   CANONICAL_PROD_API_BASE_URL,
   'https://proptii-r1-1a-1.onrender.com/api',
-  'https://api.proptii.com',
-  'https://api-staging.proptii.com'
 ];
 
+/** Legacy custom domains — only tried from localhost dev (CSP + routing differ on deployed hosts). */
+const LEGACY_REMOTE_FALLBACKS = [
+  'https://api.proptii.com',
+  'https://api-staging.proptii.com',
+];
+
+/** Origins allowed in CSP connect-src for any API base we may call. */
+export const KNOWN_API_ORIGINS = [
+  'https://proptii-r1-1a-new-backend.onrender.com',
+  'https://proptii-r1-1a-1.onrender.com',
+  'https://api.proptii.com',
+  'https://api-staging.proptii.com',
+];
+
+/** Windows: `localhost` often resolves to ::1 and can hit a hung listener on :3000. */
+const toIpv4Loopback = (url: string) =>
+  url.replace(/\/\/localhost(?=[:/])/gi, '//127.0.0.1');
+
 const LOCAL_FALLBACKS = [
-  'http://localhost:3000/api',
-  'http://localhost:3002',
-  'http://localhost:7071/api'
+  DEV_LOCAL_API_BASE,
+  'http://127.0.0.1:3002/api',
+  'http://127.0.0.1:7071/api',
 ];
 
 const isLocalApiUrl = (url: string) => /localhost|127\.0\.0\.1/i.test(url);
 
+const LOCAL_FETCH_TIMEOUT_MS = 6_000;
+const REMOTE_FETCH_TIMEOUT_MS = 12_000;
+
+/** True when the UI is served from a machine-local origin (Vite dev, etc.). */
+export function isBrowserLocalDevOrigin(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname;
+  return h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '::1';
+}
+
+const ensureApiPathPrefix = (base: string) => {
+  const normalized = normalizeBaseUrl(toIpv4Loopback(base));
+  return /\/api$/i.test(normalized) ? normalized : `${normalized}/api`;
+};
+
 const buildCandidateList = () => {
   const envUrl = (import.meta as any)?.env?.VITE_API_URL?.trim?.() || '';
-  const isLocalDevOrigin =
-    typeof window !== 'undefined' &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const isLocalDevOrigin = isBrowserLocalDevOrigin();
 
   /**
    * When the app runs on localhost but VITE_API_URL points at a deployed API, putting env first
    * forces the browser to call production from http://localhost — which triggers CORS unless the
    * remote server lists your origin. Prefer local Nest/API bases first; remote URL remains as fallback.
    */
+  const remoteFallbacks = isLocalDevOrigin
+    ? [...RENDER_REMOTE_FALLBACKS, ...LEGACY_REMOTE_FALLBACKS]
+    : RENDER_REMOTE_FALLBACKS;
+
   let candidates: string[];
   if (isLocalDevOrigin && envUrl && !isLocalApiUrl(envUrl)) {
-    candidates = [...LOCAL_FALLBACKS, envUrl, ...REMOTE_FALLBACKS];
+    candidates = [...LOCAL_FALLBACKS, envUrl, ...remoteFallbacks];
   } else {
     candidates = [
       ...(envUrl ? [envUrl] : []),
       ...(isLocalDevOrigin ? LOCAL_FALLBACKS : []),
-      ...REMOTE_FALLBACKS,
+      ...remoteFallbacks,
       ...(!isLocalDevOrigin && (import.meta as any)?.env?.DEV ? LOCAL_FALLBACKS : []),
     ];
   }
 
-  return Array.from(new Set(candidates.filter(Boolean).map(normalizeBaseUrl)));
+  return Array.from(
+    new Set(candidates.filter(Boolean).map((u) => ensureApiPathPrefix(u))),
+  );
 };
 
-export const API_BASE_CANDIDATES = buildCandidateList();
+/** Resolved at call time so `window` is available (not during Vite prebundle). */
+export function getApiBaseCandidates(): string[] {
+  return buildCandidateList();
+}
 
-export const PRIMARY_API_BASE_URL = API_BASE_CANDIDATES[0] || CANONICAL_PROD_API_BASE_URL;
+/**
+ * Billing routes exist only on the local Nest backend until Render is redeployed.
+ * In dev on a local origin, never fall back to production (returns 404 for /billing/*).
+ */
+export function getBillingApiBaseCandidates(): string[] {
+  if (import.meta.env.DEV && isBrowserLocalDevOrigin()) {
+    return [DEV_LOCAL_API_BASE];
+  }
+  return getApiBaseCandidates();
+}
+
+/** @deprecated Prefer getApiBaseCandidates() — may be stale if read before `window` exists. */
+export const API_BASE_CANDIDATES = getApiBaseCandidates();
+
+export const PRIMARY_API_BASE_URL =
+  getApiBaseCandidates()[0] || CANONICAL_PROD_API_BASE_URL;
 
 const ensureLeadingSlash = (path: string) => (path.startsWith('/') ? path : `/${path}`);
 
@@ -56,31 +112,79 @@ export const buildApiUrl = (base: string, path: string) => {
 };
 
 interface FetchWithApiFallbackOptions {
+  /** Retry next base URL on any non-OK HTTP status. */
   retryOnHttpErrors?: boolean;
+  /** Retry next base URL on 404 (undeployed route on that host). */
+  retryOnNotFound?: boolean;
+  /** Override candidate bases (e.g. billing dev-only list). */
+  bases?: string[];
 }
 
 export const fetchWithApiFallback = async (
   path: string,
   init?: RequestInit,
-  options?: FetchWithApiFallbackOptions
+  options?: FetchWithApiFallbackOptions,
 ) => {
   const normalizedPath = ensureLeadingSlash(path);
+  const bases = options?.bases ?? getApiBaseCandidates();
   let lastError: Error | null = null;
+  let lastResponse: Response | null = null;
+  let lastUrl = '';
 
-  for (const base of API_BASE_CANDIDATES) {
+  for (const base of bases) {
+    if (init?.signal?.aborted) {
+      throw lastError ?? new DOMException('Aborted', 'AbortError');
+    }
+
     const url = buildApiUrl(base, normalizedPath);
+    const timeoutMs = isLocalApiUrl(base) ? LOCAL_FETCH_TIMEOUT_MS : REMOTE_FETCH_TIMEOUT_MS;
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
+
+    const onParentAbort = () => timeoutController.abort();
+    init?.signal?.addEventListener('abort', onParentAbort);
+
     try {
-      const response = await fetch(url, init);
-      if (!response.ok && options?.retryOnHttpErrors) {
+      const response = await fetch(url, {
+        ...init,
+        signal: timeoutController.signal,
+      });
+      lastResponse = response;
+      lastUrl = url;
+
+      const retryNotFound = options?.retryOnNotFound && response.status === 404;
+      const retryOther =
+        options?.retryOnHttpErrors && !response.ok && response.status !== 404;
+
+      if (retryNotFound || retryOther) {
         lastError = new Error(`HTTP ${response.status} ${response.statusText} from ${url}`);
         continue;
       }
+
       return { response, baseUrl: base, url };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+    } finally {
+      clearTimeout(timeoutId);
+      init?.signal?.removeEventListener('abort', onParentAbort);
     }
+  }
+
+  if (lastResponse) {
+    const base = bases[bases.length - 1] ?? '';
+    return { response: lastResponse, baseUrl: base, url: lastUrl };
   }
 
   throw lastError || new Error(`All API base URLs failed for path ${normalizedPath}`);
 };
 
+/** Billing API fetch — local-only in dev; retries 404 on other environments. */
+export const fetchBillingWithApiFallback = (
+  path: string,
+  init?: RequestInit,
+) =>
+  fetchWithApiFallback(path, init, {
+    bases: getBillingApiBaseCandidates(),
+    retryOnNotFound: !import.meta.env.DEV || !isBrowserLocalDevOrigin(),
+    retryOnHttpErrors: false,
+  });

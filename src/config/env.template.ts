@@ -37,13 +37,46 @@ export const requiredEnvVariables = {
   VITE_AZURE_CDN_ENDPOINT: '',
 
   // API Configuration
-  VITE_API_BASE_URL: 'http://localhost:3000',
+  VITE_API_BASE_URL: 'http://127.0.0.1:3000',
+  VITE_API_URL: 'http://127.0.0.1:3000/api',
 
   // Analytics
   VITE_GA_MEASUREMENT_ID: '',
 
   // App Configuration
-  NODE_ENV: 'development'
+  NODE_ENV: 'development',
+
+  // ── Stripe (billing module — Sprint 1+) ─────────────────────────────────────
+  // VITE_ prefix required by Vite to expose vars to the browser bundle.
+  // Use TEST publishable key in dev/staging. Live key in production ONLY.
+  // The secret key lives in the backend .env — NEVER expose it here.
+  VITE_STRIPE_PUBLISHABLE_KEY: 'pk_test_...',
+
+  // Promo toggle — must match backend PROMO_FREE_MONTH_ACTIVE.
+  // true  = 30-day free trial + promo banner on /pricing.
+  // false = no trial, no banner. Toggle without redeploy.
+  VITE_PROMO_FREE_MONTH_ACTIVE: 'true',
+
+  // Stripe Price IDs — Renters & Buyers (test-mode price IDs)
+  VITE_STRIPE_PRICE_RENTER_PRO_MONTHLY: 'price_...',
+  VITE_STRIPE_PRICE_RENTER_PRO_ANNUAL: 'price_...',
+  VITE_STRIPE_PRICE_BUYER_PRO_MONTHLY: 'price_...',
+  VITE_STRIPE_PRICE_BUYER_PRO_ANNUAL: 'price_...',
+
+  // Stripe Price IDs — Landlords
+  VITE_STRIPE_PRICE_STARTER_MONTHLY: 'price_...',
+  VITE_STRIPE_PRICE_STARTER_ANNUAL: 'price_...',
+  VITE_STRIPE_PRICE_LANDLORD_PRO_MONTHLY: 'price_...',
+  VITE_STRIPE_PRICE_LANDLORD_PRO_ANNUAL: 'price_...',
+  VITE_STRIPE_PRICE_ELITE_MONTHLY: 'price_...',
+  VITE_STRIPE_PRICE_ELITE_ANNUAL: 'price_...',
+
+  // Stripe Price IDs — Estate Agents
+  VITE_STRIPE_PRICE_INDEPENDENT_MONTHLY: 'price_...',
+  VITE_STRIPE_PRICE_INDEPENDENT_ANNUAL: 'price_...',
+  VITE_STRIPE_PRICE_AGENT_PRO_MONTHLY: 'price_...',
+  VITE_STRIPE_PRICE_AGENT_PRO_ANNUAL: 'price_...'
+  // Note: Enterprise has no Stripe product (contact-sales flow only).
 } as const;
 
 /**

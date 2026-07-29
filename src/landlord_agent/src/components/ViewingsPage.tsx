@@ -28,8 +28,9 @@ import { useIsMobile } from './ui/use-mobile';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { trackEvent } from '../../../utils/analytics';
-import { LandlordEmptyState } from './LandlordEmptyState';
-import { UserProfile } from '../App';
+import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
+import { isNewPortfolioUser } from '../utils/portfolioStatus';
+import { Property, UserProfile } from '../App';
 
 // ViewingsPage component for managing property viewings and requests
 
@@ -40,6 +41,8 @@ interface ViewingsPageProps {
   managerName?: string;
   managerEmail?: string;
   userProfile?: UserProfile | null;
+  properties?: Property[];
+  onAddProperty?: () => void;
 }
 
 interface ScheduleFormState {
@@ -101,7 +104,7 @@ function formatTime(time: string) {
   }
 }
 
-const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, managerEmail, userProfile }) => {
+const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, managerEmail, userProfile, properties = [], onAddProperty }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('requests');
@@ -1019,67 +1022,17 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
   // Show 4 summary cards + empty state for unauthenticated users
   if (!isAuthenticatedUser) {
+    return <LandlordPageEmptyShell page="viewings" variant="guest" />;
+  }
+
+  if (isNewPortfolioUser(properties)) {
     return (
-      <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#F7F7F7' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full">
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-semibold mb-1" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>Viewings</h1>
-            <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>Manage property viewing requests and bookings</p>
-          </div>
-
-          {/* Summary Cards - all 0 values */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Pending Requests</p>
-                  <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <Mail className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Scheduled Viewings</p>
-                  <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
-                </div>
-                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                  <Calendar className="w-6 h-6 text-orange-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Completed Viewings</p>
-                  <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
-                </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Cancelled Viewings</p>
-                  <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
-                </div>
-                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                  <X className="w-6 h-6 text-red-600" />
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Empty State Sign-in */}
-          <LandlordEmptyState />
-        </div>
-      </div>
+      <LandlordPageEmptyShell
+        page="viewings"
+        variant="new-user"
+        onAddProperty={onAddProperty}
+        userName={userProfile?.name}
+      />
     );
   }
 
@@ -1097,17 +1050,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   if (error) {
     // If error is about authentication, keep users inside the unauthenticated empty state
     if (error.includes('Unable to determine your email') || error.includes('sign in') || error.includes('sign-in')) {
-      return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-            <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1 text-sm">Pending Requests</p><p className="text-2xl font-semibold">0</p></div><div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center"><Mail className="w-6 h-6 text-blue-600" /></div></div></Card>
-            <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1 text-sm">Scheduled Viewings</p><p className="text-2xl font-semibold">0</p></div><div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center"><Calendar className="w-6 h-6 text-orange-600" /></div></div></Card>
-            <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1 text-sm">Completed Viewings</p><p className="text-2xl font-semibold">0</p></div><div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center"><CheckCircle className="w-6 h-6 text-green-600" /></div></div></Card>
-            <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1 text-sm">Cancelled Viewings</p><p className="text-2xl font-semibold">0</p></div><div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center"><X className="w-6 h-6 text-red-600" /></div></div></Card>
-          </div>
-          <LandlordEmptyState />
-        </div>
-      );
+      return <LandlordPageEmptyShell page="viewings" variant="guest" />;
     }
 
     // For other errors, show the standard error message

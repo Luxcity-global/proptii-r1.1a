@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proptii — Pricing flow</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500;6..12,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="flow-shared.css">
+<style>
+.idx { max-width: 1180px; margin: 56px auto; padding: 0 32px; }
+.idx h1 { font-family: 'Archivo'; font-size: 40px; font-weight: 800; letter-spacing: -.025em; margin-bottom: 8px; }
+.idx .sub { font-size: 16px; color: var(--muted); margin-bottom: 36px; max-width: 600px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+.tile { background: #fff; border: 1px solid var(--border); border-radius: 18px; padding: 22px; text-decoration: none; color: var(--navy); display: flex; flex-direction: column; gap: 8px; transition: all .2s; }
+.tile:hover { border-color: var(--orange); transform: translateY(-3px); box-shadow: 0 12px 30px rgba(20,56,92,0.08); }
+.tile .step { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--orange); }
+.tile .title { font-family: 'Archivo'; font-size: 18px; font-weight: 700; }
+.tile .desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.tile .arrow { margin-top: auto; font-size: 13px; color: var(--orange); font-weight: 600; }
+</style></head><body>
+
+<div id="nav-mount"></div>
+
+<div class="idx fade-in">
+  <h1>Pricing &amp; signup flow</h1>
+  <p class="sub">Eight screens covering the journey from plan selection to active subscription. Every transition moves forward; the free path is always the path of least resistance.</p>
+
+  <div class="grid">
+    <a href="Pricing.html" class="tile"><div class="step">Screen 1</div><div class="title">Pricing page</div><div class="desc">Tier selection across renters, landlords, and estate agents.</div><div class="arrow">Open →</div></a>
+    <a href="screen-2-modal.html" class="tile"><div class="step">Screen 2</div><div class="title">Plan selected modal</div><div class="desc">Account check overlay after choosing a paid plan.</div><div class="arrow">Open →</div></a>
+    <a href="screen-3-account.html" class="tile"><div class="step">Screen 3</div><div class="title">Create account</div><div class="desc">Email signup with Google option and progress indicator.</div><div class="arrow">Open →</div></a>
+    <a href="screen-4-arrival.html" class="tile"><div class="step">Screen 4</div><div class="title">Free month arrival</div><div class="desc">The emotional high point — celebratory, not transactional.</div><div class="arrow">Open →</div></a>
+    <a href="screen-5-paynow.html" class="tile"><div class="step">Screen 5</div><div class="title">Pay now (skip trial)</div><div class="desc">For the minority who want to commit immediately.</div><div class="arrow">Open →</div></a>
+    <a href="screen-6-email.html" class="tile"><div class="step">Screen 6</div><div class="title">Day 27 reminder</div><div class="desc">Email mockup — friendly, informative, no pressure.</div><div class="arrow">Open →</div></a>
+    <a href="screen-7-billing.html" class="tile"><div class="step">Screen 7</div><div class="title">Day 30 billing prompt</div><div class="desc">Stay on plan, or move to free — both equally welcome.</div><div class="arrow">Open →</div></a>
+    <a href="screen-8-confirmed.html" class="tile"><div class="step">Screen 8</div><div class="title">Subscription confirmed</div><div class="desc">Calm confirmation, fast path back to the product.</div><div class="arrow">Open →</div></a>
+  </div>
+</div>
+
+<script src="flow-partials.js"></script>
+<script>document.getElementById('nav-mount').innerHTML = window.proptiiPartials.nav('pricing');</script>
+</body></html>

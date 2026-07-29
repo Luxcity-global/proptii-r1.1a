@@ -1,35 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-
-/** Search/backend (On The Market scraper) - default port 3000 */
-const DEFAULT_LOCAL_SEARCH_URL = 'http://localhost:3000';
-const DEFAULT_RENDER_SEARCH_URL = 'https://proptii-r1-1a-v39c.onrender.com';
-
-/** Azure Functions API base URL */
-const API_BASE = (import.meta.env.VITE_API_ENDPOINT || 'http://localhost:7071').replace(/\/$/, '');
-
-const normalizeBackendUrl = (rawUrl: string | undefined, defaultUrl: string): string => {
-  if (!rawUrl || !rawUrl.trim()) {
-    return defaultUrl;
-  }
-  // Trim whitespace and trailing slashes to avoid double slashes in concatenated paths
-  const trimmed = rawUrl.trim().replace(/\/+$/, '');
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-};
-
-/** URL for search/backend (scraper.ts - On The Market / Rightmove / etc.) */
-const resolveSearchBackendUrl = (): string => {
-  const envUrl = import.meta.env.VITE_SEARCH_BACKEND_URL;
-  if (envUrl && envUrl.trim()) {
-    return normalizeBackendUrl(envUrl, DEFAULT_LOCAL_SEARCH_URL);
-  }
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname.toLowerCase();
-    if (hostname.includes('onrender.com') || hostname.includes('proptii.com')) {
-      return normalizeBackendUrl(DEFAULT_RENDER_SEARCH_URL, DEFAULT_RENDER_SEARCH_URL);
-    }
-  }
-  return normalizeBackendUrl(DEFAULT_LOCAL_SEARCH_URL, DEFAULT_LOCAL_SEARCH_URL);
-};
+import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
+import { resolveSearchBackendUrl } from '../utils/searchBackendUrl';
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
 const cleanPropertyPrice = (price: string): string => {
@@ -138,7 +109,7 @@ export const useSearchBackend = () => {
       const nativeApiPromise = (async (): Promise<Property[]> => {
         try {
           const res = await fetch(
-            `${API_BASE}/api/properties/search?q=${encodeURIComponent(searchQuery)}&limit=50`,
+            `${getResolvedApiBaseUrl().replace(/\/api$/, '')}/api/properties/search?q=${encodeURIComponent(searchQuery)}&limit=50`,
             { signal: AbortSignal.timeout(15000) }
           );
           if (!res.ok) return [];

@@ -31,8 +31,26 @@ export const AuthRedirectHandler: React.FC = () => {
       return;
     }
 
+    /**
+     * Only auto-redirect right after sign-in (login/register/home).
+     * Otherwise a stale value (e.g. /signup/pay-now from checkout) hijacks
+     * "Go to dashboard" and other explicit navigation.
+     */
+    const authEntryPaths = ['/login', '/register', '/'];
+    const isAuthEntry = authEntryPaths.some(
+      (p) =>
+        location.pathname === p ||
+        location.pathname.startsWith(`${p}/`),
+    );
+    if (!isAuthEntry) {
+      // Do not clear redirectAfterLogin here — /signup and ProtectedRoute need it.
+      return;
+    }
+
     hasRedirectedRef.current = true;
     sessionStorage.removeItem('redirectAfterLogin');
+    sessionStorage.removeItem('redirect_in_progress');
+    sessionStorage.removeItem('last_redirect_path');
     navigate(storedPath, { replace: true });
   }, [isAuthenticated, isLoading, navigate, location.pathname, location.search]);
 

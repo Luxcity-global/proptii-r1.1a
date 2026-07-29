@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => {
     envDir: rootEnvDir,
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
+      dedupe: ['react', 'react-dom'],
       alias: {
         'vaul@1.1.2': 'vaul',
         'sonner@2.0.3': 'sonner',
@@ -69,10 +70,10 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, './src'),
       },
     },
-    base: '/landlord-app/',
+    base: '/landlord/',
     build: {
       target: 'esnext',
-      outDir: '../../public/landlord-app',
+      outDir: '../../public/landlord',
       emptyOutDir: true,
     },
   };

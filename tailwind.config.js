@@ -6,6 +6,8 @@ export default {
       colors: {
         primary: '#F15A22',
         secondary: '#002B49',
+        success: '#1D9E75',
+        amber: '#BA7517',
       },
       fontFamily: {
         archivo: ['Archivo', 'sans-serif'],

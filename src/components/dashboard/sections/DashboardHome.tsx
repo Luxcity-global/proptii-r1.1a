@@ -35,6 +35,7 @@ import { viewingService, ViewingStats } from '../../../services/viewingService';
 import FilePreviewModal from './FilePreviewModal';
 import { useIsMobile } from '../ui/use-mobile';
 import { trackEvent } from '../../../utils/analytics';
+import AgentQuotaWidget from '../AgentQuotaWidget';
 
 /**
  * Main dashboard home page component following the style guide
@@ -686,6 +687,10 @@ const DashboardHome: React.FC = () => {
         >
           Overview
         </h2>
+
+        <div className="mb-6">
+          <AgentQuotaWidget />
+        </div>
         
         {/* Summary Cards Grid */}
         <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'} gap-4 md:gap-6`}>

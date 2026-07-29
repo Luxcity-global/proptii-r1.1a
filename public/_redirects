@@ -4,4 +4,6 @@
 /landlord/*  /landlord/index.html  200
 
 # Main App (Catch-all)
+/billing/*  /index.html  200
+/signup/*   /index.html  200
 /*  /index.html  200

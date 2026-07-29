@@ -13,7 +13,7 @@ const LandlordApp = React.lazy(() => import('../landlord_agent/src/App'));
  * Renders the lazy-loaded landlord App component.
  */
 const LandlordDemoInner: React.FC = () => {
-  const { isLoading, login } = useAuth();
+  const { isAuthenticated, user, isLoading, login, logout, editProfile } = useAuth();
   const { pathname, search } = useLocation();
   const [signUpOpen, setSignUpOpen] = useState(false);
   const [signUpTitle, setSignUpTitle] = useState('Sign up to continue');
@@ -30,20 +30,8 @@ const LandlordDemoInner: React.FC = () => {
     }
   }, [pathname, search]);
 
-  // Listen for REQUIRE_AUTH events (both messages and CustomEvents)
+  // Listen for messages from the landlord iframe and custom events
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const data = event.data as any;
-      if (data?.type === 'REQUIRE_AUTH') {
-        triggerAuth(data.payload?.action);
-      }
-    };
-
-    const handleCustomEvent = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      triggerAuth(customEvent.detail?.action);
-    };
-
     const triggerAuth = (action?: string) => {
       setSignUpTitle(
         action === 'publish'
@@ -57,13 +45,35 @@ const LandlordDemoInner: React.FC = () => {
       setSignUpOpen(true);
     };
 
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data as any;
+      if (data?.type === 'REQUIRE_AUTH') {
+        triggerAuth(data.payload?.action);
+        return;
+      }
+
+      if (data?.type === 'AUTH_ACTION' && data.payload?.action) {
+        const authAction = data.payload.action as string;
+        if (authAction === 'logout') {
+          void logout();
+        } else if (authAction === 'editProfile') {
+          void editProfile();
+        }
+      }
+    };
+
+    const handleCustomEvent = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      triggerAuth(customEvent.detail?.action);
+    };
+
     window.addEventListener('message', handleMessage);
     window.addEventListener('require-auth', handleCustomEvent);
     return () => {
       window.removeEventListener('message', handleMessage);
       window.removeEventListener('require-auth', handleCustomEvent);
     };
-  }, []);
+  }, [logout, editProfile]);
 
   // While MSAL is resolving auth, show a brief spinner
   if (isLoading) {

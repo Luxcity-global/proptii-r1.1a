@@ -10,7 +10,8 @@ import { Alert, AlertDescription } from './ui/alert';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { useIsMobile } from './ui/use-mobile';
 import { Property, PropertyDocument, UserProfile } from '../App';
-import { LandlordEmptyState } from './LandlordEmptyState';
+import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
+import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import { downloadPropertyDocument } from '../utils/downloadPropertyDocument';
 
 interface DocumentsPageProps {
@@ -21,6 +22,7 @@ interface DocumentsPageProps {
   onArchiveDocuments?: (documentIds: string[]) => void;
   onExportDocuments?: (format: 'json' | 'csv' | 'excel' | 'pdf', documentIds: string[]) => void;
   userProfile?: UserProfile | null;
+  onAddProperty?: () => void;
 }
 
 interface DocumentWithProperty extends PropertyDocument {
@@ -28,7 +30,7 @@ interface DocumentWithProperty extends PropertyDocument {
   propertyId: string;
 }
 
-export function DocumentsPage({ properties, onViewProperty, onManageDocuments, onDeleteDocuments, onArchiveDocuments, onExportDocuments, userProfile }: DocumentsPageProps) {
+export function DocumentsPage({ properties, onViewProperty, onManageDocuments, onDeleteDocuments, onArchiveDocuments, onExportDocuments, userProfile, onAddProperty }: DocumentsPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -38,20 +40,17 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
   const isMobile = useIsMobile();
 
   if (!userProfile) {
+    return <LandlordPageEmptyShell page="documents" variant="guest" />;
+  }
+
+  if (isNewPortfolioUser(properties)) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6 overflow-x-hidden w-full">
-        <div>
-          <h1 style={{ color: '#374957' }}>Documents</h1>
-          <p className="text-muted-foreground">Manage and track compliance across all your properties</p>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-          <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1">Total Documents</p><p className="text-2xl font-semibold">0</p></div><div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center"><FileText className="w-6 h-6 text-primary" /></div></div></Card>
-          <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1">Valid Documents</p><p className="text-2xl font-semibold text-green-600">0</p></div><div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center"><CheckCircle className="w-6 h-6 text-green-600" /></div></div></Card>
-          <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1">Expiring Soon</p><p className="text-2xl font-semibold text-orange-600">0</p></div><div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center"><Clock className="w-6 h-6 text-orange-600" /></div></div></Card>
-          <Card className="p-6"><div className="flex items-center justify-between"><div><p className="text-muted-foreground mb-1">Expired</p><p className="text-2xl font-semibold text-red-600">0</p></div><div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center"><AlertTriangle className="w-6 h-6 text-red-600" /></div></div></Card>
-        </div>
-        <LandlordEmptyState />
-      </div>
+      <LandlordPageEmptyShell
+        page="documents"
+        variant="new-user"
+        onAddProperty={onAddProperty}
+        userName={userProfile.name}
+      />
     );
   }
 

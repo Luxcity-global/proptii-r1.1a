@@ -18,11 +18,14 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
 import { Roles } from '../decorators/roles.decorator';
 import { Throttle } from '@nestjs/throttler';
+import { SubscriptionGuard } from '../guards/subscription.guard';
+import { RequiresActiveSubscription } from '../decorators/requires-active-subscription.decorator';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { getFirestore } from '../config/firestore.config';
 
 @Controller('property')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, SubscriptionGuard)
+@RequiresActiveSubscription()
 @ApiBearerAuth()
 export class PropertyDocumentController {
   private readonly logger = new Logger(PropertyDocumentController.name);

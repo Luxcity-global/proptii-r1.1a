@@ -45,6 +45,10 @@ export async function getAccessTokenForApiRequest(): Promise<string | null> {
     return fromStorage();
   }
 
+  if (!msalInstance.getActiveAccount()) {
+    msalInstance.setActiveAccount(account);
+  }
+
   try {
     const r = await msalInstance.acquireTokenSilent({
       ...loginRequest,

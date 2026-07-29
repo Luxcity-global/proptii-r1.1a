@@ -41,7 +41,7 @@ const HOME_STEPS: Omit<ProgressStep, 'completed'>[] = [
   { id: 'contracts', label: 'Sign contracts', path: '/contracts', tourParam: 'tour=contracts' },
   { id: 'tools', label: 'Explore tools', path: '/tools', tourParam: 'tour=tools' },
   { id: 'profile', label: 'Complete your profile', path: '/profile', tourParam: 'tour=profile' },
-  { id: 'register', label: 'Create an account', path: '/register', tourParam: 'tour=register' },
+  { id: 'register', label: 'Create an account', path: '/pricing', tourParam: 'tour=register' },
   { id: 'agent', label: 'Try landlord features', path: '/Agent', tourParam: 'tour=agent' },
   { id: 'faq', label: 'Read the FAQ', path: '/#faq', tourParam: 'tour=faq' },
 ];

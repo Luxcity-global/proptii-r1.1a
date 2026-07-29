@@ -72,6 +72,11 @@ function Footer() {
                       Contracts
                     </Link>
                   </li>
+                  <li>
+                    <Link to="/pricing" className="block py-1 hover:underline">
+                      Pricing
+                    </Link>
+                  </li>
                 </ul>
               </div>
             )}
@@ -191,6 +196,11 @@ function Footer() {
                 <li>
                   <Link to="/contracts" className="hover:underline">
                     Contracts
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/pricing" className="hover:underline">
+                    Pricing
                   </Link>
                 </li>
               </ul>

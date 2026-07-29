@@ -44,13 +44,17 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
   const currentServiceRoute = (TENANT_SERVICE_ROUTES.find((r) => pathname === r || pathname.startsWith(r + '/')) ?? '/bookviewing') as TenantServiceRoute;
   const currentServiceLabel = TENANT_SERVICE_LABELS[currentServiceRoute];
 
-  const navigateToLandlordAction = (action: 'add-property' | 'clients' | 'coming-soon') => {
+  const navigateToLandlordAction = (action: 'add-property' | 'clients' | 'analytics' | 'coming-soon') => {
     if (action === 'add-property') {
       navigate('/landlord?start=property-setup-step1');
       return;
     }
     if (action === 'clients') {
       navigate('/landlord/clients');
+      return;
+    }
+    if (action === 'analytics') {
+      navigate('/landlord/insights');
       return;
     }
     navigate('/coming-soon');
@@ -76,7 +80,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
   const listServiceMenuItems = [
     { icon: <Building2 className="h-4 w-4" />, label: 'List Property', description: 'Advertise your property to verified tenants', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordAction('add-property'); } },
     { icon: <Users className="h-4 w-4" />, label: 'Manage Tenants', description: 'Tenant communication and management', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordAction('clients'); } },
-    { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordAction('coming-soon'); } },
+    { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordAction('analytics'); } },
     { icon: <Shield className="h-4 w-4" />, label: 'Verify Tenants', description: 'Run background and credit checks', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordAction('coming-soon'); } },
   ];
 
@@ -186,11 +190,18 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
     setIsMobileMenuOpen(false);
   };
 
-  // Navigate to the tenant dashboard
+  // Navigate to the correct dashboard based on user roles
   const handleGoToDashboard = () => {
     setIsDropdownOpen(false);
     setIsMobileMenuOpen(false);
-    navigate('/dashboard');
+    
+    if (user?.roles?.includes('landlord') || user?.roles?.includes('agent')) {
+      navigate('/landlord');
+    } else if (user?.roles?.includes('homeowner')) {
+      navigate('/homeowner/dashboard');
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   return (

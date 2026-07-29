@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature, CalendarDays, Menu, MessageSquare } from 'lucide-react';
+import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature, CalendarDays, Menu, MessageSquare, Settings } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -34,7 +34,7 @@ const requestSignIn = () => {
   }
 };
 
-export type NavigationScreen = 'dashboard' | 'properties' | 'documents' | 'viewings' | 'clients' | 'insights' | 'inbox' | 'contracts' | 'messages';
+export type NavigationScreen = 'dashboard' | 'properties' | 'documents' | 'viewings' | 'clients' | 'insights' | 'inbox' | 'contracts' | 'messages' | 'settings';
 
 interface MainLayoutProps {
   currentScreen: NavigationScreen;
@@ -102,21 +102,19 @@ function CustomNavigationMenu({ navigationItems, currentScreen, onNavigate }: {
 
   // Map navigation screens to paths
   const screenToPath: Record<NavigationScreen, string> = {
-    'dashboard': '/landlord/dashboard',
-    'viewings': '/landlord/viewings',
-    'properties': '/landlord/properties',
-    'documents': '/landlord/documents',
-    'contracts': '/landlord/contracts',
-    'clients': '/landlord/clients',
-    'insights': '/landlord/insights',
-    'inbox': '/landlord/inbox',
-    'messages': '/landlord/messages',
+    'dashboard': '/dashboard',
+    'viewings': '/viewings',
+    'properties': '/properties',
+    'documents': '/documents',
+    'contracts': '/contracts',
+    'clients': '/clients',
+    'insights': '/insights',
+    'inbox': '/inbox',
+    'messages': '/messages',
+    'settings': '/settings',
   };
 
   const handleNavigation = (screen: NavigationScreen) => {
-
-    const path = screenToPath[screen] || '/dashboard';
-    navigate(path);
     onNavigate(screen);
   };
 
@@ -330,21 +328,19 @@ function MobileSidebar({
 
   // Map navigation screens to paths
   const screenToPath: Record<NavigationScreen, string> = {
-    'dashboard': '/landlord/dashboard',
-    'viewings': '/landlord/viewings',
-    'properties': '/landlord/properties',
-    'documents': '/landlord/documents',
-    'contracts': '/landlord/contracts',
-    'clients': '/landlord/clients',
-    'insights': '/landlord/insights',
-    'inbox': '/landlord/inbox',
-    'messages': '/landlord/messages',
+    'dashboard': '/dashboard',
+    'viewings': '/viewings',
+    'properties': '/properties',
+    'documents': '/documents',
+    'contracts': '/contracts',
+    'clients': '/clients',
+    'insights': '/insights',
+    'inbox': '/inbox',
+    'messages': '/messages',
+    'settings': '/settings',
   };
 
   const handleNavigate = (screen: NavigationScreen) => {
-
-    const path = screenToPath[screen] || '/dashboard';
-    navigate(path);
     onNavigate(screen);
     onOpenChange(false);
   };
@@ -487,17 +483,16 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
       icon: MessageSquare,
       label: 'Messages',
     },
-    // COMMENTED OUT FOR THIS RELEASE - Inbox and Insights pages not in scope
-    // {
-    //   id: 'inbox' as NavigationScreen,
-    //   icon: Inbox,
-    //   label: 'Inbox',
-    // },
-    // {
-    //   id: 'insights' as NavigationScreen,
-    //   icon: BarChart3,
-    //   label: 'Insights',
-    // },
+    {
+      id: 'insights' as NavigationScreen,
+      icon: BarChart3,
+      label: 'Analytics',
+    },
+    {
+      id: 'settings' as NavigationScreen,
+      icon: Settings,
+      label: 'Settings',
+    },
   ];
 
   return (

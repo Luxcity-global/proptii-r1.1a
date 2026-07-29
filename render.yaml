@@ -4,7 +4,7 @@ services:
     name: proptii-frontend
     # Blueprint: static sites use runtime: static (SPA rewrites below require this service type)
     runtime: static
-    buildCommand: npm install --include=dev && npm run build
+    buildCommand: NPM_CONFIG_PRODUCTION=false npm install && npm run build
     staticPublishPath: ./dist
     previews:
       generation: automatic
@@ -27,7 +27,9 @@ services:
         value: https://proptii-backend.onrender.com/api/sheets
       # Update with your custom hosted search URL on Render (e.g. https://your-search-backend.onrender.com)
       - key: VITE_SEARCH_BACKEND_URL
-        value: https://proptii-search-backend.onrender.com
+        value: https://proptii-r1-1a-search.onrender.com
+      - key: SEARCH_BACKEND_URL
+        value: https://proptii-r1-1a-search.onrender.com
       - key: VITE_GA_MEASUREMENT_ID
         value: G-88HC0TG6JJ
     headers:
@@ -42,7 +44,7 @@ services:
         value: "1; mode=block"
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; connect-src 'self' https://formsubmit.co https://*.onrender.com https://*.azure.com https://*.azurewebsites.net https://*.openai.azure.com https://proptii.b2clogin.com https://proptii.co https://*.cognitiveservices.azure.com https://*.railway.app http://localhost:10000/api/*; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; frame-ancestors 'none';"
+        value: "default-src 'self'; connect-src 'self' https://formsubmit.co https://proptii-r1-1a-new-backend.onrender.com/api/* https://proptii-r1-1a-1.onrender.com/api/* https://api.proptii.com https://api-staging.proptii.com https://proptii-r1-1a-search.onrender.com https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com https://proptii.co https://*.cognitiveservices.azure.com https://*.onrender.com https://*.railway.app http://localhost:10000/api/*; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; frame-ancestors 'none';"
       - path: /*
         name: Cache-Control
         value: no-cache
@@ -50,6 +52,9 @@ services:
         name: Cache-Control
         value: public, max-age=31536000, immutable
       - path: /static/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /landlord/assets/*
         name: Cache-Control
         value: public, max-age=31536000, immutable
     # SPA: rewrite unknown paths to index.html so hard refresh works on client routes.
@@ -61,10 +66,21 @@ services:
       - type: rewrite
         source: /static/*
         destination: /static/:splat
+      # Landlord sub-app static assets (must precede SPA fallback)
+      - type: rewrite
+        source: /landlord/assets/*
+        destination: /landlord/assets/:splat
       # Landlord sub-app (basename /landlord)
       - type: rewrite
         source: /landlord/*
         destination: /landlord/index.html
+      # Main Vite app — billing/signup checkout return paths (Stripe success_url)
+      - type: rewrite
+        source: /billing/*
+        destination: /index.html
+      - type: rewrite
+        source: /signup/*
+        destination: /index.html
       # Main Vite app — must be last
       - type: rewrite
         source: /*

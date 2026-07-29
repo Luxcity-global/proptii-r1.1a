@@ -117,7 +117,16 @@ export default defineConfig(({ mode = 'development' }) => {
   const isProduction = mode === 'production';
   const isStaging = mode === 'staging';
 
+  // Render dashboard may set SEARCH_BACKEND_URL; Vite only exposes VITE_* to the client.
+  const viteSearchBackendUrl = process.env.VITE_SEARCH_BACKEND_URL?.trim() || '';
+  const aliasSearchBackendUrl = process.env.SEARCH_BACKEND_URL?.trim() || '';
+  const define: Record<string, string> = {};
+  if (!viteSearchBackendUrl && aliasSearchBackendUrl) {
+    define['import.meta.env.VITE_SEARCH_BACKEND_URL'] = JSON.stringify(aliasSearchBackendUrl);
+  }
+
   return {
+    define,
     plugins: [
       react(),
       // Intercept /landlord/* child routes (e.g. /landlord/messages) so Vite
@@ -154,7 +163,8 @@ export default defineConfig(({ mode = 'development' }) => {
           '**/proptii-backend/**',
           '**/proptii-search/**',
           '**/node_modules/**',
-          '**/public/landlord-app/**',
+          '**/public/landlord/**',
+          '**/coverage/**',
         ]
       }
       // Temporarily disabled CSP for development
@@ -163,6 +173,7 @@ export default defineConfig(({ mode = 'development' }) => {
       // }
     },
     resolve: {
+      dedupe: ['firebase', 'firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/storage'],
       alias: {
         '@': path.resolve(__dirname, './src'),
         'components': path.resolve(__dirname, './src/components'),

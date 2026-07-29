@@ -13,6 +13,9 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { firestoreService } from '../../../services/firestoreService';
 import ReferencingModal from '../../ReferencingModal.OLD';
 import { useIsMobile } from '../ui/use-mobile';
+import { useBillingStatus } from '../../../hooks/useBillingStatus';
+import { canAccessSection, sectionUpgradeLabel } from '../../../utils/planAccess';
+import PlanUpgradeWall from '../PlanUpgradeWall';
 
 // Interface for form data structure - matches the actual Firestore data
 interface FormData {
@@ -77,6 +80,17 @@ interface FormData {
  * Tenant Referencing page - matches the exact design from the image
  */
 const TenantReferencing: React.FC = () => {
+  const { plan, status } = useBillingStatus();
+  if (!canAccessSection('tenant-referencing', plan, status)) {
+    return (
+      <PlanUpgradeWall
+        featureName="Referencing toolkit"
+        upgradeLabel={sectionUpgradeLabel('tenant-referencing')}
+        segment="renters"
+      />
+    );
+  }
+
   const { user, isAuthenticated } = useAuth();
   const isMobile = useIsMobile();
   const [formData, setFormData] = useState<FormData | null>(null);

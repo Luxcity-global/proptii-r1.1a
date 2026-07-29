@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import { useState, useEffect, useRef } from 'react';
+import { getPlanById } from '../config/plans';
 
 interface HomeVariantProps {
   /** When true, hide the initial onboarding flow modal (e.g. when showing tenant/landlord options as modal) */
@@ -30,7 +31,7 @@ const PAUSE_AFTER_DELETING_MS = 400;
 const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [, forceOnboardingRefresh] = useState(0);
 
   // Typing/deleting animation for hero headline
@@ -131,30 +132,6 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
     }
   };
 
-  const handleTenantJoinCta = async (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-
-    if (isAuthenticated) {
-      navigate('/dashboard');
-      return;
-    }
-
-    sessionStorage.setItem('redirectAfterLogin', '/dashboard');
-    await login();
-  };
-
-  const handleAgentJoinCta = async (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-
-    if (isAuthenticated) {
-      navigate('/Agent');
-      return;
-    }
-
-    sessionStorage.setItem('redirectAfterLogin', '/Agent');
-    await login();
-  };
-
   // --- Pillbox toggle state ---
   const [activeMode, setActiveMode] = useState<'search' | 'list'>('search');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -176,13 +153,17 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const navigateToLandlordAction = (action: 'add-property' | 'clients' | 'coming-soon') => {
+  const navigateToLandlordAction = (action: 'add-property' | 'clients' | 'analytics' | 'coming-soon') => {
     if (action === 'add-property') {
       navigate('/landlord?start=property-setup-step1');
       return;
     }
     if (action === 'clients') {
       navigate('/landlord/clients');
+      return;
+    }
+    if (action === 'analytics') {
+      navigate('/landlord/insights');
       return;
     }
     navigate('/coming-soon');
@@ -208,7 +189,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
   const listMenuItems = [
     { icon: <Building2 className="h-4 w-4" />, label: 'List Property', description: 'Advertise your property to verified tenants', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('add-property'); } },
     { icon: <Users className="h-4 w-4" />, label: 'Manage Tenants', description: 'Tenant communication and management tools', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('clients'); } },
-    { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance and enquiries', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('coming-soon'); } },
+    { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance and enquiries', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('analytics'); } },
     { icon: <Shield className="h-4 w-4" />, label: 'Verify Tenants', description: 'Run background and credit checks securely', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('coming-soon'); } },
     { icon: <Wrench className="h-4 w-4" />, label: 'Tools', description: 'Free rental tools and official documents for landlords and tenants', action: () => { setIsDropdownOpen(false); navigate('/tools'); } },
   ];
@@ -568,12 +549,11 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
             Start free. No credit card. No commitment.
             </h2>
             <p className="text-base md:text-lg mb-8 md:mb-10 leading-relaxed">
-              Every new user gets <strong>3 months of full access</strong> to Proptii — search, viewings, referencing, and contracts. Tenants and buyers: free forever for core search. Landlords and agents: try the full toolkit before you decide.
+              Every new user gets <strong>1 month completely free</strong> on paid plans — search, viewings, referencing, and contracts. Tenants and buyers: Explorer is free forever for core search. Landlords and agents: try the full toolkit before you decide.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-start items-center mb-6 md:mb-8">
               <Link
-                to={isAuthenticated ? '/dashboard' : '/login'}
-                onClick={handleTenantJoinCta}
+                to="/pricing?segment=renters"
                 onMouseEnter={() => setCtaHover('tenant')}
                 onMouseLeave={() => setCtaHover('tenant')}
                 className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full font-semibold text-base md:text-lg transition-all duration-200 focus:outline-none focus-visible:outline-none text-white border-2 border-transparent bg-gradient-to-r from-[#DC5F12] to-[#F47A1A] shadow-md -translate-y-0.5 hover:shadow-lg hover:-translate-y-1"
@@ -581,8 +561,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                 Join as a Tenant / Buyer
               </Link>
               <Link
-                to={isAuthenticated ? '/Agent' : '/login'}
-                onClick={handleAgentJoinCta}
+                to="/pricing?segment=agents"
                 onMouseEnter={() => setCtaHover('agent')}
                 onMouseLeave={() => setCtaHover('tenant')}
                 className="w-full sm:w-auto inline-flex justify-center items-center px-8 py-3.5 rounded-full border-2 border-[#136C9E] text-[#136C9E] font-semibold text-base md:text-lg bg-transparent transition-all duration-200 hover:text-white hover:border-transparent hover:bg-gradient-to-r hover:from-[#DC5F12] hover:to-[#F47A1A] hover:shadow-lg hover:-translate-y-1 focus:outline-none focus-visible:outline-none"
@@ -591,7 +570,9 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
               </Link>
             </div>
             <p className="text-sm md:text-base">
-              After your trial, plans start from [price TBD] / month. We'll notify you before any charges.
+              After your free month, paid plans start from £
+              {getPlanById('renter_pro')?.monthlyPrice ?? 12}/month. We&apos;ll
+              notify you before any charges.
             </p>
           </div>
 

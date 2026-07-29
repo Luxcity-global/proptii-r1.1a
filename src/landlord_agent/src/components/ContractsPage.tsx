@@ -36,8 +36,9 @@ import {
 } from './ui/dropdown-menu';
 import { SendContractModal } from './SendContractModal';
 import { contractService } from '../services/contractService';
-import { LandlordEmptyState } from './LandlordEmptyState';
-import { UserProfile } from '../App';
+import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
+import { isNewPortfolioUser } from '../utils/portfolioStatus';
+import { Property, UserProfile } from '../App';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 
 export interface Contract {
@@ -60,9 +61,11 @@ interface ContractsPageProps {
   tenants?: Array<{ id: string; name: string; email: string; propertyId?: string }>;
   onBack?: () => void;
   userProfile?: UserProfile | null;
+  properties?: Property[];
+  onAddProperty?: () => void;
 }
 
-export function ContractsPage({ tenants = [], onBack, userProfile }: ContractsPageProps) {
+export function ContractsPage({ tenants = [], onBack, userProfile, properties = [], onAddProperty }: ContractsPageProps) {
   const [activeTab, setActiveTab] = useState<'sent' | 'unsigned' | 'signed'>('sent');
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -1138,71 +1141,21 @@ export function ContractsPage({ tenants = [], onBack, userProfile }: ContractsPa
 
   // Show 4 cards + empty state for unauthenticated users
   if (isAuthChecked && !userId && !landlordEmail) {
+    return <LandlordPageEmptyShell page="contracts" variant="guest" />;
+  }
+
+  if (
+    isAuthChecked &&
+    (userId || landlordEmail) &&
+    isNewPortfolioUser(properties)
+  ) {
     return (
-      <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: '#F7F7F7' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full">
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-semibold mb-2" style={{ fontFamily: 'Archivo, sans-serif', color: '#374957' }}>
-              Contracts
-            </h1>
-            <p className="text-gray-600" style={{ fontFamily: 'Archivo, sans-serif' }}>
-              Manage your property contracts and agreements
-            </p>
-          </div>
-
-          {/* Overview Cards - all 0 values */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Sent Contracts</p>
-                  <p className="text-2xl font-semibold" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <FileText className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Contracts expiring soon</p>
-                  <p className="text-2xl font-semibold text-orange-600" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
-                </div>
-                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                  <AlertTriangle className="w-6 h-6 text-orange-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Pending Signature</p>
-                  <p className="text-2xl font-semibold text-yellow-600" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
-                </div>
-                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-yellow-600" />
-                </div>
-              </div>
-            </Card>
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground mb-1 text-sm" style={{ fontFamily: 'Archivo, sans-serif' }}>Signed Contracts</p>
-                  <p className="text-2xl font-semibold text-green-600" style={{ fontFamily: 'Archivo, sans-serif' }}>0</p>
-                </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Empty State Sign-in */}
-          <LandlordEmptyState />
-        </div>
-      </div>
+      <LandlordPageEmptyShell
+        page="contracts"
+        variant="new-user"
+        onAddProperty={onAddProperty}
+        userName={userProfile?.name}
+      />
     );
   }
 

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proptii — Your free month has started</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500;6..12,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="flow-shared.css">
+<style>
+.arrival { max-width: 720px; margin: 80px auto 40px; padding: 0 24px; text-align: center; }
+.check {
+  width: 96px; height: 96px; border-radius: 50%;
+  background: var(--green-light); color: var(--green-dark);
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-bottom: 36px;
+  animation: checkPop .6s cubic-bezier(.2,.8,.2,1) both;
+}
+.check svg { width: 44px; height: 44px; stroke: var(--green-dark); stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 60; stroke-dashoffset: 60; animation: drawCheck .6s .25s cubic-bezier(.2,.8,.2,1) forwards; }
+@keyframes drawCheck { to { stroke-dashoffset: 0; } }
+@keyframes checkPop { from { opacity:0; transform: scale(.6); } to { opacity:1; transform: scale(1); } }
+@keyframes ripple { 0% { box-shadow: 0 0 0 0 rgba(29,158,117,.35); } 100% { box-shadow: 0 0 0 32px rgba(29,158,117,0); } }
+.check { animation: checkPop .6s cubic-bezier(.2,.8,.2,1) both, ripple 1.6s 1s ease-out 1; }
+
+.arrival h1 { font-family: 'Archivo'; font-size: 44px; font-weight: 800; letter-spacing: -.025em; line-height: 1.1; margin-bottom: 14px; }
+.arrival .sub { font-size: 18px; color: var(--muted); max-width: 480px; margin: 0 auto 56px; line-height: 1.55; }
+.arrival .sub strong { color: var(--navy); font-weight: 600; }
+
+.timeline { display: flex; align-items: flex-start; justify-content: space-between; max-width: 580px; margin: 0 auto 48px; position: relative; }
+.timeline::before { content: ''; position: absolute; top: 7px; left: 14%; right: 14%; height: 0; border-top: 2px dashed var(--border-strong); z-index: 0; }
+.tstep { display: flex; flex-direction: column; align-items: center; gap: 12px; flex: 1; position: relative; z-index: 1; }
+.tstep .tdot { width: 16px; height: 16px; border-radius: 50%; background: var(--cream); border: 2px solid var(--border-strong); }
+.tstep.active .tdot { background: var(--green); border-color: var(--green); box-shadow: 0 0 0 5px rgba(29,158,117,0.18); }
+.tstep .tlabel { font-size: 13px; color: var(--muted); font-weight: 500; max-width: 140px; line-height: 1.4; }
+.tstep.active .tlabel { color: var(--navy); font-weight: 600; }
+
+.cta-row { margin-top: 8px; }
+.cta-row .btn { padding: 16px 36px; font-size: 17px; }
+
+.confirm-line { font-size: 13px; color: var(--muted); margin-top: 24px; }
+.commit-link { display: inline-block; margin-top: 14px; font-size: 12px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; opacity: .8; transition: opacity .15s, color .15s; }
+.commit-link:hover { opacity: 1; color: var(--navy); }
+</style></head><body>
+
+<div id="nav-mount"></div>
+
+<main>
+  <div class="arrival fade-in">
+    <div class="check"><svg viewBox="0 0 24 24"><polyline points="5,12 10,17 19,7"/></svg></div>
+
+    <h1>Your free month has started.</h1>
+    <p class="sub">Full access to <strong>Renter Pro</strong> — no card needed, no commitment.</p>
+
+    <div class="timeline">
+      <div class="tstep active"><span class="tdot"></span><span class="tlabel">Today<br>Full access begins</span></div>
+      <div class="tstep"><span class="tdot"></span><span class="tlabel">Day 27<br>We'll remind you</span></div>
+      <div class="tstep"><span class="tdot"></span><span class="tlabel">Day 30<br>Choose to continue</span></div>
+    </div>
+
+    <div class="cta-row">
+      <a href="#" class="btn btn-primary">Go to your dashboard →</a>
+    </div>
+
+    <p class="confirm-line">A confirmation has been sent to <strong id="confirm-email">your inbox</strong>.</p>
+    <a href="screen-5-paynow.html" class="commit-link">Rather commit now? You can pay today and skip the trial →</a>
+  </div>
+</main>
+
+<script src="flow-partials.js"></script>
+<script>
+  document.getElementById('nav-mount').innerHTML = window.proptiiPartials.nav('');
+  const s = flowState.get();
+  if (s.email) document.getElementById('confirm-email').textContent = s.email;
+  flowTimeout();
+</script>
+</body></html>

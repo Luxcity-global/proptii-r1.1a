@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ScheduleModule } from '@nestjs/schedule';
 import { DatabaseModule } from './modules/database.module';
 import { ViewingRequestModule } from './modules/viewing-request.module';
 import { ReferencingModule } from './modules/referencing.module';
@@ -16,6 +17,7 @@ import { PropertyDocumentController } from './controllers/property-document.cont
 import { AzureUsersModule } from './modules/azure-users.module';
 import { AuthModule } from './modules/auth.module';
 import { HealthModule } from './health/health.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
 import { GuestEnquiryModule } from './modules/guest-enquiry.module';
 import { NativePropertiesModule } from './modules/native-properties.module';
@@ -26,6 +28,7 @@ import { NativePropertiesModule } from './modules/native-properties.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    ScheduleModule.forRoot(),
     // Sprint 5-T001: Global rate limiting — 100 req/min per IP for general routes.
     // Tighter limits can be applied per-route with @Throttle({ default: { limit: 10, ttl: 60000 } })
     ThrottlerModule.forRoot([
@@ -55,6 +58,7 @@ import { NativePropertiesModule } from './modules/native-properties.module';
     }),
     GuestEnquiryModule,
     NativePropertiesModule,
+    BillingModule,
   ],
   controllers: [AppController, PropertyDocumentController],
   providers: [

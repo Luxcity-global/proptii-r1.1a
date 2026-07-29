@@ -55,6 +55,11 @@ async function bootstrap() {
   // Apply helmet for standard security headers
   app.use(helmet());
 
+  // Stripe webhook needs the raw Buffer body for signature verification (S1-08).
+  // This middleware must be registered BEFORE express.json() so it captures the
+  // raw body stream for that path before the JSON parser consumes it.
+  app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
+
   // Body limit: 10 MB covers base64-encoded referencing documents up to ~7.5 MB raw.
   // For larger file uploads, use multipart/form-data with FileInterceptor instead.
   app.use(express.json({ limit: '10mb' }));
