@@ -6,12 +6,8 @@ export const CANONICAL_PROD_API_BASE_URL =
     ? `${(import.meta as any).env.VITE_NEST_API_ENDPOINT.trim().replace(/\/$/, '')}/api`
     : (typeof window !== 'undefined' ? `${window.location.origin}/api` : ''));
 
-/** Nest global prefix — read from environment variable or window location. */
-export const DEV_LOCAL_API_BASE =
-  (import.meta as any)?.env?.VITE_API_URL?.trim?.() ||
-  ((import.meta as any)?.env?.VITE_NEST_API_ENDPOINT?.trim?.()
-    ? `${(import.meta as any).env.VITE_NEST_API_ENDPOINT.trim().replace(/\/$/, '')}/api`
-    : (typeof window !== 'undefined' ? `${window.location.origin}/api` : ''));
+/** Nest global prefix for local development. */
+export const DEV_LOCAL_API_BASE = 'http://127.0.0.1:3000/api';
 
 const RENDER_REMOTE_FALLBACKS = Array.from(new Set([
   CANONICAL_PROD_API_BASE_URL,
@@ -74,11 +70,14 @@ const buildCandidateList = () => {
     : RENDER_REMOTE_FALLBACKS;
 
   let candidates: string[];
-  if (isLocalDevOrigin && envUrl && !isLocalApiUrl(envUrl)) {
-    candidates = [...LOCAL_FALLBACKS, envUrl, ...remoteFallbacks];
+  if (envUrl) {
+    candidates = [
+      envUrl,
+      ...(isLocalDevOrigin ? LOCAL_FALLBACKS : []),
+      ...remoteFallbacks,
+    ];
   } else {
     candidates = [
-      ...(envUrl ? [envUrl] : []),
       ...(isLocalDevOrigin ? LOCAL_FALLBACKS : []),
       ...remoteFallbacks,
       ...(!isLocalDevOrigin && (import.meta as any)?.env?.DEV ? LOCAL_FALLBACKS : []),
