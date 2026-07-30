@@ -17,6 +17,8 @@ const RENDER_REMOTE_FALLBACKS = Array.from(new Set([
     : null,
 ].filter(Boolean) as string[]));
 
+const LEGACY_REMOTE_FALLBACKS: string[] = [];
+
 /** Origins allowed in CSP connect-src dynamically built from environment variables. */
 export const KNOWN_API_ORIGINS = Array.from(new Set([
   ...(typeof window !== 'undefined' ? [window.location.origin] : []),
