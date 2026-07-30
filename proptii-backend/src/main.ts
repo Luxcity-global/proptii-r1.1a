@@ -72,6 +72,8 @@ async function bootstrap() {
 
   // Explicit CORS allowlist — origin:true (reflect-any) is a security risk.
   const allowedOrigins = [
+    ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+    'https://proptii-r1-1a-2.onrender.com',
     'https://proptii.co',
     'https://www.proptii.co',
     'https://proptii-r1-1a-new.onrender.com',
