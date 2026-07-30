@@ -113,12 +113,12 @@ export class SecurityMiddleware {
 
         return [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com https://js.stripe.com https://maps.googleapis.com https://*.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com https://js.stripe.com https://maps.googleapis.com https://*.googleapis.com https://apis.google.com https://www.googletagmanager.com https://www.google-analytics.com",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' https://fonts.gstatic.com data:",
             "img-src 'self' data: https: blob:",
             `connect-src ${connectSrc}`,
-            "frame-src 'self' https://proptii.b2clogin.com https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://*.stripe.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net https://*.google.com",
+            "frame-src 'self' https://proptii.b2clogin.com https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://*.stripe.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net https://*.google.com https://apis.google.com",
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",

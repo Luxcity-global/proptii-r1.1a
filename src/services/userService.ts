@@ -1,7 +1,8 @@
 import axios, { AxiosInstance } from 'axios';
 import { getMsalInstance } from '../contexts/AuthContext';
+import { PRIMARY_API_BASE_URL } from '../utils/apiEndpoints';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:7071/api';
+const API_BASE_URL = PRIMARY_API_BASE_URL;
 
 export interface User {
   id: string;

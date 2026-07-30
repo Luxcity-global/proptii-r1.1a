@@ -21,8 +21,13 @@ import type {
     SendMessageDto,
 } from '../types/messaging';
 
-// Azure Functions runs on 7071 locally; VITE_API_ENDPOINT overrides this.
-const FUNCTIONS_BASE = (import.meta.env.VITE_API_ENDPOINT || 'http://localhost:7071').replace(/\/$/, '');
+// Azure Functions or Nest backend base endpoint — resolved dynamically from env
+const FUNCTIONS_BASE = (
+    import.meta.env.VITE_API_ENDPOINT ||
+    import.meta.env.VITE_NEST_API_ENDPOINT ||
+    import.meta.env.VITE_API_URL ||
+    (import.meta.env.DEV ? 'http://localhost:7071' : (typeof window !== 'undefined' ? window.location.origin : ''))
+).replace(/\/api$/, '').replace(/\/$/, '');
 const BASE = `${FUNCTIONS_BASE}/api/communication`;
 
 /** Build an Authorization header using the mock token or MSAL token. */
