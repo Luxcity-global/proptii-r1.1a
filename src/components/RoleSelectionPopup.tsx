@@ -77,7 +77,7 @@ const RoleSelectionPopup: React.FC<RoleSelectionPopupProps> = ({ isOpen, onRoleS
     } else {
       // Fallback behavior
       if (selectedRole === 'landlord') {
-        window.location.href = '/landlord/index.html';
+        window.location.href = '/landlord';
       } else {
         const actionCardsSection = document.querySelector('.action-cards-section');
         if (actionCardsSection) {

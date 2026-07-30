@@ -116,7 +116,7 @@ const AgentNavbar: React.FC<AgentNavbarProps> = ({ isAgent = false }) => {
         localStorage.setItem('userRole', 'agent');
       }
       // Redirect to landlord/agent dashboard
-      window.location.href = '/landlord/index.html';
+      window.location.href = '/landlord';
     } finally {
       setIsDropdownOpen(false);
       setIsMobileMenuOpen(false);

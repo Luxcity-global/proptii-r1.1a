@@ -364,7 +364,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               if ((role === 'landlord' || role === 'agent')) {
                 const currentRedirect = sessionStorage.getItem('redirectAfterLogin');
                 if (!currentRedirect || currentRedirect === '/dashboard' || currentRedirect === '/') {
-                  sessionStorage.setItem('redirectAfterLogin', '/landlord/index.html');
+                  sessionStorage.setItem('redirectAfterLogin', '/landlord');
                 }
               }
             }
@@ -577,7 +577,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (role === 'landlord' || role === 'agent') {
               const currentRedirect = sessionStorage.getItem('redirectAfterLogin');
               if (!currentRedirect || currentRedirect === '/dashboard' || currentRedirect === '/') {
-                sessionStorage.setItem('redirectAfterLogin', '/landlord/index.html');
+                sessionStorage.setItem('redirectAfterLogin', '/landlord');
               }
             }
           }

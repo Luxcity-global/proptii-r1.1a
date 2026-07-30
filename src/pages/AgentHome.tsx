@@ -87,8 +87,8 @@ const AgentHome = () => {
   const handleGoToDashboard = () => {
     // Store the selected role in localStorage for the dashboard to use
     localStorage.setItem('userRole', selectedRole);
-    // Navigate to the landlord dashboard (served from public/landlord/)
-    window.location.href = '/landlord/index.html';
+    // Navigate to the landlord dashboard
+    window.location.href = '/landlord';
   };
 
   const handleAddProperty = () => {
@@ -98,7 +98,7 @@ const AgentHome = () => {
     }
     // Instruct landlord app to open property setup flow immediately
     localStorage.setItem('startScreen', 'property-setup-step1');
-    window.location.href = '/landlord/index.html?start=property-setup-step1';
+    window.location.href = '/landlord?start=property-setup-step1';
   };
 
   const handleSetupProfile = () => {
@@ -108,7 +108,7 @@ const AgentHome = () => {
     }
     // Deep link to the company/landlord profile setup flow
     localStorage.setItem('startScreen', 'company-profile-setup');
-    window.location.href = '/landlord/index.html?start=company-profile-setup';
+    window.location.href = '/landlord?start=company-profile-setup';
   };
 
   const handleClosePopup = () => {

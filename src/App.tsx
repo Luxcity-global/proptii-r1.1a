@@ -176,6 +176,7 @@ export const App: React.FC = () => {
                     <AgentHome />
                   </ProtectedRoute>
                 } />
+                <Route path="/landlord/index.html" element={<Navigate to="/landlord" replace />} />
                 <Route path="/landlord/*" element={
                   <ProtectedRoute requiredRoles={['landlord', 'agent']}>
                     <LandlordDemo />

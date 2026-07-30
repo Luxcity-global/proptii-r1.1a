@@ -44,7 +44,7 @@ const RoleSelect: React.FC = () => {
     } finally {
       // Always redirect, whether Firestore succeeded or we fell back to local storage
       if (role === 'landlord' || role === 'agent') {
-        window.location.href = '/landlord/index.html';
+        window.location.href = '/landlord';
       } else {
         window.location.href = '/dashboard';
       }

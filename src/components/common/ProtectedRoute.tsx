@@ -170,7 +170,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
                   </span>
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                     <a
-                      href="/landlord/index.html"
+                      href="/landlord"
                       style={{
                         background: '#DC5F12',
                         color: '#fff',
