@@ -39,25 +39,10 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
   const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
-  if (!userProfile) {
-    return <LandlordPageEmptyShell page="documents" variant="guest" />;
-  }
-
-  if (isNewPortfolioUser(properties)) {
-    return (
-      <LandlordPageEmptyShell
-        page="documents"
-        variant="new-user"
-        onAddProperty={onAddProperty}
-        userName={userProfile.name}
-      />
-    );
-  }
-
   // Flatten all documents with property information
   const allDocuments = useMemo<DocumentWithProperty[]>(() => {
-    return properties.flatMap(property => 
-      property.documents.map(document => ({
+    return (properties || []).flatMap(property => 
+      (property.documents || []).map(document => ({
         ...document,
         propertyAddress: property.address,
         propertyId: property.id,
@@ -138,6 +123,21 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
     return { total, expired, expiringSoon, valid };
   }, [allDocuments]);
 
+  if (!userProfile) {
+    return <LandlordPageEmptyShell page="documents" variant="guest" />;
+  }
+
+  if (isNewPortfolioUser(properties)) {
+    return (
+      <LandlordPageEmptyShell
+        page="documents"
+        variant="new-user"
+        onAddProperty={onAddProperty}
+        userName={userProfile.name}
+      />
+    );
+  }
+
   const getStatusIcon = (status: PropertyDocument['status']) => {
     switch (status) {
       case 'expired':
@@ -182,7 +182,7 @@ export function DocumentsPage({ properties, onViewProperty, onManageDocuments, o
   };
 
   const getDocumentTypes = () => {
-    const types = new Set(allDocuments.map(doc => doc.type));
+    const types = new Set((allDocuments || []).map(doc => doc.type).filter(t => Boolean(t && t.trim())));
     return Array.from(types);
   };
 

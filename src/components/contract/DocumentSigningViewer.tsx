@@ -192,7 +192,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
   };
 
   // Handle signature capture from drawing pad
-  const handleSignatureCapture = (signatureData: string) => {
+  const handleSignatureCapture = (signatureData: string | null) => {
     console.log('🖊️ Signature captured:', signatureData ? 'Signature data received' : 'No signature data');
     setCurrentSignature(signatureData);
     // Don't close the modal yet - let user click "Use Signature"
@@ -472,7 +472,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
       const signedPdfBytes = await pdfDoc.save();
       setSignedPdfBytes(signedPdfBytes);
       // Build a blob URL and base64 data URL for persistence
-      const signedBlob = new Blob([signedPdfBytes], { type: 'application/pdf' });
+      const signedBlob = new Blob([signedPdfBytes as any], { type: 'application/pdf' });
       const blobUrl = URL.createObjectURL(signedBlob);
       const toBase64 = (bytes: Uint8Array) => {
         let binary = '';
@@ -529,7 +529,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
             property: signedContractData.propertyName
           };
           
-          await addSignedContract(newSignedContract);
+          await addSignedContract(newSignedContract as any);
           console.log('✅ Contract also added to local context');
         } else {
           console.error('❌ Failed to save signed contract to Firestore:', result.error);
@@ -558,7 +558,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
   // Download signed PDF
   const downloadSignedPdf = () => {
     if (signedPdfBytes) {
-      const blob = new Blob([signedPdfBytes], { type: 'application/pdf' });
+      const blob = new Blob([signedPdfBytes as any], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

@@ -56,39 +56,20 @@ export function PropertiesPage({
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
 
-  if (!userProfile) {
-    return (
-      <LandlordPageEmptyShell page="properties" variant="guest" />
-    );
-  }
-
-  if (isNewPortfolioUser(properties)) {
-    return (
-      <LandlordPageEmptyShell
-        page="properties"
-        variant="new-user"
-        onAddProperty={onAddProperty}
-        userName={userProfile.name}
-      />
-    );
-  }
-
   const filteredAndSortedProperties = useMemo(() => {
     const now = new Date();
     const arrearsByTenantId = new Map<string, ArrearsAlert>();
-    arrearsAlerts.forEach(alert => arrearsByTenantId.set(alert.tenantId, alert));
+    (arrearsAlerts || []).forEach(alert => arrearsByTenantId.set(alert.tenantId, alert));
 
-    // Filter properties
-    let filtered = properties.filter((property) => {
+    let filtered = (properties || []).filter((property) => {
       const matchesSearch = property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            property.type.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || property.status === statusFilter;
       const matchesType = typeFilter === 'all' || property.type === typeFilter;
       
-      // Overdue rent filter
       let matchesOverdue = true;
       if (overdueRentFilter) {
-        const tenant = property.tenant || tenants.find(t => t.propertyId === property.id);
+        const tenant = property.tenant || (tenants || []).find(t => t.propertyId === property.id);
         if (tenant) {
           const tenantAlert = arrearsByTenantId.get(tenant.id);
           const alertAmount = tenantAlert?.overdueAmount ?? 0;
@@ -96,14 +77,13 @@ export function PropertiesPage({
           const hasOverdueRent = tenant.paymentStatus === 'overdue' || alertAmount > 0 || tenantOverdueAmount > 0;
           matchesOverdue = hasOverdueRent;
         } else {
-          matchesOverdue = false; // No tenant means no overdue rent
+          matchesOverdue = false;
         }
       }
 
-      // Lease expiry filter
       let matchesLeaseExpiry = true;
       if (leaseExpiryFilter !== 'all') {
-        const tenant = property.tenant || tenants.find(t => t.propertyId === property.id);
+        const tenant = property.tenant || (tenants || []).find(t => t.propertyId === property.id);
         if (!tenant) {
           matchesLeaseExpiry = leaseExpiryFilter === 'no-lease';
         } else {
@@ -132,11 +112,10 @@ export function PropertiesPage({
       return matchesSearch && matchesStatus && matchesType && matchesOverdue && matchesLeaseExpiry;
     });
 
-    // Sort properties
     if (sortBy !== 'default') {
       filtered = [...filtered].sort((a, b) => {
-        const tenantA = a.tenant || tenants.find(t => t.propertyId === a.id);
-        const tenantB = b.tenant || tenants.find(t => t.propertyId === b.id);
+        const tenantA = a.tenant || (tenants || []).find(t => t.propertyId === a.id);
+        const tenantB = b.tenant || (tenants || []).find(t => t.propertyId === b.id);
         const arrearsA = tenantA ? arrearsByTenantId.get(tenantA.id) : null;
         const arrearsB = tenantB ? arrearsByTenantId.get(tenantB.id) : null;
 
@@ -192,14 +171,14 @@ export function PropertiesPage({
     threshold.setDate(threshold.getDate() + 90);
 
     const arrearsByTenantId = new Map<string, ArrearsAlert>();
-    arrearsAlerts.forEach(alert => arrearsByTenantId.set(alert.tenantId, alert));
+    (arrearsAlerts || []).forEach(alert => arrearsByTenantId.set(alert.tenantId, alert));
 
     const endingSoon = new Set<string>();
     const overdue = new Set<string>();
     let overdueAmountTotal = 0;
 
-    properties.forEach(property => {
-      const tenant = property.tenant || tenants.find(t => t.propertyId === property.id);
+    (properties || []).forEach(property => {
+      const tenant = property.tenant || (tenants || []).find(t => t.propertyId === property.id);
       if (!tenant) return;
 
       const leaseEnd = tenant.leaseEnd instanceof Date ? tenant.leaseEnd : new Date(tenant.leaseEnd);
@@ -224,6 +203,23 @@ export function PropertiesPage({
       totalOverdueRentAmount: overdueAmountTotal
     };
   }, [arrearsAlerts, properties, tenants]);
+
+  if (!userProfile) {
+    return (
+      <LandlordPageEmptyShell page="properties" variant="guest" />
+    );
+  }
+
+  if (isNewPortfolioUser(properties)) {
+    return (
+      <LandlordPageEmptyShell
+        page="properties"
+        variant="new-user"
+        onAddProperty={onAddProperty}
+        userName={userProfile.name}
+      />
+    );
+  }
 
   const getStatusColor = (status: Property['status']) => {
     switch (status) {
@@ -252,7 +248,7 @@ export function PropertiesPage({
   };
 
   const getPropertyTypes = () => {
-    const types = new Set(properties.map(p => p.type));
+    const types = new Set((properties || []).map(p => p.type).filter(t => Boolean(t && t.trim())));
     return Array.from(types);
   };
 

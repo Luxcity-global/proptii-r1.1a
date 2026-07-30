@@ -71,12 +71,16 @@ interface User {
   name?: string;
   phone?: string;
   roles: string[];
+  /** true once a canonical role has been resolved (even if roles[] is empty) */
+  roleResolved: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  /** Convenience: the user's primary role or null if not yet resolved */
+  userRole: 'tenant' | 'landlord' | 'agent' | null;
   login: () => Promise<void>;
   loginAsMockUser: (id: string, role: string) => void;
   logout: () => Promise<void>;
@@ -166,12 +170,15 @@ const refreshUserData = async (instance: any, accounts: any[], loginRequest: any
           freshResult.account.homeAccountId || 
           '';
         
-        setUser({
+        setUser((prev: User | null) => ({
+          ...prev,
           id: stableUserId,
           name: freshResult.account.name || '',
           email: freshResult.account.username || '',
-          phone: phoneNumber
-        });
+          phone: phoneNumber,
+          roles: prev?.roles ?? [],
+          roleResolved: prev?.roleResolved ?? false,
+        }));
 
         console.log('✅ User data refreshed successfully with phone:', phoneNumber);
         
@@ -202,12 +209,15 @@ const refreshUserData = async (instance: any, accounts: any[], loginRequest: any
             popupResult.account.homeAccountId || 
             '';
           
-          setUser({
+          setUser((prev: User | null) => ({
+            ...prev,
             id: stableUserId,
             name: popupResult.account.name || '',
             email: popupResult.account.username || '',
-            phone: phoneNumber
-          });
+            phone: phoneNumber,
+            roles: prev?.roles ?? [],
+            roleResolved: prev?.roleResolved ?? false,
+          }));
 
           console.log('✅ User data refreshed via popup with phone:', phoneNumber);
           
@@ -251,6 +261,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             email: `${role}@test.proptii.co`,
             name: `Test ${role.charAt(0).toUpperCase() + role.slice(1)}`,
             roles: [role],
+            roleResolved: true,
           };
           setUser(mockUser);
           setIsAuthenticated(true);
@@ -341,12 +352,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             currentAccount.homeAccountId || 
             '';
           
-          let resolvedRoles = ['tenant'];
+          let resolvedRoles: string[] = [];
+          let roleResolved = false;
           try {
-            const { default: landlordUserService } = await import('../services/landlordUserService');
-            const roleCheck = await landlordUserService.isLandlordOrAgent(currentAccount.username);
-            if (roleCheck.isLandlord && roleCheck.user?.role) {
-              resolvedRoles = [roleCheck.user.role];
+            const { resolveRole } = await import('../services/roleService');
+            const role = await resolveRole(stableUserId, currentAccount.username);
+            if (role) {
+              resolvedRoles = [role];
+              roleResolved = true;
+              // If landlord/agent and no explicit redirect set, send to landlord app
+              if ((role === 'landlord' || role === 'agent')) {
+                const currentRedirect = sessionStorage.getItem('redirectAfterLogin');
+                if (!currentRedirect || currentRedirect === '/dashboard' || currentRedirect === '/') {
+                  sessionStorage.setItem('redirectAfterLogin', '/landlord/index.html');
+                }
+              }
             }
           } catch (e) {
             console.error('Error resolving role:', e);
@@ -359,7 +379,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             email: currentAccount.username,
             name: currentAccount.name,
             phone: phoneNumber,
-            roles: resolvedRoles
+            roles: resolvedRoles,
+            roleResolved,
           });
           
           console.log('👤 User object set with phone:', phoneNumber);
@@ -399,10 +420,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
         
         // Send authentication state to landlord app
-        event.source?.postMessage({
-          type: 'AUTH_STATE',
-          payload: authState
-        }, '*');
+        event.source?.postMessage(
+          { type: 'AUTH_STATE', payload: authState },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          '*' as any,
+        );
         
         // Also store in localStorage for direct access
         localStorage.setItem('proptii_auth_state', JSON.stringify(authState));
@@ -543,18 +565,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         console.log('📞 Login - Phone number found:', phoneNumber);
         
-        let resolvedRoles = ['tenant'];
+        let resolvedRoles: string[] = [];
+        let roleResolved = false;
         try {
-          const { default: landlordUserService } = await import('../services/landlordUserService');
+          const { resolveRole } = await import('../services/roleService');
           const emailToCheck = result.account?.username || '';
-          const roleCheck = await landlordUserService.isLandlordOrAgent(emailToCheck);
-          
-          if (roleCheck.isLandlord && roleCheck.user?.role) {
-            resolvedRoles = [roleCheck.user.role];
-            
-            const currentRedirect = sessionStorage.getItem('redirectAfterLogin');
-            if (!currentRedirect || currentRedirect === '/dashboard' || currentRedirect === '/') {
-              sessionStorage.setItem('redirectAfterLogin', '/landlord/index.html');
+          const role = await resolveRole(stableUserId, emailToCheck);
+          if (role) {
+            resolvedRoles = [role];
+            roleResolved = true;
+            if (role === 'landlord' || role === 'agent') {
+              const currentRedirect = sessionStorage.getItem('redirectAfterLogin');
+              if (!currentRedirect || currentRedirect === '/dashboard' || currentRedirect === '/') {
+                sessionStorage.setItem('redirectAfterLogin', '/landlord/index.html');
+              }
             }
           }
         } catch (e) {
@@ -568,7 +592,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           givenName: result.account?.name?.split(' ')[0],
           familyName: result.account?.name?.split(' ').slice(1).join(' '),
           phone: phoneNumber,
-          roles: resolvedRoles
+          roles: resolvedRoles,
+          roleResolved,
         });
         
         console.log('👤 Login - User object set:', { id: stableUserId, email: result.account?.username, phone: phoneNumber });
@@ -687,6 +712,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       givenName,
       familyName,
       roles: [role],
+      roleResolved: true, // Mock users always have a known role
     };
     
     // Store mock token in localStorage so axios can use it
@@ -732,12 +758,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             result.account.homeAccountId || 
             '';
           
-          setUser({
+          setUser((prev) => ({
+            ...prev,
             id: stableUserId,
             name: result.account.name || '',
             email: result.account.username || '',
-            phone: phoneNumber
-          });
+            phone: phoneNumber,
+            roles: prev?.roles ?? [],
+            roleResolved: prev?.roleResolved ?? false,
+          }));
 
           console.log('✅ Profile updated successfully with phone:', phoneNumber);
           
@@ -844,12 +873,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const userRole = (user?.roles?.[0] as 'tenant' | 'landlord' | 'agent' | undefined) ?? null;
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isAuthenticated,
         isLoading,
+        userRole,
         login,
         loginAsMockUser,
         logout,

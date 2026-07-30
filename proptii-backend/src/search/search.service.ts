@@ -138,13 +138,17 @@ export class SearchService {
         }
       });
 
+      if (process.env.NODE_ENV !== 'production') {
+        this.logger.warn('Azure OpenAI call failed, falling back to mock search results:', error.message);
+        return this.getMockSearchResults(query);
+      }
+
       if (error.response?.status === 429) {
         throw new Error('Rate limit exceeded. Please try again in a moment.');
       }
       if (error.response?.status === 401 || error.response?.status === 403) {
         throw new Error('Authentication failed. Please check API credentials.');
       }
-      // Always return a user-friendly error
       throw new Error('Failed to process search query. Please try again.');
     }
   }

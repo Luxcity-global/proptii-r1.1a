@@ -182,7 +182,7 @@ const SelfHostedSigningEditor: React.FC<SelfHostedSigningEditorProps> = ({
   // Download signed PDF
   const downloadSignedPdf = () => {
     if (signedPdfBytes) {
-      const blob = new Blob([signedPdfBytes], { type: 'application/pdf' });
+      const blob = new Blob([signedPdfBytes as any], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

@@ -3,6 +3,7 @@ import { AnimatedList } from './magic-ui/animated-list';
 
 interface WelcomePageProps {
   onGetStarted: () => void;
+  onClose?: () => void;
 }
 
 const WelcomePage: React.FC<WelcomePageProps> = ({ onGetStarted }) => {

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import quickRequestService, { ValidateClaimResponse } from '../services/quickRequestService';
 import { Check, AlertCircle, Loader2 } from 'lucide-react';
+import { setRole } from '../services/roleService';
 
 const getCleanErrorMessage = (err: any, fallback: string): string => {
   const apiCode = err.response?.data?.error?.code;
@@ -76,6 +77,17 @@ const ClaimAccount: React.FC = () => {
 
       try {
         await quickRequestService.confirmClaim(token);
+
+        // Persist the role derived from the claim token into the canonical users collection
+        if (user && claimData) {
+          const derivedRole = claimData.role === 'ghost_landlord' ? 'landlord' : 'tenant';
+          try {
+            await setRole(user.id, user.email, derivedRole, 'claim_token');
+          } catch (roleErr) {
+            console.warn('[ClaimAccount] Could not persist role from claim token:', roleErr);
+          }
+        }
+
         setClaimSuccess(true);
         setTimeout(() => {
           if (claimData?.role === 'ghost_landlord') {

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Property, PropertyDocument } from '../App';
 import { propertyService } from '../services/propertyService';
+import { downloadPropertyDocument } from '../utils/downloadPropertyDocument';
 import axios from 'axios';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
 
@@ -167,22 +168,38 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
       const uploadedCount = selectedDocuments.length;
 
       for (const docForm of selectedDocuments) {
-        console.log('Uploading document to backend:', docForm.file.name);
+        console.log('Uploading document:', docForm.file.name);
 
-        const formData = new FormData();
-        formData.append('document', docForm.file);
+        let documentUrl = '';
+        try {
+          const formData = new FormData();
+          formData.append('document', docForm.file);
+          const token = localStorage.getItem('proptii_access_token');
+          const headers: Record<string, string> = { 'Content-Type': 'multipart/form-data' };
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+          }
 
-        const uploadResponse = await axios.post(`${API_BASE_URL}/property/upload-document`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 30000
-        });
+          const uploadResponse = await axios.post(`${API_BASE_URL}/property/upload-document`, formData, {
+            headers,
+            timeout: 30000
+          });
 
-        console.log('Document uploaded successfully:', uploadResponse.data);
+          console.log('Document uploaded successfully to backend:', uploadResponse.data);
+          documentUrl = uploadResponse.data?.document?.url || '';
+        } catch (apiErr) {
+          console.warn('Backend upload unavailable or unauthenticated, creating local Data URL:', apiErr);
+          documentUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(docForm.file);
+          });
+        }
 
         const newDocument: Omit<PropertyDocument, 'id'> = {
           name: docForm.name,
           type: docForm.type as PropertyDocument['type'],
-          url: uploadResponse.data.document.url, // Store Azure Storage URL
+          url: documentUrl,
           issueDate: new Date(docForm.issueDate),
           expiryDate: docForm.expiryDate ? new Date(docForm.expiryDate) : undefined,
           status: 'valid'
@@ -580,7 +597,7 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
                           size="sm"
                           onClick={() => {
                             if (document.url) {
-                              window.open(document.url, '_blank');
+                              downloadPropertyDocument(document.url, document.name);
                             } else {
                               alert('Document URL not available');
                             }

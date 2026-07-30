@@ -1,29 +1,37 @@
 const normalizeBaseUrl = (url: string) => url.replace(/\/$/, '');
 
 export const CANONICAL_PROD_API_BASE_URL =
-  'https://proptii-r1-1a-new-backend.onrender.com/api';
+  (import.meta as any)?.env?.VITE_API_URL?.trim?.() ||
+  ((import.meta as any)?.env?.VITE_NEST_API_ENDPOINT?.trim?.()
+    ? `${(import.meta as any).env.VITE_NEST_API_ENDPOINT.trim().replace(/\/$/, '')}/api`
+    : (typeof window !== 'undefined' ? `${window.location.origin}/api` : ''));
 
-/** Nest global prefix — use this for billing and other /api/* routes in local dev. */
-export const DEV_LOCAL_API_BASE = 'http://127.0.0.1:3000/api';
+/** Nest global prefix — read from environment variable or window location. */
+export const DEV_LOCAL_API_BASE =
+  (import.meta as any)?.env?.VITE_API_URL?.trim?.() ||
+  ((import.meta as any)?.env?.VITE_NEST_API_ENDPOINT?.trim?.()
+    ? `${(import.meta as any).env.VITE_NEST_API_ENDPOINT.trim().replace(/\/$/, '')}/api`
+    : (typeof window !== 'undefined' ? `${window.location.origin}/api` : ''));
 
-const RENDER_REMOTE_FALLBACKS = [
+const RENDER_REMOTE_FALLBACKS = Array.from(new Set([
   CANONICAL_PROD_API_BASE_URL,
-  'https://proptii-r1-1a-1.onrender.com/api',
-];
+  (import.meta as any)?.env?.VITE_API_URL?.trim?.(),
+  (import.meta as any)?.env?.VITE_NEST_API_ENDPOINT?.trim?.()
+    ? `${(import.meta as any).env.VITE_NEST_API_ENDPOINT.trim().replace(/\/$/, '')}/api`
+    : null,
+].filter(Boolean) as string[]));
 
-/** Legacy custom domains — only tried from localhost dev (CSP + routing differ on deployed hosts). */
-const LEGACY_REMOTE_FALLBACKS = [
-  'https://api.proptii.com',
-  'https://api-staging.proptii.com',
-];
-
-/** Origins allowed in CSP connect-src for any API base we may call. */
-export const KNOWN_API_ORIGINS = [
-  'https://proptii-r1-1a-new-backend.onrender.com',
-  'https://proptii-r1-1a-1.onrender.com',
-  'https://api.proptii.com',
-  'https://api-staging.proptii.com',
-];
+/** Origins allowed in CSP connect-src dynamically built from environment variables. */
+export const KNOWN_API_ORIGINS = Array.from(new Set([
+  ...(typeof window !== 'undefined' ? [window.location.origin] : []),
+  ...RENDER_REMOTE_FALLBACKS.map(url => {
+    try {
+      return new URL(url).origin;
+    } catch {
+      return null;
+    }
+  }).filter(Boolean) as string[]
+]));
 
 /** Windows: `localhost` often resolves to ::1 and can hit a hung listener on :3000. */
 const toIpv4Loopback = (url: string) =>

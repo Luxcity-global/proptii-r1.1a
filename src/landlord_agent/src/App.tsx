@@ -1435,12 +1435,16 @@ export function AppContent() {
         };
 
         const currentUserId = getCurrentUserId();
+        const userEmail = userProfile?.email;
 
-        if (!currentUserId) {
-          console.warn('⚠️ No userId found');
+        if (!currentUserId && !userEmail) {
+          console.warn('⚠️ No userId or userEmail found');
         }
 
-        const fetchedProperties = await propertyService.getProperties(currentUserId ? { userId: currentUserId } : undefined);
+        const fetchedProperties = await propertyService.getProperties({
+          ...(currentUserId ? { userId: currentUserId } : {}),
+          ...(userEmail ? { email: userEmail } : {})
+        });
         setProperties(fetchedProperties);
       } catch (error) {
         console.error('Error loading properties:', error);

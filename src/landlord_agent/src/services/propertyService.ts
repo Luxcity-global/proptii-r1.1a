@@ -86,10 +86,16 @@ class PropertyService {
         return data.id;
     }
 
-    async getProperties(filters?: { status?: Property['status']; type?: string; userId?: string }): Promise<Property[]> {
+    async getProperties(filters?: { status?: Property['status']; type?: string; userId?: string; email?: string }): Promise<Property[]> {
         const userId = filters?.userId;
-        if (!userId) return [];
-        const res = await fetch(`${API_BASE}/api/native-properties?userId=${encodeURIComponent(userId)}`);
+        const email = filters?.email;
+        if (!userId && !email) return [];
+        
+        const queryParams = new URLSearchParams();
+        if (userId) queryParams.append('userId', userId);
+        if (email) queryParams.append('email', email);
+
+        const res = await fetch(`${API_BASE}/api/native-properties?${queryParams.toString()}`);
         if (!res.ok) throw new Error(`Failed to get properties (${res.status})`);
         const data: any[] = await res.json();
         let results = data.map(mapFromApi);

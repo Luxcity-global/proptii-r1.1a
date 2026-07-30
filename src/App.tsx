@@ -64,6 +64,8 @@ import { AuthAnalyticsBridge } from './components/analytics/AuthAnalyticsBridge'
 import ComingSoon from './pages/ComingSoon';
 import GuestThreadPage from './pages/GuestThreadPage';
 import DevAuthToolbar from './components/dev/DevAuthToolbar';
+import RoleGate from './components/common/RoleGate';
+import RoleSelect from './pages/RoleSelect';
 
 /** Default landing: onboarding flow first. Home v2 lives at / with /home-v2 as alias. */
 
@@ -99,7 +101,8 @@ export const App: React.FC = () => {
               <AuthRedirectHandler />
               <BillingStatusBanner />
               <ScrollToTop />
-              <Routes>
+              <RoleGate>
+                <Routes>
                 {/* Public Routes - / is default landing; onboarding shows as modal overlay */}
                 <Route path="/" element={<HomeVariant />} />
                 <Route path="/home-v2" element={<Navigate to="/" replace />} />
@@ -110,6 +113,7 @@ export const App: React.FC = () => {
                 <Route path="/homeowner-onboarding" element={<OnboardingOptionsModalRoute type="homeowner" />} />
                 <Route path="/search" element={<SearchResults />} />
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/select-role" element={<RoleSelect />} />
                 <Route path="/register" element={<Navigate to="/pricing" replace />} />
                 <Route path="/unauthorized" element={<UnauthorizedPage />} />
                 <Route path="/about-us" element={<AboutUs />} />
@@ -234,8 +238,9 @@ export const App: React.FC = () => {
                 {/* <Route path="/agent-contracts" element={<AgentContractLanding />} /> */}
 
                 {/* Catch-all route for 404 */}
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </RoleGate>
               {/* Dev-only mock auth toolbar — stripped from production builds */}
               <DevAuthToolbar />
             </SignedContractsProvider>

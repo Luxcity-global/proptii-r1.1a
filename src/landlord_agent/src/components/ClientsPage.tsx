@@ -98,62 +98,6 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
     fetchReferencingStatuses();
   }, [tenants, userProfile]);
 
-  if (!userProfile) {
-    return <LandlordPageEmptyShell page="clients" variant="guest" />;
-  }
-
-  if (isNewPortfolioUser(properties)) {
-    return (
-      <LandlordPageEmptyShell
-        page="clients"
-        variant="new-user"
-        onAddProperty={onAddProperty}
-        userName={userProfile.name}
-      />
-    );
-  }
-
-  const getPropertyForTenant = (tenantId: string) => {
-    const tenant = tenants.find(t => t.id === tenantId);
-    return tenant ? properties.find(p => p.id === tenant.propertyId) : null;
-  };
-
-  const getArrearsForTenant = (tenantId: string) => {
-    return arrearsAlerts.find(alert => alert.tenantId === tenantId);
-  };
-
-  // Calculate summary statistics
-  const getTenantSummary = () => {
-    const totalTenants = tenants.length;
-    const overdueCount = tenants.filter(t => t.paymentStatus === 'overdue').length;
-    const currentCount = tenants.filter(t => t.paymentStatus === 'current').length;
-    const totalOverdueAmount = arrearsAlerts.reduce((sum, alert) => sum + alert.overdueAmount, 0);
-    
-    // Calculate leases expiring in next 3 months
-    const threeMonthsFromNow = new Date();
-    threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
-    const leasesExpiringSoon = tenants.filter(t => 
-      t.leaseEnd <= threeMonthsFromNow && t.status === 'active'
-    ).length;
-    
-    // Calculate average risk score
-    const tenantsWithRisk = tenants.filter(t => t.defaultRiskScore !== undefined);
-    const avgRiskScore = tenantsWithRisk.length > 0 
-      ? Math.round(tenantsWithRisk.reduce((sum, t) => sum + (t.defaultRiskScore || 0), 0) / tenantsWithRisk.length)
-      : 0;
-    
-    return {
-      totalTenants,
-      overdueCount,
-      currentCount,
-      totalOverdueAmount,
-      leasesExpiringSoon,
-      avgRiskScore
-    };
-  };
-
-  const summary = getTenantSummary();
-
   // Selection functions
   const toggleTenantSelection = (tenantId: string) => {
     setSelectedTenants(prev => 
@@ -239,7 +183,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
     setShowBulkActions(selectedTenants.length > 0 || selectedLandlords.length > 0);
   }, [selectedTenants, selectedLandlords]);
 
-  const mockLandlords: Landlord[] = [
+  const mockLandlords: Landlord[] = useMemo(() => [
     {
       id: '1',
       name: 'Margaret Williams',
@@ -312,85 +256,19 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
       location: 'Edinburgh',
       company: 'Thompson Estates'
     }
-  ];
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-      case 'premium':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-      case 'new':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'negotiating':
-        return 'bg-blue-100 text-blue-800';
-      case 'ended':
-      case 'inactive':
-        return 'bg-gray-100 text-gray-800';
-      case 'completed':
-        return 'bg-purple-100 text-purple-800';
-      case 'suspended':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getReferencingStatusColor = (status: 'not-started' | 'in-progress' | 'complete') => {
-    switch (status) {
-      case 'complete':
-        return 'bg-green-100 text-green-800';
-      case 'in-progress':
-        return 'bg-blue-100 text-blue-800';
-      case 'not-started':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getReferencingStatusLabel = (status: 'not-started' | 'in-progress' | 'complete') => {
-    switch (status) {
-      case 'not-started':
-        return 'Not yet started';
-      case 'in-progress':
-        return 'In progress';
-      case 'complete':
-        return 'Complete';
-      default:
-        return 'Unknown';
-    }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: 'GBP',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    }).format(date);
-  };
+  ], []);
 
   const filteredAndSortedTenants = useMemo(() => {
     const now = new Date();
     const arrearsByTenantId = new Map<string, ArrearsAlert>();
     arrearsAlerts.forEach(alert => arrearsByTenantId.set(alert.tenantId, alert));
 
-    // Filter tenants
-    let filtered = tenants.filter(tenant => {
+    let filtered = (tenants || []).filter(tenant => {
       const matchesSearch = tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            tenant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            tenant.propertyAddress.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesFilter = tenantFilter === 'all' || tenant.status === tenantFilter;
       
-      // Overdue rent filter (when selected from Sort By dropdown)
       let matchesOverdue = true;
       if (tenantSortBy === 'overdue-rent-only') {
         const tenantAlert = arrearsByTenantId.get(tenant.id);
@@ -400,7 +278,6 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
         matchesOverdue = hasOverdueRent;
       }
 
-      // Lease expiry filter
       let matchesLeaseExpiry = true;
       if (leaseExpiryFilter !== 'all') {
         const leaseEnd = tenant.leaseEnd instanceof Date ? tenant.leaseEnd : new Date(tenant.leaseEnd);
@@ -427,7 +304,6 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
       return matchesSearch && matchesFilter && matchesOverdue && matchesLeaseExpiry;
     });
 
-    // Sort tenants
     if (tenantSortBy !== 'default' && tenantSortBy !== 'overdue-rent-only') {
       filtered = [...filtered].sort((a, b) => {
         const arrearsA = arrearsByTenantId.get(a.id);
@@ -463,7 +339,6 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
         }
       });
     }
-    // When "Overdue Rent Only" is selected, sort by overdue amount descending
     else if (tenantSortBy === 'overdue-rent-only') {
       filtered = [...filtered].sort((a, b) => {
         const arrearsA = arrearsByTenantId.get(a.id);
@@ -479,19 +354,18 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
 
   const filteredTenants = filteredAndSortedTenants;
 
-  // Pagination for tenants
-  const totalTenantPages = Math.ceil(filteredTenants.length / TENANTS_PER_PAGE);
-  const startIndex = (currentTenantPage - 1) * TENANTS_PER_PAGE;
-  const endIndex = startIndex + TENANTS_PER_PAGE;
-  const paginatedTenants = filteredTenants.slice(startIndex, endIndex);
+  const totalTenantPages = Math.ceil((filteredTenants || []).length / TENANTS_PER_PAGE) || 1;
 
-  // Reset pagination when filters change
+  const paginatedTenants = useMemo(() => {
+    const start = (currentTenantPage - 1) * TENANTS_PER_PAGE;
+    return (filteredTenants || []).slice(start, start + TENANTS_PER_PAGE);
+  }, [filteredTenants, currentTenantPage]);
+
   useEffect(() => {
     setCurrentTenantPage(1);
   }, [searchTerm, tenantFilter, leaseExpiryFilter, tenantSortBy]);
 
   const filteredAndSortedLandlords = useMemo(() => {
-    // Filter landlords
     let filtered = mockLandlords.filter(landlord => {
       const matchesSearch = landlord.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            landlord.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -502,7 +376,6 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
       return matchesSearch && matchesFilter;
     });
 
-    // Sort landlords
     if (landlordSortBy !== 'default') {
       filtered = [...filtered].sort((a, b) => {
         switch (landlordSortBy) {
@@ -529,9 +402,50 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
     }
 
     return filtered;
-  }, [searchTerm, landlordFilter, landlordSortBy]);
+  }, [mockLandlords, searchTerm, landlordFilter, landlordSortBy]);
 
-  const filteredLandlords = filteredAndSortedLandlords;
+  // Calculate summary statistics
+  const summary = useMemo(() => {
+    const totalTenants = (tenants || []).length;
+    const overdueCount = (tenants || []).filter(t => t.paymentStatus === 'overdue').length;
+    const currentCount = (tenants || []).filter(t => t.paymentStatus === 'current').length;
+    const totalOverdueAmount = (arrearsAlerts || []).reduce((sum, alert) => sum + alert.overdueAmount, 0);
+    
+    const threeMonthsFromNow = new Date();
+    threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
+    const leasesExpiringSoon = (tenants || []).filter(t => 
+      t.leaseEnd <= threeMonthsFromNow && t.status === 'active'
+    ).length;
+    
+    const tenantsWithRisk = (tenants || []).filter(t => t.defaultRiskScore !== undefined);
+    const avgRiskScore = tenantsWithRisk.length > 0 
+      ? Math.round(tenantsWithRisk.reduce((sum, t) => sum + (t.defaultRiskScore || 0), 0) / tenantsWithRisk.length)
+      : 0;
+    
+    return {
+      totalTenants,
+      overdueCount,
+      currentCount,
+      totalOverdueAmount,
+      leasesExpiringSoon,
+      avgRiskScore
+    };
+  }, [tenants, arrearsAlerts]);
+
+  if (!userProfile) {
+    return <LandlordPageEmptyShell page="clients" variant="guest" />;
+  }
+
+  if (isNewPortfolioUser(properties)) {
+    return (
+      <LandlordPageEmptyShell
+        page="clients"
+        variant="new-user"
+        onAddProperty={onAddProperty}
+        userName={userProfile.name}
+      />
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">

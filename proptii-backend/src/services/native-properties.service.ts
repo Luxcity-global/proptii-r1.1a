@@ -26,8 +26,26 @@ export class NativePropertiesService {
     return await newProperty.save();
   }
 
+  async findAllByUser(userId?: string, email?: string): Promise<NativeProperty[]> {
+    const conditions: any[] = [];
+    if (userId) {
+      conditions.push({ userId });
+      conditions.push({ landlordId: userId });
+    }
+    if (email) {
+      const normalizedEmail = email.toLowerCase().trim();
+      conditions.push({ ownerEmail: normalizedEmail });
+    }
+
+    if (conditions.length === 0) {
+      return [];
+    }
+
+    return await this.propertyModel.find({ $or: conditions }).sort({ createdAt: -1 }).exec();
+  }
+
   async findAllByUserId(userId: string): Promise<NativeProperty[]> {
-    return await this.propertyModel.find({ userId }).sort({ createdAt: -1 }).exec();
+    return this.findAllByUser(userId);
   }
 
   async findById(id: string): Promise<NativeProperty | null> {

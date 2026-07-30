@@ -84,7 +84,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
       // Then check boundary constraints
       if (boundaryContainer) {
         const boundaryRect = boundaryContainer.getBoundingClientRect();
-        const scrollbarWidth = boundaryContainer.offsetWidth - boundaryContainer.clientWidth;
+        const scrollbarWidth = (boundaryContainer as HTMLElement).offsetWidth - boundaryContainer.clientWidth;
         const boundaryPadding = 16;
 
         const boundaryLeft = boundaryRect.left + boundaryPadding;

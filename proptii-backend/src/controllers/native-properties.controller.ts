@@ -10,8 +10,8 @@ export class NativePropertiesController {
   constructor(private readonly propertiesService: NativePropertiesService) {}
 
   @Get()
-  async list(@Query('userId') userId: string) {
-    return await this.propertiesService.findAllByUserId(userId);
+  async list(@Query('userId') userId?: string, @Query('email') email?: string) {
+    return await this.propertiesService.findAllByUser(userId, email);
   }
 
   @Get(':id')
