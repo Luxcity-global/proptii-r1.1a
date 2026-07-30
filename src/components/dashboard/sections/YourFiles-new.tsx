@@ -26,7 +26,7 @@ const YourFiles: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<number | string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
   const ITEMS_PER_PAGE = 10;
@@ -47,13 +47,13 @@ const YourFiles: React.FC = () => {
       (templates) => {
         console.log('Real-time contract files update:', templates);
         const contractFilesList: FileItem[] = templates.map((contract, index) => ({
-          id: `contract_${contract.id}_${index}`,
+          id: 100000 + index,
           name: contract.name,
           category: 'Contracts',
           type: contract.fileType,
           size: contract.fileSize,
           uploadDate: contract.uploadDate,
-          url: `data:${contract.fileType};base64,${contract.fileData}`,
+          url: contract.fileUrl || `data:${contract.fileType};base64,${contract.fileData}`,
           firestoreId: contract.id
         }));
         setContractFiles(contractFilesList);
@@ -155,13 +155,13 @@ const YourFiles: React.FC = () => {
       if (result.success && result.templates) {
         console.log('Found contract templates:', result.templates);
         const contractFilesList: FileItem[] = result.templates.map((contract, index) => ({
-          id: `contract_${contract.id}_${index}`, // Use contract ID for consistent identification
+          id: 200000 + index, // Use unique numeric ID
           name: contract.name,
           category: 'Contracts',
           type: contract.fileType,
           size: contract.fileSize,
           uploadDate: contract.uploadDate,
-          url: `data:${contract.fileType};base64,${contract.fileData}`, // Create data URL from base64
+          url: contract.fileUrl || `data:${contract.fileType};base64,${contract.fileData}`, // Create data URL from base64 or use Firebase URL
           firestoreId: contract.id // Store Firestore ID for operations
         }));
         

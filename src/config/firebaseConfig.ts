@@ -49,4 +49,9 @@ if (typeof window !== 'undefined') {
 // Initialize Auth (for future use if needed)
 export const auth = getAuth(app);
 
+// Initialize Firebase Storage
+import { getStorage } from 'firebase/storage';
+export const storage = getStorage(app);
+
 export default app;
+

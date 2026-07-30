@@ -105,35 +105,56 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   /** The payload is already verified by passport-jwt; return it as the user. */
   async validate(payload: Record<string, any>): Promise<Record<string, any>> {
     let role = 'tenant';
+
+    // Azure AD B2C tokens have both `oid` (stable object ID, same across policies)
+    // and `sub` (policy-scoped, changes per-policy). Always normalise to `oid` so that
+    // the backend and frontend agree on the user's primary identifier.
+    const oid = (payload.oid ?? payload.sub ?? '') as string;
     const email = payload.emails?.[0] || payload.email || payload.preferred_username;
-    
-    if (email) {
-      const emailLower = email.toLowerCase();
-      const cached = roleCache.get(emailLower);
+
+    if (oid) {
+      const cacheKey = oid;
+      const cached = roleCache.get(cacheKey);
       if (cached && cached.expires > Date.now()) {
         role = cached.role;
       } else {
         const firestore = getFirestore();
         if (firestore) {
           try {
-            const snapshot = await firestore.collection('landlordUsers')
-              .where('email', '==', emailLower)
-              .limit(1)
-              .get();
-            if (!snapshot.empty) {
-              const docRole = snapshot.docs[0].data().role;
+            // 1. Check canonical users/{oid} collection first (new landlords created here)
+            const userDoc = await firestore.collection('users').doc(oid).get();
+            if (userDoc.exists) {
+              const docRole = userDoc.data()?.role;
               if (docRole === 'landlord' || docRole === 'agent') {
                 role = docRole;
               }
             }
-            roleCache.set(emailLower, { role, expires: Date.now() + CACHE_TTL_MS });
+
+            // 2. Fallback: legacy landlordUsers collection keyed by email
+            if (role === 'tenant' && email) {
+              const emailLower = email.toLowerCase();
+              const snapshot = await firestore.collection('landlordUsers')
+                .where('email', '==', emailLower)
+                .limit(1)
+                .get();
+              if (!snapshot.empty) {
+                const docRole = snapshot.docs[0].data().role;
+                if (docRole === 'landlord' || docRole === 'agent') {
+                  role = docRole;
+                }
+              }
+            }
+
+            roleCache.set(cacheKey, { role, expires: Date.now() + CACHE_TTL_MS });
           } catch (err) {
-            Logger.error(`Error resolving role for ${email}:`, err, 'JwtStrategy');
+            Logger.error(`Error resolving role for oid=${oid}:`, err, 'JwtStrategy');
           }
         }
       }
     }
-    
-    return { ...payload, role };
+
+    // Normalise sub → oid so every downstream consumer (controllers, guards) uses
+    // the stable object ID, which matches what AuthContext stores as the user ID.
+    return { ...payload, sub: oid || payload.sub, role };
   }
 }

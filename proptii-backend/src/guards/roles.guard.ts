@@ -18,10 +18,7 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('User is not authenticated');
     }
     if (!user.role) {
-      if (requiredRoles.includes('tenant')) {
-        return true;
-      }
-      throw new ForbiddenException(`Missing required role. Required: ${requiredRoles.join(', ')}`);
+      throw new ForbiddenException('User role is not assigned');
     }
 
     if (!requiredRoles.includes(user.role)) {
@@ -30,3 +27,4 @@ export class RolesGuard implements CanActivate {
     return true;
   }
 }
+

@@ -12,6 +12,9 @@ import { msalConfig, loginRequest, b2cPolicies } from '../config/authConfig';
 import SessionManager from '../services/SessionManager';
 import SecurityMiddleware from '../middleware/SecurityMiddleware';
 import SecurityPolicyService from '../services/SecurityPolicyService';
+import { signInWithCustomToken } from 'firebase/auth';
+import { auth } from '../config/firebaseConfig';
+import { getAccessTokenForApiRequest } from '../services/msalAccessToken';
 
 // Singleton pattern for MSAL instance
 let msalInstance: PublicClientApplication | null = null;
@@ -291,7 +294,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (accounts.length > 0) {
           const currentAccount = accounts[0];
           instance.setActiveAccount(currentAccount);
-          setIsAuthenticated(true);
           
           // Debug: Log all available claims
           console.log('🔍 All available token claims:', currentAccount.idTokenClaims);
@@ -383,20 +385,57 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             roleResolved,
           });
           
+          setIsAuthenticated(true);
+          
           console.log('👤 User object set with phone:', phoneNumber);
 
-          // Try silent token acquisition
-          await instance.acquireTokenSilent({
-            ...loginRequest,
-            account: currentAccount
-          });
+          // Sync Firebase Auth with Azure AD B2C custom token exchange
+          const isMock = localStorage.getItem('mock_token');
+          if (!isMock) {
+            try {
+              const b2cToken = await getAccessTokenForApiRequest();
+              if (b2cToken) {
+                const apiEndpoint = (import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000').replace(/\/$/, '');
+                const res = await fetch(`${apiEndpoint}/api/auth/firebase-token`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${b2cToken}`,
+                    'Content-Type': 'application/json'
+                  }
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  if (data.firebaseToken) {
+                    await signInWithCustomToken(auth, data.firebaseToken);
+                    console.log('✅ Firebase Auth custom token signed in successfully');
+                  }
+                } else {
+                  console.warn('Firebase token exchange failed:', res.statusText);
+                }
+              }
+            } catch (firebaseAuthError) {
+              console.error('Failed to sync Firebase Auth:', firebaseAuthError);
+            }
+          }
+
+          // Try silent token acquisition — failure here is non-fatal; user is already authenticated.
+          try {
+            await instance.acquireTokenSilent({
+              ...loginRequest,
+              account: currentAccount
+            });
+          } catch (silentTokenError) {
+            // InteractionRequiredAuthError means the token cache is stale/expired but the
+            // user IS still authenticated (MSAL accounts still exist). Do NOT clear auth state.
+            console.warn('Silent token refresh failed (non-fatal):', silentTokenError);
+          }
 
           // Record session activity
           sessionManager.updateActivity('interaction', 'Session initialized');
         }
       } catch (error) {
         if (error instanceof InteractionRequiredAuthError) {
-          // Silent token acquisition failed, user needs to sign in interactively
+          // Only clear auth if the core initialization (not token refresh) failed
           setIsAuthenticated(false);
           setUser(null);
         }
@@ -405,6 +444,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setIsLoading(false);
       }
     };
+
 
     initializeAuth();
 
@@ -651,7 +691,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (user?.id.startsWith('tenant-test-') || user?.id.startsWith('landlord-test-')) {
         setIsAuthenticated(false);
         setUser(null);
-        localStorage.clear();
+        ['mock_token', 'auth_token', 'proptii_auth_state', 'redirectAfterLogin'].forEach(
+          k => localStorage.removeItem(k)
+        );
+        sessionStorage.removeItem('redirectAfterLogin');
         return;
       }
 
@@ -662,8 +705,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsAuthenticated(false);
       setUser(null);
 
-      // Clear session
-      localStorage.clear();
+      // Clear session keys surgically
+      ['mock_token', 'auth_token', 'proptii_auth_state', 'redirectAfterLogin'].forEach(
+        k => localStorage.removeItem(k)
+      );
+      sessionStorage.removeItem('redirectAfterLogin');
     } catch (error) {
       console.error('Logout error:', error);
       // Try redirect logout as fallback
@@ -674,6 +720,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(false);
     }
   };
+
 
   const loginAsMockUser = (id: string, role: string) => {
     console.log(`🧪 Logging in as mock ${role}: ${id}`);

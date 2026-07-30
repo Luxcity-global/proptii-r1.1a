@@ -179,7 +179,7 @@ const DashboardHome: React.FC = () => {
           type: contract.fileType,
           size: contract.fileSize,
           uploadDate: contract.uploadDate,
-          url: `data:${contract.fileType};base64,${contract.fileData}`,
+          url: contract.fileUrl || `data:${contract.fileType};base64,${contract.fileData}`,
           firestoreId: contract.id
         }));
         

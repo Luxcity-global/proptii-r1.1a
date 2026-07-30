@@ -13,16 +13,20 @@ export class ViewingRequestController {
   @HttpCode(201)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async create(@Body() createViewingRequestDto: CreateViewingRequestDto): Promise<ViewingRequest> {
-    return await this.viewingRequestService.create(createViewingRequestDto);
+  async create(@Req() req: any, @Body() createViewingRequestDto: CreateViewingRequestDto): Promise<ViewingRequest> {
+    const userId = req.user?.sub;
+    return await this.viewingRequestService.create(createViewingRequestDto, userId);
   }
 
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async findAll(): Promise<ViewingRequest[]> {
-    return await this.viewingRequestService.findAll();
+  async findAll(@Req() req: any): Promise<ViewingRequest[]> {
+    const userId = req.user?.sub;
+    const email = req.user?.emails?.[0] || req.user?.email || req.user?.preferred_username || '';
+    return await this.viewingRequestService.findAll(userId, email);
   }
+
 
   // Static-segment routes MUST come before generic param routes (:id)
   // to prevent NestJS from matching e.g. /property/abc123 against :id.

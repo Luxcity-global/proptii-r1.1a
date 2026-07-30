@@ -13,14 +13,16 @@ import {
   serverTimestamp,
   Timestamp 
 } from 'firebase/firestore';
-import { db } from '../config/firebaseConfig';
+import { db, storage } from '../config/firebaseConfig';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export interface ContractTemplate {
   id: string;
   userId: string;
   name: string;
   uploadDate: string;
-  fileData: string; // Base64 encoded file data
+  fileData: string; // Base64 encoded file data (legacy support or placeholder)
+  fileUrl?: string; // Real file download URL from Firebase Storage
   fileSize: number;
   fileType: string;
   imagePreview?: string; // Base64 encoded preview image
@@ -36,6 +38,16 @@ export interface ContractStats {
   deleted: number;
   totalSize: number;
 }
+
+const base64ToBlob = (base64: string, mimeType: string): Blob => {
+  const byteCharacters = atob(base64);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: mimeType });
+};
 
 class ContractService {
   private readonly collectionName = 'contractTemplates';
@@ -60,10 +72,32 @@ class ContractService {
       const templateId = `${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const docRef = doc(db, this.collectionName, templateId);
       
+      let fileUrl = '';
+      let fileDataPlaceholder = templateData.fileData;
+
+      // If fileData (base64) is present, upload it to Firebase Storage instead of storing in Firestore document
+      if (templateData.fileData && !templateData.fileData.startsWith('stored_')) {
+        try {
+          console.log(`📤 Uploading contract file to Firebase Storage for template: ${templateId}`);
+          const storageRef = ref(storage, `contractTemplates/${userId}/${templateId}.pdf`);
+          const blob = base64ToBlob(templateData.fileData, templateData.fileType);
+          await uploadBytes(storageRef, blob);
+          fileUrl = await getDownloadURL(storageRef);
+          console.log(`✅ Uploaded to Firebase Storage. URL: ${fileUrl}`);
+          
+          // Clear large base64 payload to prevent hitting Firestore 1MB document size limit
+          fileDataPlaceholder = 'stored_in_firebase_storage';
+        } catch (storageError) {
+          console.error('❌ Failed to upload contract to Firebase Storage, falling back to base64 in Firestore:', storageError);
+        }
+      }
+
       const contractData: ContractTemplate = {
         id: templateId,
         userId,
         ...templateData,
+        fileData: fileDataPlaceholder,
+        ...(fileUrl ? { fileUrl } : {}),
         createdAt: serverTimestamp() as Timestamp,
         updatedAt: serverTimestamp() as Timestamp
       };

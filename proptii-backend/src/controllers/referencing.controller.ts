@@ -19,7 +19,6 @@ import {
 } from '../dtos/referencing.dto';
 
 @Controller('referencing')
-@RequiresActiveSubscription()
 export class ReferencingController {
   private readonly logger = new Logger(ReferencingController.name);
 
@@ -32,6 +31,7 @@ export class ReferencingController {
   @Post('ai-extract')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard, SubscriptionGuard)
+  @RequiresActiveSubscription()
   @ApiBearerAuth()
   async extractDataFromAI(@Body() data: AiExtractDto) {
     this.logger.log(`AI extraction request — mimeType: ${data.mimeType}`);
@@ -42,6 +42,7 @@ export class ReferencingController {
   @Post('identity')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard, SubscriptionGuard)
+  @RequiresActiveSubscription()
   @ApiBearerAuth()
   async saveIdentityData(@Req() req: any, @Body() data: SaveIdentityDto) {
     if (data.userId !== req.user?.sub) {
@@ -53,6 +54,7 @@ export class ReferencingController {
   @Post('employment')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard, SubscriptionGuard)
+  @RequiresActiveSubscription()
   @ApiBearerAuth()
   async saveEmploymentData(@Req() req: any, @Body() data: SaveEmploymentDto) {
     if (data.userId !== req.user?.sub) {
@@ -64,6 +66,7 @@ export class ReferencingController {
   @Post('residential')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard, SubscriptionGuard)
+  @RequiresActiveSubscription()
   @ApiBearerAuth()
   async saveResidentialData(@Req() req: any, @Body() data: SaveResidentialDto) {
     if (data.userId !== req.user?.sub) {
@@ -75,6 +78,7 @@ export class ReferencingController {
   @Post('financial')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard, SubscriptionGuard)
+  @RequiresActiveSubscription()
   @ApiBearerAuth()
   async saveFinancialData(@Req() req: any, @Body() data: SaveFinancialDto) {
     if (data.userId !== req.user?.sub) {
@@ -86,6 +90,7 @@ export class ReferencingController {
   @Post('guarantor')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard, SubscriptionGuard)
+  @RequiresActiveSubscription()
   @ApiBearerAuth()
   async saveGuarantorData(@Req() req: any, @Body() data: SaveGuarantorDto) {
     if (data.userId !== req.user?.sub) {
@@ -97,6 +102,7 @@ export class ReferencingController {
   @Post('agentDetails')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard, SubscriptionGuard)
+  @RequiresActiveSubscription()
   @ApiBearerAuth()
   async saveAgentDetailsData(@Req() req: any, @Body() data: SaveAgentDetailsDto) {
     if (data.userId !== req.user?.sub) {
@@ -119,6 +125,7 @@ export class ReferencingController {
   @Post(':userId/submit')
   @HttpCode(200)
   @UseGuards(JwtAuthGuard, SubscriptionGuard)
+  @RequiresActiveSubscription()
   @ApiBearerAuth()
   async submitApplication(
     @Req() req: any,
@@ -134,6 +141,7 @@ export class ReferencingController {
   /** Send referencing email with attachments (multipart form) */
   @Post('send-email')
   @UseGuards(JwtAuthGuard, SubscriptionGuard)
+  @RequiresActiveSubscription()
   @ApiBearerAuth()
   @UseInterceptors(FileFieldsInterceptor([{ name: 'attachments', maxCount: 10 }]))
   async sendEmail(
@@ -159,6 +167,7 @@ export class ReferencingController {
 
   @Post('send-multiple-emails')
   @UseGuards(JwtAuthGuard, SubscriptionGuard)
+  @RequiresActiveSubscription()
   @ApiBearerAuth()
   @UseInterceptors(FileFieldsInterceptor([{ name: 'attachments', maxCount: 10 }]))
   async sendMultipleEmails(
@@ -182,12 +191,19 @@ export class ReferencingController {
   }
 
   @Get('test-email-config')
-  async testEmailConfig() {
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async testEmailConfig(@Req() req: any) {
+    if (process.env.NODE_ENV === 'production' && req.user?.role !== 'admin') {
+      return { configured: true };
+    }
     return await this.referencingService.testEmailConfig();
   }
 
+
   @Post('test-email')
   @UseGuards(JwtAuthGuard, SubscriptionGuard)
+  @RequiresActiveSubscription()
   @ApiBearerAuth()
   async testEmail(@Body() data: { email: string }) {
     return await this.referencingService.testEmail(data.email);
@@ -195,8 +211,6 @@ export class ReferencingController {
 
   @Post('response')
   @HttpCode(200)
-  @UseGuards(JwtAuthGuard, SubscriptionGuard)
-  @ApiBearerAuth()
   async saveRefereeGuarantorResponse(@Body() data: RefereeResponseDto) {
     return await this.referencingService.saveRefereeGuarantorResponse(data);
   }

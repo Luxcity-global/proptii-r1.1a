@@ -36,8 +36,11 @@ export async function getAccessTokenForApiRequest(): Promise<string | null> {
   const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
 
   // Check for mock token first in development
-  const mockToken = localStorage.getItem('mock_token');
-  if (mockToken) return mockToken;
+  if (import.meta.env.DEV) {
+    const mockToken = localStorage.getItem('mock_token');
+    if (mockToken) return mockToken;
+  }
+
 
   const fromStorage = () => localStorage.getItem('auth_token');
 

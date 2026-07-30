@@ -243,7 +243,7 @@ export const App: React.FC = () => {
                 </Routes>
               </RoleGate>
               {/* Dev-only mock auth toolbar — stripped from production builds */}
-              <DevAuthToolbar />
+              {import.meta.env.DEV && <DevAuthToolbar />}
             </SignedContractsProvider>
           </OnboardingSessionProvider>
         </SavedPropertiesProvider>

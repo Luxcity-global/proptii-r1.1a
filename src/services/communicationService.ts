@@ -54,8 +54,13 @@ const communicationService = {
      * Requirements: 6.1
      */
     async getConversations(): Promise<Conversation[]> {
-        const { data } = await axios.get(`${BASE}/conversations`, { headers: await authHeaders() });
-        return unwrap<Conversation[]>(data);
+        try {
+            const { data } = await axios.get(`${BASE}/conversations`, { headers: await authHeaders() });
+            return unwrap<Conversation[]>(data) || [];
+        } catch (err) {
+            console.warn('⚠️ Communication service getConversations failed, falling back to empty list:', err);
+            return [];
+        }
     },
 
     /**
@@ -74,10 +79,15 @@ const communicationService = {
      * Requirements: 6.3
      */
     async getMessages(conversationId: string): Promise<Message[]> {
-        const { data } = await axios.get(`${BASE}/conversations/${conversationId}/messages`, {
-            headers: await authHeaders(),
-        });
-        return unwrap<Message[]>(data);
+        try {
+            const { data } = await axios.get(`${BASE}/conversations/${conversationId}/messages`, {
+                headers: await authHeaders(),
+            });
+            return unwrap<Message[]>(data) || [];
+        } catch (err) {
+            console.warn('⚠️ Communication service getMessages failed:', err);
+            return [];
+        }
     },
 
     /**
@@ -98,11 +108,15 @@ const communicationService = {
      * Requirements: 6.5
      */
     async markRead(messageId: string, conversationId: string): Promise<void> {
-        await axios.patch(
-            `${BASE}/messages/${messageId}/read`,
-            {},
-            { headers: await authHeaders(), params: { conversationId } },
-        );
+        try {
+            await axios.patch(
+                `${BASE}/messages/${messageId}/read`,
+                {},
+                { headers: await authHeaders(), params: { conversationId } },
+            );
+        } catch (err) {
+            console.warn('⚠️ Communication service markRead failed:', err);
+        }
     },
 
     /**
@@ -111,15 +125,20 @@ const communicationService = {
      * Requirements: 6.6
      */
     async getUnreadCount(): Promise<number> {
-        const { data } = await axios.get(`${BASE}/conversations/unread-count`, {
-            headers: await authHeaders(),
-        });
-        const result = unwrap<{ unreadCount: number } | number>(data);
-        // Backend returns { unreadCount: N } — unwrap the inner field if needed
-        if (result !== null && typeof result === 'object' && 'unreadCount' in result) {
-            return (result as { unreadCount: number }).unreadCount;
+        try {
+            const { data } = await axios.get(`${BASE}/conversations/unread-count`, {
+                headers: await authHeaders(),
+            });
+            const result = unwrap<{ unreadCount: number } | number>(data);
+            // Backend returns { unreadCount: N } — unwrap the inner field if needed
+            if (result !== null && typeof result === 'object' && 'unreadCount' in result) {
+                return (result as { unreadCount: number }).unreadCount;
+            }
+            return (result as number) || 0;
+        } catch (err) {
+            console.warn('⚠️ Communication service getUnreadCount failed, falling back to 0:', err);
+            return 0;
         }
-        return result as number;
     },
 
     /**

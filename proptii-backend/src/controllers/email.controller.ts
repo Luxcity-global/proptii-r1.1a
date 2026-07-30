@@ -54,9 +54,14 @@ export class EmailController {
       );
     }
 
+    const ALLOWED_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!ALLOWED_EMAIL_PATTERN.test(to.trim())) {
+      throw new BadRequestException('Invalid recipient email address format');
+    }
+
     try {
       const result = await this.emailService.sendEmail({
-        to,
+        to: to.trim(),
         subject,
         html,
         emailType: emailType as 'agent' | 'referee' | 'guarantor' | 'user' | 'viewing-agent' | 'viewing-user' | 'viewing-reschedule' | 'viewing-cancel' | undefined,
@@ -104,6 +109,11 @@ export class EmailController {
       );
     }
 
+    const ALLOWED_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!ALLOWED_EMAIL_PATTERN.test(to.trim())) {
+      throw new BadRequestException('Invalid recipient email address format');
+    }
+
     if (attachmentBase64 && !attachmentFilename) {
       throw new BadRequestException(
         'Attachment filename is required when attachment data is provided',
@@ -132,7 +142,7 @@ export class EmailController {
 
     try {
       const result = await this.emailService.sendEmail({
-        to,
+        to: to.trim(),
         subject,
         html,
         emailType: emailType as 'agent' | 'referee' | 'guarantor' | 'user' | 'viewing-agent' | 'viewing-user' | 'viewing-reschedule' | 'viewing-cancel' | undefined,
@@ -150,6 +160,7 @@ export class EmailController {
       );
     }
   }
+
 }
 
 

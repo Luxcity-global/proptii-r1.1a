@@ -34,7 +34,7 @@ export class ViewingRequestService {
     }
   }
 
-  async create(createViewingRequestDto: CreateViewingRequestDto): Promise<any> {
+  async create(createViewingRequestDto: CreateViewingRequestDto, userId?: string): Promise<any> {
     try {
       // Use Cosmos DB if available
       if (this.container) {
@@ -61,6 +61,7 @@ export class ViewingRequestService {
         // Create the viewing request in Cosmos DB
         const { resource: createdViewing } = await this.container.items.create({
           ...createViewingRequestDto,
+          userId,
           type: 'viewing-request',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -102,6 +103,7 @@ export class ViewingRequestService {
 
           // Convert DTOs to plain objects for Firestore (Firestore can't serialize class instances)
           const viewingRequestData = {
+            userId,
             property: {
               street: createViewingRequestDto.property.street,
               city: createViewingRequestDto.property.city,
@@ -144,6 +146,7 @@ export class ViewingRequestService {
       const mockResponse = {
         id: `mock_${Date.now()}`,
         ...createViewingRequestDto,
+        userId,
         type: 'viewing-request',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -159,13 +162,21 @@ export class ViewingRequestService {
     }
   }
 
-  async findAll(): Promise<any[]> {
+  async findAll(userId?: string, email?: string): Promise<any[]> {
     if (this.container) {
       const { resources } = await this.container.items
         .query({
           query: 'SELECT * FROM c WHERE c.type = "viewing-request"'
         })
         .fetchAll();
+      if (userId || email) {
+        const emailLower = email?.toLowerCase().trim();
+        return resources.filter((item: any) => 
+          item.userId === userId || 
+          item.agentId === userId || 
+          (item.agent?.email && item.agent.email.toLowerCase().trim() === emailLower)
+        );
+      }
       return resources;
     }
 
@@ -173,12 +184,22 @@ export class ViewingRequestService {
       const snapshot = await this.firestore.collection(this.collectionName)
         .where('type', '==', 'viewing-request')
         .get();
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const all = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (userId || email) {
+        const emailLower = email?.toLowerCase().trim();
+        return all.filter((item: any) => 
+          item.userId === userId || 
+          item.agentId === userId || 
+          (item.agent?.email && item.agent.email.toLowerCase().trim() === emailLower)
+        );
+      }
+      return all;
     }
 
     this.logger.warn('No database available. Returning empty array for viewing requests.');
     return [];
   }
+
 
   async findOne(id: string): Promise<any> {
     try {

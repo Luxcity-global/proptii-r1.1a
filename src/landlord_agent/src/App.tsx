@@ -545,7 +545,7 @@ export function AppContent() {
     };
 
     // Authentication state changes are now handled by the parent SPA bridging (AUTH_STATE message listener below)
-  }, [clearSignInQueryParam, getCachedAuthUser]);
+  }, [hostIsAuthenticated, hostIsLoading, hostUser, clearSignInQueryParam, getCachedAuthUser]);
 
   // Listen for AUTH_STATE and NAVIGATE messages from the embedding tenant app (bridge)
   React.useEffect(() => {

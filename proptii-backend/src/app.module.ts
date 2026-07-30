@@ -14,7 +14,9 @@ import { SheetsModule } from './sheets/sheets.module';
 import { ContractModule } from './modules/contract.module';
 import { StorageModule } from './storage/storage.module';
 import { PropertyDocumentController } from './controllers/property-document.controller';
+import { CommunicationController } from './controllers/communication.controller';
 import { AzureUsersModule } from './modules/azure-users.module';
+
 import { AuthModule } from './modules/auth.module';
 import { HealthModule } from './health/health.module';
 import { BillingModule } from './modules/billing/billing.module';
@@ -60,7 +62,7 @@ import { NativePropertiesModule } from './modules/native-properties.module';
     NativePropertiesModule,
     BillingModule,
   ],
-  controllers: [AppController, PropertyDocumentController],
+  controllers: [AppController, PropertyDocumentController, CommunicationController],
   providers: [
     AppService,
     // Apply rate limiting globally via the ThrottlerGuard.

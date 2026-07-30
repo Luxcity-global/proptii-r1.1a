@@ -670,6 +670,16 @@ export class EmailService {
   }
 
   async sendEmail(emailData: EmailData, retries = 3): Promise<any> {
+    const toEmail = emailData.to?.trim();
+    if (!toEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)) {
+      this.logger.error(`[EmailService] Invalid or missing recipient email address: "${emailData.to}"`);
+      return {
+        success: false,
+        error: `Invalid or missing recipient email address: "${emailData.to}"`,
+      };
+    }
+    emailData.to = toEmail;
+
     let htmlContent = emailData.html;
     if (!htmlContent && emailData.formData && emailData.emailType) {
       try {

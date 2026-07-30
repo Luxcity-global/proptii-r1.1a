@@ -150,8 +150,23 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
           for (const contract of activeResult.templates) {
             try {
               console.log('🔄 Processing template:', contract.name, 'Size:', contract.fileSize);
-              const file = convertBase64ToFile(contract.fileData, contract.name, contract.fileType);
-              const fileUrl = URL.createObjectURL(file);
+              let file: File;
+              let fileUrl = '';
+              
+              if (contract.fileUrl) {
+                console.log('🔄 Fetching template file from Firebase Storage URL:', contract.fileUrl);
+                const response = await fetch(contract.fileUrl);
+                if (!response.ok) {
+                  throw new Error(`Failed to fetch file from storage: ${response.statusText}`);
+                }
+                const blob = await response.blob();
+                file = new File([blob], contract.name, { type: contract.fileType });
+                fileUrl = URL.createObjectURL(file);
+              } else {
+                console.log('🔄 Using legacy base64 in Firestore document');
+                file = convertBase64ToFile(contract.fileData, contract.name, contract.fileType);
+                fileUrl = URL.createObjectURL(file);
+              }
               
               templates.push({
                 id: contract.id,
@@ -186,28 +201,49 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
         
         if (deletedResult.success && deletedResult.templates) {
           console.log('🔄 Processing', deletedResult.templates.length, 'deleted templates');
-          const deletedTemplates = deletedResult.templates.map(contract => {
-            const file = convertBase64ToFile(contract.fileData, contract.name, contract.fileType);
-            const fileUrl = URL.createObjectURL(file);
-            
-            return {
-              id: contract.id,
-              name: contract.name,
-              uploadDate: contract.uploadDate,
-              fileUrl,
-              imagePreview: contract.imagePreview || null,
-              file: file,
-              fileData: contract.fileData,
-              fileSize: contract.fileSize,
-              firestoreId: contract.id
-            };
-          });
-          setDeletedTemplates(deletedTemplates);
-          console.log(`✅ Loaded ${deletedTemplates.length} deleted templates from Firestore`);
+          const deleted = [];
+          
+          for (const contract of deletedResult.templates) {
+            try {
+              let file: File;
+              let fileUrl = '';
+              
+              if (contract.fileUrl) {
+                console.log('🔄 Fetching deleted template file from Firebase Storage URL:', contract.fileUrl);
+                const response = await fetch(contract.fileUrl);
+                if (!response.ok) {
+                  throw new Error(`Failed to fetch file from storage: ${response.statusText}`);
+                }
+                const blob = await response.blob();
+                file = new File([blob], contract.name, { type: contract.fileType });
+                fileUrl = URL.createObjectURL(file);
+              } else {
+                file = convertBase64ToFile(contract.fileData, contract.name, contract.fileType);
+                fileUrl = URL.createObjectURL(file);
+              }
+              
+              deleted.push({
+                id: contract.id,
+                name: contract.name,
+                uploadDate: contract.uploadDate,
+                fileUrl,
+                imagePreview: contract.imagePreview || null,
+                file: file,
+                fileData: contract.fileData,
+                fileSize: contract.fileSize,
+                firestoreId: contract.id
+              });
+            } catch (error) {
+              console.error('❌ Failed to process deleted template:', contract.name, error);
+            }
+          }
+          setDeletedTemplates(deleted);
+          console.log(`✅ Loaded ${deleted.length} deleted templates from Firestore`);
         } else {
           console.log('❌ Failed to load deleted templates:', deletedResult.error);
           setDeletedTemplates([]);
         }
+
 
         // Load received contracts (sent by landlords)
         if (user?.email) {

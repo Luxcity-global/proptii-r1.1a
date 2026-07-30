@@ -17,21 +17,11 @@ service cloud.firestore {
     }
 
     // Properties collection
-    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
-    // For development, we allow all access. For production, you should:
-    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
-    // 2. Use Cloud Functions to validate Azure AD tokens, OR
-    // 3. Use a different authentication approach
     match /properties/{propertyId} {
-      // Development: Allow all reads and writes
-      // TODO: Secure this for production - see note above
-      allow read, write: if false;
-      
-      // Production-ready rule (commented out until Firebase Auth is set up):
-      // allow read: if true; // Public read access
-      // allow create: if isAuthenticated(); // Allow any authenticated user to create
-      // allow update, delete: if isAuthenticated() && 
-      //   (resource.data.userId == request.auth.uid || resource.data.agentId == request.auth.uid || request.auth.token.admin == true);
+      allow read: if true; // Public read access
+      allow create: if isAuthenticated() && (request.auth.token.role == 'landlord' || request.auth.token.role == 'agent');
+      allow update, delete: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || resource.data.agentId == request.auth.uid || request.auth.token.admin == true);
     }
 
     // Viewing requests
@@ -59,100 +49,45 @@ service cloud.firestore {
     }
 
     // Referencing forms collection
-    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
-    // For development, we allow all access. For production, you should:
-    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
-    // 2. Use Cloud Functions to validate Azure AD tokens, OR
-    // 3. Use a different authentication approach
     match /referencingForms/{documentId} {
-      // Development: Allow all reads and writes
-      // TODO: Secure this for production - see note above
-      allow read, write: if false;
-      
-      // Production-ready rule (commented out until Firebase Auth is set up):
-      // allow read, write: if request.auth != null && 
-      //   resource.data.userId == request.auth.uid;
+      allow read, write: if isAuthenticated() && 
+        (resource == null || resource.data.userId == request.auth.uid);
     }
 
     // User files collection
     match /userFiles/{fileId} {
-      // Development: Allow all reads and writes
-      // TODO: Secure this for production
-      allow read, write: if false;
-      
-      // Production-ready rule (commented out until Firebase Auth is set up):
-      // allow read, write: if request.auth != null && 
-      //   resource.data.userId == request.auth.uid;
+      allow read, write: if isAuthenticated() && 
+        (resource == null || resource.data.userId == request.auth.uid);
     }
 
     // Book Viewing Requests collection
-    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
-    // For development, we allow all access. For production, you should:
-    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
-    // 2. Use Cloud Functions to validate Azure AD tokens, OR
-    // 3. Use a different authentication approach
     match /bookViewingRequests/{documentId} {
-      // Development: Allow all reads and writes
-      // TODO: Secure this for production - see note above
-      allow read, write: if false;
-      
-      // Production-ready rule (commented out until Firebase Auth is set up):
-      // allow read: if request.auth != null && 
-      //   (resource.data.userId == request.auth.uid || 
-      //    resource.data.landlordId == request.auth.uid || 
-      //    resource.data.agentId == request.auth.uid);
-      // allow create: if request.auth != null;
-      // allow update, delete: if request.auth != null && 
-      //   (resource.data.landlordId == request.auth.uid || 
-      //    resource.data.agentId == request.auth.uid);
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || 
+         resource.data.landlordId == request.auth.uid || 
+         resource.data.agentId == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && 
+        (resource.data.landlordId == request.auth.uid || 
+         resource.data.agentId == request.auth.uid);
     }
 
     // Viewing bookings collection
-    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
-    // For development, we allow all access. For production, you should:
-    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
-    // 2. Use Cloud Functions to validate Azure AD tokens, OR
-    // 3. Use a different authentication approach
     match /viewingBookings/{documentId} {
-      // Development: Allow all reads and writes
-      // TODO: Secure this for production - see note above
-      allow read, write: if false;
-      
-      // Production-ready rule (commented out until Firebase Auth is set up):
-      // allow read, write: if request.auth != null && 
-      //   resource.data.userId == request.auth.uid;
+      allow read, write: if isAuthenticated() && 
+        (resource == null || resource.data.userId == request.auth.uid || resource.data.landlordId == request.auth.uid || resource.data.agentId == request.auth.uid);
     }
 
     // Contract templates collection
-    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
-    // For development, we allow all access. For production, you should:
-    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
-    // 2. Use Cloud Functions to validate Azure AD tokens, OR
-    // 3. Use a different authentication approach
     match /contractTemplates/{documentId} {
-      // Development: Allow all reads and writes
-      // TODO: Secure this for production - see note above
-      allow read, write: if false;
-      
-      // Production-ready rule (commented out until Firebase Auth is set up):
-      // allow read, write: if request.auth != null && 
-      //   resource.data.userId == request.auth.uid;
+      allow read, write: if isAuthenticated() && 
+        (resource == null || resource.data.userId == request.auth.uid);
     }
 
     // Signed contracts collection
-    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
-    // For development, we allow all access. For production, you should:
-    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
-    // 2. Use Cloud Functions to validate Azure AD tokens, OR
-    // 3. Use a different authentication approach
     match /signedContracts/{documentId} {
-      // Development: Allow all reads and writes
-      // TODO: Secure this for production - see note above
-      allow read, write: if false;
-      
-      // Production-ready rule (commented out until Firebase Auth is set up):
-      // allow read, write: if request.auth != null && 
-      //   resource.data.userId == request.auth.uid;
+      allow read, write: if isAuthenticated() && 
+        (resource == null || resource.data.userId == request.auth.uid);
     }
 
     // Support Forms Collection
@@ -162,74 +97,47 @@ service cloud.firestore {
       
       // Only authenticated users (admin/support staff) can read, update, or delete
       allow read, update, delete: if isAuthenticated();
-      
-      // Alternative: Allow all for development
-      // allow read, write: if true;
     }
 
     // Alerts collection
-    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
-    // For development, we allow all access. For production, you should:
-    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
-    // 2. Use Cloud Functions to validate Azure AD tokens, OR
-    // 3. Use a different authentication approach
     match /alerts/{alertId} {
-      // Development: Allow all reads and writes
-      // TODO: Secure this for production - see note above
-      allow read, write: if false;
-      
-      // Production-ready rule (commented out until Firebase Auth is set up):
-      // allow read, write: if request.auth != null && 
-      //   resource.data.userId == request.auth.uid;
+      allow read, write: if isAuthenticated() && 
+        (resource == null || resource.data.userId == request.auth.uid);
     }
 
     // Tenants collection
-    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
-    // For development, we allow all access. For production, you should:
-    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
-    // 2. Use Cloud Functions to validate Azure AD tokens, OR
-    // 3. Use a different authentication approach
     match /tenants/{tenantId} {
-      // Development: Allow all reads and writes
-      // TODO: Secure this for production - see note above
-      allow read, write: if false;
-      
-      // Production-ready rule (commented out until Firebase Auth is set up):
-      // allow read, write: if request.auth != null && 
-      //   resource.data.userId == request.auth.uid;
+      allow read, write: if isAuthenticated() && 
+        (resource == null || resource.data.userId == request.auth.uid);
     }
 
     // Contracts collection
-    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
-    // For development, we allow all access. For production, you should:
-    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
-    // 2. Use Cloud Functions to validate Azure AD tokens, OR
-    // 3. Use a different authentication approach
     match /contracts/{contractId} {
-      // Development: Allow all reads and writes
-      // TODO: Secure this for production - see note above
-      allow read, write: if false;
-      
-      // Production-ready rule (commented out until Firebase Auth is set up):
-      // allow read, write: if request.auth != null && 
-      //   resource.data.userId == request.auth.uid;
+      allow read, write: if isAuthenticated() && 
+        (resource == null || 
+         resource.data.userId == request.auth.uid || 
+         resource.data.tenantEmail == request.auth.token.email || 
+         resource.data.landlordEmail == request.auth.token.email);
     }
 
     // Market Insights collection
-    // NOTE: Since the app uses Azure AD B2C (not Firebase Auth), request.auth will be null
-    // For development, we allow all reads and writes. For production, you should:
-    // 1. Set up Firebase Auth alongside Azure AD B2C, OR
-    // 2. Use Cloud Functions to validate Azure AD tokens, OR
-    // 3. Use a different authentication approach
     match /marketInsights/{insightId} {
-      // Development: Allow all reads (for users) and writes (for Cloud Functions)
-      // TODO: Secure this for production - see note above
-      allow read, write: if false; // Deny by default
+      allow read: if true; // Market insights are public
+      allow create, update: if isAuthenticated() && (request.auth.token.role == 'landlord' || request.auth.token.role == 'agent' || request.auth.token.admin == true);
+      allow delete: if false; // Don't allow deletion (archive instead)
+    }
+
+    // Referee & Guarantor responses (submitted by external anonymous users)
+    match /referee_guarantor_responses/{docId} {
+      // Anyone can submit a response, but check that basic fields are present
+      allow create: if request.resource.data.email != null && request.resource.data.consent != null;
       
-      // Production-ready rule (commented out until Firebase Auth is set up):
-      // allow read: if true; // Market insights are public
-      // allow create, update: if request.auth != null; // Only authenticated can create/update
-      // allow delete: if false; // Don't allow deletion (archive instead)
+      // Only authenticated users who are part of the transaction can read/manage
+      allow read, update, delete: if isAuthenticated() && 
+        (resource.data.tenantEmail == request.auth.token.email || 
+         request.auth.token.role == 'landlord' || 
+         request.auth.token.role == 'agent' || 
+         request.auth.token.admin == true);
     }
   }
-} 
+}
