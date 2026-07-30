@@ -2,6 +2,7 @@ import { Controller, Post, Req, UseGuards, InternalServerErrorException } from '
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import * as admin from 'firebase-admin';
+import { initializeFirestore } from '../config/firestore.config';
 
 @Controller('auth')
 export class AuthController {
@@ -14,7 +15,24 @@ export class AuthController {
       const role = req.user?.role || 'tenant';
 
       if (!uid) {
-        throw new InternalServerErrorException('Missing user identifier in token');
+        return {
+          success: false,
+          error: 'Missing user identifier in token'
+        };
+      }
+
+      // Ensure Firebase Admin is initialized
+      if (!admin.apps.length) {
+        await initializeFirestore();
+      }
+
+      // If Firebase Admin credentials are not configured on the server environment, handle gracefully
+      if (!admin.apps.length) {
+        return {
+          success: false,
+          message: 'Firebase Admin SDK credentials not configured on backend environment',
+          firebaseToken: null
+        };
       }
 
       // Generate a custom token with user's Azure B2C Object ID (uid) and claims
@@ -24,13 +42,17 @@ export class AuthController {
         email: email.toLowerCase().trim() 
       });
 
-
       return {
         success: true,
         firebaseToken,
       };
     } catch (error: any) {
-      throw new InternalServerErrorException(`Failed to generate Firebase custom token: ${error.message}`);
+      console.error('❌ Error generating Firebase custom token:', error);
+      return {
+        success: false,
+        error: error?.message || 'Failed to generate Firebase custom token'
+      };
     }
   }
 }
+
