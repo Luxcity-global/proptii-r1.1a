@@ -13,23 +13,27 @@ services:
         value: 22.12.0
       - key: VITE_APP_ENV
         value: production
-      # Update with your custom hosted backend URL on Render (e.g. https://your-backend.onrender.com/api)
+      # Update with your custom hosted backend URL on Render
       - key: VITE_API_URL
-        value: https://proptii-backend.onrender.com/api
+        value: https://proptii-r1-1a-1-hcw6.onrender.com/api
+      - key: VITE_NEST_API_ENDPOINT
+        value: https://proptii-r1-1a-1-hcw6.onrender.com
+      - key: VITE_API_ENDPOINT
+        value: https://proptii-r1-1a-1-hcw6.onrender.com
       - key: VITE_AZURE_OPENAI_API_KEY
         sync: false
       - key: VITE_AZURE_OPENAI_ENDPOINT
         sync: false
       - key: VITE_AZURE_OPENAI_DEPLOYMENT_NAME
         sync: false
-      # Update with your custom hosted backend sheets URL on Render (e.g. https://your-backend.onrender.com/api/sheets)
+      # Update with your custom hosted backend sheets URL on Render
       - key: VITE_GOOGLE_SHEETS_API_ENDPOINT
-        value: https://proptii-backend.onrender.com/api/sheets
-      # Update with your custom hosted search URL on Render (e.g. https://your-search-backend.onrender.com)
+        value: https://proptii-r1-1a-1-hcw6.onrender.com/api/sheets
+      # Update with your custom hosted search URL on Render
       - key: VITE_SEARCH_BACKEND_URL
-        value: https://proptii-r1-1a-search.onrender.com
+        value: https://proptii-r1-1a-q95f.onrender.com
       - key: SEARCH_BACKEND_URL
-        value: https://proptii-r1-1a-search.onrender.com
+        value: https://proptii-r1-1a-q95f.onrender.com
       - key: VITE_GA_MEASUREMENT_ID
         value: G-88HC0TG6JJ
     headers:
@@ -44,7 +48,7 @@ services:
         value: "1; mode=block"
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; connect-src 'self' https://formsubmit.co https://proptii-r1-1a-new-backend.onrender.com/api/* https://proptii-r1-1a-1.onrender.com/api/* https://api.proptii.com https://api-staging.proptii.com https://proptii-r1-1a-search.onrender.com https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com https://proptii.co https://*.cognitiveservices.azure.com https://*.onrender.com https://*.railway.app http://localhost:10000/api/*; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; frame-ancestors 'none';"
+        value: "default-src 'self'; connect-src 'self' https://*.onrender.com https://proptii-r1-1a-1-hcw6.onrender.com https://proptii-r1-1a-q95f.onrender.com https://*.firebaseapp.com wss://*.firebaseio.com https://*.googleapis.com https://*.firestore.googleapis.com https://formsubmit.co https://api.proptii.com https://api-staging.proptii.com https://*.azure.com https://*.openai.azure.com https://proptii.b2clogin.com https://proptii.co https://www.proptii.co https://*.cognitiveservices.azure.com https://*.railway.app http://localhost:10000 http://localhost:3000; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com https://www.googletagmanager.com https://*.googleapis.com https://apis.google.com https://*.firebaseapp.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; frame-src 'self' https://proptii-16946.firebaseapp.com https://*.firebaseapp.com https://proptii.b2clogin.com https://*.google.com https://apis.google.com https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://*.stripe.com; frame-ancestors 'none';"
       - path: /*
         name: Cache-Control
         value: no-cache
