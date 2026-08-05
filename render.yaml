@@ -115,6 +115,10 @@ services:
         sync: false
       - key: GOOGLE_SHEETS_CREDENTIALS_JSON
         sync: false
+      - key: COSMOS_DB_CONNECTION_STRING
+        sync: false
+      - key: COSMOS_DB_KEY
+        sync: false
 
   # Search Backend (Express)
   - type: web
