@@ -11,6 +11,7 @@ export const DEV_LOCAL_API_BASE = 'http://127.0.0.1:3000/api';
 
 const RENDER_REMOTE_FALLBACKS = Array.from(new Set([
   CANONICAL_PROD_API_BASE_URL,
+  'https://proptii-r1-1a-1-hcw6.onrender.com/api',
   (import.meta as any)?.env?.VITE_API_URL?.trim?.(),
   (import.meta as any)?.env?.VITE_NEST_API_ENDPOINT?.trim?.()
     ? `${(import.meta as any).env.VITE_NEST_API_ENDPOINT.trim().replace(/\/$/, '')}/api`
