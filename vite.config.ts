@@ -157,19 +157,19 @@ export default defineConfig(({ mode = 'development' }) => {
     ],
     server: {
       watch: {
+        usePolling: true,
+        interval: 500,
         ignored: [
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/dist/**',
           '**/api/**',
           '**/proptii-backend/**',
           '**/proptii-search/**',
-          '**/node_modules/**',
           '**/public/landlord/**',
           '**/coverage/**',
-        ]
-      }
-      // Temporarily disabled CSP for development
-      // headers: {
-      //   'Content-Security-Policy': [ ... ]
-      // }
+        ],
+      },
     },
     resolve: {
       dedupe: ['firebase', 'firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/storage'],
