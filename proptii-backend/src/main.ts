@@ -33,15 +33,14 @@ async function bootstrap() {
   logger.log(`NODE_ENV: ${process.env.NODE_ENV}`);
   logger.log(`PORT: ${process.env.PORT || 3000}`);
 
-  // Initialize Cosmos DB
-  try {
-    logger.log('Initializing Cosmos DB...');
-    await initializeCosmosDB();
+  // Initialize Cosmos DB asynchronously so it doesn't block port binding on Render
+  logger.log('Starting Cosmos DB initialization in background...');
+  initializeCosmosDB().then(() => {
     logger.log('Cosmos DB initialization completed');
-  } catch (error) {
+  }).catch((error) => {
     logger.error('Failed to initialize Cosmos DB:', error);
     logger.warn('Continuing without Cosmos DB - some features may not work');
-  }
+  });
 
   const isProd = process.env.NODE_ENV === 'production';
   const app = await NestFactory.create(AppModule, {
