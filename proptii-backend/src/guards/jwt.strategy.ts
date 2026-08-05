@@ -63,15 +63,24 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
                 'MSAL_CLIENT_ID is empty — set it to the same value as VITE_AZURE_AD_CLIENT_ID (SPA app ID) or JWT validation will fail.',
               );
             }
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const { passportJwtSecret } = require('jwks-rsa') as typeof import('jwks-rsa');
+            let cachedHandler: any = null;
             return {
-              secretOrKeyProvider: passportJwtSecret({
-                cache: true,
-                rateLimit: true,
-                jwksRequestsPerMinute: 5,
-                jwksUri,
-              }),
+              secretOrKeyProvider: (request: any, rawJwtToken: any, done: any) => {
+                if (cachedHandler) {
+                  return cachedHandler(request, rawJwtToken, done);
+                }
+                import('jwks-rsa')
+                  .then((jwksRsa) => {
+                    cachedHandler = jwksRsa.passportJwtSecret({
+                      cache: true,
+                      rateLimit: true,
+                      jwksRequestsPerMinute: 5,
+                      jwksUri,
+                    });
+                    cachedHandler(request, rawJwtToken, done);
+                  })
+                  .catch((err) => done(err));
+              },
             };
           })()),
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
