@@ -24,7 +24,7 @@ import {
   FileTextIcon,
   Heart
 } from 'lucide-react';
-import ReferencingModal from '../../ReferencingModal.OLD';
+import ReferencingModal from '../../ReferencingModalLegacy';
 import { firestoreService } from '../../../services/firestoreService';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useSavedProperties } from '../../../contexts/SavedPropertiesContext';
@@ -49,7 +49,9 @@ const DashboardHome: React.FC = () => {
   // State for referencing modal
   const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
   const [referencingStep, setReferencingStep] = useState(1);
-  const [selectedPropertyId, setSelectedPropertyId] = useState('demo-property-123'); // Using demo property ID
+  // Referencing is scoped to the user (no specific property selected from dashboard)
+  // The actual propertyId is derived from user.id so data is never shared across tenants.
+  const selectedPropertyId = user?.id ? `general_${user.id}` : null;
   
   // State for files
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -66,22 +68,10 @@ const DashboardHome: React.FC = () => {
     total: 0
   });
   
-  // Get the user ID from auth context or localStorage fallback
-  const getUserId = () => {
-    if (user?.id) {
-      return user.id;
-    }
-    // Fallback: Try to get user ID from localStorage keys
-    const keys = Object.keys(localStorage);
-    const referencingKey = keys.find(key => key.startsWith('referencing_') && key.includes('_formData'));
-    if (referencingKey) {
-      return referencingKey.split('_')[1]; // Extract user ID from key
-    }
-    return null;
-  };
-  
-  const userId = getUserId();
+  // Get the user ID from auth context
+  const userId = user?.id ?? null;
   const [completedSections, setCompletedSections] = useState<Set<string>>(new Set());
+  const [referencingStartedAt, setReferencingStartedAt] = useState<string | null>(null);
 
   React.useEffect(() => {
     trackEvent('tenant_dashboard_home_view', {
@@ -123,7 +113,7 @@ const DashboardHome: React.FC = () => {
     try {
       if (!user?.id) return;
       
-      const propertyId = 'demo-property-123'; // Using same demo property ID
+      const propertyId = `general_${user.id}`;
       const result = await firestoreService.getReferencingForm(user.id, propertyId);
       
       if (result.success && result.data) {
@@ -239,199 +229,64 @@ const DashboardHome: React.FC = () => {
   };
   
   // Calculate remaining forms and alert status
-  const totalSections = 6; // Identity, Employment, Residential, Financial, Guarantor, Agent Details
+  // P3-3: Steps 1,2,3,4,5,7 — step 6 (credit check) is excluded from user-completion tracking.
+  // This constant must match everywhere so the displayed denominator is always accurate.
+  const REFERENCING_STEPS = [1, 2, 3, 4, 5, 7] as const;
+  const totalSections = REFERENCING_STEPS.length; // 6 sections, not 7
   const completedCount = completedSections.size;
   const remainingCount = totalSections - completedCount;
   const allCompleted = completedCount === totalSections;
   
-  // Load form completion status from localStorage and Firestore
-  // Using EXACT same logic as ReferencingSidebar component
+  // Load referencing completion status from the backend (scoped to this user)
   React.useEffect(() => {
     const loadFormStatus = async () => {
+      if (!userId || !selectedPropertyId) return;
       try {
-        let storedData = null;
-        let dataSource = '';
-        
-        // First try to load from Firestore
-        if (userId) {
-          try {
-            const firestoreResult = await firestoreService.getReferencingForm(userId, selectedPropertyId);
-            if (firestoreResult.success && firestoreResult.data) {
-              storedData = JSON.stringify(firestoreResult.data.formData);
-              dataSource = 'firestore';
-              console.log('Using Firestore data:', firestoreResult.data);
-            }
-          } catch (error) {
-            console.warn('Failed to load from Firestore:', error);
+        const firestoreResult = await firestoreService.getReferencingForm(userId, selectedPropertyId);
+        if (firestoreResult.success && firestoreResult.data) {
+          const formData = firestoreResult.data.formData;
+          // Capture when the form was first started for due-date computation (P3-1)
+          const createdAt = (firestoreResult.data as any).createdAt;
+          if (createdAt) {
+            const ts = createdAt?.toDate?.() ?? createdAt?._seconds
+              ? new Date(createdAt._seconds * 1000)
+              : typeof createdAt === 'string' ? new Date(createdAt) : null;
+            if (ts) setReferencingStartedAt(ts.toISOString());
           }
-        }
-        
-        // Fallback to localStorage if Firestore fails
-        if (!storedData && userId) {
-          // Try user ID-based key first (where actual data is stored)
-          const userKey = `referencing_${userId}_formData`;
-          storedData = localStorage.getItem(userKey);
-          dataSource = 'user_id_based';
-          console.log('Using user ID-based key:', userKey);
-        }
-        
-        if (!storedData) {
-          // Fallback to property ID-based key
-          const storageKey = `property_${selectedPropertyId}_draft`;
-          const fullKey = `proptii_${storageKey}`;
-          storedData = localStorage.getItem(fullKey);
-          dataSource = 'property_id_based';
-          console.log('Fallback to property ID-based key:', fullKey);
-        }
-        
-        console.log('🔍 Dashboard Debug - Loading form status:');
-        console.log('Data source:', dataSource);
-        console.log('User ID:', userId);
-        console.log('Raw stored data:', storedData);
-        console.log('All localStorage keys:', Object.keys(localStorage));
-        
-        // Check for alternative keys that might exist
-        const alternativeKeys = [
-          `form_${selectedPropertyId}`,
-          `proptii_form_${selectedPropertyId}`,
-          `proptii_property_${selectedPropertyId}_draft`,
-          `referencing_ebc1c666-fed1-4567-843d-9736cc2e082e_formData`,
-          `referencing_ebc1c666-fed1-4567-843d-9736cc2e082e_stepStatus`,
-          `referencing_ebc1c666-fed1-4567-843d-9736cc2e082e_currentStep`
-        ];
-        
-        alternativeKeys.forEach(key => {
-          const data = localStorage.getItem(key);
-          if (data) {
-            console.log(`Found data in key: ${key}`, JSON.parse(data));
-          }
-        });
-        
-        // Check if the user ID-based key has the actual form data
-        const userIdBasedKey = `referencing_ebc1c666-fed1-4567-843d-9736cc2e082e_formData`;
-        const userIdData = localStorage.getItem(userIdBasedKey);
-        if (userIdData) {
-          try {
-            const parsedData = JSON.parse(userIdData);
-            console.log('🔍 User ID-based form data found:', parsedData);
-            
-            // Check if this data has the identity information
-            if (parsedData.identity) {
-              console.log('Identity data in user ID key:', parsedData.identity);
-              const identityComplete = parsedData.identity.firstName && parsedData.identity.lastName && parsedData.identity.email;
-              console.log('Identity complete in user ID key:', identityComplete);
-            }
-          } catch (error) {
-            console.error('Error parsing user ID data:', error);
-          }
-        }
-        
-        if (storedData) {
-          const formData = JSON.parse(storedData);
-          console.log('Parsed form data:', formData);
-          
+
           const completed = new Set<string>();
-          
-          // EXACT SAME LOGIC as ReferencingSidebar.isStepCompleted
-          // Identity: firstName, lastName, and email must be filled
-          const identityComplete = formData.identity?.firstName && formData.identity?.lastName && formData.identity?.email;
-          console.log('Identity check:', {
-            firstName: formData.identity?.firstName,
-            lastName: formData.identity?.lastName,
-            email: formData.identity?.email,
-            complete: identityComplete,
-            identityObject: formData.identity
-          });
-          
-          if (identityComplete) {
+
+          if (formData.identity?.firstName && formData.identity?.lastName && formData.identity?.email) {
             completed.add('identity');
           }
-          
-          // Employment: employmentStatus must be filled
           if (formData.employment?.employmentStatus) {
             completed.add('employment');
           }
-          
-          // Residential: currentAddress must be filled
           if (formData.residential?.currentAddress) {
             completed.add('residential');
           }
-          
-          // Financial: check for actual meaningful data
-          const financialComplete = formData.financial?.proofOfIncomeType && 
-                                   formData.financial.proofOfIncomeType.trim() !== '';
-          console.log('Financial check:', {
-            proofOfIncomeType: formData.financial?.proofOfIncomeType,
-            complete: financialComplete,
-            financialObject: formData.financial
-          });
-          if (financialComplete) {
+          if (formData.financial?.proofOfIncomeType?.trim()) {
             completed.add('financial');
           }
-          
-          // Guarantor: check for actual meaningful data
-          const guarantorComplete = formData.guarantor?.firstName && 
-                                   formData.guarantor?.lastName && 
-                                   formData.guarantor?.email &&
-                                   formData.guarantor.firstName.trim() !== '' &&
-                                   formData.guarantor.lastName.trim() !== '' &&
-                                   formData.guarantor.email.trim() !== '';
-          console.log('Guarantor check:', {
-            firstName: formData.guarantor?.firstName,
-            lastName: formData.guarantor?.lastName,
-            email: formData.guarantor?.email,
-            complete: guarantorComplete,
-            guarantorObject: formData.guarantor
-          });
-          if (guarantorComplete) {
+          if (
+            formData.guarantor?.firstName?.trim() &&
+            formData.guarantor?.lastName?.trim() &&
+            formData.guarantor?.email?.trim()
+          ) {
             completed.add('guarantor');
           }
-          
-          // Agent Details: hasAgreedToCheck must be true
           if (formData.agentDetails?.hasAgreedToCheck) {
             completed.add('agentDetails');
           }
-          
-          console.log('Completed sections:', Array.from(completed));
           setCompletedSections(completed);
-        } else {
-          console.log('No stored data found for any key');
-          
-          // Check what keys actually exist in localStorage
-          const allKeys = [];
-          for (let i = 0; i < localStorage.length; i++) {
-            allKeys.push(localStorage.key(i));
-          }
-          console.log('All localStorage keys:', allKeys);
         }
       } catch (error) {
-        console.error('Error loading form status:', error);
+        console.error('Error loading referencing form status:', error);
       }
     };
-    
+
     loadFormStatus();
-    
-    // Reload when modal closes to update completion status
-    if (!isReferencingModalOpen) {
-      loadFormStatus();
-    }
-    
-    // Listen for storage events from other tabs/windows (and same window)
-    const handleStorageChange = (e: StorageEvent) => {
-      const userKey = userId ? `referencing_${userId}_formData` : null;
-      const propertyKey = `proptii_property_${selectedPropertyId}_draft`;
-      
-      if (e.key === userKey || e.key === propertyKey || e.key === null) {
-        loadFormStatus();
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [selectedPropertyId, isReferencingModalOpen]);
+  }, [userId, selectedPropertyId, isReferencingModalOpen]);
   
   // Function to open referencing modal at a specific step
   const openReferencingModal = (step: number) => {
@@ -444,6 +299,24 @@ const DashboardHome: React.FC = () => {
   
   const closeReferencingModal = () => {
     setIsReferencingModalOpen(false);
+  };
+
+  /**
+   * P3-1: Compute a human-readable due-date string based on when the form was started.
+   * Each section is due 7 days after the form was first opened.
+   * Returns null when the section is already complete or no start date is known.
+   */
+  const getDueDateLabel = (sectionKey: string): string | null => {
+    if (completedSections.has(sectionKey)) return null;
+    if (!referencingStartedAt) return 'Due date unknown';
+    const startMs = new Date(referencingStartedAt).getTime();
+    const dueMs = startMs + 7 * 24 * 60 * 60 * 1000; // 7 days
+    const diffDays = Math.floor((Date.now() - dueMs) / (24 * 60 * 60 * 1000));
+    if (diffDays <= 0) {
+      const remaining = Math.abs(diffDays);
+      return remaining === 0 ? 'Due today' : `Due in ${remaining} day${remaining === 1 ? '' : 's'}`;
+    }
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} past due date`;
   };
 
   
@@ -755,7 +628,7 @@ const DashboardHome: React.FC = () => {
           {/* Row 2: Number */}
           <div className={isMobile ? 'mb-2' : 'mb-3'}>
             <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {dashboardSummary?.referencing.completedSteps || 6}/{dashboardSummary?.referencing.totalSteps || 6}
+              {dashboardSummary?.referencing.completedSteps || completedCount}/{dashboardSummary?.referencing.totalSteps || totalSections}
             </p>
           </div>
           
@@ -892,7 +765,7 @@ const DashboardHome: React.FC = () => {
                         {!completedSections.has('identity') && (
                           <div className="flex items-baseline space-x-3">
                             <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-orange-600`}>
-                              5 days past due date
+                              {getDueDateLabel('identity') ?? ''}
                             </span>
                           </div>
                         )}
@@ -938,7 +811,7 @@ const DashboardHome: React.FC = () => {
                         {!completedSections.has('employment') && (
                           <div className="flex items-baseline space-x-3">
                             <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-orange-600`}>
-                              14 days past due date
+                              {getDueDateLabel('employment') ?? ''}
                             </span>
                           </div>
                         )}
@@ -984,7 +857,7 @@ const DashboardHome: React.FC = () => {
                         {!completedSections.has('guarantor') && (
                           <div className="flex items-baseline space-x-3">
                             <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-red-600`}>
-                              12 days past due date
+                              {getDueDateLabel('guarantor') ?? ''}
                             </span>
                           </div>
                         )}
@@ -1030,7 +903,7 @@ const DashboardHome: React.FC = () => {
                         {!completedSections.has('residential') && (
                           <div className="flex items-baseline space-x-3">
                             <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-yellow-600`}>
-                              8 days past due date
+                              {getDueDateLabel('residential') ?? ''}
                             </span>
                           </div>
                         )}
@@ -1076,7 +949,7 @@ const DashboardHome: React.FC = () => {
                         {!completedSections.has('financial') && (
                           <div className="flex items-baseline space-x-3">
                             <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-blue-600`}>
-                              3 days past due date
+                              {getDueDateLabel('financial') ?? ''}
                             </span>
                           </div>
                         )}
@@ -1122,7 +995,7 @@ const DashboardHome: React.FC = () => {
                         {!completedSections.has('agentDetails') && (
                           <div className="flex items-baseline space-x-3">
                             <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-purple-600`}>
-                              1 day past due date
+                              {getDueDateLabel('agentDetails') ?? ''}
                             </span>
                           </div>
                         )}
@@ -1524,13 +1397,12 @@ const DashboardHome: React.FC = () => {
       </div>
 
       {/* Referencing Modal */}
-      {isReferencingModalOpen && (
+      {isReferencingModalOpen && selectedPropertyId && (
         <ReferencingModal
           isOpen={isReferencingModalOpen}
           onClose={closeReferencingModal}
           initialStep={referencingStep}
           onSubmissionComplete={() => {
-            // Reload form status when submission is complete
             window.location.reload();
           }}
         />

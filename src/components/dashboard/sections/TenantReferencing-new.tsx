@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { firestoreService } from '../../../services/firestoreService';
-import ReferencingModal from '../../ReferencingModal.OLD';
+import ReferencingModal from '../../ReferencingModalLegacy';
 import { useIsMobile } from '../ui/use-mobile';
 import { useBillingStatus } from '../../../hooks/useBillingStatus';
 import { canAccessSection, sectionUpgradeLabel } from '../../../utils/planAccess';
@@ -102,7 +102,7 @@ const TenantReferencing: React.FC = () => {
   const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
   const [referencingStep, setReferencingStep] = useState(1);
 
-  // Load form data from Firestore
+  // Load form data from Firestore (scoped to this user)
   useEffect(() => {
     const loadFormData = async () => {
       if (!user?.id) {
@@ -112,7 +112,8 @@ const TenantReferencing: React.FC = () => {
 
       try {
         setLoading(true);
-        const propertyId = 'demo-property-123'; // Using demo property ID
+        // Key is scoped per-user so no tenant can overwrite another's data
+        const propertyId = `general_${user.id}`;
         const result = await firestoreService.getReferencingForm(user.id, propertyId);
         
         if (result.success && result.data) {
@@ -267,7 +268,7 @@ const TenantReferencing: React.FC = () => {
             <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>{summaryOverallProgress}%</p>
           </div>
           <div>
-            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>{summaryCompleted} of 6 sections</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>{summaryCompleted} of {progress.pending + summaryCompleted} sections</p>
           </div>
         </div>
 
@@ -358,9 +359,9 @@ const TenantReferencing: React.FC = () => {
           <div className="flex-1 min-w-0">
             <p className={`${isMobile ? 'text-xs' : 'text-base'} ${isMobile ? 'mb-1' : 'mb-4'}`} style={{ color: '#374957' }}>
               {isMobile ? (
-                <>Completed {progress.completed} of 6 sections</>
+                <>Completed {progress.completed} of {progress.completed + progress.pending} sections</>
               ) : (
-                <>You have completed {progress.completed} out of 6 referencing sections. Complete all sections to finalize your application.</>
+                <>You have completed {progress.completed} out of {progress.completed + progress.pending} referencing sections. Complete all sections to finalize your application.</>
               )}
             </p>
             

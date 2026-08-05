@@ -41,6 +41,8 @@ const Viewings: React.FC = () => {
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [selectedViewing, setSelectedViewing] = useState<ViewingBooking | null>(null);
+  const [rescheduleNewDate, setRescheduleNewDate] = useState('');
+  const [rescheduleNewTime, setRescheduleNewTime] = useState('');
   const [rescheduleMessage, setRescheduleMessage] = useState('');
   const [cancelMessage, setCancelMessage] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -519,6 +521,8 @@ const Viewings: React.FC = () => {
     const viewing = upcomingViewings.find(v => v.id === bookingId);
     if (viewing) {
       setSelectedViewing(viewing);
+      setRescheduleNewDate('');
+      setRescheduleNewTime('');
       setRescheduleMessage('');
       setIsRescheduleModalOpen(true);
     }
@@ -538,10 +542,13 @@ const Viewings: React.FC = () => {
       alert('Please enter a message');
       return;
     }
+    if (!rescheduleNewDate || !rescheduleNewTime) {
+      alert('Please select the new date and time for the reschedule');
+      return;
+    }
 
     setIsSendingEmail(true);
     try {
-      // Structure data for reschedule email (only to agent, not user confirmation)
       const formData = {
         property: {
           street: selectedViewing.property.street,
@@ -554,8 +561,8 @@ const Viewings: React.FC = () => {
           }
         },
         viewing: {
-          date: selectedViewing.viewingDetails.date,
-          time: selectedViewing.viewingDetails.time,
+          date: rescheduleNewDate,
+          time: rescheduleNewTime,
           preference: selectedViewing.viewingDetails.preference || 'in-person',
           rescheduleMessage: rescheduleMessage
         },
@@ -567,7 +574,6 @@ const Viewings: React.FC = () => {
 
       const propertyAddress = `${selectedViewing.property.street}, ${selectedViewing.property.town}, ${selectedViewing.property.city}`;
 
-      // Send reschedule-specific email directly to agent (not using viewingEmailService which sends both agent and user emails)
       const result = await emailService.sendEmail({
         to: selectedViewing.property.agent.email,
         subject: `Viewing Reschedule Request - ${propertyAddress}`,
@@ -577,14 +583,25 @@ const Viewings: React.FC = () => {
       });
 
       if (result.success) {
+        // P2-1: Store the new date and time in Firestore so the card updates
         await viewingService.updateViewingStatus(
           selectedViewing.id,
           'rescheduled',
-          `Reschedule requested: ${rescheduleMessage}`
+          `Reschedule requested: ${rescheduleMessage}`,
+          undefined,
+          {
+            viewingDetails: {
+              ...selectedViewing.viewingDetails,
+              date: rescheduleNewDate,
+              time: rescheduleNewTime,
+            }
+          }
         );
 
         alert('Reschedule request sent successfully!');
         setIsRescheduleModalOpen(false);
+        setRescheduleNewDate('');
+        setRescheduleNewTime('');
         setRescheduleMessage('');
         setSelectedViewing(null);
       } else {
@@ -671,13 +688,27 @@ const Viewings: React.FC = () => {
   };
 
   const handleBookAgain = async (bookingId: string) => {
-    // TODO: Implement book again functionality
-    console.log('Book again:', bookingId);
+    // Re-open the booking modal; the user fills a new date/time for the same property
+    const viewing = pastViewings.find(v => v.id === bookingId);
+    if (viewing) {
+      setSelectedViewing(viewing);
+    }
+    setIsBookViewingOpen(true);
   };
 
   const handleViewProperty = (bookingId: string) => {
-    // TODO: Implement view property functionality
-    console.log('View property:', bookingId);
+    const viewing = pastViewings.find(v => v.id === bookingId);
+    if (!viewing) return;
+    // Navigate to search with property street as query, or open saved property if we have a propertyId
+    const propertyId = viewing.propertyId;
+    if (propertyId) {
+      window.location.href = `/search?propertyId=${encodeURIComponent(propertyId)}`;
+    } else {
+      const query = [viewing.property.street, viewing.property.town, viewing.property.city]
+        .filter(Boolean)
+        .join(', ');
+      window.location.href = `/search?q=${encodeURIComponent(query)}`;
+    }
   };
 
   // Test function to create a sample viewing
@@ -816,7 +847,7 @@ const Viewings: React.FC = () => {
               </p>
             </div>
           <div>
-            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>As of 8/10/2025</p>
+            <p className={`${isMobile ? 'text-xs' : 'text-sm'}`} style={{ color: '#717182' }}>As of {new Date().toLocaleDateString('en-GB')}</p>
           </div>
         </div>
 
@@ -1059,6 +1090,8 @@ const Viewings: React.FC = () => {
                 <button
                   onClick={() => {
                     setIsRescheduleModalOpen(false);
+                    setRescheduleNewDate('');
+                    setRescheduleNewTime('');
                     setRescheduleMessage('');
                     setSelectedViewing(null);
                   }}
@@ -1078,6 +1111,33 @@ const Viewings: React.FC = () => {
                 <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mb-4`}>
                   Current Time: <strong>{selectedViewing.viewingDetails.time}</strong>
                 </p>
+              </div>
+
+              {/* New date/time — stored in Firestore on submit (P2-1) */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className={`block ${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-700 mb-1`}>
+                    New Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={rescheduleNewDate}
+                    min={new Date().toISOString().split('T')[0]}
+                    onChange={(e) => setRescheduleNewDate(e.target.value)}
+                    className={`w-full ${isMobile ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                  />
+                </div>
+                <div>
+                  <label className={`block ${isMobile ? 'text-xs' : 'text-sm'} font-medium text-gray-700 mb-1`}>
+                    New Time <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={rescheduleNewTime}
+                    onChange={(e) => setRescheduleNewTime(e.target.value)}
+                    className={`w-full ${isMobile ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                  />
+                </div>
               </div>
 
               <div className="mb-4">
@@ -1100,6 +1160,8 @@ const Viewings: React.FC = () => {
                 <button
                   onClick={() => {
                     setIsRescheduleModalOpen(false);
+                    setRescheduleNewDate('');
+                    setRescheduleNewTime('');
                     setRescheduleMessage('');
                     setSelectedViewing(null);
                   }}

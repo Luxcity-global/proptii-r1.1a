@@ -21,13 +21,21 @@ import type {
     SendMessageDto,
 } from '../types/messaging';
 
-// Azure Functions or Nest backend base endpoint — resolved dynamically from env
-const FUNCTIONS_BASE = (
-    import.meta.env.VITE_API_ENDPOINT ||
-    import.meta.env.VITE_NEST_API_ENDPOINT ||
-    import.meta.env.VITE_API_URL ||
-    (import.meta.env.DEV ? 'http://localhost:7071' : (typeof window !== 'undefined' ? window.location.origin : ''))
-).replace(/\/api$/, '').replace(/\/$/, '');
+// Azure Functions base endpoint — single source of truth is VITE_API_ENDPOINT.
+// Falls back to window.location.origin in production (same-origin deployment)
+// and http://localhost:7071 in development.
+const FUNCTIONS_BASE = (() => {
+    const env = import.meta.env.VITE_API_ENDPOINT?.trim();
+    if (env) return env.replace(/\/api$/, '').replace(/\/$/, '');
+    if (import.meta.env.DEV) return 'http://localhost:7071';
+    if (typeof window !== 'undefined') return window.location.origin;
+    return '';
+})();
+
+if (!FUNCTIONS_BASE && import.meta.env.DEV) {
+    console.error('[communicationService] VITE_API_ENDPOINT is not set — messaging will not work. Add it to .env.local.');
+}
+
 const BASE = `${FUNCTIONS_BASE}/api/communication`;
 
 /** Build an Authorization header using the mock token or MSAL token. */

@@ -232,76 +232,38 @@ const SavedProperties: React.FC = () => {
     try {
       if (!user?.id) return;
       
-      const selectedPropertyId = 'demo-property-123';
-      let storedData = null;
+      const propertyId = `general_${user.id}`;
       
-      // Try to load from Firestore first
-      try {
-        const firestoreResult = await firestoreService.getReferencingForm(user.id, selectedPropertyId);
-        if (firestoreResult.success && firestoreResult.data) {
-          storedData = JSON.stringify(firestoreResult.data.formData);
-        }
-      } catch (error) {
-        console.warn('Failed to load from Firestore:', error);
+      const firestoreResult = await firestoreService.getReferencingForm(user.id, propertyId);
+      if (!firestoreResult.success || !firestoreResult.data) return;
+      
+      const formData = firestoreResult.data.formData;
+      const completed = new Set<string>();
+      
+      if (formData.identity?.firstName && formData.identity?.lastName && formData.identity?.email) {
+        completed.add('identity');
+      }
+      if (formData.employment?.employmentStatus) {
+        completed.add('employment');
+      }
+      if (formData.residential?.currentAddress) {
+        completed.add('residential');
+      }
+      if (formData.financial?.proofOfIncomeType?.trim()) {
+        completed.add('financial');
+      }
+      if (
+        formData.guarantor?.firstName?.trim() &&
+        formData.guarantor?.lastName?.trim() &&
+        formData.guarantor?.email?.trim()
+      ) {
+        completed.add('guarantor');
+      }
+      if (formData.agentDetails?.hasAgreedToCheck) {
+        completed.add('agentDetails');
       }
       
-      // Fallback to localStorage if Firestore fails
-      if (!storedData) {
-        const userKey = `referencing_${user.id}_formData`;
-        storedData = localStorage.getItem(userKey);
-      }
-      
-      if (!storedData) {
-        const storageKey = `property_${selectedPropertyId}_draft`;
-        const fullKey = `proptii_${storageKey}`;
-        storedData = localStorage.getItem(fullKey);
-      }
-      
-      if (storedData) {
-        const formData = JSON.parse(storedData);
-        const completed = new Set<string>();
-        
-        // Identity: firstName, lastName, and email must be filled
-        const identityComplete = formData.identity?.firstName && formData.identity?.lastName && formData.identity?.email;
-        if (identityComplete) {
-          completed.add('identity');
-        }
-        
-        // Employment: employmentStatus must be filled
-        if (formData.employment?.employmentStatus) {
-          completed.add('employment');
-        }
-        
-        // Residential: currentAddress must be filled
-        if (formData.residential?.currentAddress) {
-          completed.add('residential');
-        }
-        
-        // Financial: check for actual meaningful data
-        const financialComplete = formData.financial?.proofOfIncomeType && 
-                                 formData.financial.proofOfIncomeType.trim() !== '';
-        if (financialComplete) {
-          completed.add('financial');
-        }
-        
-        // Guarantor: check for actual meaningful data
-        const guarantorComplete = formData.guarantor?.firstName && 
-                                 formData.guarantor?.lastName && 
-                                 formData.guarantor?.email &&
-                                 formData.guarantor.firstName.trim() !== '' &&
-                                 formData.guarantor.lastName.trim() !== '' &&
-                                 formData.guarantor.email.trim() !== '';
-        if (guarantorComplete) {
-          completed.add('guarantor');
-        }
-        
-        // Agent Details: hasAgreedToCheck must be true
-        if (formData.agentDetails?.hasAgreedToCheck) {
-          completed.add('agentDetails');
-        }
-        
-        setCompletedSections(completed);
-      }
+      setCompletedSections(completed);
     } catch (error) {
       console.error('Error loading referencing status:', error);
     }

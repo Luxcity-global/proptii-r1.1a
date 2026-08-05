@@ -802,32 +802,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       if (!user?.id) return;
 
       try {
-        const propertyId = 'demo-property-123'; // Using demo property ID as in DashboardHome
+        // Scope referencing data to this user — never share across tenants
+        const propertyId = `general_${user.id}`;
 
-        // First try to load from Firestore by specific property
+        // Load from backend API (user-scoped key)
         try {
-          console.log('🔍 Attempting to load referencing form from Firestore:', { userId: user.id, propertyId });
-          let firestoreResult = await firestoreService.getReferencingForm(user.id, propertyId);
-          console.log('📋 Firestore result (specific property):', { success: firestoreResult.success, hasData: !!firestoreResult.data, error: firestoreResult.error });
-
-          // If not found with specific propertyId, try to get all forms for user and use the latest one
-          if (firestoreResult.success && !firestoreResult.data) {
-            console.log('ℹ️ No data found for specific property, trying to get all forms for user...');
-            const allFormsResult = await firestoreService.getUserReferencingForms(user.id);
-            if (allFormsResult.success && allFormsResult.data && allFormsResult.data.length > 0) {
-              // Use the most recently updated form
-              const sortedForms = allFormsResult.data.sort((a, b) => {
-                const aTime = a.updatedAt?.toMillis?.() || a.updatedAt?._seconds || 0;
-                const bTime = b.updatedAt?.toMillis?.() || b.updatedAt?._seconds || 0;
-                return bTime - aTime;
-              });
-              firestoreResult = { success: true, data: sortedForms[0] };
-              console.log('✅ Found form data from user forms (using latest):', sortedForms[0]);
-            }
-          }
+          const firestoreResult = await firestoreService.getReferencingForm(user.id, propertyId);
 
           if (firestoreResult.success && firestoreResult.data) {
-            console.log('✅ Loading form data from Firestore:', firestoreResult.data);
 
             // Set form data from Firestore
             setFormData(prev => mergeLoadedFormData(prev, firestoreResult.data!.formData));
@@ -881,31 +863,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
     if (isOpen && user?.id) {
       const loadDataOnOpen = async () => {
         try {
-          const propertyId = 'demo-property-123';
-          console.log('🔍 Loading data on modal open:', { userId: user.id, propertyId });
+          const propertyId = `general_${user.id}`;
 
-          let firestoreResult = await firestoreService.getReferencingForm(user.id, propertyId);
-          console.log('📋 Firestore result on open (specific property):', { success: firestoreResult.success, hasData: !!firestoreResult.data });
-
-          // If not found with specific propertyId, try to get all forms for user and use the latest one
-          if (firestoreResult.success && !firestoreResult.data) {
-            console.log('ℹ️ No data found for specific property on open, trying to get all forms for user...');
-            const allFormsResult = await firestoreService.getUserReferencingForms(user.id);
-            if (allFormsResult.success && allFormsResult.data && allFormsResult.data.length > 0) {
-              // Use the most recently updated form
-              const sortedForms = allFormsResult.data.sort((a, b) => {
-                const aTime = a.updatedAt?.toMillis?.() || a.updatedAt?._seconds || 0;
-                const bTime = b.updatedAt?.toMillis?.() || b.updatedAt?._seconds || 0;
-                return bTime - aTime;
-              });
-              firestoreResult = { success: true, data: sortedForms[0] };
-              console.log('✅ Found form data from user forms on open (using latest):', sortedForms[0]);
-            }
-          }
+          const firestoreResult = await firestoreService.getReferencingForm(user.id, propertyId);
 
           if (firestoreResult.success && firestoreResult.data) {
-            console.log('✅ Loading form data on modal open:', firestoreResult.data);
-
             // Set form data from Firestore
             setFormData(prev => mergeLoadedFormData(prev, firestoreResult.data!.formData));
 
@@ -921,7 +883,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
               setStepStatus(firestoreResult.data.stepStatus);
             }
           } else {
-            console.log('ℹ️ No Firestore data found on modal open, falling back to localStorage');
             // Fallback to localStorage
             const savedFormData = localStorage.getItem(`referencing_${user.id}_formData`);
             if (savedFormData) {
@@ -930,7 +891,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
             }
           }
         } catch (error) {
-          console.warn('❌ Failed to load from Firestore on modal open:', error);
+          console.warn('Failed to load from Firestore on modal open:', error);
           // Fallback to localStorage
           const savedFormData = localStorage.getItem(`referencing_${user.id}_formData`);
           if (savedFormData) {
@@ -958,8 +919,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(formData));
       localStorage.setItem(`referencing_${user.id}_stepStatus`, JSON.stringify(stepStatus));
 
-      // Save to Firestore
-      const propertyId = 'demo-property-123'; // Using demo property ID as in DashboardHome
+      // Save to backend API (user-scoped key, no shared demo ID)
+      const propertyId = `general_${user.id}`;
       const saveResult = await firestoreService.saveReferencingForm(
         user.id,
         propertyId,
@@ -1145,10 +1106,9 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
       // Don't save current step - data is already auto-saved
       // Don't show multiple progress updates - just submit directly
 
-      const propertyId = 'demo-property-123'; // Using demo property ID as in DashboardHome
+      const propertyId = `general_${userId}`;
 
-      // Save final form data to Firestore before submission (non-blocking - don't wait for it)
-      // Firestore save is optional - API submission is the primary action
+      // Save final form data to Firestore before submission (non-blocking)
       firestoreService.saveReferencingForm(
         userId,
         propertyId,
@@ -1157,33 +1117,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
         stepStatus
       ).catch((error) => {
         console.warn('Failed to save to Firestore before submission (non-blocking):', error);
-        // Don't block submission if Firestore fails
       });
 
-      // Submit to backend API immediately (this is the primary action)
-      console.log('🚀 Submitting referencing application to backend API...', {
-        userId,
-        propertyId,
-        hasFormData: !!formData,
-        agentEmail: formData.agentDetails?.email
-      });
-
-      // Do not use a short Promise.race — the API persists to Cosmos and sends multiple emails
-      // (can exceed 15s). Axios timeout is set on submit in referencingService (120s).
+      // Submit to backend API
       const result = await referencingService.submitApplication(userId, {
         formData,
         isNewReference: true
       });
-
-      console.log('✅ Backend API submission result:', result);
-
-      // Mark as submitted in Firestore (non-blocking - don't wait for it)
-      if (result.success) {
-        firestoreService.submitReferencingForm(userId, propertyId).catch((error) => {
-          console.warn('Failed to mark as submitted in Firestore (non-blocking):', error);
-          // Don't block success flow if Firestore fails
-        });
-      }
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to submit application');

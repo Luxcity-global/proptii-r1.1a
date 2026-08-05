@@ -410,11 +410,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     console.log('✅ Firebase Auth custom token signed in successfully');
                   }
                 } else {
+                  // Non-fatal in dev; fatal in prod because Firestore security rules require
+                  // a valid Firebase identity. Dispatch an event so the UI can react.
                   console.warn('Firebase token exchange failed:', res.statusText);
+                  window.dispatchEvent(new CustomEvent('firebase-auth-sync-failed', {
+                    detail: { status: res.status, message: res.statusText }
+                  }));
                 }
               }
             } catch (firebaseAuthError) {
               console.error('Failed to sync Firebase Auth:', firebaseAuthError);
+              window.dispatchEvent(new CustomEvent('firebase-auth-sync-failed', {
+                detail: { message: firebaseAuthError instanceof Error ? firebaseAuthError.message : 'Unknown error' }
+              }));
             }
           }
 

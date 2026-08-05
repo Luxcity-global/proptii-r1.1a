@@ -15,6 +15,7 @@ const GuestThreadPage: React.FC = () => {
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [pollingActive, setPollingActive] = useState(true);
+  const [threadLimitReached, setThreadLimitReached] = useState(false);
 
   // Email resend claim state
   const [showResendClaim, setShowResendClaim] = useState(true);
@@ -82,7 +83,14 @@ const GuestThreadPage: React.FC = () => {
       // Refresh thread data immediately
       await fetchThreadData(false);
     } catch (err: any) {
-      setError(err.message || 'Failed to send message. Please try again.');
+      // P3-4: 429 means the 20-message ghost limit has been reached
+      if (err?.response?.status === 429 || err?.message?.includes('limit')) {
+        setThreadLimitReached(true);
+        setPollingActive(false);
+        setError(null);
+      } else {
+        setError(err.message || 'Failed to send message. Please try again.');
+      }
     } finally {
       setSending(false);
     }
@@ -114,7 +122,7 @@ const GuestThreadPage: React.FC = () => {
     return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const isLimitReached = thread ? thread.limit_reached : false;
+  const isLimitReached = threadLimitReached || (thread ? thread.limit_reached : false);
 
   if (loading) {
     return (
@@ -290,9 +298,15 @@ const GuestThreadPage: React.FC = () => {
               <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
               <div>
                 <h4 className="text-sm font-bold">Message Limit Reached</h4>
-                <p className="text-xs leading-relaxed mt-0.5">
-                  Guest conversations are limited to 20 messages. To keep replying and secure this conversation history, claim your permanent account using the verification email sent to you.
+                <p className="text-xs leading-relaxed mt-0.5 mb-3">
+                  Guest conversations are limited to 20 messages. Create a free Proptii account to continue this conversation and access your full history on any device.
                 </p>
+                <button
+                  onClick={() => navigate('/signup')}
+                  className="px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Create Free Account →
+                </button>
               </div>
             </div>
           ) : (

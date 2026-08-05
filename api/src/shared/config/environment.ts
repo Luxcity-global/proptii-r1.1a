@@ -32,6 +32,8 @@ const envSchema = z.object({
     SMTP_PORT: z.coerce.number().optional(),
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
+    // Frontend URL — used in email links and DocuSign return URL
+    FRONTEND_URL: z.string().url().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

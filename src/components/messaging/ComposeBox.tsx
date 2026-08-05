@@ -22,6 +22,7 @@ import communicationService from '../../services/communicationService';
 
 const MAX_CHARS = 4000;
 const ALLOWED_ACCEPT = '.pdf,.doc,.docx,.txt';
+const MAX_ATTACHMENT_MB = 5; // Must match AttachmentService.MAX_FILE_SIZE_BYTES
 
 // ---------------------------------------------------------------------------
 // Props
@@ -100,7 +101,13 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({ conversationId, onSend, senderR
 
     const handleBodyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => setBody(e.target.value);
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSelectedFile(e.target.files?.[0] ?? null);
+        const file = e.target.files?.[0] ?? null;
+        if (file && file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
+            toast.error(`File is too large. Maximum attachment size is ${MAX_ATTACHMENT_MB} MB.`);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+        setSelectedFile(file);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -339,7 +346,7 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({ conversationId, onSend, senderR
                         data-testid="attach-button"
                         aria-label="Attach file"
                         className="compose-attach-btn"
-                        title="Attach PDF, DOC, DOCX or TXT"
+                        title={`Attach PDF, DOC, DOCX or TXT (max ${MAX_ATTACHMENT_MB} MB)`}
                         style={{
                             display: 'flex',
                             alignItems: 'center',

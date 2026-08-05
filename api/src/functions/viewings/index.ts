@@ -1,135 +1,38 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { ViewingService } from "../../shared/services/ViewingService";
+/**
+ * DEPRECATED — Cosmos DB–backed viewings endpoints.
+ *
+ * The frontend uses Firestore (viewingBookings collection) directly via the
+ * client-side viewingService.ts. These routes were never called by any live UI
+ * code and are replaced by Firestore real-time subscriptions.
+ *
+ * Routes are kept registered but return 410 Gone with a clear deprecation
+ * message so any accidental callers get an informative error instead of a
+ * silent 500 from a missing Cosmos DB connection.
+ *
+ * To remove entirely: delete this file and remove `import './functions/viewings'`
+ * from api/src/index.ts.
+ */
 
-export class ViewingsController {
-    private viewingService: ViewingService;
+import { app, HttpRequest, HttpResponseInit } from '@azure/functions';
 
-    constructor() {
-        this.viewingService = new ViewingService();
-    }
-
-    async createViewing(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-        try {
-            const body = await request.json();
-            const viewingData = body as any;
-            
-            const viewing = await this.viewingService.createViewing(viewingData);
-            
-            return {
-                status: 201,
-                body: JSON.stringify(viewing)
-            };
-        } catch (error) {
-            context.error('Error creating viewing:', error);
-            return {
-                status: 500,
-                body: JSON.stringify({ error: 'Failed to create viewing' })
-            };
-        }
-    }
-
-    async updateViewing(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-        try {
-            const viewingId = request.params.viewingId;
-            const body = await request.json();
-            const viewingData = body as any;
-            
-            const viewing = await this.viewingService.updateViewing(viewingId, viewingData);
-            
-            return {
-                status: 200,
-                body: JSON.stringify(viewing)
-            };
-        } catch (error) {
-            context.error('Error updating viewing:', error);
-            return {
-                status: 500,
-                body: JSON.stringify({ error: 'Failed to update viewing' })
-            };
-        }
-    }
-
-    async getViewing(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-        try {
-            const viewingId = request.params.viewingId;
-            const viewing = await this.viewingService.getViewingById(viewingId);
-            
-            return {
-                status: 200,
-                body: JSON.stringify(viewing)
-            };
-        } catch (error) {
-            context.error('Error getting viewing:', error);
-            return {
-                status: 404,
-                body: JSON.stringify({ error: 'Viewing not found' })
-            };
-        }
-    }
-
-    async getAllViewings(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-        try {
-            const viewings = await this.viewingService.getAll();
-            
-            return {
-                status: 200,
-                body: JSON.stringify(viewings)
-            };
-        } catch (error) {
-            context.error('Error getting viewings:', error);
-            return {
-                status: 500,
-                body: JSON.stringify({ error: 'Failed to get viewings' })
-            };
-        }
-    }
-
-    async deleteViewing(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-        try {
-            const viewingId = request.params.viewingId;
-            await this.viewingService.deleteViewing(viewingId);
-            
-            return {
-                status: 204
-            };
-        } catch (error) {
-            context.error('Error deleting viewing:', error);
-            return {
-                status: 500,
-                body: JSON.stringify({ error: 'Failed to delete viewing' })
-            };
-        }
-    }
-}
-
-const controller = new ViewingsController();
+const DEPRECATED: HttpResponseInit = {
+    status: 410,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        error: 'This endpoint is deprecated. Viewings are managed via Firestore in real-time by the frontend.',
+        deprecatedAt: '2024-11',
+    }),
+};
 
 app.http('viewings', {
     methods: ['GET', 'POST'],
     authLevel: 'anonymous',
-    handler: async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
-        if (request.method === 'GET') {
-            return controller.getAllViewings(request, context);
-        } else if (request.method === 'POST') {
-            return controller.createViewing(request, context);
-        }
-        
-        return { status: 405, body: 'Method not allowed' };
-    }
+    handler: async () => DEPRECATED,
 });
 
-app.http('viewings/{viewingId}', {
+app.http('viewings-by-id', {
+    route: 'viewings/{viewingId}',
     methods: ['GET', 'PUT', 'DELETE'],
     authLevel: 'anonymous',
-    handler: async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
-        if (request.method === 'GET') {
-            return controller.getViewing(request, context);
-        } else if (request.method === 'PUT') {
-            return controller.updateViewing(request, context);
-        } else if (request.method === 'DELETE') {
-            return controller.deleteViewing(request, context);
-        }
-        
-        return { status: 405, body: 'Method not allowed' };
-    }
-}); 
+    handler: async () => DEPRECATED,
+});

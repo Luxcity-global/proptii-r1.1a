@@ -57,6 +57,12 @@ import { NativePropertiesModule } from './modules/native-properties.module';
     HealthModule,
     MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://localhost:27017', {
       dbName: process.env.MONGODB_DB_NAME || 'proptii-communication',
+      // Graceful degradation: fail fast instead of hanging the server if Atlas is unreachable.
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+      socketTimeoutMS: 10000,
+      // Don't queue operations when disconnected — surface errors immediately.
+      bufferCommands: false,
     }),
     GuestEnquiryModule,
     NativePropertiesModule,

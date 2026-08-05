@@ -68,11 +68,25 @@ export class SearchService {
     }
   }
 
+  // In-memory caches for AI search results (5-minute TTL)
+  private readonly searchCache = new Map<string, { result: any[], timestamp: number }>();
+  private readonly suggestionCache = new Map<string, { result: string[], timestamp: number }>();
+  private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
   async searchProperties(query: string): Promise<any[]> {
     // Check if Azure OpenAI is configured
     if (!this.endpoint || !this.apiKey || !this.deploymentName) {
       this.logger.warn('Azure OpenAI not configured. Returning mock search results.');
       return this.getMockSearchResults(query);
+    }
+
+    const normalizedQuery = query.trim().toLowerCase();
+    
+    // Check cache first
+    const cached = this.searchCache.get(normalizedQuery);
+    if (cached && (Date.now() - cached.timestamp < this.CACHE_TTL_MS)) {
+      this.logger.debug(`Returning cached search results for "${query}"`);
+      return cached.result;
     }
 
     try {
@@ -113,6 +127,13 @@ export class SearchService {
         if (!Array.isArray(parsedResult)) {
           throw new Error('Response is not an array');
         }
+        
+        // Cache the successful result
+        this.searchCache.set(normalizedQuery, {
+          result: parsedResult,
+          timestamp: Date.now()
+        });
+        
         return parsedResult;
       } catch (parseError) {
         this.logger.error('Failed to parse OpenAI response', parseError);
@@ -154,9 +175,19 @@ export class SearchService {
   }
 
   async getSuggestions(query: string): Promise<string[]> {
+    const normalizedQuery = query.trim().toLowerCase();
+    
+    // Check cache first
+    const cached = this.suggestionCache.get(normalizedQuery);
+    if (cached && (Date.now() - cached.timestamp < this.CACHE_TTL_MS)) {
+      this.logger.debug(`Returning cached suggestions for "${query}"`);
+      return cached.result;
+    }
+
     try {
       this.logger.log(`Getting suggestions for query: "${query}"`);
       const payload = {
+
         messages: [
           {
             role: 'system',
@@ -192,6 +223,12 @@ export class SearchService {
         if (!Array.isArray(suggestions)) {
           throw new Error('Suggestions response is not an array');
         }
+        
+        this.suggestionCache.set(normalizedQuery, {
+          result: suggestions,
+          timestamp: Date.now()
+        });
+        
         return suggestions;
       } catch (parseError) {
         this.logger.error('Failed to parse suggestions response', parseError);
@@ -210,6 +247,12 @@ export class SearchService {
             throw new Error('Suggestions response is not an array (after repair)');
           }
           this.logger.warn('Successfully repaired and parsed suggestions JSON.');
+          
+          this.suggestionCache.set(normalizedQuery, {
+            result: suggestions,
+            timestamp: Date.now()
+          });
+          
           return suggestions;
         } catch (repairError) {
           this.logger.error('Failed to repair and parse suggestions JSON', repairError);

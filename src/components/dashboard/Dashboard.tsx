@@ -204,6 +204,21 @@ const DashboardInner: React.FC = () => {
 
   const { unreadCount } = useMessagingContext();
 
+  // P1-3: Show a banner if Firebase Auth sync fails (Firestore writes would be blocked)
+  useEffect(() => {
+    const handleFirebaseSyncFailure = () => {
+      // toast from react-hot-toast is already available in the app
+      import('react-hot-toast').then(({ default: toast }) => {
+        toast.error(
+          'Session sync issue — some features may not save correctly. Please refresh the page.',
+          { duration: 8000, id: 'firebase-sync-failed' }
+        );
+      });
+    };
+    window.addEventListener('firebase-auth-sync-failed', handleFirebaseSyncFailure);
+    return () => window.removeEventListener('firebase-auth-sync-failed', handleFirebaseSyncFailure);
+  }, []);
+
   // Update activeSection based on the current route
   useEffect(() => {
     // Sort sections by path length (longest first) to ensure more specific routes match first

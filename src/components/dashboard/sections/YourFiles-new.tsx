@@ -99,7 +99,7 @@ const YourFiles: React.FC = () => {
     try {
       if (!user?.id) return;
       
-      const propertyId = 'demo-property-123'; // Using same demo property ID
+      const propertyId = `general_${user.id}`;
       const result = await firestoreService.getReferencingForm(user.id, propertyId);
       
       if (result.success && result.data) {

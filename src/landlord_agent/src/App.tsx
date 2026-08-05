@@ -425,60 +425,24 @@ export function AppContent() {
   }, []);
 
   const getCachedAuthUser = useCallback((): { name?: string; email?: string; phone?: string; isAuthenticated: boolean } | null => {
-    try {
-      const raw = localStorage.getItem('proptii_auth_state');
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      const user = parsed?.user ?? parsed;
-      const isAuthed =
-        parsed?.isAuthenticated === true ||
-        user?.isAuthenticated === true ||
-        Boolean(user?.email);
-      if (!isAuthed) return null;
+    // P1-5: Use shared AuthContext (hostUser) — never read from stale localStorage cache
+    if (hostIsAuthenticated && hostUser) {
       return {
-        name: user?.name || user?.givenName || user?.displayName || '',
-        email: user?.email || user?.username || '',
-        phone: user?.phone || '+44 7911 123456',
+        name: hostUser.name || '',
+        email: hostUser.email || '',
+        phone: hostUser.phone || '+44 7911 123456',
         isAuthenticated: true,
       };
-    } catch (error) {
-      console.warn('Failed to parse cached auth state:', error);
-      return null;
-    }
-  }, []);
-
-  const resolveManagerId = useCallback((): string | null => {
-    try {
-      if (userProfile && (userProfile as any).id) {
-        return (userProfile as any).id;
-      }
-
-      const params = new URLSearchParams(window.location.search);
-      const uidFromQuery = params.get('uid');
-      if (uidFromQuery) {
-        return uidFromQuery;
-      }
-
-      if (typeof (window as any).getUserInfo === 'function') {
-        const info = (window as any).getUserInfo();
-        if (info?.id || info?.sub || info?.oid) {
-          return info.id || info.sub || info.oid;
-        }
-      }
-
-      const cached = localStorage.getItem('proptii_auth_state');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        const uid = parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId;
-        if (uid) {
-          return uid;
-        }
-      }
-    } catch (err) {
-      console.error('Error resolving manager id:', err);
     }
     return null;
-  }, [userProfile]);
+  }, [hostIsAuthenticated, hostUser]);
+
+  const resolveManagerId = useCallback((): string | null => {
+    // P1-5: hostUser is the authoritative source — no localStorage fallbacks
+    if (hostUser?.id) return hostUser.id;
+    if (userProfile && (userProfile as any).id) return (userProfile as any).id;
+    return null;
+  }, [hostUser, userProfile]);
 
   // Property setup state
   const [propertySetupData, setPropertySetupData] = useState<PropertySetupData>({
@@ -551,52 +515,22 @@ export function AppContent() {
   React.useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const data: any = (event as any).data;
-      
-      // Handle AUTH_STATE messages
-      if (data && data.type === 'AUTH_STATE' && data.payload) {
-        const { isAuthenticated, user } = data.payload;
-        if (isAuthenticated && user) {
-          try {
-            localStorage.setItem('proptii_auth_state', JSON.stringify({ isAuthenticated: true, user }));
-          } catch (error) {
-            console.warn('Failed to cache AUTH_STATE:', error);
-          }
 
-          setIsAuthenticated(true);
-          setUserProfile({
-            name: user.name || user.givenName || '',
-            email: user.email || '',
-            phone: user.phone || '+44 7911 123456',
-            companyName: 'Proptii',
-            logo: undefined
-          });
-          clearSignInQueryParam();
-          console.log('✅ Received AUTH_STATE from parent, updated userProfile:', user);
-        } else {
-          setIsAuthenticated(false);
-          // Explicit unauthenticated state from parent should clear profile
-          setUserProfile(null);
-          setProperties([]);
-          setTenants([]);
-          setVacancyAlerts([]);
-          setArrearsAlerts([]);
-          setAlerts([]);
-          setMarketInsights([]);
-          console.log('ℹ️ Received unauthenticated AUTH_STATE, cleared userProfile');
-        }
+      // AUTH_STATE messages are no longer needed — auth is synced directly
+      // from the shared AuthContext (hostUser). This branch is kept only to
+      // avoid breaking any legacy callers that still send the message.
+      if (data && data.type === 'AUTH_STATE') {
+        // No-op: The useEffect above already syncs from hostUser / hostIsAuthenticated.
+        // Do NOT write to localStorage here as it causes stale-cache race conditions.
         setIsAuthLoading(false);
+        return;
       }
       
       // Handle NAVIGATE messages
       if (data && data.type === 'NAVIGATE' && data.payload) {
         const { path } = data.payload;
-        console.log('🧭 Received NAVIGATE message with path:', path);
-        
-        // Remove leading slash and get the screen
         const normalizedPath = path.startsWith('/') ? path : `/${path}`;
         const targetScreen = PATH_TO_NAV_SCREEN[normalizedPath] || 'dashboard';
-        
-        console.log('🧭 Navigating to screen:', targetScreen);
         setCurrentScreen('main-app');
         setNavigationScreen(targetScreen);
       }
@@ -604,10 +538,8 @@ export function AppContent() {
 
     window.addEventListener('message', handleMessage);
 
-    // Set a timeout to stop loading if no auth state is received
-    const timer = setTimeout(() => {
-        setIsAuthLoading(false);
-    }, 2000);
+    // Stop loading spinner after 2 s maximum even if no auth event fires
+    const timer = setTimeout(() => { setIsAuthLoading(false); }, 2000);
 
     return () => {
       window.removeEventListener('message', handleMessage);
@@ -1279,57 +1211,7 @@ export function AppContent() {
 
   const loadScopedTenants = React.useCallback(async () => {
     try {
-      // Use the same userId extraction logic as addTenant and loadProperties
-      const getCurrentUserId = (): string | null => {
-        try {
-          // PRIORITY 1: Direct from userProfile (most reliable)
-          if (userProfile && (userProfile as any).id) {
-            const uid = (userProfile as any).id;
-            console.log('🔍 UserId from userProfile.id:', uid);
-            return uid;
-          }
-
-          // PRIORITY 2: Query parameter
-          const params = new URLSearchParams(window.location.search);
-          const uidFromQuery = params.get('uid');
-          if (uidFromQuery) {
-            console.log('🔍 UserId from query param:', uidFromQuery);
-            return uidFromQuery;
-          }
-
-          // PRIORITY 3: getUserInfo function
-          if (typeof (window as any).getUserInfo === 'function') {
-            const info = (window as any).getUserInfo();
-            console.log('🔍 getUserInfo() returned:', info);
-            if (info?.id || info?.sub || info?.oid) {
-              const uid = info.id || info.sub || info.oid;
-              console.log('🔍 UserId from getUserInfo:', uid);
-              return uid;
-            }
-          }
-
-          // PRIORITY 4: localStorage auth state
-          const cached = localStorage.getItem('proptii_auth_state');
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            console.log('🔍 Cached auth state:', parsed);
-            // Check both nested user.id AND top-level user id fields
-            const uid = parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId;
-            if (uid) {
-              console.log('🔍 UserId from localStorage:', uid);
-              return uid;
-            }
-          }
-        } catch (e) {
-          console.error('🔍 Error extracting userId:', e);
-        }
-
-        // Don't use email as fallback - it won't match stored userIds
-        console.warn('⚠️ No userId found - tenants may not load correctly');
-        return null;
-      };
-
-      const userId = getCurrentUserId();
+            const userId = resolveManagerId();
       let list = await tenantService.getTenants(userId || undefined);
 
       // If docs lack userId, fall back to scoping by owned property IDs
@@ -1384,57 +1266,7 @@ export function AppContent() {
   React.useEffect(() => {
     const loadProperties = async () => {
       try {
-        const getCurrentUserId = (): string | null => {
-          try {
-            // PRIORITY 1: Direct from userProfile (most reliable)
-            if (userProfile && (userProfile as any).id) {
-              const uid = (userProfile as any).id;
-              console.log('🔍 UserId from userProfile.id:', uid);
-              return uid;
-            }
-
-            // PRIORITY 2: Query parameter
-            const params = new URLSearchParams(window.location.search);
-            const uidFromQuery = params.get('uid');
-            if (uidFromQuery) {
-              console.log('🔍 UserId from query param:', uidFromQuery);
-              return uidFromQuery;
-            }
-
-            // PRIORITY 3: getUserInfo function
-            if (typeof (window as any).getUserInfo === 'function') {
-              const info = (window as any).getUserInfo();
-              console.log('🔍 getUserInfo() returned:', info);
-              if (info?.id || info?.sub || info?.oid) {
-                const uid = info.id || info.sub || info.oid;
-                console.log('🔍 UserId from getUserInfo:', uid);
-                return uid;
-              }
-            }
-
-            // PRIORITY 4: localStorage auth state
-            const cached = localStorage.getItem('proptii_auth_state');
-            if (cached) {
-              const parsed = JSON.parse(cached);
-              console.log('🔍 Cached auth state:', parsed);
-              // Check both nested user.id AND top-level user id fields
-              const uid = parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId;
-              if (uid) {
-                console.log('🔍 UserId from localStorage:', uid);
-                return uid;
-              }
-            }
-          } catch (e) {
-            console.error('🔍 Error extracting userId:', e);
-          }
-
-          // FALLBACK: Email
-          const emailFallback = userProfile?.email;
-          console.log('🔍 Using email as userId fallback:', emailFallback);
-          return emailFallback || null;
-        };
-
-        const currentUserId = getCurrentUserId();
+        const currentUserId = resolveManagerId();
         const userEmail = userProfile?.email;
 
         if (!currentUserId && !userEmail) {
@@ -1455,29 +1287,8 @@ export function AppContent() {
     loadProperties();
   }, [userProfile, loadScopedTenants]);
 
-  // Helper function to get current user ID
-  const getCurrentUserId = (): string | null => {
-    try {
-      if (userProfile && (userProfile as any).id) {
-        return (userProfile as any).id;
-      }
-      const params = new URLSearchParams(window.location.search);
-      const uidFromQuery = params.get('uid');
-      if (uidFromQuery) return uidFromQuery;
-      if (typeof (window as any).getUserInfo === 'function') {
-        const info = (window as any).getUserInfo();
-        return info?.id || info?.sub || info?.oid || null;
-      }
-      const cached = localStorage.getItem('proptii_auth_state');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        return parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId || null;
-      }
-    } catch (e) {
-      console.error('Error extracting userId for alerts:', e);
-    }
-    return userProfile?.email || null;
-  };
+  // Helper function to get current user ID — delegates to resolveManagerId
+  const getCurrentUserId = (): string | null => resolveManagerId();
 
   // Function to process alerts and update state
   const processAlerts = (activeAlerts: Alert[]) => {
@@ -1835,54 +1646,11 @@ export function AppContent() {
 
     try {
       // Save to Firebase (scoped) - use same extraction logic as loading
-      const currentUserId = (() => {
-        try {
-          // PRIORITY 1: Direct from userProfile
-          if (userProfile && (userProfile as any).id) {
-            const uid = (userProfile as any).id;
-            console.log('✅ Creating property with userId from userProfile.id:', uid);
-            return uid;
-          }
-
-          // PRIORITY 2: Query parameter
-          const params = new URLSearchParams(window.location.search);
-          const uidFromQuery = params.get('uid');
-          if (uidFromQuery) {
-            console.log('✅ Creating property with userId from query:', uidFromQuery);
-            return uidFromQuery;
-          }
-
-          // PRIORITY 3: getUserInfo
-          if (typeof (window as any).getUserInfo === 'function') {
-            const info = (window as any).getUserInfo();
-            const uid = info?.id || info?.sub || info?.oid;
-            if (uid) {
-              console.log('✅ Creating property with userId from getUserInfo:', uid);
-              return uid;
-            }
-          }
-
-          // PRIORITY 4: localStorage
-          const cached = localStorage.getItem('proptii_auth_state');
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            const uid = parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId;
-            if (uid) {
-              console.log('✅ Creating property with userId from localStorage:', uid);
-              return uid;
-            }
-          }
-        } catch (e) {
-          console.error('❌ Error extracting userId for property creation:', e);
-        }
-        const emailFallback = userProfile?.email || 'unknown';
-        console.warn('⚠️ Using email as userId fallback for property creation:', emailFallback);
-        return emailFallback;
-      })();
+      const currentUserId = resolveManagerId() ?? userProfile?.email ?? '';
 
       console.log('📝 About to create property with userId:', currentUserId);
       // Get owner email from userProfile for storing in property document
-      const ownerEmail = userProfile?.email || (typeof (window as any).getUserInfo === 'function' ? (window as any).getUserInfo()?.email : undefined);
+      const ownerEmail = userProfile?.email || hostUser?.email;
       const propertyId = await propertyService.createProperty(safeProperty, currentUserId, ownerEmail);
 
       // Fetch the created property to get full data with timestamps
@@ -2009,33 +1777,7 @@ export function AppContent() {
   const addTenant = async (tenant: Omit<Tenant, 'id'>) => {
     try {
       console.log('📝 [App] addTenant called with tenant data:', tenant);
-      const currentUserId = (() => {
-        try {
-          // PRIORITY 1: Direct from userProfile
-          if (userProfile && (userProfile as any).id) {
-            return (userProfile as any).id;
-          }
-          // PRIORITY 2: Query parameter
-          const params = new URLSearchParams(window.location.search);
-          const uidFromQuery = params.get('uid');
-          if (uidFromQuery) return uidFromQuery;
-          // PRIORITY 3: getUserInfo
-          if (typeof (window as any).getUserInfo === 'function') {
-            const info = (window as any).getUserInfo();
-            const uid = info?.id || info?.sub || info?.oid;
-            if (uid) return uid;
-          }
-          // PRIORITY 4: localStorage
-          const cached = localStorage.getItem('proptii_auth_state');
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            return parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId || null;
-          }
-        } catch (e) {
-          console.error('❌ [App] Error extracting userId:', e);
-        }
-        return userProfile?.email || 'unknown';
-      })();
+      const currentUserId = resolveManagerId() ?? userProfile?.email ?? '';
       console.log('📝 [App] Creating tenant with userId:', currentUserId);
 
       const id = await tenantService.createTenant(tenant, currentUserId);

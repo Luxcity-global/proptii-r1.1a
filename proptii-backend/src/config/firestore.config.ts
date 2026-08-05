@@ -1,6 +1,9 @@
 import * as admin from 'firebase-admin';
 import { Firestore } from 'firebase-admin/firestore';
 import { Logger } from '@nestjs/common';
+import * as os from 'os';
+import * as path from 'path';
+import * as fs from 'fs';
 
 let firestoreInstance: Firestore | null = null;
 const logger = new Logger('FirestoreConfig');
@@ -21,8 +24,32 @@ export async function initializeFirestore(): Promise<Firestore | null> {
       let credential = null;
       let initializedWith = '';
 
+      // Option 0: Single JSON string environment variable (FIREBASE_SERVICE_ACCOUNT_JSON / FIREBASE_SERVICE_ACCOUNT_KEY)
+      const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+      if (serviceAccountJson) {
+        try {
+          const serviceAccountObj = JSON.parse(serviceAccountJson);
+          if (serviceAccountObj.type === 'authorized_user' || serviceAccountObj.refresh_token) {
+            const tempAdcPath = path.join(os.tmpdir(), 'gcp_adc_render.json');
+            fs.writeFileSync(tempAdcPath, JSON.stringify(serviceAccountObj));
+            process.env.GOOGLE_APPLICATION_CREDENTIALS = tempAdcPath;
+            credential = admin.credential.applicationDefault();
+            initializedWith = 'user refresh token JSON variable';
+          } else {
+            if (!serviceAccountObj.project_id) {
+              serviceAccountObj.project_id = serviceAccountObj.quota_project_id || projectId || 'proptii-16946';
+            }
+            credential = admin.credential.cert(serviceAccountObj);
+            initializedWith = 'service account JSON variable';
+          }
+          logger.log(`ℹ️ Initializing Firebase Admin using ${initializedWith}`);
+        } catch (jsonErr) {
+          logger.error(`❌ Failed to parse service account JSON variable: ${jsonErr.message}`);
+        }
+      }
+
       // Option 1: Full service account credentials (projectId + clientEmail + privateKey)
-      if (projectId && clientEmail && privateKey) {
+      if (!credential && projectId && clientEmail && privateKey) {
         try {
           // Handle private key formatting - replace escaped newlines and ensure proper format
           let formattedPrivateKey = privateKey.trim();
@@ -98,24 +125,30 @@ export async function initializeFirestore(): Promise<Firestore | null> {
         }
       }
       
-      // Note: We cannot derive client email reliably as it contains a random string
-      // Format: firebase-adminsdk-XXXXX@project-id.iam.gserviceaccount.com
-      // The user must provide FIREBASE_CLIENT_EMAIL from their service account JSON file
-      
-      // Option 3: Try application default credentials (for GCP environments)
-      // IMPORTANT: When using application default credentials, projectId MUST be explicitly set
-      // Otherwise Firestore will fail with "Unable to detect a Project Id" when trying to use it
+      // Option 2: Try application default credentials (for GCP or local gcloud auth application-default login)
       if (!credential) {
-        if (projectId && projectId.trim() !== '') {
+        const homedir = os.homedir();
+        const gcloudAdcExists = 
+          fs.existsSync(path.join(homedir, '.config', 'gcloud', 'application_default_credentials.json')) ||
+          fs.existsSync(path.join(homedir, 'AppData', 'Roaming', 'gcloud', 'application_default_credentials.json'));
+
+        const hasAdcOrGcp = 
+          !!process.env.GOOGLE_APPLICATION_CREDENTIALS || 
+          !!process.env.GAE_ENV || 
+          !!process.env.K_SERVICE || 
+          !!process.env.GCLOUD_PROJECT ||
+          gcloudAdcExists;
+
+        if (hasAdcOrGcp && projectId && projectId.trim() !== '') {
           try {
             credential = admin.credential.applicationDefault();
-            initializedWith = 'application default credentials';
-            logger.log('ℹ️ Using application default credentials');
+            initializedWith = gcloudAdcExists 
+              ? 'gcloud user Application Default Credentials' 
+              : 'application default credentials';
+            logger.log(`ℹ️ Using ${initializedWith}`);
           } catch (error) {
             logger.warn(`⚠️ Application default credentials not available: ${error.message}`);
           }
-        } else {
-          logger.warn('⚠️ Cannot use application default credentials: FIREBASE_PROJECT_ID is required');
         }
       }
 
@@ -123,12 +156,9 @@ export async function initializeFirestore(): Promise<Firestore | null> {
       if (credential) {
         const initOptions: any = { credential };
         
-        // CRITICAL: projectId MUST be set when using application default credentials
-        // Otherwise Firestore operations will fail with "Unable to detect a Project Id"
         if (projectId && projectId.trim() !== '') {
           initOptions.projectId = projectId.trim();
         } else {
-          // If we're using application default credentials but no projectId, we can't proceed
           logger.error('❌ FIREBASE_PROJECT_ID is required when using application default credentials');
           logger.warn('   Firestore cannot be initialized without a project ID');
           return null;
@@ -137,28 +167,15 @@ export async function initializeFirestore(): Promise<Firestore | null> {
         admin.initializeApp(initOptions);
         logger.log(`✅ Firebase Admin initialized with ${initializedWith}${projectId ? ` for project: ${projectId}` : ''}`);
       } else {
-        // No credentials available
+        // No valid credentials available
         const missingVars: string[] = [];
-        if (!projectId || projectId.trim() === '') {
-          missingVars.push('FIREBASE_PROJECT_ID');
-        }
-        if (!privateKey || privateKey.trim() === '') {
-          missingVars.push('FIREBASE_PRIVATE_KEY');
-        }
-        // clientEmail is optional if we can derive it
+        if (!projectId || projectId.trim() === '') missingVars.push('FIREBASE_PROJECT_ID');
+        if (!clientEmail || clientEmail.trim() === '') missingVars.push('FIREBASE_CLIENT_EMAIL');
+        if (!privateKey || privateKey.trim() === '') missingVars.push('FIREBASE_PRIVATE_KEY');
         
         logger.warn(`⚠️ Firestore not configured - Missing: ${missingVars.join(', ')}`);
         logger.warn('   The application will work without Firestore persistence');
-        logger.warn('   To enable Firestore, set FIREBASE_PROJECT_ID and FIREBASE_PRIVATE_KEY (FIREBASE_CLIENT_EMAIL is optional)');
-        
-        // Log which variables are present
-        const presentVars: string[] = [];
-        if (projectId && projectId.trim() !== '') presentVars.push(`FIREBASE_PROJECT_ID`);
-        if (clientEmail && clientEmail.trim() !== '') presentVars.push(`FIREBASE_CLIENT_EMAIL`);
-        if (privateKey && privateKey.trim() !== '') presentVars.push(`FIREBASE_PRIVATE_KEY`);
-        if (presentVars.length > 0) {
-          logger.warn(`   Present variables: ${presentVars.join(', ')}`);
-        }
+        logger.warn('   To enable Firestore, set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY in .env');
         
         return null;
       }

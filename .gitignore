@@ -52,3 +52,4 @@ public/landlord/assets/
 search/backend/.cache/
 search/backend/.cache/ms-playwright/
 search/backend/.cache/puppeteer/
+.env.production.*

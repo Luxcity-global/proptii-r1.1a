@@ -73,18 +73,17 @@ const TenantContracts: React.FC = () => {
   // Load signed contracts from Firestore
   useEffect(() => {
     const loadFirestoreContracts = async () => {
-      console.log('🔄 Loading signed contracts from Firestore...');
+      if (!user?.id) {
+        setIsLoadingFirestore(false);
+        return;
+      }
+
       setIsLoadingFirestore(true);
       
       try {
-        // Use authenticated user ID or fallback for development
-        const userId = user?.id || 'dev-user-123';
-        
-        const result = await signedContractsFirestoreService.getUserSignedContracts(userId);
+        const result = await signedContractsFirestoreService.getUserSignedContracts(user.id);
         
         if (result.success && result.contracts) {
-          console.log('✅ Loaded', result.contracts.length, 'signed contracts from Firestore');
-          
           // Transform Firestore contracts to match the expected format
           const transformedContracts = result.contracts.map(contract => ({
             id: contract.id,

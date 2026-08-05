@@ -80,8 +80,7 @@ const envConfigs = {
     },
     rollupOptions: {
       output: {
-        // Temporarily disabled manual chunks to fix circular dependency issue
-        // manualChunks: getManualChunks
+        manualChunks: getManualChunks,
         assetFileNames: 'assets/[hash][extname]',
         chunkFileNames: 'chunks/[hash].js',
         entryFileNames: 'entries/[hash].js'
@@ -100,9 +99,9 @@ const envConfigs = {
     },
     rollupOptions: {
       output: {
-        // Temporarily disabled manual chunks to fix circular dependency issue
-        // Let Vite handle chunking automatically to avoid circular deps
-        // manualChunks: getManualChunks,
+        // Vendor splitting: keeps large libraries in separate cached chunks.
+        // MUI + Emotion must stay together (MUI has Emotion peer dep).
+        manualChunks: getManualChunks,
         assetFileNames: 'assets/[hash][extname]',
         chunkFileNames: 'chunks/[hash].js',
         entryFileNames: 'entries/[hash].js'

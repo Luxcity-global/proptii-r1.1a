@@ -12,7 +12,8 @@ interface DocuSignResponse {
   error?: string;
 }
 
-// DocuSign configuration
+// Get frontend base URL from environment (never hardcode localhost)
+const FRONTEND_URL = (process.env.FRONTEND_URL ?? 'https://proptii.co').replace(/\/$/, '');
 const docusignConfig = {
   integrationKey: process.env.DOCUSIGN_INTEGRATION_KEY,
   userId: process.env.DOCUSIGN_USER_ID,
@@ -151,7 +152,7 @@ async function getEmbeddedSigningUrl(request: any): Promise<string> {
     const accessToken = await getAccessToken();
     
     const recipientViewRequest = {
-      returnUrl: request.returnUrl || 'https://localhost:5173/contract',
+      returnUrl: request.returnUrl || `${FRONTEND_URL}/contracts`,
       authenticationMethod: request.authenticationMethod || 'none',
       clientUserId: request.clientUserId || '1000',
       email: request.email || 'user@example.com',
@@ -318,3 +319,110 @@ app.http('docusign', {
     }
   }
 }); 
+
+// ---------------------------------------------------------------------------
+// DocuSign Connect Webhook — POST /api/docusign/webhook
+//
+// Receives envelope status change notifications from DocuSign Connect.
+// When an envelope is completed, updates the matching contract in Firestore.
+//
+// Setup: In the DocuSign Admin console, create a Connect configuration
+//   pointing to <FUNCTIONS_URL>/api/docusign/webhook with HMAC enabled.
+//   Set the secret as process.env.DOCUSIGN_WEBHOOK_SECRET.
+//   Run: npm install firebase-admin --save  (in the api/ directory)
+// ---------------------------------------------------------------------------
+
+import * as crypto from 'crypto';
+
+/** Lazy-initialize Firebase Admin (safe to call multiple times). */
+async function getAdminFirestore() {
+  // Dynamic import keeps this optional — the function still runs if firebase-admin
+  // is not yet installed; it will just skip the Firestore update.
+  try {
+    const { getFirestore } = await import('firebase-admin/firestore');
+    const { initializeApp, getApps, cert } = await import('firebase-admin/app');
+
+    if (!getApps().length) {
+      const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+      if (serviceAccount) {
+        initializeApp({ credential: cert(JSON.parse(serviceAccount)) });
+      } else {
+        initializeApp(); // Application Default Credentials
+      }
+    }
+    return getFirestore();
+  } catch {
+    return null; // firebase-admin not installed — webhook still returns 200
+  }
+}
+
+/**
+ * Validate the HMAC-SHA256 signature sent by DocuSign Connect.
+ * Returns true if the secret is not configured (allows local dev without it).
+ */
+function validateDocuSignHmac(body: string, signature: string | null): boolean {
+  const secret = process.env.DOCUSIGN_WEBHOOK_SECRET;
+  if (!secret) return true; // no secret configured — skip validation (dev only)
+  if (!signature) return false;
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(body, 'utf8')
+    .digest('base64');
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+}
+
+app.http('docusign-webhook', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'docusign/webhook',
+  handler: async (request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+    try {
+      const rawBody = await request.text();
+      const hmacSignature = request.headers.get('x-docusign-signature-1');
+
+      if (!validateDocuSignHmac(rawBody, hmacSignature)) {
+        context.warn('DocuSign webhook HMAC validation failed');
+        return { status: 401, body: 'Invalid signature' };
+      }
+
+      const event = JSON.parse(rawBody) as any;
+      const envelopeId: string = event?.data?.envelopeId ?? event?.envelopeId ?? '';
+      const status: string = (event?.data?.envelopeSummary?.status ?? event?.status ?? '').toLowerCase();
+
+      context.log(`DocuSign webhook: envelopeId=${envelopeId} status=${status}`);
+
+      // Only act on completed envelopes
+      if (status === 'completed' && envelopeId) {
+        const db = await getAdminFirestore();
+        if (db) {
+          try {
+            for (const collectionName of ['contracts', 'signedContracts']) {
+              const snap = await db
+                .collection(collectionName)
+                .where('envelopeId', '==', envelopeId)
+                .limit(1)
+                .get();
+
+              if (!snap.empty) {
+                await snap.docs[0].ref.update({
+                  status: 'signed',
+                  signedDate: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                });
+                context.log(`Updated ${collectionName}/${snap.docs[0].id} to signed`);
+                break;
+              }
+            }
+          } catch (dbErr) {
+            context.error('Failed to update contract status in Firestore:', dbErr);
+          }
+        }
+      }
+
+      return { status: 200, body: 'OK' };
+    } catch (error) {
+      context.error('DocuSign webhook error:', error);
+      return { status: 200, body: 'OK' }; // always 200 to prevent DocuSign retries
+    }
+  },
+});

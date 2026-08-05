@@ -488,8 +488,11 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
       // Add to signed contracts context
       console.log('🔄 Adding signed contract to Firestore...');
       try {
-        // Use authenticated user ID or fallback for development
-        const userId = user?.id || 'dev-user-123';
+        if (!user?.id) {
+          console.warn('Cannot save signed contract: user not authenticated.');
+          return;
+        }
+        const userId = user.id;
         
         const signedContractData = {
           templateId: template.id,

@@ -17,7 +17,10 @@ const ALLOWED_MIME_TYPES = new Set([
     'text/plain',
 ]);
 
-const MAX_FILE_SIZE_BYTES = 10_485_760;
+// P2-8: Reduced from 10MB to 5MB while multipart upload is not yet implemented.
+// The base64 JSON approach adds ~33% overhead, so 5MB source → ~6.7MB request body
+// which stays safely under Azure Functions default 100MB limit.
+const MAX_FILE_SIZE_BYTES = 5_242_880; // 5 MB
 
 /**
  * Service for uploading message attachments to Azure Blob Storage and

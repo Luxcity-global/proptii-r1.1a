@@ -19,16 +19,6 @@ export const AZURE_STORAGE = {
   sasToken: import.meta.env.VITE_AZURE_STORAGE_SAS_TOKEN || '',
 };
 
-// Azure SQL Database configuration
-export const AZURE_SQL = {
-  server: import.meta.env.VITE_AZURE_SQL_SERVER || '',
-  database: import.meta.env.VITE_AZURE_SQL_DATABASE || '',
-  // Note: These credentials should only be used in a secure backend environment
-  // and never exposed to the client
-  username: import.meta.env.VITE_AZURE_SQL_USERNAME || '',
-  password: import.meta.env.VITE_AZURE_SQL_PASSWORD || '',
-};
-
 // Azure AD B2C configuration for authentication
 export const AZURE_AD_B2C = {
   clientId: import.meta.env.VITE_AZURE_AD_B2C_CLIENT_ID || '',

@@ -117,24 +117,8 @@ export function SelectExistingTenant({ properties, existingTenants, onBack, onSu
     return () => clearTimeout(timeoutId);
   }, [searchTerm]);
 
-  // Get current user ID
-  const getCurrentUserId = (): string => {
-    try {
-      if (userId) return userId;
-      
-      // Try to get from localStorage
-      const cached = localStorage.getItem('proptii_auth_state');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        return parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId || '';
-      }
-      
-      return '';
-    } catch (e) {
-      console.error('Error extracting userId:', e);
-      return '';
-    }
-  };
+    // Get current user ID — userId prop is the authoritative source (passed from App.tsx via resolveManagerId)
+  const getCurrentUserId = (): string => userId || '';
 
   const handleAssignTenant = async () => {
     if (!selectedUserId || !selectedPropertyId) return;

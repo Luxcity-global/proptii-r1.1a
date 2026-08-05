@@ -4,6 +4,7 @@ import {
   Get,
   Body,
   Query,
+  Res,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -112,7 +113,9 @@ export class BillingController {
    */
   @Get('plans')
   @ApiOperation({ summary: 'Get plan catalogue (public)' })
-  getPlans() {
+  getPlans(@Res({ passthrough: true }) res: import('express').Response) {
+    // Plan catalogue is static config — safe to cache for 1 hour at CDN/browser.
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
     return this.billingService.getPlans();
   }
 

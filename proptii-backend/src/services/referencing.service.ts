@@ -833,7 +833,8 @@ export class ReferencingService {
   async getReferencingForm(userId: string, propertyId: string): Promise<any> {
     try {
       if (!this.firestore) {
-        throw new Error('Firestore not available');
+        this.logger.warn('Firestore not available for getReferencingForm proxy');
+        return { success: true, data: null };
       }
       const docId = `${userId}_${propertyId}`;
       const docSnap = await this.firestore.collection('referencingForms').doc(docId).get();
@@ -850,7 +851,8 @@ export class ReferencingService {
   async getUserReferencingForms(userId: string): Promise<any> {
     try {
       if (!this.firestore) {
-        throw new Error('Firestore not available');
+        this.logger.warn('Firestore not available for getUserReferencingForms proxy');
+        return { success: true, data: [] };
       }
       const snapshot = await this.firestore.collection('referencingForms')
         .where('userId', '==', userId)
@@ -904,7 +906,8 @@ export class ReferencingService {
   async getUserFiles(userId: string): Promise<any> {
     try {
       if (!this.firestore) {
-        throw new Error('Firestore not available');
+        this.logger.warn('Firestore not available for getUserFiles proxy');
+        return { success: true, data: [] };
       }
       const snapshot = await this.firestore.collection('userFiles')
         .where('userId', '==', userId)

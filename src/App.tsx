@@ -1,71 +1,84 @@
-import React, { useLayoutEffect } from 'react';
+import React, { lazy, Suspense, useLayoutEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
 import { MSALProviderWrapper } from './contexts/AuthContext';
 import { SavedPropertiesProvider } from './contexts/SavedPropertiesContext';
 import { SignedContractsProvider } from './contexts/SignedContractsContext';
 import { OnboardingSessionProvider } from './contexts/OnboardingSessionContext';
-import { OnboardingOptionsModalRoute } from './pages/OnboardingOptionsModalRoute';
-import HomeLegacy from './pages/HomeLegacy';
-import { LoginPage } from './pages/Login';
-import { NotFoundPage } from './pages/NotFound';
-import ClaimListing from './pages/ClaimListing';
-import ClaimAccount from './pages/ClaimAccount';
-import Referencing from './pages/Referencing';
-import ContractsPage from './pages/Contracts';
-import BookViewing from './pages/BookViewing';
-import Dashboard from './components/dashboard/Dashboard';
-import { DashboardHome } from './components/dashboard/index';
-import SavedProperties from './components/dashboard/sections/SavedProperties-new';
-import Viewings from './components/dashboard/sections/Viewings-new';
-import TenantContracts from './components/dashboard/sections/TenantContracts-new';
-import FileTable from './components/dashboard/sections/YourFiles-new';
-import TenantReferencing from './components/dashboard/sections/TenantReferencing-new';
-import TenantMessages from './pages/dashboard/TenantMessages';
-import DashboardSettings from './components/dashboard/sections/DashboardSettings';
-import AgentHome from './pages/AgentHome';
-import HomeownerHome from './pages/HomeownerHome';
-import HomeownerHomeVariantB from './pages/HomeownerHomeVariantB';
-import PublicWorkerHome from './pages/PublicWorkerHome';
-import { HomeownerDashboard } from './components/homeowner/HomeownerDashboard';
-import Listings from './pages/Listings';
-import NewListingPage from './pages/listings/new';
-import LandlordDemo from './pages/LandlordDemo';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
-import { UnauthorizedPage } from './pages/Unauthorized';
-import AboutUs from './pages/AboutUs';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsOfService from './pages/TermsOfService';
-import FAQ from './pages/FAQ';
-// import AgentContractLanding from './pages/AgentContractLanding';
 import { AuthRedirectHandler } from './components/common/AuthRedirectHandler';
 import { StripeCheckoutReturnHandler } from './components/common/StripeCheckoutReturnHandler';
-import SearchResults from './pages/SearchResults';
-import HomeVariant from './pages/HomeVariant';
-import Pricing from './pages/pricing';
-import SignupModalPage from './pages/signup';
-import CreateAccountPage from './pages/signup/create-account';
-import SignupWelcomePage from './pages/signup/welcome';
-import PlanSelected from './pages/pricing/PlanSelected';
-import PricingArrival from './pages/pricing/PricingArrival';
-import PayNowPage from './pages/billing/pay-now';
-import BillingConfirmedPage from './pages/billing/confirmed';
-import BillingActivatePage from './pages/billing/activate';
 import BillingStatusBanner from './components/billing/BillingStatusBanner';
-import Tools from './pages/Tools';
-import ReadinessChecker from './pages/tools/ReadinessChecker';
-import DocumentTracker from './pages/tools/DocumentTracker';
-import ViewingTracker from './pages/tools/ViewingTracker';
-import ProcessSimulator from './pages/tools/ProcessSimulator';
-import TimelineGenerator from './pages/tools/TimelineGenerator';
-import KnowYourRights from './pages/tools/KnowYourRights';
 import { AuthAnalyticsBridge } from './components/analytics/AuthAnalyticsBridge';
-import ComingSoon from './pages/ComingSoon';
-import GuestThreadPage from './pages/GuestThreadPage';
 import DevAuthToolbar from './components/dev/DevAuthToolbar';
 import RoleGate from './components/common/RoleGate';
-import RoleSelect from './pages/RoleSelect';
+
+// ─── Eagerly loaded (small, above-the-fold) ────────────────────────────────
+import HomeVariant from './pages/HomeVariant';
+import { LoginPage } from './pages/Login';
+import { NotFoundPage } from './pages/NotFound';
+import { UnauthorizedPage } from './pages/Unauthorized';
+import { OnboardingOptionsModalRoute } from './pages/OnboardingOptionsModalRoute';
+import Dashboard from './components/dashboard/Dashboard';
+import { DashboardHome } from './components/dashboard/index';
+
+// ─── Lazily loaded (heavy pages — split into async chunks) ─────────────────
+const HomeLegacy          = lazy(() => import('./pages/HomeLegacy'));
+const ClaimListing        = lazy(() => import('./pages/ClaimListing'));
+const ClaimAccount        = lazy(() => import('./pages/ClaimAccount'));
+const Referencing         = lazy(() => import('./pages/Referencing'));
+const ContractsPage       = lazy(() => import('./pages/Contracts'));
+const BookViewing         = lazy(() => import('./pages/BookViewing'));
+const AgentHome           = lazy(() => import('./pages/AgentHome'));
+const HomeownerHome       = lazy(() => import('./pages/HomeownerHome'));
+const HomeownerHomeVariantB = lazy(() => import('./pages/HomeownerHomeVariantB'));
+const PublicWorkerHome    = lazy(() => import('./pages/PublicWorkerHome'));
+const HomeownerDashboard  = lazy(() => import('./components/homeowner/HomeownerDashboard').then(m => ({ default: m.HomeownerDashboard })));
+const Listings            = lazy(() => import('./pages/Listings'));
+const NewListingPage      = lazy(() => import('./pages/listings/new'));
+const LandlordDemo        = lazy(() => import('./pages/LandlordDemo'));
+const AboutUs             = lazy(() => import('./pages/AboutUs'));
+const PrivacyPolicy       = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService      = lazy(() => import('./pages/TermsOfService'));
+const FAQ                 = lazy(() => import('./pages/FAQ'));
+const SearchResults       = lazy(() => import('./pages/SearchResults'));
+const Pricing             = lazy(() => import('./pages/pricing'));
+const SignupModalPage     = lazy(() => import('./pages/signup'));
+const CreateAccountPage   = lazy(() => import('./pages/signup/create-account'));
+const SignupWelcomePage   = lazy(() => import('./pages/signup/welcome'));
+const PlanSelected        = lazy(() => import('./pages/pricing/PlanSelected'));
+const PayNowPage          = lazy(() => import('./pages/billing/pay-now'));
+const BillingConfirmedPage = lazy(() => import('./pages/billing/confirmed'));
+const BillingActivatePage = lazy(() => import('./pages/billing/activate'));
+const Tools               = lazy(() => import('./pages/Tools'));
+const ReadinessChecker    = lazy(() => import('./pages/tools/ReadinessChecker'));
+const DocumentTracker     = lazy(() => import('./pages/tools/DocumentTracker'));
+const ViewingTracker      = lazy(() => import('./pages/tools/ViewingTracker'));
+const ProcessSimulator    = lazy(() => import('./pages/tools/ProcessSimulator'));
+const TimelineGenerator   = lazy(() => import('./pages/tools/TimelineGenerator'));
+const KnowYourRights      = lazy(() => import('./pages/tools/KnowYourRights'));
+const ComingSoon          = lazy(() => import('./pages/ComingSoon'));
+const GuestThreadPage     = lazy(() => import('./pages/GuestThreadPage'));
+const RoleSelect          = lazy(() => import('./pages/RoleSelect'));
+// Dashboard sections
+const SavedProperties     = lazy(() => import('./components/dashboard/sections/SavedProperties-new'));
+const Viewings            = lazy(() => import('./components/dashboard/sections/Viewings-new'));
+const TenantContracts     = lazy(() => import('./components/dashboard/sections/TenantContracts-new'));
+const FileTable           = lazy(() => import('./components/dashboard/sections/YourFiles-new'));
+const TenantReferencing   = lazy(() => import('./components/dashboard/sections/TenantReferencing-new'));
+const TenantMessages      = lazy(() => import('./pages/dashboard/TenantMessages'));
+const DashboardSettings   = lazy(() => import('./components/dashboard/sections/DashboardSettings'));
+
+/** Minimal spinner shown while an async route chunk is loading. */
+function RouteLoadingFallback() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0f172a' }}>
+      <div style={{ width: 40, height: 40, border: '3px solid #6366f1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
 
 /** Default landing: onboarding flow first. Home v2 lives at / with /home-v2 as alias. */
 
@@ -102,6 +115,7 @@ export const App: React.FC = () => {
               <BillingStatusBanner />
               <ScrollToTop />
               <RoleGate>
+                <Suspense fallback={<RouteLoadingFallback />}>
                 <Routes>
                 {/* Public Routes - / is default landing; onboarding shows as modal overlay */}
                 <Route path="/" element={<HomeVariant />} />
@@ -241,6 +255,7 @@ export const App: React.FC = () => {
                 {/* Catch-all route for 404 */}
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
+                </Suspense>
               </RoleGate>
               {/* Dev-only mock auth toolbar — stripped from production builds */}
               {import.meta.env.DEV && <DevAuthToolbar />}

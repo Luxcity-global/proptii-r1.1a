@@ -145,8 +145,30 @@ app.http('inbound-email-webhook', {
                 senderId = thread.ghost_tenant_id;
                 senderName = ghostTenant?.name ?? 'Tenant';
             } else if (senderEmail === landlordEmailLower) {
-                context.warn(`Email reply from landlord ${senderEmail} is blocked.`);
-                return { status: 200, body: 'Ignored: Landlord replies via email are disabled' };
+                // Landlord email replies are not supported — we reply via the platform.
+                // Send a friendly bounce so the landlord knows what happened.
+                context.warn(`Email reply from landlord ${senderEmail} blocked — sending bounce.`);
+                if (landlordEmail) {
+                    try {
+                        const env = require('../../../shared/config/environment').validateEnv();
+                        const { buildTransporter } = require('../../../shared/services/NotificationService');
+                        const transporter = buildTransporter(env);
+                        if (transporter) {
+                            const fromAddress = env.EMAIL_FROM_ADDRESS ?? 'noreply@reply.proptii.co';
+                            const frontendUrl = process.env.FRONTEND_URL ?? 'https://proptii.co';
+                            await transporter.sendMail({
+                                from: fromAddress,
+                                to: landlordEmail,
+                                subject: 'Reply not delivered — please use Proptii to respond',
+                                text: `Hi ${landlordName},\n\nYour reply to a tenant enquiry could not be delivered via email.\n\nTo keep conversations secure and ensure your reply reaches the tenant, please log in to Proptii and reply directly through the platform:\n${frontendUrl}/thread/${thread.thread_token}\n\nThe Proptii Team`,
+                                html: `<p>Hi ${landlordName},</p><p>Your reply to a tenant enquiry could not be delivered via email.</p><p>To keep conversations secure, please <a href="${frontendUrl}/thread/${thread.thread_token}">log in to Proptii</a> and reply directly through the platform.</p><p>The Proptii Team</p>`,
+                            });
+                        }
+                    } catch (bounceErr) {
+                        context.warn('Failed to send bounce email to landlord:', bounceErr);
+                    }
+                }
+                return { status: 200, body: 'Landlord reply bounced with notification' };
             }
 
             if (!senderType || !senderId) {

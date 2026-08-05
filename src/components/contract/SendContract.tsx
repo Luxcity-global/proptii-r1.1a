@@ -264,7 +264,8 @@ const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfByte
       console.log('🔄 Saving signed contract to Firestore via Send button...');
       
       try {
-        const userId = user?.id || 'dev-user-123'; // Fallback for development
+        if (!user?.id) throw new Error('You must be signed in to save a contract.');
+        const userId = user.id;
         
         // Convert signed PDF bytes to base64 data URL (using Promise wrapper)
         // Convert Uint8Array to ArrayBuffer for Blob constructor

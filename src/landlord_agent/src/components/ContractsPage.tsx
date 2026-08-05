@@ -40,6 +40,7 @@ import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import { Property, UserProfile } from '../App';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
+import { useAuth } from '../../../contexts/AuthContext';
 
 export interface Contract {
   id: string;
@@ -66,14 +67,16 @@ interface ContractsPageProps {
 }
 
 export function ContractsPage({ tenants = [], onBack, userProfile, properties = [], onAddProperty }: ContractsPageProps) {
+  // P1-4: Use AuthContext directly — never read from localStorage for auth
+  const { user } = useAuth();
+  const landlordEmail = user?.email ?? userProfile?.email ?? null;
+  const userId = user?.id ?? null;
+
   const [activeTab, setActiveTab] = useState<'sent' | 'unsigned' | 'signed'>('sent');
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [landlordEmail, setLandlordEmail] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [isAuthChecked, setIsAuthChecked] = useState(false);
   const [showSuccessScreen, setShowSuccessScreen] = useState(false);
   const [successData, setSuccessData] = useState<{ recipientName: string; recipientEmail: string; fileName: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -88,66 +91,17 @@ export function ContractsPage({ tenants = [], onBack, userProfile, properties = 
   
   const ITEMS_PER_PAGE = 10;
 
-  // Get landlord email and userId from localStorage/auth on component mount
+  // Load contracts when tab or auth state changes
   useEffect(() => {
-    const getUserInfo = () => {
-      // Also seed from userProfile prop if available
-      if (userProfile?.email) {
-        setLandlordEmail(userProfile.email);
-      }
-
-      // Try to get from localStorage (set during login/registration)
-      const storedEmail = localStorage.getItem('landlordEmail');
-      if (storedEmail) {
-        console.log('✅ Found landlord email in localStorage:', storedEmail);
-        setLandlordEmail(storedEmail);
-      }
-
-      // Try to get userId and email from proptii_auth_state
-      const authState = localStorage.getItem('proptii_auth_state');
-      if (authState) {
-        try {
-          const parsed = JSON.parse(authState);
-          if (parsed?.user?.email && !storedEmail) {
-            console.log('✅ Found landlord email in auth state:', parsed.user.email);
-            setLandlordEmail(parsed.user.email);
-          }
-          
-          // Get userId
-          const uid = parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId;
-          if (uid) {
-            console.log('✅ Found userId in auth state:', uid);
-            setUserId(uid);
-          }
-        } catch (e) {
-          console.error('Error parsing auth state:', e);
-        }
-      }
-
-      // Try to get userId from query parameter
-      const params = new URLSearchParams(window.location.search);
-      const uidFromQuery = params.get('uid');
-      if (uidFromQuery) {
-        console.log('✅ Found userId in query param:', uidFromQuery);
-        setUserId(uidFromQuery);
-      }
-
-      // Mark auth check as complete
-      setIsAuthChecked(true);
-    };
-
-    getUserInfo();
-  }, [userProfile]);
-
-  // Load contracts when tab changes or landlordEmail/userId is set
-  // Wait until auth check is complete to avoid loading all contracts for unauthenticated users
-  useEffect(() => {
-    if (!isAuthChecked) return;
+    if (!userId && !landlordEmail) {
+      setContracts([]);
+      setLoading(false);
+      return;
+    }
     loadContracts();
-  }, [activeTab, landlordEmail, userId, isAuthChecked]);
+  }, [activeTab, userId, landlordEmail]);
 
   const loadContracts = async () => {
-    // Do not load contracts if user is not authenticated
     if (!userId && !landlordEmail) {
       setContracts([]);
       setLoading(false);
@@ -164,30 +118,14 @@ export function ContractsPage({ tenants = [], onBack, userProfile, properties = 
         'signed': 'signed'
       };
       
-      // Build filters
-      const filters: any = {
-        status: statusMap[activeTab]
-      };
-      
-      // Add all available user identifiers to maximize chances of finding contracts
-      // Some contracts may have userId, others may have landlordId, others may have landlordEmail
-      if (userId) {
-        filters.userId = userId;
-        // Also try userId as landlordId since they might be the same
-        filters.landlordId = userId;
-        console.log('🔍 Loading contracts with userId and landlordId filters:', userId);
-      }
-      
-      if (landlordEmail) {
-        filters.landlordEmail = landlordEmail;
-        console.log('🔍 Loading contracts with landlordEmail filter:', landlordEmail);
-      }
+      const filters: any = { status: statusMap[activeTab] };
+      if (userId) { filters.userId = userId; filters.landlordId = userId; }
+      if (landlordEmail) { filters.landlordEmail = landlordEmail; }
       
       const fetchedContracts = await contractService.getContracts(filters);
-      console.log(`✅ Loaded ${fetchedContracts.length} contracts for status: ${statusMap[activeTab]}`);
       setContracts(fetchedContracts);
     } catch (err) {
-      console.error('❌ Error loading contracts:', err);
+      console.error('Error loading contracts:', err);
       setError('Failed to load contracts. Please try again.');
       setContracts([]);
     } finally {
@@ -539,24 +477,11 @@ export function ContractsPage({ tenants = [], onBack, userProfile, properties = 
         
         // Save contract to Firestore for tracking
         try {
-          // Get userId if not already set
-          const currentUserId = userId || (() => {
-            try {
-              const authState = localStorage.getItem('proptii_auth_state');
-              if (authState) {
-                const parsed = JSON.parse(authState);
-                return parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId || '';
-              }
-              const params = new URLSearchParams(window.location.search);
-              return params.get('uid') || '';
-            } catch (e) {
-              console.error('Error getting userId:', e);
-              return '';
-            }
-          })();
+          // userId is already resolved from AuthContext — no localStorage fallback needed
+          const currentUserId = userId ?? '';
 
           if (!currentUserId) {
-            console.warn('⚠️ No userId found - contract will be saved without userId');
+            console.warn('No userId found — contract will be saved without userId');
           }
 
           const contractId = await contractService.createContractWithBase64({
@@ -1139,13 +1064,12 @@ export function ContractsPage({ tenants = [], onBack, userProfile, properties = 
     );
   }
 
-  // Show 4 cards + empty state for unauthenticated users
-  if (isAuthChecked && !userId && !landlordEmail) {
+  // Show guest state for unauthenticated users
+  if (!userId && !landlordEmail) {
     return <LandlordPageEmptyShell page="contracts" variant="guest" />;
   }
 
   if (
-    isAuthChecked &&
     (userId || landlordEmail) &&
     isNewPortfolioUser(properties)
   ) {
