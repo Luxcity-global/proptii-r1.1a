@@ -93,13 +93,17 @@ header "🚀  Starting Proptii Development Stack"
 # 0. Azurite (Blob Storage Emulator)
 if [ "$START_API" = true ]; then
   echo -e "${CYAN}[storage]${RESET}        Starting Azurite Emulator → ${BOLD}http://127.0.0.1:10000${RESET}"
+  mkdir -p /tmp/azurite
   if command -v azurite &>/dev/null; then
-    mkdir -p /tmp/azurite
     azurite --silent --location /tmp/azurite --debug /tmp/azurite-debug.log &
     PIDS+=($!)
     sleep 2
+  elif command -v npx &>/dev/null; then
+    npx azurite --silent --location /tmp/azurite --debug /tmp/azurite-debug.log &
+    PIDS+=($!)
+    sleep 2
   else
-    echo -e "${YELLOW}⚠️  Azurite not found globally. Attachments might fail if cloud storage isn't configured.${RESET}"
+    echo -e "${YELLOW}⚠️  Azurite not found. Attachments might fail if cloud storage isn't configured.${RESET}"
   fi
 fi
 
