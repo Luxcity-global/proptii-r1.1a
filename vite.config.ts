@@ -15,51 +15,11 @@ const customLogger = {
   },
 };
 
-// Enhanced manual chunks function for better code splitting
-function getManualChunks(id: string) {
-  // Vendor chunks - split large libraries
-  if (id.includes('node_modules')) {
-    // React core
-    if (id.includes('react/') || id.includes('react-dom/')) {
-      return 'vendor';
-    }
-    // MUI and Emotion packages - keep ALL together to avoid circular dependencies
-    // MUI depends on Emotion, so they must be in the same chunk
-    if (id.includes('@mui/') || id.includes('@emotion/')) {
-      return 'mui-emotion-vendor';
-    }
-    // PDF libraries
-    if (id.includes('pdfjs-dist') || id.includes('pdf-lib') || id.includes('pdf2pic')) {
-      return 'pdf-vendor';
-    }
-    // Azure SDKs
-    if (id.includes('@azure/')) {
-      return 'azure-vendor';
-    }
-    // Firebase
-    if (id.includes('firebase/')) {
-      return 'firebase-vendor';
-    }
-    // Date libraries
-    if (id.includes('date-fns') || id.includes('@date-io/') || id.includes('dayjs')) {
-      return 'date-vendor';
-    }
-    // Form libraries
-    if (id.includes('react-hook-form') || id.includes('@hookform/') || id.includes('yup') || id.includes('zod')) {
-      return 'forms-vendor';
-    }
-    // Icons
-    if (id.includes('@fortawesome/') || id.includes('lucide-react')) {
-      return 'icons-vendor';
-    }
-    // Other large dependencies
-    if (id.includes('axios') || id.includes('openai')) {
-      return 'api-vendor';
-    }
-    // Default vendor chunk for everything else
-    return 'vendor';
-  }
-}
+// NOTE: manual chunk splitting (manualChunks) has been intentionally removed.
+// Custom manualChunks causes circular chunk cycles (e.g. mui-emotion-vendor ->
+// vendor -> mui-emotion-vendor) which produce TDZ runtime errors ('Cannot access
+// X before initialization'). Rollup's automatic splitting never creates circular
+// chunks. The chunkSizeWarningLimit is raised to suppress size warnings.
 
 // Environment-specific configurations
 const envConfigs = {
@@ -80,7 +40,6 @@ const envConfigs = {
     },
     rollupOptions: {
       output: {
-        manualChunks: getManualChunks,
         assetFileNames: 'assets/[hash][extname]',
         chunkFileNames: 'chunks/[hash].js',
         entryFileNames: 'entries/[hash].js'
@@ -92,16 +51,13 @@ const envConfigs = {
     minify: 'terser',
     cssCodeSplit: true,
     reportCompressedSize: false,
-    chunkSizeWarningLimit: 500,
+    chunkSizeWarningLimit: 2500,
     assetsInlineLimit: 8192,
     modulePreload: {
       polyfill: true
     },
     rollupOptions: {
       output: {
-        // Vendor splitting: keeps large libraries in separate cached chunks.
-        // MUI + Emotion must stay together (MUI has Emotion peer dep).
-        manualChunks: getManualChunks,
         assetFileNames: 'assets/[hash][extname]',
         chunkFileNames: 'chunks/[hash].js',
         entryFileNames: 'entries/[hash].js'
