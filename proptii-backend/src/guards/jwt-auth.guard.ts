@@ -45,7 +45,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   ): TUser {
     if (err || !user) {
       const detail = this.describeJwtFailure(err, info);
-      if (detail && process.env.NODE_ENV !== 'production') {
+      if (detail) {
         this.logger.warn(`JWT auth failed: ${detail}`);
       }
       throw new UnauthorizedException(

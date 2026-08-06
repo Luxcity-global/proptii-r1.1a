@@ -482,6 +482,24 @@ const LandlordAgentSettingsPage: React.FC<LandlordAgentSettingsPageProps> = ({
               onClick={handleEditProfile}
             />
             <SettingsRow
+              title="Switch account role"
+              description={`Currently active role: ${userRole || 'landlord'}. Change your account role.`}
+              onClick={() => openInParentApp('/select-role')}
+              action={
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openInParentApp('/select-role');
+                  }}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-blue-50"
+                  style={{ color: '#136C9E', borderColor: '#136C9E' }}
+                >
+                  Change role
+                </button>
+              }
+            />
+            <SettingsRow
               title="Sign out"
               description="Sign out of your Proptii account on this device."
               destructive

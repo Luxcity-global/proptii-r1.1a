@@ -161,6 +161,9 @@ export async function setRole(
   role: UserRole,
   source: 'manual_select' | 'claim_token' = 'manual_select',
 ): Promise<void> {
+  // Always store in localStorage immediately so role persists locally across sessions
+  localStorage.setItem(`proptii_role_${uid}`, role);
+
   // First update backend (which updates Firestore and invalidates backend cache)
   try {
     const { getAccessTokenForApiRequest } = await import('./msalAccessToken');
