@@ -58,7 +58,10 @@ export async function getAccessTokenForApiRequest(): Promise<string | null> {
       account,
     });
     const t = bearerJwtFromResult(r);
-    if (t) return t;
+    if (t) {
+      localStorage.setItem('auth_token', t);
+      return t;
+    }
   } catch (e) {
     if (import.meta.env.DEV) {
       console.warn('[msal] acquireTokenSilent failed:', e);
@@ -73,7 +76,10 @@ export async function getAccessTokenForApiRequest(): Promise<string | null> {
       loginHint: account.username,
     });
     const t = bearerJwtFromResult(r);
-    if (t) return t;
+    if (t) {
+      localStorage.setItem('auth_token', t);
+      return t;
+    }
   } catch {
     // Expected when no server session or iframe blocked
   }
