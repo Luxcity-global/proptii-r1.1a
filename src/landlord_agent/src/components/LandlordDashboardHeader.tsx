@@ -96,7 +96,7 @@ const LandlordDashboardHeader: React.FC<LandlordDashboardHeaderProps> = ({
             >
               <Phone className="w-4 h-4 flex-shrink-0" style={{ color: '#374957' }} />
               <span className="text-sm" style={{ color: '#374957' }}>
-                {userPhone || '+44 7911 123456'}
+                {userPhone || 'Not provided'}
               </span>
             </div>
 
@@ -106,7 +106,7 @@ const LandlordDashboardHeader: React.FC<LandlordDashboardHeaderProps> = ({
             >
               <Mail className="w-4 h-4 flex-shrink-0" style={{ color: '#374957' }} />
               <span className="text-sm" style={{ color: '#374957' }}>
-                {userEmail || 'user@example.com'}
+                {userEmail || 'Not provided'}
               </span>
             </div>
           </div>

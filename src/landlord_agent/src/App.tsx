@@ -430,7 +430,7 @@ export function AppContent() {
       return {
         name: hostUser.name || '',
         email: hostUser.email || '',
-        phone: hostUser.phone || '+44 7911 123456',
+        phone: hostUser.phone || '',
         isAuthenticated: true,
       };
     }
@@ -491,7 +491,7 @@ export function AppContent() {
           id: hostUser.id,
           name: hostUser.name || `${hostUser.givenName || ''} ${hostUser.familyName || ''}`.trim() || 'Landlord',
           email: hostUser.email,
-          phone: hostUser.phone || '+44 7911 123456',
+          phone: hostUser.phone || '',
           companyProfile: existingCompanyProfile,
           companyName: prev?.companyName || 'Proptii',
           logo: prev?.logo

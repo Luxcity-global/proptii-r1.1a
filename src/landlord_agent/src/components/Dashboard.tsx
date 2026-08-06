@@ -622,7 +622,7 @@ export function Dashboard({
               >
                 <Phone className="w-4 h-4 flex-shrink-0" style={{ color: '#374957' }} />
                 <span className="text-sm" style={{ color: '#374957' }}>
-                  {userProfile?.phone || '+44 7911 123456'}
+                  {userProfile?.phone || 'Not provided'}
                 </span>
                 </div>
               
@@ -632,7 +632,7 @@ export function Dashboard({
               >
                 <Mail className="w-4 h-4 flex-shrink-0" style={{ color: '#374957' }} />
                 <span className="text-sm" style={{ color: '#374957' }}>
-                  {userProfile?.email || 'TosinLanipekun@Luxcity.omnimicrosoft'}
+                  {userProfile?.email || 'Not provided'}
                 </span>
               </div>
             </div>
