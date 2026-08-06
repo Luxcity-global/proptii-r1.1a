@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { getFirestore } from '../config/firestore.config';
 
-const roleCache = new Map<string, { role: string; expires: number }>();
+export const roleCache = new Map<string, { role: string; expires: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';

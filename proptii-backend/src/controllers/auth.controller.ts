@@ -1,4 +1,4 @@
-import { Controller, Post, Req, UseGuards, InternalServerErrorException } from '@nestjs/common';
+import { Controller, Post, Req, Body, UseGuards, InternalServerErrorException } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import * as admin from 'firebase-admin';
@@ -51,6 +51,63 @@ export class AuthController {
       return {
         success: false,
         error: error?.message || 'Failed to generate Firebase custom token'
+      };
+    }
+  }
+
+  @Post('role')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async updateRole(@Req() req: any, @Body() body: { role: string }) {
+    try {
+      const uid = req.user?.sub;
+      const email = req.user?.emails?.[0] || req.user?.email || req.user?.preferred_username || '';
+      const { role } = body;
+
+      if (!uid) {
+        return {
+          success: false,
+          error: 'Missing user identifier in token'
+        };
+      }
+
+      if (!role || !['tenant', 'landlord', 'agent'].includes(role)) {
+        return {
+          success: false,
+          error: 'Invalid role'
+        };
+      }
+
+      // Ensure Firebase Admin is initialized
+      if (!admin.apps.length) {
+        await initializeFirestore();
+      }
+
+      if (admin.apps.length) {
+        const db = admin.firestore();
+        await db.collection('users').doc(uid).set({
+          uid,
+          email: email.toLowerCase().trim(),
+          role,
+          roleAssignedAt: new Date().toISOString(),
+          roleSource: 'manual_select',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+
+      // Clear roleCache for this user so it's not stale
+      const { roleCache } = await import('../guards/jwt.strategy');
+      roleCache.delete(uid);
+
+      return {
+        success: true,
+        role,
+      };
+    } catch (error: any) {
+      console.error('❌ Error updating user role:', error);
+      return {
+        success: false,
+        error: error?.message || 'Failed to update user role'
       };
     }
   }

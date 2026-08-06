@@ -161,6 +161,29 @@ export async function setRole(
   role: UserRole,
   source: 'manual_select' | 'claim_token' = 'manual_select',
 ): Promise<void> {
+  // First update backend (which updates Firestore and invalidates backend cache)
+  try {
+    const { getAccessTokenForApiRequest } = await import('./msalAccessToken');
+    const token = await getAccessTokenForApiRequest().catch(() => null);
+    if (token) {
+      const apiBase = (import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000').replace(/\/$/, '');
+      const res = await fetch(`${apiBase}/api/auth/role`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ role }),
+      });
+      if (!res.ok) {
+        throw new Error(`Backend role update failed: ${res.status}`);
+      }
+    }
+  } catch (err) {
+    console.warn('[RoleService] Failed to update role on NestJS backend, falling back to direct Firestore write:', err);
+  }
+
+  // Fallback / local Firestore write to keep frontend in sync
   await writeUserDoc(uid, email, role, source);
 }
 
