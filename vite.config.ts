@@ -21,7 +21,7 @@ function getManualChunks(id: string) {
   if (id.includes('node_modules')) {
     // React core
     if (id.includes('react/') || id.includes('react-dom/')) {
-      return 'react-vendor';
+      return 'vendor';
     }
     // MUI and Emotion packages - keep ALL together to avoid circular dependencies
     // MUI depends on Emotion, so they must be in the same chunk
@@ -176,7 +176,7 @@ export default defineConfig(({ mode = 'development' }) => {
       },
     },
     resolve: {
-      dedupe: ['firebase', 'firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/storage'],
+      dedupe: ['react', 'react-dom', 'firebase', 'firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/storage'],
       alias: {
         // Short-form src/ path aliases
         '@':        path.resolve(__dirname, './src'),
