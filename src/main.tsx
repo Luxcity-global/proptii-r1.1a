@@ -6,59 +6,40 @@ import './index.css';
 import { getMsalInstance } from './contexts/AuthContext';
 import theme from './theme/theme';
 import { ErrorBoundary } from './utils/errorHandler';
-import appInsights from './utils/performanceMonitor';
 import { Router } from './config/routerConfig';
 
-// Initialize MSAL before rendering the app
-const initializeApp = async () => {
+// Render the React tree immediately — the page paints before any async work.
+const root = createRoot(document.getElementById('root')!);
+
+root.render(
+  <StrictMode>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <ErrorBoundary>
+        <Router />
+      </ErrorBoundary>
+    </ThemeProvider>
+  </StrictMode>
+);
+
+// Background init — none of this blocks the first paint.
+(async () => {
   try {
-    // Initialize MSAL first
     const msalInstance = getMsalInstance();
-    
-    // Only proceed with MSAL operations if we have the required environment variables
+
     if (import.meta.env.VITE_AZURE_AD_CLIENT_ID && import.meta.env.VITE_AZURE_AD_TENANT_NAME) {
       await msalInstance.initialize();
-      console.log('MSAL initialized successfully');
-
-      await msalInstance.handleRedirectPromise().catch(error => {
-        console.error('Error handling redirect:', error);
+      await msalInstance.handleRedirectPromise().catch((err) => {
+        console.error('[main] MSAL redirect error:', err);
       });
-    } else {
-      console.log('MSAL initialization skipped - missing required environment variables');
     }
 
-    // Initialize performance monitoring only if enabled and not already initialized
-    if (import.meta.env.VITE_ENABLE_PERFORMANCE_MONITORING === 'true' && !appInsights.core.isInitialized()) {
-      appInsights.loadAppInsights();
+    // Only load the ~200 KB App Insights SDK when explicitly enabled.
+    if (import.meta.env.VITE_ENABLE_PERFORMANCE_MONITORING === 'true') {
+      const { initPerformanceMonitoring } = await import('./utils/performanceMonitor');
+      await initPerformanceMonitoring();
     }
-
-    // Render the app
-    createRoot(document.getElementById('root')!).render(
-      <StrictMode>
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <ErrorBoundary>
-            <Router />
-          </ErrorBoundary>
-        </ThemeProvider>
-      </StrictMode>
-    );
-  } catch (error) {
-    console.error('Error during initialization:', error);
-
-    // Render the app anyway
-    createRoot(document.getElementById('root')!).render(
-      <StrictMode>
-        <ThemeProvider theme={theme}>
-          <CssBaseline />
-          <ErrorBoundary>
-            <Router />
-          </ErrorBoundary>
-        </ThemeProvider>
-      </StrictMode>
-    );
+  } catch (err) {
+    console.error('[main] Background init error:', err);
   }
-};
-
-// Start the initialization process
-initializeApp();
+})();

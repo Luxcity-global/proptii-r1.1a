@@ -6,7 +6,7 @@ export const CANONICAL_PROD_API_BASE_URL =
     ? `${(import.meta as any).env.VITE_NEST_API_ENDPOINT.trim().replace(/\/$/, '')}/api`
     : (typeof window !== 'undefined' ? `${window.location.origin}/api` : ''));
 
-/** Nest global prefix for local development. */
+/** Nest backend for local development (port 3000). */
 export const DEV_LOCAL_API_BASE = 'http://127.0.0.1:3000/api';
 
 const RENDER_REMOTE_FALLBACKS = Array.from(new Set([
@@ -35,15 +35,20 @@ export const KNOWN_API_ORIGINS = Array.from(new Set([
 const toIpv4Loopback = (url: string) =>
   url.replace(/\/\/localhost(?=[:/])/gi, '//127.0.0.1');
 
+// Only include URLs for services that actually exist in this project.
+// Port 3002 was a ghost entry — nothing runs there; every call waited 2 s
+// for a connection-refused before moving on.
 const LOCAL_FALLBACKS = [
-  DEV_LOCAL_API_BASE,
-  'http://127.0.0.1:3002/api',
-  'http://127.0.0.1:7071/api',
+  DEV_LOCAL_API_BASE,             // NestJS backend (npm run start:backend)
+  'http://127.0.0.1:7071/api',   // Azure Functions (api/, rare in dev)
 ];
 
 const isLocalApiUrl = (url: string) => /localhost|127\.0\.0\.1/i.test(url);
 
-const LOCAL_FETCH_TIMEOUT_MS = 6_000;
+// Reduced from 6 s → 2 s for local (connection-refused is instant; the delay
+// was masking the real problem of too many fallback URLs).
+// Remote timeout kept at 12 s for Render cold-start tolerance.
+const LOCAL_FETCH_TIMEOUT_MS  = 2_000;
 const REMOTE_FETCH_TIMEOUT_MS = 12_000;
 
 /** True when the UI is served from a machine-local origin (Vite dev, etc.). */

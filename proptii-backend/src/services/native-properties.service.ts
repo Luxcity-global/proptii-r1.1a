@@ -48,6 +48,55 @@ export class NativePropertiesService {
     return this.findAllByUser(userId);
   }
 
+  /**
+   * Public full-text search across all native (landlord-listed) properties.
+   * Used by the tenant search flow in useSearchBackend.ts.
+   *
+   * Search strategy:
+   *  1. MongoDB $text index (fast — covers title, address, city, notes fields).
+   *  2. If text search returns 0 results (index not yet built or partial match),
+   *     fall back to a case-insensitive regex across the same fields.
+   *
+   * Only returns properties with status = 'vacant' (available to rent).
+   */
+  async searchPublic(query: string, limit = 50): Promise<NativeProperty[]> {
+    const trimmed = query.trim();
+    if (!trimmed) return [];
+
+    // --- Primary: $text index search (O(log n)) ---
+    try {
+      const textResults = await this.propertyModel
+        .find(
+          { $text: { $search: trimmed }, status: 'vacant' },
+          { score: { $meta: 'textScore' } },
+        )
+        .sort({ score: { $meta: 'textScore' } })
+        .limit(limit)
+        .exec();
+
+      if (textResults.length > 0) return textResults;
+    } catch {
+      // $text index may not exist yet — fall through to regex.
+    }
+
+    // --- Fallback: regex across key fields ---
+    const pattern = new RegExp(trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    return this.propertyModel
+      .find({
+        status: 'vacant',
+        $or: [
+          { title: pattern },
+          { address: pattern },
+          { city: pattern },
+          { postcode: pattern },
+          { notes: pattern },
+        ],
+      })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .exec();
+  }
+
   async findById(id: string): Promise<NativeProperty | null> {
     return await this.propertyModel.findOne({ id }).exec();
   }

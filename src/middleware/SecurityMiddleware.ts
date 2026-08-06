@@ -1,417 +1,88 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { v4 as uuidv4 } from 'uuid';
-import { SessionManager } from '../services/SessionManager';
-import { ApplicationInsights } from '@microsoft/applicationinsights-web';
-import { KNOWN_API_ORIGINS } from '../utils/apiEndpoints';
-import { resolveSearchBackendUrl } from '../utils/searchBackendUrl';
+/**
+ * SecurityMiddleware — thin axios factory.
+ *
+ * The previous implementation maintained a client-side CSRF token that the
+ * NestJS backend never validated, injected CSP via <meta> tags (overridden by
+ * Render's HTTP headers anyway), and ran XSS detection by regex on error
+ * events (never actionable). All of that has been removed.
+ *
+ * This module now exports:
+ *   - createApiClient(baseURL)  — an axios instance pre-configured with auth
+ *   - SecurityMiddleware        — a backward-compatible singleton that wraps
+ *                                  createApiClient so existing call-sites compile
+ */
 
-interface CSRFToken {
-    token: string;
-    timestamp: number;
-    rotationCount: number;
+import axios, { AxiosInstance } from 'axios';
+import { waitForMsalReady } from '../contexts/AuthContext';
+import SessionManager from '../services/SessionManager';
+
+const DEFAULT_TIMEOUT_MS = 15_000;
+
+/**
+ * Create a pre-configured axios instance.
+ * The request interceptor attaches the MSAL Bearer token when available.
+ */
+export function createApiClient(baseURL: string): AxiosInstance {
+  const client = axios.create({ baseURL, timeout: DEFAULT_TIMEOUT_MS });
+
+  client.interceptors.request.use(async (config) => {
+    try {
+      await waitForMsalReady();
+      const mockToken = localStorage.getItem('mock_token');
+      if (mockToken) {
+        config.headers['Authorization'] = `Bearer ${mockToken}`;
+        return config;
+      }
+      const { getAccessTokenForApiRequest } = await import('../services/msalAccessToken');
+      const token = await getAccessTokenForApiRequest();
+      if (token) config.headers['Authorization'] = `Bearer ${token}`;
+    } catch {
+      // Non-fatal — unauthenticated requests are allowed; the server will 401.
+    }
+    return config;
+  });
+
+  client.interceptors.response.use(
+    (res) => res,
+    (err) => {
+      if (err.response?.status === 401) {
+        window.dispatchEvent(new CustomEvent('auth-state-changed'));
+      }
+      return Promise.reject(err);
+    },
+  );
+
+  return client;
 }
 
-interface SecurityHeaders {
-    'X-CSRF-Token': string;
-    'X-XSS-Protection': string;
-    'X-Content-Type-Options': string;
-    'X-Frame-Options': string;
-    'Content-Security-Policy': string;
-    'Referrer-Policy': string;
-}
+// ─── Backward-compatible singleton ──────────────────────────────────────────
+// Tests and any remaining call-sites that do SecurityMiddleware.getInstance()
+// receive an object that exposes getAxiosInstance().
 
 export class SecurityMiddleware {
-    private static instance: SecurityMiddleware;
-    private readonly csrfTokenKey = 'csrf_token';
-    private readonly sessionManager: SessionManager;
-    private axiosInstance: AxiosInstance;
-    private appInsights: ApplicationInsights;
-    private readonly tokenRotationInterval = 15 * 60 * 1000; // 15 minutes
-    private readonly maxRotationCount = 100;
-    private tokenRotationTimer: NodeJS.Timeout | null = null;
-    private securityHeaders: SecurityHeaders;
+  private static _instance: SecurityMiddleware;
+  private readonly _client: AxiosInstance;
 
-    private constructor() {
-        this.sessionManager = SessionManager.getInstance();
-        this.appInsights = new ApplicationInsights({
-            config: {
-                connectionString: import.meta.env.VITE_APP_INSIGHTS_INSTRUMENTATION_KEY,
-                enableAutoRouteTracking: true,
-            }
-        });
-        this.securityHeaders = this.initializeSecurityHeaders();
-        this.axiosInstance = this.createAxiosInstance();
-        this.setupSecurityMeasures();
+  private constructor() {
+    const baseURL = import.meta.env.VITE_API_URL ?? '';
+    this._client = createApiClient(baseURL);
+  }
+
+  public static getInstance(): SecurityMiddleware {
+    if (!SecurityMiddleware._instance) {
+      SecurityMiddleware._instance = new SecurityMiddleware();
     }
+    return SecurityMiddleware._instance;
+  }
 
-    public static getInstance(): SecurityMiddleware {
-        if (!SecurityMiddleware.instance) {
-            SecurityMiddleware.instance = new SecurityMiddleware();
-        }
-        return SecurityMiddleware.instance;
-    }
+  public getAxiosInstance(): AxiosInstance {
+    return this._client;
+  }
 
-    private initializeSecurityHeaders(): SecurityHeaders {
-        return {
-            'X-CSRF-Token': '',
-            'X-XSS-Protection': '1; mode=block',
-            'X-Content-Type-Options': 'nosniff',
-            'X-Frame-Options': 'DENY',
-            'Content-Security-Policy': this.generateCSP(),
-            'Referrer-Policy': 'strict-origin-when-cross-origin'
-        };
-    }
-
-    private generateCSP(): string {
-        const isDevelopment = import.meta.env.DEV;
-        const apiUrl = import.meta.env.VITE_API_URL || '';
-        // Remove /api from the end if it exists
-        const baseUrl = apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
-        const searchBackendOrigin = this.sanitizeOrigin(resolveSearchBackendUrl());
-
-        const connectSources = new Set<string>([
-            'https://formsubmit.co',
-            'https://proptii.b2clogin.com',
-            'https://api.stripe.com',
-            'https://*.stripe.com',
-            'https://*.azure.com',
-            'https://*.azurewebsites.net',
-            // Always include known backend origins
-            ...KNOWN_API_ORIGINS,
-            'https://proptii-backend.onrender.com',
-            'https://demo.docusign.net',
-            'https://www.docusign.net',
-            'https://*.docusign.net',
-            'https://*.googleapis.com',
-            'https://*.firebaseapp.com',
-            'https://*.firebaseio.com',
-            'https://*.google.com',
-            'https://www.googletagmanager.com',
-            'https://www.google-analytics.com',
-            'wss://*.googleapis.com',
-            'wss://*.firebaseio.com',
-            'wss://*.firebaseapp.com'
-        ]);
-
-        if (searchBackendOrigin) {
-            connectSources.add(searchBackendOrigin);
-        }
-
-        // Local API in dev (Nest on :3000, search on :3001). Include 127.0.0.1 — Windows
-        // often breaks on localhost (::1); billing uses 127.0.0.1 explicitly.
-        if (isDevelopment) {
-            connectSources.add('http://localhost:*');
-            connectSources.add('http://127.0.0.1:*');
-        }
-
-        const apiOrigin = this.sanitizeOrigin(apiUrl) ?? this.sanitizeOrigin(baseUrl);
-        if (apiOrigin) {
-            connectSources.add(apiOrigin);
-        }
-
-        const connectSrc = ["'self'", ...connectSources].join(' ');
-
-        return [
-            "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://proptii.b2clogin.com https://js.stripe.com https://maps.googleapis.com https://*.googleapis.com https://apis.google.com https://www.googletagmanager.com https://www.google-analytics.com",
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-            "font-src 'self' https://fonts.gstatic.com data:",
-            "img-src 'self' data: https: blob:",
-            `connect-src ${connectSrc}`,
-            "frame-src 'self' https://proptii.b2clogin.com https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://*.stripe.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net https://*.google.com https://apis.google.com",
-            "object-src 'none'",
-            "base-uri 'self'",
-            "form-action 'self'",
-            "upgrade-insecure-requests"
-        ].join('; ');
-    }
-
-    private sanitizeOrigin(rawUrl?: string): string | null {
-        if (!rawUrl) {
-            return null;
-        }
-
-        const trimmed = rawUrl.trim();
-        if (!trimmed) {
-            return null;
-        }
-
-        const asUrl = (candidate: string) => {
-            try {
-                const parsed = new URL(candidate);
-                return `${parsed.protocol}//${parsed.host}`;
-            } catch {
-                return null;
-            }
-        };
-
-        return asUrl(trimmed) ?? asUrl(`https://${trimmed}`);
-    }
-
-    private createAxiosInstance(): AxiosInstance {
-        const instance = axios.create({
-            baseURL: import.meta.env.VITE_API_URL,
-            timeout: 10000,
-            headers: this.securityHeaders
-        });
-
-        // Request interceptor
-        instance.interceptors.request.use(
-            (config: AxiosRequestConfig) => {
-                const token = this.getCurrentCSRFToken();
-                if (token && config.headers) {
-                    config.headers['X-CSRF-Token'] = token.token;
-                }
-                return config;
-            },
-            (error) => {
-                this.logSecurityEvent('RequestError', error);
-                return Promise.reject(error);
-            }
-        );
-
-        // Response interceptor
-        instance.interceptors.response.use(
-            (response: AxiosResponse) => {
-                this.validateResponseHeaders(response);
-                return response;
-            },
-            (error) => {
-                this.handleSecurityError(error);
-                return Promise.reject(error);
-            }
-        );
-
-        return instance;
-    }
-
-    private setupSecurityMeasures(): void {
-        this.initializeCSRFToken();
-        this.startTokenRotation();
-        this.setupEventListeners();
-        this.injectSecurityHeaders();
-    }
-
-    private initializeCSRFToken(): void {
-        const token: CSRFToken = {
-            token: uuidv4(),
-            timestamp: Date.now(),
-            rotationCount: 0
-        };
-        this.storeCSRFToken(token);
-        this.securityHeaders['X-CSRF-Token'] = token.token;
-    }
-
-    private startTokenRotation(): void {
-        if (this.tokenRotationTimer) {
-            clearInterval(this.tokenRotationTimer);
-        }
-
-        this.tokenRotationTimer = setInterval(() => {
-            this.rotateCSRFToken();
-        }, this.tokenRotationInterval);
-    }
-
-    private rotateCSRFToken(): void {
-        const currentToken = this.getCurrentCSRFToken();
-        if (!currentToken) {
-            this.initializeCSRFToken();
-            return;
-        }
-
-        if (currentToken.rotationCount >= this.maxRotationCount) {
-            this.logSecurityEvent('TokenRotationLimit', { rotationCount: currentToken.rotationCount });
-            this.initializeCSRFToken();
-            return;
-        }
-
-        const newToken: CSRFToken = {
-            token: uuidv4(),
-            timestamp: Date.now(),
-            rotationCount: currentToken.rotationCount + 1
-        };
-
-        this.storeCSRFToken(newToken);
-        this.securityHeaders['X-CSRF-Token'] = newToken.token;
-        this.logSecurityEvent('TokenRotation', { oldToken: currentToken.token, newToken: newToken.token });
-    }
-
-    private getCurrentCSRFToken(): CSRFToken | null {
-        try {
-            const stored = sessionStorage.getItem(this.csrfTokenKey);
-            return stored ? JSON.parse(stored) : null;
-        } catch (error) {
-            this.logSecurityEvent('TokenRetrievalError', error);
-            return null;
-        }
-    }
-
-    private storeCSRFToken(token: CSRFToken): void {
-        try {
-            sessionStorage.setItem(this.csrfTokenKey, JSON.stringify(token));
-        } catch (error) {
-            this.logSecurityEvent('TokenStorageError', error);
-        }
-    }
-
-    private setupEventListeners(): void {
-        // Listen for session changes
-        window.addEventListener('sessionEnd', () => {
-            this.handleSessionEnd();
-        });
-
-        // Monitor for XSS attempts
-        window.addEventListener('error', (event) => {
-            if (this.isXSSAttempt(event)) {
-                this.handleXSSAttempt(event);
-            }
-        });
-
-        // Monitor for CSRF attempts
-        document.addEventListener('submit', (event) => {
-            if (!this.validateFormSubmission(event)) {
-                event.preventDefault();
-            }
-        });
-    }
-
-    private isXSSAttempt(event: ErrorEvent): boolean {
-        const suspiciousPatterns = [
-            /<script>/i,
-            /javascript:/i,
-            /data:/i,
-            /vbscript:/i,
-            /on\w+=/i
-        ];
-
-        return suspiciousPatterns.some(pattern =>
-            pattern.test(event.error?.toString() || '') ||
-            pattern.test(event.message)
-        );
-    }
-
-    private handleXSSAttempt(event: ErrorEvent): void {
-        this.logSecurityEvent('XSSAttempt', {
-            message: event.message,
-            source: event.filename,
-            line: event.lineno,
-            column: event.colno
-        });
-    }
-
-    private validateFormSubmission(event: Event): boolean {
-        const form = event.target as HTMLFormElement;
-        if (!form || form.nodeName !== 'FORM') return true;
-
-        const token = this.getCurrentCSRFToken();
-        if (!token) {
-            this.logSecurityEvent('CSRFValidationError', { error: 'No CSRF token found' });
-            return false;
-        }
-
-        const formToken = form.querySelector('input[name="csrf_token"]')?.value;
-        if (!formToken || formToken !== token.token) {
-            this.logSecurityEvent('CSRFValidationError', {
-                error: 'Token mismatch',
-                formToken,
-                expectedToken: token.token
-            });
-            return false;
-        }
-
-        return true;
-    }
-
-    private validateResponseHeaders(response: AxiosResponse): void {
-        const expectedHeaders = [
-            'X-Content-Type-Options',
-            'X-Frame-Options',
-            'X-XSS-Protection'
-        ];
-
-        const missingHeaders = expectedHeaders.filter(
-            header => !response.headers[header.toLowerCase()]
-        );
-
-        if (missingHeaders.length > 0) {
-            this.logSecurityEvent('MissingSecurityHeaders', { missingHeaders });
-        }
-    }
-
-    private handleSecurityError(error: any): void {
-        const securityErrors = {
-            401: 'Unauthorized',
-            403: 'Forbidden',
-            419: 'CSRF Token Mismatch',
-            440: 'Session Expired'
-        };
-
-        const statusCode = error.response?.status;
-        if (statusCode && securityErrors[statusCode as keyof typeof securityErrors]) {
-            this.logSecurityEvent('SecurityError', {
-                type: securityErrors[statusCode as keyof typeof securityErrors],
-                status: statusCode,
-                url: error.config?.url
-            });
-        }
-    }
-
-    private handleSessionEnd(): void {
-        this.initializeCSRFToken();
-        this.logSecurityEvent('SessionEnd', { timestamp: Date.now() });
-    }
-
-    private injectSecurityHeaders(): void {
-        // Add meta tags for security
-        const metaTags = [
-            { httpEquiv: 'X-XSS-Protection', content: this.securityHeaders['X-XSS-Protection'] },
-            { httpEquiv: 'X-Content-Type-Options', content: this.securityHeaders['X-Content-Type-Options'] },
-            { httpEquiv: 'Content-Security-Policy', content: this.securityHeaders['Content-Security-Policy'] },
-            { name: 'referrer', content: this.securityHeaders['Referrer-Policy'] }
-        ];
-
-        metaTags.forEach(({ httpEquiv, content, name }) => {
-            const meta = document.createElement('meta');
-            if (httpEquiv) meta.httpEquiv = httpEquiv;
-            if (name) meta.name = name;
-            meta.content = content;
-            document.head.appendChild(meta);
-        });
-    }
-
-    private logSecurityEvent(eventName: string, data?: any): void {
-        this.appInsights.trackEvent({
-            name: `Security_${eventName}`,
-            properties: {
-                ...data,
-                sessionId: this.sessionManager.getSessionId(),
-                timestamp: new Date().toISOString()
-            }
-        });
-    }
-
-    // Public methods
-    public getAxiosInstance(): AxiosInstance {
-        return this.axiosInstance;
-    }
-
-    public getCSRFToken(): string {
-        const token = this.getCurrentCSRFToken();
-        return token ? token.token : '';
-    }
-
-    public validateRequest(config: AxiosRequestConfig): boolean {
-        const token = this.getCurrentCSRFToken();
-        if (!token) return false;
-
-        const headerToken = config.headers?.['X-CSRF-Token'];
-        return headerToken === token.token;
-    }
-
-    public refreshSecurityHeaders(): void {
-        this.securityHeaders = this.initializeSecurityHeaders();
-        this.injectSecurityHeaders();
-    }
+  /** No-op kept for call-site compatibility. */
+  public getSessionId(): string {
+    return SessionManager.getInstance().getSessionId();
+  }
 }
 
-export default SecurityMiddleware; 
+export default SecurityMiddleware;

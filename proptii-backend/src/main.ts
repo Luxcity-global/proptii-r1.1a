@@ -27,9 +27,6 @@ validateEnv(); // exits process with clear error if required vars are missing
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
-  // Log environment variables (excluding sensitive data)
-  logger.log(`COSMOS_DB_DATABASE_NAME: ${process.env.COSMOS_DB_DATABASE_NAME}`);
-  logger.log(`STORAGE_ACCOUNT: ${process.env.AZURE_STORAGE_ACCOUNT_NAME}`);
   logger.log(`NODE_ENV: ${process.env.NODE_ENV}`);
   logger.log(`PORT: ${process.env.PORT || 3000}`);
 
@@ -47,9 +44,6 @@ async function bootstrap() {
     // Structured log levels: quiet in production, verbose in development.
     logger: isProd ? ['warn', 'error'] : ['log', 'debug', 'verbose', 'warn', 'error'],
   });
-
-  // Apply logger level via app.useLogger as well for runtime control.
-  app.useLogger(isProd ? ['warn', 'error'] : ['log', 'debug', 'verbose', 'warn', 'error']);
 
   // Apply helmet for standard security headers
   app.use(helmet());

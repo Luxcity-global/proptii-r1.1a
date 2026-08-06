@@ -4,45 +4,36 @@ import {
   PublicClientApplication,
   EventType,
   EventMessage,
-  AuthenticationResult,
   InteractionRequiredAuthError,
-  AccountInfo
 } from '@azure/msal-browser';
 import { msalConfig, loginRequest, b2cPolicies } from '../config/authConfig';
 import SessionManager from '../services/SessionManager';
-import SecurityMiddleware from '../middleware/SecurityMiddleware';
-import SecurityPolicyService from '../services/SecurityPolicyService';
 import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
 import { getAccessTokenForApiRequest } from '../services/msalAccessToken';
 
-// Singleton pattern for MSAL instance
+// ─── MSAL singleton ──────────────────────────────────────────────────────────
+
 let msalInstance: PublicClientApplication | null = null;
-/** First API calls must await this so getAllAccounts / acquireTokenSilent work reliably */
+/** Settled once initialize() completes — awaited by axios interceptors. */
 let msalInitPromise: Promise<void> | null = null;
 
-// Initialize MSAL instance only once
-export const getMsalInstance = () => {
+export const getMsalInstance = (): PublicClientApplication => {
   if (!msalInstance) {
     msalInstance = new PublicClientApplication(msalConfig);
 
     msalInitPromise = msalInstance.initialize();
-    msalInitPromise.catch((error) => {
-      console.error('Error initializing MSAL:', error);
-    });
+    msalInitPromise.catch((err) => console.error('[MSAL] init error:', err));
 
-    // Register event callbacks for redirect handling
     msalInstance.addEventCallback((event: EventMessage) => {
-      if (event.eventType === EventType.LOGIN_SUCCESS) {
-        console.log('Login successful');
-        window.dispatchEvent(new CustomEvent('auth-state-changed'));
-      }
-      if (event.eventType === EventType.LOGOUT_SUCCESS) {
-        console.log('Logout successful');
-        window.dispatchEvent(new CustomEvent('auth-state-changed'));
-      }
-      if (event.eventType === EventType.LOGIN_FAILURE || event.eventType === EventType.ACQUIRE_TOKEN_FAILURE) {
-        console.log('Authentication failed:', event.error && 'errorMessage' in event.error ? event.error.errorMessage : event.error?.message);
+      const succeeded =
+        event.eventType === EventType.LOGIN_SUCCESS ||
+        event.eventType === EventType.LOGOUT_SUCCESS;
+      const failed =
+        event.eventType === EventType.LOGIN_FAILURE ||
+        event.eventType === EventType.ACQUIRE_TOKEN_FAILURE;
+
+      if (succeeded || failed) {
         window.dispatchEvent(new CustomEvent('auth-state-changed'));
       }
     });
@@ -50,23 +41,15 @@ export const getMsalInstance = () => {
   return msalInstance;
 };
 
-/** Wait until MSAL `initialize()` has finished (needed before acquireTokenSilent in axios). */
+/** Await MSAL initialization before making API calls that need a valid token. */
 export async function waitForMsalReady(): Promise<void> {
-  if (!msalInstance) {
-    getMsalInstance();
-  }
-  if (msalInitPromise) {
-    await msalInitPromise;
-  }
+  if (!msalInstance) getMsalInstance();
+  if (msalInitPromise) await msalInitPromise;
 }
 
-// Development mode flag - set to true to bypass authentication for development
-const DEV_MODE = false; // Set to false in production
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-// Initialize services
-const securityPolicyService = SecurityPolicyService.getInstance();
-
-interface User {
+export interface User {
   id: string;
   email: string;
   givenName?: string;
@@ -82,7 +65,6 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  /** Convenience: the user's primary role or null if not yet resolved */
   userRole: 'tenant' | 'landlord' | 'agent' | null;
   login: () => Promise<void>;
   loginAsMockUser: (id: string, role: string) => void;
@@ -91,840 +73,399 @@ interface AuthContextType {
   refreshUserData: () => Promise<void>;
 }
 
+// ─── Context ─────────────────────────────────────────────────────────────────
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+export const useAuth = (): AuthContextType => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+  return ctx;
 };
 
-// Helper function to check if popups are blocked
-const isPopupBlocked = (popup: Window | null): boolean => {
-  return popup === null || typeof popup === 'undefined' || popup.closed || popup.closed === undefined;
-};
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-// Provider component to wrap the app with
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-// Helper function to extract phone number from token claims
-const extractPhoneNumber = (claims: any): string | undefined => {
-  if (!claims) {
-    console.log('❌ No claims provided to extractPhoneNumber');
-    return undefined;
-  }
-  
-  console.log('🔍 All available claims:', Object.keys(claims));
-  console.log('🔍 All claim values:', claims);
-  
-  const possibleKeys = [
-    'extension_PhoneNumber', // Most common Azure AD B2C custom attribute name
-    'Phone Number',
+/**
+ * Extract phone number from Azure AD B2C id-token claims.
+ * Azure B2C custom attributes land as `extension_<AttributeName>`.
+ */
+function extractPhoneNumber(claims: Record<string, unknown> | undefined): string | undefined {
+  if (!claims) return undefined;
+  const keys = [
+    'extension_PhoneNumber',
     'phoneNumber',
     'phone_number',
     'mobilePhone',
-    'mobile_phone',
-    'Mobile Phone',
     'extension_phoneNumber',
     'telephone',
-    'telephoneNumber',
-    'signInNames.phoneNumber' // Alternative location
   ];
-  
-  for (const key of possibleKeys) {
-    if (claims[key]) {
-      console.log(`✅ Found phone number with key "${key}":`, claims[key]);
-      return claims[key] as string;
-    }
+  for (const key of keys) {
+    if (typeof claims[key] === 'string' && claims[key]) return claims[key] as string;
   }
-  
-  console.log('❌ No phone number found in any of the expected keys');
   return undefined;
-};
+}
 
-// Helper function to refresh user data from Azure AD B2C
-const refreshUserData = async (instance: any, accounts: any[], loginRequest: any, setUser: any, extractPhoneNumber: any) => {
+/** Derive a stable user ID from token claims (oid > sub > localAccountId). */
+function resolveUserId(account: { idTokenClaims?: Record<string, unknown>; localAccountId?: string; homeAccountId?: string }): string {
+  return (
+    (account.idTokenClaims?.oid as string) ||
+    (account.idTokenClaims?.sub as string) ||
+    account.localAccountId ||
+    account.homeAccountId ||
+    ''
+  );
+}
+
+const LANDLORD_ROLES = new Set(['landlord', 'agent']);
+const SESSION_KEYS = ['mock_token', 'auth_token', 'proptii_auth_state', 'redirectAfterLogin'];
+
+function clearSessionStorage(): void {
+  SESSION_KEYS.forEach((k) => localStorage.removeItem(k));
+  sessionStorage.removeItem('redirectAfterLogin');
+}
+
+/** Sync Firebase identity from B2C token. Non-fatal on failure. */
+async function syncFirebaseAuth(b2cToken: string): Promise<void> {
+  const base = (import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000').replace(/\/$/, '');
   try {
-    console.log('🔄 Refreshing user data from Azure AD B2C...');
-    
-    if (!accounts || accounts.length === 0) {
-      console.log('No accounts found for refresh');
-      return;
+    const res = await fetch(`${base}/api/auth/firebase-token`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${b2cToken}`, 'Content-Type': 'application/json' },
+    });
+    if (res.ok) {
+      const { firebaseToken } = await res.json();
+      if (firebaseToken) await signInWithCustomToken(auth, firebaseToken);
+    } else {
+      console.warn('[Auth] Firebase token exchange failed:', res.status, res.statusText);
+      window.dispatchEvent(
+        new CustomEvent('firebase-auth-sync-failed', { detail: { status: res.status } }),
+      );
     }
-
-    // Try to get fresh token without iframe
-    try {
-      const freshResult = await instance.acquireTokenSilent({
-        ...loginRequest,
-        account: accounts[0],
-        forceRefresh: true // Force refresh to get latest claims
-      });
-      
-      if (freshResult && freshResult.account) {
-        const phoneNumber = extractPhoneNumber(freshResult.account.idTokenClaims);
-        const stableUserId = 
-          freshResult.account.idTokenClaims?.oid || 
-          freshResult.account.idTokenClaims?.sub ||
-          freshResult.account.localAccountId || 
-          freshResult.account.homeAccountId || 
-          '';
-        
-        setUser((prev: User | null) => ({
-          ...prev,
-          id: stableUserId,
-          name: freshResult.account.name || '',
-          email: freshResult.account.username || '',
-          phone: phoneNumber,
-          roles: prev?.roles ?? [],
-          roleResolved: prev?.roleResolved ?? false,
-        }));
-
-        console.log('✅ User data refreshed successfully with phone:', phoneNumber);
-        
-        // Dispatch auth state change event
-        window.dispatchEvent(new CustomEvent('auth-state-changed', {
-          detail: {
-            success: true,
-            userId: stableUserId
-          }
-        }));
-      }
-    } catch (silentError) {
-      console.log('Silent token acquisition failed, trying popup approach:', silentError);
-      
-      // Fallback to popup if silent fails
-      try {
-        const popupResult = await instance.acquireTokenPopup({
-          ...loginRequest,
-          account: accounts[0]
-        });
-        
-        if (popupResult && popupResult.account) {
-          const phoneNumber = extractPhoneNumber(popupResult.account.idTokenClaims);
-          const stableUserId = 
-            popupResult.account.idTokenClaims?.oid || 
-            popupResult.account.idTokenClaims?.sub ||
-            popupResult.account.localAccountId || 
-            popupResult.account.homeAccountId || 
-            '';
-          
-          setUser((prev: User | null) => ({
-            ...prev,
-            id: stableUserId,
-            name: popupResult.account.name || '',
-            email: popupResult.account.username || '',
-            phone: phoneNumber,
-            roles: prev?.roles ?? [],
-            roleResolved: prev?.roleResolved ?? false,
-          }));
-
-          console.log('✅ User data refreshed via popup with phone:', phoneNumber);
-          
-          // Dispatch auth state change event
-          window.dispatchEvent(new CustomEvent('auth-state-changed', {
-            detail: {
-              success: true,
-              userId: stableUserId
-            }
-          }));
-        }
-      } catch (popupError) {
-        console.error('❌ Both silent and popup token acquisition failed:', popupError);
-        throw popupError;
-      }
-    }
-  } catch (error) {
-    console.error('❌ Error refreshing user data:', error);
-    throw error;
+  } catch (err) {
+    console.error('[Auth] Firebase sync error:', err);
+    window.dispatchEvent(
+      new CustomEvent('firebase-auth-sync-failed', {
+        detail: { message: err instanceof Error ? err.message : 'Unknown' },
+      }),
+    );
   }
-};
+}
+
+// ─── AuthProvider ─────────────────────────────────────────────────────────────
+
+interface AuthProviderProps { children: ReactNode }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const { instance, accounts, inProgress } = useMsal();
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const sessionManager = SessionManager.getInstance();
-  const securityMiddleware = SecurityMiddleware.getInstance();
+  const { instance, accounts } = useMsal();
+  const [user, setUser]                       = useState<User | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading]             = useState(true);
 
+  const sessionManager = SessionManager.getInstance();
+
+  // ── Initialise auth on mount / account change ────────────────────────────
   useEffect(() => {
-    const initializeAuth = async () => {
+    let cancelled = false;
+
+    const init = async () => {
       try {
-        // Check for mock user session first
+        // Mock user shortcut (dev toolbar)
         const mockToken = localStorage.getItem('mock_token');
-        if (mockToken && mockToken.startsWith('mock-token-')) {
-          const id = mockToken.replace('mock-token-', '');
+        if (mockToken?.startsWith('mock-token-')) {
+          const id   = mockToken.replace('mock-token-', '');
           const role = id.startsWith('tenant') ? 'tenant' : 'landlord';
-          const mockUser: User = {
-            id,
-            email: `${role}@test.proptii.co`,
-            name: `Test ${role.charAt(0).toUpperCase() + role.slice(1)}`,
-            roles: [role],
-            roleResolved: true,
-          };
-          setUser(mockUser);
-          setIsAuthenticated(true);
-          setIsLoading(false);
+          if (!cancelled) {
+            setUser({ id, email: `${role}@test.proptii.co`, name: `Test ${role}`, roles: [role], roleResolved: true });
+            setIsAuthenticated(true);
+          }
           return;
         }
-        // Handle redirect response if any
-        const redirectResponse = await instance.handleRedirectPromise();
-        if (redirectResponse?.account) {
-          instance.setActiveAccount(redirectResponse.account);
-        }
 
-        // Check if there's a redirect path in the response state
-        if (redirectResponse && redirectResponse.state) {
+        // Process any pending B2C redirect
+        const redirect = await instance.handleRedirectPromise();
+        if (redirect?.account) instance.setActiveAccount(redirect.account);
+
+        if (redirect?.state) {
           try {
-            const state = JSON.parse(redirectResponse.state);
-            if (state.redirect) {
-              console.log('🔐 Restored redirect path from state:', state.redirect);
-              sessionStorage.setItem('redirectAfterLogin', state.redirect);
-            }
-          } catch (e) {
-            // State might not be JSON, that's okay
-            console.log('State is not JSON:', redirectResponse.state);
-          }
+            const parsed = JSON.parse(redirect.state);
+            if (parsed.redirect) sessionStorage.setItem('redirectAfterLogin', parsed.redirect);
+          } catch { /* state is not JSON, ignore */ }
         }
 
-        if (accounts.length > 0) {
-          const currentAccount = accounts[0];
-          instance.setActiveAccount(currentAccount);
-          
-          // Debug: Log all available claims
-          console.log('🔍 All available token claims:', currentAccount.idTokenClaims);
-          console.log('🔍 All claim keys:', Object.keys(currentAccount.idTokenClaims || {}));
-          console.log('🔍 All account properties:', Object.keys(currentAccount));
-          console.log('🔍 Full token claims object:', JSON.stringify(currentAccount.idTokenClaims, null, 2));
-          
-          // Try to find phone number in ALL possible locations
-          const claims = currentAccount.idTokenClaims || {};
-          let phoneNumber = undefined;
-          
-          console.log('🔍 Searching for phone number in claims...');
-          console.log('🔍 All available claim keys:', Object.keys(claims));
-          
-          // Try exact match for each possible key
-          // Azure AD B2C custom attributes are typically named like: extension_PhoneNumber
-          const possibleKeys = [
-            'extension_PhoneNumber', // Most common Azure AD B2C custom attribute name
-            'Phone Number',
-            'phoneNumber',
-            'phone_number',
-            'mobilePhone',
-            'mobile_phone',
-            'Mobile Phone',
-            'extension_phoneNumber',
-            'telephone',
-            'telephoneNumber',
-            'signInNames.phoneNumber' // Alternative location
-          ];
-          
-          for (const key of possibleKeys) {
-            if (claims[key as keyof typeof claims]) {
-              phoneNumber = claims[key as keyof typeof claims] as string;
-              console.log(`✅ Found phone number with key "${key}":`, phoneNumber);
-              break;
-            } else {
-              console.log(`❌ Key "${key}" not found in claims`);
-            }
-          }
-          
-          // If no phone number found, log all claims for debugging
-          if (!phoneNumber) {
-            console.log('❌ No phone number found in any expected keys');
-            console.log('🔍 All claims values:', claims);
-          }
-          
-          // Also check direct account properties
-          if (!phoneNumber) {
-            phoneNumber = (currentAccount as any).phoneNumber || (currentAccount as any).phone;
-          }
-          
-          console.log('📞 Final phone number:', phoneNumber);
-          
-          const stableUserId = 
-            currentAccount.idTokenClaims?.oid || 
-            currentAccount.idTokenClaims?.sub ||
-            currentAccount.localAccountId || 
-            currentAccount.homeAccountId || 
-            '';
-          
-          let resolvedRoles: string[] = [];
-          let roleResolved = false;
-          try {
-            const { resolveRole } = await import('../services/roleService');
-            const role = await resolveRole(stableUserId, currentAccount.username);
-            if (role) {
-              resolvedRoles = [role];
-              roleResolved = true;
-              // If landlord/agent and no explicit redirect set, send to landlord app
-              if ((role === 'landlord' || role === 'agent')) {
-                const currentRedirect = sessionStorage.getItem('redirectAfterLogin');
-                if (!currentRedirect || currentRedirect === '/dashboard' || currentRedirect === '/') {
-                  sessionStorage.setItem('redirectAfterLogin', '/landlord');
-                }
-              }
-            }
-          } catch (e) {
-            console.error('Error resolving role:', e);
-          }
+        if (accounts.length === 0) return;
 
-          setUser({
-            id: stableUserId,
-            givenName: currentAccount.name?.split(' ')[0],
-            familyName: currentAccount.name?.split(' ').slice(1).join(' '),
-            email: currentAccount.username,
-            name: currentAccount.name,
-            phone: phoneNumber,
-            roles: resolvedRoles,
-            roleResolved,
-          });
-          
-          setIsAuthenticated(true);
-          
-          console.log('👤 User object set with phone:', phoneNumber);
+        const account = accounts[0];
+        instance.setActiveAccount(account);
 
-          // Sync Firebase Auth with Azure AD B2C custom token exchange
-          const isMock = localStorage.getItem('mock_token');
-          if (!isMock) {
-            try {
-              const b2cToken = await getAccessTokenForApiRequest();
-              if (b2cToken) {
-                const apiEndpoint = (import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000').replace(/\/$/, '');
-                const res = await fetch(`${apiEndpoint}/api/auth/firebase-token`, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${b2cToken}`,
-                    'Content-Type': 'application/json'
-                  }
-                });
-                if (res.ok) {
-                  const data = await res.json();
-                  if (data.firebaseToken) {
-                    await signInWithCustomToken(auth, data.firebaseToken);
-                    console.log('✅ Firebase Auth custom token signed in successfully');
-                  }
-                } else {
-                  // Non-fatal in dev; fatal in prod because Firestore security rules require
-                  // a valid Firebase identity. Dispatch an event so the UI can react.
-                  console.warn('Firebase token exchange failed:', res.statusText);
-                  window.dispatchEvent(new CustomEvent('firebase-auth-sync-failed', {
-                    detail: { status: res.status, message: res.statusText }
-                  }));
-                }
-              }
-            } catch (firebaseAuthError) {
-              console.error('Failed to sync Firebase Auth:', firebaseAuthError);
-              window.dispatchEvent(new CustomEvent('firebase-auth-sync-failed', {
-                detail: { message: firebaseAuthError instanceof Error ? firebaseAuthError.message : 'Unknown error' }
-              }));
-            }
-          }
+        const userId = resolveUserId(account as any);
+        const phone  = extractPhoneNumber(account.idTokenClaims as Record<string, unknown>);
 
-          // Try silent token acquisition — failure here is non-fatal; user is already authenticated.
-          try {
-            await instance.acquireTokenSilent({
-              ...loginRequest,
-              account: currentAccount
-            });
-          } catch (silentTokenError) {
-            // InteractionRequiredAuthError means the token cache is stale/expired but the
-            // user IS still authenticated (MSAL accounts still exist). Do NOT clear auth state.
-            console.warn('Silent token refresh failed (non-fatal):', silentTokenError);
-          }
-
-          // Record session activity
-          sessionManager.updateActivity('interaction', 'Session initialized');
-        }
-      } catch (error) {
-        if (error instanceof InteractionRequiredAuthError) {
-          // Only clear auth if the core initialization (not token refresh) failed
-          setIsAuthenticated(false);
-          setUser(null);
-        }
-        console.error('Auth initialization error:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-
-    initializeAuth();
-
-    // Authentication bridge - listen for requests from landlord app
-    const handleAuthStateRequest = (event: MessageEvent) => {
-      if (event.data.type === 'REQUEST_AUTH_STATE') {
-        console.log('Tenant app received auth state request from landlord app');
-        
-        const authState = {
-          isAuthenticated,
-          user,
-          isLoading
-        };
-        
-        // Send authentication state to landlord app
-        event.source?.postMessage(
-          { type: 'AUTH_STATE', payload: authState },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          '*' as any,
-        );
-        
-        // Also store in localStorage for direct access
-        localStorage.setItem('proptii_auth_state', JSON.stringify(authState));
-      }
-    };
-
-    // Listen for authentication state requests
-    window.addEventListener('message', handleAuthStateRequest);
-
-    // Listen for session timeout
-    const handleSessionTimeout = () => {
-      logout();
-    };
-    window.addEventListener('session_timeout', handleSessionTimeout);
-
-    // Listen for account lockout
-    const handleAccountLockout = () => {
-      logout();
-      // Show lockout notification to user
-      // You would need to implement this UI component
-    };
-    window.addEventListener('account-locked', handleAccountLockout);
-
-    // Listen for password reuse attempts
-    const handlePasswordReuseAttempt = () => {
-      // Show password reuse error to user
-      // You would need to implement this UI component
-    };
-    window.addEventListener('password-reuse-attempt', handlePasswordReuseAttempt);
-
-    return () => {
-      window.removeEventListener('session_timeout', handleSessionTimeout);
-      window.removeEventListener('account-locked', handleAccountLockout);
-      window.removeEventListener('password-reuse-attempt', handlePasswordReuseAttempt);
-      window.removeEventListener('message', handleAuthStateRequest);
-    };
-  }, [instance, accounts]);
-
-  // Broadcast authentication state changes to landlord app
-  useEffect(() => {
-    const authState = {
-      isAuthenticated,
-      user,
-      isLoading
-    };
-
-    // Store in localStorage for landlord app access
-    localStorage.setItem('proptii_auth_state', JSON.stringify(authState));
-
-    // Broadcast to any listening landlord apps
-    window.dispatchEvent(new CustomEvent('authStateChanged', {
-      detail: authState
-    }));
-
-    console.log('Authentication state updated:', authState);
-  }, [isAuthenticated, user, isLoading]);
-
-  // Trigger auto-merge on successful login
-  useEffect(() => {
-    if (isAuthenticated && user?.email) {
-      console.log('🔄 User logged in. Checking for ghost accounts to auto-merge for:', user.email);
-      import('../services/quickRequestService')
-        .then((module) => {
-          const service = module.default;
-          service.autoMerge(user.email)
-            .then((result) => {
-              if (result.success && result.migratedCount > 0) {
-                console.log(`✅ Auto-merged ${result.migratedCount} guest conversations!`);
-              }
-            })
-            .catch((err) => {
-              console.error('Error during automatic guest merge:', err);
-            });
-        })
-        .catch((err) => {
-          console.error('Failed to load quickRequestService for autoMerge:', err);
-        });
-    }
-  }, [isAuthenticated, user?.email]);
-
-  const login = async (): Promise<void> => {
-    try {
-      setIsLoading(true);
-
-      // Get the intended redirect path from sessionStorage
-      const redirectPath = sessionStorage.getItem('redirectAfterLogin');
-      console.log('🔐 Login starting with redirect path:', redirectPath);
-
-      // Create login request with state to preserve redirect
-      const loginRequestWithState = {
-        ...loginRequest,
-        // Store redirect path in state to survive the auth flow
-        state: redirectPath ? JSON.stringify({ redirect: redirectPath }) : undefined
-      };
-
-      // Try popup login first
-      const result = await instance.loginPopup(loginRequestWithState);
-
-      if (result?.account) {
-        instance.setActiveAccount(result.account);
-      }
-
-      if (result) {
-        // Extract stable userId from token claims (oid or sub)
-        // These are consistent across browsers/sessions, unlike localAccountId
-        const stableUserId = 
-          result.account?.idTokenClaims?.oid || 
-          result.account?.idTokenClaims?.sub ||
-          result.account?.localAccountId || 
-          result.account?.homeAccountId || 
-          '';
-        
-        // Dispatch auth state change event with success status
-        window.dispatchEvent(new CustomEvent('auth-state-changed', {
-          detail: {
-            success: true,
-            userId: stableUserId
-          }
-        }));
-
-        setIsAuthenticated(true);
-        
-        // Debug: Log all available claims
-        console.log('🔍 Login - All available token claims:', result.account?.idTokenClaims);
-        console.log('🔍 Login - All account properties:', Object.keys(result.account || {}));
-        console.log('🔑 Login - Using stable userId (oid/sub):', stableUserId);
-        
-        // Try multiple possible phone number claim names
-        const phoneNumber = 
-          result.account?.idTokenClaims?.['Phone Number'] ||
-          result.account?.idTokenClaims?.['phoneNumber'] ||
-          result.account?.idTokenClaims?.extension_PhoneNumber ||
-          result.account?.idTokenClaims?.phone_number ||
-          result.account?.idTokenClaims?.mobilePhone ||
-          result.account?.idTokenClaims?.phoneNumber ||
-          (result.account as any)?.phoneNumber ||
-          (result.account as any)?.phone;
-        
-        console.log('📞 Login - Phone number found:', phoneNumber);
-        
-        let resolvedRoles: string[] = [];
-        let roleResolved = false;
+        // Resolve role from Firestore/backend
+        let roles: string[]    = [];
+        let roleResolved        = false;
         try {
           const { resolveRole } = await import('../services/roleService');
-          const emailToCheck = result.account?.username || '';
-          const role = await resolveRole(stableUserId, emailToCheck);
+          const role = await resolveRole(userId, account.username);
           if (role) {
-            resolvedRoles = [role];
+            roles        = [role];
             roleResolved = true;
-            if (role === 'landlord' || role === 'agent') {
-              const currentRedirect = sessionStorage.getItem('redirectAfterLogin');
-              if (!currentRedirect || currentRedirect === '/dashboard' || currentRedirect === '/') {
+            if (LANDLORD_ROLES.has(role)) {
+              const redir = sessionStorage.getItem('redirectAfterLogin');
+              if (!redir || redir === '/dashboard' || redir === '/') {
                 sessionStorage.setItem('redirectAfterLogin', '/landlord');
               }
             }
           }
-        } catch (e) {
-          console.error('Error resolving role during login:', e);
+        } catch (err) {
+          console.error('[Auth] Role resolution failed:', err);
         }
 
-        setUser({
-          id: stableUserId,
-          email: result.account?.username || '',
-          name: result.account?.name,
-          givenName: result.account?.name?.split(' ')[0],
-          familyName: result.account?.name?.split(' ').slice(1).join(' '),
-          phone: phoneNumber,
-          roles: resolvedRoles,
-          roleResolved,
+        if (!cancelled) {
+          setUser({
+            id: userId,
+            givenName:  account.name?.split(' ')[0],
+            familyName: account.name?.split(' ').slice(1).join(' '),
+            email: account.username,
+            name:  account.name,
+            phone,
+            roles,
+            roleResolved,
+          });
+          setIsAuthenticated(true);
+        }
+
+        // Firebase sync (non-blocking)
+        const b2cToken = await getAccessTokenForApiRequest().catch(() => null);
+        if (b2cToken) syncFirebaseAuth(b2cToken);
+
+        // Silent token refresh (non-fatal)
+        instance.acquireTokenSilent({ ...loginRequest, account }).catch((err) => {
+          if (!(err instanceof InteractionRequiredAuthError)) {
+            console.warn('[Auth] Silent token refresh failed:', err);
+          }
         });
-        
-        console.log('👤 Login - User object set:', { id: stableUserId, email: result.account?.username, phone: phoneNumber });
 
-        // Record login activity
-        sessionManager.updateActivity('interaction', 'User login');
-      }
-    } catch (error: any) {
-      console.error('Login error:', error);
-
-      // Dispatch auth state change event with failure status
-      const fallbackUserId = 
-        accounts[0]?.idTokenClaims?.oid || 
-        accounts[0]?.idTokenClaims?.sub ||
-        accounts[0]?.localAccountId || 
-        accounts[0]?.homeAccountId;
-      
-      window.dispatchEvent(new CustomEvent('auth-state-changed', {
-        detail: {
-          success: false,
-          userId: fallbackUserId
+        sessionManager.updateActivity('authentication', 'Session initialized');
+      } catch (err) {
+        if (err instanceof InteractionRequiredAuthError) {
+          if (!cancelled) { setIsAuthenticated(false); setUser(null); }
         }
-      }));
+        console.error('[Auth] Initialization error:', err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
 
-      // Get the intended redirect path from sessionStorage
-      const redirectPath = sessionStorage.getItem('redirectAfterLogin');
-      console.log('🔐 Login popup failed, using redirect flow with path:', redirectPath);
+    init();
 
-      // Create login request with state to preserve redirect
-      const loginRequestWithState = {
-        ...loginRequest,
-        // Store redirect path in state to survive the auth flow
-        state: redirectPath ? JSON.stringify({ redirect: redirectPath }) : undefined,
-        // Ensure redirect fallback returns user to the current page context.
-        redirectStartPage: window.location.href
-      };
+    // Cross-iframe auth bridge for the landlord sub-app
+    const onAuthRequest = (event: MessageEvent) => {
+      if (event.data?.type !== 'REQUEST_AUTH_STATE') return;
+      const origin = event.origin;
+      // Only respond to same-origin or known Render origins
+      if (origin !== window.location.origin && !origin.endsWith('.onrender.com')) return;
 
-      // Try redirect login as fallback - this is more reliable for Azure B2C signup
-      await instance.loginRedirect(loginRequestWithState);
+      event.source?.postMessage(
+        { type: 'AUTH_STATE', payload: { isAuthenticated, user, isLoading } },
+        { targetOrigin: origin } as WindowPostMessageOptions,
+      );
+    };
+
+    const onSessionTimeout = () => logout();
+    const onAccountLocked  = () => logout();
+
+    window.addEventListener('message', onAuthRequest);
+    window.addEventListener('session_timeout', onSessionTimeout);
+    window.addEventListener('account-locked', onAccountLocked);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('message', onAuthRequest);
+      window.removeEventListener('session_timeout', onSessionTimeout);
+      window.removeEventListener('account-locked', onAccountLocked);
+    };
+  }, [instance, accounts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync auth state to localStorage for the landlord iframe (read-only snapshot)
+  useEffect(() => {
+    if (!isLoading) {
+      localStorage.setItem(
+        'proptii_auth_state',
+        JSON.stringify({ isAuthenticated, userId: user?.id ?? null }),
+      );
+    }
+  }, [isAuthenticated, user?.id, isLoading]);
+
+  // Auto-merge guest conversations on login
+  useEffect(() => {
+    if (!isAuthenticated || !user?.email) return;
+    import('../services/quickRequestService')
+      .then((m) => m.default.autoMerge(user.email))
+      .catch((err) => console.error('[Auth] Auto-merge error:', err));
+  }, [isAuthenticated, user?.email]);
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+
+  const login = async (): Promise<void> => {
+    setIsLoading(true);
+    const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+    const req = {
+      ...loginRequest,
+      state: redirectPath ? JSON.stringify({ redirect: redirectPath }) : undefined,
+    };
+
+    try {
+      const result = await instance.loginPopup(req);
+      if (result?.account) instance.setActiveAccount(result.account);
+
+      const userId = resolveUserId(result.account as any);
+      window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { success: true, userId } }));
+      setIsAuthenticated(true);
+
+      const phone = extractPhoneNumber(result.account?.idTokenClaims as Record<string, unknown>);
+
+      let roles: string[] = [];
+      let roleResolved = false;
+      try {
+        const { resolveRole } = await import('../services/roleService');
+        const role = await resolveRole(userId, result.account?.username ?? '');
+        if (role) {
+          roles = [role];
+          roleResolved = true;
+          if (LANDLORD_ROLES.has(role)) {
+            const redir = sessionStorage.getItem('redirectAfterLogin');
+            if (!redir || redir === '/dashboard' || redir === '/') {
+              sessionStorage.setItem('redirectAfterLogin', '/landlord');
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Auth] Role resolution on login failed:', err);
+      }
+
+      setUser({
+        id: userId,
+        email:      result.account?.username ?? '',
+        name:       result.account?.name,
+        givenName:  result.account?.name?.split(' ')[0],
+        familyName: result.account?.name?.split(' ').slice(1).join(' '),
+        phone,
+        roles,
+        roleResolved,
+      });
+
+      sessionManager.updateActivity('interaction', 'User login');
+    } catch (err) {
+      console.error('[Auth] Login popup failed, falling back to redirect:', err);
+      window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { success: false } }));
+      await instance.loginRedirect({ ...req, redirectStartPage: window.location.href });
     } finally {
       setIsLoading(false);
     }
   };
 
   const logout = async (): Promise<void> => {
-    try {
-      setIsLoading(true);
-      // Record logout activity before clearing session
-      sessionManager.updateActivity('interaction', 'User logout');
+    setIsLoading(true);
+    sessionManager.updateActivity('interaction', 'User logout');
 
-      // Clear mock token first
-      localStorage.removeItem('mock_token');
-
-      // If it's a mock user, just clear state
-      if (user?.id.startsWith('tenant-test-') || user?.id.startsWith('landlord-test-')) {
-        setIsAuthenticated(false);
-        setUser(null);
-        ['mock_token', 'auth_token', 'proptii_auth_state', 'redirectAfterLogin'].forEach(
-          k => localStorage.removeItem(k)
-        );
-        sessionStorage.removeItem('redirectAfterLogin');
-        return;
-      }
-
-      await instance.logoutPopup({
-        postLogoutRedirectUri: window.location.origin
-      });
-
+    // Mock user logout
+    if (user?.id.startsWith('tenant-test-') || user?.id.startsWith('landlord-test-')) {
       setIsAuthenticated(false);
       setUser(null);
+      clearSessionStorage();
+      setIsLoading(false);
+      return;
+    }
 
-      // Clear session keys surgically
-      ['mock_token', 'auth_token', 'proptii_auth_state', 'redirectAfterLogin'].forEach(
-        k => localStorage.removeItem(k)
-      );
-      sessionStorage.removeItem('redirectAfterLogin');
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Try redirect logout as fallback
-      await instance.logoutRedirect({
-        postLogoutRedirectUri: window.location.origin
-      });
+    try {
+      await instance.logoutPopup({ postLogoutRedirectUri: window.location.origin });
+    } catch {
+      await instance.logoutRedirect({ postLogoutRedirectUri: window.location.origin });
     } finally {
+      setIsAuthenticated(false);
+      setUser(null);
+      clearSessionStorage();
       setIsLoading(false);
     }
   };
 
-
-  const loginAsMockUser = (id: string, role: string) => {
-    console.log(`🧪 Logging in as mock ${role}: ${id}`);
-    
-    let name = `Test ${role.charAt(0).toUpperCase() + role.slice(1)}`;
-    let email = `${role}@test.proptii.co`;
-    let givenName = `Test`;
-    let familyName = `${role.charAt(0).toUpperCase() + role.slice(1)}`;
-
-    if (id === 'tenant-test-001') {
-      name = 'Sarah Jones';
-      givenName = 'Sarah';
-      familyName = 'Jones';
-      email = 'tenant@test.proptii.co';
-    } else if (id === 'tenant-test-002') {
-      name = 'Emily Davis';
-      givenName = 'Emily';
-      familyName = 'Davis';
-      email = 'tenant-two@test.proptii.co';
-    } else if (id === 'landlord-test-001') {
-      name = 'John Smith';
-      givenName = 'John';
-      familyName = 'Smith';
-      email = 'landlord@test.proptii.co';
-    } else if (id === 'landlord-test-002') {
-      name = 'Jack Smith';
-      givenName = 'Jack';
-      familyName = 'Smith';
-      email = 'landlord-two@test.proptii.co';
-    }
-
-    const mockUser: User = {
-      id,
-      email,
-      name,
-      givenName,
-      familyName,
-      roles: [role],
-      roleResolved: true, // Mock users always have a known role
+  const loginAsMockUser = (id: string, role: string): void => {
+    const names: Record<string, { name: string; givenName: string; familyName: string; email: string }> = {
+      'tenant-test-001':   { name: 'Sarah Jones',  givenName: 'Sarah',  familyName: 'Jones',  email: 'tenant@test.proptii.co' },
+      'tenant-test-002':   { name: 'Emily Davis',  givenName: 'Emily',  familyName: 'Davis',  email: 'tenant-two@test.proptii.co' },
+      'landlord-test-001': { name: 'John Smith',   givenName: 'John',   familyName: 'Smith',  email: 'landlord@test.proptii.co' },
+      'landlord-test-002': { name: 'Jack Smith',   givenName: 'Jack',   familyName: 'Smith',  email: 'landlord-two@test.proptii.co' },
     };
-    
-    // Store mock token in localStorage so axios can use it
+    const defaults = { name: `Test ${role}`, givenName: 'Test', familyName: role, email: `${role}@test.proptii.co` };
+    const info = names[id] ?? defaults;
+
     localStorage.setItem('mock_token', `mock-token-${id}`);
-    
-    setUser(mockUser);
+    setUser({ id, ...info, roles: [role], roleResolved: true });
     setIsAuthenticated(true);
     setIsLoading(false);
   };
 
   const editProfile = async (): Promise<void> => {
+    setIsLoading(true);
+    sessionManager.updateActivity('interaction', 'Profile edit');
+
     try {
-      setIsLoading(true);
-      console.log('🔄 Starting profile edit...');
-      console.log('🔄 MSAL instance:', instance);
-      console.log('🔄 Current accounts:', accounts);
-      
-      // Record profile edit activity
-      sessionManager.updateActivity('interaction', 'Profile edit');
+      const result = await instance.loginPopup({
+        scopes: loginRequest.scopes,
+        authority: `https://proptii.b2clogin.com/proptii.onmicrosoft.com/${b2cPolicies.editProfile}`,
+        prompt: 'login',
+      });
 
-      // Try MSAL's built-in profile editing first
-      try {
-        console.log('🔄 Attempting MSAL profile edit with profile editing authority...');
-        
-        const result = await instance.loginPopup({
-          scopes: loginRequest.scopes,
-          authority: `https://proptii.b2clogin.com/proptii.onmicrosoft.com/b2c_1_profileediting`,
-          prompt: 'login',
-          extraQueryParameters: {
-            'ui_locales': 'en'
-          }
-        });
-        
-        console.log('✅ MSAL profile edit completed:', result);
-        
-        // Update user data immediately
-        if (result && result.account) {
-          const phoneNumber = extractPhoneNumber(result.account.idTokenClaims);
-          const stableUserId = 
-            result.account.idTokenClaims?.oid || 
-            result.account.idTokenClaims?.sub ||
-            result.account.localAccountId || 
-            result.account.homeAccountId || 
-            '';
-          
-          setUser((prev) => ({
-            ...prev,
-            id: stableUserId,
-            name: result.account.name || '',
-            email: result.account.username || '',
-            phone: phoneNumber,
-            roles: prev?.roles ?? [],
-            roleResolved: prev?.roleResolved ?? false,
-          }));
-
-          console.log('✅ Profile updated successfully with phone:', phoneNumber);
-          
-          // Dispatch auth state change event
-          window.dispatchEvent(new CustomEvent('auth-state-changed', {
-            detail: {
-              success: true,
-              userId: stableUserId
-            }
-          }));
-        }
-        
-        return; // Success, exit early
-        
-      } catch (msalError) {
-        console.log('MSAL profile edit failed, trying fallback approach:', msalError);
-        
-        // Fallback: Open Azure AD B2C profile editing page in new window
-        const profileEditUrl = `https://proptii.b2clogin.com/proptii.onmicrosoft.com/oauth2/v2.0/authorize?p=b2c_1_profileediting&client_id=532e1fa0-18a6-4356-bd78-1f62bd6d5e2f&nonce=defaultNonce&redirect_uri=${encodeURIComponent(window.location.origin)}&scope=openid&response_type=id_token&prompt=login`;
-        
-        console.log('🔄 Opening profile edit URL in new window:', profileEditUrl);
-        
-        const profileWindow = window.open(profileEditUrl, '_blank', 'width=600,height=700,scrollbars=yes,resizable=yes');
-        
-        if (!profileWindow) {
-          throw new Error('Popup blocked. Please allow popups for this site.');
-        }
-
-        // Monitor the popup window
-        const checkClosed = setInterval(() => {
-          if (profileWindow.closed) {
-            clearInterval(checkClosed);
-            console.log('Profile edit window closed');
-            
-            // Refresh user data after profile edit
-            setTimeout(async () => {
-              try {
-                console.log('🔄 Refreshing user data after profile edit...');
-                
-                // Force refresh the user data by re-acquiring tokens
-                await refreshUserData(instance, accounts, loginRequest, setUser, extractPhoneNumber);
-                
-              } catch (refreshError) {
-                console.error('❌ Error refreshing user data:', refreshError);
-              }
-            }, 1000);
-          }
-        }, 1000);
-
-        // Also add a focus event listener to refresh when user returns to the main window
-        const handleWindowFocus = async () => {
-          console.log('🔄 Window focused - checking for profile updates...');
-          try {
-            await refreshUserData(instance, accounts, loginRequest, setUser, extractPhoneNumber);
-          } catch (error) {
-            console.error('❌ Error refreshing user data on focus:', error);
-          }
-        };
-
-        window.addEventListener('focus', handleWindowFocus);
-        
-        // Clean up the event listener when the profile window closes
-        const originalCheckClosed = checkClosed;
-        const checkClosedWithCleanup = setInterval(() => {
-          if (profileWindow.closed) {
-            clearInterval(checkClosedWithCleanup);
-            window.removeEventListener('focus', handleWindowFocus);
-            console.log('Profile edit window closed');
-            
-            // Refresh user data after profile edit
-            setTimeout(async () => {
-              try {
-                console.log('🔄 Refreshing user data after profile edit...');
-                await refreshUserData(instance, accounts, loginRequest, setUser, extractPhoneNumber);
-              } catch (refreshError) {
-                console.error('❌ Error refreshing user data:', refreshError);
-              }
-            }, 1000);
-          }
-        }, 1000);
+      if (result?.account) {
+        const stableUserId = resolveUserId(result.account as any);
+        const phone = extractPhoneNumber(result.account.idTokenClaims as Record<string, unknown>);
+        setUser((prev) =>
+          prev
+            ? { ...prev, id: stableUserId, name: result.account.name ?? '', email: result.account.username, phone }
+            : prev,
+        );
+        window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { success: true, userId: stableUserId } }));
       }
+    } catch (msalErr) {
+      // Fallback: open policy URL in new window and refresh when it closes
+      console.warn('[Auth] Profile edit popup failed, opening window:', msalErr);
+      const url = `https://proptii.b2clogin.com/proptii.onmicrosoft.com/oauth2/v2.0/authorize`
+        + `?p=b2c_1_profileediting`
+        + `&client_id=${msalConfig.auth.clientId}`
+        + `&nonce=defaultNonce`
+        + `&redirect_uri=${encodeURIComponent(window.location.origin)}`
+        + `&scope=openid&response_type=id_token&prompt=login`;
 
-    } catch (error: any) {
-      console.error('❌ Profile edit error:', error);
-      
-      // Handle specific error cases
-      if (error.message.includes('Popup blocked')) {
-        alert('Popup was blocked. Please allow popups for this site and try again.');
-      } else {
-        alert('Failed to edit profile. Please try again.');
-      }
+      const win = window.open(url, '_blank', 'width=600,height=700');
+      if (!win) { alert('Popup blocked — please allow popups for this site.'); return; }
+
+      const poll = setInterval(async () => {
+        if (!win.closed) return;
+        clearInterval(poll);
+        // Quietly attempt a silent refresh to pick up updated claims
+        const account = accounts[0];
+        if (!account) return;
+        try {
+          await instance.acquireTokenSilent({ ...loginRequest, account, forceRefresh: true });
+        } catch { /* non-fatal */ }
+      }, 800);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Create a refresh function that can be called manually
-  const manualRefreshUserData = async () => {
+  const refreshUserData = async (): Promise<void> => {
+    const account = accounts[0];
+    if (!account) return;
     try {
-      console.log('🔄 Manual refresh triggered...');
-      await refreshUserData(instance, accounts, loginRequest, setUser, extractPhoneNumber);
-    } catch (error) {
-      console.error('❌ Manual refresh failed:', error);
+      await instance.acquireTokenSilent({ ...loginRequest, account, forceRefresh: true });
+    } catch (silentErr) {
+      try {
+        await instance.acquireTokenPopup({ ...loginRequest, account });
+      } catch (err) {
+        console.error('[Auth] refreshUserData failed:', err);
+        throw err;
+      }
     }
   };
 
@@ -932,34 +473,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated,
-        isLoading,
-        userRole,
-        login,
-        loginAsMockUser,
-        logout,
-        editProfile,
-        refreshUserData: manualRefreshUserData
-      }}
+      value={{ user, isAuthenticated, isLoading, userRole, login, loginAsMockUser, logout, editProfile, refreshUserData }}
     >
       {children}
     </AuthContext.Provider>
   );
 };
 
-// MSAL Provider wrapper component
-interface MSALProviderWrapperProps {
-  children: ReactNode;
-}
+// ─── MSALProviderWrapper ──────────────────────────────────────────────────────
 
-export const MSALProviderWrapper: React.FC<MSALProviderWrapperProps> = ({ children }) => {
-  return (
-    <MsalProvider instance={getMsalInstance()}>
-      <AuthProvider>{children}</AuthProvider>
-    </MsalProvider>
-  );
-};
+export const MSALProviderWrapper: React.FC<{ children: ReactNode }> = ({ children }) => (
+  <MsalProvider instance={getMsalInstance()}>
+    <AuthProvider>{children}</AuthProvider>
+  </MsalProvider>
+);
 
 export default AuthContext;

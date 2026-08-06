@@ -21,6 +21,7 @@ import { AuthModule } from './modules/auth.module';
 import { HealthModule } from './health/health.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
+import { KeepAliveService } from './services/keep-alive.service';
 import { GuestEnquiryModule } from './modules/guest-enquiry.module';
 import { NativePropertiesModule } from './modules/native-properties.module';
 
@@ -76,6 +77,8 @@ import { NativePropertiesModule } from './modules/native-properties.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    // Keep Render free-tier services warm — pings backend + search every 14 min.
+    KeepAliveService,
   ],
 })
 export class AppModule implements NestModule {

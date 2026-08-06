@@ -62,13 +62,15 @@ export const useSearchBackend = () => {
     }
   };
 
-  // Load cached results on mount
+  // Load cached results on mount — expire after 10 minutes
   useEffect(() => {
+    const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
     const cachedData = sessionStorage.getItem('searchResults');
     if (cachedData) {
       try {
         const parsed = JSON.parse(cachedData);
-        if (parsed.results && parsed.results.length > 0) {
+        const age = Date.now() - (parsed.timestamp ?? 0);
+        if (parsed.results && parsed.results.length > 0 && age < CACHE_TTL_MS) {
           // Clean the pricing for cached results as well
           const cleanedCachedResults = parsed.results.map((property: Property) => ({
             ...property,
@@ -80,6 +82,7 @@ export const useSearchBackend = () => {
           setQuery(parsed.query || '');
           setSearchType(parsed.searchType || 'onthemarket');
         } else {
+          // Cache expired or empty — clear it
           sessionStorage.removeItem('searchResults');
         }
       } catch (error) {
@@ -106,21 +109,37 @@ export const useSearchBackend = () => {
 
     try {
       // 1. Parallel native (Proptii-hosted) property search via API
+      // Tries /api/properties/search first (AppController alias), then
+      // /api/native-properties/search (direct controller route) as fallback.
       const nativeApiPromise = (async (): Promise<Property[]> => {
-        try {
-          const res = await fetch(
-            `${getResolvedApiBaseUrl().replace(/\/api$/, '')}/api/properties/search?q=${encodeURIComponent(searchQuery)}&limit=50`,
-            { signal: AbortSignal.timeout(15000) }
-          );
+        const apiBase = getResolvedApiBaseUrl().replace(/\/api$/, '');
+        const primaryUrl = `${apiBase}/api/properties/search?q=${encodeURIComponent(searchQuery)}&limit=50`;
+        const fallbackUrl = `${apiBase}/api/native-properties/search?q=${encodeURIComponent(searchQuery)}&limit=50`;
+
+        const tryFetch = async (url: string): Promise<Property[]> => {
+          const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
           if (!res.ok) return [];
           const data = await res.json();
           return ((data.results ?? []) as any[]).map(p => ({
             ...p,
+            source: p.source ?? 'native',
             price: cleanPropertyPrice(p.price ?? ''),
           }));
+        };
+
+        try {
+          const primaryResults = await tryFetch(primaryUrl);
+          if (primaryResults.length > 0) return primaryResults;
+          // Primary returned empty — try the direct route
+          return await tryFetch(fallbackUrl);
         } catch (e) {
-          console.warn('[Search] Native API search failed:', e);
-          return [];
+          console.warn('[Search] Primary native search failed, trying fallback:', e);
+          try {
+            return await tryFetch(fallbackUrl);
+          } catch (e2) {
+            console.warn('[Search] Native API search failed on both routes:', e2);
+            return [];
+          }
         }
       })();
 
