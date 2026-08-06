@@ -133,7 +133,6 @@ class ApiService {
 
       // Handle authentication errors
       if (error.response.status === 401) {
-        localStorage.removeItem('auth_token');
         if (
           /missing or invalid bearer token/i.test(apiError.message) ||
           apiError.message === 'Unauthorized'

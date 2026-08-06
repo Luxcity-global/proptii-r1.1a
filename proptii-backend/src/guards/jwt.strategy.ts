@@ -103,7 +103,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       algorithms: ['RS256'],
     });
 
-    if (!isJestTestEnv && jwksUri?.startsWith('http') && clientId && process.env.NODE_ENV !== 'production') {
+    if (!isJestTestEnv && jwksUri?.startsWith('http') && clientId) {
       const log = new Logger('JwtStrategy');
       log.log(
         `JWT validation enabled — authority ends with …${authority.length > 48 ? authority.slice(-48) : authority}; audience clientId prefix ${clientId.slice(0, 8)}… (must match SPA VITE_AZURE_AD_CLIENT_ID)`,
