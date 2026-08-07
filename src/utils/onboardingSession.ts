@@ -1,6 +1,8 @@
 /**
  * Onboarding (demo) session utilities.
  * Stores anonymous session in sessionStorage for value-first onboarding.
+ * Completion / skip is stored in localStorage so the mascot flow does not
+ * reappear after the user dismisses or finishes it (across visits).
  */
 
 const KEY_PREFIX = 'onboarding_';
@@ -16,6 +18,11 @@ export type OnboardingUserGroup = 'tenant' | 'landlord' | 'agent' | 'homeowner';
 function getSessionStorage(): Storage | null {
   if (typeof window === 'undefined') return null;
   return window.sessionStorage;
+}
+
+function getLocalStorage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage;
 }
 
 /**
@@ -102,23 +109,38 @@ export function isGuideDismissed(): boolean {
 }
 
 /**
- * Mark onboarding flow (Discovery + Profiling) as completed so we don't show it again this session.
+ * Mark onboarding flow (Discovery + Profiling) as completed or skipped so we
+ * don't show it again on later visits. Persisted in localStorage.
  */
 export function setOnboardingCompleted(): void {
-  getSessionStorage()?.setItem(ONBOARDING_COMPLETED_KEY, '1');
+  getLocalStorage()?.setItem(ONBOARDING_COMPLETED_KEY, '1');
+  // Drop legacy sessionStorage flag if present from older builds
+  getSessionStorage()?.removeItem(ONBOARDING_COMPLETED_KEY);
 }
 
 /**
- * True if user has already completed the homepage onboarding flow (Discovery + Profiling).
+ * True if user has already completed or skipped the homepage onboarding flow
+ * (Discovery + Profiling). Survives tab/browser restarts.
  */
 export function hasOnboardingCompleted(): boolean {
-  return getSessionStorage()?.getItem(ONBOARDING_COMPLETED_KEY) === '1';
+  if (getLocalStorage()?.getItem(ONBOARDING_COMPLETED_KEY) === '1') {
+    return true;
+  }
+  // Migrate one-time from sessionStorage so an in-progress dismiss still sticks
+  const sessionFlag = getSessionStorage()?.getItem(ONBOARDING_COMPLETED_KEY);
+  if (sessionFlag === '1') {
+    getLocalStorage()?.setItem(ONBOARDING_COMPLETED_KEY, '1');
+    getSessionStorage()?.removeItem(ONBOARDING_COMPLETED_KEY);
+    return true;
+  }
+  return false;
 }
 
 /**
  * Clear onboarding completed flag so the onboarding flow can be shown again (for "Resume Onboarding").
  */
 export function clearOnboardingCompleted(): void {
+  getLocalStorage()?.removeItem(ONBOARDING_COMPLETED_KEY);
   getSessionStorage()?.removeItem(ONBOARDING_COMPLETED_KEY);
 }
 
@@ -143,6 +165,8 @@ export function getDiscoveryAnswer(key: string): string | null {
 
 /**
  * Clear onboarding session (e.g. after sign-up).
+ * Does not clear the completed/skipped flag — that stays in localStorage so
+ * the homepage mascot flow does not reappear after the user has dismissed it.
  */
 export function clearOnboardingSession(): void {
   const storage = getSessionStorage();
@@ -153,4 +177,5 @@ export function clearOnboardingSession(): void {
   storage.removeItem(ONBOARDING_COMPLETED_KEY);
   // Leave PENDING_PROPERTY_KEY to be consumed by migration
   // Discovery keys could be cleared here too if desired
+  // Intentionally leave localStorage ONBOARDING_COMPLETED_KEY intact
 }
