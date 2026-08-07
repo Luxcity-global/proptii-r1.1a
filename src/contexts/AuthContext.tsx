@@ -181,7 +181,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           } catch { /* state is not JSON */ }
         }
 
-        if (accounts.length === 0) return;
+        const logoutInProgress = sessionStorage.getItem('logout_in_progress');
+        if (accounts.length === 0) {
+          if (logoutInProgress) {
+            sessionStorage.removeItem('logout_in_progress');
+          }
+          return;
+        }
+
+        if (logoutInProgress === 'true') {
+          setIsAuthenticated(false);
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
 
         const account = accounts[0];
         instance.setActiveAccount(account);
@@ -316,26 +329,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async (): Promise<void> => {
     sessionManager.updateActivity('interaction', 'User logout');
 
+    // Set logout in progress to prevent init() from re-authenticating the user
+    // during the redirect round-trip.
+    sessionStorage.setItem('logout_in_progress', 'true');
+
     // Clear local state immediately — do not wait for any MSAL round-trip.
     setIsAuthenticated(false);
     setUser(null);
     clearAuthStorage();
 
     // Mock user: nothing further needed.
-    if (user?.id?.startsWith('tenant-test-') || user?.id?.startsWith('landlord-test-')) return;
+    if (user?.id?.startsWith('tenant-test-') || user?.id?.startsWith('landlord-test-')) {
+      sessionStorage.removeItem('logout_in_progress');
+      return;
+    }
 
-    // Local-only logout: clears MSAL's localStorage cache client-side without
-    // navigating to B2C's end-session endpoint. Prevents the redirect round-trip
-    // that re-renders the app while the MSAL cache still has the account, causing
-    // init() to immediately re-authenticate the user.
     try {
       const activeAccount = instance.getActiveAccount() ?? instance.getAllAccounts()[0];
       await instance.logoutRedirect({
         account: activeAccount ?? undefined,
-        onRedirectNavigate: () => false, // clear cache locally, skip B2C redirect
       });
     } catch (err) {
       console.warn('[Auth] logoutRedirect() threw (local state already cleared):', err);
+      sessionStorage.removeItem('logout_in_progress');
     }
   };
 

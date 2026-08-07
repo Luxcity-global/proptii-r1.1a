@@ -13,9 +13,5 @@ export function openInParentApp(path: string) {
 
 /** Delegate logout / profile edit to the parent app auth context. */
 export function requestAuthAction(action: 'logout' | 'editProfile') {
-  if (window.parent !== window.self) {
-    window.parent.postMessage({ type: 'AUTH_ACTION', payload: { action } }, '*');
-    return;
-  }
-  openInParentApp('/');
+  window.parent.postMessage({ type: 'AUTH_ACTION', payload: { action } }, '*');
 }
