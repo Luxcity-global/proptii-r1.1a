@@ -131,6 +131,18 @@ services:
         sync: false
 
     headers:
+      # ── COOP: same-origin-allow-popups ──────────────────────────────────────
+      # Required for MSAL popup flows (editProfile, acquireTokenPopup).
+      # "same-origin-allow-popups" lets our origin open popups to B2C while still
+      # blocking malicious cross-origin window references. Without this header,
+      # B2C's own "same-origin" COOP response nullifies window.opener on the
+      # popup's return trip, causing MSAL to throw BrowserAuthError with an empty
+      # .message — the exact crash that rendered "Something went wrong / Error".
+      # Note: login() and logout() use redirect flows (not popups), so this header
+      # is defence-in-depth for editProfile and any future popup calls.
+      - path: /*
+        name: Cross-Origin-Opener-Policy
+        value: same-origin-allow-popups
       - path: /*
         name: X-Frame-Options
         value: sameorigin

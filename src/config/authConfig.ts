@@ -1,100 +1,91 @@
 import { Configuration, BrowserCacheLocation, LogLevel } from "@azure/msal-browser";
 
-// Get environment variables with fallbacks
-const clientId = import.meta.env.VITE_AZURE_AD_CLIENT_ID || "532e1fa0-18a6-4356-bd78-1f62bd6d5e2f";
-const tenantName = import.meta.env.VITE_AZURE_AD_TENANT_NAME || "proptii.onmicrosoft.com";
-const policyName = import.meta.env.VITE_AZURE_AD_POLICY_NAME || "B2C_1_SignUpandSignInProptii";
-const redirectUri = import.meta.env.VITE_REDIRECT_URI || window.location.origin;
-const postLogoutRedirectUri = import.meta.env.VITE_POST_LOGOUT_REDIRECT_URI || window.location.origin;
+// ─── Environment variables with hardcoded fallbacks ───────────────────────────
+const clientId    = import.meta.env.VITE_AZURE_AD_CLIENT_ID   || "532e1fa0-18a6-4356-bd78-1f62bd6d5e2f";
+const tenantName  = import.meta.env.VITE_AZURE_AD_TENANT_NAME || "proptii.onmicrosoft.com";
+const policyName  = import.meta.env.VITE_AZURE_AD_POLICY_NAME || "B2C_1_SignUpandSignInProptii";
 
-// Azure AD B2C configuration
+// redirectUri: baked at build time from env, falls back to runtime origin.
+// Evaluated lazily inside a function so it's never read at module parse time
+// in non-browser environments (SSR / test workers).
+function getRedirectUri(): string {
+  return import.meta.env.VITE_REDIRECT_URI || (typeof window !== 'undefined' ? window.location.origin : '');
+}
+function getPostLogoutRedirectUri(): string {
+  return import.meta.env.VITE_POST_LOGOUT_REDIRECT_URI || (typeof window !== 'undefined' ? window.location.origin : '');
+}
+
+// ─── MSAL configuration ───────────────────────────────────────────────────────
 export const msalConfig: Configuration = {
   auth: {
-    clientId: clientId,
+    clientId,
     authority: `https://proptii.b2clogin.com/${tenantName}/${policyName}`,
     knownAuthorities: ["proptii.b2clogin.com"],
-    redirectUri: redirectUri,
-    // Prevent popup flows from re-navigating to request URL in the popup window.
-    // This avoids blank popup/modal states when the SPA router mutates the landing path.
+    redirectUri:            getRedirectUri(),
+    postLogoutRedirectUri:  getPostLogoutRedirectUri(),
+    // Do NOT re-navigate to the original URL after redirect — the SPA router
+    // handles post-login navigation via sessionStorage.redirectAfterLogin.
     navigateToLoginRequestUrl: false,
-    postLogoutRedirectUri: postLogoutRedirectUri,
   },
   cache: {
+    // localStorage so tokens survive page refreshes and redirect round-trips.
     cacheLocation: "localStorage" as BrowserCacheLocation,
+    // Cookies needed for third-party contexts (iframes, Safari ITP).
     storeAuthStateInCookie: true,
   },
   system: {
-    allowRedirectInIframe: false, // Disable iframe to avoid CSP issues
-    windowHashTimeout: 60000, // Increase timeout for popup operations to 60 seconds
-    iframeHashTimeout: 10000,
-    loadFrameTimeout: 10000,
+    // Hidden-iframe redirects are disabled: the ssoSilent iframe is removed from
+    // the token acquisition flow (see msalAccessToken.ts) because B2C sets
+    // Cross-Origin-Opener-Policy: same-origin on their auth pages, which makes
+    // iframe postMessage unreliable. allowRedirectInIframe:false prevents MSAL
+    // from trying a redirect inside iframes (e.g. the landlord sub-app).
+    allowRedirectInIframe: false,
+    // Generous timeouts — Render cold-start can be slow.
+    windowHashTimeout: 60_000,
+    iframeHashTimeout: 10_000,
+    loadFrameTimeout:  10_000,
     loggerOptions: {
+      logLevel: import.meta.env.PROD ? LogLevel.Warning : LogLevel.Verbose,
       loggerCallback: (level, message, containsPii) => {
-        if (containsPii) {
-          return;
-        }
+        if (containsPii) return;
         switch (level) {
-          case LogLevel.Error:
-            console.error(message);
-            return;
-          case LogLevel.Warning:
-            console.warn(message);
-            return;
-          case LogLevel.Info:
-            console.info(message);
-            return;
-          case LogLevel.Verbose:
-            console.debug(message);
-            return;
-          default:
-            console.log(message);
-            return;
+          case LogLevel.Error:   console.error(message); break;
+          case LogLevel.Warning: console.warn(message);  break;
+          case LogLevel.Info:    console.info(message);  break;
+          case LogLevel.Verbose: console.debug(message); break;
+          default:               console.log(message);
         }
       },
-      logLevel: LogLevel.Verbose
-    }
-  }
+    },
+  },
 };
 
-/**
- * Optional extra scopes (space- or comma-separated), e.g. an exposed API scope so the
- * access token's `aud` matches the backend `MSAL_CLIENT_ID`. Set in `.env` when B2C
- * returns tokens the Nest JWT guard rejects.
- */
-const extraScopes = (import.meta.env.VITE_AZURE_AD_EXTRA_SCOPES || "")
+// ─── Token request ────────────────────────────────────────────────────────────
+
+const extraScopes = (import.meta.env.VITE_AZURE_AD_EXTRA_SCOPES || '')
   .trim()
   .split(/[\s,]+/)
   .filter(Boolean);
 
-// Add scopes for token request
 export const loginRequest = {
-  scopes: [
-    "openid",
-    "profile",
-    "email",
-    "offline_access",
-    ...extraScopes,
-  ],
-  // Request phone number claim
-  claims: JSON.stringify({
-    id_token: {
-      extension_PhoneNumber: null // Request phone number claim
-    }
-  })
-  // Removed popup window attributes to avoid triggering popup blockers
+  scopes: ['openid', 'profile', 'email', 'offline_access', ...extraScopes],
+  // Request phone-number custom claim from B2C.
+  claims: JSON.stringify({ id_token: { extension_PhoneNumber: null } }),
 };
 
-// Authentication endpoints
+// ─── Policy names ─────────────────────────────────────────────────────────────
+
 export const b2cPolicies = {
-  signUpSignIn: import.meta.env.VITE_AZURE_AD_POLICY_NAME || "B2C_1_SignUpandSignInProptii",
-  forgotPassword: import.meta.env.VITE_AZURE_AD_RESET_PASSWORD_POLICY_NAME || "B2C_1_passwordreset",
-  editProfile: import.meta.env.VITE_AZURE_AD_EDIT_PROFILE_POLICY_NAME || "B2C_1_profileediting",
+  signUpSignIn:  import.meta.env.VITE_AZURE_AD_POLICY_NAME                    || "B2C_1_SignUpandSignInProptii",
+  forgotPassword:import.meta.env.VITE_AZURE_AD_RESET_PASSWORD_POLICY_NAME     || "B2C_1_passwordreset",
+  editProfile:   import.meta.env.VITE_AZURE_AD_EDIT_PROFILE_POLICY_NAME       || "B2C_1_profileediting",
 };
 
-// Token Validation Parameters
+// ─── Token validation (backend use) ──────────────────────────────────────────
+
 export const tokenValidationParameters = {
   validationParameters: {
-    issuer: `https://proptii.b2clogin.com/${tenantName}/v2.0/`,
+    issuer:        `https://proptii.b2clogin.com/${tenantName}/v2.0/`,
     validAudience: clientId,
-  }
-}; 
+  },
+};
