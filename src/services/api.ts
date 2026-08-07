@@ -105,10 +105,32 @@ class ApiService {
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor for handling errors
+    // Response interceptor: on 401, clear the stale cached token and retry once
+    // with a freshly acquired MSAL token before giving up.
     this.api.interceptors.response.use(
       (response) => response,
-      (error: AxiosError) => this.handleApiError(error)
+      async (error: AxiosError) => {
+        const originalRequest = error.config as InternalAxiosRequestConfig & { _retried?: boolean };
+        if (
+          error.response?.status === 401 &&
+          originalRequest &&
+          !originalRequest._retried
+        ) {
+          originalRequest._retried = true;
+          // Clear the stale token so getAccessTokenForApiRequest() skips the localStorage fallback
+          localStorage.removeItem('auth_token');
+          try {
+            const freshToken = await getAccessTokenForApiRequest();
+            if (freshToken) {
+              setBearerAuth(originalRequest, freshToken);
+              return this.api.request(originalRequest);
+            }
+          } catch {
+            // Fresh token acquisition failed — fall through to error handling
+          }
+        }
+        return this.handleApiError(error);
+      }
     );
   }
 

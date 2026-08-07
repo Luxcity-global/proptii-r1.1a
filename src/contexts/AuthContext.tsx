@@ -71,6 +71,12 @@ interface AuthContextType {
   logout: () => Promise<void>;
   editProfile: () => Promise<void>;
   refreshUserData: () => Promise<void>;
+  /**
+   * Patch the in-memory user immediately without a full re-init.
+   * Used by RoleSelect after writing a new role so the React tree sees
+   * the updated role before any navigation happens — no page reload needed.
+   */
+  patchUser: (patch: Partial<User>) => void;
 }
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -469,11 +475,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const patchUser = (patch: Partial<User>): void => {
+    setUser((prev) => (prev ? { ...prev, ...patch } : prev));
+  };
+
   const userRole = (user?.roles?.[0] as 'tenant' | 'landlord' | 'agent' | undefined) ?? null;
 
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated, isLoading, userRole, login, loginAsMockUser, logout, editProfile, refreshUserData }}
+      value={{ user, isAuthenticated, isLoading, userRole, login, loginAsMockUser, logout, editProfile, refreshUserData, patchUser }}
     >
       {children}
     </AuthContext.Provider>

@@ -1,4 +1,4 @@
-import { Controller, Post, Req, Body, UseGuards, InternalServerErrorException } from '@nestjs/common';
+import { Controller, Post, Get, Req, Body, UseGuards, InternalServerErrorException } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import * as admin from 'firebase-admin';
@@ -111,5 +111,42 @@ export class AuthController {
       };
     }
   }
-}
 
+  /**
+   * GET /api/auth/debug-token
+   * Temporarily enabled by setting DEBUG_TOKEN_ENDPOINT=true in Render environment.
+   * Shows exactly what claims the backend sees from the Bearer token.
+   * Use this to diagnose 401 failures: check aud, iss, sub, oid, role, exp.
+   * IMPORTANT: Disable (remove env var) after debugging.
+   */
+  @Get('debug-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async debugToken(@Req() req: any) {
+    if (process.env.DEBUG_TOKEN_ENDPOINT !== 'true' && process.env.NODE_ENV === 'production') {
+      return { error: 'Debug endpoint disabled. Set DEBUG_TOKEN_ENDPOINT=true in Render env to enable.' };
+    }
+    const user = req.user ?? {};
+    const nowSec = Math.floor(Date.now() / 1000);
+    return {
+      claims: {
+        sub: user.sub,
+        oid: user.oid,
+        email: user.email || user.emails?.[0] || user.preferred_username,
+        aud: user.aud,
+        iss: user.iss,
+        role: user.role,
+        exp: user.exp,
+        expHuman: user.exp ? new Date(user.exp * 1000).toISOString() : null,
+        isExpired: user.exp ? nowSec > user.exp : null,
+        secondsUntilExpiry: user.exp ? user.exp - nowSec : null,
+      },
+      backendConfig: {
+        MSAL_CLIENT_ID_prefix: process.env.MSAL_CLIENT_ID?.slice(0, 8) + '...',
+        MSAL_AUTHORITY_set: !!process.env.MSAL_AUTHORITY,
+        FIREBASE_configured: !!(process.env.FIREBASE_PROJECT_ID && (process.env.FIREBASE_CLIENT_EMAIL || process.env.FIREBASE_SERVICE_ACCOUNT_JSON)),
+        NODE_ENV: process.env.NODE_ENV,
+      },
+    };
+  }
+}

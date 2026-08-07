@@ -7,15 +7,20 @@ import type { UserRole } from '../services/roleService';
 /**
  * RoleSelect
  *
- * Shown to authenticated users whose role has not yet been resolved.
- * The user picks either "Tenant" or "Landlord/Agent" and we write the
- * choice to Firestore via RoleService before redirecting them to their
- * respective dashboard.
+ * Shown to authenticated users whose role has not yet been resolved,
+ * and to landlords/agents switching roles from DashboardSettings.
  *
- * Accessible via /select-role (added to App.tsx router).
+ * After the user picks a role:
+ *   1. Write to Firestore via setRole() (3-second timeout; falls back to
+ *      localStorage so the app still works if Firestore is unreachable).
+ *   2. Patch the in-memory AuthContext user immediately via patchUser() so
+ *      the updated role is visible to every component in the tree before we
+ *      navigate — no full page reload, no re-run of resolveRole() with stale
+ *      Firestore data, no MSAL redirect loop.
+ *   3. Use React Router navigate() (soft navigation) to reach the dashboard.
  */
 const RoleSelect: React.FC = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, patchUser } = useAuth();
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,28 +32,33 @@ const RoleSelect: React.FC = () => {
     setError(null);
 
     try {
-      // Race the Firestore write against a 3-second timeout
-      // because Firestore setDoc can hang indefinitely if offline or blocked by security rules
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Firestore write timeout')), 3000)
-      );
-      
+      // Write to Firestore (race against 3 s so we never hang indefinitely).
       await Promise.race([
         setRole(user.id, user.email, role, 'manual_select'),
-        timeoutPromise
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Firestore write timeout')), 3000),
+        ),
       ]);
     } catch (err) {
-      console.warn('⚠️ Firestore setRole failed or timed out, falling back to localStorage', err);
-      // Fallback: save to localStorage so the app still functions locally
+      // Non-fatal: persist locally so the role survives the session even if
+      // Firestore is offline or security rules block the write.
+      console.warn('[RoleSelect] setRole timed out or failed — falling back to localStorage:', err);
       localStorage.setItem(`proptii_role_${user.id}`, role);
-    } finally {
-      // Always redirect, whether Firestore succeeded or we fell back to local storage
-      if (role === 'landlord' || role === 'agent') {
-        window.location.href = '/landlord';
-      } else {
-        window.location.href = '/dashboard';
-      }
     }
+
+    // Update the in-memory user BEFORE navigating so ProtectedRoute sees
+    // the new role immediately and never redirects back to /login or /select-role.
+    patchUser({ roles: [role], roleResolved: true });
+
+    // Soft navigation — React Router keeps the app mounted; no page reload,
+    // no re-run of resolveRole(), no MSAL redirect.
+    if (role === 'landlord' || role === 'agent') {
+      navigate('/landlord', { replace: true });
+    } else {
+      navigate('/dashboard', { replace: true });
+    }
+    // Reset saving state — the component stays mounted briefly during navigation.
+    setSaving(false);
   };
 
   if (isLoading) {
