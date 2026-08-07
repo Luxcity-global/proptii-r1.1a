@@ -60,7 +60,7 @@ import KnowYourRights from './pages/tools/KnowYourRights';
 import { AuthAnalyticsBridge } from './components/analytics/AuthAnalyticsBridge';
 import ComingSoon from './pages/ComingSoon';
 
-/** Default landing: onboarding flow first. Home v2 lives at / with /home-v2 as alias. */
+/** Default landing: homepage (mascot onboarding archived; see HOMEPAGE_ONBOARDING_FLOW_ENABLED). */
 
 /** Reset window scroll on route change (SPA navigation does not scroll to top by default). */
 function ScrollToTop() {

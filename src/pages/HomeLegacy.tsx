@@ -5,7 +5,7 @@ import FAQSection from '../components/FAQSection';
 import { SearchInput } from '../components/SearchInput';
 import RefereeGuarantorResponseModal from '../components/referencing/RefereeGuarantorResponseModal';
 import { useAuth } from '../contexts/AuthContext';
-import { hasOnboardingCompleted } from '../utils/onboardingSession';
+import { hasOnboardingCompleted, HOMEPAGE_ONBOARDING_FLOW_ENABLED } from '../utils/onboardingSession';
 import { useState, useEffect } from 'react';
 
 /**
@@ -17,7 +17,9 @@ const HomeLegacy = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { isAuthenticated, login, user } = useAuth();
   const userName = user?.name ?? user?.email ?? undefined;
-  const showOnboarding = !isAuthenticated && !hasOnboardingCompleted();
+  // Archived: flip HOMEPAGE_ONBOARDING_FLOW_ENABLED to restore mascot startup
+  const showOnboarding =
+    HOMEPAGE_ONBOARDING_FLOW_ENABLED && !isAuthenticated && !hasOnboardingCompleted();
 
   const [searchInputHeight, setSearchInputHeight] = useState(50);
   const [isResponseModalOpen, setIsResponseModalOpen] = useState(false);

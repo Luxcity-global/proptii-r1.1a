@@ -7,7 +7,7 @@ import { GettingStartedHub } from '../components/getting-started';
 import RefereeGuarantorResponseModal from '../components/referencing/RefereeGuarantorResponseModal';
 import { ServicesSection } from '../components/home/ServicesSection';
 import { useAuth } from '../contexts/AuthContext';
-import { hasOnboardingCompleted } from '../utils/onboardingSession';
+import { hasOnboardingCompleted, HOMEPAGE_ONBOARDING_FLOW_ENABLED } from '../utils/onboardingSession';
 import { OnboardingFlow } from '../components/onboarding/OnboardingFlow';
 import {
   Search, Home, CalendarCheck, FileCheck, FileSignature,
@@ -72,7 +72,12 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
 
     return () => clearTimeout(timer);
   }, [typingIndex, typingText, isDeleting]);
-  const showOnboarding = !hideOnboardingModal && !isAuthenticated && !hasOnboardingCompleted();
+  // Archived: flip HOMEPAGE_ONBOARDING_FLOW_ENABLED to restore mascot startup
+  const showOnboarding =
+    HOMEPAGE_ONBOARDING_FLOW_ENABLED &&
+    !hideOnboardingModal &&
+    !isAuthenticated &&
+    !hasOnboardingCompleted();
   const searchBarRef = useRef<HTMLDivElement>(null);
 
   const [searchInputHeight, setSearchInputHeight] = useState(50);
