@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, MemoryRouter } from 'react-router-dom';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { LandlordEmptyState } from './components/LandlordEmptyState';
 import { RoleSelection } from './components/RoleSelection';
@@ -353,7 +353,6 @@ function isEmbeddedInParent(): boolean {
 
 // Main App Content Component (wrapped by Routes)
 export function AppContent() {
-  const navigate = useNavigate();
   const location = useLocation();
   const { user: hostUser, isAuthenticated: hostIsAuthenticated, isLoading: hostIsLoading } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('main-app');
@@ -386,9 +385,13 @@ export function AppContent() {
       return;
     }
 
-
-    if (location.pathname !== `/landlord${path === '/' ? '' : path}`) {
-      navigate(`/landlord${path === '/' ? '' : path}`);
+    // Update the browser URL bar without going through the React Router — the
+    // landlord app is wrapped in MemoryRouter so navigate() only updates the
+    // in-memory history, not window.location. pushState keeps the URL in sync
+    // for bookmarking / back-button without triggering a full navigation.
+    const targetUrl = `/landlord${path === '/' ? '' : path}`;
+    if (window.location.pathname !== targetUrl) {
+      window.history.pushState(null, '', targetUrl);
     }
   };
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -3456,10 +3459,25 @@ export function AppContent() {
 }
 
 // Main App Component with Routes
+//
+// IMPORTANT: This component is lazy-loaded into the main Proptii app which uses
+// createBrowserRouter (React Router data mode). Data-mode routers assign route.id
+// to every route; a plain <Routes> inside a data router does NOT get route.id set.
+// Any hook that calls useRouteId() internally (including useNavigate in RR v6.4+)
+// throws "Error" with an empty message when route.id is undefined — this is what
+// crashed the landlord dashboard with the ErrorBoundary showing "Something went wrong / Error".
+//
+// Fix: wrap in MemoryRouter so this sub-app has its own isolated router context
+// with proper route IDs, independent of the parent data router.
+// The initial URL is derived from window.location.pathname so deep-links work.
 export default function App() {
+  // Strip the /landlord prefix so MemoryRouter sees routes relative to /
+  const initialPath = window.location.pathname.replace(/^\/landlord/, '') || '/';
   return (
-    <Routes>
-      <Route path="*" element={<AppContent />} />
-    </Routes>
+    <MemoryRouter initialEntries={[initialPath + window.location.search]} initialIndex={0}>
+      <Routes>
+        <Route path="*" element={<AppContent />} />
+      </Routes>
+    </MemoryRouter>
   );
 }
