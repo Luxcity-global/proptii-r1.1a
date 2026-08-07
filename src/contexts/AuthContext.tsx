@@ -244,15 +244,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setIsAuthenticated(true);
         }
 
-        // Firebase sync (non-blocking)
-        const b2cToken = await getAccessTokenForApiRequest().catch(() => null);
-        if (b2cToken) syncFirebaseAuth(b2cToken);
-
-        // Silent token refresh (non-fatal)
-        instance.acquireTokenSilent({ ...loginRequest, account }).catch((err) => {
-          if (!(err instanceof InteractionRequiredAuthError)) {
-            console.warn('[Auth] Silent token refresh failed:', err);
-          }
+        // Firebase sync (non-blocking) — get token directly from MSAL here to avoid
+        // deadlock: getAccessTokenForApiRequest() waits for notifyAuthReady() which
+        // hasn't fired yet (we're still inside the init() try block).
+        instance.acquireTokenSilent({ ...loginRequest, account }).then(async (r) => {
+          const idTok = r.idToken?.trim();
+          if (idTok) syncFirebaseAuth(idTok);
+        }).catch(() => {
+          // Non-fatal: Firebase sync will simply be skipped on this page load.
         });
 
         sessionManager.updateActivity('authentication', 'Session initialized');
@@ -289,14 +288,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Fired by msalAccessToken.ts when refresh token is also expired (InteractionRequiredAuthError).
     // Clear auth state and redirect to login so the user isn't stuck in a 401 loop.
     const onSessionExpired = () => {
-      console.warn('[Auth] Session fully expired — clearing state and redirecting to login');
+      // The session is fully expired (both access token and refresh token gone).
+      // Clear stale auth state so the UI shows as unauthenticated.
+      // DO NOT call loginRedirect() automatically — that causes an unwanted full-page
+      // navigation on load (COOP errors + ErrorBoundary crash). The user will be
+      // prompted to sign in when they next attempt an authenticated action.
+      console.warn('[Auth] Session fully expired — clearing state');
       localStorage.removeItem('auth_token');
       setIsAuthenticated(false);
       setUser(null);
-      // loginPopup() gets blocked by browsers when not initiated by a user click,
-      // which causes COOP errors and React ErrorBoundary crashes.
-      // Use loginRedirect instead for automatic session expiry.
-      instance.loginRedirect(loginRequest).catch(console.error);
     };
 
     window.addEventListener('message', onAuthRequest);

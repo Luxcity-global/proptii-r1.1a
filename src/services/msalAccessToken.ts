@@ -55,9 +55,22 @@ function bearerJwtFromResult(r: AuthenticationResult | null | undefined): string
 /**
  * Fires a global event telling the app the user's session has fully expired
  * and they must log in again interactively. AuthContext listens for this and
- * redirects to /login (or opens the login popup).
+ * clears auth state so the user sees the unauthenticated UI.
+ *
+ * Only fires if at least one successful token acquisition has already occurred
+ * in this page session. This prevents false positives during MSAL's initial
+ * hydration, when acquireTokenSilent may briefly throw InteractionRequiredAuthError
+ * before the account/tokens are ready in the cache.
  */
+let hasEverSucceeded = false;
+
 export function notifySessionExpired(): void {
+  if (!hasEverSucceeded) {
+    // No successful token yet in this page load — this is a timing/hydration issue,
+    // not a genuine session expiry. Suppress to prevent spurious redirects.
+    console.warn('[msal] notifySessionExpired suppressed — no successful token yet this session');
+    return;
+  }
   window.dispatchEvent(new CustomEvent('auth-session-expired'));
 }
 
@@ -109,6 +122,7 @@ export async function getAccessTokenForApiRequest(): Promise<string | null> {
     const t = bearerJwtFromResult(r);
     if (t) {
       localStorage.setItem('auth_token', t);
+      hasEverSucceeded = true;
       return t;
     }
   } catch (e) {
@@ -133,6 +147,7 @@ export async function getAccessTokenForApiRequest(): Promise<string | null> {
     const t = bearerJwtFromResult(r);
     if (t) {
       localStorage.setItem('auth_token', t);
+      hasEverSucceeded = true;
       return t;
     }
   } catch {
@@ -142,6 +157,7 @@ export async function getAccessTokenForApiRequest(): Promise<string | null> {
   // Final fallback: return cached token only if not expired
   const stored = fromStorage();
   if (stored && !isTokenExpired(stored)) {
+    hasEverSucceeded = true;
     return stored;
   }
 
