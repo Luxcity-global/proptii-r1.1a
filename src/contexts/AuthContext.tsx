@@ -11,6 +11,7 @@ import SessionManager from '../services/SessionManager';
 import { signInWithCustomToken } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
 import { getAccessTokenForApiRequest } from '../services/msalAccessToken';
+import { notifyAuthReady } from '../services/authReady';
 
 // ─── MSAL singleton ──────────────────────────────────────────────────────────
 
@@ -47,16 +48,8 @@ export async function waitForMsalReady(): Promise<void> {
   if (msalInitPromise) await msalInitPromise;
 }
 
-export let isAuthReady = false;
-/** Await full AuthContext initialization (including handleRedirectPromise and role resolution). */
-export async function waitForAuthReady(): Promise<void> {
-  if (isAuthReady) return;
-  return new Promise((resolve) => {
-    window.addEventListener('auth-init-complete', () => {
-      resolve();
-    }, { once: true });
-  });
-}
+// Re-export from the canonical leaf module so any existing imports from AuthContext keep working.
+export { isAuthReady, waitForAuthReady } from '../services/authReady';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -271,10 +264,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } finally {
         if (!cancelled) {
           setIsLoading(false);
-          if (!isAuthReady) {
-            isAuthReady = true;
-            window.dispatchEvent(new CustomEvent('auth-init-complete'));
-          }
+          notifyAuthReady();
         }
       }
     };
