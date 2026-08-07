@@ -47,6 +47,17 @@ export async function waitForMsalReady(): Promise<void> {
   if (msalInitPromise) await msalInitPromise;
 }
 
+export let isAuthReady = false;
+/** Await full AuthContext initialization (including handleRedirectPromise and role resolution). */
+export async function waitForAuthReady(): Promise<void> {
+  if (isAuthReady) return;
+  return new Promise((resolve) => {
+    window.addEventListener('auth-init-complete', () => {
+      resolve();
+    }, { once: true });
+  });
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface User {
@@ -258,7 +269,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
         console.error('[Auth] Initialization error:', err);
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+          if (!isAuthReady) {
+            isAuthReady = true;
+            window.dispatchEvent(new CustomEvent('auth-init-complete'));
+          }
+        }
       }
     };
 
@@ -286,11 +303,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.removeItem('auth_token');
       setIsAuthenticated(false);
       setUser(null);
-      // Open login popup so the user can sign in without a full page reload
-      instance.loginPopup(loginRequest).catch(() => {
-        // Popup blocked or closed — fall back to redirect
-        instance.loginRedirect(loginRequest).catch(console.error);
-      });
+      // loginPopup() gets blocked by browsers when not initiated by a user click,
+      // which causes COOP errors and React ErrorBoundary crashes.
+      // Use loginRedirect instead for automatic session expiry.
+      instance.loginRedirect(loginRequest).catch(console.error);
     };
 
     window.addEventListener('message', onAuthRequest);
