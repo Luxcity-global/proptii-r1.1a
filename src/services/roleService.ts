@@ -4,14 +4,11 @@
  * Single source of truth for resolving, writing, and reading a user's role.
  *
  * Resolution order (first match wins):
- *   1. users/{userId} Firestore document  ← canonical, fast
- *   2. landlordUsers collection by email  ← back-compat for existing landlords
- *   3. sessionStorage role intent          ← set during signup before B2C popup
- *   4. null                               ← triggers /select-role screen
- *
- * The public API surface intentionally mirrors what AuthContext needs:
- *   - resolveRole(userId, email)  → called once on login / page-load
- *   - setRole(userId, role)       → called by RoleSelect & ClaimAccount
+ *   1. localStorage cache       ← instant, avoids Firestore cold-start delay
+ *   2. users/{uid} Firestore    ← canonical document
+ *   3. landlordUsers collection ← back-compat for existing landlords
+ *   4. sessionStorage intent    ← set during signup before B2C redirect
+ *   5. null                     ← routes user to /select-role
  */
 
 import {
@@ -33,13 +30,9 @@ export interface UserRoleDoc {
   uid: string;
   email: string;
   role: UserRole;
-  /** ISO timestamp of when the role was first assigned */
   roleAssignedAt?: string;
-  /** 'firestore' | 'landlordUsers_migration' | 'signup_intent' | 'claim_token' | 'manual_select' */
   roleSource?: string;
 }
-
-// ─── internal helpers ────────────────────────────────────────────────────────
 
 const USERS_COL = 'users';
 const LANDLORD_USERS_COL = 'landlordUsers';
@@ -47,11 +40,9 @@ const LANDLORD_USERS_COL = 'landlordUsers';
 async function readUserDoc(uid: string): Promise<UserRoleDoc | null> {
   try {
     const snap = await getDoc(doc(db, USERS_COL, uid));
-    if (snap.exists()) {
-      return snap.data() as UserRoleDoc;
-    }
+    if (snap.exists()) return snap.data() as UserRoleDoc;
   } catch (e) {
-    console.warn('[RoleService] Could not read users doc:', e);
+    console.warn('[Auth] Could not read users Firestore doc:', e);
   }
   return null;
 }
@@ -67,13 +58,10 @@ async function queryLandlordUsers(
     const snap = await getDocs(q);
     if (!snap.empty) {
       const data = snap.docs[0].data();
-      return {
-        role: (data.role as UserRole) ?? 'landlord',
-        name: data.name,
-      };
+      return { role: (data.role as UserRole) ?? 'landlord', name: data.name };
     }
   } catch (e) {
-    console.warn('[RoleService] Could not query landlordUsers:', e);
+    console.warn('[Auth] Could not query landlordUsers:', e);
   }
   return null;
 }
@@ -85,94 +73,69 @@ async function writeUserDoc(
   source: string,
 ): Promise<void> {
   try {
-    const payload: Record<string, unknown> = {
+    await setDoc(doc(db, USERS_COL, uid), {
       uid,
       email: email.toLowerCase(),
       role,
       roleAssignedAt: new Date().toISOString(),
       roleSource: source,
       updatedAt: serverTimestamp(),
-    };
-    await setDoc(doc(db, USERS_COL, uid), payload, { merge: true });
-    console.log(`[RoleService] Wrote role "${role}" for uid=${uid} (source: ${source})`);
+    }, { merge: true });
   } catch (e) {
-    console.error('[RoleService] Failed to write users doc:', e);
-    // Non-fatal — role is still returned from memory
+    console.error('[Auth] Failed to write users Firestore doc:', e);
   }
 }
 
 // ─── public API ──────────────────────────────────────────────────────────────
 
-/**
- * Resolve the canonical role for an authenticated user.
- *
- * Returns null when no role can be determined → caller should route to
- * /select-role so the user can pick one explicitly.
- */
 export async function resolveRole(
   uid: string,
   email: string,
 ): Promise<UserRole | null> {
-  const t0 = Date.now();
-  console.log('[RoleService] resolveRole() — uid:', uid, 'email:', email);
-
-  // Fast path: localStorage cache avoids a Firestore round-trip and protects
-  // against cold-start delays on Render (Firestore rules need the backend warm).
+  // 1. localStorage cache — instant, survives Firestore cold-starts
   const cached = localStorage.getItem(`proptii_role_${uid}`);
   if (cached === 'tenant' || cached === 'landlord' || cached === 'agent') {
-    console.log(`[RoleService] ✓ Role from localStorage cache: ${cached} (${Date.now() - t0}ms)`);
     return cached as UserRole;
   }
-  console.log('[RoleService] No localStorage cache — querying Firestore...');
 
-  // 1. users/{uid} Firestore document — canonical
+  // 2. Firestore users/{uid}
   const userDoc = await readUserDoc(uid);
   if (userDoc?.role) {
-    console.log(`[RoleService] ✓ Role from Firestore users/${uid}: ${userDoc.role} (${Date.now() - t0}ms)`);
     localStorage.setItem(`proptii_role_${uid}`, userDoc.role);
     return userDoc.role;
   }
-  console.log(`[RoleService] users/${uid} doc missing or has no role (${Date.now() - t0}ms) — checking landlordUsers...`);
 
-  // 2. landlordUsers collection — back-compat
+  // 3. landlordUsers collection (back-compat)
   const landlordCheck = await queryLandlordUsers(email);
   if (landlordCheck) {
     const role = landlordCheck.role;
-    console.log(`[RoleService] ✓ Role from landlordUsers: ${role} (${Date.now() - t0}ms)`);
     localStorage.setItem(`proptii_role_${uid}`, role);
     await writeUserDoc(uid, email, role, 'landlordUsers_migration');
     return role;
   }
-  console.log(`[RoleService] Not in landlordUsers (${Date.now() - t0}ms) — checking signup intent...`);
 
-  // 3. sessionStorage signup intent
+  // 4. sessionStorage signup intent
   const intent = getRoleIntent();
   if (intent) {
-    console.log(`[RoleService] ✓ Role from signup intent: ${intent} (${Date.now() - t0}ms)`);
     clearRoleIntent();
     localStorage.setItem(`proptii_role_${uid}`, intent);
     await writeUserDoc(uid, email, intent, 'signup_intent');
     return intent;
   }
 
-  console.warn(`[RoleService] ✗ No role found for uid: ${uid} (${Date.now() - t0}ms total) — user will be routed to /select-role`);
+  // 5. No role found
+  console.warn('[Auth] No role found for uid:', uid, '— routing to /select-role');
   return null;
 }
 
-/**
- * Explicitly set a user's role (from /select-role or claim flow).
- * Overwrites any existing role in Firestore.
- */
 export async function setRole(
   uid: string,
   email: string,
   role: UserRole,
   source: 'manual_select' | 'claim_token' = 'manual_select',
 ): Promise<void> {
-  // Always store in localStorage immediately so role persists locally across sessions
   localStorage.setItem(`proptii_role_${uid}`, role);
 
-  // First update backend (which updates Firestore and invalidates backend cache)
   try {
     const { getAccessTokenForApiRequest } = await import('./msalAccessToken');
     const token = await getAccessTokenForApiRequest().catch(() => null);
@@ -180,29 +143,19 @@ export async function setRole(
       const apiBase = (import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000').replace(/\/$/, '');
       const res = await fetch(`${apiBase}/api/auth/role`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ role }),
       });
-      if (!res.ok) {
-        throw new Error(`Backend role update failed: ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`Backend role update failed: ${res.status}`);
     }
   } catch (err) {
-    console.warn('[RoleService] Failed to update role on NestJS backend, falling back to direct Firestore write:', err);
+    console.warn('[Auth] Backend role update failed, writing directly to Firestore:', err);
   }
 
-  // Fallback / local Firestore write to keep frontend in sync
   await writeUserDoc(uid, email, role, source);
 }
 
-/**
- * Read the stored role without attempting resolution.
- * Returns null if the document doesn't exist or has no role.
- */
 export async function getStoredRole(uid: string): Promise<UserRole | null> {
-  const doc = await readUserDoc(uid);
-  return doc?.role ?? null;
+  const userDoc = await readUserDoc(uid);
+  return userDoc?.role ?? null;
 }

@@ -400,6 +400,12 @@ export function AppContent() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  // Stable ref to `properties` so loadScopedTenants can read the latest list
+  // without needing `properties` in its useCallback dependency array.
+  // This breaks the render loop: properties → new loadScopedTenants → effects
+  // re-run → setProperties → properties changes → new loadScopedTenants → …
+  const propertiesRef = React.useRef<Property[]>([]);
+  React.useEffect(() => { propertiesRef.current = properties; }, [properties]);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const editingTenantRef = React.useRef<Tenant | null>(null);
@@ -1217,9 +1223,12 @@ export function AppContent() {
             const userId = resolveManagerId();
       let list = await tenantService.getTenants(userId || undefined);
 
-      // If docs lack userId, fall back to scoping by owned property IDs
+      // If docs lack userId, fall back to scoping by owned property IDs.
+      // Read from the ref so this callback's identity is stable (doesn't
+      // change every time `properties` state updates), which breaks the
+      // render loop caused by effects that depend on loadScopedTenants.
       if (userId) {
-        const ownedPropertyIds = new Set(properties.map(p => p.id));
+        const ownedPropertyIds = new Set(propertiesRef.current.map(p => p.id));
         if (ownedPropertyIds.size > 0) {
           list = list.filter(t => !t.propertyId || ownedPropertyIds.has(t.propertyId));
         }
@@ -1228,7 +1237,7 @@ export function AppContent() {
     } catch (e) {
       console.error('Failed to load tenants:', e);
     }
-  }, [properties, userProfile]);
+  }, [userProfile]); // removed `properties` — use propertiesRef instead to keep stable identity
 
   // Reload and scope tenants once we know the current user's properties
   React.useEffect(() => {

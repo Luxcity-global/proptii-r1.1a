@@ -431,8 +431,8 @@ const DashboardSettings: React.FC = () => {
         />
         {canSwitchRole && (
           <SettingsRow
-            title="Switch account role"
-            description={`Currently active as: ${currentRole}. Switch to your tenant view.`}
+            title="Switch to tenant view"
+            description={`Your account role is: ${currentRole}. You can browse Proptii as a tenant to search properties and book viewings.`}
             onClick={() => navigate('/select-role')}
             action={
               <button
@@ -441,7 +441,7 @@ const DashboardSettings: React.FC = () => {
                 className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-blue-50"
                 style={{ color: '#136C9E', borderColor: '#136C9E' }}
               >
-                Switch role
+                Switch view
               </button>
             }
           />
