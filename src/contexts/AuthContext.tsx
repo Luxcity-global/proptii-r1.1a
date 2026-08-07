@@ -279,16 +279,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const onSessionTimeout = () => logout();
     const onAccountLocked  = () => logout();
+    // Fired by msalAccessToken.ts when refresh token is also expired (InteractionRequiredAuthError).
+    // Clear auth state and redirect to login so the user isn't stuck in a 401 loop.
+    const onSessionExpired = () => {
+      console.warn('[Auth] Session fully expired — clearing state and redirecting to login');
+      localStorage.removeItem('auth_token');
+      setIsAuthenticated(false);
+      setUser(null);
+      // Open login popup so the user can sign in without a full page reload
+      instance.loginPopup(loginRequest).catch(() => {
+        // Popup blocked or closed — fall back to redirect
+        instance.loginRedirect(loginRequest).catch(console.error);
+      });
+    };
 
     window.addEventListener('message', onAuthRequest);
     window.addEventListener('session_timeout', onSessionTimeout);
     window.addEventListener('account-locked', onAccountLocked);
+    window.addEventListener('auth-session-expired', onSessionExpired);
 
     return () => {
       cancelled = true;
       window.removeEventListener('message', onAuthRequest);
       window.removeEventListener('session_timeout', onSessionTimeout);
       window.removeEventListener('account-locked', onAccountLocked);
+      window.removeEventListener('auth-session-expired', onSessionExpired);
     };
   }, [instance, accounts]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -1,4 +1,5 @@
 import type { AuthenticationResult } from '@azure/msal-browser';
+import { InteractionRequiredAuthError } from '@azure/msal-browser';
 import { getMsalInstance, waitForMsalReady } from '../contexts/AuthContext';
 import { loginRequest, msalConfig } from '../config/authConfig';
 
@@ -22,15 +23,14 @@ function getJwtExpiry(token: string): number {
 }
 
 /**
- * Returns true if the token is a JWT that expires within the next 5 minutes,
- * or has already expired. Used to decide whether to force a silent refresh.
+ * Returns true if the token has already expired.
+ * Does NOT check near-expiry — we let MSAL's own refresh logic handle that.
  */
-function isTokenNearExpiry(token: string): boolean {
-  if (!isJwtFormat(token)) return true; // opaque tokens should always be refreshed
+function isTokenExpired(token: string): boolean {
+  if (!isJwtFormat(token)) return true;
   const exp = getJwtExpiry(token);
   if (exp === 0) return true;
-  const nowPlusFiveMinutes = Math.floor(Date.now() / 1000) + 5 * 60;
-  return exp < nowPlusFiveMinutes;
+  return Math.floor(Date.now() / 1000) >= exp;
 }
 
 /**
@@ -52,9 +52,25 @@ function bearerJwtFromResult(r: AuthenticationResult | null | undefined): string
 }
 
 /**
- * Returns a Bearer token for API calls: MSAL silent (+ id_token fallback) → ssoSilent → localStorage `auth_token`.
- * Does not open popups (those were flashing closed and only read accessToken, missing id_token).
- * Forces a refresh when the cached token is near expiry (<5 min) to prevent backend 401s.
+ * Fires a global event telling the app the user's session has fully expired
+ * and they must log in again interactively. AuthContext listens for this and
+ * redirects to /login (or opens the login popup).
+ */
+export function notifySessionExpired(): void {
+  window.dispatchEvent(new CustomEvent('auth-session-expired'));
+}
+
+/**
+ * Returns a Bearer token for API calls: MSAL silent → ssoSilent → localStorage `auth_token`.
+ *
+ * Key design decisions:
+ * - Do NOT use forceRefresh:true. It skips MSAL's cache and hits B2C's server directly.
+ *   When the B2C server-side session (cookie) has expired, this throws AADB2C90077
+ *   even when MSAL still has a valid refresh token that could work without forceRefresh.
+ * - MSAL's acquireTokenSilent (without forceRefresh) uses the refresh token automatically
+ *   when the access/id token in cache is expired — no B2C session required.
+ * - If InteractionRequiredAuthError is thrown, it means the refresh token is also gone
+ *   (session fully expired) and the user must log in again interactively.
  */
 export async function getAccessTokenForApiRequest(): Promise<string | null> {
   await waitForMsalReady();
@@ -67,28 +83,27 @@ export async function getAccessTokenForApiRequest(): Promise<string | null> {
     if (mockToken) return mockToken;
   }
 
-
   const fromStorage = () => localStorage.getItem('auth_token');
 
   if (!account) {
-    return fromStorage();
+    // No MSAL account — check localStorage as last resort
+    const stored = fromStorage();
+    if (stored && !isTokenExpired(stored)) return stored;
+    return null;
   }
 
   if (!msalInstance.getActiveAccount()) {
     msalInstance.setActiveAccount(account);
   }
 
-  // Determine if we need a forced refresh (cached token near expiry or expired)
-  const cachedToken = fromStorage();
-  const needsRefresh = !cachedToken || isTokenNearExpiry(cachedToken);
-
   try {
+    // acquireTokenSilent without forceRefresh:
+    // - Returns cached token if still valid
+    // - Uses refresh token to get a new token if cached one expired
+    // - Does NOT require an active B2C server session for refresh token flow
     const r = await msalInstance.acquireTokenSilent({
       ...loginRequest,
       account,
-      // Force a server-side token refresh if the cached token is near expiry.
-      // Without this, MSAL returns the same in-memory cached token even if it's 58 min old.
-      forceRefresh: needsRefresh,
     });
     const t = bearerJwtFromResult(r);
     if (t) {
@@ -96,10 +111,18 @@ export async function getAccessTokenForApiRequest(): Promise<string | null> {
       return t;
     }
   } catch (e) {
+    if (e instanceof InteractionRequiredAuthError) {
+      // Refresh token also expired — the user MUST log in again interactively.
+      // Clear stale storage and notify the app so it can redirect to /login.
+      localStorage.removeItem('auth_token');
+      notifySessionExpired();
+      return null;
+    }
     console.warn('[msal] acquireTokenSilent failed:', e);
   }
 
-  // Hidden iframe SSO — no popup; helps when silent refresh fails but session cookies exist
+  // Hidden iframe SSO — fallback when silent refresh fails for non-interaction reasons
+  // (e.g. network hiccup). Skip if B2C session is known to be gone (AADB2C90077).
   try {
     const r = await msalInstance.ssoSilent({
       scopes: loginRequest.scopes,
@@ -112,8 +135,14 @@ export async function getAccessTokenForApiRequest(): Promise<string | null> {
       return t;
     }
   } catch {
-    // Expected when no server session or iframe blocked
+    // Expected when no server session or iframe blocked — fall through
   }
 
-  return fromStorage();
+  // Final fallback: return cached token only if not expired
+  const stored = fromStorage();
+  if (stored && !isTokenExpired(stored)) return stored;
+
+  // Token is expired and we couldn't refresh — notify app
+  if (account) notifySessionExpired();
+  return null;
 }
