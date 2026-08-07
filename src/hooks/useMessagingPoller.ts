@@ -14,11 +14,13 @@
 import { useEffect, useContext } from 'react';
 import { MessagingContext } from '../contexts/MessagingContext';
 import communicationService from '../services/communicationService';
+import { useAuth } from '../contexts/AuthContext';
 
 const DEFAULT_INTERVAL_MS = 30_000;
 
 export function useMessagingPoller(intervalMs: number = DEFAULT_INTERVAL_MS): void {
     const { _setConversations, _setUnreadCount } = useContext(MessagingContext);
+    const { user } = useAuth();
 
     useEffect(() => {
         let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -79,5 +81,5 @@ export function useMessagingPoller(intervalMs: number = DEFAULT_INTERVAL_MS): vo
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [intervalMs]);
+    }, [intervalMs, user?.id]);
 }

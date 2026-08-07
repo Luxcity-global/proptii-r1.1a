@@ -13,6 +13,22 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 
+const getTimestampMs = (ts: any): number => {
+  if (!ts) return 0;
+  if (typeof ts.toMillis === 'function') return ts.toMillis();
+  if (typeof ts.toDate === 'function') return ts.toDate().getTime();
+  if (typeof ts.getTime === 'function') return ts.getTime();
+  if (ts.seconds) return ts.seconds * 1000;
+  const d = new Date(ts);
+  return isNaN(d.getTime()) ? 0 : d.getTime();
+};
+
+const logDev = (...args: any[]) => {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+};
+
 export interface BookViewingRequest {
   id: string;
   userId: string;
@@ -101,19 +117,19 @@ class BookViewingRequestService {
     managerId: string
   ): Promise<BookViewingRequest[]> {
     try {
-      console.log(`🔍 Querying ${this.collectionName} by ${field} = ${managerId}`);
+      logDev(`🔍 Querying ${this.collectionName} by ${field} = ${managerId}`);
       const q = query(
         collection(db, this.collectionName),
         where(field, '==', managerId),
         orderBy('createdAt', 'desc')
       );
       const snap = await getDocs(q);
-      console.log(`📊 Found ${snap.size} requests for ${field} = ${managerId}`);
+      logDev(`📊 Found ${snap.size} requests for ${field} = ${managerId}`);
       const out: BookViewingRequest[] = [];
       snap.forEach(d => {
         const data = d.data() as BookViewingRequest;
         out.push(data);
-        console.log(`📋 Request found:`, {
+        logDev(`📋 Request found:`, {
           id: data.id,
           landlordId: data.landlordId,
           agentId: data.agentId,
@@ -157,27 +173,27 @@ class BookViewingRequestService {
    */
   async getManagerRequests(managerId: string): Promise<{ success: boolean; requests?: BookViewingRequest[]; error?: string }> {
     try {
-      console.log(`🔍 [bookViewingRequests] getManagerRequests called with managerId: ${managerId}`);
-      console.log(`🔍 [bookViewingRequests] Collection: ${this.collectionName}`);
-      console.log(`🔍 [bookViewingRequests] Querying by landlordId = ${managerId}`);
+      logDev(`🔍 [bookViewingRequests] getManagerRequests called with managerId: ${managerId}`);
+      logDev(`🔍 [bookViewingRequests] Collection: ${this.collectionName}`);
+      logDev(`🔍 [bookViewingRequests] Querying by landlordId = ${managerId}`);
       
       // Query by landlordId first (primary query for bookViewingRequests)
       const landlordRequests = await this.getRequestsByManagerField('landlordId', managerId);
-      console.log(`✅ [bookViewingRequests] Found ${landlordRequests.length} requests by landlordId`);
+      logDev(`✅ [bookViewingRequests] Found ${landlordRequests.length} requests by landlordId`);
       
       // Also query by agentId as fallback (some records might only have agentId set)
-      console.log(`🔍 [bookViewingRequests] Also querying by agentId = ${managerId}`);
+      logDev(`🔍 [bookViewingRequests] Also querying by agentId = ${managerId}`);
       const agentRequests = await this.getRequestsByManagerField('agentId', managerId);
-      console.log(`✅ [bookViewingRequests] Found ${agentRequests.length} requests by agentId`);
+      logDev(`✅ [bookViewingRequests] Found ${agentRequests.length} requests by agentId`);
       
       // Merge and deduplicate requests
       const requests = this.mergeRequestsById(landlordRequests, agentRequests);
-      console.log(`✅ [bookViewingRequests] Total merged requests: ${requests.length}`);
+      logDev(`✅ [bookViewingRequests] Total merged requests: ${requests.length}`);
       
       if (requests.length > 0) {
-        console.log(`📋 [bookViewingRequests] Request details:`);
+        logDev(`📋 [bookViewingRequests] Request details:`);
         requests.forEach((req, index) => {
-          console.log(`  ${index + 1}. ID: ${req.id}, landlordId: ${req.landlordId}, agentId: ${req.agentId}, property: ${req.property?.street}`);
+          logDev(`  ${index + 1}. ID: ${req.id}, landlordId: ${req.landlordId}, agentId: ${req.agentId}, property: ${req.property?.street}`);
         });
       }
       
@@ -202,8 +218,8 @@ class BookViewingRequestService {
     try {
       // Normalize email to lowercase for comparison (emails are case-insensitive)
       const normalizedEmail = agentEmail?.toLowerCase().trim();
-      console.log('🔍 Getting viewing requests for agent email:', normalizedEmail);
-      console.log('🔍 Collection name:', this.collectionName);
+      logDev('🔍 Getting viewing requests for agent email:', normalizedEmail);
+      logDev('🔍 Collection name:', this.collectionName);
       
       // OPTIMIZATION: Try top-level agentEmail field first (much faster than nested field query)
       let q = query(
@@ -217,7 +233,7 @@ class BookViewingRequestService {
         querySnapshot = await getDocs(q);
         // If no results with top-level field, try nested field query for backward compatibility
         if (querySnapshot.empty) {
-          console.log('⚠️ No results with top-level agentEmail field, trying nested field query...');
+          logDev('⚠️ No results with top-level agentEmail field, trying nested field query...');
           const nestedQ = query(
             collection(db, this.collectionName),
             where('property.agent.email', '==', normalizedEmail),
@@ -239,8 +255,8 @@ class BookViewingRequestService {
         }
       }
       
-      console.log('🔍 Query completed! Snapshot size:', querySnapshot.size);
-      console.log('🔍 Query empty?', querySnapshot.empty);
+      logDev('🔍 Query completed! Snapshot size:', querySnapshot.size);
+      logDev('🔍 Query empty?', querySnapshot.empty);
       
       const requests: BookViewingRequest[] = [];
       
@@ -250,7 +266,7 @@ class BookViewingRequestService {
         if (data.agentEmail?.toLowerCase() === normalizedEmail || 
             data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
           requests.push(data);
-          console.log('📋 Found request:', {
+          logDev('📋 Found request:', {
             id: data.id,
             agentEmail: data.agentEmail || data.property?.agent?.email,
             propertyStreet: data.property?.street
@@ -263,7 +279,7 @@ class BookViewingRequestService {
         requests.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
       }
       
-      console.log(`✅✅✅ Retrieved ${requests.length} requests for email: ${normalizedEmail} ✅✅✅`);
+      logDev(`✅✅✅ Retrieved ${requests.length} requests for email: ${normalizedEmail} ✅✅✅`);
       return { success: true, requests };
     } catch (error: any) {
       // Final fallback: query without orderBy and sort in memory
@@ -281,7 +297,7 @@ class BookViewingRequestService {
           if (data.agentEmail?.toLowerCase() === normalizedEmail || 
               data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
             requests.push(data);
-            console.log('📋 Found request (fallback):', {
+            logDev('📋 Found request (fallback):', {
               id: data.id,
               agentEmail: data.agentEmail || data.property?.agent?.email,
               propertyStreet: data.property?.street
@@ -290,7 +306,7 @@ class BookViewingRequestService {
         });
         // Sort in memory
         const sorted = requests.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-        console.log(`✅ Retrieved ${sorted.length} requests (fallback) for email: ${normalizedEmail}`);
+        logDev(`✅ Retrieved ${sorted.length} requests (fallback) for email: ${normalizedEmail}`);
         return { success: true, requests: sorted };
       }
       console.error('❌ Error getting viewing requests by email:', error);
@@ -312,24 +328,46 @@ class BookViewingRequestService {
     callback: (requests: BookViewingRequest[]) => void,
     onError?: (error: Error) => void
   ): () => void {
-    const q = query(
-      collection(db, this.collectionName),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
+    let unsubscribe: () => void = () => {};
 
-    return onSnapshot(
-      q,
-      (snap) => {
-        const out: BookViewingRequest[] = [];
-        snap.forEach(d => out.push(d.data() as BookViewingRequest));
-        callback(out);
-      },
-      (err) => {
-        console.error('Error in requests subscription:', err);
-        if (onError) onError(err as any);
-      }
-    );
+    const setupListener = (useOrderBy: boolean) => {
+      const q = useOrderBy
+        ? query(
+            collection(db, this.collectionName),
+            where('userId', '==', userId),
+            orderBy('createdAt', 'desc')
+          )
+        : query(
+            collection(db, this.collectionName),
+            where('userId', '==', userId)
+          );
+
+      unsubscribe = onSnapshot(
+        q,
+        (snap) => {
+          const out: BookViewingRequest[] = [];
+          snap.forEach(d => out.push(d.data() as BookViewingRequest));
+          
+          if (!useOrderBy) {
+            // Sort in memory by createdAt descending
+            out.sort((a, b) => getTimestampMs(b.createdAt) - getTimestampMs(a.createdAt));
+          }
+          callback(out);
+        },
+        (err: any) => {
+          if (useOrderBy && (err.code === 'failed-precondition' || err.message?.includes('index'))) {
+            console.warn('⚠️ User requests ordered listener failed, falling back to unordered listener...');
+            setupListener(false);
+          } else {
+            console.error('Error in requests subscription:', err);
+            if (onError) onError(err as any);
+          }
+        }
+      );
+    };
+
+    setupListener(true);
+    return () => unsubscribe();
   }
 
   subscribeToManagerRequests(
@@ -348,42 +386,73 @@ class BookViewingRequestService {
       callback(requests);
     };
 
-    const handleError = (error: Error) => {
-      console.error('Error in manager viewing request subscription:', error);
-      if (onError) onError(error);
+    let unsubscribeLandlord: () => void = () => {};
+    let unsubscribeAgent: () => void = () => {};
+
+    const setupLandlordListener = (useOrderBy: boolean) => {
+      const q = useOrderBy
+        ? query(
+            collection(db, this.collectionName),
+            where('landlordId', '==', managerId),
+            orderBy('createdAt', 'desc')
+          )
+        : query(
+            collection(db, this.collectionName),
+            where('landlordId', '==', managerId)
+          );
+
+      unsubscribeLandlord = onSnapshot(
+        q,
+        (snap) => {
+          landlordMap.clear();
+          snap.forEach(d => landlordMap.set(d.id, d.data() as BookViewingRequest));
+          emit();
+        },
+        (error: any) => {
+          if (useOrderBy && (error.code === 'failed-precondition' || error.message?.includes('index'))) {
+            console.warn('⚠️ Landlord requests ordered listener failed, falling back...');
+            setupLandlordListener(false);
+          } else {
+            console.error('Error in landlord manager requests subscription:', error);
+            if (onError) onError(error);
+          }
+        }
+      );
     };
 
-    const landlordQuery = query(
-      collection(db, this.collectionName),
-      where('landlordId', '==', managerId),
-      orderBy('createdAt', 'desc')
-    );
+    const setupAgentListener = (useOrderBy: boolean) => {
+      const q = useOrderBy
+        ? query(
+            collection(db, this.collectionName),
+            where('agentId', '==', managerId),
+            orderBy('createdAt', 'desc')
+          )
+        : query(
+            collection(db, this.collectionName),
+            where('agentId', '==', managerId)
+          );
 
-    const agentQuery = query(
-      collection(db, this.collectionName),
-      where('agentId', '==', managerId),
-      orderBy('createdAt', 'desc')
-    );
+      unsubscribeAgent = onSnapshot(
+        q,
+        (snap) => {
+          agentMap.clear();
+          snap.forEach(d => agentMap.set(d.id, d.data() as BookViewingRequest));
+          emit();
+        },
+        (error: any) => {
+          if (useOrderBy && (error.code === 'failed-precondition' || error.message?.includes('index'))) {
+            console.warn('⚠️ Agent requests ordered listener failed, falling back...');
+            setupAgentListener(false);
+          } else {
+            console.error('Error in agent manager requests subscription:', error);
+            if (onError) onError(error);
+          }
+        }
+      );
+    };
 
-    const unsubscribeLandlord = onSnapshot(
-      landlordQuery,
-      (snap) => {
-        landlordMap.clear();
-        snap.forEach(d => landlordMap.set(d.id, d.data() as BookViewingRequest));
-        emit();
-      },
-      handleError
-    );
-
-    const unsubscribeAgent = onSnapshot(
-      agentQuery,
-      (snap) => {
-        agentMap.clear();
-        snap.forEach(d => agentMap.set(d.id, d.data() as BookViewingRequest));
-        emit();
-      },
-      handleError
-    );
+    setupLandlordListener(true);
+    setupAgentListener(true);
 
     return () => {
       unsubscribeLandlord();
@@ -400,82 +469,74 @@ class BookViewingRequestService {
     onError?: (error: Error) => void
   ): () => void {
     const normalizedEmail = agentEmail?.toLowerCase().trim();
-    console.log('🔔 Subscribing to viewing requests for email:', normalizedEmail);
-    
-    let unsubscribeMain: (() => void) | null = null;
-    let unsubscribeFallback: (() => void) | null = null;
-    
-    // OPTIMIZATION: Try top-level agentEmail field first
-    const q = query(
-      collection(db, this.collectionName),
-      where('agentEmail', '==', normalizedEmail),
-      orderBy('createdAt', 'desc')
-    );
+    logDev('🔔 Subscribing to viewing requests for email:', normalizedEmail);
+    let unsubscribe: () => void = () => {};
 
-    unsubscribeMain = onSnapshot(
-      q,
-      (querySnapshot) => {
-        const requests: BookViewingRequest[] = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data() as BookViewingRequest;
-          // Filter to ensure we only include matching requests
-          if (data.agentEmail?.toLowerCase() === normalizedEmail || 
-              data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
-            requests.push(data);
-          }
-        });
-        console.log(`🔔 Subscription update: ${requests.length} requests for email: ${normalizedEmail}`);
-        callback(requests);
-      },
-      (error) => {
-        // Fallback to nested field query if top-level field query fails
-        if (error.code === 'failed-precondition' || error.message?.includes('index')) {
-          console.warn('⚠️ Top-level agentEmail field query failed, falling back to nested field query');
-          const fallbackQ = query(
-            collection(db, this.collectionName),
-            where('property.agent.email', '==', normalizedEmail)
-          );
-          unsubscribeFallback = onSnapshot(
-            fallbackQ,
-            (querySnapshot) => {
-              const requests: BookViewingRequest[] = [];
-              querySnapshot.forEach((doc) => {
-                const data = doc.data() as BookViewingRequest;
-                if (data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
-                  requests.push(data);
-                }
-              });
-              // Sort in memory since we can't use orderBy with nested field
-              const sorted = requests.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-              console.log(`🔔 Subscription update (fallback): ${sorted.length} requests for email: ${normalizedEmail}`);
-              callback(sorted);
-            },
-            (fallbackError) => {
-              console.error('❌ Error in viewing requests by email subscription (fallback):', fallbackError);
-              if (onError) {
-                onError(fallbackError);
+    const setupListener = (step: 'ordered' | 'unordered' | 'nested') => {
+      let q;
+      if (step === 'ordered') {
+        q = query(
+          collection(db, this.collectionName),
+          where('agentEmail', '==', normalizedEmail),
+          orderBy('createdAt', 'desc')
+        );
+      } else if (step === 'unordered') {
+        q = query(
+          collection(db, this.collectionName),
+          where('agentEmail', '==', normalizedEmail)
+        );
+      } else {
+        q = query(
+          collection(db, this.collectionName),
+          where('property.agent.email', '==', normalizedEmail)
+        );
+      }
+
+      unsubscribe = onSnapshot(
+        q,
+        (querySnapshot: any) => {
+          const requests: BookViewingRequest[] = [];
+          querySnapshot.forEach((doc: any) => {
+            const data = doc.data() as BookViewingRequest;
+            if (step === 'nested') {
+              if (data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+                requests.push(data);
+              }
+            } else {
+              if (data.agentEmail?.toLowerCase() === normalizedEmail ||
+                data.property?.agent?.email?.toLowerCase() === normalizedEmail) {
+                requests.push(data);
               }
             }
-          );
-        } else {
-          console.error('❌ Error in viewing requests by email subscription:', error);
-          console.error('❌ Subscription error details:', {
-            code: error.code,
-            message: error.message,
-            collectionName: this.collectionName,
-            email: normalizedEmail
           });
-          if (onError) {
-            onError(error);
+          
+          if (step !== 'ordered') {
+            requests.sort((a, b) => getTimestampMs(b.createdAt) - getTimestampMs(a.createdAt));
+          }
+          callback(requests);
+        },
+        (error: any) => {
+          if (error.code === 'failed-precondition' || error.message?.includes('index')) {
+            if (step === 'ordered') {
+              console.warn('⚠️ top-level agentEmail ordered query failed, falling back to unordered...');
+              setupListener('unordered');
+            } else if (step === 'unordered') {
+              console.warn('⚠️ top-level agentEmail unordered query failed, falling back to nested...');
+              setupListener('nested');
+            } else {
+              console.error('❌ All fallback queries failed for viewing requests by email:', error);
+              if (onError) onError(error);
+            }
+          } else {
+            console.error('Error in viewing requests subscription:', error);
+            if (onError) onError(error);
           }
         }
-      }
-    );
-
-    return () => {
-      if (unsubscribeMain) unsubscribeMain();
-      if (unsubscribeFallback) unsubscribeFallback();
+      );
     };
+
+    setupListener('ordered');
+    return () => unsubscribe();
   }
 
   async deleteRequest(requestId: string): Promise<{ success: boolean; error?: string }> {

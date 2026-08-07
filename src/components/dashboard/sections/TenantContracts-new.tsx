@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { FileText, Download, Eye, Calendar, CheckCircle, Clock, AlertTriangle, User, Mail, Phone, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import ContractModal from '../../contract/ContractModal';
-import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
+
 import { useAuth } from '../../../contexts/AuthContext';
 import { useIsMobile } from '../ui/use-mobile';
 import { useBillingStatus } from '../../../hooks/useBillingStatus';
@@ -24,97 +24,50 @@ const TenantContracts: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const isMobile = useIsMobile();
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
-  const [firestoreContracts, setFirestoreContracts] = useState<any[]>([]);
-  const [isLoadingFirestore, setIsLoadingFirestore] = useState(false);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
   const ITEMS_PER_PAGE = 10;
 
-  // Use Firestore contracts as the primary source, fallback to context contracts
-  // Normalize contract data to ensure consistent structure
-  let displaySignedContracts = (firestoreContracts.length > 0 ? firestoreContracts : signedContracts).map((c: any) => {
-    // Normalize the contract structure to ensure all fields are properly mapped
-    const normalizedContract = {
-      id: c.id,
-      documentName: c.documentName || c.name || null, // Contract file name
-      propertyName: c.propertyName || null,
-      propertyAddress: c.propertyAddress || null,
-      agentName: c.agentName || c.agent || null, // Agent name, NOT document name
-      agentEmail: c.agentEmail || null,
-      tenantEmail: c.tenantEmail || null,
-      email: c.email || c.tenantEmail || c.agentEmail || null,
-      signedDate: c.signedDate || null,
-      documentUrl: c.documentUrl || null,
-      documentBase64: c.documentBase64 || null,
-      status: c.status || null,
-      emailSent: c.emailSent || false
-    };
-    
-    // If no usable documentUrl but we have a base64 data URL, build a blob URL on the fly
-    if ((!normalizedContract.documentUrl || normalizedContract.documentUrl.startsWith('/')) && normalizedContract.documentBase64 && typeof normalizedContract.documentBase64 === 'string' && normalizedContract.documentBase64.startsWith('data:application/pdf;base64,')) {
-      try {
-        // Convert data URL to Blob URL
-        const res = fetch(normalizedContract.documentBase64);
-        // Note: fetch on data URL returns a resolved promise; convert to blob lazily
-        // We'll attach a lazy getter to avoid blocking render
-        (res as any).then?.(async (r: Response) => {
-          const blob = await r.blob();
-          const url = URL.createObjectURL(blob);
-          normalizedContract.documentUrl = url;
-        });
-      } catch (e) {
-        console.warn('Failed to convert base64 to blob url for contract', normalizedContract.id, e);
-      }
-    }
-    return normalizedContract;
-  });
-
-  // Load signed contracts from Firestore
-  useEffect(() => {
-    const loadFirestoreContracts = async () => {
-      if (!user?.id) {
-        setIsLoadingFirestore(false);
-        return;
-      }
-
-      setIsLoadingFirestore(true);
+  // Use SignedContractsContext directly to support real-time updates and remove reload flickers
+  const displaySignedContracts = useMemo(() => {
+    return signedContracts.map((c: any) => {
+      // Normalize the contract structure to ensure all fields are properly mapped
+      const normalizedContract = {
+        id: c.id,
+        documentName: c.documentName || c.name || null, // Contract file name
+        propertyName: c.propertyName || null,
+        propertyAddress: c.propertyAddress || null,
+        agentName: c.agentName || c.agent || null, // Agent name, NOT document name
+        agentEmail: c.agentEmail || null,
+        tenantEmail: c.tenantEmail || null,
+        email: c.email || c.tenantEmail || c.agentEmail || null,
+        signedDate: c.signedDate || null,
+        documentUrl: c.documentUrl || null,
+        documentBase64: c.documentBase64 || null,
+        status: c.status || null,
+        emailSent: c.emailSent || false
+      };
       
-      try {
-        const result = await signedContractsFirestoreService.getUserSignedContracts(user.id);
-        
-        if (result.success && result.contracts) {
-          // Transform Firestore contracts to match the expected format
-          const transformedContracts = result.contracts.map(contract => ({
-            id: contract.id,
-            propertyName: contract.propertyName,
-            propertyAddress: contract.propertyAddress,
-            agentName: contract.agentName,
-            email: contract.tenantEmail || contract.agentEmail,
-            phone: '+1 (555) 123-4567', // Default phone
-            signedDate: contract.signedDate,
-            documentUrl: contract.documentUrl,
-            documentBase64: (contract as any).documentBase64,
-            documentName: contract.documentName,
-            status: contract.status,
-            emailSent: contract.emailSent
-          }));
-          
-          setFirestoreContracts(transformedContracts);
-        } else {
-          console.log('❌ Failed to load contracts from Firestore:', result.error);
-          setFirestoreContracts([]);
+      // If no usable documentUrl but we have a base64 data URL, build a blob URL on the fly
+      if ((!normalizedContract.documentUrl || normalizedContract.documentUrl.startsWith('/')) && normalizedContract.documentBase64 && typeof normalizedContract.documentBase64 === 'string' && normalizedContract.documentBase64.startsWith('data:application/pdf;base64,')) {
+        try {
+          // Convert data URL to Blob URL
+          const res = fetch(normalizedContract.documentBase64);
+          // Note: fetch on data URL returns a resolved promise; convert to blob lazily
+          // We'll attach a lazy getter to avoid blocking render
+          (res as any).then?.(async (r: Response) => {
+            const blob = await r.blob();
+            const url = URL.createObjectURL(blob);
+            normalizedContract.documentUrl = url;
+          });
+        } catch (e) {
+          console.warn('Failed to convert base64 to blob url for contract', normalizedContract.id, e);
         }
-      } catch (error) {
-        console.error('❌ Error loading contracts from Firestore:', error);
-        setFirestoreContracts([]);
-      } finally {
-        setIsLoadingFirestore(false);
       }
-    };
-
-    loadFirestoreContracts();
-  }, [user?.id]); // Reload when user changes
+      return normalizedContract;
+    });
+  }, [signedContracts]);
 
   // Contract statistics
   const contractStats = {
@@ -277,22 +230,13 @@ const TenantContracts: React.FC = () => {
     try {
       console.log('🔍 Delete button clicked for contract:', contractId);
       if (window.confirm('Are you sure you want to delete this contract? This action cannot be undone.')) {
-        // Delete from Firestore
-        const firestoreResult = await signedContractsFirestoreService.deleteSignedContract(contractId);
+        const result = await removeSignedContract(contractId);
         
-        if (firestoreResult.success) {
-          console.log('✅ Contract deleted from Firestore successfully:', contractId);
-          
-          // Also remove from local state
-          setFirestoreContracts(prev => prev.filter(contract => contract.id !== contractId));
-          
-          // Also remove from context if it exists there
-          await removeSignedContract(contractId);
-          
+        if (result.success) {
           console.log('✅ Contract deleted successfully:', contractId);
         } else {
-          console.error('❌ Failed to delete contract from Firestore:', firestoreResult.error);
-          alert('Failed to delete contract from database. Please try again.');
+          console.error('❌ Failed to delete contract:', result.error);
+          alert('Failed to delete contract. Please try again.');
         }
       }
     } catch (error) {
@@ -301,12 +245,12 @@ const TenantContracts: React.FC = () => {
     }
   };
 
-  if (isLoading || isLoadingFirestore) {
+  if (isLoading) {
     return (
       <div className={`flex items-center justify-center ${isMobile ? 'h-48' : 'h-64'}`}>
         <div className={`animate-spin rounded-full ${isMobile ? 'h-6 w-6' : 'h-8 w-8'} border-b-2 border-gray-900`}></div>
         <span className={`${isMobile ? 'ml-2 text-sm' : 'ml-2'} text-gray-600`}>
-          {isLoadingFirestore ? 'Loading contracts from database...' : 'Loading...'}
+          Loading...
         </span>
       </div>
     );

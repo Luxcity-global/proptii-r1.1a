@@ -215,7 +215,7 @@ async function fetchRegulatoryChanges(): Promise<MarketInsight[]> {
   const insights: MarketInsight[] = [];
   
   try {
-    const RSS_URL = 'https://www.gov.uk/government/announcements.atom';
+    const RSS_URL = 'https://www.gov.uk/search/news-and-communications.atom';
     console.log(`📰 Fetching GOV.UK announcements from: ${RSS_URL}`);
     
     const response = await fetch(RSS_URL, {

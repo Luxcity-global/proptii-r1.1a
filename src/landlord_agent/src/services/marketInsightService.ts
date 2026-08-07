@@ -14,6 +14,13 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { fetchWithApiFallback } from '../../../utils/apiEndpoints';
+
+const logDev = (...args: any[]) => {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+};
 
 export type MarketInsightType = 'rental-demand' | 'epc-requirements' | 'property-values' | 'regulatory-change' | 'market-trend' | 'price-change';
 export type MarketInsightSeverity = 'low' | 'medium' | 'high';
@@ -81,7 +88,7 @@ class MarketInsightService {
         return insights;
       } catch (indexError: any) {
         if (indexError.code === 'failed-precondition' && indexError.message?.includes('index')) {
-          console.log('ℹ️ Firestore index not configured, using in-memory sort');
+          logDev('ℹ️ Firestore index not configured, using in-memory sort');
           const q = query(this.insightsCollection, where('expiryDate', '>', now));
           const querySnapshot = await getDocs(q);
           let insights = this.mapInsightDocs(querySnapshot.docs);
@@ -123,43 +130,67 @@ class MarketInsightService {
   ): Unsubscribe {
     const now = Timestamp.now();
     
-    try {
-      const q = query(
-        this.insightsCollection,
-        where('expiryDate', '>', now),
-        orderBy('expiryDate', 'asc')
-      );
-      
-      return onSnapshot(q, 
-        (snapshot) => {
-          let insights = this.mapInsightDocs(snapshot.docs);
-          
-          // Filter dismissed if userId provided
-          if (userId) {
-            insights = insights.filter(insight => 
-              !insight.dismissedBy?.includes(userId)
+    // We will keep track of active unsubscribe function so we can clean up properly.
+    let unsubscribe: () => void = () => {};
+    
+    const setupListener = (useOrderBy: boolean) => {
+      try {
+        const q = useOrderBy 
+          ? query(
+              this.insightsCollection,
+              where('expiryDate', '>', now),
+              orderBy('expiryDate', 'asc')
+            )
+          : query(
+              this.insightsCollection,
+              where('expiryDate', '>', now)
             );
+            
+        unsubscribe = onSnapshot(q, 
+          (snapshot) => {
+            let insights = this.mapInsightDocs(snapshot.docs);
+            
+            // Filter dismissed if userId provided
+            if (userId) {
+              insights = insights.filter(insight => 
+                !insight.dismissedBy?.includes(userId)
+              );
+            }
+            
+            // Sort by severity then date
+            insights.sort((a, b) => {
+              const severityOrder = { high: 3, medium: 2, low: 1 };
+              const severityDiff = (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0);
+              if (severityDiff !== 0) return severityDiff;
+              return b.date.getTime() - a.date.getTime();
+            });
+            
+            callback(insights.slice(0, 10));
+          },
+          (error: any) => {
+            if (useOrderBy && (error.code === 'failed-precondition' || error.message?.includes('index'))) {
+              console.warn('⚠️ Market insights ordered query failed, falling back to unordered listener...');
+              setupListener(false);
+            } else {
+              console.error('Error listening to market insights:', error);
+            }
           }
-          
-          // Sort by severity then date
-          insights.sort((a, b) => {
-            const severityOrder = { high: 3, medium: 2, low: 1 };
-            const severityDiff = (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0);
-            if (severityDiff !== 0) return severityDiff;
-            return b.date.getTime() - a.date.getTime();
-          });
-          
-          callback(insights.slice(0, 10));
-        },
-        (error) => {
-          console.error('Error listening to market insights:', error);
+        );
+      } catch (error: any) {
+        if (useOrderBy && (error.code === 'failed-precondition' || error.message?.includes('index'))) {
+          console.warn('⚠️ Market insights ordered query setup failed, falling back to unordered listener...');
+          setupListener(false);
+        } else {
+          console.error('Error setting up insights listener:', error);
         }
-      );
-    } catch (error) {
-      console.error('Error setting up insights listener:', error);
-      // Fallback: return empty unsubscribe function
-      return () => {};
-    }
+      }
+    };
+
+    setupListener(true);
+    
+    return () => {
+      unsubscribe();
+    };
   }
 
   /**
@@ -180,7 +211,7 @@ class MarketInsightService {
             dismissedBy: [...dismissedBy, userId],
             updatedAt: Timestamp.now()
           });
-          console.log(`✅ Insight ${insightId} dismissed by user ${userId}`);
+          logDev(`✅ Insight ${insightId} dismissed by user ${userId}`);
         }
       }
     } catch (error) {
@@ -195,31 +226,47 @@ class MarketInsightService {
    */
   async fetchGOVUKRegulatoryChanges(): Promise<number> {
     try {
-      console.log('📰 Fetching GOV.UK announcements from RSS feed...');
+      logDev('📰 Fetching GOV.UK announcements from RSS feed...');
+      const RSS_URL = 'https://www.gov.uk/search/news-and-communications.atom';
       
-      // Use CORS proxy to bypass browser CORS restrictions
-      // Alternative proxies: https://api.allorigins.win/raw?url= or https://corsproxy.io/?
-      const RSS_URL = 'https://www.gov.uk/government/announcements.atom';
-      const PROXY_URL = `https://api.allorigins.win/raw?url=${encodeURIComponent(RSS_URL)}`;
-      
-      console.log('📡 Using CORS proxy to fetch RSS feed...');
-      const response = await fetch(PROXY_URL, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; Proptii Market Insights Bot)'
+      let xmlText = '';
+      try {
+        logDev('📡 Fetching GOV.UK RSS feed via NestJS backend proxy...');
+        const { response } = await fetchWithApiFallback('/govuk-rss');
+        if (response.ok) {
+          xmlText = await response.text();
+          logDev('✅ Successfully fetched RSS feed via backend proxy');
+        } else {
+          console.warn(`⚠️ Backend proxy returned status ${response.status}, falling back to public CORS proxy`);
         }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`GOV.UK RSS error: ${response.status} ${response.statusText}`);
+      } catch (backendError: any) {
+        console.warn('⚠️ Failed to fetch RSS feed via backend proxy, falling back to public CORS proxy:', backendError.message);
       }
-      
-      let xmlText = await response.text();
+
+      if (!xmlText) {
+        // Use CORS proxy to bypass browser CORS restrictions
+        // Alternative proxies: https://api.allorigins.win/raw?url= or https://corsproxy.io/?
+        const PROXY_URL = `https://api.allorigins.win/raw?url=${encodeURIComponent(RSS_URL)}`;
+        
+        logDev('📡 Using CORS proxy to fetch RSS feed...');
+        const response = await fetch(PROXY_URL, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; Proptii Market Insights Bot)'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`GOV.UK RSS error: ${response.status} ${response.statusText}`);
+        }
+        
+        xmlText = await response.text();
+      }
       
       if (!xmlText || xmlText.length < 100) {
         throw new Error('GOV.UK RSS feed returned empty or invalid content');
       }
       
-      console.log(`📥 Received ${xmlText.length} bytes from GOV.UK RSS feed`);
+      logDev(`📥 Received ${xmlText.length} bytes from GOV.UK RSS feed`);
       
       // Check if response is HTML (proxy error page) instead of XML - do this BEFORE parsing
       const isHTML = xmlText.trim().startsWith('<!DOCTYPE') || 
@@ -229,7 +276,7 @@ class MarketInsightService {
       
       if (isHTML) {
         console.warn('⚠️ Proxy returned HTML instead of XML, extracting feed from HTML...');
-        console.log(`🔍 First 500 chars of response: ${xmlText.substring(0, 500)}`);
+        logDev(`🔍 First 500 chars of response: ${xmlText.substring(0, 500)}`);
         
         // Try multiple extraction patterns - the feed might be in various formats
         let extractedXml: string | null = null;
@@ -238,7 +285,7 @@ class MarketInsightService {
         const feedMatch1 = xmlText.match(/<feed[\s\S]*?<\/feed>/i);
         if (feedMatch1) {
           extractedXml = feedMatch1[0];
-          console.log(`✅ Pattern 1: Found feed tag (${extractedXml.length} bytes)`);
+          logDev(`✅ Pattern 1: Found feed tag (${extractedXml.length} bytes)`);
         }
         
         // Pattern 2: RSS feed
@@ -246,7 +293,7 @@ class MarketInsightService {
           const rssMatch = xmlText.match(/<rss[\s\S]*?<\/rss>/i);
           if (rssMatch) {
             extractedXml = rssMatch[0];
-            console.log(`✅ Pattern 2: Found RSS tag (${extractedXml.length} bytes)`);
+            logDev(`✅ Pattern 2: Found RSS tag (${extractedXml.length} bytes)`);
           }
         }
         
@@ -255,7 +302,7 @@ class MarketInsightService {
           const xmlFeedMatch = xmlText.match(/<\?xml[\s\S]*?<feed[\s\S]*?<\/feed>/i);
           if (xmlFeedMatch) {
             extractedXml = xmlFeedMatch[0];
-            console.log(`✅ Pattern 3: Found XML declaration + feed (${extractedXml.length} bytes)`);
+            logDev(`✅ Pattern 3: Found XML declaration + feed (${extractedXml.length} bytes)`);
           }
         }
         
@@ -267,7 +314,7 @@ class MarketInsightService {
             const innerFeedMatch = innerContent.match(/<feed[\s\S]*?<\/feed>/i) || innerContent.match(/<rss[\s\S]*?<\/rss>/i);
             if (innerFeedMatch) {
               extractedXml = innerFeedMatch[0];
-              console.log(`✅ Pattern 4: Found feed in <pre>/<textarea> (${extractedXml.length} bytes)`);
+              logDev(`✅ Pattern 4: Found feed in <pre>/<textarea> (${extractedXml.length} bytes)`);
             }
           }
         }
@@ -280,14 +327,14 @@ class MarketInsightService {
             const cdataFeedMatch = cdataContent.match(/<feed[\s\S]*?<\/feed>/i) || cdataContent.match(/<rss[\s\S]*?<\/rss>/i);
             if (cdataFeedMatch) {
               extractedXml = cdataFeedMatch[0];
-              console.log(`✅ Pattern 5: Found feed in CDATA (${extractedXml.length} bytes)`);
+              logDev(`✅ Pattern 5: Found feed in CDATA (${extractedXml.length} bytes)`);
             }
           }
         }
         
         if (extractedXml) {
           xmlText = extractedXml;
-          console.log(`📋 Extracted ${xmlText.length} bytes of XML from HTML`);
+          logDev(`📋 Extracted ${xmlText.length} bytes of XML from HTML`);
         } else {
           // Try alternative proxy
           console.warn('⚠️ Could not extract feed from HTML, trying alternative proxy...');
@@ -303,7 +350,7 @@ class MarketInsightService {
             
             for (const altProxyUrl of altProxies) {
               try {
-                console.log(`🔄 Trying alternative proxy: ${altProxyUrl.substring(0, 50)}...`);
+                logDev(`🔄 Trying alternative proxy: ${altProxyUrl.substring(0, 50)}...`);
                 const altResponse = await fetch(altProxyUrl, {
                   headers: {
                     'User-Agent': 'Mozilla/5.0 (compatible; Proptii Market Insights Bot)'
@@ -312,14 +359,14 @@ class MarketInsightService {
                 
                 if (altResponse.ok) {
                   altXmlText = await altResponse.text();
-                  console.log(`📥 Received ${altXmlText.length} bytes from alternative proxy`);
+                  logDev(`📥 Received ${altXmlText.length} bytes from alternative proxy`);
                   
                   // Check if this is also HTML
                   if (altXmlText.trim().startsWith('<!DOCTYPE') || altXmlText.trim().startsWith('<html') || altXmlText.includes('<html')) {
                     const altFeedMatch = altXmlText.match(/<feed[\s\S]*?<\/feed>/i) || altXmlText.match(/<rss[\s\S]*?<\/rss>/i);
                     if (altFeedMatch) {
                       altXmlText = altFeedMatch[0];
-                      console.log(`📋 Extracted ${altXmlText.length} bytes from alternative proxy HTML`);
+                      logDev(`📋 Extracted ${altXmlText.length} bytes from alternative proxy HTML`);
                     }
                   }
                   
@@ -336,7 +383,7 @@ class MarketInsightService {
             
             if (altXmlText && !altXmlText.includes('<html') && !altXmlText.includes('<!DOCTYPE')) {
               xmlText = altXmlText;
-              console.log(`✅ Alternative proxy succeeded`);
+              logDev(`✅ Alternative proxy succeeded`);
             } else {
               throw new Error('All proxies returned HTML without extractable feed');
             }
@@ -363,7 +410,7 @@ class MarketInsightService {
         const parseError2 = xmlDoc2.querySelector('parsererror');
         
         if (!parseError2) {
-          console.log('✅ Successfully parsed after cleaning XML');
+          logDev('✅ Successfully parsed after cleaning XML');
           return this.processFeedEntries(xmlDoc2, Timestamp.now());
         }
         
@@ -374,7 +421,7 @@ class MarketInsightService {
           const xmlDoc3 = parser.parseFromString(extractedXml, 'text/xml');
           const parseError3 = xmlDoc3.querySelector('parsererror');
           if (!parseError3) {
-            console.log('✅ Successfully parsed extracted feed');
+            logDev('✅ Successfully parsed extracted feed');
             return this.processFeedEntries(xmlDoc3, Timestamp.now());
           }
         }
@@ -398,7 +445,7 @@ class MarketInsightService {
     try {
       // Extract entries from Atom feed
       const entries = xmlDoc.querySelectorAll('entry');
-      console.log(`📋 Parsed ${entries.length} total announcements from GOV.UK`);
+      logDev(`📋 Parsed ${entries.length} total announcements from GOV.UK`);
       
       // Keywords to identify relevant landlord/rental property announcements
       const relevantKeywords = [
@@ -423,7 +470,7 @@ class MarketInsightService {
         }
       });
       
-      console.log(`✅ Found ${relevantEntries.length} relevant announcements out of ${entries.length} total`);
+      logDev(`✅ Found ${relevantEntries.length} relevant announcements out of ${entries.length} total`);
       
       // Process each relevant announcement (limit to 10 most recent)
       const insightsToSave: any[] = [];
@@ -519,18 +566,18 @@ class MarketInsightService {
           batch.set(docRef, insightData);
           insightsToSave.push({ type: insightType, title: title.substring(0, 60) });
           
-          console.log(`✅ Prepared ${insightType} insight: "${title.substring(0, 60)}..."`);
+          logDev(`✅ Prepared ${insightType} insight: "${title.substring(0, 60)}..."`);
         } else {
-          console.log(`⏭️  Insight already exists: "${title.substring(0, 60)}..."`);
+          logDev(`⏭️  Insight already exists: "${title.substring(0, 60)}..."`);
         }
       }
       
       // Commit all new insights
       if (insightsToSave.length > 0) {
         await batch.commit();
-        console.log(`✅ Created ${insightsToSave.length} new regulatory insights from GOV.UK`);
+        logDev(`✅ Created ${insightsToSave.length} new regulatory insights from GOV.UK`);
       } else {
-        console.log('ℹ️  No new insights to create (all already exist)');
+        logDev('ℹ️  No new insights to create (all already exist)');
       }
       
       return insightsToSave.length;

@@ -5,7 +5,7 @@ import BookViewingModal from '../../viewings/BookViewingModal';
 import { useAuth } from '../../../contexts/AuthContext';
 import { viewingService, ViewingStats } from '../../../services/viewingService';
 import { firestoreService } from '../../../services/firestoreService';
-import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
+import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import { useIsMobile } from '../ui/use-mobile';
 import { trackEvent } from '../../../utils/analytics';
 
@@ -15,6 +15,7 @@ import { trackEvent } from '../../../utils/analytics';
 const SavedProperties: React.FC = () => {
   const { savedProperties, unsaveProperty } = useSavedProperties();
   const { user, isAuthenticated } = useAuth();
+  const { signedContracts } = useSignedContracts();
   const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(6);
@@ -29,7 +30,6 @@ const SavedProperties: React.FC = () => {
     total: 0
   });
   const [completedSections, setCompletedSections] = useState<Set<string>>(new Set());
-  const [signedContractsCount, setSignedContractsCount] = useState(0);
 
   // Inline copy of the Search Results Property Details modal for visual parity
   const SavedPropertyDetailsModal = ({ property, isOpen, onClose }: { property: any | null; isOpen: boolean; onClose: () => void }) => {
@@ -199,7 +199,6 @@ const SavedProperties: React.FC = () => {
   useEffect(() => {
     if (user?.id) {
       loadViewingStats();
-      loadSignedContractsCount();
       loadReferencingStatus();
     }
   }, [user?.id]);
@@ -216,17 +215,7 @@ const SavedProperties: React.FC = () => {
     }
   };
 
-  const loadSignedContractsCount = async () => {
-    try {
-      if (!user?.id) return;
-      const result = await signedContractsFirestoreService.getUserSignedContracts(user.id);
-      if (result.success && result.contracts) {
-        setSignedContractsCount(result.contracts.length);
-      }
-    } catch (error) {
-      console.error('Error loading signed contracts count:', error);
-    }
-  };
+
 
   const loadReferencingStatus = async () => {
     try {
@@ -297,7 +286,7 @@ const SavedProperties: React.FC = () => {
   const summarySavedCount = isAuthenticated ? savedProperties.length : 0;
   const summaryViewingsCount = isAuthenticated ? (viewingStats.total || 0) : 0;
   const summaryReferencingCount = isAuthenticated ? completedSections.size : 0;
-  const summaryContractsCount = isAuthenticated ? (signedContractsCount || 0) : 0;
+  const summaryContractsCount = isAuthenticated ? (signedContracts.length || 0) : 0;
 
   const displayedProperties = useMemo(() => {
     return filteredProperties.slice(0, visibleCount);

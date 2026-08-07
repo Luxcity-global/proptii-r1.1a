@@ -141,7 +141,19 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
 
   // ─── P2-3: Subscribe to Firestore when authenticated ─────────────────────────
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      // Restore guest saved properties from localStorage if unauthenticated
+      const raw = localStorage.getItem('savedProperties');
+      let parsed: SavedProperty[] = [];
+      if (raw) {
+        try { parsed = JSON.parse(raw); } catch {}
+      }
+      setSavedProperties(parsed);
+      return;
+    }
+
+    // Set to empty first to prevent state bleed during network hydration
+    setSavedProperties([]);
 
     // On first auth, merge any local-only saves into Firestore
     const syncLocalToFirestore = async (local: SavedProperty[]) => {

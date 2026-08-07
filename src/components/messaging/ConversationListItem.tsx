@@ -14,7 +14,7 @@ import type { Conversation } from '../../types/messaging';
 // Constants
 // ---------------------------------------------------------------------------
 
-const PREVIEW_MAX_CHARS = 55;
+const PREVIEW_MAX_CHARS = 80;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -76,11 +76,11 @@ const ConversationListItem: React.FC<ConversationListItemProps> = ({
     onClick,
     participantName = 'Unknown',
     propertyAddress = 'Unknown property',
-    lastMessageBody = '',
+    lastMessageBody,
     lastReadAt = null,
     unreadCount = 0,
 }) => {
-    const preview = truncatePreview(lastMessageBody || propertyAddress);
+    const preview = truncatePreview(lastMessageBody !== undefined && lastMessageBody !== null ? lastMessageBody : propertyAddress);
 
     const hasUnread =
         conversation.lastMessageAt !== null &&
@@ -161,6 +161,19 @@ const ConversationListItem: React.FC<ConversationListItemProps> = ({
                     {participantName}
                 </p>
                 <p
+                    data-testid="property-address"
+                    style={{
+                        margin: '2px 0 0',
+                        fontSize: '0.75rem',
+                        color: '#4b5563',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                    }}
+                >
+                    {propertyAddress}
+                </p>
+                <p
                     data-testid="message-preview"
                     style={{
                         margin: '3px 0 0',
@@ -201,39 +214,25 @@ const ConversationListItem: React.FC<ConversationListItemProps> = ({
                 )}
 
                 {/* Unread badge */}
-                {hasUnread && unreadCount > 0 ? (
-                    <span
-                        data-testid="unread-indicator"
-                        aria-label={`${unreadCount} unread messages`}
-                        style={{
-                            minWidth: '20px',
-                            height: '20px',
-                            borderRadius: '10px',
-                            background: '#3b82f6',
-                            color: '#ffffff',
-                            fontSize: '0.68rem',
-                            fontWeight: 700,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: '0 5px',
-                        }}
-                    >
-                        {unreadCount > 99 ? '99+' : unreadCount}
-                    </span>
-                ) : hasUnread ? (
-                    <span
-                        data-testid="unread-indicator"
-                        aria-label="Unread messages"
-                        style={{
-                            width: '9px',
-                            height: '9px',
-                            borderRadius: '50%',
-                            background: '#3b82f6',
-                            display: 'block',
-                        }}
-                    />
-                ) : null}
+                <span
+                    data-testid="unread-indicator"
+                    aria-label={hasUnread ? (unreadCount > 0 ? `${unreadCount} unread messages` : 'Unread messages') : undefined}
+                    style={{
+                        display: hasUnread ? 'flex' : 'none',
+                        minWidth: hasUnread && unreadCount > 0 ? '20px' : '9px',
+                        height: hasUnread && unreadCount > 0 ? '20px' : '9px',
+                        borderRadius: '50%',
+                        background: hasUnread ? '#3b82f6' : 'transparent',
+                        color: '#ffffff',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: hasUnread && unreadCount > 0 ? '0 5px' : '0',
+                    }}
+                >
+                    {hasUnread && unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : ''}
+                </span>
             </div>
         </button>
     );

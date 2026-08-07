@@ -31,7 +31,7 @@ const MAX_ATTACHMENT_MB = 5; // Must match AttachmentService.MAX_FILE_SIZE_BYTES
 export interface ComposeBoxProps {
     conversationId: string;
     onSend: (message: Message, attachedFile?: File) => void;
-    senderRole: 'tenant' | 'landlord';
+    senderRole?: 'tenant' | 'landlord';
     recipientId?: string;
     agentEmail?: string;
     propertyTitle?: string;
@@ -81,7 +81,15 @@ const SpinnerIcon = () => (
 // Component
 // ---------------------------------------------------------------------------
 
-const ComposeBox: React.FC<ComposeBoxProps> = ({ conversationId, onSend, senderRole, recipientId, agentEmail, propertyTitle, initialBody }) => {
+const ComposeBox: React.FC<ComposeBoxProps> = ({
+    conversationId,
+    onSend,
+    senderRole = 'tenant',
+    recipientId,
+    agentEmail,
+    propertyTitle,
+    initialBody,
+}) => {
     const [body, setBody] = useState(initialBody ?? '');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [sending, setSending] = useState(false);
@@ -138,7 +146,11 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({ conversationId, onSend, senderR
                 propertyTitle,
             });
 
-            onSend(message, selectedFile ?? undefined);
+            if (selectedFile) {
+                onSend(message, selectedFile);
+            } else {
+                onSend(message);
+            }
             setBody('');
             setSelectedFile(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
@@ -370,15 +382,18 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({ conversationId, onSend, senderR
                     {/* Spacer */}
                     <div style={{ flex: 1 }} />
 
-                    {/* Char counter ring */}
-                    {charCount > 0 && (
-                        <div
-                            id="char-counter"
-                            data-testid="char-counter"
-                            aria-live="polite"
-                            title={`${charCount}/${MAX_CHARS} characters`}
-                            style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
-                        >
+                    {/* Char counter ring & text */}
+                    <div
+                        id="char-counter"
+                        data-testid="char-counter"
+                        aria-live="polite"
+                        title={`${charCount}/${MAX_CHARS} characters`}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                        <span style={{ fontSize: '0.75rem', color: isOverLimit ? '#ef4444' : '#6b7280' }}>
+                            {charCount}/{MAX_CHARS}
+                        </span>
+                        {charCount > 0 && (
                             <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
                                 {/* Track */}
                                 <circle cx="11" cy="11" r={radius}
@@ -398,17 +413,17 @@ const ComposeBox: React.FC<ComposeBoxProps> = ({ conversationId, onSend, senderR
                                     style={{ transition: 'stroke-dashoffset 0.2s, stroke 0.2s' }}
                                 />
                             </svg>
-                            {isOverLimit && (
-                                <span
-                                    data-testid="char-limit-error"
-                                    role="alert"
-                                    style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 600 }}
-                                >
-                                    {charCount - MAX_CHARS} over
-                                </span>
-                            )}
-                        </div>
-                    )}
+                        )}
+                        {isOverLimit && (
+                            <span
+                                data-testid="char-limit-error"
+                                role="alert"
+                                style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 600 }}
+                            >
+                                {charCount - MAX_CHARS} over
+                            </span>
+                        )}
+                    </div>
 
                     {/* Send button */}
                     <button

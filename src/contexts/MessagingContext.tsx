@@ -5,9 +5,10 @@
  * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 15.1–15.4
  */
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Conversation } from '../types/messaging';
 import communicationService from '../services/communicationService';
+import { useAuth } from './AuthContext';
 
 // ---------------------------------------------------------------------------
 // Context shape
@@ -51,9 +52,17 @@ export const MessagingContext = createContext<MessagingContextType>({
 // ---------------------------------------------------------------------------
 
 export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { user } = useAuth();
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [unreadCount, setUnreadCount] = useState<number>(0);
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+
+    // Clear state on user change to prevent data bleed
+    useEffect(() => {
+        setConversations([]);
+        setUnreadCount(0);
+        setActiveConversationId(null);
+    }, [user?.id]);
 
     const refreshConversations = useCallback(async () => {
         try {

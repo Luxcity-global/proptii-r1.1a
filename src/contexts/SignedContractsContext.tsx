@@ -6,7 +6,7 @@ interface SignedContractsContextType {
   signedContracts: SignedContractData[];
   isLoading: boolean;
   addSignedContract: (contract: Omit<SignedContractData, 'id' | 'signedDate'>) => Promise<SignedContractData>;
-  removeSignedContract: (id: string) => Promise<void>;
+  removeSignedContract: (id: string) => Promise<{ success: boolean; error?: string }>;
   getSignedContract: (id: string) => SignedContractData | undefined;
   clearAllContracts: () => Promise<void>;
 }
@@ -28,8 +28,10 @@ export const SignedContractsProvider: React.FC<{ children: React.ReactNode }> = 
 
   // Set up real-time Firestore listener — only when user is authenticated
   useEffect(() => {
+    setIsLoading(true);
+    setSignedContracts([]);
+
     if (!user?.id) {
-      setSignedContracts([]);
       setIsLoading(false);
       return;
     }
@@ -45,7 +47,8 @@ export const SignedContractsProvider: React.FC<{ children: React.ReactNode }> = 
   const addSignedContract = async (contractData: Omit<SignedContractData, 'id' | 'signedDate'>): Promise<SignedContractData> => {
     if (!user?.id) throw new Error('You must be signed in to save a contract.');
 
-    const result = await signedContractsFirestoreService.saveSignedContract(user.id, contractData);
+    const { userId: _, createdAt: __, updatedAt: ___, ...rest } = contractData as any;
+    const result = await signedContractsFirestoreService.saveSignedContract(user.id, rest);
 
     if (result.success && result.contractId) {
       const newContract: SignedContractData = {
@@ -62,8 +65,8 @@ export const SignedContractsProvider: React.FC<{ children: React.ReactNode }> = 
     throw new Error(result.error || 'Failed to save contract');
   };
 
-  const removeSignedContract = async (id: string): Promise<void> => {
-    await signedContractsFirestoreService.deleteSignedContract(id);
+  const removeSignedContract = async (id: string): Promise<{ success: boolean; error?: string }> => {
+    return await signedContractsFirestoreService.deleteSignedContract(id);
   };
 
   const getSignedContract = (id: string): SignedContractData | undefined => {

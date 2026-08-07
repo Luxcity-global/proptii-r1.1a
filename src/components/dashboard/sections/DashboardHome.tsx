@@ -30,7 +30,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useSavedProperties } from '../../../contexts/SavedPropertiesContext';
 import { fileService, FileItem } from '../../../services/fileService';
 import { contractService } from '../../../services/contractService';
-import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
+import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import { viewingService, ViewingStats } from '../../../services/viewingService';
 import FilePreviewModal from './FilePreviewModal';
 import { useIsMobile } from '../ui/use-mobile';
@@ -44,6 +44,7 @@ const DashboardHome: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { savedProperties } = useSavedProperties();
+  const { signedContracts } = useSignedContracts();
   const isMobile = useIsMobile();
   
   // State for referencing modal
@@ -60,7 +61,6 @@ const DashboardHome: React.FC = () => {
   const [filesLoading, setFilesLoading] = useState(true);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
-  const [signedContractsCount, setSignedContractsCount] = useState(0);
   const [viewingStats, setViewingStats] = useState<ViewingStats>({
     upcoming: 0,
     completed: 0,
@@ -82,7 +82,6 @@ const DashboardHome: React.FC = () => {
   // Load files on component mount
   React.useEffect(() => {
     loadFiles();
-    loadSignedContractsCount();
     loadViewingStats();
   }, [user?.id]);
   
@@ -181,21 +180,7 @@ const DashboardHome: React.FC = () => {
     }
   };
 
-  const loadSignedContractsCount = async () => {
-    try {
-      if (!user?.id) return;
-      
-      console.log('Loading signed contracts count for dashboard');
-      const result = await signedContractsFirestoreService.getUserSignedContracts(user.id);
-      
-      if (result.success && result.contracts) {
-        setSignedContractsCount(result.contracts.length);
-        console.log(`Loaded ${result.contracts.length} signed contracts for dashboard`);
-      }
-    } catch (error) {
-      console.error('Error loading signed contracts count:', error);
-    }
-  };
+
 
   const loadViewingStats = async () => {
     try {
@@ -377,7 +362,7 @@ const DashboardHome: React.FC = () => {
     savedSearches: { count: savedProperties.length }, // Use real count from SavedPropertiesContext
     viewings: { upcoming: 5, total: 8 }, // 5 upcoming from Viewings page
     referencing: { completedSteps: completedCount, totalSteps: 6 }, // Dynamic count based on actual completion
-    contracts: { pending: 0, total: signedContractsCount, requested: 0 }, // Use actual signed contracts count
+    contracts: { pending: 0, total: signedContracts.length, requested: 0 }, // Use actual signed contracts count
     portfolioValue: '2,400',
     occupancyRate: 95,
     averageRent: 2400,
@@ -651,7 +636,7 @@ const DashboardHome: React.FC = () => {
           {/* Row 2: Number */}
           <div className={isMobile ? 'mb-2' : 'mb-3'}>
             <p className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`} style={{ color: '#374957' }}>
-              {signedContractsCount || 0}
+              {signedContracts.length || 0}
             </p>
           </div>
           
@@ -1316,7 +1301,7 @@ const DashboardHome: React.FC = () => {
             {/* Signed Contracts */}
             <div className={`${isMobile ? 'p-3' : 'p-4'} bg-blue-50 rounded-lg border border-blue-200`}>
               <div className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-gray-800 ${isMobile ? 'mb-1' : 'mb-2'}`}>
-                {signedContractsCount || 0}
+                 {signedContracts.length || 0}
               </div>
               <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 ${isMobile ? 'mb-2' : 'mb-3'}`}>
                 Signed Contracts

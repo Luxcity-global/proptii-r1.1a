@@ -15,6 +15,12 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 
+const logDev = (...args: any[]) => {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+};
+
 export interface SignedContractData {
   id: string;
   userId: string;
@@ -79,7 +85,7 @@ class SignedContractsFirestoreService {
 
       await setDoc(docRef, signedContractData);
       
-      console.log('✅ Signed contract saved to Firestore successfully:', contractId);
+      logDev('✅ Signed contract saved to Firestore successfully:', contractId);
       return { success: true, contractId };
     } catch (error: any) {
       console.error('❌ Error saving signed contract to Firestore:', error);
@@ -112,7 +118,7 @@ class SignedContractsFirestoreService {
    */
   async getUserSignedContracts(userId: string): Promise<{ success: boolean; contracts?: SignedContractData[]; error?: string }> {
     try {
-      console.log('Getting user signed contracts for userId:', userId);
+      logDev('Getting user signed contracts for userId:', userId);
       const q = query(
         collection(db, this.collectionName),
         where('userId', '==', userId),
@@ -122,13 +128,13 @@ class SignedContractsFirestoreService {
       const querySnapshot = await getDocs(q);
       const contracts: SignedContractData[] = [];
       
-      console.log('Signed contracts query snapshot size:', querySnapshot.size);
+      logDev('Signed contracts query snapshot size:', querySnapshot.size);
       querySnapshot.forEach((doc) => {
-        console.log('Found signed contract document:', doc.id, doc.data());
+        logDev('Found signed contract document:', doc.id, doc.data());
         contracts.push(doc.data() as SignedContractData);
       });
       
-      console.log('Retrieved signed contracts:', contracts);
+      logDev('Retrieved signed contracts:', contracts);
       return { success: true, contracts };
     } catch (error) {
       console.error('❌ Error getting user signed contracts:', error);
@@ -184,7 +190,7 @@ class SignedContractsFirestoreService {
       
       await updateDoc(docRef, updateData);
       
-      console.log('✅ Signed contract status updated successfully:', contractId, status);
+      logDev('✅ Signed contract status updated successfully:', contractId, status);
       return { success: true };
     } catch (error) {
       console.error('❌ Error updating signed contract status:', error);
@@ -203,7 +209,7 @@ class SignedContractsFirestoreService {
       const docRef = doc(db, this.collectionName, contractId);
       await deleteDoc(docRef);
       
-      console.log('✅ Signed contract deleted successfully:', contractId);
+      logDev('✅ Signed contract deleted successfully:', contractId);
       return { success: true };
     } catch (error) {
       console.error('❌ Error deleting signed contract:', error);
@@ -250,27 +256,50 @@ class SignedContractsFirestoreService {
     userId: string, 
     callback: (contracts: SignedContractData[]) => void
   ): () => void {
-    console.log('Setting up real-time listener for signed contracts, userId:', userId);
-    
-    const q = query(
-      collection(db, this.collectionName),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
-    
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const contracts: SignedContractData[] = [];
-      querySnapshot.forEach((doc) => {
-        contracts.push(doc.data() as SignedContractData);
+    logDev('Setting up real-time listener for signed contracts, userId:', userId);
+    let unsubscribe: () => void = () => {};
+
+    const setupListener = (useOrderBy: boolean) => {
+      const q = useOrderBy
+        ? query(
+            collection(db, this.collectionName),
+            where('userId', '==', userId),
+            orderBy('createdAt', 'desc')
+          )
+        : query(
+            collection(db, this.collectionName),
+            where('userId', '==', userId)
+          );
+
+      unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const contracts: SignedContractData[] = [];
+        querySnapshot.forEach((doc) => {
+          contracts.push(doc.data() as SignedContractData);
+        });
+        
+        if (!useOrderBy) {
+          // Sort in memory by createdAt descending
+          contracts.sort((a, b) => {
+            const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
+            const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
+            return bTime - aTime;
+          });
+        }
+        
+        logDev('Real-time update: signed contracts changed:', contracts.length, 'contracts');
+        callback(contracts);
+      }, (error: any) => {
+        if (useOrderBy && (error.code === 'failed-precondition' || error.message?.includes('index'))) {
+          console.warn('⚠️ Signed contracts ordered listener failed, falling back to unordered listener...');
+          setupListener(false);
+        } else {
+          console.error('Error in signed contracts real-time listener:', error);
+        }
       });
-      
-      console.log('Real-time update: signed contracts changed:', contracts.length, 'contracts');
-      callback(contracts);
-    }, (error) => {
-      console.error('Error in signed contracts real-time listener:', error);
-    });
-    
-    return unsubscribe;
+    };
+
+    setupListener(true);
+    return () => unsubscribe();
   }
 }
 

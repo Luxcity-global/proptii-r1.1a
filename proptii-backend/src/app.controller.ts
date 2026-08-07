@@ -1,4 +1,5 @@
-import { Controller, Get, Logger, Query } from '@nestjs/common';
+import { Controller, Get, Logger, Query, HttpException, HttpStatus, Header } from '@nestjs/common';
+import axios from 'axios';
 import { AppService } from './app.service';
 import { NativePropertiesService } from './services/native-properties.service';
 import type { NativeProperty } from './schemas/native-property.schema';
@@ -96,5 +97,26 @@ export class AppController {
     const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
     const results = await this.nativePropertiesService.searchPublic(q, limitNum);
     return { results: results.map(normaliseForSearch), total: results.length, query: q };
+  }
+
+  @Get('govuk-rss')
+  @Header('Content-Type', 'application/xml')
+  async getGovUkRss() {
+    try {
+      this.logger.log('Fetching GOV.UK RSS Atom feed...');
+      const response = await axios.get('https://www.gov.uk/search/news-and-communications.atom', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; Proptii Market Insights Bot)',
+        },
+        timeout: 10000,
+      });
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(`Failed to fetch GOV.UK RSS feed: ${error.message}`);
+      throw new HttpException(
+        `Failed to fetch GOV.UK RSS feed: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
   }
 }
