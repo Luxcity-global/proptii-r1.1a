@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { PassportStrategy } from '@nestjs/passport';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+import { passportJwtSecret } from 'jwks-rsa';
 import { getFirestore } from '../config/firestore.config';
 
 export const roleCache = new Map<string, { role: string; expires: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
-import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
 
 /**
  * B2C policy base URL only — no trailing /v2.0/ (Nest appends that for `iss` checks and builds JWKS URL).
@@ -25,6 +26,11 @@ function normalizeB2cAuthority(raw: string): string {
  * Required env vars:
  *   MSAL_AUTHORITY (or AZURE_AD_B2C_AUTHORITY)  – e.g. https://proptii.b2clogin.com/proptii.onmicrosoft.com/B2C_1_signupsignin
  *   MSAL_CLIENT_ID (or AZURE_AD_B2C_CLIENT_ID)  – Azure AD B2C application (client) ID
+ *
+ * Uses jwks-rsa v3 (CommonJS) via a static top-level import.
+ * jwks-rsa v4 is ESM-only and cannot be used in a CommonJS NestJS build
+ * because TypeScript compiles dynamic import() to require(), which throws:
+ *   "require() of ES Module ... not supported"
  */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -39,50 +45,38 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     /** B2C access tokens sometimes use `aud` = client GUID, sometimes an app-id URI — allow both. */
     const audienceList = [clientId, ...extraAudiences].filter(Boolean);
 
-    // IMPORTANT: `jwks-rsa` pulls in `jose` which is ESM.
-    // Jest (CommonJS) can't parse it by default, breaking e2e tests.
-    // For Jest runs we use a simple static secret so passport-jwt can still reject
-    // missing/invalid tokens without loading `jwks-rsa`.
     const isJestTestEnv = process.env.NODE_ENV === 'test';
     const jwksUri = authority
       ? `${authority.replace(/\/$/, '')}/discovery/v2.0/keys`
       : '';
 
+    const log = new Logger('JwtStrategy');
+
+    if (!isJestTestEnv && (!jwksUri || !jwksUri.startsWith('http'))) {
+      log.warn(`MSAL_AUTHORITY is misconfigured or missing. Value: "${rawAuthority}". JWT auth will reject all tokens.`);
+    }
+
+    if (!isJestTestEnv && !clientId) {
+      log.warn(
+        'MSAL_CLIENT_ID is empty — set it to the same value as VITE_AZURE_AD_CLIENT_ID (SPA app ID) or JWT validation will fail.',
+      );
+    }
+
     super({
       ...(isJestTestEnv
         ? { secretOrKey: process.env.JWT_TEST_SECRET ?? 'test-jwt-secret' }
-        : (() => {
-            if (!jwksUri || !jwksUri.startsWith('http')) {
-              const logger = new Logger('JwtStrategy');
-              logger.warn(`MSAL_AUTHORITY is missconfigured or missing. Value: "${rawAuthority}". JWT auth disabled.`);
-              return { secretOrKey: 'missing-jwks-secret-fallback' };
-            }
-            if (!clientId) {
-              const logger = new Logger('JwtStrategy');
-              logger.warn(
-                'MSAL_CLIENT_ID is empty — set it to the same value as VITE_AZURE_AD_CLIENT_ID (SPA app ID) or JWT validation will fail.',
-              );
-            }
-            let cachedHandler: any = null;
-            return {
-              secretOrKeyProvider: (request: any, rawJwtToken: any, done: any) => {
-                if (cachedHandler) {
-                  return cachedHandler(request, rawJwtToken, done);
-                }
-                import('jwks-rsa')
-                  .then((jwksRsa) => {
-                    cachedHandler = jwksRsa.passportJwtSecret({
-                      cache: true,
-                      rateLimit: true,
-                      jwksRequestsPerMinute: 5,
-                      jwksUri,
-                    });
-                    cachedHandler(request, rawJwtToken, done);
-                  })
-                  .catch((err) => done(err));
-              },
-            };
-          })()),
+        : (!jwksUri || !jwksUri.startsWith('http'))
+          ? { secretOrKey: 'missing-jwks-secret-fallback' }
+          : {
+              // Use passportJwtSecret from jwks-rsa v3 (CommonJS) — a static top-level import.
+              // This avoids the TypeScript dynamic import() → require() compile issue that breaks jwks-rsa v4 (ESM).
+              secretOrKeyProvider: passportJwtSecret({
+                cache: true,
+                rateLimit: true,
+                jwksRequestsPerMinute: 5,
+                jwksUri,
+              }),
+            }),
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ...(audienceList.length > 0
         ? {
@@ -104,9 +98,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
 
     if (!isJestTestEnv && jwksUri?.startsWith('http') && clientId) {
-      const log = new Logger('JwtStrategy');
       log.log(
-        `JWT validation enabled — authority ends with …${authority.length > 48 ? authority.slice(-48) : authority}; audience clientId prefix ${clientId.slice(0, 8)}… (must match SPA VITE_AZURE_AD_CLIENT_ID)`,
+        `JWT validation enabled — JWKS URI: ${jwksUri}; audience clientId prefix ${clientId.slice(0, 8)}…`,
       );
     }
   }
