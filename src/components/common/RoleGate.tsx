@@ -1,51 +1,65 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 /**
- * RoleGate
+ * RoleGate — redirects authenticated users with no assigned role to /select-role.
  *
- * Sits just inside the router and watches for authenticated users who
- * have no role assigned yet (user.roleResolved === false).
+ * A 400 ms settle delay prevents acting on the first render frame when the
+ * role may not yet be resolved (Firestore cold-start, etc.).
  *
- * When it detects such a user it redirects to /select-role so they
- * can pick their role before reaching any protected content.
- *
- * Exempted paths (no redirect even without a role):
- *   - /select-role itself (prevents infinite redirect loop)
- *   - /claim (claim flow assigns role itself)
- *   - /login, /register
- *   - /unauthorized
+ * Exempt paths: /select-role, /claim, /login, /register, /unauthorized
  */
+
 const EXEMPT_PATHS = ['/select-role', '/claim', '/login', '/register', '/unauthorized'];
+const SETTLE_DELAY_MS = 400;
 
 const RoleGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading, user } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate   = useNavigate();
+  const location   = useLocation();
   const redirectedRef = useRef(false);
+  const [settled, setSettled] = useState(false);
 
-  // Reset on logout so next login can trigger the gate again
+  // Start settle timer once isLoading goes false
   useEffect(() => {
-    if (!isAuthenticated) redirectedRef.current = false;
+    if (!isLoading) {
+      const t = setTimeout(() => {
+        console.log('[RoleGate] settled — will now evaluate role state');
+        setSettled(true);
+      }, SETTLE_DELAY_MS);
+      return () => clearTimeout(t);
+    }
+    setSettled(false);
+  }, [isLoading]);
+
+  // Reset on logout
+  useEffect(() => {
+    if (!isAuthenticated) {
+      redirectedRef.current = false;
+      setSettled(false);
+      console.log('[RoleGate] reset (user logged out)');
+    }
   }, [isAuthenticated]);
 
   useEffect(() => {
-    if (isLoading || !isAuthenticated || redirectedRef.current) return;
+    if (!settled || isLoading || !isAuthenticated || redirectedRef.current) return;
 
-    // Skip exempt paths
     const isExempt = EXEMPT_PATHS.some(
       (p) => location.pathname === p || location.pathname.startsWith(`${p}/`),
     );
     if (isExempt) return;
 
-    // If user has no role assigned yet, send to select-role
+    console.log('[RoleGate] evaluating — user.roleResolved:', user?.roleResolved, 'roles:', user?.roles, 'path:', location.pathname);
+
     if (user && user.roleResolved === false) {
-      console.log('[RoleGate] No role resolved — redirecting to /select-role');
+      console.warn('[RoleGate] roleResolved=false — redirecting to /select-role');
       redirectedRef.current = true;
       navigate('/select-role', { replace: true });
+    } else {
+      console.log('[RoleGate] role OK — allowing through');
     }
-  }, [isAuthenticated, isLoading, user, navigate, location.pathname]);
+  }, [settled, isAuthenticated, isLoading, user, navigate, location.pathname]);
 
   return <>{children}</>;
 };

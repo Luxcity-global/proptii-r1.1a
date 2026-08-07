@@ -36,35 +36,34 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
 
   if (isLoading) {
-
     return (
-
       <div style={{
-
         display: 'flex',
-
         justifyContent: 'center',
-
         alignItems: 'center',
-
         minHeight: '50vh',
-
         fontFamily: 'Archivo, sans-serif',
-
       }}>
-
         <div style={{ textAlign: 'center' }}>
-
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
-
           <p style={{ color: '#666' }}>Loading...</p>
-
         </div>
-
       </div>
-
     );
+  }
 
+  // If authenticated but role resolution hasn't completed yet
+  // (Firestore slow / cold-start), hold on loading instead of redirecting.
+  if (isAuthenticated && user && !user.roleResolved) {
+    console.log('[ProtectedRoute] authenticated but roleResolved=false — holding on loading spinner');
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh', fontFamily: 'Archivo, sans-serif' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4" />
+          <p style={{ color: '#666' }}>Loading...</p>
+        </div>
+      </div>
+    );
   }
 
 
@@ -78,13 +77,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!isAuthenticated) {
-
     const fullPath = location.pathname + location.search;
-
+    console.log('[ProtectedRoute] unauthenticated — redirecting to login, storing return path:', fullPath);
     sessionStorage.setItem('redirectAfterLogin', fullPath);
-
     sessionStorage.removeItem('redirect_in_progress');
-
     sessionStorage.removeItem('last_redirect_path');
 
 
@@ -114,12 +110,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
 
   if (requiredRoles.length > 0 && user) {
-
     const userRoles = user.roles || [];
     const hasRequiredRole = requiredRoles.some(role => userRoles.includes(role));
+    console.log('[ProtectedRoute] path:', location.pathname, 'requiredRoles:', requiredRoles, 'userRoles:', userRoles, 'hasRequired:', hasRequiredRole);
 
     if (!hasRequiredRole) {
       const actualRole = userRoles[0];
+      console.warn('[ProtectedRoute] role mismatch — actualRole:', actualRole, 'required:', requiredRoles);
 
       // ── Smart redirects: send users to their correct dashboard ──────────────
 

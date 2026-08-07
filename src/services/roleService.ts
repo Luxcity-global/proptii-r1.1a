@@ -113,41 +113,49 @@ export async function resolveRole(
   uid: string,
   email: string,
 ): Promise<UserRole | null> {
-  // 1. Check users/{uid} — fastest, canonical
+  const t0 = Date.now();
+  console.log('[RoleService] resolveRole() — uid:', uid, 'email:', email);
+
+  // Fast path: localStorage cache avoids a Firestore round-trip and protects
+  // against cold-start delays on Render (Firestore rules need the backend warm).
+  const cached = localStorage.getItem(`proptii_role_${uid}`);
+  if (cached === 'tenant' || cached === 'landlord' || cached === 'agent') {
+    console.log(`[RoleService] ✓ Role from localStorage cache: ${cached} (${Date.now() - t0}ms)`);
+    return cached as UserRole;
+  }
+  console.log('[RoleService] No localStorage cache — querying Firestore...');
+
+  // 1. users/{uid} Firestore document — canonical
   const userDoc = await readUserDoc(uid);
   if (userDoc?.role) {
-    console.log(`[RoleService] Role from Firestore users/${uid}:`, userDoc.role);
+    console.log(`[RoleService] ✓ Role from Firestore users/${uid}: ${userDoc.role} (${Date.now() - t0}ms)`);
+    localStorage.setItem(`proptii_role_${uid}`, userDoc.role);
     return userDoc.role;
   }
+  console.log(`[RoleService] users/${uid} doc missing or has no role (${Date.now() - t0}ms) — checking landlordUsers...`);
 
-  // 2. Back-compat: check landlordUsers collection
+  // 2. landlordUsers collection — back-compat
   const landlordCheck = await queryLandlordUsers(email);
   if (landlordCheck) {
     const role = landlordCheck.role;
-    console.log('[RoleService] Role from landlordUsers collection:', role);
-    // Migrate: write into users/{uid} so future lookups are fast
+    console.log(`[RoleService] ✓ Role from landlordUsers: ${role} (${Date.now() - t0}ms)`);
+    localStorage.setItem(`proptii_role_${uid}`, role);
     await writeUserDoc(uid, email, role, 'landlordUsers_migration');
     return role;
   }
+  console.log(`[RoleService] Not in landlordUsers (${Date.now() - t0}ms) — checking signup intent...`);
 
-  // 3. Check sessionStorage intent set during signup
+  // 3. sessionStorage signup intent
   const intent = getRoleIntent();
   if (intent) {
-    console.log('[RoleService] Role from signup intent:', intent);
+    console.log(`[RoleService] ✓ Role from signup intent: ${intent} (${Date.now() - t0}ms)`);
     clearRoleIntent();
+    localStorage.setItem(`proptii_role_${uid}`, intent);
     await writeUserDoc(uid, email, intent, 'signup_intent');
     return intent;
   }
-  
-  // 3.5. Fallback check for localStorage (used if Firestore write fails/hangs)
-  const localFallback = localStorage.getItem(`proptii_role_${uid}`);
-  if (localFallback === 'tenant' || localFallback === 'landlord' || localFallback === 'agent') {
-    console.log('[RoleService] Role from localStorage fallback:', localFallback);
-    return localFallback as UserRole;
-  }
 
-  // 4. No role found
-  console.log('[RoleService] No role found for uid:', uid);
+  console.warn(`[RoleService] ✗ No role found for uid: ${uid} (${Date.now() - t0}ms total) — user will be routed to /select-role`);
   return null;
 }
 

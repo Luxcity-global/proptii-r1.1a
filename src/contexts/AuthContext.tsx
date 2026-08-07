@@ -13,22 +13,18 @@ import { auth } from '../config/firebaseConfig';
 import { notifyAuthReady } from '../services/authReady';
 
 // ─── MSAL singleton ───────────────────────────────────────────────────────────
-//
-// One PublicClientApplication instance for the lifetime of the page.
-// Created on first call; initialize() is called immediately and the promise
-// cached so callers can await it cheaply.
 
 let msalInstance: PublicClientApplication | null = null;
 let msalInitPromise: Promise<void> | null = null;
 
 export const getMsalInstance = (): PublicClientApplication => {
   if (!msalInstance) {
+    console.log('[Auth] Creating MSAL PublicClientApplication singleton');
     msalInstance = new PublicClientApplication(msalConfig);
-
-    // Kick off initialization immediately; errors are swallowed here and
-    // surfaced later when callers await msalInitPromise.
     msalInitPromise = msalInstance.initialize() as Promise<void>;
-    msalInitPromise.catch((err) => console.error('[MSAL] init error:', err));
+    msalInitPromise
+      .then(() => console.log('[Auth] MSAL initialize() completed'))
+      .catch((err) => console.error('[Auth] MSAL initialize() failed:', err));
 
     msalInstance.addEventCallback((event: EventMessage) => {
       const succeeded =
@@ -38,6 +34,7 @@ export const getMsalInstance = (): PublicClientApplication => {
         event.eventType === EventType.LOGIN_FAILURE ||
         event.eventType === EventType.ACQUIRE_TOKEN_FAILURE;
       if (succeeded || failed) {
+        console.log('[Auth] MSAL event:', event.eventType);
         window.dispatchEvent(new CustomEvent('auth-state-changed'));
       }
     });
@@ -45,14 +42,11 @@ export const getMsalInstance = (): PublicClientApplication => {
   return msalInstance;
 };
 
-/** Resolves once msalInstance.initialize() has settled. */
 export async function waitForMsalReady(): Promise<void> {
   if (!msalInstance) getMsalInstance();
   if (msalInitPromise) await msalInitPromise;
 }
 
-// Re-export the auth-ready helpers from their canonical leaf module so any
-// existing consumer that imports from AuthContext keeps working.
 export { isAuthReady, waitForAuthReady } from '../services/authReady';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -65,7 +59,6 @@ export interface User {
   name?: string;
   phone?: string;
   roles: string[];
-  /** true once a canonical role has been resolved (even if roles[] is empty) */
   roleResolved: boolean;
 }
 
@@ -79,15 +72,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   editProfile: () => Promise<void>;
   refreshUserData: () => Promise<void>;
-  /**
-   * Patch the in-memory user without a full re-init.
-   * Used by RoleSelect after writing a new role so the React tree sees the
-   * updated role before navigation happens — no page reload needed.
-   */
   patchUser: (patch: Partial<User>) => void;
 }
-
-// ─── Context ──────────────────────────────────────────────────────────────────
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -133,12 +119,9 @@ function clearAuthStorage(): void {
   sessionStorage.removeItem('redirectAfterLogin');
 }
 
-/**
- * Sync Firebase identity from a B2C id-token. Non-fatal — a failure here
- * only means Firestore will fall back to anonymous/unauthenticated rules.
- */
 async function syncFirebaseAuth(b2cIdToken: string): Promise<void> {
   const base = (import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000').replace(/\/$/, '');
+  console.log('[Auth] Syncing Firebase auth token via', base);
   try {
     const res = await fetch(`${base}/api/auth/firebase-token`, {
       method: 'POST',
@@ -146,11 +129,16 @@ async function syncFirebaseAuth(b2cIdToken: string): Promise<void> {
     });
     if (res.ok) {
       const { firebaseToken } = await res.json();
-      if (firebaseToken) await signInWithCustomToken(auth, firebaseToken);
+      if (firebaseToken) {
+        await signInWithCustomToken(auth, firebaseToken);
+        console.log('[Auth] Firebase sync OK');
+      }
     } else {
+      console.warn('[Auth] Firebase token exchange failed:', res.status, res.statusText);
       window.dispatchEvent(new CustomEvent('firebase-auth-sync-failed', { detail: { status: res.status } }));
     }
   } catch (err) {
+    console.warn('[Auth] Firebase sync error (non-fatal):', err instanceof Error ? err.message : err);
     window.dispatchEvent(new CustomEvent('firebase-auth-sync-failed', {
       detail: { message: err instanceof Error ? err.message : 'Unknown' },
     }));
@@ -169,17 +157,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const sessionManager = SessionManager.getInstance();
 
-  // ── One-time auth initialisation ─────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
+    const t0 = Date.now();
 
     const init = async () => {
+      console.log('[Auth] init() started — accounts in MSAL cache:', accounts.length);
       try {
-        // ── Dev-only mock user shortcut ──────────────────────────────────────
+        // Dev mock shortcut
         const mockToken = localStorage.getItem('mock_token');
         if (mockToken?.startsWith('mock-token-')) {
           const id   = mockToken.replace('mock-token-', '');
           const role = id.startsWith('tenant') ? 'tenant' : 'landlord';
+          console.log('[Auth] Using mock user:', id, 'role:', role);
           if (!cancelled) {
             setUser({ id, email: `${role}@test.proptii.co`, name: `Test ${role}`, roles: [role], roleResolved: true });
             setIsAuthenticated(true);
@@ -187,53 +177,62 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return;
         }
 
-        // ── Process any pending B2C redirect ────────────────────────────────
-        // IMPORTANT: handleRedirectPromise() MUST be awaited before any other
-        // MSAL call. It processes the hash/query params Azure B2C appends on
-        // redirect and clears them — calling acquireTokenSilent before this
-        // completes throws InteractionRequiredAuthError, which is the root cause
-        // of every spurious "session expired" redirect this codebase has had.
+        // Process any pending B2C redirect response
+        console.log('[Auth] Calling handleRedirectPromise()...');
         const redirect = await instance.handleRedirectPromise();
-        if (redirect?.account) instance.setActiveAccount(redirect.account);
-
-        // Restore any in-progress navigation target the user had before login.
-        if (redirect?.state) {
-          try {
-            const parsed = JSON.parse(redirect.state);
-            if (parsed.redirect) sessionStorage.setItem('redirectAfterLogin', parsed.redirect);
-          } catch { /* state is not JSON — ignore */ }
+        if (redirect) {
+          console.log('[Auth] handleRedirectPromise() returned an account:', redirect.account?.username);
+          if (redirect.account) instance.setActiveAccount(redirect.account);
+          if (redirect.state) {
+            try {
+              const parsed = JSON.parse(redirect.state);
+              if (parsed.redirect) {
+                console.log('[Auth] Restoring redirect target from state:', parsed.redirect);
+                sessionStorage.setItem('redirectAfterLogin', parsed.redirect);
+              }
+            } catch { /* state is not JSON */ }
+          }
+        } else {
+          console.log('[Auth] handleRedirectPromise() → no redirect response (normal for non-redirect page loads)');
         }
 
-        // No accounts → user is unauthenticated; nothing more to do.
-        if (accounts.length === 0) return;
+        if (accounts.length === 0) {
+          console.log('[Auth] No MSAL accounts — user is unauthenticated');
+          return;
+        }
 
-        // ── Resolve user from MSAL account ───────────────────────────────────
         const account = accounts[0];
         instance.setActiveAccount(account);
-
         const userId = resolveUserId(account as any);
-        const phone  = extractPhoneNumber(account.idTokenClaims as Record<string, unknown>);
+        console.log('[Auth] Account found:', account.username, 'uid:', userId);
+
+        const phone = extractPhoneNumber(account.idTokenClaims as Record<string, unknown>);
 
         let roles: string[]  = [];
         let roleResolved      = false;
         try {
+          console.log('[Auth] Resolving role for uid:', userId);
           const { resolveRole } = await import('../services/roleService');
           const role = await resolveRole(userId, account.username);
+          console.log('[Auth] Role resolved:', role, '(took', Date.now() - t0, 'ms)');
           if (role) {
-            roles        = [role];
-            roleResolved = true;
+            roles = [role];
             if (LANDLORD_ROLES.has(role)) {
               const redir = sessionStorage.getItem('redirectAfterLogin');
               if (!redir || redir === '/dashboard' || redir === '/') {
+                console.log('[Auth] Landlord/agent — setting redirectAfterLogin → /landlord');
                 sessionStorage.setItem('redirectAfterLogin', '/landlord');
               }
             }
           }
+          roleResolved = true; // always true after lookup completes, even if role is null
         } catch (err) {
-          console.error('[Auth] Role resolution failed:', err);
+          console.error('[Auth] Role resolution threw — roleResolved stays false:', err);
+          // roleResolved remains false; ProtectedRoute will hold on loading spinner
         }
 
         if (!cancelled) {
+          console.log('[Auth] Setting user state — roles:', roles, 'roleResolved:', roleResolved);
           setUser({
             id: userId,
             givenName:  account.name?.split(' ')[0],
@@ -247,29 +246,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setIsAuthenticated(true);
         }
 
-        // ── Firebase sync (non-blocking, non-fatal) ──────────────────────────
-        // Acquire the token DIRECTLY from MSAL here — do NOT call
-        // getAccessTokenForApiRequest(), which would wait for notifyAuthReady()
-        // that hasn't been called yet (we're still inside this try block).
+        // Firebase sync — non-blocking, uses MSAL directly to avoid deadlock
         instance.acquireTokenSilent({ ...loginRequest, account })
-          .then((r) => { if (r.idToken) syncFirebaseAuth(r.idToken); })
-          .catch(() => { /* non-fatal */ });
+          .then((r) => {
+            if (r.idToken) syncFirebaseAuth(r.idToken);
+          })
+          .catch((e) => {
+            console.warn('[Auth] acquireTokenSilent for Firebase sync failed (non-fatal):', e?.message ?? e);
+          });
 
         sessionManager.updateActivity('authentication', 'Session initialized');
+        console.log('[Auth] init() completed successfully in', Date.now() - t0, 'ms');
 
       } catch (err) {
-        // InteractionRequiredAuthError here means MSAL's cache is corrupt or the
-        // account was removed from B2C. Just mark the user as unauthenticated —
-        // do NOT call loginRedirect() because that would cause an infinite loop
-        // if the account truly doesn't exist.
+        const msg = err instanceof Error ? err.message : String(err);
+        const code = (err as any)?.errorCode ?? (err as any)?.name ?? 'unknown';
+        console.error(`[Auth] init() caught error — code: ${code}, message: ${msg}`, err);
         if (err instanceof InteractionRequiredAuthError) {
+          console.warn('[Auth] InteractionRequiredAuthError during init — clearing auth state (NOT redirecting)');
           if (!cancelled) { setIsAuthenticated(false); setUser(null); }
         }
-        console.error('[Auth] Initialization error:', err);
       } finally {
-        // Always unblock waitForAuthReady() — even if init threw or returned
-        // early. API interceptors will hang forever if this never fires.
         if (!cancelled) {
+          console.log('[Auth] init() finally — setting isLoading=false, notifyAuthReady()');
           setIsLoading(false);
           notifyAuthReady();
         }
@@ -278,9 +277,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     init();
 
-    // ── Event listeners ──────────────────────────────────────────────────────
-
-    // Cross-iframe auth bridge — landlord sub-app reads auth state via postMessage.
     const onAuthRequest = (event: MessageEvent) => {
       if (event.data?.type !== 'REQUEST_AUTH_STATE') return;
       const origin = event.origin;
@@ -291,22 +287,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       );
     };
 
-    // Inactivity / account lock → log out silently.
-    const onSessionTimeout = () => logout();
-    const onAccountLocked  = () => logout();
-
-    // Fired by msalAccessToken when the refresh token is confirmed expired.
-    // Just clear state — do NOT call loginRedirect automatically. The user will
-    // be prompted to sign in next time they click something that needs auth.
+    const onSessionTimeout = () => {
+      console.warn('[Auth] session_timeout event — logging out');
+      logout();
+    };
+    const onAccountLocked = () => {
+      console.warn('[Auth] account-locked event — logging out');
+      logout();
+    };
     const onSessionExpired = () => {
-      console.warn('[Auth] Session expired — clearing state');
+      // msalAccessToken fires this only after hasEverSucceeded=true, so this is
+      // a genuine expiry (refresh token gone), not a cold-start false positive.
+      console.warn('[Auth] auth-session-expired event — clearing state (user must sign in again)');
       localStorage.removeItem('auth_token');
       if (!cancelled) { setIsAuthenticated(false); setUser(null); }
     };
 
-    window.addEventListener('message',            onAuthRequest);
-    window.addEventListener('session_timeout',    onSessionTimeout);
-    window.addEventListener('account-locked',     onAccountLocked);
+    window.addEventListener('message',              onAuthRequest);
+    window.addEventListener('session_timeout',      onSessionTimeout);
+    window.addEventListener('account-locked',       onAccountLocked);
     window.addEventListener('auth-session-expired', onSessionExpired);
 
     return () => {
@@ -318,7 +317,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, [instance, accounts]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync a read-only auth snapshot to localStorage for the landlord iframe.
   useEffect(() => {
     if (!isLoading) {
       localStorage.setItem(
@@ -328,7 +326,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [isAuthenticated, user?.id, isLoading]);
 
-  // Auto-merge anonymous guest chat conversations on sign-in.
   useEffect(() => {
     if (!isAuthenticated || !user?.email) return;
     import('../services/quickRequestService')
@@ -338,18 +335,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  /**
-   * Initiates sign-in via a full-page redirect to Azure B2C.
-   *
-   * We deliberately use loginRedirect (not loginPopup) because:
-   * - Azure B2C sets Cross-Origin-Opener-Policy: same-origin on their auth
-   *   pages, which nullifies window.opener on return and causes MSAL's popup
-   *   handler to throw a BrowserAuthError with empty .message — this is the
-   *   exact crash that shows "Something went wrong / Error" in the ErrorBoundary.
-   * - Redirect flows work reliably regardless of COOP headers.
-   */
   const login = async (): Promise<void> => {
     const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+    console.log('[Auth] login() called — will redirect to B2C, restoring to:', redirectPath ?? window.location.href);
     const req = {
       ...loginRequest,
       state: redirectPath ? JSON.stringify({ redirect: redirectPath }) : undefined,
@@ -357,23 +345,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
     try {
       await instance.loginRedirect(req);
-      // loginRedirect navigates away — code below never runs in this tab.
     } catch (err) {
-      console.error('[Auth] loginRedirect failed:', err);
-      // Nothing else we can do — the redirect itself failed (e.g. B2C unreachable).
+      console.error('[Auth] loginRedirect() threw:', err);
       window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { success: false } }));
     }
   };
 
-  /**
-   * Signs out via a full-page redirect so MSAL can clear its server-side
-   * session cookie at B2C and the local cache atomically.
-   */
   const logout = async (): Promise<void> => {
+    console.log('[Auth] logout() called');
     sessionManager.updateActivity('interaction', 'User logout');
 
-    // Mock user logout — just clear state, no MSAL round-trip needed.
     if (user?.id?.startsWith('tenant-test-') || user?.id?.startsWith('landlord-test-')) {
+      console.log('[Auth] Mock user logout');
       setIsAuthenticated(false);
       setUser(null);
       clearAuthStorage();
@@ -381,13 +364,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     try {
-      await instance.logoutRedirect({
-        postLogoutRedirectUri: window.location.origin,
-      });
-      // logoutRedirect navigates away — code below never runs.
+      await instance.logoutRedirect({ postLogoutRedirectUri: window.location.origin });
     } catch (err) {
-      // Redirect itself failed — clear local state so the UI isn't stuck.
-      console.error('[Auth] logoutRedirect failed:', err);
+      console.error('[Auth] logoutRedirect() threw — clearing local state:', err);
       setIsAuthenticated(false);
       setUser(null);
       clearAuthStorage();
@@ -395,6 +374,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const loginAsMockUser = (id: string, role: string): void => {
+    console.log('[Auth] loginAsMockUser:', id, role);
     const names: Record<string, { name: string; givenName: string; familyName: string; email: string }> = {
       'tenant-test-001':   { name: 'Sarah Jones', givenName: 'Sarah', familyName: 'Jones',  email: 'tenant@test.proptii.co' },
       'tenant-test-002':   { name: 'Emily Davis', givenName: 'Emily', familyName: 'Davis',  email: 'tenant-two@test.proptii.co' },
@@ -409,13 +389,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(false);
   };
 
-  /**
-   * Opens the B2C profile-edit policy.
-   * Uses a popup here (not redirect) so the user stays on the current page
-   * while editing. If the popup is blocked, we open a plain window as fallback
-   * and poll for its close to trigger a silent token refresh.
-   */
   const editProfile = async (): Promise<void> => {
+    console.log('[Auth] editProfile() — opening B2C profile-edit popup');
     setIsLoading(true);
     sessionManager.updateActivity('interaction', 'Profile edit');
     try {
@@ -433,8 +408,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { success: true, userId: stableUserId } }));
       }
     } catch (msalErr) {
-      // Popup was blocked or COOP-killed — open a plain window and poll for close.
-      console.warn('[Auth] Profile-edit popup failed, opening fallback window:', msalErr);
+      console.warn('[Auth] editProfile popup failed — opening fallback window:', msalErr);
       const url = `https://proptii.b2clogin.com/proptii.onmicrosoft.com/oauth2/v2.0/authorize`
         + `?p=b2c_1_profileediting`
         + `&client_id=${msalConfig.auth.clientId}`
@@ -473,6 +447,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const patchUser = (patch: Partial<User>): void => {
+    console.log('[Auth] patchUser:', patch);
     setUser((prev) => (prev ? { ...prev, ...patch } : prev));
   };
 
@@ -486,8 +461,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-
-// ─── MSALProviderWrapper ──────────────────────────────────────────────────────
 
 export const MSALProviderWrapper: React.FC<{ children: ReactNode }> = ({ children }) => (
   <MsalProvider instance={getMsalInstance()}>
