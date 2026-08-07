@@ -200,7 +200,13 @@ export default defineConfig(({ mode = 'development' }) => {
       rollupOptions: envConfig.rollupOptions,
       terserOptions: isProduction ? {
         compress: {
-          drop_console: true,
+          // Preserve console.log / console.warn / console.error so the
+          // [Auth], [Token], [RoleService], [RoleGate], [ProtectedRoute]
+          // diagnostic logs are visible in the browser DevTools Console tab
+          // on the production site (https://proptii-r1-1a-2.onrender.com).
+          // Only drop console.debug which is MSAL's verbose output.
+          drop_console: false,
+          pure_funcs: ['console.debug'],
           drop_debugger: true,
         },
       } : undefined,
