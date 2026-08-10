@@ -98,8 +98,8 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName, userEmail, 
               style={{ backgroundColor: '#F7F7F7', width: '280px' }}
             >
               <Phone className="w-4 h-4 flex-shrink-0" style={{ color: '#374957' }} />
-              <span className="text-sm" style={{ color: '#374957' }}>
-                {userPhone || user?.phone || '+44 7911 123456'}
+              <span className="text-sm font-medium" style={{ color: '#374957' }}>
+                {userPhone || user?.phone || 'Not provided'}
               </span>
             </div>
             

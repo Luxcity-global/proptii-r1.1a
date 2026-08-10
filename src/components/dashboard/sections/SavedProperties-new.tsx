@@ -42,7 +42,8 @@ const SavedProperties: React.FC = () => {
       navigate('/dashboard/messages', {
         state: {
           prefilledMessage: property.source === 'native' ? 'I want to make enquiries concerning this property' : undefined,
-          conversationId: conversation.id
+          conversationId: conversation.id,
+          conversation
         }
       });
     } catch (error) {

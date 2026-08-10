@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import ListingDetailsModal from './ListingDetailsModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMessagingContext } from '../../contexts/MessagingContext';
+import { useSavedProperties } from '../../contexts/SavedPropertiesContext';
 import communicationService from '../../services/communicationService';
 import QuickRequestModal from '../enquiry/QuickRequestModal';
 
@@ -54,7 +55,9 @@ interface ListingCardProps {
 }
 
 const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
-  const [isSaved, setIsSaved] = useState(false);
+  const { isPropertySaved, toggleSaveProperty } = useSavedProperties();
+  const isSaved = isPropertySaved(property.id);
+  
   const [showModal, setShowModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isMessaging, setIsMessaging] = useState(false);
@@ -90,7 +93,8 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
       navigate('/dashboard/messages', {
         state: {
           conversationId: conversation.id,
-          prefilledMessage: 'I want to make enquiries concerning this property'
+          prefilledMessage: 'I want to make enquiries concerning this property',
+          conversation
         }
       });
     } catch {
@@ -186,12 +190,16 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setIsSaved(!isSaved);
+              toggleSaveProperty({
+                ...property,
+                source: 'native',
+                imageUrls: property.images?.map(img => img.src) || []
+              });
             }}
             className={`p-1.5 rounded-full ${isSaved ? 'text-red-500' : 'text-gray-600'
               } hover:bg-gray-100`}
           >
-            <Heart className="w-4 h-4" />
+            <Heart className="w-4 h-4" fill={isSaved ? "currentColor" : "none"} />
           </button>
           <button
             onClick={(e) => {

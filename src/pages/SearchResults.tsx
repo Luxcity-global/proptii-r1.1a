@@ -247,7 +247,8 @@ function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDetailsModa
       navigate('/dashboard/messages', {
         state: {
           prefilledMessage: !isScrapedProperty ? 'I want to make enquiries concerning this property' : undefined,
-          conversationId: conversation.id
+          conversationId: conversation.id,
+          conversation
         }
       });
     } catch {
