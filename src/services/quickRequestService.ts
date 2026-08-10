@@ -1,13 +1,4 @@
-import axios from 'axios';
-import { getAccessTokenForApiRequest } from './msalAccessToken';
-import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
-
-const BASE = `${getResolvedApiBaseUrl()}/guest`;
-
-async function authHeaders(): Promise<Record<string, string>> {
-  const token = await getAccessTokenForApiRequest();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+import apiService from './api';
 
 export interface QuickRequestPayload {
   email: string;
@@ -71,7 +62,7 @@ class QuickRequestService {
    * Submit a new Quick Request guest enquiry
    */
   async submitEnquiry(payload: QuickRequestPayload): Promise<QuickRequestResponse> {
-    const response = await axios.post(`${BASE}/enquiry`, payload);
+    const response = await apiService.post<any>('/guest/enquiry', payload);
     return response.data.data;
   }
 
@@ -79,7 +70,7 @@ class QuickRequestService {
    * Fetch thread message history by token
    */
   async getThread(token: string): Promise<ThreadResponse> {
-    const response = await axios.get(`${BASE}/thread/${token}`);
+    const response = await apiService.get<any>(`/guest/thread/${token}`);
     return response.data.data;
   }
 
@@ -90,7 +81,7 @@ class QuickRequestService {
     token: string,
     payload: { message: string; senderType: string; senderId: string; senderName?: string }
   ): Promise<{ id: string; sent_at: string }> {
-    const response = await axios.post(`${BASE}/thread/${token}/reply`, payload);
+    const response = await apiService.post<any>(`/guest/thread/${token}/reply`, payload);
     return response.data.data;
   }
 
@@ -98,7 +89,7 @@ class QuickRequestService {
    * Validate a claim token
    */
   async validateClaimToken(token: string): Promise<ValidateClaimResponse> {
-    const response = await axios.post(`${BASE}/claim/validate`, { token });
+    const response = await apiService.post<any>('/guest/claim/validate', { token });
     return response.data.data;
   }
 
@@ -106,7 +97,7 @@ class QuickRequestService {
    * Request resending a claim token
    */
   async resendClaimToken(email: string): Promise<{ sent: boolean }> {
-    const response = await axios.post(`${BASE}/claim/resend`, { email });
+    const response = await apiService.post<any>('/guest/claim/resend', { email });
     return response.data.data;
   }
 
@@ -114,8 +105,7 @@ class QuickRequestService {
    * Confirm claim for the authenticated user using B2C token
    */
   async confirmClaim(token: string): Promise<{ success: boolean; migratedCount: number }> {
-    const headers = await authHeaders();
-    const response = await axios.post(`${BASE}/claim/confirm`, { token }, { headers });
+    const response = await apiService.post<any>('/guest/claim/confirm', { token });
     return response.data.data;
   }
 
@@ -123,8 +113,7 @@ class QuickRequestService {
    * Trigger automatic merging of ghost accounts matching email
    */
   async autoMerge(email: string): Promise<{ success: boolean; migratedCount: number }> {
-    const headers = await authHeaders();
-    const response = await axios.post(`${BASE}/claim/auto-merge`, { email }, { headers });
+    const response = await apiService.post<any>('/guest/claim/auto-merge', { email });
     return response.data.data;
   }
 }

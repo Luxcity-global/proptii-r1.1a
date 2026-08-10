@@ -12,8 +12,6 @@ function referencingPath(suffix: string): string {
   return `${prefix}/referencing/${suffix}`;
 }
 
-console.log('Using API URL:', getResolvedApiBaseUrl());
-
 class ReferencingService {
   async saveIdentityData(data: any) {
     try {

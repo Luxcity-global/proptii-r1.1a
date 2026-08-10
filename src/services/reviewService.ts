@@ -1,10 +1,4 @@
-import axios from 'axios';
-import { PRIMARY_API_BASE_URL } from '../utils/apiEndpoints';
-
-// Get the API URL from environment variables
-const API_BASE_URL = PRIMARY_API_BASE_URL;
-
-console.log('Review Service using API URL:', API_BASE_URL);
+import apiService from './api';
 
 interface ReviewData {
   rating: number;
@@ -18,7 +12,7 @@ interface ReviewData {
 class ReviewService {
   async submitReview(data: ReviewData) {
     try {
-      const response = await axios.post(`${API_BASE_URL}/reviews`, {
+      const response = await apiService.post('/reviews', {
         ...data,
         timestamp: new Date().toISOString()
       });
@@ -31,9 +25,7 @@ class ReviewService {
 
   async getReviews(filters?: { userType?: string; rating?: number; source?: string }) {
     try {
-      const response = await axios.get(`${API_BASE_URL}/reviews`, {
-        params: filters
-      });
+      const response = await apiService.get('/reviews', filters);
       return response.data;
     } catch (error) {
       console.error('Error fetching reviews:', error);
@@ -43,7 +35,7 @@ class ReviewService {
 
   async getReviewStats() {
     try {
-      const response = await axios.get(`${API_BASE_URL}/reviews/stats`);
+      const response = await apiService.get('/reviews/stats');
       return response.data;
     } catch (error) {
       console.error('Error fetching review stats:', error);

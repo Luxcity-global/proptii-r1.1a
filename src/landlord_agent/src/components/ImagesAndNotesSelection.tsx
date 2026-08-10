@@ -12,6 +12,7 @@ import {
 
 interface ImagesAndNotesSelectionProps {
   uploadedImages?: string[];
+  imageFiles?: File[];
   additionalNotes?: string;
   onImagesChange?: (images: string[], imageFiles: File[]) => void;
   onNotesChange?: (notes: string) => void;
@@ -21,9 +22,9 @@ interface ImagesAndNotesSelectionProps {
   onPropertySetup: () => void;
 }
 
-export function ImagesAndNotesSelection({ uploadedImages: propUploadedImages, additionalNotes: propAdditionalNotes, onImagesChange, onNotesChange, onNext, onBack, onHome, onPropertySetup }: ImagesAndNotesSelectionProps) {
+export function ImagesAndNotesSelection({ uploadedImages: propUploadedImages, imageFiles: propImageFiles, additionalNotes: propAdditionalNotes, onImagesChange, onNotesChange, onNext, onBack, onHome, onPropertySetup }: ImagesAndNotesSelectionProps) {
   const [uploadedImages, setUploadedImages] = useState<string[]>(propUploadedImages || []);
-  const [imageFiles, setImageFiles] = useState<File[]>([]); // Store File objects
+  const [imageFiles, setImageFiles] = useState<File[]>(propImageFiles || []); // Store File objects
   const [additionalNotes, setAdditionalNotes] = useState(propAdditionalNotes || '');
   
   // Update local state when props change
@@ -31,10 +32,13 @@ export function ImagesAndNotesSelection({ uploadedImages: propUploadedImages, ad
     if (propUploadedImages) {
       setUploadedImages(propUploadedImages);
     }
+    if (propImageFiles) {
+      setImageFiles(propImageFiles);
+    }
     if (propAdditionalNotes !== undefined) {
       setAdditionalNotes(propAdditionalNotes);
     }
-  }, [propUploadedImages, propAdditionalNotes]);
+  }, [propUploadedImages, propImageFiles, propAdditionalNotes]);
   const [showTips, setShowTips] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);

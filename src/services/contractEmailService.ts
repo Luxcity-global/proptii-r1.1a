@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { PRIMARY_API_BASE_URL } from '../utils/apiEndpoints';
+import apiService from './api';
 
 interface ContractEmailParams {
   to: string;
@@ -17,11 +16,7 @@ interface ContractEmailResponse {
   error?: string;
 }
 
-const API_BASE_URL = PRIMARY_API_BASE_URL;
-
 class ContractEmailService {
-  private readonly API_URL = API_BASE_URL;
-
   private generateContractEmailTemplate(params: ContractEmailParams): string {
     const { recipientName, contractName, senderName = 'Proptii Team' } = params;
     
@@ -128,7 +123,7 @@ class ContractEmailService {
       formData.append('emailType', 'signed-contract');
 
       // Convert Uint8Array to Blob and then to File
-      const pdfBlob = new Blob([params.signedPdfBytes], { type: 'application/pdf' });
+      const pdfBlob = new Blob([params.signedPdfBytes as any], { type: 'application/pdf' });
       const documentName = params.documentName || `${params.contractName.replace(/[^a-zA-Z0-9]/g, '_')}_signed.pdf`;
       const pdfFile = new File([pdfBlob], documentName, { type: 'application/pdf' });
 
@@ -140,7 +135,7 @@ class ContractEmailService {
       formData.append('htmlContent', htmlContent);
 
       // Send to backend
-      const response = await axios.post(`${this.API_URL}/contracts/send-signed-contract`, formData, {
+      const response = await apiService.post<any>('/contracts/send-signed-contract', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -151,29 +146,29 @@ class ContractEmailService {
 
       console.log('📧 Email sent successfully:', response.data);
 
-      if (!response.data.success) {
+      if (response.data && !response.data.success) {
         throw new Error(response.data.error || 'Failed to send contract email');
       }
 
       return {
         success: true,
-        messageId: response.data.messageId
+        messageId: response.data?.messageId
       };
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error sending contract email:', error);
       
-      if (axios.isAxiosError(error)) {
-        console.error('Axios error details:', {
-          status: error.response?.status,
-          data: error.response?.data,
-          message: error.message
+      if (error.status) {
+        console.error('API error details:', {
+          status: error.status,
+          message: error.message,
+          errors: error.errors
         });
       }
 
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred while sending email'
+        error: error.message || 'Unknown error occurred while sending email'
       };
     }
   }

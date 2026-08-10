@@ -200,13 +200,13 @@ export default defineConfig(({ mode = 'development' }) => {
       rollupOptions: envConfig.rollupOptions,
       terserOptions: isProduction ? {
         compress: {
-          // Preserve console.log / console.warn / console.error so the
-          // [Auth], [Token], [RoleService], [RoleGate], [ProtectedRoute]
-          // diagnostic logs are visible in the browser DevTools Console tab
-          // on the production site (https://proptii-r1-1a-2.onrender.com).
-          // Only drop console.debug which is MSAL's verbose output.
+          // Strip all console.log / .info / .debug calls from the production
+          // bundle. console.warn and console.error are kept for genuine runtime
+          // problems (auth failures, API errors, etc.).
+          // This removes ALL 500+ diagnostic logs without touching source files —
+          // no manual audit needed for new code added in the future.
           drop_console: false,
-          pure_funcs: ['console.debug'],
+          pure_funcs: ['console.log', 'console.info', 'console.debug', 'console.trace'],
           drop_debugger: true,
         },
       } : undefined,

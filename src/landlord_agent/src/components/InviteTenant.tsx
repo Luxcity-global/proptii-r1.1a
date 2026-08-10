@@ -15,6 +15,8 @@ interface InviteTenantProps {
   properties: Property[];
   onBack: () => void;
   onSuccess: () => void;
+  landlordEmail?: string;
+  landlordId?: string;
 }
 
 interface InvitationData {
@@ -24,7 +26,7 @@ interface InvitationData {
   inviteType: 'new-tenant' | 'existing-tenant';
 }
 
-export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProps) {
+export function InviteTenant({ properties, onBack, onSuccess, landlordEmail, landlordId }: InviteTenantProps) {
   const [formData, setFormData] = useState<InvitationData>({
     email: '',
     propertyId: '',
@@ -61,11 +63,17 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
     return Object.keys(newErrors).length === 0;
   };
 
-  const generateInvitationEmailHTML = (property: Property | undefined) => {
+  const generateInvitationEmailHTML = (property: Property | undefined, landlordEmail?: string, landlordId?: string) => {
     const propertyAddress = property?.address || 'the property';
     const invitationTypeText = formData.inviteType === 'new-tenant' 
       ? 'create a new account and complete your tenant profile'
       : 'complete your tenant profile';
+    
+    const inviteLink = new URL('https://proptii-frontend.onrender.com/');
+    inviteLink.searchParams.append('invite', 'true');
+    if (formData.propertyId) inviteLink.searchParams.append('propertyId', formData.propertyId);
+    if (landlordEmail) inviteLink.searchParams.append('landlordEmail', landlordEmail);
+    if (landlordId) inviteLink.searchParams.append('landlordId', landlordId);
     
     return `
       <!DOCTYPE html>
@@ -176,7 +184,7 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
           <p>Please click the button below to ${formData.inviteType === 'new-tenant' ? 'create your account and' : ''} complete your tenant profile:</p>
           
           <div style="text-align: center;">
-            <a href="https://proptii-frontend.onrender.com/" class="cta-button">
+            <a href="${inviteLink.toString()}" class="cta-button">
               ${formData.inviteType === 'new-tenant' ? 'Create Account & Complete Profile' : 'Complete Your Profile'}
             </a>
           </div>
@@ -223,7 +231,7 @@ export function InviteTenant({ properties, onBack, onSuccess }: InviteTenantProp
       console.log('📡 API Endpoint:', emailEndpoint);
 
       // Generate email HTML
-      const emailHTML = generateInvitationEmailHTML(selectedProperty);
+      const emailHTML = generateInvitationEmailHTML(selectedProperty, landlordEmail, landlordId);
       const emailSubject = `Invitation to join as tenant for ${selectedProperty.address}`;
 
       console.log('📝 Email generated successfully');

@@ -1,11 +1,7 @@
 import React from 'react';
-import { Button } from './ui/button';
-import { Card } from './ui/card';
-import { Badge } from './ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
-import { Building2, Users, HelpCircle, Check } from 'lucide-react';
-import { UserRole } from '../App';
 import { trackEvent } from '../../../utils/analytics';
+import { UserRole } from '../App';
+import proptiiLogo from '../assets/proptii_logo_small.png';
 
 interface RoleSelectionProps {
   selectedRole: UserRole;
@@ -13,151 +9,123 @@ interface RoleSelectionProps {
   onContinue: () => void;
 }
 
-export function RoleSelection({ selectedRole, onRoleSelect, onContinue }: RoleSelectionProps) {
-  const roles = [
-    {
-      id: 'landlord' as const,
-      title: 'Landlord',
-      description: 'I own and manage my own properties',
-      icon: Building2,
-      features: [
-        'Personal property portfolio',
-        'Direct tenant management',
-        'Individual compliance tracking',
-        'Simple financial reporting'
-      ],
-      badge: 'Popular'
-    },
-    {
-      id: 'agent' as const,
-      title: 'Property Agent',
-      description: 'I manage properties for multiple clients',
-      icon: Users,
-      features: [
-        'Multi-client property management',
-        'Advanced reporting tools',
-        'Team collaboration features',
-        'White-label options'
-      ],
-      badge: 'Professional'
-    }
-  ];
+export function RoleSelection({ onRoleSelect, onContinue }: RoleSelectionProps) {
+  const handleSelectRole = (role: UserRole) => {
+    onRoleSelect(role);
+    trackEvent('landlord_role_selected', { role });
+    // Small delay to allow visual feedback and state update
+    setTimeout(() => {
+      onContinue();
+    }, 100);
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-3 sm:p-4" style={{ backgroundColor: '#F7F7F7', fontFamily: 'Archivo, sans-serif' }}>
-      <div className="max-w-4xl mx-auto w-full flex flex-col items-center">
-        {/* Header Section - Centered */}
-        <div className="mb-4 sm:mb-6 md:mb-8 w-full">
-          <div className="text-center mb-3 sm:mb-4 md:mb-6">
-            <h1 className="font-bold mb-2 sm:mb-3 leading-tight text-lg sm:text-xl md:text-2xl lg:text-3xl" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
-              What best describes you?
-            </h1>
-            <p className="text-xs sm:text-sm md:text-base lg:text-lg mb-2 sm:mb-3 px-2" style={{ color: '#374957' }}>
-              Help us customize your experience by selecting your role
-            </p>
-            <div className="flex justify-center">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" className="p-1 h-auto">
-                      <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: '#374957' }} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <div className="max-w-xs">
-                      <p className="text-sm">
-                        <strong>Landlord:</strong> Individual property owners managing their own rentals
-                      </p>
-                      <p className="text-sm mt-2">
-                        <strong>Agent:</strong> Professional property managers handling multiple clients
-                      </p>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: '#F8FAFC', fontFamily: 'Archivo, sans-serif' }}>
+      <div className="max-w-5xl mx-auto w-full flex flex-col items-center">
+        {/* Header Section */}
+        <div className="text-center mb-10 w-full flex flex-col items-center">
+          <img src={proptiiLogo} alt="proptii" className="h-8 mb-6" />
+          <h1 className="font-semibold mb-3 text-3xl md:text-4xl lg:text-5xl" style={{ color: '#030712', letterSpacing: '-0.02em' }}>
+            Refining the way you<br/>experience property.
+          </h1>
+          <p className="text-sm md:text-base max-w-lg mt-2" style={{ color: '#364153' }}>
+            Select your profile to personalize your dashboard and tools.<br/>This can be updated later in your account settings
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 mb-4 sm:mb-6 w-full max-w-3xl">
-          {roles.map((role) => (
-            <Card
-              key={role.id}
-              className={`p-4 sm:p-5 md:p-6 cursor-pointer transition-all duration-200 hover:shadow-lg bg-white ${
-                selectedRole === role.id
-                  ? 'ring-1 shadow-lg'
-                  : 'border-border hover:border-primary/50'
-              }`}
-              style={selectedRole === role.id ? { borderColor: '#136C9E', borderWidth: '2px' } : {}}
-              onClick={() => onRoleSelect(role.id)}
-            >
-              <div className="flex items-start justify-between mb-3 sm:mb-4">
-                <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#FFE5D9' }}>
-                    <role.icon className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: '#DC5F12' }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="flex items-center gap-1.5 sm:gap-2 text-base sm:text-lg font-semibold flex-wrap">
-                      <span>{role.title}</span>
-                      <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5">
-                        {role.badge}
-                      </Badge>
-                    </h3>
-                    <p className="text-muted-foreground text-xs sm:text-sm mt-1">
-                      {role.description}
-                    </p>
-                  </div>
+        {/* Cards Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
+          
+          {/* Tenant Card */}
+          <div className="relative rounded-3xl overflow-hidden shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md cursor-pointer group" 
+               style={{ backgroundColor: '#CBE6FF', minHeight: '400px' }}
+               onClick={() => handleSelectRole('tenant' as any)}>
+            <div className="p-8 pb-32 md:pb-8 flex flex-col h-full relative z-10 w-3/4">
+              <div className="mb-6">
+                <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold tracking-wider" 
+                      style={{ border: '1px solid #8FCDFF', color: '#030712' }}>
+                  RESIDENTIAL / EXPLORER
+                </span>
+              </div>
+              
+              <h2 className="text-3xl font-semibold mb-4" style={{ color: '#030712' }}>Find a home</h2>
+              
+              <p className="text-sm leading-relaxed mb-6" style={{ color: '#364153' }}>
+                Browse verified listings, schedule seamless viewings, and manage your rental agreements in one unified interface.
+              </p>
+              
+              <div className="flex gap-6 mb-8">
+                <div>
+                  <div className="font-bold text-lg" style={{ color: '#030712' }}>5k+</div>
+                  <div className="text-xs" style={{ color: '#364153' }}>live listings</div>
                 </div>
-                {selectedRole === role.id && (
-                  <div
-                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center flex-shrink-0 ml-2"
-                    style={{ backgroundColor: 'transparent', border: '1px solid #136C9E' }}
-                  >
-                    <Check className="w-3 h-3 sm:w-4 sm:h-4" style={{ color: '#136C9E' }} />
-                  </div>
-                )}
+                <div>
+                  <div className="font-bold text-lg" style={{ color: '#030712' }}>0%</div>
+                  <div className="text-xs" style={{ color: '#364153' }}>platform fees</div>
+                </div>
               </div>
-
-              <div className="space-y-1.5 sm:space-y-2">
-                <p className="text-xs sm:text-sm font-medium">Key features:</p>
-                <ul className="space-y-1">
-                  {role.features.map((feature, index) => (
-                    <li key={index} className="text-xs sm:text-sm text-muted-foreground flex items-center space-x-2">
-                      <div className="w-1 h-1 bg-primary rounded-full flex-shrink-0" />
-                      <span className="leading-relaxed">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+              
+              <div className="mt-auto">
+                <button className="bg-white rounded-full px-5 py-2 text-sm font-medium flex items-center gap-2 transition-colors"
+                        style={{ color: '#030712' }}>
+                  Tenant Dashboard <span className="text-lg leading-none transition-transform group-hover:translate-x-1">→</span>
+                </button>
               </div>
-            </Card>
-          ))}
-        </div>
+            </div>
+            
+            <img 
+              src="/images/role-selection/tenant-home.png" 
+              alt="Tenant Homes" 
+              className="absolute bottom-0 right-0 w-48 md:w-56 lg:w-64 object-cover rounded-tl-3xl rounded-br-3xl"
+              style={{ objectPosition: 'center', height: '65%' }}
+            />
+          </div>
 
-        <div className="flex justify-center w-full px-2">
-          <Button 
-            onClick={() => {
-              trackEvent('landlord_role_selected', { role: selectedRole });
-              onContinue();
-            }}
-            className="flex items-center justify-center space-x-2 px-4 sm:px-6 md:px-8 py-2 sm:py-2.5 min-h-[2.5rem] sm:min-h-[2.75rem] md:min-h-[3rem] rounded-full transition-all duration-300 flex-shrink-0 w-full sm:w-auto text-xs sm:text-sm md:text-base font-semibold max-w-xs" 
-            style={{ 
-              backgroundColor: '#DC5F12', 
-              borderColor: '#DC5F12', 
-              background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-              e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
-              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-              e.currentTarget.style.transform = 'translateY(0px)';
-            }}
-          >
-            Continue as {selectedRole === 'landlord' ? 'Landlord' : 'Property Agent'}
-          </Button>
+          {/* Landlord Card */}
+          <div className="relative rounded-3xl overflow-hidden shadow-sm transition-transform hover:-translate-y-1 hover:shadow-md cursor-pointer group" 
+               style={{ backgroundColor: '#FFEFD4', minHeight: '400px' }}
+               onClick={() => handleSelectRole('landlord')}>
+            <div className="p-8 pb-32 md:pb-8 flex flex-col h-full relative z-10 w-3/4">
+              <div className="mb-6">
+                <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold tracking-wider" 
+                      style={{ border: '1px solid #FEDFA0', color: '#030712' }}>
+                  MANAGEMENT / SCALE
+                </span>
+              </div>
+              
+              <h2 className="text-3xl font-semibold mb-4" style={{ color: '#030712' }}>Manage assets</h2>
+              
+              <p className="text-sm leading-relaxed mb-6" style={{ color: '#364153' }}>
+                List properties, handle tenancy applications, collect references, and manage your portfolio from one dashboard
+              </p>
+              
+              <div className="flex gap-6 mb-8">
+                <div>
+                  <div className="font-bold text-lg" style={{ color: '#030712' }}>Enterprise</div>
+                  <div className="text-xs" style={{ color: '#364153' }}>grade</div>
+                </div>
+                <div>
+                  <div className="font-bold text-lg" style={{ color: '#030712' }}>Real-time</div>
+                  <div className="text-xs" style={{ color: '#364153' }}>analytics</div>
+                </div>
+              </div>
+              
+              <div className="mt-auto">
+                <button className="bg-white rounded-full px-5 py-2 text-sm font-medium flex items-center gap-2 transition-colors"
+                        style={{ color: '#030712' }}>
+                  Landlord/Agent Dashboard <span className="text-lg leading-none transition-transform group-hover:translate-x-1">→</span>
+                </button>
+              </div>
+            </div>
+            
+            <img 
+              src="/images/role-selection/landlord-assets.png" 
+              alt="Landlord Assets" 
+              className="absolute bottom-0 right-0 w-48 md:w-56 lg:w-64 object-cover rounded-tl-3xl rounded-br-3xl"
+              style={{ objectPosition: 'center', height: '65%' }}
+            />
+          </div>
+
         </div>
       </div>
     </div>

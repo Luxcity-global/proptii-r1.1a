@@ -1,7 +1,5 @@
-import axios from 'axios';
 import JSZip from 'jszip';
-import { getMsalInstance } from '../contexts/AuthContext';
-import { API_BASE_CANDIDATES, buildApiUrl, PRIMARY_API_BASE_URL } from '../utils/apiEndpoints';
+import apiService from './api';
 
 interface EmailAttachment {
   filename: string;
@@ -58,42 +56,7 @@ interface MultiEmailResult {
   error?: string;
 }
 
-const DEFAULT_BROWSER_FALLBACK = window.location.hostname === 'localhost'
-  ? 'http://localhost:3000/api'
-  : 'https://proptii-r1-1a-new-backend.onrender.com/api';
-
-const API_BASE_URLS = API_BASE_CANDIDATES.length > 0 ? API_BASE_CANDIDATES : [DEFAULT_BROWSER_FALLBACK];
-
-// Use VITE_API_URL if available, otherwise fallback to defaults
-const API_BASE_URL = PRIMARY_API_BASE_URL || API_BASE_URLS[0];
-
 class EmailService {
-  private readonly API_URL = API_BASE_URL;
-  private readonly apiBases = API_BASE_URLS;
-
-  /** Same token resolution as `src/services/api.ts` — backend `/referencing/send-email` requires JwtAuthGuard. */
-  private async resolveBearerToken(): Promise<string | null> {
-    const msalInstance = getMsalInstance();
-    if (msalInstance) {
-      try {
-        const accounts = msalInstance.getAllAccounts();
-        if (accounts.length > 0) {
-          const silentRequest = {
-            scopes: ['openid', 'profile', 'email'],
-            account: accounts[0],
-          };
-          const response = await msalInstance.acquireTokenSilent(silentRequest);
-          if (response?.accessToken) {
-            return response.accessToken;
-          }
-        }
-      } catch (error) {
-        console.warn('[EmailService] Could not acquire MSAL token for send-email:', error);
-      }
-    }
-    const stored = localStorage.getItem('auth_token');
-    return stored || null;
-  }
 
   private generateEmailTemplate(formData: any): string {
     const identity = formData.identity || {};
@@ -289,47 +252,34 @@ class EmailService {
         emailContent.emailType &&
         viewingEmailTypes.includes(emailContent.emailType)
       ) {
-        const errorLog: string[] = [];
-        for (const base of this.apiBases) {
-          const targetUrl = buildApiUrl(base, '/email/send');
-          try {
-            console.info(`[EmailService] Sending viewing email via ${targetUrl} (no JWT)`);
-            const response = await axios.post(
-              targetUrl,
-              {
-                to: emailContent.to,
-                subject: emailContent.subject,
-                html: emailContent.html,
-                emailType: emailContent.emailType,
-              },
-              {
-                headers: { 'Content-Type': 'application/json' },
-                timeout: 60000,
-              }
-            );
-            if (!response.data?.success) {
-              throw new Error(response.data?.error || 'Failed to send email');
+        try {
+          console.info(`[EmailService] Sending viewing email via apiService`);
+          const response = await apiService.post<any>(
+            '/email/send',
+            {
+              to: emailContent.to,
+              subject: emailContent.subject,
+              html: emailContent.html,
+              emailType: emailContent.emailType,
+            },
+            {
+              headers: { 'Content-Type': 'application/json' },
+              timeout: 60000,
             }
-            console.log('Server response:', response.data);
-            return {
-              success: true,
-              messageId: response.data.messageId,
-            };
-          } catch (error) {
-            const shouldRetry = axios.isAxiosError(error) ? !error.response : false;
-            const errMessage = axios.isAxiosError(error)
-              ? `${error.message}${error.code ? ` (${error.code})` : ''}`
-              : error instanceof Error
-                ? error.message
-                : 'Unknown error';
-            errorLog.push(`[${targetUrl}] ${errMessage}`);
-            if (!shouldRetry) {
-              throw new Error(`Email submission failed: ${errorLog.join(' | ')}`);
-            }
-            console.warn(`[EmailService] Retrying with next API base after error at ${targetUrl}`);
+          );
+          
+          if (response.data && !response.data.success) {
+            throw new Error(response.data.error || 'Failed to send email');
           }
+          console.log('Server response:', response.data);
+          return {
+            success: true,
+            messageId: response.data?.messageId,
+          };
+        } catch (error: any) {
+          const errMessage = error.message || 'Unknown error';
+          throw new Error(`Email submission failed: ${errMessage}`);
         }
-        throw new Error(`Email submission failed for all API bases: ${errorLog.join(' | ')}`);
       }
 
       const buildFormData = (zipFile: File | null) => {
@@ -400,57 +350,37 @@ class EmailService {
         zipAttachment = zipFile;
       }
 
-      const bearerToken = await this.resolveBearerToken();
       const axiosConfig = {
         headers: {
           'Content-Type': 'multipart/form-data',
-          ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
         },
         timeout: 60000,
         maxContentLength: 100 * 1024 * 1024,
         maxBodyLength: 100 * 1024 * 1024
       };
 
-      const errorLog: string[] = [];
+      try {
+        console.info(`[EmailService] Sending referencing email via apiService`);
+        const response = await apiService.post<any>('/referencing/send-email', buildFormData(zipAttachment), axiosConfig);
 
-      for (const base of this.apiBases) {
-        const targetUrl = buildApiUrl(base, '/referencing/send-email');
-        try {
-          console.info(`[EmailService] Sending referencing email via ${targetUrl}`);
-          const response = await axios.post(targetUrl, buildFormData(zipAttachment), axiosConfig);
-
-          if (!response.data.success) {
-            throw new Error(response.data.error || 'Failed to send email');
-          }
-
-          console.log('Server response:', response.data);
-          return {
-            success: true,
-            messageId: response.data.messageId
-          };
-        } catch (error) {
-          const shouldRetry = axios.isAxiosError(error) ? !error.response : false;
-          const errMessage = axios.isAxiosError(error)
-            ? `${error.message}${error.code ? ` (${error.code})` : ''}`
-            : (error instanceof Error ? error.message : 'Unknown error');
-          errorLog.push(`[${targetUrl}] ${errMessage}`);
-
-          if (!shouldRetry) {
-            throw new Error(`Email submission failed: ${errorLog.join(' | ')}`);
-          }
-
-          console.warn(`[EmailService] Retrying with next API base due to network error at ${targetUrl}`);
+        if (response.data && !response.data.success) {
+          throw new Error(response.data.error || 'Failed to send email');
         }
-      }
 
-      throw new Error(`Email submission failed for all API bases: ${errorLog.join(' | ')}`);
+        console.log('Server response:', response.data);
+        return {
+          success: true,
+          messageId: response.data?.messageId
+        };
+      } catch (error: any) {
+        const errMessage = error.message || 'Unknown error';
+        throw new Error(`Email submission failed: ${errMessage}`);
+      }
     } catch (error) {
       console.error('Error sending email:', error);
       return {
         success: false,
-        error: axios.isAxiosError(error)
-          ? error.message
-          : (error instanceof Error ? error.message : 'Unknown error occurred')
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }

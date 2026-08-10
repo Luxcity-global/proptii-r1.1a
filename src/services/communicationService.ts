@@ -11,7 +11,7 @@
  * Requirements: 3.2, 6.1–6.6, 7.1, 7.4
  */
 
-import axios from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getAccessTokenForApiRequest } from './msalAccessToken';
 import type {
     Conversation,
@@ -38,11 +38,62 @@ if (!FUNCTIONS_BASE && import.meta.env.DEV) {
 
 const BASE = `${FUNCTIONS_BASE}/api/communication`;
 
-/** Build an Authorization header using the mock token or MSAL token. */
-async function authHeaders(): Promise<Record<string, string>> {
-    const token = await getAccessTokenForApiRequest();
-    return token ? { Authorization: `Bearer ${token}` } : {};
+/** Axios 1.x may use AxiosHeaders — set Authorization in a way that always applies. */
+function setBearerAuth(config: InternalAxiosRequestConfig, accessToken: string): void {
+    const value = `Bearer ${accessToken}`;
+    const headers = config.headers;
+    if (!headers) return;
+    if (typeof (headers as { set?: (k: string, v: string) => void }).set === 'function') {
+        (headers as { set: (k: string, v: string) => void }).set('Authorization', value);
+    } else {
+        (headers as Record<string, string>)['Authorization'] = value;
+    }
 }
+
+// Dedicated Axios instance for communication module
+const commApi = axios.create({
+    baseURL: BASE,
+    timeout: 30000,
+});
+
+// Request interceptor: attach Bearer token (MSAL silent → popup → auth_token fallback)
+commApi.interceptors.request.use(
+    async (config: InternalAxiosRequestConfig) => {
+        const token = await getAccessTokenForApiRequest();
+        if (token) {
+            setBearerAuth(config, token);
+        }
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
+// Response interceptor: on 401, clear the stale cached token and retry once
+// with a freshly acquired MSAL token before giving up.
+commApi.interceptors.response.use(
+    (response) => response,
+    async (error: AxiosError) => {
+        const originalRequest = error.config as InternalAxiosRequestConfig & { _retried?: boolean };
+        if (
+            error.response?.status === 401 &&
+            originalRequest &&
+            !originalRequest._retried
+        ) {
+            originalRequest._retried = true;
+            localStorage.removeItem('auth_token');
+            try {
+                const freshToken = await getAccessTokenForApiRequest();
+                if (freshToken) {
+                    setBearerAuth(originalRequest, freshToken);
+                    return commApi.request(originalRequest);
+                }
+            } catch {
+                // Fresh token acquisition failed — fall through to error handling
+            }
+        }
+        return Promise.reject(error);
+    }
+);
 
 /**
  * Unwrap the Azure Functions response envelope `{ data: T }` → T.
@@ -63,7 +114,7 @@ const communicationService = {
      */
     async getConversations(): Promise<Conversation[]> {
         try {
-            const { data } = await axios.get(`${BASE}/conversations`, { headers: await authHeaders() });
+            const { data } = await commApi.get('/conversations');
             return unwrap<Conversation[]>(data) || [];
         } catch (err) {
             console.warn('⚠️ Communication service getConversations failed, falling back to empty list:', err);
@@ -77,7 +128,7 @@ const communicationService = {
      * Requirements: 3.2, 6.2
      */
     async getOrCreateConversation(dto: CreateConversationDto): Promise<Conversation> {
-        const { data } = await axios.post(`${BASE}/conversations`, dto, { headers: await authHeaders() });
+        const { data } = await commApi.post('/conversations', dto);
         return unwrap<Conversation>(data);
     },
 
@@ -88,9 +139,7 @@ const communicationService = {
      */
     async getMessages(conversationId: string): Promise<Message[]> {
         try {
-            const { data } = await axios.get(`${BASE}/conversations/${conversationId}/messages`, {
-                headers: await authHeaders(),
-            });
+            const { data } = await commApi.get(`/conversations/${conversationId}/messages`);
             return unwrap<Message[]>(data) || [];
         } catch (err) {
             console.warn('⚠️ Communication service getMessages failed:', err);
@@ -104,9 +153,7 @@ const communicationService = {
      * Requirements: 6.4
      */
     async sendMessage(conversationId: string, dto: SendMessageDto): Promise<Message> {
-        const { data } = await axios.post(`${BASE}/conversations/${conversationId}/messages`, dto, {
-            headers: await authHeaders(),
-        });
+        const { data } = await commApi.post(`/conversations/${conversationId}/messages`, dto);
         return unwrap<Message>(data);
     },
 
@@ -117,10 +164,10 @@ const communicationService = {
      */
     async markRead(messageId: string, conversationId: string): Promise<void> {
         try {
-            await axios.patch(
-                `${BASE}/messages/${messageId}/read`,
+            await commApi.patch(
+                `/messages/${messageId}/read`,
                 {},
-                { headers: await authHeaders(), params: { conversationId } },
+                { params: { conversationId } },
             );
         } catch (err) {
             console.warn('⚠️ Communication service markRead failed:', err);
@@ -134,9 +181,7 @@ const communicationService = {
      */
     async getUnreadCount(): Promise<number> {
         try {
-            const { data } = await axios.get(`${BASE}/conversations/unread-count`, {
-                headers: await authHeaders(),
-            });
+            const { data } = await commApi.get('/conversations/unread-count');
             const result = unwrap<{ unreadCount: number } | number>(data);
             // Backend returns { unreadCount: N } — unwrap the inner field if needed
             if (result !== null && typeof result === 'object' && 'unreadCount' in result) {
@@ -180,15 +225,14 @@ const communicationService = {
         const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
         const mimeType = file.type || extensionMimeMap[ext] || 'application/octet-stream';
 
-        const { data } = await axios.post(
-            `${BASE}/attachments/upload?conversationId=${encodeURIComponent(conversationId)}`,
+        const { data } = await commApi.post(
+            `/attachments/upload?conversationId=${encodeURIComponent(conversationId)}`,
             {
                 file: base64,
                 fileName: file.name,
                 mimeType,
                 sizeBytes: file.size,
             },
-            { headers: await authHeaders() },
         );
         return unwrap<MessageAttachment>(data);
     },
@@ -199,8 +243,7 @@ const communicationService = {
      * Requirements: 7.4
      */
     async getAttachmentUrl(attachmentId: string, conversationId: string): Promise<string> {
-        const { data } = await axios.get(`${BASE}/attachments/${attachmentId}/url`, {
-            headers: await authHeaders(),
+        const { data } = await commApi.get(`/attachments/${attachmentId}/url`, {
             params: { conversationId },
         });
         const result = unwrap<{ url: string } | string>(data);

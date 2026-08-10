@@ -63,8 +63,8 @@ function bearerJwtFromResult(r: AuthenticationResult | null | undefined): string
 
 let hasEverSucceeded = false;
 
-export function notifySessionExpired(): void {
-  if (!hasEverSucceeded) {
+export function notifySessionExpired(force = false): void {
+  if (!force && !hasEverSucceeded) {
     console.warn('[Auth] notifySessionExpired suppressed — no token confirmed yet this session');
     return;
   }
@@ -106,7 +106,7 @@ export async function getAccessTokenForApiRequest(): Promise<string | null> {
     if (err instanceof InteractionRequiredAuthError) {
       console.warn('[Auth] Session expired — refresh token gone:', (err as any)?.errorCode ?? '');
       localStorage.removeItem('auth_token');
-      notifySessionExpired();
+      notifySessionExpired(true);
       return null;
     }
     console.warn('[Auth] acquireTokenSilent failed (transient):', (err as any)?.message ?? err);

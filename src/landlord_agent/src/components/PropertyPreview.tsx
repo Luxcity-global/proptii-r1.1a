@@ -33,6 +33,7 @@ import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 interface PropertyPreviewProps {
   property: Property | null;
   isEditing?: boolean;
+  isPublishing?: boolean;
   onBack: () => void;
   onEdit: (property: Property) => void;
   onManageDocuments: () => void;
@@ -48,6 +49,7 @@ interface PropertyPreviewProps {
 export function PropertyPreview({
   property,
   isEditing,
+  isPublishing,
   onBack,
   onEdit,
   onManageDocuments,
@@ -419,8 +421,15 @@ export function PropertyPreview({
                       console.log('Publishing property...');
                     }
                   }}
+                  disabled={isPublishing}
                 >
-                  {isEditing ? (
+                  {isPublishing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                      <span className="hidden md:inline">{isEditing ? 'Saving...' : 'Publishing...'}</span>
+                      <span className="md:hidden">Saving...</span>
+                    </>
+                  ) : isEditing ? (
                     <span className="hidden md:inline">Save changes</span>
                   ) : (
                     <>

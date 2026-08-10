@@ -58,7 +58,7 @@ class TenantService {
     }
   }
 
-  async getTenants(ownerUserId?: string): Promise<Tenant[]> {
+  async getTenants(ownerUserId?: string, ownedPropertyIds?: Set<string>): Promise<Tenant[]> {
     try {
       const base = query(this.tenantsCollection, orderBy('createdAt', 'desc'));
       const snap = await getDocs(base);
@@ -67,7 +67,12 @@ class TenantService {
         const beforeFilter = list.length;
         list = list.filter(t => {
           const tUserId = (t as any).userId;
-          return tUserId === ownerUserId;
+          if (tUserId === ownerUserId) return true;
+          // Legacy tenant fallback: if it has no userId, check if it belongs to an owned property
+          if (!tUserId && ownedPropertyIds && ownedPropertyIds.size > 0 && t.propertyId) {
+            return ownedPropertyIds.has(t.propertyId);
+          }
+          return false;
         });
         if (list.length === 0 && beforeFilter > 0) {
           console.log(`ℹ️ TenantService: ${beforeFilter} tenants in database, 0 belong to your account`);
@@ -83,7 +88,14 @@ class TenantService {
       let list = snap.docs.map(d => this.fromFirestore(d.id, d.data()));
       if (ownerUserId) {
         const beforeFilter = list.length;
-        list = list.filter(t => (t as any).userId === ownerUserId);
+        list = list.filter(t => {
+          const tUserId = (t as any).userId;
+          if (tUserId === ownerUserId) return true;
+          if (!tUserId && ownedPropertyIds && ownedPropertyIds.size > 0 && t.propertyId) {
+            return ownedPropertyIds.has(t.propertyId);
+          }
+          return false;
+        });
         if (list.length === 0 && beforeFilter > 0) {
           console.log(`ℹ️ TenantService: ${beforeFilter} tenants in database, 0 belong to your account`);
         }

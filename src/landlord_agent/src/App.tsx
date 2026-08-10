@@ -420,6 +420,7 @@ export function AppContent() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editingPropertyId, setEditingPropertyId] = useState<string | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
 
   const clearSignInQueryParam = useCallback(() => {
@@ -1220,19 +1221,16 @@ export function AppContent() {
 
   const loadScopedTenants = React.useCallback(async () => {
     try {
-            const userId = resolveManagerId();
-      let list = await tenantService.getTenants(userId || undefined);
-
-      // If docs lack userId, fall back to scoping by owned property IDs.
-      // Read from the ref so this callback's identity is stable (doesn't
-      // change every time `properties` state updates), which breaks the
-      // render loop caused by effects that depend on loadScopedTenants.
+      const userId = resolveManagerId();
+      let ownedPropertyIds: Set<string> | undefined;
+      
       if (userId) {
-        const ownedPropertyIds = new Set(propertiesRef.current.map(p => p.id));
-        if (ownedPropertyIds.size > 0) {
-          list = list.filter(t => !t.propertyId || ownedPropertyIds.has(t.propertyId));
-        }
+        ownedPropertyIds = new Set(propertiesRef.current.map(p => p.id));
       }
+      
+      let list = await tenantService.getTenants(userId || undefined, ownedPropertyIds);
+
+      // The fallback filtering is now done directly inside tenantService.getTenants
       setTenants(list);
     } catch (e) {
       console.error('Failed to load tenants:', e);
@@ -1802,6 +1800,22 @@ export function AppContent() {
         const tenantWithUserId = { ...saved, userId: currentUserId } as any;
         console.log('✅ [App] Adding tenant to state with userId:', currentUserId);
 
+        // Update the backend property status to 'occupied'
+        if (saved.propertyId) {
+          try {
+            console.log(`🔄 Updating property ${saved.propertyId} status to occupied...`);
+            await propertyService.updateProperty(saved.propertyId, { 
+              status: 'occupied',
+              tenantId: saved.id 
+            });
+            // Update local state
+            setProperties(prev => prev.map(p => p.id === saved.propertyId ? { ...p, status: 'occupied', tenantId: saved.id } as Property : p));
+            console.log('✅ Property status updated to occupied');
+          } catch (propError) {
+            console.error('⚠️ Failed to update property status:', propError);
+          }
+        }
+
         // Trigger alert generation after tenant is created (to check for lease expiry, etc.)
         try {
           console.log('🔄 Triggering alert generation after tenant creation...');
@@ -2168,15 +2182,14 @@ export function AppContent() {
                       : doc
                   );
 
-                  // Update Firebase - convert dates to Timestamps
                   await propertyService.updateProperty(propertyId, {
                     documents: updatedDocuments.map(doc => ({
                       id: doc.id,
                       name: doc.name,
                       type: doc.type,
                       url: doc.url,
-                      issueDate: Timestamp.fromDate(doc.issueDate),
-                      expiryDate: doc.expiryDate ? Timestamp.fromDate(doc.expiryDate) : undefined,
+                      issueDate: doc.issueDate,
+                      expiryDate: doc.expiryDate,
                       status: doc.status,
                       archived: (doc as any).archived || false
                     }))
@@ -2380,7 +2393,19 @@ export function AppContent() {
             }}
             onDeleteTenant={async (tenantId) => {
               try {
+                const tenantToDelete = tenants.find(t => t.id === tenantId);
+                const propertyId = tenantToDelete?.propertyId;
+                
                 await tenantService.deleteTenant(tenantId);
+                
+                if (propertyId) {
+                  try {
+                    await propertyService.updateProperty(propertyId, { status: 'vacant', tenantId: undefined as any });
+                    setProperties(prev => prev.map(p => p.id === propertyId ? { ...p, status: 'vacant', tenantId: undefined } as Property : p));
+                  } catch (e) {
+                    console.error('Failed to update property status to vacant after tenant deletion', e);
+                  }
+                }
               } catch (e) {
                 // proceed to update UI regardless; rules are open in dev
               }
@@ -2609,6 +2634,7 @@ export function AppContent() {
         return (
           <ImagesAndNotesSelection
             uploadedImages={propertySetupData.images}
+            imageFiles={propertySetupData.imageFiles}
             additionalNotes={propertySetupData.additionalNotes}
             onImagesChange={(images, imageFiles) => updatePropertySetupData({ images, imageFiles })}
             onNotesChange={(notes) => updatePropertySetupData({ additionalNotes: notes })}
@@ -3063,6 +3089,7 @@ export function AppContent() {
           <PropertyPreview
             property={createPropertyFromSetupData()}
             isEditing={isEditing}
+            isPublishing={isPublishing}
             onBack={() => navigateToScreen('images-notes-selection')}
             onEdit={() => navigateToScreen('property-type-selection')}
             onManageDocuments={() => { }}
@@ -3076,6 +3103,8 @@ export function AppContent() {
                 window.parent.postMessage({ type: 'REQUIRE_AUTH', payload: { action: 'publish' } }, '*');
                 return;
               }
+              
+              setIsPublishing(true);
               try {
                 console.log(isEditing ? '💾 Saving property changes...' : '📤 Publishing property...');
                 console.log('Property setup data:', {
@@ -3246,6 +3275,10 @@ export function AppContent() {
                   if (createdProperty) {
                     selectProperty(createdProperty);
                     navigateToScreen('property-details');
+                    trackEvent('landlord_property_saved', {
+                      is_edit: false,
+                      property_id: propertyId
+                    });
                   } else {
                     console.error('Failed to retrieve created property');
                     alert('Property created but failed to load. Please refresh the page.');
@@ -3254,6 +3287,8 @@ export function AppContent() {
               } catch (error) {
                 console.error('Error publishing property:', error);
                 alert(`Failed to publish property: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              } finally {
+                setIsPublishing(false);
               }
             }}
             onAddTenant={() => {
@@ -3371,6 +3406,8 @@ export function AppContent() {
         return (
           <InviteTenant
             properties={properties}
+            landlordEmail={userProfile?.email}
+            landlordId={getCurrentUserId() || undefined}
             onBack={() => navigateToScreen('tenant-selection')}
             onSuccess={() => {
               if (previousScreen === 'property-preview') {
