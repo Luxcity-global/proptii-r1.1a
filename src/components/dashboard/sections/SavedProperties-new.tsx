@@ -8,6 +8,8 @@ import { firestoreService } from '../../../services/firestoreService';
 import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import { useIsMobile } from '../ui/use-mobile';
 import { trackEvent } from '../../../utils/analytics';
+import { useNavigate } from 'react-router-dom';
+import communicationService from '../../../services/communicationService';
 
 /**
  * Saved Properties section - redesigned to follow style guide
@@ -17,12 +19,38 @@ const SavedProperties: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const { signedContracts } = useSignedContracts();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(6);
   const [detailsModal, setDetailsModal] = useState<{ open: boolean; property: any | null }>({ open: false, property: null });
   const [isBookViewingOpen, setIsBookViewingOpen] = useState(false);
   const [prefilledPropertyData, setPrefilledPropertyData] = useState<any | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  
+  const handleMessageClick = async (property: any) => {
+    if (!user) return;
+    try {
+      const landlordId = property.source === 'native' ? property.userId : 'UNCLAIMED';
+      const agentEmail = property.source === 'scraped' ? property.agent?.email : undefined;
+      const conversation = await communicationService.getOrCreateConversation({
+        propertyId: property.id,
+        tenantId: user.id,
+        landlordId,
+        agentEmail,
+        propertyTitle: property.title,
+      });
+      navigate('/dashboard/messages', {
+        state: {
+          prefilledMessage: property.source === 'native' ? 'I want to make enquiries concerning this property' : undefined,
+          conversationId: conversation.id
+        }
+      });
+    } catch (error) {
+      console.error('Failed to start conversation:', error);
+      alert('Failed to start conversation. Please try again.');
+    }
+  };
+
   const [viewingStats, setViewingStats] = useState<ViewingStats>({
     upcoming: 0,
     completed: 0,
@@ -184,7 +212,7 @@ const SavedProperties: React.FC = () => {
                         Call
                       </button>
                     )}
-                    <button className={`${isMobile ? 'w-full' : 'px-4'} py-2 bg-white border border-gray-300 text-gray-700 rounded-lg ${isMobile ? 'text-sm' : ''}`}>Message</button>
+                    <button onClick={() => handleMessageClick(property)} className={`${isMobile ? 'w-full' : 'px-4'} py-2 bg-white border border-gray-300 text-gray-700 rounded-lg ${isMobile ? 'text-sm' : ''}`}>Message</button>
                   </div>
                 </div>
               </div>

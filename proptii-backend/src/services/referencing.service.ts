@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException, Inject, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, Logger, forwardRef } from '@nestjs/common';
 import { CosmosClient, Container } from '@azure/cosmos';
 import { Firestore } from 'firebase-admin/firestore';
 import { EmailService } from './email.service';
+import { NativePropertiesService } from './native-properties.service';
 
 @Injectable()
 export class ReferencingService {
@@ -12,7 +13,8 @@ export class ReferencingService {
   constructor(
     @Inject('COSMOS_CLIENT') private readonly cosmosClient: CosmosClient | null,
     @Inject('FIRESTORE') private readonly firestoreClient: Firestore | null,
-    private readonly emailService: EmailService
+    private readonly emailService: EmailService,
+    private readonly nativePropertiesService: NativePropertiesService
   ) {
     // Initialize Cosmos DB (legacy support)
     if (this.cosmosClient) {
@@ -606,18 +608,52 @@ export class ReferencingService {
         </html>
       `;
 
-      // In a production environment, you would get the agent's email from the application data
-      // For now, we'll log it. You may need to query the database for the agent's email
+      let agentEmail: string | undefined;
+
+      if (this.firestore && data.applicantEmail) {
+        try {
+          const formsSnapshot = await this.firestore.collection('referencingForms').get();
+          const userForms = formsSnapshot.docs.map(doc => doc.data())
+            .filter(f => f.formData?.identity?.email === data.applicantEmail);
+          
+          if (userForms.length > 0) {
+            const propertyId = userForms[0].propertyId;
+            if (propertyId) {
+              const property = await this.nativePropertiesService.findById(propertyId);
+              if (property) {
+                // Determine landlord/agent email
+                // Note: The property might have an agent object with an email, or ownerEmail, or we might need to look up the userId.
+                // Assuming property.ownerEmail or property.agent.email is set, or we can fetch the user.
+                agentEmail = (property as any).ownerEmail || (property as any).agent?.email;
+                if (!agentEmail && property.userId) {
+                  // Fallback to fetch from Firestore users if needed, but usually ownerEmail is there.
+                  const userSnap = await this.firestore.collection('users').doc(property.userId).get();
+                  if (userSnap.exists) {
+                    agentEmail = userSnap.data()?.email;
+                  }
+                }
+              }
+            }
+          }
+        } catch (err) {
+          this.logger.error('Failed to lookup agent email for notification:', err);
+        }
+      }
+
       this.logger.log(`Would send ${responseTypeLabel} response notification email`);
       this.logger.log('Notification email HTML:', notificationHtml);
       
-      // TODO: Get agent email from application data and send notification
-      // await this.emailService.sendEmail({
-      //   to: agentEmail,
-      //   subject: `${responseTypeLabel} Response Received - ${data.applicantName}`,
-      //   html: notificationHtml,
-      //   attachments: []
-      // });
+      if (agentEmail) {
+        await this.emailService.sendEmail({
+          to: agentEmail,
+          subject: `${responseTypeLabel} Response Received - ${data.applicantName}`,
+          html: notificationHtml,
+          attachments: []
+        });
+        this.logger.log(`✅ Sent notification email to agent/landlord: ${agentEmail}`);
+      } else {
+        this.logger.warn('Could not determine agent/landlord email to send notification.');
+      }
 
     } catch (error) {
       this.logger.error('Error sending response notification email:', error);

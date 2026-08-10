@@ -74,7 +74,7 @@ export function RoleSelection({ onRoleSelect, onContinue }: RoleSelectionProps) 
             </div>
             
             <img 
-              src="/images/role-selection/tenant-home.png" 
+              src="/tenant-role.png" 
               alt="Tenant Homes" 
               className="absolute bottom-0 right-0 w-48 md:w-56 lg:w-64 object-cover rounded-tl-3xl rounded-br-3xl"
               style={{ objectPosition: 'center', height: '65%' }}
@@ -119,7 +119,7 @@ export function RoleSelection({ onRoleSelect, onContinue }: RoleSelectionProps) 
             </div>
             
             <img 
-              src="/images/role-selection/landlord-assets.png" 
+              src="/landlord-role.png" 
               alt="Landlord Assets" 
               className="absolute bottom-0 right-0 w-48 md:w-56 lg:w-64 object-cover rounded-tl-3xl rounded-br-3xl"
               style={{ objectPosition: 'center', height: '65%' }}

@@ -149,6 +149,10 @@ const TenantMessages: React.FC = () => {
         const state = location.state as { prefilledMessage?: string; conversationId?: string } | null;
         if (state?.conversationId) {
             setActiveConversationId(state.conversationId);
+            
+            // Immediately refresh so the newly created conversation is in the context
+            refreshConversations();
+
             if (state.prefilledMessage) {
                 setPrefilledDrafts((prev) => ({
                     ...prev,
@@ -158,7 +162,7 @@ const TenantMessages: React.FC = () => {
             // Clear history state immediately so refreshing doesn't re-trigger prefilling
             navigate(location.pathname, { replace: true, state: {} });
         }
-    }, [location.state, location.pathname, navigate, setActiveConversationId]);
+    }, [location.state, location.pathname, navigate, setActiveConversationId, refreshConversations]);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const optimisticBottomRef = useRef<HTMLDivElement>(null);

@@ -1,13 +1,17 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { NativeProperty } from '../schemas/native-property.schema';
 import * as crypto from 'crypto';
+import { Firestore } from 'firebase-admin/firestore';
 
 @Injectable()
 export class NativePropertiesService {
+  private readonly logger = new Logger(NativePropertiesService.name);
+
   constructor(
     @InjectModel(NativeProperty.name) private propertyModel: Model<NativeProperty>,
+    @Inject('FIRESTORE') private readonly firestoreClient: Firestore | null,
   ) {}
 
   async create(data: any): Promise<NativeProperty> {
@@ -131,5 +135,23 @@ export class NativePropertiesService {
       throw new ForbiddenException('Forbidden');
     }
     await this.propertyModel.findOneAndDelete({ id }).exec();
+
+    // Cascading decouple: set propertyId to null for associated tenants
+    if (this.firestoreClient) {
+      try {
+        const tenantsRef = this.firestoreClient.collection('tenants');
+        const snapshot = await tenantsRef.where('propertyId', '==', id).get();
+        if (!snapshot.empty) {
+          const batch = this.firestoreClient.batch();
+          snapshot.docs.forEach((doc) => {
+            batch.update(doc.ref, { propertyId: null });
+          });
+          await batch.commit();
+          this.logger.log(`Decoupled ${snapshot.size} tenants from deleted property ${id}`);
+        }
+      } catch (error) {
+        this.logger.error(`Error decoupling tenants for deleted property ${id}:`, error);
+      }
+    }
   }
 }
