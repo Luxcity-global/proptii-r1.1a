@@ -84,10 +84,13 @@ const ListingCard: React.FC<ListingCardProps> = ({ property, viewMode }) => {
 
     setIsMessaging(true);
     try {
+      const tenantName = (user as any)?.name || (user as any)?.displayName || user?.email || '';
       const conversation = await communicationService.getOrCreateConversation({
         propertyId: property.id,
         tenantId: user.id,
         landlordId: property.landlordId,
+        propertyTitle: property.title,
+        tenantName,
       });
       setActiveConversationId(conversation.id);
       navigate('/dashboard/messages', {

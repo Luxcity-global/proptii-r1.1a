@@ -33,6 +33,7 @@ export interface Conversation {
     /** Optional fields for shadow conversations */
     agentEmail?: string;
     propertyTitle?: string;
+    tenantName?: string;
 }
 
 /**
@@ -149,6 +150,7 @@ export interface CreateConversationDto {
     landlordId: string;
     agentEmail?: string;
     propertyTitle?: string;
+    tenantName?: string;
     /** Full property snapshot sent when messaging an unclaimed scraped property */
     scrapedPropertySnapshot?: {
         url: string;

@@ -98,7 +98,8 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
       const landlordId = property.landlordId || 'UNCLAIMED';
       const isScrapedProperty = !property.landlordId;
       const agentEmail = isScrapedProperty ? property.agent?.email : undefined;
-      const propertyTitle = isScrapedProperty ? property.title : undefined;
+      const propertyTitle = property.title;
+      const tenantName = (user as any)?.name || (user as any)?.displayName || user?.email || '';
 
       // Note: ListingDetailsModal shows native (Proptii-listed) properties.
       // Native properties always have a landlordId set, so isScrapedProperty
@@ -109,6 +110,7 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
         landlordId,
         agentEmail,
         propertyTitle,
+        tenantName,
       });
       setActiveConversationId(conversation.id);
       onClose();

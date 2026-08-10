@@ -42,6 +42,7 @@ function nameToHue(name: string): number {
 
 function formatTime(iso: string): string {
     const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
     const now = new Date();
     const diffDays = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
     if (diffDays === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

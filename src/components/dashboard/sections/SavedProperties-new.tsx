@@ -32,12 +32,14 @@ const SavedProperties: React.FC = () => {
     try {
       const landlordId = property.source === 'native' ? property.userId : 'UNCLAIMED';
       const agentEmail = property.source === 'scraped' ? property.agent?.email : undefined;
+      const tenantName = (user as any)?.name || (user as any)?.displayName || user?.email || '';
       const conversation = await communicationService.getOrCreateConversation({
         propertyId: property.id,
         tenantId: user.id,
         landlordId,
         agentEmail,
         propertyTitle: property.title,
+        tenantName,
       });
       navigate('/dashboard/messages', {
         state: {

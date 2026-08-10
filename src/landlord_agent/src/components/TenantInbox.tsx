@@ -247,59 +247,59 @@ export const TenantInbox: React.FC = () => {
                                 <EmptyState {...emptyMessages[activeTab]} />
                             ) : (
                                 visibleConvs.map((conv) => (
-                                    <ConversationListItem
-                                        key={conv.id}
-                                        conversation={conv}
-                                        isActive={conv.id === activeConversationId}
-                                        onClick={handleSelect}
-                                        participantName="Tenant"
-                                        propertyAddress={conv.propertyId}
-                                        lastReadAt={readCursors[conv.id] ?? null}
-                                    />
-                                ))
-                            )}
-                        </div>
+                                        <ConversationListItem
+                                            key={conv.id}
+                                            conversation={conv}
+                                            isActive={conv.id === activeConversationId}
+                                            onClick={handleSelect}
+                                            participantName={conv.tenantName || 'Tenant'}
+                                            propertyAddress={conv.propertyTitle || conv.propertyId}
+                                            lastReadAt={readCursors[conv.id] ?? null}
+                                        />
+                                    ))
+                                )}
+                            </div>
 
-                        {/* Back button */}
-                        <div style={{ padding: '10px 16px', borderTop: '1px solid #f3f4f6', flexShrink: 0 }}>
-                            <button type="button" className="msg-back-btn-ll" onClick={() => navigate('/landlord/dashboard')}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
-                                    padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e7eb',
-                                    background: '#ffffff', color: '#374151', cursor: 'pointer',
-                                    fontSize: '0.8125rem', fontWeight: 500, transition: 'all 0.15s', justifyContent: 'center',
-                                }}>
-                                <BackIcon />
-                                Back to Dashboard
-                            </button>
-                        </div>
-                    </aside>
-
-                    {/* ── Right panel ──────────────────────────────────────── */}
-                    <main aria-label="Message thread"
-                        style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fafbff' }}>
-                        {activeConversationId ? (
-                            <>
-                                <div style={{
-                                    padding: '14px 20px', borderBottom: '1px solid #e5e7eb',
-                                    display: 'flex', alignItems: 'center', gap: '12px',
-                                    background: '#ffffff', flexShrink: 0,
-                                }}>
-                                    <div style={{
-                                        width: '38px', height: '38px', borderRadius: '50%',
-                                        background: '#3b82f6', color: '#fff',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        fontSize: '0.8125rem', fontWeight: 700, flexShrink: 0,
+                            {/* Back button */}
+                            <div style={{ padding: '10px 16px', borderTop: '1px solid #f3f4f6', flexShrink: 0 }}>
+                                <button type="button" className="msg-back-btn-ll" onClick={() => navigate('/landlord/dashboard')}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
+                                        padding: '8px 12px', borderRadius: '8px', border: '1px solid #e5e7eb',
+                                        background: '#ffffff', color: '#374151', cursor: 'pointer',
+                                        fontSize: '0.8125rem', fontWeight: 500, transition: 'all 0.15s', justifyContent: 'center',
                                     }}>
-                                        {getInitials('Tenant')}
-                                    </div>
-                                    <div>
-                                        <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9375rem', color: '#111827' }}>Tenant</p>
-                                        <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280' }}>{activeConversation?.propertyId ?? ''}</p>
-                                    </div>
-                                </div>
+                                    <BackIcon />
+                                    Back to Dashboard
+                                </button>
+                            </div>
+                        </aside>
 
-                                <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto' }}>
+                        {/* ── Right panel ──────────────────────────────────────── */}
+                        <main aria-label="Message thread"
+                            style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fafbff' }}>
+                            {activeConversationId ? (
+                                <>
+                                    <div style={{
+                                        padding: '14px 20px', borderBottom: '1px solid #e5e7eb',
+                                        display: 'flex', alignItems: 'center', gap: '12px',
+                                        background: '#ffffff', flexShrink: 0,
+                                    }}>
+                                        <div style={{
+                                            width: '38px', height: '38px', borderRadius: '50%',
+                                            background: '#3b82f6', color: '#fff',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontSize: '0.8125rem', fontWeight: 700, flexShrink: 0,
+                                        }}>
+                                            {getInitials(activeConversation?.tenantName || 'Tenant')}
+                                        </div>
+                                        <div>
+                                            <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9375rem', color: '#111827' }}>{activeConversation?.tenantName || 'Tenant'}</p>
+                                            <p style={{ margin: 0, fontSize: '0.75rem', color: '#6b7280' }}>{activeConversation?.propertyTitle || activeConversation?.propertyId || ''}</p>
+                                        </div>
+                                    </div>
+
+                                    <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto' }}>
                                     <MessageThread conversationId={activeConversationId} currentUserId={currentUserId} onScrollRequest={scrollToBottom} />
                                     {(optimisticMessages[activeConversationId] ?? []).map(({ message: msg, file }) => (
                                         <div key={msg.id} data-testid="optimistic-message"

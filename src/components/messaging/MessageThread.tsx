@@ -209,15 +209,17 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
                                 </div>
                             )}
 
-                            <time
-                                dateTime={message.sentAt}
-                                style={{ fontSize: '0.75rem', opacity: 0.7, display: 'block', marginTop: '4px' }}
-                            >
-                                {new Date(message.sentAt).toLocaleTimeString([], {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                })}
-                            </time>
+                            {message.sentAt && !isNaN(new Date(message.sentAt).getTime()) && (
+                                <time
+                                    dateTime={message.sentAt}
+                                    style={{ fontSize: '0.75rem', opacity: 0.7, display: 'block', marginTop: '4px' }}
+                                >
+                                    {new Date(message.sentAt).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                    })}
+                                </time>
+                            )}
                         </div>
                     </div>
                 );

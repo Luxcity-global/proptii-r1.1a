@@ -1,12 +1,15 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, HttpCode, Req, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, HttpCode, Req, Logger, BadRequestException } from '@nestjs/common';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { getFirestore } from '../config/firestore.config';
+import { StorageService } from '../services/storage.service';
 
 @ApiTags('communication')
 @Controller('communication')
 export class CommunicationController {
   private readonly logger = new Logger(CommunicationController.name);
+
+  constructor(private readonly storageService: StorageService) {}
 
   @Get('conversations')
   @HttpCode(200)
@@ -95,6 +98,7 @@ export class CommunicationController {
         landlordId: dto.landlordId || '',
         agentEmail: dto.agentEmail || null,
         propertyTitle: dto.propertyTitle || '',
+        tenantName: dto.tenantName || '',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -119,7 +123,14 @@ export class CommunicationController {
     try {
       const messagesRef = db.collection('conversations').doc(id).collection('messages');
       const snapshot = await messagesRef.orderBy('timestamp', 'asc').get();
-      const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const messages = snapshot.docs.map(doc => {
+        const data = doc.data();
+        let sentAt = data.sentAt;
+        if (!sentAt) {
+           sentAt = data.timestamp ? data.timestamp.toDate().toISOString() : new Date().toISOString();
+        }
+        return { id: doc.id, ...data, sentAt };
+      });
       return { data: messages };
     } catch (error) {
       this.logger.error(`Error getting messages: ${error.message}`);
@@ -191,5 +202,79 @@ export class CommunicationController {
        }
     }
     return { data: { success: true } };
+  }
+
+  @Post('attachments/upload')
+  @HttpCode(201)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload an attachment for a conversation' })
+  async uploadAttachment(@Body() body: any, @Query('conversationId') conversationId: string, @Req() req: any) {
+    if (!conversationId) throw new BadRequestException('conversationId is required');
+    const { file, fileName, mimeType, sizeBytes } = body;
+    if (!file) throw new BadRequestException('file base64 data is required');
+
+    // Convert base64 to Buffer
+    const buffer = Buffer.from(file, 'base64');
+    
+    // Create a mock Multer file object for StorageService
+    const multerFile = {
+      buffer,
+      originalname: fileName || 'attachment',
+      mimetype: mimeType || 'application/octet-stream',
+      size: sizeBytes || buffer.length,
+    } as Express.Multer.File;
+
+    // Upload using StorageService
+    const uploaded = await this.storageService.uploadFile(multerFile, `conversations/${conversationId}`);
+    
+    // Now save to Firestore collection message_attachments
+    const db = getFirestore();
+    const attachmentData = {
+      id: '', // Will be set to doc.id
+      conversationId,
+      messageId: '', // it will be attached to a message later
+      uploaderId: req.user?.sub || 'unknown', 
+      fileName: fileName || 'attachment',
+      mimeType: mimeType || 'application/octet-stream',
+      sizeBytes: multerFile.size,
+      blobPath: uploaded.url,
+      uploadedAt: new Date().toISOString()
+    };
+    
+    if (db) {
+       const docRef = await db.collection('message_attachments').add(attachmentData);
+       attachmentData.id = docRef.id;
+       await docRef.update({ id: docRef.id });
+    } else {
+       attachmentData.id = `att_${Date.now()}`;
+    }
+    
+    return { data: attachmentData };
+  }
+
+  @Get('attachments/:id/url')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a URL for an attachment' })
+  async getAttachmentUrl(@Param('id') id: string, @Query('conversationId') conversationId: string) {
+    const db = getFirestore();
+    if (!db) return { data: { url: '' } };
+
+    try {
+      const doc = await db.collection('message_attachments').doc(id).get();
+      if (!doc.exists) {
+         // Fallback if not in message_attachments collection - some old mock data might just pass the raw URL as ID
+         if (id.startsWith('http')) return { data: { url: id } };
+         return { data: { url: '' } };
+      }
+      
+      const data = doc.data();
+      return { data: { url: data.blobPath || '' } };
+    } catch (error) {
+      this.logger.error(`Error getting attachment URL: ${error.message}`);
+      return { data: { url: '' } };
+    }
   }
 }

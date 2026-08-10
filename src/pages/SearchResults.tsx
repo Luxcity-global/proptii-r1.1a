@@ -218,7 +218,8 @@ function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDetailsModa
     try {
       const landlordId = property.landlordId || 'UNCLAIMED';
       const agentEmail = isScrapedProperty ? property.agent?.email : undefined;
-      const propertyTitle = isScrapedProperty ? property.title : undefined;
+      const propertyTitle = property.title;
+      const tenantName = (user as any)?.name || (user as any)?.displayName || user?.email || '';
 
       const conversation = await communicationService.getOrCreateConversation({
         propertyId: property.url || property.id || '',
@@ -226,6 +227,7 @@ function PropertyDetailsModal({ property, isOpen, onClose }: PropertyDetailsModa
         landlordId,
         agentEmail,
         propertyTitle,
+        tenantName,
         scrapedPropertySnapshot: isScrapedProperty && property.agent?.email ? {
           url: property.url || '',
           title: property.title || '',
