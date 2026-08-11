@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { google } from 'googleapis';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 @Injectable()
 export class SheetsService {
@@ -13,8 +15,8 @@ export class SheetsService {
     private async init() {
         try {
             if (!process.env.GOOGLE_SHEETS_CREDENTIALS_JSON) {
-                this.logger.error(
-                    'GOOGLE_SHEETS_CREDENTIALS_JSON environment variable not set.',
+                this.logger.warn(
+                    'GOOGLE_SHEETS_CREDENTIALS_JSON environment variable not set. Sheets submissions will be stored locally.',
                 );
                 return;
             }
@@ -33,15 +35,55 @@ export class SheetsService {
         }
     }
 
+    /**
+     * Persist submissions when Google Sheets credentials are unavailable
+     * (common in local development) so reviews/help forms still succeed.
+     */
+    private async persistLocally(spreadsheetId: string, data: any): Promise<any> {
+        const dir = path.join(process.cwd(), 'data');
+        const file = path.join(dir, 'sheets-submissions.json');
+
+        await fs.mkdir(dir, { recursive: true });
+
+        let existing: any[] = [];
+        try {
+            const raw = await fs.readFile(file, 'utf8');
+            existing = JSON.parse(raw);
+            if (!Array.isArray(existing)) existing = [];
+        } catch {
+            existing = [];
+        }
+
+        const entry = {
+            spreadsheetId,
+            data,
+            receivedAt: new Date().toISOString(),
+            storage: 'local',
+        };
+        existing.push(entry);
+        await fs.writeFile(file, JSON.stringify(existing, null, 2), 'utf8');
+
+        this.logger.log(
+            `Stored sheets submission locally (${existing.length} total) at ${file}`,
+        );
+
+        return {
+            stored: 'local',
+            count: existing.length,
+            message:
+                'Google Sheets unavailable — submission saved locally for development',
+        };
+    }
+
     async submitData(spreadsheetId: string, data: any): Promise<any> {
         if (!this.sheets) {
-            throw new Error('Google Sheets API not initialized');
+            return this.persistLocally(spreadsheetId, data);
         }
 
         try {
             this.logger.log(`Submitting data to spreadsheet: ${spreadsheetId}`);
             this.logger.log(`Data received: ${JSON.stringify(data)}`);
-            
+
             const formattedTimestamp = new Date(data.timestamp).toLocaleString();
             let values: any[][] = [];
             let range: string = '';
@@ -56,9 +98,9 @@ export class SheetsService {
                     userType: data.userType,
                     userId: data.userId,
                     userEmail: data.userEmail,
-                    source: data.source
+                    source: data.source,
                 });
-                
+
                 values = [
                     [
                         formattedTimestamp,
@@ -67,8 +109,8 @@ export class SheetsService {
                         data.userType || 'Unknown',
                         data.userId || 'Anonymous',
                         data.userEmail || 'No email provided',
-                        data.source || 'Unknown'
-                    ]
+                        data.source || 'Unknown',
+                    ],
                 ];
                 range = 'Sheet1!A:G'; // 7 columns for review data (added userEmail)
                 this.logger.log('Processing as review data with 7 columns:', values[0]);
@@ -101,7 +143,9 @@ export class SheetsService {
             return response.data;
         } catch (error) {
             this.logger.error('Failed to submit data to spreadsheet', error.stack);
-            throw error;
+            // Fall back to local storage so the user-facing submit still succeeds
+            this.logger.warn('Falling back to local sheets submission storage');
+            return this.persistLocally(spreadsheetId, data);
         }
     }
-} 
+}

@@ -44,14 +44,9 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
     uploadedDocuments: []
   });
   
-  // Update local state when prop changes
-  useEffect(() => {
-    if (propPropertyDetails) {
-      setPropertyDetails(propPropertyDetails);
-    }
-  }, [propPropertyDetails]);
-  
-  const [uploadedDocuments, setUploadedDocuments] = useState<File[]>([]);
+  const [uploadedDocuments, setUploadedDocuments] = useState<File[]>(
+    propPropertyDetails?.uploadedDocuments || []
+  );
   const [showMap, setShowMap] = useState(false);
   const [useLocation, setUseLocation] = useState(false);
   const [mapError, setMapError] = useState('');
@@ -60,6 +55,14 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
   const googleMapRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
+
+  // Update local state when prop changes (including restored drafts / back-navigation)
+  useEffect(() => {
+    if (propPropertyDetails) {
+      setPropertyDetails(propPropertyDetails);
+      setUploadedDocuments(propPropertyDetails.uploadedDocuments || []);
+    }
+  }, [propPropertyDetails]);
   
   // Progress tracker steps
   const progressSteps = [
@@ -115,17 +118,17 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
     const files = event.target.files;
     if (files) {
       const newDocuments = Array.from(files);
-      setUploadedDocuments(prev => [...prev, ...newDocuments]);
-      
-      // Update property details with new documents
-      const updatedDocuments = [...uploadedDocuments, ...newDocuments];
-      const newPropertyDetails = { ...propertyDetails, uploadedDocuments: updatedDocuments };
-      setPropertyDetails(newPropertyDetails);
-      
-      // Notify parent component
-      if (onPropertyDetailsChange) {
-        onPropertyDetailsChange({ uploadedDocuments: updatedDocuments });
-      }
+      setUploadedDocuments(prev => {
+        const updatedDocuments = [...prev, ...newDocuments];
+        const newPropertyDetails = { ...propertyDetails, uploadedDocuments: updatedDocuments };
+        setPropertyDetails(newPropertyDetails);
+        if (onPropertyDetailsChange) {
+          onPropertyDetailsChange({ uploadedDocuments: updatedDocuments });
+        }
+        return updatedDocuments;
+      });
+      // Allow re-selecting the same file
+      event.target.value = '';
     }
   };
 
@@ -371,7 +374,7 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
               <Button variant="outline" className="rounded-full px-4 py-2">
                 Questions?
               </Button>
-              <Button variant="outline" className="rounded-full px-4 py-2">
+              <Button variant="outline" className="rounded-full px-4 py-2" onClick={onHome}>
                 Save & exit
               </Button>
               <Button 
@@ -398,7 +401,7 @@ export function PropertyDetailsSelection({ propertyDetails: propPropertyDetails,
                   <DropdownMenuItem className="cursor-pointer">
                     Questions?
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer">
+                  <DropdownMenuItem className="cursor-pointer" onClick={onHome}>
                     Save & exit
                   </DropdownMenuItem>
                   <DropdownMenuItem 

@@ -85,7 +85,18 @@ export function PropertyCard({
   return (
     <Card className={`overflow-hidden hover:shadow-lg transition-shadow ${className}`}>
       {/* Property Image */}
-      <div className="aspect-video relative overflow-hidden">
+      <div
+        className="aspect-video relative overflow-hidden cursor-pointer"
+        onClick={() => onView?.(property)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onView?.(property);
+          }
+        }}
+      >
         {property.photos.length > 0 ? (
           <img
             src={

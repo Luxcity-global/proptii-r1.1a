@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Star } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { fetchWithApiFallback } from '../utils/apiEndpoints';
 
 interface ReviewModalProps {
   isOpen: boolean;
@@ -11,14 +12,32 @@ interface ReviewModalProps {
   source?: 'viewing_completion' | 'referencing_completion';
 }
 
-const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, userId, userEmail, source = 'referencing_completion' }) => {
+const REVIEW_SPREADSHEET_ID = '1WBACyGHtXUMfD9UeCUYcBM-2McIB3UJywcYWSPwj5nk';
+
+const ReviewModal: React.FC<ReviewModalProps> = ({
+  isOpen,
+  onClose,
+  userType,
+  userId,
+  userEmail,
+  source = 'referencing_completion',
+}) => {
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [feedback, setFeedback] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+
+  const resetForm = () => {
+    setRating(0);
+    setFeedback('');
+    setHoveredRating(0);
+    setErrorMessage('');
+  };
 
   const handleStarClick = (starRating: number) => {
     setRating(starRating);
+    setErrorMessage('');
   };
 
   const handleStarHover = (starRating: number) => {
@@ -29,88 +48,96 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
     setHoveredRating(0);
   };
 
+  const persistReviewLocally = (reviewData: Record<string, unknown>) => {
+    const existingReviews = JSON.parse(localStorage.getItem('proptii_reviews') || '[]');
+    existingReviews.push(reviewData);
+    localStorage.setItem('proptii_reviews', JSON.stringify(existingReviews));
+  };
+
   const handleSubmit = async () => {
     if (rating === 0) {
-      toast.error('Please select a rating');
+      const message = 'Please select a rating';
+      setErrorMessage(message);
+      toast.error(message);
       return;
     }
 
     if (rating <= 3 && !feedback.trim()) {
-      toast.error('Please provide feedback for your rating');
+      const message = 'Please provide feedback for your rating';
+      setErrorMessage(message);
+      toast.error(message);
       return;
     }
 
     setIsSubmitting(true);
+    setErrorMessage('');
+
+    const reviewPayload = {
+      timestamp: new Date().toISOString(),
+      rating,
+      feedback: feedback.trim() || 'No feedback provided',
+      userType,
+      userId: userId || 'Anonymous',
+      userEmail: userEmail || 'No email provided',
+      source,
+    };
 
     try {
-      // Submit to Google Sheets
-      console.log('Submitting review to:', import.meta.env.VITE_GOOGLE_SHEETS_API_ENDPOINT + '/submit');
-      const response = await fetch(
-        `${import.meta.env.VITE_GOOGLE_SHEETS_API_ENDPOINT}/submit`,
+      const { response } = await fetchWithApiFallback(
+        '/sheets/submit',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            spreadsheetId: '1WBACyGHtXUMfD9UeCUYcBM-2McIB3UJywcYWSPwj5nk',
-            data: {
-              timestamp: new Date().toISOString(),
-              rating: rating,
-              feedback: feedback.trim() || 'No feedback provided',
-              userType: userType,
-              userId: userId || 'Anonymous',
-              userEmail: userEmail || 'No email provided',
-              source: source
-            }
-          })
-        }
+            spreadsheetId: REVIEW_SPREADSHEET_ID,
+            data: reviewPayload,
+          }),
+        },
+        // Do not retry across every fallback host on 500 — local Sheets misconfig
+        // was cascading into connection refused / SSL errors on dead remotes.
+        { retryOnHttpErrors: false, retryOnNotFound: true }
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to submit review');
+        let message = 'Failed to submit review';
+        try {
+          const errorData = await response.json();
+          message = errorData.message || message;
+        } catch {
+          // Non-JSON error body — keep default message
+        }
+        throw new Error(message);
       }
-      
+
       toast.success('Thank you for your feedback!');
+      resetForm();
       onClose();
-      
-      // Reset form
-      setRating(0);
-      setFeedback('');
     } catch (error) {
       console.error('Failed to submit review:', error);
-      // Fallback: store in localStorage as backup
-      const reviewData = {
-        rating,
-        feedback: feedback.trim() || 'No feedback provided',
-        userType,
-        timestamp: new Date().toISOString(),
-        source: source,
-        userId: userId || 'Anonymous',
-        userEmail: userEmail || 'No email provided'
-      };
-      
-      const existingReviews = JSON.parse(localStorage.getItem('proptii_reviews') || '[]');
-      existingReviews.push(reviewData);
-      localStorage.setItem('proptii_reviews', JSON.stringify(existingReviews));
-      
-      toast.success('Thank you for your feedback!');
-      onClose();
-      
-      // Reset form
-      setRating(0);
-      setFeedback('');
+
+      // Fallback: store locally so feedback is not lost if the API is unavailable
+      try {
+        persistReviewLocally(reviewPayload);
+        toast.success('Thank you for your feedback!');
+        resetForm();
+        onClose();
+      } catch (storageError) {
+        console.error('Failed to store review locally:', storageError);
+        const message =
+          error instanceof Error ? error.message : 'Failed to submit review. Please try again.';
+        setErrorMessage(message);
+        toast.error(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleSkip = () => {
+    resetForm();
     onClose();
-    // Reset form
-    setRating(0);
-    setFeedback('');
   };
 
   if (!isOpen) return null;
@@ -122,10 +149,9 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Rate Your Experience
-          </h3>
+          <h3 className="text-lg font-semibold text-gray-900">Rate Your Experience</h3>
           <button
+            type="button"
             onClick={handleSkip}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors"
             aria-label="Close modal"
@@ -137,10 +163,9 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
         {/* Content */}
         <div className="p-6">
           <p className="text-gray-600 mb-6 text-center">
-            {source === 'viewing_completion' 
+            {source === 'viewing_completion'
               ? 'How was your experience with the book viewing process?'
-              : 'How was your experience with the referencing process?'
-            }
+              : 'How was your experience with the referencing process?'}
           </p>
 
           {/* Star Rating */}
@@ -148,6 +173,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
             {[1, 2, 3, 4, 5].map((star) => (
               <button
                 key={star}
+                type="button"
                 onClick={() => handleStarClick(star)}
                 onMouseEnter={() => handleStarHover(star)}
                 onMouseLeave={handleStarLeave}
@@ -157,9 +183,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
                 <Star
                   size={32}
                   className={`transition-colors ${
-                    star <= displayRating
-                      ? 'text-yellow-400 fill-yellow-400'
-                      : 'text-gray-300'
+                    star <= displayRating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'
                   }`}
                 />
               </button>
@@ -187,7 +211,10 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
               </label>
               <textarea
                 value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
+                onChange={(e) => {
+                  setFeedback(e.target.value);
+                  if (errorMessage) setErrorMessage('');
+                }}
                 placeholder="Your feedback helps us improve our service..."
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
@@ -196,9 +223,16 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
             </div>
           )}
 
+          {errorMessage && (
+            <p className="mb-4 text-sm text-red-600 text-center" role="alert">
+              {errorMessage}
+            </p>
+          )}
+
           {/* Buttons */}
           <div className="flex space-x-3">
             <button
+              type="button"
               onClick={handleSkip}
               className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
               disabled={isSubmitting}
@@ -206,6 +240,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
               Skip
             </button>
             <button
+              type="button"
               onClick={handleSubmit}
               className="flex-1 px-4 py-2 bg-[#136C9E] text-white rounded-md hover:bg-[#0F5A82] transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
               disabled={isSubmitting || rating === 0}
@@ -219,4 +254,4 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ isOpen, onClose, userType, us
   );
 };
 
-export default ReviewModal; 
+export default ReviewModal;

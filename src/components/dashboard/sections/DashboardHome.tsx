@@ -33,6 +33,7 @@ import { contractService } from '../../../services/contractService';
 import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
 import { viewingService, ViewingStats } from '../../../services/viewingService';
 import FilePreviewModal from './FilePreviewModal';
+import SavedPropertyDetailsModal from '../SavedPropertyDetailsModal';
 import { useIsMobile } from '../ui/use-mobile';
 import { trackEvent } from '../../../utils/analytics';
 import AgentQuotaWidget from '../AgentQuotaWidget';
@@ -58,6 +59,10 @@ const DashboardHome: React.FC = () => {
   const [filesLoading, setFilesLoading] = useState(true);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
+  const [detailsModal, setDetailsModal] = useState<{ open: boolean; property: any | null }>({
+    open: false,
+    property: null,
+  });
   const [signedContractsCount, setSignedContractsCount] = useState(0);
   const [viewingStats, setViewingStats] = useState<ViewingStats>({
     upcoming: 0,
@@ -498,6 +503,38 @@ const DashboardHome: React.FC = () => {
     features: [property.propertyType, `${property.bedrooms} Bedrooms`],
     image: property.imageUrls?.[0] || '/images/detached-house.jpg'
   }));
+
+  const openSavedPropertyDetails = (propertyId: string) => {
+    const p = savedProperties.find((prop) => prop.id === propertyId);
+    if (!p) return;
+
+    const modalProperty = {
+      title: p.title,
+      price: typeof p.price === 'string' ? p.price : `£${p.price} pcm`,
+      location: p.location,
+      bedrooms: Number(p.bedrooms) || 0,
+      propertyType: p.propertyType,
+      source: p.source,
+      description: p.description,
+      imageUrls: p.imageUrls?.length ? p.imageUrls : ['/images/detached-house.jpg'],
+      agent: p.agent
+        ? {
+            name: p.agent.name || 'Estate Agent',
+            email: p.agent.email || '',
+            phone: p.agent.phone,
+            company: p.agent.company,
+            website: p.agent.website,
+          }
+        : undefined,
+    };
+
+    setDetailsModal({ open: true, property: modalProperty });
+    trackEvent('tenant_dashboard_home_saved_property_view', {
+      property_id: p.id,
+      location: p.location,
+      source: p.source,
+    });
+  };
 
   // Mock data for now since we removed the hook dependency
   const dashboardSummary = {
@@ -1361,7 +1398,11 @@ const DashboardHome: React.FC = () => {
                   
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2">
-                    <button className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                    <button
+                      type="button"
+                      className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                      onClick={() => openSavedPropertyDetails(search.id)}
+                    >
                       <Eye className="w-4 h-4 mr-2" />
                       View
                     </button>
@@ -1546,6 +1587,15 @@ const DashboardHome: React.FC = () => {
         file={selectedFile}
         onDownload={handleDownload}
       />
+
+      {/* Saved listing details modal */}
+      {detailsModal.open && detailsModal.property && (
+        <SavedPropertyDetailsModal
+          property={detailsModal.property}
+          isOpen={detailsModal.open}
+          onClose={() => setDetailsModal({ open: false, property: null })}
+        />
+      )}
     </div>
   );
 };

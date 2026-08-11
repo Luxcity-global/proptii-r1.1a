@@ -82,7 +82,7 @@ export function AmenitiesSelection({ selectedAmenities: propSelectedAmenities, o
               <Button variant="outline" className="rounded-full px-4 py-2">
                 Questions?
               </Button>
-              <Button variant="outline" className="rounded-full px-4 py-2">
+              <Button variant="outline" className="rounded-full px-4 py-2" onClick={onHome}>
                 Save & exit
               </Button>
               <Button 
@@ -109,7 +109,7 @@ export function AmenitiesSelection({ selectedAmenities: propSelectedAmenities, o
                   <DropdownMenuItem className="cursor-pointer">
                     Questions?
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer">
+                  <DropdownMenuItem className="cursor-pointer" onClick={onHome}>
                     Save & exit
                   </DropdownMenuItem>
                   <DropdownMenuItem 

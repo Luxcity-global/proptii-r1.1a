@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { Toaster } from 'react-hot-toast';
 import './index.css';
 import { getMsalInstance } from './contexts/AuthContext';
 import theme from './theme/theme';
@@ -39,6 +40,7 @@ const initializeApp = async () => {
           <CssBaseline />
           <ErrorBoundary>
             <Router />
+            <Toaster position="top-center" />
           </ErrorBoundary>
         </ThemeProvider>
       </StrictMode>
@@ -53,6 +55,7 @@ const initializeApp = async () => {
           <CssBaseline />
           <ErrorBoundary>
             <Router />
+            <Toaster position="top-center" />
           </ErrorBoundary>
         </ThemeProvider>
       </StrictMode>

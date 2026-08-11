@@ -766,7 +766,18 @@ export function PropertiesPage({
               <Card key={property.id} className="overflow-hidden">
                 <CardHeader className="p-0">
                   {coverPhoto ? (
-                    <div className="aspect-video bg-muted">
+                    <div
+                      className="aspect-video bg-muted cursor-pointer"
+                      onClick={() => onViewProperty(property)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onViewProperty(property);
+                        }
+                      }}
+                    >
                       <img
                         src={coverPhoto.url}
                         alt={property.address}
@@ -774,7 +785,18 @@ export function PropertiesPage({
                       />
                     </div>
                   ) : (
-                    <div className="aspect-video bg-muted flex items-center justify-center">
+                    <div
+                      className="aspect-video bg-muted flex items-center justify-center cursor-pointer"
+                      onClick={() => onViewProperty(property)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onViewProperty(property);
+                        }
+                      }}
+                    >
                       <Building2 className="h-12 w-12 text-muted-foreground" />
                     </div>
                   )}

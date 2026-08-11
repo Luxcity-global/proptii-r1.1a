@@ -46,6 +46,15 @@ import { storage, db } from './config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, query, where, onSnapshot, Unsubscribe, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { trackEvent } from '../../utils/analytics';
+import {
+  clearPropertySetupDraft,
+  hasPropertySetupDraftContent,
+  isPropertySetupDraftScreen,
+  loadPropertySetupDraft,
+  peekPropertySetupDraftScreen,
+  savePropertySetupDraft,
+  type PropertySetupDraftScreen,
+} from './utils/propertySetupDraft';
 
 export type UserRole = 'landlord' | 'agent';
 
@@ -307,6 +316,23 @@ interface PropertySetupData {
   pendingTenants?: Omit<Tenant, 'id'>[]; // Tenants added before property is published
 }
 
+const EMPTY_PROPERTY_SETUP_DATA: PropertySetupData = {
+  propertyType: null,
+  propertyDetails: {
+    address: '',
+    monthlyRent: '',
+    bedrooms: '',
+    bathrooms: '',
+    squareFootage: '',
+    uploadedDocuments: []
+  },
+  amenities: [],
+  images: [],
+  imageFiles: [],
+  additionalNotes: '',
+  pendingTenants: []
+};
+
 // Map URL paths to main-app navigation screens (shared by routing helpers below)
 const PATH_TO_NAV_SCREEN: Record<string, NavigationScreen> = {
   '/': 'dashboard',
@@ -475,21 +501,9 @@ function AppContent() {
   }, [userProfile]);
   
   // Property setup state
-  const [propertySetupData, setPropertySetupData] = useState<PropertySetupData>({
-    propertyType: null,
-    propertyDetails: {
-      address: '',
-      monthlyRent: '',
-      bedrooms: '',
-      bathrooms: '',
-      squareFootage: '',
-      uploadedDocuments: []
-    },
-    amenities: [],
-    images: [], // Blob URLs for preview
-    imageFiles: [], // File objects for upload
-    additionalNotes: '',
-    pendingTenants: [] // Tenants added before property is published
+  const [propertySetupData, setPropertySetupData] = useState<PropertySetupData>(() => {
+    const draft = loadPropertySetupDraft();
+    return draft ? { ...EMPTY_PROPERTY_SETUP_DATA, ...draft.data, pendingTenants: [] } : EMPTY_PROPERTY_SETUP_DATA;
   });
 
   // Helper functions to update property setup data
@@ -503,6 +517,36 @@ function AppContent() {
       propertyDetails: { ...prev.propertyDetails, ...updates }
     }));
   };
+
+  const resetPropertySetupData = () => {
+    setPropertySetupData(EMPTY_PROPERTY_SETUP_DATA);
+    clearPropertySetupDraft();
+  };
+
+  const restoreCreateDraftOrEmpty = () => {
+    const draft = loadPropertySetupDraft();
+    setPropertySetupData(
+      draft
+        ? { ...EMPTY_PROPERTY_SETUP_DATA, ...draft.data, pendingTenants: [] }
+        : EMPTY_PROPERTY_SETUP_DATA
+    );
+  };
+
+  // Persist create-flow draft whenever setup data changes (not while editing)
+  useEffect(() => {
+    if (isEditing) return;
+    if (!hasPropertySetupDraftContent(propertySetupData)) return;
+
+    const lastScreen: PropertySetupDraftScreen = isPropertySetupDraftScreen(currentScreen)
+      ? currentScreen
+      : peekPropertySetupDraftScreen() || 'property-setup-step1';
+
+    const timer = window.setTimeout(() => {
+      void savePropertySetupDraft(propertySetupData, lastScreen);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [propertySetupData, isEditing, currentScreen]);
 
   // Listen for authentication changes from the bridge script
   React.useEffect(() => {
@@ -1356,6 +1400,15 @@ function AppContent() {
   }, [loadScopedTenants]);
 
   const navigateToScreen = (screen: Screen) => {
+    // Persist create-wizard progress when leaving or moving between setup steps
+    if (!isEditing && hasPropertySetupDraftContent(propertySetupData)) {
+      if (isPropertySetupDraftScreen(currentScreen)) {
+        void savePropertySetupDraft(propertySetupData, currentScreen);
+      } else if (isPropertySetupDraftScreen(screen)) {
+        void savePropertySetupDraft(propertySetupData, screen);
+      }
+    }
+
     setIsTransitioning(true);
     trackEvent('landlord_screen_navigation', { screen, from_screen: currentScreen });
     setTimeout(() => {
@@ -1377,6 +1430,83 @@ function AppContent() {
         }
       }
     }, 2); // Half of the transition duration
+  };
+
+  const exitPropertySetupToHome = () => {
+    if (!isEditing && isPropertySetupDraftScreen(currentScreen)) {
+      void savePropertySetupDraft(propertySetupData, currentScreen);
+    }
+    navigateToScreen('main-app');
+  };
+
+  const startAddPropertyFlow = () => {
+    trackEvent('landlord_add_property_clicked');
+
+    // Leaving an unfinished edit should restore create draft, not keep edit fields
+    if (isEditing) {
+      setIsEditing(false);
+      setEditingPropertyId(null);
+      const draft = loadPropertySetupDraft();
+      if (draft) {
+        setPropertySetupData({ ...EMPTY_PROPERTY_SETUP_DATA, ...draft.data, pendingTenants: [] });
+        navigateToScreen(draft.lastScreen);
+        return;
+      }
+      setPropertySetupData(EMPTY_PROPERTY_SETUP_DATA);
+      navigateToScreen('property-setup-step1');
+      return;
+    }
+
+    // Resume create draft at the last step the user reached
+    if (hasPropertySetupDraftContent(propertySetupData)) {
+      const lastScreen =
+        peekPropertySetupDraftScreen() ||
+        (isPropertySetupDraftScreen(currentScreen) ? currentScreen : null) ||
+        'property-setup-step1';
+      void savePropertySetupDraft(propertySetupData, lastScreen as PropertySetupDraftScreen);
+      navigateToScreen(lastScreen);
+      return;
+    }
+
+    const draft = loadPropertySetupDraft();
+    if (draft) {
+      setPropertySetupData({ ...EMPTY_PROPERTY_SETUP_DATA, ...draft.data, pendingTenants: [] });
+      navigateToScreen(draft.lastScreen);
+      return;
+    }
+
+    navigateToScreen('property-setup-step1');
+  };
+
+  const beginEditProperty = (property: Property) => {
+    // Preserve any in-progress create draft before overwriting setup state
+    if (!isEditing && hasPropertySetupDraftContent(propertySetupData)) {
+      const lastScreen =
+        peekPropertySetupDraftScreen() ||
+        (isPropertySetupDraftScreen(currentScreen) ? currentScreen : 'property-setup-step1');
+      void savePropertySetupDraft(propertySetupData, lastScreen);
+    }
+
+    selectProperty(property);
+    setIsEditing(true);
+    setEditingPropertyId(property.id);
+    setPropertySetupData({
+      propertyType: property.type || null,
+      propertyDetails: {
+        address: property.address || '',
+        monthlyRent: String(property.rent ?? ''),
+        bedrooms: String(property.bedrooms ?? ''),
+        bathrooms: String((property as any).bathrooms ?? ''),
+        squareFootage: String((property as any).squareFootage ?? ''),
+        uploadedDocuments: []
+      },
+      amenities: property.amenities || [],
+      images: (property.photos || []).map(p => p.url),
+      imageFiles: [],
+      additionalNotes: property.notes || '',
+      status: property.status
+    });
+    navigateToScreen('property-setup-step1');
   };
 
   const completeOnboarding = () => {
@@ -2216,10 +2346,7 @@ function AppContent() {
             tenants={tenants}
             userProfile={userProfile}
             isAuthenticated={isAuthenticated}
-            onAddProperty={() => {
-              trackEvent('landlord_add_property_clicked');
-              navigateToScreen('property-setup-step1');
-            }}
+            onAddProperty={startAddPropertyFlow}
             onViewProperty={(property) => {
               trackEvent('landlord_property_viewed', { property_address: property.address });
               selectProperty(property);
@@ -2260,38 +2387,13 @@ function AppContent() {
             properties={properties}
             tenants={tenants}
             arrearsAlerts={arrearsAlerts}
-            onAddProperty={() => {
-              trackEvent('landlord_add_property_clicked');
-              navigateToScreen('property-setup-step1');
-            }}
+            onAddProperty={startAddPropertyFlow}
             onViewProperty={(property) => {
               trackEvent('landlord_property_viewed', { property_address: property.address });
               selectProperty(property);
               navigateToScreen('property-details');
             }}
-            onEditProperty={(property) => {
-              // Prefill edit state when editing from the Properties list
-              selectProperty(property);
-              setIsEditing(true);
-              setEditingPropertyId(property.id);
-              setPropertySetupData({
-                propertyType: property.type || null,
-                propertyDetails: {
-                  address: property.address || '',
-                  monthlyRent: String(property.rent ?? ''),
-                  bedrooms: String(property.bedrooms ?? ''),
-                  bathrooms: String((property as any).bathrooms ?? ''),
-                  squareFootage: String((property as any).squareFootage ?? ''),
-                  uploadedDocuments: []
-                },
-                amenities: property.amenities || [],
-                images: (property.photos || []).map(p => p.url),
-                imageFiles: [],
-                additionalNotes: property.notes || '',
-                status: property.status // Preserve the original status
-              });
-              navigateToScreen('property-setup-step1');
-            }}
+            onEditProperty={beginEditProperty}
             onManageDocuments={(property) => {
               selectProperty(property);
               navigateToScreen('document-management');
@@ -2317,10 +2419,7 @@ function AppContent() {
         return (
           <DocumentsPage
             properties={properties}
-            onAddProperty={() => {
-              trackEvent('landlord_add_property_clicked');
-              navigateToScreen('property-setup-step1');
-            }}
+            onAddProperty={startAddPropertyFlow}
             onViewProperty={(property) => {
               trackEvent('landlord_property_viewed', { property_address: property.address });
               selectProperty(property);
@@ -2573,10 +2672,7 @@ function AppContent() {
             managerEmail={userProfile?.email}
             userProfile={userProfile}
             properties={properties}
-            onAddProperty={() => {
-              trackEvent('landlord_add_property_clicked');
-              navigateToScreen('property-setup-step1');
-            }}
+            onAddProperty={startAddPropertyFlow}
           />
         );
 
@@ -2586,10 +2682,7 @@ function AppContent() {
             tenants={tenants}
             userProfile={userProfile}
             properties={properties}
-            onAddProperty={() => {
-              trackEvent('landlord_add_property_clicked');
-              navigateToScreen('property-setup-step1');
-            }}
+            onAddProperty={startAddPropertyFlow}
             onBack={() => setNavigationScreen('dashboard')}
           />
         );
@@ -2601,10 +2694,7 @@ function AppContent() {
             properties={properties}
             arrearsAlerts={arrearsAlerts}
             userRole={userRole}
-            onAddProperty={() => {
-              trackEvent('landlord_add_property_clicked');
-              navigateToScreen('property-setup-step1');
-            }}
+            onAddProperty={startAddPropertyFlow}
             onViewTenant={(tenant) => {
               selectTenant(tenant);
               navigateToScreen('tenant-details');
@@ -2666,10 +2756,7 @@ function AppContent() {
             isAuthenticated={isAuthenticated}
             onBack={() => setNavigationScreen('dashboard')}
             marketInsights={marketInsights}
-            onAddProperty={() => {
-              trackEvent('landlord_add_property_clicked');
-              navigateToScreen('property-setup-step1');
-            }}
+            onAddProperty={startAddPropertyFlow}
           />
         );
 
@@ -2688,10 +2775,7 @@ function AppContent() {
             properties={properties}
             userProfile={userProfile}
             isAuthenticated={isAuthenticated}
-            onAddProperty={() => {
-              trackEvent('landlord_add_property_clicked');
-              navigateToScreen('property-setup-step1');
-            }}
+            onAddProperty={startAddPropertyFlow}
             onViewProperty={(property) => {
               trackEvent('landlord_property_viewed', { property_address: property.address });
               selectProperty(property);
@@ -2763,10 +2847,7 @@ function AppContent() {
               setCurrentScreen('main-app');
               setNavigationScreen('dashboard');
             }}
-            onAddProperty={() => {
-              trackEvent('landlord_add_property_clicked');
-              navigateToScreen('property-setup-step1');
-            }}
+            onAddProperty={startAddPropertyFlow}
             onSetupCompanyProfile={() => navigateToScreen('company-profile-setup')}
             userHasCompanyInfo={!!userProfile?.companyProfile}
           />
@@ -2797,12 +2878,12 @@ function AppContent() {
             onNext={() => navigateToScreen('property-type-selection')}
             onBack={() => {
               if (properties.length > 0) {
-                navigateToScreen('main-app');
+                exitPropertySetupToHome();
               } else {
                 navigateToScreen('onboarding-options');
               }
             }}
-            onHome={() => navigateToScreen('main-app')}
+            onHome={exitPropertySetupToHome}
             onSection1={() => navigateToScreen('property-type-selection')}
             onSection2={() => navigateToScreen('property-details-selection')}
             onSection3={() => navigateToScreen('amenities-selection')}
@@ -2817,7 +2898,7 @@ function AppContent() {
             onTypeSelect={(type) => updatePropertySetupData({ propertyType: type })}
             onNext={() => navigateToScreen('property-details-selection')}
             onBack={() => navigateToScreen('property-setup-step1')}
-            onHome={() => navigateToScreen('main-app')}
+            onHome={exitPropertySetupToHome}
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
           />
         );
@@ -2829,7 +2910,7 @@ function AppContent() {
             onPropertyDetailsChange={updatePropertyDetails}
             onNext={() => navigateToScreen('amenities-selection')}
             onBack={() => navigateToScreen('property-type-selection')}
-            onHome={() => navigateToScreen('main-app')}
+            onHome={exitPropertySetupToHome}
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
           />
         );
@@ -2841,7 +2922,7 @@ function AppContent() {
             onAmenitiesChange={(amenities) => updatePropertySetupData({ amenities })}
             onNext={() => navigateToScreen('images-notes-selection')}
             onBack={() => navigateToScreen('property-details-selection')}
-            onHome={() => navigateToScreen('main-app')}
+            onHome={exitPropertySetupToHome}
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
           />
         );
@@ -2850,12 +2931,13 @@ function AppContent() {
         return (
             <ImagesAndNotesSelection
             uploadedImages={propertySetupData.images}
+            imageFiles={propertySetupData.imageFiles}
             additionalNotes={propertySetupData.additionalNotes}
             onImagesChange={(images, imageFiles) => updatePropertySetupData({ images, imageFiles })}
             onNotesChange={(notes) => updatePropertySetupData({ additionalNotes: notes })}
             onNext={() => navigateToScreen('property-preview')}
             onBack={() => navigateToScreen('amenities-selection')}
-            onHome={() => navigateToScreen('main-app')}
+            onHome={exitPropertySetupToHome}
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
           />
         );
@@ -2929,29 +3011,7 @@ function AppContent() {
             property={selectedProperty}
             tenants={tenants}
             onBack={() => navigateToScreen('main-app')}
-            onEdit={(property) => {
-              // Enter editing mode and prefill setup data from the selected property
-              setSelectedProperty(property);
-              setIsEditing(true);
-              setEditingPropertyId(property.id);
-              setPropertySetupData({
-                propertyType: property.type || null,
-                propertyDetails: {
-                  address: property.address || '',
-                  monthlyRent: String(property.rent ?? ''),
-                  bedrooms: String(property.bedrooms ?? ''),
-                  bathrooms: String((property as any).bathrooms ?? ''),
-                  squareFootage: String((property as any).squareFootage ?? ''),
-                  uploadedDocuments: []
-                },
-                amenities: property.amenities || [],
-                images: (property.photos || []).map(p => p.url),
-                imageFiles: [],
-                additionalNotes: property.notes || '',
-                status: property.status // Preserve the original status
-              });
-              navigateToScreen('property-setup-step1');
-            }}
+            onEdit={beginEditProperty}
             onManageDocuments={() => navigateToScreen('document-management')}
             onManagePhotos={() => navigateToScreen('photo-management')}
             updateProperty={updateProperty}
@@ -3313,7 +3373,7 @@ function AppContent() {
             onManageDocuments={() => {}}
             onManagePhotos={() => {}}
             updateProperty={() => {}}
-            onHome={() => navigateToScreen('main-app')}
+            onHome={exitPropertySetupToHome}
             onPropertySetup={() => navigateToScreen('property-setup-step1')}
             onPublishProperty={async () => {
               // Guest user – ask them to sign up before saving to Firebase
@@ -3391,6 +3451,20 @@ function AppContent() {
                   ) as any;
                   
                   await propertyService.updateProperty(editingPropertyId, cleanUpdates);
+
+                  // Persist newly uploaded documents from the edit wizard
+                  if (uploadedDocuments.length > 0) {
+                    for (const doc of uploadedDocuments) {
+                      await propertyService.addDocumentToProperty(editingPropertyId, {
+                        name: doc.name,
+                        type: doc.type,
+                        url: doc.url,
+                        issueDate: doc.issueDate,
+                        expiryDate: doc.expiryDate,
+                        status: doc.status
+                      });
+                    }
+                  }
                   
                   // Fetch the updated property from Firebase to get the latest data with proper mapping
                   const updated = await propertyService.getProperty(editingPropertyId);
@@ -3445,6 +3519,7 @@ function AppContent() {
                   
                   setIsEditing(false);
                   setEditingPropertyId(null);
+                  restoreCreateDraftOrEmpty();
                   navigateToScreen('property-details');
                 } else {
                   console.log('Creating property with photos:', newProperty.photos.length);
@@ -3453,10 +3528,14 @@ function AppContent() {
                   // 4. Create property in Firebase
                   const propertyId = await addProperty(newProperty);
                   console.log('Property created with ID:', propertyId);
+
+                  const pendingTenantsToLink = propertySetupData.pendingTenants || [];
+                  // Clear create draft after successful publish
+                  resetPropertySetupData();
                   
                   // 5. Update pending tenants with the correct propertyId
-                  if (propertySetupData.pendingTenants && propertySetupData.pendingTenants.length > 0) {
-                    console.log(`Updating ${propertySetupData.pendingTenants.length} pending tenant(s) with propertyId:`, propertyId);
+                  if (pendingTenantsToLink.length > 0) {
+                    console.log(`Updating ${pendingTenantsToLink.length} pending tenant(s) with propertyId:`, propertyId);
                     try {
                       const { tenantService } = await import('./services/tenantService');
                       // Find tenants that were saved but need propertyId update
