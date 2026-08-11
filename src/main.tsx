@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import './index.css';
-import { getMsalInstance } from './contexts/AuthContext';
+import { getMsalInstance, waitForMsalReady } from './contexts/AuthContext';
 import theme from './theme/theme';
 import { ErrorBoundary } from './utils/errorHandler';
 import { Router } from './config/routerConfig';
@@ -28,7 +28,7 @@ root.render(
     const msalInstance = getMsalInstance();
 
     if (import.meta.env.VITE_AZURE_AD_CLIENT_ID && import.meta.env.VITE_AZURE_AD_TENANT_NAME) {
-      await msalInstance.initialize();
+      await waitForMsalReady();
       await msalInstance.handleRedirectPromise().catch((err) => {
         console.error('[main] MSAL redirect error:', err);
       });

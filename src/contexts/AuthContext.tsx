@@ -14,16 +14,14 @@ import { notifyAuthReady } from '../services/authReady';
 
 // ─── MSAL singleton ───────────────────────────────────────────────────────────
 
-let msalInstance: PublicClientApplication | null = null;
-let msalInitPromise: Promise<void> | null = null;
-
 export const getMsalInstance = (): PublicClientApplication => {
-  if (!msalInstance) {
-    msalInstance = new PublicClientApplication(msalConfig);
-    msalInitPromise = msalInstance.initialize() as Promise<void>;
-    msalInitPromise.catch((err) => console.error('[Auth] MSAL initialize() failed:', err));
+  const win = window as any;
+  if (!win.__msalInstance) {
+    win.__msalInstance = new PublicClientApplication(msalConfig);
+    win.__msalInitPromise = win.__msalInstance.initialize() as Promise<void>;
+    win.__msalInitPromise.catch((err: any) => console.error('[Auth] MSAL initialize() failed:', err));
 
-    msalInstance.addEventCallback((event: EventMessage) => {
+    win.__msalInstance.addEventCallback((event: EventMessage) => {
       const succeeded =
         event.eventType === EventType.LOGIN_SUCCESS ||
         event.eventType === EventType.LOGOUT_SUCCESS;
@@ -35,12 +33,13 @@ export const getMsalInstance = (): PublicClientApplication => {
       }
     });
   }
-  return msalInstance;
+  return win.__msalInstance;
 };
 
 export async function waitForMsalReady(): Promise<void> {
-  if (!msalInstance) getMsalInstance();
-  if (msalInitPromise) await msalInitPromise;
+  const win = window as any;
+  if (!win.__msalInstance) getMsalInstance();
+  if (win.__msalInitPromise) await win.__msalInitPromise;
 }
 
 export { isAuthReady, waitForAuthReady } from '../services/authReady';
