@@ -226,13 +226,9 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent 
-        className="max-w-[800px] w-[calc(100vw-2rem)] max-h-[80vh] flex flex-col p-0 gap-0"
+        className="bg-white max-w-[800px] w-[calc(100vw-2rem)] max-h-[80vh] flex flex-col p-0 gap-0"
         style={{
-          fontFamily: 'Archivo, sans-serif',
-          top: '80%',
-          left: '60%',
-          transform: 'translate(-50%, -50%)',
-          marginTop: '3rem'
+          fontFamily: 'Archivo, sans-serif'
         }}
       >
         {/* Header - Fixed */}

@@ -33,7 +33,48 @@ export class CommunicationController {
       tenantConvs.forEach(doc => conversationsMap.set(doc.id, { id: doc.id, ...doc.data() }));
       landlordConvs.forEach(doc => conversationsMap.set(doc.id, { id: doc.id, ...doc.data() }));
 
-      return { data: Array.from(conversationsMap.values()).sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()) };
+      const data = Array.from(conversationsMap.values());
+
+      // Enrich missing fields to fix UI showing 'id' and 'tenant'
+      await Promise.all(data.map(async (conv: any) => {
+          let updated = false;
+          if (!conv.tenantName && conv.tenantId) {
+             try {
+               const userDoc = await db.collection('users').doc(conv.tenantId).get();
+               if (userDoc.exists) {
+                   const userData = userDoc.data() || {};
+                   conv.tenantName = userData.name || userData.displayName || userData.firstName || 'Tenant';
+                   updated = true;
+               }
+             } catch (e) { this.logger.error(`Failed to enrich tenant name: ${e.message}`); }
+          }
+          if (!conv.propertyTitle && conv.propertyId) {
+             try {
+                 const propDoc = await db.collection('native_properties').doc(conv.propertyId).get();
+                 if (propDoc.exists) {
+                     const propData = propDoc.data() || {};
+                     conv.propertyTitle = propData.title || propData.address || conv.propertyId;
+                     updated = true;
+                 } else {
+                     const pDoc = await db.collection('properties').doc(conv.propertyId).get();
+                     if (pDoc.exists) {
+                         const pData = pDoc.data() || {};
+                         conv.propertyTitle = pData.title || pData.address || conv.propertyId;
+                         updated = true;
+                     }
+                 }
+             } catch (e) { this.logger.error(`Failed to enrich property title: ${e.message}`); }
+          }
+          
+          if (updated) {
+              db.collection('conversations').doc(conv.id).update({
+                  tenantName: conv.tenantName,
+                  propertyTitle: conv.propertyTitle
+              }).catch(() => {});
+          }
+      }));
+
+      return { data: data.sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()) };
     } catch (error) {
       this.logger.error(`Error getting conversations: ${error.message}`);
       return { data: [] };
@@ -127,7 +168,13 @@ export class CommunicationController {
         const data = doc.data();
         let sentAt = data.sentAt;
         if (!sentAt) {
-           sentAt = data.timestamp ? data.timestamp.toDate().toISOString() : new Date().toISOString();
+           if (data.timestamp) {
+             sentAt = typeof data.timestamp.toDate === 'function' 
+               ? data.timestamp.toDate().toISOString() 
+               : new Date(data.timestamp).toISOString();
+           } else {
+             sentAt = new Date().toISOString();
+           }
         }
         return { id: doc.id, ...data, sentAt };
       });

@@ -45,7 +45,12 @@ export class NativePropertiesService {
       return [];
     }
 
-    return await this.propertyModel.find({ $or: conditions }).sort({ createdAt: -1 }).exec();
+    try {
+      return await this.propertyModel.find({ $or: conditions }).sort({ createdAt: -1 }).exec();
+    } catch (error) {
+      this.logger.error('Error fetching native properties from MongoDB (returning empty array fallback):', error);
+      return [];
+    }
   }
 
   async findAllByUserId(userId: string): Promise<NativeProperty[]> {

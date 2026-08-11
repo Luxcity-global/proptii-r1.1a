@@ -35,6 +35,7 @@ import { Tenant } from '../App';
 import { referencingService, ReferencingDocument } from '../services/referencingService';
 import { paymentScheduleService, RentPaymentPeriod } from '../services/paymentScheduleService';
 import { tenantService } from '../services/tenantService';
+import { useTenantDetails } from '../hooks/useTenantDetails';
 
 interface TenantReference {
   id: string;
@@ -100,6 +101,8 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
   const [paymentPeriods, setPaymentPeriods] = useState<RentPaymentPeriod[]>([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(true);
   const [updatingPayments, setUpdatingPayments] = useState<Record<string, boolean>>({});
+
+  const { tenantDetails: liveTenant, isLoading: isLoadingTenant } = useTenantDetails(tenant?.id);
 
   if (!tenant) {
     return (
@@ -377,38 +380,25 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
   };
 
   // Mock additional data for demonstration (non-payment related)
-  const mockTenant: Tenant = {
+  const mockTenant: any = {
     ...tenant,
-    depositAmount: tenant.rentAmount * 1.5,
-    monthlyRent: tenant.rentAmount,
+    name: liveTenant?.name || tenant.name,
+    email: liveTenant?.email || tenant.email,
+    phone: liveTenant?.phone || tenant.phone,
+    avatar: liveTenant?.avatar || tenant.avatar,
+    status: liveTenant?.status || tenant.status,
+    propertyAddress: liveTenant?.propertyAddress || 'Not assigned',
+    depositAmount: liveTenant?.depositAmount || tenant.rentAmount * 1.5,
+    monthlyRent: liveTenant?.rentAmount || tenant.rentAmount,
+    rentAmount: liveTenant?.rentAmount || tenant.rentAmount,
     tenancyType: 'assured-shorthold',
-    moveInDate: tenant.leaseStart,
-    previousAddress: '789 Previous Street, London NW1 1AA',
-    employer: 'Tech Solutions Ltd',
-    annualSalary: 45000,
-    notes: 'Excellent tenant with good payment history. Prefers email communication for non-urgent matters.',
-    maintenanceRequests: [
-      {
-        id: '1',
-        title: 'Leaky kitchen tap',
-        description: 'Kitchen tap has been dripping for the past week',
-        priority: 'medium',
-        status: 'completed',
-        dateReported: new Date('2024-05-15'),
-        dateCompleted: new Date('2024-05-18'),
-        category: 'plumbing'
-      },
-      {
-        id: '2',
-        title: 'Heating not working properly',
-        description: 'Radiator in bedroom not heating up',
-        priority: 'high',
-        status: 'in-progress',
-        dateReported: new Date('2024-06-01'),
-        category: 'heating'
-      }
-    ],
-    documents: tenant.documents || []
+    moveInDate: liveTenant?.leaseStart || tenant.leaseStart,
+    leaseStart: liveTenant?.leaseStart || tenant.leaseStart,
+    leaseEnd: liveTenant?.leaseEnd || tenant.leaseEnd,
+    emergencyContact: liveTenant?.emergencyContact || undefined,
+    notes: liveTenant?.notes || 'No notes available.',
+    maintenanceRequests: [],
+    documents: liveTenant?.documents || tenant.documents || []
   };
 
   // Convert payment periods to display format
@@ -659,6 +649,17 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
 
   // Combine mock documents with referencing documents
   const allDocuments = [...(mockTenant.documents || []), ...referencingDocuments];
+
+  if (isLoadingTenant) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-[#1776B6] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading tenant details...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

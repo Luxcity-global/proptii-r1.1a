@@ -15,6 +15,8 @@ import { ContractModule } from './modules/contract.module';
 import { StorageModule } from './storage/storage.module';
 import { PropertyDocumentController } from './controllers/property-document.controller';
 import { CommunicationController } from './controllers/communication.controller';
+import { AnalyticsController } from './controllers/analytics.controller';
+import { ClientsController } from './controllers/clients.controller';
 import { AzureUsersModule } from './modules/azure-users.module';
 
 import { AuthModule } from './modules/auth.module';
@@ -22,6 +24,8 @@ import { HealthModule } from './health/health.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { RequestIdMiddleware } from './middleware/request-id.middleware';
 import { KeepAliveService } from './services/keep-alive.service';
+import { AnalyticsService } from './services/analytics.service';
+import { ClientsService } from './services/clients.service';
 import { GuestEnquiryModule } from './modules/guest-enquiry.module';
 import { NativePropertiesModule } from './modules/native-properties.module';
 
@@ -69,9 +73,11 @@ import { NativePropertiesModule } from './modules/native-properties.module';
     NativePropertiesModule,
     BillingModule,
   ],
-  controllers: [AppController, PropertyDocumentController, CommunicationController],
+  controllers: [AppController, PropertyDocumentController, CommunicationController, AnalyticsController, ClientsController],
   providers: [
     AppService,
+    AnalyticsService,
+    ClientsService,
     // Apply rate limiting globally via the ThrottlerGuard.
     {
       provide: APP_GUARD,

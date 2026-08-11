@@ -1256,12 +1256,12 @@ export function AppContent() {
         // Ignore storage errors
       }
 
-      // Clear selected property when navigating to certain screens
-      if (screen === 'main-app' || screen === 'property-setup') {
-        if (screen === 'property-setup' && currentScreen === 'main-app') {
-          // Don't clear when adding new property from main app
-          setSelectedProperty(null);
-        }
+      // Clear selected property when navigating back to main app
+      if (screen === 'main-app') {
+        setSelectedProperty(null);
+        try {
+          sessionStorage.removeItem('proptii_selected_property_id');
+        } catch (e) {}
       }
     }, 2); // Half of the transition duration
   };
@@ -1747,12 +1747,36 @@ export function AppContent() {
   };
 
   const selectProperty = (property: Property) => {
+    try {
+      if (property?.id) {
+        sessionStorage.setItem('proptii_selected_property_id', property.id);
+      }
+    } catch (e) {
+      console.warn('Failed to save selected property ID:', e);
+    }
     const tenantForProperty = tenants.find(t => t.propertyId === property.id || t.id === (property as any).tenantId);
     const enriched: Property = tenantForProperty
       ? { ...property, tenant: tenantForProperty, status: 'occupied' as any }
       : property;
     setSelectedProperty(enriched);
   };
+
+  // Re-hydrate selectedProperty on refresh or properties load
+  React.useEffect(() => {
+    if (selectedProperty) return;
+    try {
+      const savedPropertyId = sessionStorage.getItem('proptii_selected_property_id') || new URLSearchParams(window.location.search).get('propertyId');
+      if (savedPropertyId && properties.length > 0) {
+        const found = properties.find(p => p.id === savedPropertyId);
+        if (found) {
+          console.log('🔄 Restoring selectedProperty from storage:', found.id);
+          selectProperty(found);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to restore selectedProperty:', e);
+    }
+  }, [properties, tenants, selectedProperty, currentScreen]);
 
   const selectTenant = (tenant: Tenant) => {
     setSelectedTenant(tenant);
@@ -3517,13 +3541,9 @@ export function AppContent() {
 // with proper route IDs, independent of the parent data router.
 // The initial URL is derived from window.location.pathname so deep-links work.
 export default function App() {
-  // Strip the /landlord prefix so MemoryRouter sees routes relative to /
-  const initialPath = window.location.pathname.replace(/^\/landlord/, '') || '/';
   return (
-    <MemoryRouter initialEntries={[initialPath + window.location.search]} initialIndex={0}>
-      <Routes>
-        <Route path="*" element={<AppContent />} />
-      </Routes>
-    </MemoryRouter>
+    <Routes>
+      <Route path="*" element={<AppContent />} />
+    </Routes>
   );
 }

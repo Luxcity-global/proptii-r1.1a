@@ -1425,7 +1425,7 @@ export function Dashboard({
                           <Badge
                             key={amenity}
                             variant="secondary"
-                            className="text-xs"
+                            className="text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 border-0"
                           >
                             {amenity ? amenity.charAt(0).toUpperCase() + amenity.slice(1) : ''}
                           </Badge>
@@ -1433,7 +1433,7 @@ export function Dashboard({
                       {property.amenities.length > 3 && (
                         <Badge
                           variant="secondary"
-                          className="text-xs"
+                          className="text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 border-0"
                         >
                           +{property.amenities.length - 3} more
                         </Badge>

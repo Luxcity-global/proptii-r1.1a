@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { Property, PropertyMarketData } from '../App';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import { usePropertyMarketData } from '../hooks/usePropertyMarketData';
 
 interface PropertyInsightsProps {
   property: Property | null;
@@ -32,6 +33,7 @@ interface PropertyInsightsProps {
 
 export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
   const [timeframe, setTimeframe] = useState('1yr');
+  const { marketData, isLoading, error } = usePropertyMarketData(property?.id);
 
   if (!property) {
     return (
@@ -44,75 +46,56 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
     );
   }
 
-  // Mock market data for the property
-  const mockMarketData: PropertyMarketData = {
-    averagePrice: property.rent === 2500 ? 425000 : property.rent === 3200 ? 520000 : 380000,
-    priceChange12Months: property.rent === 2500 ? 8.5 : property.rent === 3200 ? 12.1 : 6.3,
-    rentalDemandIndex: property.rent === 2500 ? 82 : property.rent === 3200 ? 91 : 74,
-    occupancyRate: property.rent === 2500 ? 89 : property.rent === 3200 ? 85 : 92,
-    averageRent: property.rent === 2500 ? 2400 : property.rent === 3200 ? 3100 : 1650,
-    growthScore: property.rent === 2500 ? 78 : property.rent === 3200 ? 85 : 68,
-    demographics: {
-      averageAge: property.rent === 2500 ? 32 : property.rent === 3200 ? 35 : 29,
-      averageIncome: property.rent === 2500 ? 55000 : property.rent === 3200 ? 68000 : 42000,
-      householdSize: property.rent === 2500 ? 1.8 : property.rent === 3200 ? 2.3 : 1.6,
-      rentersRatio: property.rent === 2500 ? 0.73 : property.rent === 3200 ? 0.65 : 0.81
-    },
-    nearbyDevelopments: property.rent === 2500 
-      ? ['New Crossrail station opening 2025', 'Tech hub expansion planned'] 
-      : property.rent === 3200 
-      ? ['Victoria Park regeneration', 'New school opening 2024']
-      : ['Shopping center renovation', 'New bus routes planned'],
-    confidenceLevel: property.rent === 2500 ? 'high' : 'medium'
-  };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Aggregating market insights...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const priceHistoryData = [
-    { month: 'Jul 23', price: mockMarketData.averagePrice * 0.92 },
-    { month: 'Aug 23', price: mockMarketData.averagePrice * 0.94 },
-    { month: 'Sep 23', price: mockMarketData.averagePrice * 0.95 },
-    { month: 'Oct 23', price: mockMarketData.averagePrice * 0.96 },
-    { month: 'Nov 23', price: mockMarketData.averagePrice * 0.97 },
-    { month: 'Dec 23', price: mockMarketData.averagePrice * 0.98 },
-    { month: 'Jan 24', price: mockMarketData.averagePrice * 0.99 },
-    { month: 'Feb 24', price: mockMarketData.averagePrice * 1.00 },
-    { month: 'Mar 24', price: mockMarketData.averagePrice * 1.01 },
-    { month: 'Apr 24', price: mockMarketData.averagePrice * 1.02 },
-    { month: 'May 24', price: mockMarketData.averagePrice * 1.03 },
-    { month: 'Jun 24', price: mockMarketData.averagePrice }
-  ];
+  if (error || !marketData) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
+          <h2 className="mb-2">Unable to load insights</h2>
+          <p className="text-muted-foreground mb-4">{error || 'Market data unavailable'}</p>
+          <Button onClick={onBack}>Back to Property</Button>
+        </div>
+      </div>
+    );
+  }
 
-  const demandData = [
+  const priceHistoryData = marketData.priceHistory || [];  const demandData = [
     { category: 'Students', percentage: 35, color: '#8884d8' },
     { category: 'Young Professionals', percentage: 40, color: '#82ca9d' },
     { category: 'Families', percentage: 15, color: '#ffc658' },
     { category: 'Others', percentage: 10, color: '#ff7300' }
   ];
 
-  const nearbyComparisons = [
-    { address: '125 Regent Street', rent: 2400, bedrooms: 2, type: 'Flat' },
-    { address: '130 Regent Street', rent: 2600, bedrooms: 2, type: 'Flat' },
-    { address: '118 Regent Street', rent: 2350, bedrooms: 2, type: 'Flat' }
-  ];
-
   const recommendations = [
     {
       type: 'pricing',
       title: 'Rent Optimization Opportunity',
-      description: `Your rent is ${property.rent > mockMarketData.averageRent ? 'above' : 'below'} market average. ${property.rent > mockMarketData.averageRent ? 'Great positioning!' : 'Consider gradual increase.'}`,
-      impact: property.rent > mockMarketData.averageRent ? 'positive' : 'opportunity',
-      confidence: mockMarketData.confidenceLevel
+      description: `Your rent is ${property.rentAmount > marketData.averagePrice ? 'above' : 'below'} market average. ${property.rentAmount > marketData.averagePrice ? 'Great positioning!' : 'Consider gradual increase.'}`,
+      impact: property.rentAmount > marketData.averagePrice ? 'positive' : 'opportunity',
+      confidence: marketData.confidenceLevel
     },
     {
       type: 'market',
       title: 'Strong Rental Demand',
-      description: `Rental demand index is ${mockMarketData.rentalDemandIndex}/100 in this area. High tenant interest expected.`,
-      impact: mockMarketData.rentalDemandIndex > 80 ? 'positive' : 'neutral',
-      confidence: mockMarketData.confidenceLevel
+      description: `Rental demand index is ${marketData.rentalDemandIndex}/100 in this area. High tenant interest expected.`,
+      impact: marketData.rentalDemandIndex > 80 ? 'positive' : 'neutral',
+      confidence: marketData.confidenceLevel
     },
     {
       type: 'demographics',
       title: 'Target Demographic Insights',
-      description: `Area attracts young professionals (avg age ${mockMarketData.demographics.averageAge}). Consider modern amenities.`,
+      description: `Area attracts young professionals (avg age ${marketData.demographics.averageAge}). Consider modern amenities.`,
       impact: 'neutral',
       confidence: 'high'
     }
@@ -186,7 +169,7 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
                 </SelectContent>
               </Select>
               
-              {getConfidenceBadge(mockMarketData.confidenceLevel)}
+              {getConfidenceBadge(marketData.confidenceLevel)}
             </div>
           </div>
         </div>
@@ -203,12 +186,12 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
               <Badge variant="secondary">Market Value</Badge>
             </div>
             <div>
-              <p className="text-2xl font-semibold">{formatCurrency(mockMarketData.averagePrice)}</p>
+              <p className="text-2xl font-semibold">{formatCurrency(marketData.averagePrice)}</p>
               <p className="text-muted-foreground">Average Price</p>
               <div className="flex items-center mt-2">
                 <TrendingUp className="w-4 h-4 text-green-600 mr-1" />
                 <span className="text-sm text-green-600">
-                  +{mockMarketData.priceChange12Months}% this year
+                  +{marketData.priceChange12Months}% this year
                 </span>
               </div>
             </div>
@@ -222,10 +205,10 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
               <Badge variant="secondary">Demand</Badge>
             </div>
             <div>
-              <p className="text-2xl font-semibold">{mockMarketData.rentalDemandIndex}</p>
+              <p className="text-2xl font-semibold">{marketData.rentalDemandIndex}</p>
               <p className="text-muted-foreground">Demand Index</p>
               <div className="flex items-center mt-2">
-                {mockMarketData.rentalDemandIndex > 80 ? (
+                {marketData.rentalDemandIndex > 80 ? (
                   <>
                     <TrendingUp className="w-4 h-4 text-green-600 mr-1" />
                     <span className="text-sm text-green-600">High demand</span>
@@ -248,21 +231,21 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
               <Badge variant="secondary">Rental</Badge>
             </div>
             <div>
-              <p className="text-2xl font-semibold">{formatCurrency(mockMarketData.averageRent)}</p>
+              <p className="text-2xl font-semibold">{formatCurrency(marketData.averagePrice)}</p>
               <p className="text-muted-foreground">Market Rent</p>
               <div className="flex items-center mt-2">
-                {property.rent > mockMarketData.averageRent ? (
+                {property.rentAmount > marketData.averagePrice ? (
                   <>
                     <TrendingUp className="w-4 h-4 text-green-600 mr-1" />
                     <span className="text-sm text-green-600">
-                      +{((property.rent / mockMarketData.averageRent - 1) * 100).toFixed(0)}% vs market
+                      +{((property.rentAmount / marketData.averagePrice - 1) * 100).toFixed(0)}% vs market
                     </span>
                   </>
                 ) : (
                   <>
                     <TrendingDown className="w-4 h-4 text-orange-600 mr-1" />
                     <span className="text-sm text-orange-600">
-                      {((property.rent / mockMarketData.averageRent - 1) * 100).toFixed(0)}% vs market
+                      {((property.rentAmount / marketData.averagePrice - 1) * 100).toFixed(0)}% vs market
                     </span>
                   </>
                 )}
@@ -278,12 +261,12 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
               <Badge variant="secondary">Growth Score</Badge>
             </div>
             <div>
-              <p className="text-2xl font-semibold">{mockMarketData.growthScore}</p>
+              <p className="text-2xl font-semibold">82</p>
               <p className="text-muted-foreground">AI Growth Score</p>
               <div className="flex items-center mt-2">
-                <Progress value={mockMarketData.growthScore} className="w-16 h-2 mr-2 [&>[data-slot=progress-indicator]]:bg-[#136C9E]" />
+                <Progress value={82} className="w-16 h-2 mr-2 [&>[data-slot=progress-indicator]]:bg-[#136C9E]" />
                 <span className="text-sm text-muted-foreground">
-                  {mockMarketData.growthScore > 80 ? 'Excellent' : mockMarketData.growthScore > 60 ? 'Good' : 'Average'}
+                  Excellent
                 </span>
               </div>
             </div>
@@ -311,7 +294,7 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
                   
                   <div className="flex justify-between items-center">
                     <span>Area Occupancy Rate</span>
-                    <span className="font-medium">{mockMarketData.occupancyRate}%</span>
+                    <span className="font-medium">92%</span>
                   </div>
                   
                   <div className="flex justify-between items-center">
@@ -337,15 +320,13 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
               <Card className="p-6">
                 <h3 className="mb-4">Upcoming Developments</h3>
                 <div className="space-y-3">
-                  {mockMarketData.nearbyDevelopments.map((development, index) => (
-                    <div key={index} className="flex items-start space-x-3 p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-start space-x-3 p-3 bg-muted/50 rounded-lg">
                       <Building className="w-5 h-5 text-primary mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium">{development}</p>
+                        <p className="text-sm font-medium">New Transport Link</p>
                         <p className="text-xs text-muted-foreground">Expected to increase property value</p>
                       </div>
                     </div>
-                  ))}
                 </div>
               </Card>
             </div>
@@ -373,22 +354,7 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
             <Card className="p-6">
               <h3 className="mb-4">Similar Properties Nearby</h3>
               <div className="space-y-3">
-                {nearbyComparisons.map((comp, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">{comp.address}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {comp.type} • {comp.bedrooms} bed{comp.bedrooms !== 1 ? 's' : ''}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold">{formatCurrency(comp.rent)}/month</p>
-                      <p className={`text-sm ${comp.rent > property.rent ? 'text-red-600' : 'text-green-600'}`}>
-                        {comp.rent > property.rent ? '+' : ''}{((comp.rent / property.rent - 1) * 100).toFixed(0)}%
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                <div className="text-muted-foreground text-center">No comparisons available</div>
               </div>
             </Card>
           </TabsContent>
@@ -401,23 +367,23 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span>Average Age</span>
-                    <span className="font-semibold">{mockMarketData.demographics.averageAge} years</span>
+                    <span className="font-semibold">{marketData.demographics.averageAge} years</span>
                   </div>
                   
                   <div className="flex justify-between items-center">
                     <span>Average Income</span>
-                    <span className="font-semibold">{formatCurrency(mockMarketData.demographics.averageIncome)}</span>
+                    <span className="font-semibold">{formatCurrency(45000)}</span>
                   </div>
                   
                   <div className="flex justify-between items-center">
                     <span>Household Size</span>
-                    <span className="font-semibold">{mockMarketData.demographics.householdSize} people</span>
+                    <span className="font-semibold">{marketData.demographics.familyHouseholds}% families</span>
                   </div>
                   
                   <div className="flex justify-between items-center">
                     <span>Renters vs Owners</span>
                     <span className="font-semibold">
-                      {(mockMarketData.demographics.rentersRatio * 100).toFixed(0)}% renters
+                      65% renters
                     </span>
                   </div>
                 </div>
@@ -625,7 +591,7 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
                   <div className="grid md:grid-cols-3 gap-4 text-sm">
                     <div>
                       <p className="text-muted-foreground">New Monthly Rent</p>
-                      <p className="font-semibold">{formatCurrency(Math.round(property.rent * 1.03))}</p>
+                      <p className="font-semibold">{formatCurrency(Math.round(property.rentAmount * 1.03))}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Tenant Retention Risk</p>
@@ -633,7 +599,7 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
                     </div>
                     <div>
                       <p className="text-muted-foreground">Annual Impact</p>
-                      <p className="font-semibold text-green-600">+{formatCurrency(property.rent * 0.03 * 12)}</p>
+                      <p className="font-semibold text-green-600">+{formatCurrency(property.rentAmount * 0.03 * 12)}</p>
                     </div>
                   </div>
                 </div>

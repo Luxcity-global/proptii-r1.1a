@@ -148,12 +148,12 @@ export function PropertyCard({
           {property.amenities && property.amenities.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {property.amenities.slice(0, 3).map((amenity, index) => (
-                <Badge key={index} variant="outline" className="text-xs">
+                <Badge key={index} variant="secondary" className="text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 border-0">
                   {amenity}
                 </Badge>
               ))}
               {property.amenities.length > 3 && (
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="secondary" className="text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 border-0">
                   +{property.amenities.length - 3} more
                 </Badge>
               )}

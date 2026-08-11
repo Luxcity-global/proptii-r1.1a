@@ -22,6 +22,7 @@ import {
 } from 'recharts';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { isNewPortfolioUser } from '../utils/portfolioStatus';
+import { useAnalytics, AnalyticsData } from '../hooks/useAnalytics';
 
 interface PortfolioInsightsProps {
   properties: Property[];
@@ -39,6 +40,7 @@ export function PortfolioInsights({
   isAuthenticated = false,
 }: PortfolioInsightsProps) {
   const isUserAuthenticated = isAuthenticated || Boolean(userProfile);
+  const { data, isLoading } = useAnalytics();
 
   if (!isUserAuthenticated) {
     return <LandlordPageEmptyShell page="insights" variant="guest" />;
@@ -55,11 +57,23 @@ export function PortfolioInsights({
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#F2F4F7] flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <div className="w-8 h-8 border-4 border-[#1776B6] border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-[#6B7280] font-medium">Aggregating portfolio analytics...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <PortfolioInsightsContent
       properties={properties}
       userProfile={userProfile}
       onAddProperty={onAddProperty}
+      analyticsData={data}
     />
   );
 }
@@ -67,173 +81,71 @@ export function PortfolioInsights({
 function PortfolioInsightsContent({
   properties,
   userProfile,
-}: Pick<PortfolioInsightsProps, 'properties' | 'userProfile' | 'onAddProperty'>) {
+  analyticsData,
+}: Pick<PortfolioInsightsProps, 'properties' | 'userProfile' | 'onAddProperty'> & { analyticsData: AnalyticsData | null }) {
   const [range, setRange] = useState('30d');
   const [activeTab, setActiveTab] = useState('overview');
 
-  const yieldRows = useMemo(() => {
-    const seedRows = ['Testing with', 'Cliffside', 'A testing', 'Leeds'];
-    const propertyNames = properties.slice(0, 4).map((p) => p.address.split(',')[0].trim());
-    const labels = propertyNames.length > 0 ? [...propertyNames, ...seedRows].slice(0, 4) : seedRows;
-    const values = [9.6, 7.2, 12, 9.6];
+  const revenue = analyticsData?.revenue;
+  const occupancy = analyticsData?.occupancy;
+  const tenants = analyticsData?.tenants;
 
-    return labels.map((label, index) => ({ label, value: values[index] ?? 0 }));
+  const yieldRows = useMemo(() => {
+    if (properties.length === 0) return [];
+    return properties.slice(0, 5).map((p) => {
+      // Calculate estimated annual yield percentage based on rent vs typical unit value (~£200k baseline)
+      const annualRent = (p.rent || 0) * 12;
+      const estimatedValue = (p as any).estimatedValue || 200000;
+      const yieldPct = parseFloat(((annualRent / estimatedValue) * 100).toFixed(1));
+      return {
+        label: p.address.split(',')[0].trim(),
+        value: yieldPct > 0 ? yieldPct : 5.0
+      };
+    });
   }, [properties]);
 
-  const months = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
-  const revenueSeries = [5000, 5100, 4950, 5150, 5100, 7000];
-  const expensesSeries = [900, 920, 1200, 800, 950, 980];
-
-  const chartData = months.map((month, index) => ({
-    month,
-    revenue: revenueSeries[index],
-    expenses: expensesSeries[index],
+  const revenueTrendData = revenue?.revenueTrendData || [];
+  const months = revenueTrendData.map(d => d.month);
+  
+  // For the small line chart
+  const chartData = revenueTrendData.map(d => ({
+    month: d.month,
+    revenue: d.collected,
+    expenses: Math.round(d.collected * 0.2),
   }));
 
+  const occupiedCount = properties.filter(p => p.status === 'occupied').length;
+  const vacantCount = properties.filter(p => p.status === 'vacant').length;
+  const renovatingCount = properties.filter(p => p.status === 'under-renovation').length;
+
   const occupancyData = [
-    { name: 'Occupied', value: 1, color: '#1776B6' },
-    { name: 'Vacant', value: 6, color: '#F57B1D' },
+    { name: 'Occupied', value: occupiedCount, color: '#1776B6' },
+    { name: 'Vacant', value: vacantCount, color: '#F57B1D' },
+    ...(renovatingCount > 0 ? [{ name: 'Renovating', value: renovatingCount, color: '#F59E0B' }] : [])
   ];
 
-  const enquiriesData = [
-    { week: 'W1', enquiries: 4, viewings: 1, offers: 0.4 },
-    { week: 'W2', enquiries: 6, viewings: 2, offers: 0.8 },
-    { week: 'W3', enquiries: 3, viewings: 0.8, offers: 0.3 },
-    { week: 'W4', enquiries: 7, viewings: 3, offers: 1.2 },
-  ];
+  const rawRevenueByProp = revenue?.revenueByProperty || [];
+  const revenueByProperty = rawRevenueByProp.length > 0 
+    ? rawRevenueByProp 
+    : properties.slice(0, 5).map((p) => ({
+        label: p.address.split(',')[0].trim(),
+        value: p.rent || 0
+      }));
+  const maxRevenueValue = Math.max(...revenueByProperty.map((row) => row.value), 1);
 
-  const revenueTrendData = [
-    { month: 'JAN', collected: 96, projected: 122 },
-    { month: 'FEB', collected: 130, projected: 142 },
-    { month: 'MAR', collected: 160, projected: 172 },
-    { month: 'APR', collected: 146, projected: 152 },
-    { month: 'MAY', collected: 176, projected: 182 },
-    { month: 'JUN', collected: 182, projected: 188 },
-    { month: 'JUL', collected: 156, projected: 160 },
-    { month: 'AUG', collected: 116, projected: 172 },
-    { month: 'SEP', collected: 170, projected: 184 },
-  ];
+  const calcRate = properties.length > 0 ? Math.round((occupiedCount / properties.length) * 100) : (occupancy?.rate || 0);
 
-  const revenueByProperty = [
-    { name: 'THE HEIGHTS LUXURY LOFTS', value: 182 },
-    { name: 'SUNSET GARDEN ESTATES', value: 124 },
-    { name: 'OPAL PLAZA RETAIL', value: 98 },
-    { name: 'RIVERSIDE CORPORATE HUB', value: 78 },
-  ];
+  const payments = tenants?.payments || [];
 
-  const maxRevenueValue = Math.max(...revenueByProperty.map((row) => row.value));
+  const tenantOverviewRows = tenants?.overview || [];
 
-  const occupancyTrendData = [
-    { month: 'JAN', portfolio: 18, market: 12 },
-    { month: 'FEB', portfolio: 22, market: 14 },
-    { month: 'MAR', portfolio: 28, market: 16 },
-    { month: 'APR', portfolio: 40, market: 18 },
-    { month: 'MAY', portfolio: 52, market: 20 },
-    { month: 'JUN', portfolio: 56, market: 23 },
-    { month: 'JUL', portfolio: 61, market: 25 },
-    { month: 'AUG', portfolio: 65, market: 26 },
-    { month: 'SEP', portfolio: 68, market: 27 },
-    { month: 'OCT', portfolio: 72, market: 28 },
-    { month: 'NOV', portfolio: 74, market: 29 },
-    { month: 'DEC', portfolio: 76, market: 30 },
-  ];
+  const avgRentCalc = properties.length > 0 
+    ? Math.round(properties.reduce((sum, p) => sum + (p.rent || 0), 0) / properties.length)
+    : (revenue?.avgRentPerUnit || 0);
 
-  const timeToLetRows = [
-    { prop: 'Prop 1', days: 12, tier: 'good' as const },
-    { prop: 'Prop 2', days: 18, tier: 'mid' as const },
-    { prop: 'Prop 3', days: 24, tier: 'bad' as const },
-    { prop: 'Prop 4', days: 8, tier: 'good' as const },
-    { prop: 'Prop 5', days: 31, tier: 'bad' as const },
-    { prop: 'Prop 6', days: 16, tier: 'mid' as const },
-  ];
-
-  const timeToLetColor = (tier: 'good' | 'mid' | 'bad') => {
-    switch (tier) {
-      case 'good':
-        return '#2FB36D';
-      case 'mid':
-        return '#E67220';
-      case 'bad':
-        return '#D14343';
-      default:
-        return '#2FB36D';
-    }
-  };
-
-  const payments = [
-    {
-      initials: 'JD',
-      tenant: 'Aisha Daodu',
-      property: 'The Heights Luxury Lofts, #402',
-      amount: '£2,850.00',
-      dueDate: 'Oct 01, 2023',
-      status: 'PAID',
-      statusClass: 'bg-[#DFF7ED] text-[#1F9D64]',
-    },
-    {
-      initials: 'MS',
-      tenant: 'Marcus Smith',
-      property: 'Sunset Garden Estates, #12B',
-      amount: '£1,420.00',
-      dueDate: 'Oct 03, 2023',
-      status: 'LATE (2D)',
-      statusClass: 'bg-[#FFF0E6] text-[#D96A1D]',
-    },
-    {
-      initials: 'RL',
-      tenant: 'Robert Lewis',
-      property: 'The Heights Luxury Lofts, #108',
-      amount: '£3,100.00',
-      dueDate: 'Sep 28, 2023',
-      status: 'IN PROGRESS',
-      statusClass: 'bg-[#FCE9ED] text-[#D04D67]',
-    },
-  ];
-
-  const tenantSatisfactionData = [
-    { subject: 'Maintenance', value: 4.9, fullMark: 5 },
-    { subject: 'Communication', value: 4.1, fullMark: 5 },
-    { subject: 'Value', value: 3.9, fullMark: 5 },
-    { subject: 'Safety', value: 3.8, fullMark: 5 },
-    { subject: 'Cleanliness', value: 4.3, fullMark: 5 },
-  ];
-
-  const tenantOverviewRows = [
-    {
-      initials: 'AD',
-      name: 'Aisha Daodu',
-      email: 'aishadaodu@gmail.com',
-      status: 'ACTIVE',
-      statusClass: 'bg-[#DFF7ED] text-[#1F9D64]',
-      property: 'Skyline Apts #402',
-      sub: 'Lease: Oct 2025',
-    },
-    {
-      initials: 'GU',
-      name: 'Godwin Udu',
-      email: 'godwin.udu@gmail.com',
-      status: 'ACTIVE',
-      statusClass: 'bg-[#DFF7ED] text-[#1F9D64]',
-      property: 'Oak Terrace #12',
-      sub: 'Lease: Jan 2024',
-    },
-    {
-      initials: 'SL',
-      name: 'Sandra Lee',
-      email: 'sandra.lee@gmail.com',
-      status: 'PENDING',
-      statusClass: 'bg-[#E7F2FF] text-[#1776B6]',
-      property: 'The Pinnacle #1008',
-      sub: 'Move in: July 2024',
-    },
-  ];
-
-  const marketCompareData = [
-    { metric: 'AVG YIELD', portfolio: 4.8, market: 4.1 },
-    { metric: 'OCCUPANCY %', portfolio: 14, market: 79 },
-    { metric: 'AVG RENT (£)', portfolio: 1150, market: 980 },
-    { metric: 'DAYS VACANT', portfolio: 14, market: 13 },
-  ];
+  const avgYieldCalc = yieldRows.length > 0 
+    ? parseFloat((yieldRows.reduce((sum, r) => sum + r.value, 0) / yieldRows.length).toFixed(1))
+    : 5.0;
 
   return (
     <div className="min-h-screen bg-[#F2F4F7] p-4 md:p-6 lg:p-8">
@@ -305,7 +217,7 @@ function PortfolioInsightsContent({
                   <span className="rounded-full bg-[#EAFBF0] px-2 py-0.5 text-xs font-semibold text-[#1F9D64]">+12.5%</span>
                 </div>
                 <p className="mt-5 text-xs font-semibold tracking-[0.12em] text-[#6B7280]">TOTAL REVENUE</p>
-                <p className="mt-2 text-3xl sm:text-[40px] font-semibold leading-none text-[#1F2937] break-words">£482,950</p>
+                <p className="mt-2 text-3xl sm:text-[40px] font-semibold leading-none text-[#1F2937] break-words">£{(revenue?.totalMonthly || 0).toLocaleString()}</p>
               </article>
 
               <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
@@ -316,7 +228,7 @@ function PortfolioInsightsContent({
                   <span className="rounded-full bg-[#FFF0E6] px-2 py-0.5 text-xs font-semibold text-[#D96A1D]">HIGH ALERT</span>
                 </div>
                 <p className="mt-5 text-xs font-semibold tracking-[0.12em] text-[#6B7280]">OUTSTANDING RENT</p>
-                <p className="mt-2 text-3xl sm:text-[40px] font-semibold leading-none text-[#1F2937] break-words">£14,200</p>
+                <p className="mt-2 text-3xl sm:text-[40px] font-semibold leading-none text-[#1F2937] break-words">£{(revenue?.outstandingRent || 0).toLocaleString()}</p>
               </article>
 
               <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
@@ -324,7 +236,7 @@ function PortfolioInsightsContent({
                   <TrendingUp className="h-4 w-4 text-[#1776B6]" />
                 </div>
                 <p className="mt-5 text-xs font-semibold tracking-[0.12em] text-[#6B7280]">MOM GROWTH</p>
-                <p className="mt-2 text-3xl sm:text-[40px] font-semibold leading-none text-[#1F2937] break-words">4.8%</p>
+                <p className="mt-2 text-3xl sm:text-[40px] font-semibold leading-none text-[#1F2937] break-words">{revenue?.momGrowth || 0}%</p>
               </article>
 
               <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
@@ -332,7 +244,7 @@ function PortfolioInsightsContent({
                   <Building2 className="h-4 w-4 text-[#1776B6]" />
                 </div>
                 <p className="mt-5 text-xs font-semibold tracking-[0.12em] text-[#6B7280]">AVG RENT / UNIT</p>
-                <p className="mt-2 text-3xl sm:text-[40px] font-semibold leading-none text-[#1F2937] break-words">£2,450</p>
+                <p className="mt-2 text-3xl sm:text-[40px] font-semibold leading-none text-[#1F2937] break-words">£{(revenue?.avgRentPerUnit || 0).toLocaleString()}</p>
               </article>
             </section>
 
@@ -443,7 +355,7 @@ function PortfolioInsightsContent({
               </div>
 
               <div className="flex items-center justify-between border-t border-[#EEF1F5] p-4 text-sm text-[#6B7280]">
-                <span>Showing 3 of 142 payment records</span>
+                <span>Showing {payments.length} payment records</span>
                 <div className="flex items-center gap-2">
                   <button type="button" className="h-7 w-7 rounded border border-[#E7EBF0] text-[#6B7280]">‹</button>
                   <button type="button" className="h-7 w-7 rounded border border-[#E7EBF0] text-[#6B7280]">›</button>
@@ -459,7 +371,7 @@ function PortfolioInsightsContent({
                   <p className="text-sm font-semibold text-[#1F2937]">Occupancy Rate</p>
                   <span className="text-xs font-semibold text-[#D14343]">▼ -65.0%</span>
                 </div>
-                <p className="mt-3 text-[34px] font-semibold leading-none text-[#1F2937]">14%</p>
+                <p className="mt-3 text-[34px] font-semibold leading-none text-[#1F2937]">{occupancy?.rate || 0}%</p>
                 <p className="mt-1 text-xs font-semibold text-[#6B7280]">vs 79% market avg</p>
               </article>
 
@@ -468,7 +380,7 @@ function PortfolioInsightsContent({
                   <p className="text-sm font-semibold text-[#1F2937]">Vacant Units</p>
                   <span className="text-xs font-semibold text-[#D14343]">▼ -50.0%</span>
                 </div>
-                <p className="mt-3 text-[34px] font-semibold leading-none text-[#1F2937]">6</p>
+                <p className="mt-3 text-[34px] font-semibold leading-none text-[#1F2937]">{occupancy?.vacantUnits || 0}</p>
                 <p className="mt-1 text-xs font-semibold text-[#6B7280]">Currently empty</p>
               </article>
 
@@ -477,7 +389,7 @@ function PortfolioInsightsContent({
                   <p className="text-sm font-semibold text-[#1F2937]">Avg. Days Vacant</p>
                   <span className="text-xs font-semibold text-[#D14343]">▼ -50.0%</span>
                 </div>
-                <p className="mt-3 text-[34px] font-semibold leading-none text-[#1F2937]">14</p>
+                <p className="mt-3 text-[34px] font-semibold leading-none text-[#1F2937]">{occupancy?.avgDaysVacant || 0}</p>
                 <p className="mt-1 text-xs font-semibold text-[#6B7280]">days vs 28 market avg</p>
               </article>
 
@@ -486,105 +398,12 @@ function PortfolioInsightsContent({
                   <p className="text-sm font-semibold text-[#1F2937]">Renewal Rate</p>
                   <span className="text-xs font-semibold text-[#22A06B]">▲ +4.5%</span>
                 </div>
-                <p className="mt-3 text-[34px] font-semibold leading-none text-[#1F2937]">78%</p>
+                <p className="mt-3 text-[34px] font-semibold leading-none text-[#1F2937]">{occupancy?.renewalRate || 0}%</p>
                 <p className="mt-1 text-xs font-semibold text-[#6B7280]">tenants renewing</p>
               </article>
             </section>
 
-            <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
-              <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <h3 className="text-[18px] font-semibold text-[#1F2937]">Occupancy Trend</h3>
-                  <div className="flex items-center gap-6 text-xs font-semibold text-[#6B7280]">
-                    <span className="inline-flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-[#2FB36D]" />
-                      Your Portfolio
-                    </span>
-                    <span className="inline-flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-[#9CA3AF]" />
-                      Market Average
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-4 h-[310px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={occupancyTrendData} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid stroke="transparent" vertical={false} horizontal={false} />
-                      <XAxis
-                        dataKey="month"
-                        tick={{ fill: '#9CA3AF', fontSize: 10 }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis hide />
-                      <Tooltip />
-                      <Line
-                        type="monotone"
-                        dataKey="portfolio"
-                        stroke="#2FB36D"
-                        strokeWidth={3}
-                        dot={false}
-                        activeDot={{ r: 3 }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="market"
-                        stroke="#9CA3AF"
-                        strokeWidth={2}
-                        strokeDasharray="4 4"
-                        dot={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </article>
-
-              <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <h3 className="text-[18px] font-semibold text-[#1F2937]">Time To Let</h3>
-                  <div className="text-xs font-semibold text-[#9CA3AF]">Avg Days</div>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  {timeToLetRows.map((row) => {
-                    const widthPct = Math.max(12, Math.min(100, (row.days / 35) * 100));
-                    return (
-                      <div key={row.prop} className="flex items-center gap-4">
-                        <div className="w-[56px] text-sm font-semibold text-[#1F2937]">{row.prop}</div>
-                        <div className="flex-1 h-4 rounded-full bg-[#EDF2F7] overflow-hidden">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${widthPct}%`,
-                              backgroundColor: timeToLetColor(row.tier),
-                            }}
-                          />
-                        </div>
-                        <div className="w-[72px] text-right text-sm font-semibold text-[#1F2937]">
-                          {row.days} days
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-6 flex items-center gap-6 text-xs font-semibold text-[#6B7280]">
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-[#2FB36D]" />
-                    &lt;= 14 days
-                  </span>
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-[#E67220]" />
-                    15-20 days
-                  </span>
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-[#D14343]" />
-                    &gt;= 21 days
-                  </span>
-                </div>
-              </article>
-            </section>
+            {/* Removed Occupancy Trend & Time To Let mock data cards */}
           </>
         ) : activeTab === 'tenants' ? (
           <>
@@ -597,7 +416,7 @@ function PortfolioInsightsContent({
                   <span className="text-xs font-semibold text-[#9CA3AF]">→</span>
                 </div>
                 <p className="mt-3 text-sm text-[#6B7280]">Total Tenants</p>
-                <p className="mt-1 text-[44px] font-semibold leading-none text-[#1F2937]">3</p>
+                <p className="mt-1 text-[44px] font-semibold leading-none text-[#1F2937]">{tenants?.totalActive || 0}</p>
                 <p className="text-xs text-[#9CA3AF]">Active tenancies</p>
               </article>
 
@@ -609,7 +428,7 @@ function PortfolioInsightsContent({
                   <span className="text-xs font-semibold text-[#22A06B]">▲ +5.0%</span>
                 </div>
                 <p className="mt-3 text-sm text-[#6B7280]">Satisfaction</p>
-                <p className="mt-1 text-[44px] font-semibold leading-none text-[#1F2937]">4.7 / 5</p>
+                <p className="mt-1 text-[44px] font-semibold leading-none text-[#1F2937]">{tenants?.satisfactionScore || 0} / 5</p>
                 <p className="text-xs text-[#9CA3AF]">Avg. rating</p>
               </article>
 
@@ -621,7 +440,7 @@ function PortfolioInsightsContent({
                   <span className="text-xs font-semibold text-[#22A06B]">▲ +8.0%</span>
                 </div>
                 <p className="mt-3 text-sm text-[#6B7280]">Avg. Tenancy</p>
-                <p className="mt-1 text-[44px] font-semibold leading-none text-[#1F2937]">22 months</p>
+                <p className="mt-1 text-[44px] font-semibold leading-none text-[#1F2937]">{tenants?.avgTenancyMonths || 0} months</p>
                 <p className="text-xs text-[#9CA3AF]">Duration</p>
               </article>
 
@@ -633,39 +452,12 @@ function PortfolioInsightsContent({
                   <span className="text-xs font-semibold text-[#D14343]">▼ -25.0%</span>
                 </div>
                 <p className="mt-3 text-sm text-[#6B7280]">Open Requests</p>
-                <p className="mt-1 text-[44px] font-semibold leading-none text-[#1F2937]">3</p>
+                <p className="mt-1 text-[44px] font-semibold leading-none text-[#1F2937]">{tenants?.openRequests || 0}</p>
                 <p className="text-xs text-[#9CA3AF]">Maintenance</p>
               </article>
             </section>
 
-            <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.4fr]">
-              <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
-                <div className="mb-2 flex items-start justify-between">
-                  <h3 className="text-[18px] font-semibold text-[#1F2937]">Tenant Satisfaction</h3>
-                  <MoreVertical className="h-4 w-4 text-[#6B7280]" />
-                </div>
-                <div className="h-[280px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={tenantSatisfactionData}>
-                      <PolarGrid stroke="#E6EBF0" />
-                      <PolarAngleAxis dataKey="subject" tick={{ fill: '#6B7280', fontSize: 11 }} />
-                      <PolarRadiusAxis angle={30} domain={[0, 5]} tick={false} axisLine={false} />
-                      <Radar dataKey="value" stroke="#D96A1D" fill="#D96A1D" fillOpacity={0.18} strokeWidth={3} />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="mt-4 space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#6B7280]">Top performing</span>
-                    <span className="font-semibold text-[#22A06B]">Maintenance (4.9)</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[#6B7280]">Focus area</span>
-                    <span className="font-semibold text-[#D96A1D]">Safety (3.8)</span>
-                  </div>
-                </div>
-              </article>
-
+            <section className="mt-6 grid grid-cols-1 gap-4">
               <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
                 <div className="mb-3 flex items-start justify-between">
                   <h3 className="text-[18px] font-semibold text-[#1F2937]">Tenant Overview</h3>
@@ -713,73 +505,6 @@ function PortfolioInsightsContent({
                   View All Portfolio Tenants
                 </div>
               </article>
-            </section>
-          </>
-        ) : activeTab === 'market' ? (
-          <>
-            <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-              <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <p className="text-xs font-semibold tracking-[0.12em] text-[#6B7280]">YOUR AVG YIELD</p>
-                  <span className="text-xs font-semibold text-[#22A06B]">+0.7%</span>
-                </div>
-                <p className="mt-2 text-[44px] font-semibold leading-none text-[#1F2937]">4.8%</p>
-                <p className="text-xs text-[#9CA3AF]">vs 4.1% market</p>
-              </article>
-              <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <p className="text-xs font-semibold tracking-[0.12em] text-[#6B7280]">MARKET OCCUPANCY</p>
-                  <span className="text-xs font-semibold text-[#9CA3AF]">-0%</span>
-                </div>
-                <p className="mt-2 text-[44px] font-semibold leading-none text-[#1F2937]">79%</p>
-                <p className="text-xs text-[#9CA3AF]">Local avg</p>
-              </article>
-              <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <p className="text-xs font-semibold tracking-[0.12em] text-[#6B7280]">AVG MARKET RENT</p>
-                  <span className="text-xs font-semibold text-[#22A06B]">+2.3%</span>
-                </div>
-                <p className="mt-2 text-[44px] font-semibold leading-none text-[#1F2937]">£1,150</p>
-                <p className="text-xs text-[#9CA3AF]">Per month, local</p>
-              </article>
-              <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <p className="text-xs font-semibold tracking-[0.12em] text-[#6B7280]">SUPPLY INDEX</p>
-                  <span className="text-xs font-semibold text-[#9CA3AF]">-0%</span>
-                </div>
-                <p className="mt-2 text-[44px] font-semibold leading-none text-[#1F2937]">LOW</p>
-                <p className="text-xs text-[#9CA3AF]">High demand area</p>
-              </article>
-            </section>
-
-            <section className="mt-6 rounded-2xl border border-[#E7EBF0] bg-white p-6 shadow-sm">
-              <button type="button" className="rounded-full bg-[#1776B6] px-5 py-2 text-sm font-semibold text-white">Market</button>
-              <div className="mt-6 flex items-center justify-between">
-                <h3 className="text-[36px] font-semibold leading-none text-[#1F2937]">You vs Market</h3>
-                <div className="flex items-center gap-6 text-sm font-semibold text-[#6B7280]">
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#1776B6]" />
-                    Your Portfolio
-                  </span>
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#C9D6E4]" />
-                    Market Average
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-6 h-[240px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={marketCompareData} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid stroke="#EEF1F5" vertical={false} />
-                    <XAxis dataKey="metric" tick={{ fill: '#6B7280', fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} />
-                    <YAxis hide />
-                    <Tooltip />
-                    <Bar dataKey="portfolio" fill="#1776B6" radius={[4, 4, 0, 0]} barSize={40} />
-                    <Bar dataKey="market" fill="#F4A261" radius={[4, 4, 0, 0]} barSize={40} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
             </section>
           </>
         ) : (
@@ -934,39 +659,7 @@ function PortfolioInsightsContent({
           </article>
             </section>
 
-            <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
-            <h3 className="text-[30px] font-semibold leading-none text-[#1F2937]">Enquiries &amp; Viewings</h3>
-            <p className="mt-1 text-sm text-[#9CA3AF]">Weekly activity (past month)</p>
-            <div className="mt-4 h-[220px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={enquiriesData}>
-                  <CartesianGrid stroke="#EEF1F5" vertical={false} />
-                  <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} />
-                  <YAxis hide />
-                  <Tooltip />
-                  <Bar dataKey="enquiries" fill="#1776B6" radius={[4, 4, 0, 0]} barSize={14} />
-                  <Bar dataKey="viewings" fill="#E67220" radius={[4, 4, 0, 0]} barSize={14} />
-                  <Bar dataKey="offers" fill="#39AA3F" radius={[4, 4, 0, 0]} barSize={14} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-3 flex items-center gap-6 text-sm text-[#6B7280]">
-              <div className="flex items-center gap-2">
-                <span className="inline-block h-2 w-2 rounded-full bg-[#1776B6]" />
-                Enquiries
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="inline-block h-2 w-2 rounded-full bg-[#E67220]" />
-                Viewings
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="inline-block h-2 w-2 rounded-full bg-[#39AA3F]" />
-                Offers
-              </div>
-            </div>
-          </article>
-
+            <section className="grid grid-cols-1 gap-4">
           <article className="rounded-2xl border border-[#E7EBF0] bg-white p-5 shadow-sm">
             <h3 className="text-[30px] font-semibold leading-none text-[#1F2937]">Yield by Property</h3>
             <p className="mt-1 text-sm text-[#9CA3AF]">Annual gross yield %</p>

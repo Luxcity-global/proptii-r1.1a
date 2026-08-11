@@ -12,28 +12,13 @@ import { Tenant, Property, ArrearsAlert, UserRole, UserProfile } from '../App';
 import { referencingService } from '../services/referencingService';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { isNewPortfolioUser } from '../utils/portfolioStatus';
+import { useLandlords, Landlord } from '../hooks/useLandlords';
 
 
 
-interface Landlord {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  status: 'active' | 'inactive' | 'new' | 'premium' | 'suspended';
-  portfolio: {
-    totalProperties: number;
-    totalValue: number;
-    monthlyIncome: number;
-  };
-  properties: string[];
-  notes: string;
-  avatar?: string;
-  lastContact: Date;
-  joinDate: Date;
-  location: string;
-  company?: string;
-}
+
+// Interface is now imported from the hook
+
 
 interface ClientsPageProps {
   tenants: Tenant[];
@@ -70,6 +55,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
   const [referencingStatuses, setReferencingStatuses] = useState<Map<string, 'not-started' | 'in-progress' | 'complete'>>(new Map());
   const [isLoadingReferencingStatuses, setIsLoadingReferencingStatuses] = useState(false);
 
+  const { landlords: liveLandlords, isLoading: isLandlordsLoading } = useLandlords();
   const TENANTS_PER_PAGE = 10;
 
   // Fetch referencing statuses for all tenants
@@ -183,80 +169,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
     setShowBulkActions(selectedTenants.length > 0 || selectedLandlords.length > 0);
   }, [selectedTenants, selectedLandlords]);
 
-  const mockLandlords: Landlord[] = useMemo(() => [
-    {
-      id: '1',
-      name: 'Margaret Williams',
-      email: 'margaret.williams@email.com',
-      phone: '+44 7700 900127',
-      status: 'premium',
-      portfolio: { 
-        totalProperties: 12, 
-        totalValue: 4200000, 
-        monthlyIncome: 18500 
-      },
-      properties: ['prop1', 'prop3', 'prop4', 'prop5', 'prop6'],
-      notes: 'Experienced landlord with portfolio across London. Interested in expanding to new areas.',
-      lastContact: new Date('2024-12-15'),
-      joinDate: new Date('2020-03-15'),
-      location: 'London',
-      company: 'Williams Property Group'
-    },
-    {
-      id: '2',
-      name: 'Robert Chen',
-      email: 'robert.chen@email.com',
-      phone: '+44 7700 900128',
-      status: 'active',
-      portfolio: { 
-        totalProperties: 6, 
-        totalValue: 2100000, 
-        monthlyIncome: 9200 
-      },
-      properties: ['prop2', 'prop7'],
-      notes: 'Tech professional turned landlord. Looking for modern properties with good yields.',
-      lastContact: new Date('2024-12-12'),
-      joinDate: new Date('2022-08-20'),
-      location: 'Manchester',
-      company: 'Chen Investments'
-    },
-    {
-      id: '3',
-      name: 'Sarah Mitchell',
-      email: 'sarah.mitchell@email.com',
-      phone: '+44 7700 900129',
-      status: 'new',
-      portfolio: { 
-        totalProperties: 2, 
-        totalValue: 850000, 
-        monthlyIncome: 3800 
-      },
-      properties: ['prop8', 'prop9'],
-      notes: 'New to property investment. Seeking guidance on portfolio management and tenant relations.',
-      lastContact: new Date('2024-12-10'),
-      joinDate: new Date('2024-09-01'),
-      location: 'Birmingham',
-      company: undefined
-    },
-    {
-      id: '4',
-      name: 'David Thompson',
-      email: 'david.thompson@email.com',
-      phone: '+44 7700 900130',
-      status: 'inactive',
-      portfolio: { 
-        totalProperties: 8, 
-        totalValue: 3200000, 
-        monthlyIncome: 14200 
-      },
-      properties: ['prop10', 'prop11', 'prop12'],
-      notes: 'Seasoned investor taking a break from new acquisitions. Focus on existing portfolio optimization.',
-      lastContact: new Date('2024-11-28'),
-      joinDate: new Date('2019-01-10'),
-      location: 'Edinburgh',
-      company: 'Thompson Estates'
-    }
-  ], []);
+  // Replaced mockLandlords with liveLandlords from useLandlords hook
 
   const filteredAndSortedTenants = useMemo(() => {
     const now = new Date();
@@ -366,13 +279,10 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
   }, [searchTerm, tenantFilter, leaseExpiryFilter, tenantSortBy]);
 
   const filteredAndSortedLandlords = useMemo(() => {
-    let filtered = mockLandlords.filter(landlord => {
-      const matchesSearch = landlord.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           landlord.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           landlord.notes.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           landlord.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           (landlord.company && landlord.company.toLowerCase().includes(searchTerm.toLowerCase()));
-      const matchesFilter = landlordFilter === 'all' || landlord.status === landlordFilter;
+    let filtered = (liveLandlords || []).filter(landlord => {
+      const matchesSearch = landlord.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           landlord.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesFilter = landlordFilter === 'all' || landlord.status.toLowerCase() === landlordFilter.toLowerCase();
       return matchesSearch && matchesFilter;
     });
 
@@ -384,17 +294,17 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
           case 'name-desc':
             return b.name.localeCompare(a.name);
           case 'properties-asc':
-            return a.portfolio.totalProperties - b.portfolio.totalProperties;
+            return a.propertyCount - b.propertyCount;
           case 'properties-desc':
-            return b.portfolio.totalProperties - a.portfolio.totalProperties;
+            return b.propertyCount - a.propertyCount;
           case 'income-asc':
-            return a.portfolio.monthlyIncome - b.portfolio.monthlyIncome;
+            return a.activeTenants - b.activeTenants;
           case 'income-desc':
-            return b.portfolio.monthlyIncome - a.portfolio.monthlyIncome;
+            return b.activeTenants - a.activeTenants;
           case 'portfolio-asc':
-            return a.portfolio.totalValue - b.portfolio.totalValue;
+            return parseFloat(a.totalValue.replace(/[^0-9.]/g, '')) - parseFloat(b.totalValue.replace(/[^0-9.]/g, ''));
           case 'portfolio-desc':
-            return b.portfolio.totalValue - a.portfolio.totalValue;
+            return parseFloat(b.totalValue.replace(/[^0-9.]/g, '')) - parseFloat(a.totalValue.replace(/[^0-9.]/g, ''));
           default:
             return 0;
         }
@@ -402,7 +312,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
     }
 
     return filtered;
-  }, [mockLandlords, searchTerm, landlordFilter, landlordSortBy]);
+  }, [liveLandlords, searchTerm, landlordFilter, landlordSortBy]);
 
   // Calculate summary statistics
   const summary = useMemo(() => {
@@ -1082,11 +992,6 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                           <Badge className={getStatusColor(landlord.status)}>
                             {landlord.status}
                           </Badge>
-                          {landlord.company && (
-                            <Badge variant="outline" className="text-xs">
-                              {landlord.company}
-                            </Badge>
-                          )}
                         </div>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
@@ -1100,36 +1005,26 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                          <div className="flex items-center">
-                            <Home className="h-4 w-4 mr-2 text-muted-foreground" />
-                            {landlord.portfolio.totalProperties} properties
+                        <div className="flex flex-wrap items-center gap-4 pt-2">
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <Home className="h-4 w-4 mr-1.5 text-blue-500" />
+                            {landlord.propertyCount} properties
                           </div>
-                          <div className="flex items-center">
-                            <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
-                            {formatCurrency(landlord.portfolio.monthlyIncome)}/month
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <Users className="h-4 w-4 mr-1.5 text-green-500" />
+                            {landlord.activeTenants} active tenants
                           </div>
-                          <div className="flex items-center">
-                            <TrendingUp className="h-4 w-4 mr-2 text-muted-foreground" />
-                            {formatCurrency(landlord.portfolio.totalValue)} portfolio
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <DollarSign className="h-4 w-4 mr-1.5 text-purple-500" />
+                            {landlord.totalValue} portfolio value
                           </div>
                         </div>
                         
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <MapPin className="h-4 w-4 mr-2" />
-                          {landlord.location}
-                        </div>
-                        
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          Joined: {formatDate(landlord.joinDate)} • Last contact: {formatDate(landlord.lastContact)}
-                        </div>
-                        
-                        {landlord.notes && (
-                          <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-                            <strong>Notes:</strong> {landlord.notes}
+                        <div className="flex items-center justify-between mt-4 text-xs text-muted-foreground">
+                          <div className="flex items-center">
+                            Joined: {landlord.joinDate} • Last active: {landlord.lastActive}
                           </div>
-                        )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 ml-4">

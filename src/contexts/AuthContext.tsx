@@ -210,7 +210,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             roles = [role];
             if (LANDLORD_ROLES.has(role)) {
               const redir = sessionStorage.getItem('redirectAfterLogin');
-              if (!redir || redir === '/dashboard' || redir === '/') {
+              if (!redir || redir === '/dashboard') {
                 sessionStorage.setItem('redirectAfterLogin', '/landlord');
               }
             }
