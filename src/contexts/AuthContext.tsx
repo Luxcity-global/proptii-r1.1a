@@ -171,17 +171,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Process any pending B2C redirect response — MUST be awaited before
         // any other MSAL call to avoid racing MSAL's internal hydration.
-        console.log('[Auth:init] Calling handleRedirectPromise...');
+        console.warn('[Auth:init] Calling handleRedirectPromise...');
         const redirect = await instance.handleRedirectPromise();
-        console.log('[Auth:init] handleRedirectPromise resolved:', !!redirect);
-        if (redirect) console.log('[Auth:init] Redirect payload:', { account: redirect.account?.username, state: redirect.state });
+        console.warn('[Auth:init] handleRedirectPromise resolved:', !!redirect);
+        if (redirect) console.warn('[Auth:init] Redirect payload:', { account: redirect.account?.username, state: redirect.state });
 
         if (redirect?.account) instance.setActiveAccount(redirect.account);
         if (redirect?.state) {
           try {
             const parsed = JSON.parse(redirect.state);
             if (parsed.redirect) {
-              console.log('[Auth:init] Found redirect state:', parsed.redirect);
+              console.warn('[Auth:init] Found redirect state:', parsed.redirect);
               sessionStorage.setItem('redirectAfterLogin', parsed.redirect);
             }
           } catch { /* state is not JSON */ }
@@ -210,17 +210,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         let roles: string[]  = [];
         let roleResolved      = false;
         try {
-          console.log('[Auth:init] Resolving role for user:', account.username);
+          console.warn('[Auth:init] Resolving role for user:', account.username);
           const { resolveRole } = await import('../services/roleService');
           const role = await resolveRole(userId, account.username);
-          console.log('[Auth:init] Role resolved to:', role);
+          console.warn('[Auth:init] Role resolved to:', role);
           if (role) {
             roles = [role];
             if (LANDLORD_ROLES.has(role)) {
               const redir = sessionStorage.getItem('redirectAfterLogin');
-              console.log('[Auth:init] Landlord role detected. Current redirect is:', redir);
+              console.warn('[Auth:init] Landlord role detected. Current redirect is:', redir);
               if (!redir || redir === '/dashboard') {
-                console.log('[Auth:init] Overriding redirect to /landlord');
+                console.warn('[Auth:init] Overriding redirect to /landlord');
                 sessionStorage.setItem('redirectAfterLogin', '/landlord');
               }
             }
@@ -323,14 +323,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (): Promise<void> => {
     const redirectPath = sessionStorage.getItem('redirectAfterLogin');
-    console.log('[Auth:login] Initiating login. Target redirect:', redirectPath);
+    console.warn('[Auth:login] Initiating login. Target redirect:', redirectPath);
     const req = {
       ...loginRequest,
       state: redirectPath ? JSON.stringify({ redirect: redirectPath }) : undefined,
       redirectStartPage: window.location.href,
     };
     try {
-      console.log('[Auth:login] Calling msal.loginRedirect() with payload:', req);
+      console.warn('[Auth:login] Calling msal.loginRedirect() with payload:', req);
       await instance.loginRedirect(req);
     } catch (err) {
       console.error('[Auth] loginRedirect() failed:', err);

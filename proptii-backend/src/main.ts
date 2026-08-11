@@ -15,6 +15,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { HttpExceptionFilter } from './filters/http-exception.filter';
 import { initializeCosmosDB } from './config/cosmos.config';
+import { initializeFirestore } from './config/firestore.config';
 import { validateEnv } from './config/env.validation';
 import * as express from 'express';
 import * as dotenv from 'dotenv';
@@ -37,6 +38,12 @@ async function bootstrap() {
   }).catch((error) => {
     logger.error('Failed to initialize Cosmos DB:', error);
     logger.warn('Continuing without Cosmos DB - some features may not work');
+  });
+
+  // Initialize Firestore/Firebase Admin
+  logger.log('Starting Firestore/Firebase initialization...');
+  initializeFirestore().catch((error) => {
+    logger.error('Failed to initialize Firestore/Firebase:', error);
   });
 
   const isProd = process.env.NODE_ENV === 'production';
