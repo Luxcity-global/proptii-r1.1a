@@ -14,7 +14,7 @@ import { SheetsModule } from './sheets/sheets.module';
 import { ContractModule } from './modules/contract.module';
 import { StorageModule } from './storage/storage.module';
 import { PropertyDocumentController } from './controllers/property-document.controller';
-import { CommunicationController } from './controllers/communication.controller';
+import { CommunicationModule } from './modules/communication.module';
 import { AnalyticsController } from './controllers/analytics.controller';
 import { ClientsController } from './controllers/clients.controller';
 import { AzureUsersModule } from './modules/azure-users.module';
@@ -72,8 +72,9 @@ import { NativePropertiesModule } from './modules/native-properties.module';
     GuestEnquiryModule,
     NativePropertiesModule,
     BillingModule,
+    CommunicationModule,
   ],
-  controllers: [AppController, PropertyDocumentController, CommunicationController, AnalyticsController, ClientsController],
+  controllers: [AppController, PropertyDocumentController, AnalyticsController, ClientsController],
   providers: [
     AppService,
     AnalyticsService,

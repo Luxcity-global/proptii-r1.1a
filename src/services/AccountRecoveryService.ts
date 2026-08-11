@@ -1,6 +1,4 @@
 import { ApplicationInsights } from '@microsoft/applicationinsights-web';
-import { PublicClientApplication } from '@azure/msal-browser';
-import { msalConfig } from '../config/authConfig';
 import { SecurityPolicyService } from './SecurityPolicyService';
 
 interface RecoveryRequest {
@@ -27,7 +25,6 @@ interface ComplianceCheck {
 export class AccountRecoveryService {
     private static instance: AccountRecoveryService;
     private appInsights: ApplicationInsights;
-    private msalInstance: PublicClientApplication;
     private securityPolicy: SecurityPolicyService;
     private recoveryRequests: Map<string, RecoveryRequest> = new Map();
     
@@ -43,7 +40,6 @@ export class AccountRecoveryService {
                 enableAutoRouteTracking: true,
             }
         });
-        this.msalInstance = new PublicClientApplication(msalConfig);
         this.securityPolicy = SecurityPolicyService.getInstance();
     }
 

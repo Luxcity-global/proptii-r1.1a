@@ -39,6 +39,7 @@ export class EnquiryEmailTemplates {
     actionUrl?: string | null;
     actionLabel?: string | null;
     footerHtml?: string;
+    bannerHtml?: string;
   }): string {
     const frontendUrl = this.getFrontendUrl();
     const actionButtonHtml = opts.actionUrl && opts.actionLabel
@@ -79,6 +80,12 @@ export class EnquiryEmailTemplates {
 </head>
 <body>
   <div class="container">
+    ${opts.bannerHtml !== undefined ? opts.bannerHtml : `
+    <div style="background: #FFF3E0; color: #E65100; padding: 12px; text-align: center; border-radius: 8px; margin-bottom: 24px; font-weight: bold; border: 1px solid #FFE0B2;">
+      ⚠️ DO NOT REPLY TO THIS EMAIL ⚠️<br/>
+      <span style="font-size: 14px; font-weight: normal;">Please click the link or button below to reply securely on Proptii. Emails sent directly to this address will be lost.</span>
+    </div>
+    `}
     <div class="header">${opts.title}</div>
     <p>${opts.greeting}</p>
     ${opts.introHtml}
@@ -205,7 +212,13 @@ export class EnquiryEmailTemplates {
       `,
       supportingHtml: `<p>To view the message details and start chatting with the tenant, please log in to your Proptii dashboard.</p>`,
       actionUrl: replyUrl,
-      actionLabel: '👉 Log In to Proptii'
+      actionLabel: '👉 Log In to Proptii',
+      bannerHtml: `
+        <div style="background: #E3F2FD; color: #1565C0; padding: 12px; text-align: center; border-radius: 8px; margin-bottom: 24px; font-weight: bold; border: 1px solid #BBDEFB;">
+          📩 New Enquiry Received<br/>
+          <span style="font-size: 14px; font-weight: normal;">Please log in to your Proptii dashboard to read the full message and start chatting.</span>
+        </div>
+      `
     });
 
     return { subject, text, html };
@@ -248,6 +261,12 @@ export class EnquiryEmailTemplates {
       supportingHtml: `<p>To read their message, manage leads, and start chatting, please claim your free Proptii landlord account.</p>`,
       actionUrl: claimUrl,
       actionLabel: '👉 Claim My Landlord Account on Proptii',
+      bannerHtml: `
+        <div style="background: #E8F5E9; color: #2E7D32; padding: 12px; text-align: center; border-radius: 8px; margin-bottom: 24px; font-weight: bold; border: 1px solid #C8E6C9;">
+          ✨ You Have A New Lead!<br/>
+          <span style="font-size: 14px; font-weight: normal;">Claim your free account below to unlock the full message and start chatting with the tenant.</span>
+        </div>
+      `,
       footerHtml: `
         <p>Best regards,<br>The Proptii Team</p>
         <hr />
@@ -335,6 +354,12 @@ export class EnquiryEmailTemplates {
       `,
       actionUrl: claimUrl,
       actionLabel: '👉 Claim My Landlord Account on Proptii',
+      bannerHtml: `
+        <div style="background: #E8F5E9; color: #2E7D32; padding: 12px; text-align: center; border-radius: 8px; margin-bottom: 24px; font-weight: bold; border: 1px solid #C8E6C9;">
+          ✨ You Have A New Lead!<br/>
+          <span style="font-size: 14px; font-weight: normal;">Claim your free account below to unlock the full message and start chatting with the tenant.</span>
+        </div>
+      `,
       footerHtml: `
         <p>Best regards,<br>The Proptii Team</p>
         <hr />
@@ -393,7 +418,13 @@ export class EnquiryEmailTemplates {
           `,
           supportingHtml: `<p>To read their message and start chatting, please claim your free Proptii landlord account.</p>`,
           actionUrl: claimUrl,
-          actionLabel: '👉 Claim My Landlord Account on Proptii'
+          actionLabel: '👉 Claim My Landlord Account on Proptii',
+          bannerHtml: `
+            <div style="background: #E8F5E9; color: #2E7D32; padding: 12px; text-align: center; border-radius: 8px; margin-bottom: 24px; font-weight: bold; border: 1px solid #C8E6C9;">
+              ✨ New Reply Received!<br/>
+              <span style="font-size: 14px; font-weight: normal;">Claim your free account below to unlock the full message and reply to the tenant.</span>
+            </div>
+          `
         });
 
         return { subject, text, html };
@@ -413,13 +444,19 @@ export class EnquiryEmailTemplates {
           `,
           supportingHtml: `<p>To read their message and start chatting, please log in to your Proptii dashboard.</p>`,
           actionUrl: opts.threadUrl,
-          actionLabel: '👉 Log In to Proptii'
+          actionLabel: '👉 Log In to Proptii',
+          bannerHtml: `
+            <div style="background: #E3F2FD; color: #1565C0; padding: 12px; text-align: center; border-radius: 8px; margin-bottom: 24px; font-weight: bold; border: 1px solid #BBDEFB;">
+              📩 New Reply Received<br/>
+              <span style="font-size: 14px; font-weight: normal;">Please log in to your Proptii dashboard to read the full message and reply.</span>
+            </div>
+          `
         });
 
         return { subject, text, html };
       }
     } else {
-      const text = `Hi ${opts.recipientName},\n\nYou have received a new reply from ${senderName} regarding the listing ${listingTitle}:\n\n"${opts.messageBody}"\n\nReply to this email directly or view the conversation here: ${opts.threadUrl}\n\nBest,\nThe Proptii Team`;
+      const text = `Hi ${opts.recipientName},\n\nYou have received a new reply from ${senderName} regarding the listing ${listingTitle}:\n\n"${opts.messageBody}"\n\n⚠️ DO NOT REPLY TO THIS EMAIL ⚠️\nClick here to reply securely on Proptii: ${opts.threadUrl}\n\nBest,\nThe Proptii Team`;
 
       const html = this.buildHtmlLayout({
         title: 'New Reply Received ✉️',
@@ -432,7 +469,7 @@ export class EnquiryEmailTemplates {
             <p><strong>Message:</strong> ${this.escapeHtml(opts.messageBody)}</p>
           </div>
         `,
-        supportingHtml: `<p class="muted">Or simply reply directly to this email to respond.</p>`,
+        supportingHtml: `<p class="muted">Click the button below to view the full conversation and reply.</p>`,
         actionUrl: opts.threadUrl,
         actionLabel: '👉 View &amp; Reply on Proptii'
       });

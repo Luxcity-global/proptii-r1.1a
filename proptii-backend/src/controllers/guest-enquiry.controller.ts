@@ -23,6 +23,7 @@ import { AppError } from '../utils/app-error';
 import { QuickRequestCategory } from '../schemas/enquiry-thread.schema';
 import { SourcePlatform } from '../schemas/ghost-account.schema';
 import { MongoUser, MongoUserDocument } from '../schemas/mongo-user.schema';
+import { NativeProperty } from '../schemas/native-property.schema';
 import { GuestEnquiryExceptionFilter } from './guest-enquiry-exception.filter';
 
 const VALID_CATEGORIES: QuickRequestCategory[] = [
@@ -45,6 +46,8 @@ export class GuestEnquiryController {
     private readonly emailRelayService: EmailRelayService,
     @InjectModel(MongoUser.name)
     private readonly mongoUserModel: Model<MongoUserDocument>,
+    @InjectModel(NativeProperty.name)
+    private readonly nativePropertyModel: Model<NativeProperty>,
   ) {}
 
   private sanitiseCategories(raw: unknown): QuickRequestCategory[] {
@@ -111,14 +114,11 @@ export class GuestEnquiryController {
         });
       landlordId = ghostLandlord.id;
     } else {
-      if (!body.landlordId || body.landlordId === 'UNCLAIMED') {
-        throw new AppError(
-          422,
-          'landlordId is required for native listings',
-          'MISSING_LANDLORD_ID',
-        );
+      const property = await this.nativePropertyModel.findOne({ id: body.listingId }).lean() as any;
+      if (!property) {
+        throw new AppError(404, 'Native property not found', 'PROPERTY_NOT_FOUND');
       }
-      landlordId = body.landlordId;
+      landlordId = property.userId;
     }
 
     const { thread, messages } = await this.enquiryThreadService.createThread({
@@ -140,6 +140,22 @@ export class GuestEnquiryController {
       } catch (claimErr) {
         this.logger.warn('Failed to issue immediate claim token:', claimErr);
       }
+    }
+
+    if (listingSource === 'scraped' && !hasAgentEmail) {
+      await this.enquiryThreadService.addReply({
+        threadToken: thread.thread_token,
+        senderType: 'platform_landlord', // Use platform generic to represent system
+        senderId: 'SYSTEM',
+        senderName: 'Proptii System',
+        body: 'Proptii was unable to find contact details for this agent. Your message could not be delivered to them.',
+        source: 'web_form',
+      });
+      // Archive it so it doesn't show as active
+      await this.enquiryThreadService['enquiryThreadModel'].updateOne(
+        { id: thread.id },
+        { $set: { status: 'archived' } }
+      );
     }
 
     this.emailRelayService

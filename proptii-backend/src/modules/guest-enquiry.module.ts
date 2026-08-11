@@ -15,6 +15,7 @@ import {
   ConversationParticipantSchema,
 } from '../schemas/conversation-participant.schema';
 import { MongoUser, MongoUserSchema } from '../schemas/mongo-user.schema';
+import { NativeProperty, NativePropertySchema } from '../schemas/native-property.schema';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { MongoUser, MongoUserSchema } from '../schemas/mongo-user.schema';
       { name: Message.name, schema: MessageSchema },
       { name: ConversationParticipant.name, schema: ConversationParticipantSchema },
       { name: MongoUser.name, schema: MongoUserSchema },
+      { name: NativeProperty.name, schema: NativePropertySchema },
     ]),
   ],
   controllers: [GuestEnquiryController],
