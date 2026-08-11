@@ -175,17 +175,15 @@ export function Dashboard({
 
   const totalPriorityAlerts = combinedAlerts.length;
 
-  // Use actual properties - start with empty array when no properties exist
-  const mockProperties: Property[] = properties;
 
   React.useEffect(() => {
     trackEvent("landlord_dashboard_view", {
-      total_properties: mockProperties.length,
+      total_properties: properties.length,
       total_tenants: tenants.length,
     });
-  }, [mockProperties.length, tenants.length]);
+  }, [properties.length, tenants.length]);
 
-  const displayProperties = mockProperties.filter(
+  const displayProperties = properties.filter(
     (property) => {
       const matchesSearch =
         property.address
@@ -214,22 +212,22 @@ export function Dashboard({
     },
   );
 
-  const totalProperties = mockProperties.length;
+  const totalProperties = properties.length;
   // Derive occupancy: A property is occupied if it has a tenant OR if status is explicitly 'occupied'
   // A property is vacant if status is 'vacant' AND it has no tenant
   const tenantOccupiedIds = new Set((tenants || []).map(t => t.propertyId));
-  const occupiedProperties = mockProperties.filter(p => {
+  const occupiedProperties = properties.filter(p => {
     const hasTenant = tenantOccupiedIds.has(p.id);
     return p.status === 'occupied' || hasTenant;
   }).length;
   
-  const renovatingCount = mockProperties.filter(p => p.status === 'under-renovation').length;
+  const renovatingCount = properties.filter(p => p.status === 'under-renovation').length;
   
-  const vacantProperties = mockProperties.filter(p => {
+  const vacantProperties = properties.filter(p => {
     const hasTenant = tenantOccupiedIds.has(p.id);
     return p.status === 'vacant' && !hasTenant;
   }).length;
-  const expiringDocuments = mockProperties.reduce(
+  const expiringDocuments = properties.reduce(
     (count, p) =>
       count +
       p.documents.filter(
@@ -240,7 +238,7 @@ export function Dashboard({
     0,
   );
 
-  const totalRent = mockProperties
+  const totalRent = properties
     .filter(p => {
       const hasTenant = tenantOccupiedIds.has(p.id);
       return p.status === 'occupied' || hasTenant;
@@ -254,7 +252,7 @@ export function Dashboard({
       { name: "Vacant", value: vacantProperties, color: "#ef4444" },
       {
         name: "Renovating",
-        value: mockProperties.filter(p => p.status === 'under-renovation').length,
+        value: properties.filter(p => p.status === 'under-renovation').length,
         color: "#f59e0b"
       }
     ].filter(item => item.value > 0); // Only include non-zero values
@@ -263,7 +261,7 @@ export function Dashboard({
   };
 
   const getRentData = () => {
-    const occupiedList = mockProperties.filter(p => {
+    const occupiedList = properties.filter(p => {
       const hasTenant = tenantOccupiedIds.has(p.id);
       return p.status === 'occupied' || hasTenant;
     });
@@ -280,7 +278,7 @@ export function Dashboard({
   };
 
   const getPropertyTypeData = () => {
-    if (mockProperties.length === 0) {
+    if (properties.length === 0) {
       return [{ name: 'No Properties', value: 1, color: '#e5e7eb' }];
     }
 
@@ -295,7 +293,7 @@ export function Dashboard({
       return 'Other';
     };
 
-    const typeCount = mockProperties.reduce((acc, p) => {
+    const typeCount = properties.reduce((acc, p) => {
       const key = normalizeType(p.type);
       acc[key] = (acc[key] || 0) + 1;
       return acc;
@@ -332,7 +330,7 @@ export function Dashboard({
       // Calculate revenue for this month based on properties with active leases
       let monthlyRevenue = 0;
       
-      mockProperties.forEach((property) => {
+      properties.forEach((property) => {
         // Only count revenue if the property was added before or during this month
         // Default to now if createdAt is missing (shouldn't happen for real data)
         const propertyAddedDate = property.createdAt || new Date(); 

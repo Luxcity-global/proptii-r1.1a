@@ -217,12 +217,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (role) {
             roles = [role];
             if (LANDLORD_ROLES.has(role)) {
-              const redir = sessionStorage.getItem('redirectAfterLogin');
-              console.warn('[Auth:init] Landlord role detected. Current redirect is:', redir);
-              if (!redir || redir === '/dashboard') {
-                console.warn('[Auth:init] Overriding redirect to /landlord');
-                sessionStorage.setItem('redirectAfterLogin', '/landlord');
-              }
+              console.warn('[Auth:init] Landlord role detected. Proceeding without forced redirect.');
             }
           }
           roleResolved = true;

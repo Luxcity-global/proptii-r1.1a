@@ -28,6 +28,10 @@ import { AnalyticsService } from './services/analytics.service';
 import { ClientsService } from './services/clients.service';
 import { GuestEnquiryModule } from './modules/guest-enquiry.module';
 import { NativePropertiesModule } from './modules/native-properties.module';
+import { TenantDashboardController } from './controllers/tenant-dashboard.controller';
+import { TenantDashboardService } from './services/tenant-dashboard.service';
+import { SavedPropertiesController } from './controllers/saved-properties.controller';
+import { SavedPropertiesService } from './services/saved-properties.service';
 
 @Module({
   imports: [
@@ -74,7 +78,7 @@ import { NativePropertiesModule } from './modules/native-properties.module';
     BillingModule,
     CommunicationModule,
   ],
-  controllers: [AppController, PropertyDocumentController, AnalyticsController, ClientsController],
+  controllers: [AppController, PropertyDocumentController, AnalyticsController, ClientsController, TenantDashboardController, SavedPropertiesController],
   providers: [
     AppService,
     AnalyticsService,
@@ -86,6 +90,8 @@ import { NativePropertiesModule } from './modules/native-properties.module';
     },
     // Keep Render free-tier services warm — pings backend + search every 14 min.
     KeepAliveService,
+    TenantDashboardService,
+    SavedPropertiesService,
   ],
 })
 export class AppModule implements NestModule {

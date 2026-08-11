@@ -45,36 +45,7 @@ export interface ApiError {
   status: number;
 }
 
-// Mock properties for testing
-const mockProperties = [
-  {
-    id: '1',
-    address: '123 Main Street, London, SW1 1AA',
-    type: 'Apartment',
-    monthlyRent: 1500,
-    bedrooms: 2,
-    bathrooms: 1,
-    imageUrl: '/images/modern-building.jpg'
-  },
-  {
-    id: '2',
-    address: '456 Park Avenue, London, E1 6BT',
-    type: 'House',
-    monthlyRent: 2200,
-    bedrooms: 3,
-    bathrooms: 2,
-    imageUrl: '/images/viewing-room.jpg'
-  },
-  {
-    id: '3',
-    address: '789 Oxford Street, London, W1D 1BS',
-    type: 'Studio',
-    monthlyRent: 1100,
-    bedrooms: 1,
-    bathrooms: 1,
-    imageUrl: '/images/modern-building.jpg'
-  }
-];
+
 
 class ApiService {
   private api: AxiosInstance;
@@ -256,22 +227,7 @@ class ApiService {
 const apiService = new ApiService();
 export default apiService;
 
-// Get properties function
-export const getProperties = async (): Promise<ApiResponse<any[]>> => {
-  try {
-    // For now, return mock data
-    return {
-      success: true,
-      data: mockProperties
-    };
-  } catch (error) {
-    console.error('Error fetching properties:', error);
-    return {
-      success: false,
-      error: 'Failed to fetch properties'
-    };
-  }
-};
+
 
 // API service functions
 export const saveSectionData = async (

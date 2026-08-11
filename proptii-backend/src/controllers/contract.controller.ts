@@ -1,4 +1,4 @@
-import { Body, Controller, Logger, Post, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
+import { Body, Controller, Logger, Post, Get, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
@@ -19,6 +19,14 @@ interface SendSignedContractDto {
 export class ContractController {
   constructor(private readonly contractEmailService: ContractEmailService) {}
   private readonly logger = new Logger(ContractController.name);
+
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async getContracts() {
+    // Return empty array for now until contract persistence is fully implemented
+    return { success: true, data: [] };
+  }
 
   @Post('send-signed-contract')
   @UseGuards(JwtAuthGuard)

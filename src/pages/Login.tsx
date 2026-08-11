@@ -173,32 +173,7 @@ export const LoginPage: React.FC = () => {
               Sign In with Microsoft
             </Button>
 
-            {/* Mock Login Buttons for Development */}
-            {import.meta.env.DEV && (
-              <Box sx={{ mt: 4, pt: 2, borderTop: '1px solid #eee' }}>
-                <Typography variant="body2" color="text.secondary" align="center" gutterBottom>
-                  Development Mock Login
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    color="secondary"
-                    onClick={() => (useAuth as any)().loginAsMockUser('tenant-test-001', 'tenant')}
-                  >
-                    As Tenant
-                  </Button>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    color="secondary"
-                    onClick={() => (useAuth as any)().loginAsMockUser('landlord-test-001', 'landlord')}
-                  >
-                    As Landlord
-                  </Button>
-                </Box>
-              </Box>
-            )}
+
 
             <Button
               fullWidth

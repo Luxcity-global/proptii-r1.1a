@@ -1,21 +1,114 @@
 import { ApiResponse } from './api';
-import {
-  DashboardSummary,
-  SavedProperty,
-  PropertyViewing,
-  ReferencingApplication,
-  Contract,
-  UserFile,
-  mockGetDashboardSummary,
-  mockGetSavedProperties,
-  mockGetViewings,
-  mockGetReferencingApplications,
-  mockGetContracts,
-  mockGetUserFiles
-} from '../mocks/dashboardApi';
+import apiService from './api';
 
+export interface DashboardSummary {
+  savedSearches: {
+    count: number;
+    recentSearches: Array<{ id: string; query: string; date: string }>;
+  };
+  viewings: {
+    upcoming: number;
+    past: number;
+    total: number;
+    nextViewing?: { property: string; date: string; time: string };
+  };
+  referencing: {
+    status: 'not_started' | 'in_progress' | 'completed';
+    progress: number;
+    completedSteps: number;
+    totalSteps: number;
+    identity: boolean,
+    employment: boolean,
+    residential: boolean,
+    financial: boolean,
+    guarantor: boolean,
+    agentDetails: boolean,
+  };
+  contracts: {
+    pending: number;
+    signed: number;
+    total: number;
+    requested: number;
+    urgent?: Array<{ id: string; name: string; dueDate: string }>;
+  };
+  files: {
+    count: number;
+    recentlyAdded: Array<{ 
+      id: string; 
+      name: string; 
+      type: string; 
+      date: string;
+      url: string;
+      size: number;
+    }>;
+  };
+}
+
+export interface SavedProperty {
+  id: string;
+  price: number;
+  address: string;
+  city: string;
+  postcode: string;
+  bedrooms: number;
+  bathrooms: number;
+  propertyType: string;
+  imageUrl: string;
+  savedAt: string;
+}
+
+export interface PropertyViewing {
+  id: string;
+  propertyId: string;
+  propertyAddress: string;
+  propertyImageUrl: string;
+  date: string;
+  time: string;
+  status: 'upcoming' | 'completed' | 'cancelled' | 'PENDING' | 'CONFIRMED' | 'DECLINED';
+  notes?: string;
+  agentName?: string;
+  agentContact?: string;
+}
+
+export interface ReferencingApplication {
+  id: string;
+  propertyId: string;
+  propertyAddress: string;
+  startedAt: string;
+  lastUpdatedAt: string;
+  status: 'not_started' | 'in_progress' | 'completed' | 'rejected' | string;
+  progress: number;
+  completedSteps: number;
+  totalSteps: number;
+}
+
+export interface Contract {
+  id: string;
+  propertyId: string;
+  propertyAddress: string;
+  status: 'draft' | 'pending_signature' | 'signed' | 'completed' | 'expired' | string;
+  createdAt: string;
+  expiresAt: string;
+  signedAt?: string;
+  documentUrl?: string;
+  parties: Array<{
+    name: string;
+    email: string;
+    status: 'pending' | 'signed' | 'rejected';
+  }>;
+}
+
+export interface UserFile {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  uploadedAt: string;
+  category: 'identity' | 'employment' | 'residential' | 'financial' | 'contract' | 'other' | string;
+  url: string;
+}
 // Use environment variable to determine if we're using mock data
-const USE_MOCK_DATA = true; // In production, this would be process.env.REACT_APP_USE_MOCK_DATA === 'true'
+const USE_MOCK_DATA = false; // Set to false to force real API
 
 // Dashboard Service Interface
 export interface DashboardServiceInterface {
@@ -27,81 +120,33 @@ export interface DashboardServiceInterface {
   getUserFiles(): Promise<ApiResponse<UserFile[]>>;
 }
 
-// Implementation using mock data for testing
-class MockDashboardService implements DashboardServiceInterface {
-  getDashboardSummary(): Promise<ApiResponse<DashboardSummary>> {
-    return mockGetDashboardSummary();
-  }
-
-  getSavedProperties(): Promise<ApiResponse<SavedProperty[]>> {
-    return mockGetSavedProperties();
-  }
-
-  getViewings(): Promise<ApiResponse<PropertyViewing[]>> {
-    return mockGetViewings();
-  }
-
-  getReferencingApplications(): Promise<ApiResponse<ReferencingApplication[]>> {
-    return mockGetReferencingApplications();
-  }
-
-  getContracts(): Promise<ApiResponse<Contract[]>> {
-    return mockGetContracts();
-  }
-
-  getUserFiles(): Promise<ApiResponse<UserFile[]>> {
-    return mockGetUserFiles();
-  }
-}
-
-// Real API implementation (to be replaced with actual API calls)
 class RealDashboardService implements DashboardServiceInterface {
   async getDashboardSummary(): Promise<ApiResponse<DashboardSummary>> {
-    // TODO: Replace with actual API call
-    console.log('Using real API for getDashboardSummary');
-    return { success: false, error: 'Real API not implemented yet' };
+    return apiService.get<DashboardSummary>('/tenant-dashboard/summary');
   }
 
   async getSavedProperties(): Promise<ApiResponse<SavedProperty[]>> {
-    // TODO: Replace with actual API call
-    console.log('Using real API for getSavedProperties');
-    return { success: false, error: 'Real API not implemented yet' };
+    return apiService.get<SavedProperty[]>('/users/me/saved-properties');
   }
 
   async getViewings(): Promise<ApiResponse<PropertyViewing[]>> {
-    // TODO: Replace with actual API call
-    console.log('Using real API for getViewings');
-    return { success: false, error: 'Real API not implemented yet' };
+    return apiService.get<PropertyViewing[]>('/viewing-requests');
   }
 
   async getReferencingApplications(): Promise<ApiResponse<ReferencingApplication[]>> {
-    // TODO: Replace with actual API call
-    console.log('Using real API for getReferencingApplications');
-    return { success: false, error: 'Real API not implemented yet' };
+    return apiService.get<ReferencingApplication[]>('/referencing/forms/all');
   }
 
   async getContracts(): Promise<ApiResponse<Contract[]>> {
-    // TODO: Replace with actual API call
-    console.log('Using real API for getContracts');
-    return { success: false, error: 'Real API not implemented yet' };
+    return apiService.get<Contract[]>('/contracts');
   }
 
   async getUserFiles(): Promise<ApiResponse<UserFile[]>> {
-    // TODO: Replace with actual API call
-    console.log('Using real API for getUserFiles');
-    return { success: false, error: 'Real API not implemented yet' };
+    return apiService.get<UserFile[]>('/referencing/files/all');
   }
 }
 
-// Factory function to create the appropriate dashboard service based on configuration
-export const createDashboardService = (): DashboardServiceInterface => {
-  return USE_MOCK_DATA 
-    ? new MockDashboardService() 
-    : new RealDashboardService();
-};
-
-// Export default instance for easy use
-export const dashboardService = createDashboardService();
+export const dashboardService = new RealDashboardService();
 
 // Export type interfaces
 export type {

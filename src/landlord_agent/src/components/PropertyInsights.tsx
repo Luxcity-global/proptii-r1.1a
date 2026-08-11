@@ -133,7 +133,7 @@ export function PropertyInsights({ property, onBack }: PropertyInsightsProps) {
   };
 
   const getPostcode = (address: string) => {
-    // Extract postcode from address (mock implementation)
+    // Extract postcode from address
     const parts = address.split(' ');
     return parts.slice(-2).join(' ');
   };

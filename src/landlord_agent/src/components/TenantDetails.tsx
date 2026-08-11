@@ -379,8 +379,8 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     }
   };
 
-  // Mock additional data for demonstration (non-payment related)
-  const mockTenant: any = {
+  // Merge real tenant data with live updates
+  const displayTenant: any = {
     ...tenant,
     name: liveTenant?.name || tenant.name,
     email: liveTenant?.email || tenant.email,
@@ -517,8 +517,8 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
       status: 'valid'
     };
 
-    // Add to mockTenant documents (in real app, this would be an API call)
-    mockTenant.documents = [...(mockTenant.documents || []), newDocument];
+    // Add to displayTenant documents (in real app, this would be an API call)
+    displayTenant.documents = [...(displayTenant.documents || []), newDocument];
     
     console.log('Document uploaded:', newDocument);
     // In a real app, you would call an API to save the document
@@ -647,8 +647,8 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     }
   };
 
-  // Combine mock documents with referencing documents
-  const allDocuments = [...(mockTenant.documents || []), ...referencingDocuments];
+  // Combine display documents with referencing documents
+  const allDocuments = [...(displayTenant.documents || []), ...referencingDocuments];
 
   if (isLoadingTenant) {
     return (
@@ -673,16 +673,16 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
               </Button>
               <div className="flex items-center space-x-4">
                 <Avatar className="h-16 w-16">
-                  {mockTenant.avatar && <AvatarImage src={mockTenant.avatar} alt={mockTenant.name} />}
+                  {displayTenant.avatar && <AvatarImage src={displayTenant.avatar} alt={displayTenant.name} />}
                   <AvatarFallback>
                     <User className="h-8 w-8" style={{ color: '#DC5F12' }} />
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h1 className="mb-1">{mockTenant.name}</h1>
+                  <h1 className="mb-1">{displayTenant.name}</h1>
                   <div className="flex items-center space-x-3 flex-wrap gap-2">
-                    <Badge className={getStatusColor(mockTenant.status)}>
-                      {mockTenant.status}
+                    <Badge className={getStatusColor(displayTenant.status)}>
+                      {displayTenant.status}
                     </Badge>
                     {isLoadingReferencing ? (
                       <Badge className="bg-gray-100 text-gray-800">
@@ -701,7 +701,7 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
 
             <div className="flex items-center space-x-2">
               {onEdit && (
-                <Button variant="outline" onClick={() => onEdit(mockTenant)}>
+                <Button variant="outline" onClick={() => onEdit(displayTenant)}>
                   <Edit3 className="w-4 h-4 mr-2" style={{ color: '#DC5F12' }} />
                   Edit
                 </Button>
@@ -756,24 +756,24 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
                 <CardContent className="space-y-4">
                   <div className="flex items-center">
                     <Mail className="w-4 h-4 mr-3 text-muted-foreground" />
-                    <span>{mockTenant.email}</span>
+                    <span>{displayTenant.email}</span>
                   </div>
                   <div className="flex items-center">
                     <Phone className="w-4 h-4 mr-3 text-muted-foreground" />
-                    <span>{mockTenant.phone}</span>
+                    <span>{displayTenant.phone}</span>
                   </div>
                   <div className="flex items-center">
                     <MapPin className="w-4 h-4 mr-3 text-muted-foreground" />
-                    <span>{mockTenant.propertyAddress}</span>
+                    <span>{displayTenant.propertyAddress}</span>
                   </div>
-                  {mockTenant.emergencyContact && (
+                  {displayTenant.emergencyContact && (
                     <>
                       <Separator />
                       <div>
                         <p className="font-medium mb-2">Emergency Contact</p>
                         <div className="space-y-1 text-sm text-muted-foreground">
-                          <p>{mockTenant.emergencyContact.name} ({mockTenant.emergencyContact.relationship})</p>
-                          <p>{mockTenant.emergencyContact.phone}</p>
+                          <p>{displayTenant.emergencyContact.name} ({displayTenant.emergencyContact.relationship})</p>
+                          <p>{displayTenant.emergencyContact.phone}</p>
                         </div>
                       </div>
                     </>
@@ -793,21 +793,21 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Monthly Rent</p>
-                      <p>{formatCurrency(mockTenant.monthlyRent || mockTenant.rentAmount)}</p>
+                      <p>{formatCurrency(displayTenant.monthlyRent || displayTenant.rentAmount)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Deposit</p>
-                      <p>{formatCurrency(mockTenant.depositAmount || mockTenant.rentAmount * 1.5)}</p>
+                      <p>{formatCurrency(displayTenant.depositAmount || displayTenant.rentAmount * 1.5)}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Lease Start</p>
-                      <p>{formatDate(mockTenant.leaseStart)}</p>
+                      <p>{formatDate(displayTenant.leaseStart)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Lease End</p>
-                      <p>{formatDate(mockTenant.leaseEnd)}</p>
+                      <p>{formatDate(displayTenant.leaseEnd)}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -930,7 +930,7 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">
-                    {mockTenant.notes || 'No additional notes'}
+                    {displayTenant.notes || 'No additional notes'}
                   </p>
                 </CardContent>
               </Card>
