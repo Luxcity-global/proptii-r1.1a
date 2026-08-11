@@ -163,6 +163,19 @@ export async function initializeFirestore(): Promise<Firestore | null> {
           logger.warn('   Firestore cannot be initialized without a project ID');
           return null;
         }
+
+        // To generate custom tokens when using application default credentials or refresh tokens,
+        // we must provide a service account ID explicitly.
+        let serviceAccountId = clientEmail;
+        if (!serviceAccountId && process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+          try {
+            const parsed = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+            serviceAccountId = parsed.client_email;
+          } catch (e) {}
+        }
+        if (serviceAccountId) {
+          initOptions.serviceAccountId = serviceAccountId;
+        }
         
         admin.initializeApp(initOptions);
         logger.log(`✅ Firebase Admin initialized with ${initializedWith}${projectId ? ` for project: ${projectId}` : ''}`);
