@@ -1,4 +1,4 @@
-import { Body, Controller, Logger, Post, Get, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
+import { Body, Controller, Logger, Post, Get, UseInterceptors, UploadedFile, UseGuards, Req } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
@@ -23,9 +23,42 @@ export class ContractController {
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async getContracts() {
-    // Return empty array for now until contract persistence is fully implemented
-    return { success: true, data: [] };
+  async getContracts(@Req() req: any) {
+    try {
+      const tenantEmail = req.user?.emails?.[0] || req.user?.email || req.user?.preferred_username;
+      if (!tenantEmail) {
+        return { success: false, error: 'User email not found' };
+      }
+      
+      const admin = await import('firebase-admin');
+      if (!admin.apps.length) {
+        const { initializeFirestore } = await import('../config/firestore.config');
+        await initializeFirestore();
+      }
+      
+      const db = admin.firestore();
+      const snapshot = await db.collection('contracts')
+        .where('tenantEmail', '==', tenantEmail.toLowerCase().trim())
+        .get();
+        
+      const data = snapshot.docs.map(doc => {
+        const docData = doc.data();
+        return {
+          id: doc.id,
+          ...docData,
+          sentDate: docData.sentDate?.toDate?.() || docData.sentDate,
+          signedDate: docData.signedDate?.toDate?.() || docData.signedDate,
+          expiryDate: docData.expiryDate?.toDate?.() || docData.expiryDate,
+        };
+      });
+      
+      data.sort((a, b) => new Date(b.sentDate).getTime() - new Date(a.sentDate).getTime());
+      
+      return { success: true, data };
+    } catch (error: any) {
+      this.logger.error('❌ Error getting contracts:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   @Post('send-signed-contract')

@@ -10,18 +10,9 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import {
-  collection,
-  doc,
-  setDoc,
-  deleteDoc,
-  getDocs,
-  onSnapshot,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '../config/firebaseConfig';
 import { useAuth } from './AuthContext';
 import { consumePendingProperty } from '../utils/onboardingSession';
+import apiService from '../services/api';
 
 export interface SavedProperty {
   id: string;
@@ -77,9 +68,7 @@ function stablePropertyId(property: any): string {
   return `${property.title}-${property.location}-${property.price}`;
 }
 
-function firestoreColRef(userId: string) {
-  return collection(db, 'savedProperties', userId, 'items');
-}
+// Helper removed: no longer using direct Firestore references
 
 interface SavedPropertiesProviderProps {
   children: ReactNode;
@@ -139,7 +128,7 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
     }
   }, [savedProperties, isInitialized]);
 
-  // ─── P2-3: Subscribe to Firestore when authenticated ─────────────────────────
+  // ─── Fetch from Backend when authenticated ─────────────────────────────────
   useEffect(() => {
     if (!user?.id) {
       // Restore guest saved properties from localStorage if unauthenticated
@@ -152,39 +141,49 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
       return;
     }
 
-    // Set to empty first to prevent state bleed during network hydration
-    setSavedProperties([]);
+    let isMounted = true;
 
-    // On first auth, merge any local-only saves into Firestore
-    const syncLocalToFirestore = async (local: SavedProperty[]) => {
-      if (!local.length) return;
-      const col = firestoreColRef(user.id);
-      const existing = await getDocs(col);
-      const existingIds = new Set(existing.docs.map(d => d.id));
-      for (const prop of local) {
-        if (!existingIds.has(prop.id)) {
-          await setDoc(doc(col, prop.id), { ...prop, savedAt: prop.savedAt || new Date().toISOString() });
+    const fetchProperties = async () => {
+      try {
+        const response = await apiService.get('/users/me/saved-properties');
+        if (isMounted) {
+          // The backend currently returns an object with a 'data' array based on standard formatting,
+          // or possibly the array directly depending on the service implementation.
+          const items = Array.isArray(response) ? response : (response.data || []);
+          setSavedProperties(items);
         }
+      } catch (err) {
+        console.error('Failed to fetch saved properties from backend:', err);
       }
     };
 
-    // Snapshot listener keeps state in sync across devices
-    const unsubscribe = onSnapshot(
-      firestoreColRef(user.id),
-      (snapshot) => {
-        const remote = snapshot.docs.map(d => d.data() as SavedProperty);
-        setSavedProperties(remote);
-      },
-      (err) => console.error('SavedProperties Firestore listener error:', err)
-    );
+    // On first auth, merge any local-only saves into backend
+    const syncLocalToBackend = async (local: SavedProperty[]) => {
+      if (!local.length) return;
+      try {
+        const response = await apiService.get('/users/me/saved-properties');
+        const existing = Array.isArray(response) ? response : (response.data || []);
+        const existingIds = new Set(existing.map((d: any) => d.id));
+        for (const prop of local) {
+          if (!existingIds.has(prop.id)) {
+            await apiService.post('/users/me/saved-properties', { ...prop, savedAt: prop.savedAt || new Date().toISOString() });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to sync local properties to backend:', err);
+      }
+    };
 
-    // Fire-and-forget local→Firestore sync on first mount
     setSavedProperties(local => {
-      syncLocalToFirestore(local).catch(console.error);
+      syncLocalToBackend(local).then(() => {
+        fetchProperties();
+      });
       return local;
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+    };
   }, [user?.id]);
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -219,14 +218,14 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
       savedAt: new Date().toISOString(),
     };
 
-    // Optimistic local update (Firestore listener will confirm)
+    // Optimistic local update
     setSavedProperties(prev => [...prev, savedProperty]);
 
     if (user?.id) {
       try {
-        await setDoc(doc(firestoreColRef(user.id), propertyId), savedProperty);
+        await apiService.post('/users/me/saved-properties', savedProperty);
       } catch (err) {
-        console.error('Failed to save property to Firestore:', err);
+        console.error('Failed to save property to backend:', err);
         // localStorage already updated — property is retained offline
       }
     }
@@ -237,9 +236,9 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
 
     if (user?.id) {
       try {
-        await deleteDoc(doc(firestoreColRef(user.id), propertyId));
+        await apiService.delete(`/users/me/saved-properties/${propertyId}`);
       } catch (err) {
-        console.error('Failed to delete property from Firestore:', err);
+        console.error('Failed to delete property from backend:', err);
       }
     }
   }, [user?.id]);

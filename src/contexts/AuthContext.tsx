@@ -8,8 +8,7 @@ import {
 } from '@azure/msal-browser';
 import { msalConfig, loginRequest, b2cPolicies } from '../config/authConfig';
 import SessionManager from '../services/SessionManager';
-import { signInWithCustomToken } from 'firebase/auth';
-import { auth } from '../config/firebaseConfig';
+
 import { notifyAuthReady } from '../services/authReady';
 
 // ─── MSAL singleton ───────────────────────────────────────────────────────────
@@ -118,28 +117,6 @@ function clearAuthStorage(): void {
     .forEach(k => localStorage.removeItem(k));
 }
 
-async function syncFirebaseAuth(b2cIdToken: string): Promise<void> {
-  const base = (import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000').replace(/\/$/, '');
-  try {
-    const res = await fetch(`${base}/api/auth/firebase-token`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${b2cIdToken}`, 'Content-Type': 'application/json' },
-    });
-    if (res.ok) {
-      const { firebaseToken } = await res.json();
-      if (firebaseToken) await signInWithCustomToken(auth, firebaseToken);
-    } else {
-      console.warn('[Auth] Firebase token exchange failed:', res.status, res.statusText);
-      window.dispatchEvent(new CustomEvent('firebase-auth-sync-failed', { detail: { status: res.status } }));
-    }
-  } catch (err) {
-    console.warn('[Auth] Firebase sync error (non-fatal):', err instanceof Error ? err.message : err);
-    window.dispatchEvent(new CustomEvent('firebase-auth-sync-failed', {
-      detail: { message: err instanceof Error ? err.message : 'Unknown' },
-    }));
-  }
-}
-
 // ─── AuthProvider ─────────────────────────────────────────────────────────────
 
 interface AuthProviderProps { children: ReactNode }
@@ -240,13 +217,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setIsAuthenticated(true);
         }
 
-        // Firebase sync — non-blocking, uses MSAL directly to avoid deadlock
-        // with waitForAuthReady() (notifyAuthReady hasn't fired yet here).
-        instance.acquireTokenSilent({ ...loginRequest, account })
-          .then((r) => { if (r.idToken) syncFirebaseAuth(r.idToken); })
-          .catch((e) => {
-            console.warn('[Auth] Firebase sync token failed (non-fatal):', e?.message ?? e);
-          });
+        // Using MSAL exclusively for frontend authentication.
 
         sessionManager.updateActivity('authentication', 'Session initialized');
 

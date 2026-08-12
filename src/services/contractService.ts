@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db, storage } from '../config/firebaseConfig';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import apiService from './api';
 
 export interface ContractTemplate {
   id: string;
@@ -415,102 +416,24 @@ class ContractService {
 
   /**
    * Get contracts received by tenant email (from landlords)
-   * These are stored in the 'contracts' collection (shared between landlord and tenant apps)
+   * These are fetched from the NestJS backend which verifies the user session
    */
   async getReceivedContracts(
     tenantEmail: string,
     statusFilter?: 'sent' | 'unsigned' | 'signed'
   ): Promise<{ success: boolean; contracts?: any[]; error?: string }> {
     try {
-      console.log('🔄 Getting contracts received by tenant:', tenantEmail);
+      console.log('🔄 Getting contracts received by tenant from backend');
+      const response = await apiService.get('/contracts');
       
-      const constraints = [where('tenantEmail', '==', tenantEmail)];
-      
+      let contracts = response.data || [];
       if (statusFilter) {
-        constraints.push(where('status', '==', statusFilter));
+        contracts = contracts.filter((c: any) => c.status === statusFilter);
       }
       
-      const q = query(
-        collection(db, 'contracts'), // Different collection than contractTemplates
-        ...constraints,
-        orderBy('sentDate', 'desc')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const contracts: any[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        contracts.push({
-          id: doc.id,
-          title: data.title || '',
-          propertyAddress: data.propertyAddress || '',
-          tenantName: data.tenantName || '',
-          tenantEmail: data.tenantEmail || '',
-          landlordEmail: data.landlordEmail || '',
-          status: data.status || 'sent',
-          contractType: data.contractType || 'other',
-          fileUrl: data.fileUrl || '',
-          fileName: data.fileName || '',
-          sentDate: data.sentDate?.toDate?.() || new Date(data.sentDate),
-          signedDate: data.signedDate?.toDate?.(),
-          expiryDate: data.expiryDate?.toDate?.(),
-          additionalInfo: data.additionalInfo,
-        });
-      });
-      
-      console.log(`✅ Found ${contracts.length} contracts for tenant ${tenantEmail}`);
       return { success: true, contracts };
     } catch (error: any) {
       console.error('❌ Error getting received contracts:', error);
-      
-      // If it's an index error, try without orderBy
-      if (error.code === 'failed-precondition' && error.message?.includes('index')) {
-        console.warn('⚠️ Firestore index missing, retrying without orderBy');
-        try {
-          const constraints = [where('tenantEmail', '==', tenantEmail)];
-          if (statusFilter) {
-            constraints.push(where('status', '==', statusFilter));
-          }
-          
-          const q = query(collection(db, 'contracts'), ...constraints);
-          const querySnapshot = await getDocs(q);
-          const contracts: any[] = [];
-          
-          querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            contracts.push({
-              id: doc.id,
-              title: data.title || '',
-              propertyAddress: data.propertyAddress || '',
-              tenantName: data.tenantName || '',
-              tenantEmail: data.tenantEmail || '',
-              landlordEmail: data.landlordEmail || '',
-              status: data.status || 'sent',
-              contractType: data.contractType || 'other',
-              fileUrl: data.fileUrl || '',
-              fileName: data.fileName || '',
-              sentDate: data.sentDate?.toDate?.() || new Date(data.sentDate),
-              signedDate: data.signedDate?.toDate?.(),
-              expiryDate: data.expiryDate?.toDate?.(),
-              additionalInfo: data.additionalInfo,
-            });
-          });
-          
-          // Sort in memory
-          contracts.sort((a, b) => b.sentDate.getTime() - a.sentDate.getTime());
-          
-          console.log(`✅ Found ${contracts.length} contracts (without index)`);
-          return { success: true, contracts };
-        } catch (retryError) {
-          console.error('❌ Retry failed:', retryError);
-          return { 
-            success: false, 
-            error: retryError instanceof Error ? retryError.message : 'Unknown error' 
-          };
-        }
-      }
-      
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error occurred' 
@@ -520,6 +443,7 @@ class ContractService {
 
   /**
    * Subscribe to real-time updates for received contracts
+   * Replaced Firestore listener with simple polling to REST API
    */
   subscribeToReceivedContracts(
     tenantEmail: string,
@@ -527,54 +451,28 @@ class ContractService {
     statusFilter?: 'sent' | 'unsigned' | 'signed',
     onError?: (error: Error) => void
   ): () => void {
-    console.log('🔄 Subscribing to contracts for tenant:', tenantEmail);
+    let active = true;
     
-    const constraints = [where('tenantEmail', '==', tenantEmail)];
-    if (statusFilter) {
-      constraints.push(where('status', '==', statusFilter));
-    }
-    
-    const q = query(
-      collection(db, 'contracts'),
-      ...constraints
-    );
-
-    return onSnapshot(
-      q,
-      (querySnapshot) => {
-        const contracts: any[] = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          contracts.push({
-            id: doc.id,
-            title: data.title || '',
-            propertyAddress: data.propertyAddress || '',
-            tenantName: data.tenantName || '',
-            tenantEmail: data.tenantEmail || '',
-            landlordEmail: data.landlordEmail || '',
-            status: data.status || 'sent',
-            contractType: data.contractType || 'other',
-            fileUrl: data.fileUrl || '',
-            fileName: data.fileName || '',
-            sentDate: data.sentDate?.toDate?.() || new Date(data.sentDate),
-            signedDate: data.signedDate?.toDate?.(),
-            expiryDate: data.expiryDate?.toDate?.(),
-            additionalInfo: data.additionalInfo,
-          });
-        });
-        
-        // Sort by sent date
-        contracts.sort((a, b) => b.sentDate.getTime() - a.sentDate.getTime());
-        
-        callback(contracts);
-      },
-      (error) => {
-        console.error('❌ Error in received contracts subscription:', error);
-        if (onError) {
-          onError(error);
+    const fetchContracts = async () => {
+      try {
+        const res = await this.getReceivedContracts(tenantEmail, statusFilter);
+        if (active && res.success && res.contracts) {
+          callback(res.contracts);
+        } else if (res.error && onError && active) {
+          onError(new Error(res.error));
         }
+      } catch (err: any) {
+        if (active && onError) onError(err);
       }
-    );
+    };
+    
+    fetchContracts();
+    const interval = setInterval(fetchContracts, 10000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }
 }
 
