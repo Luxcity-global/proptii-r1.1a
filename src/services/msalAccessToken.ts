@@ -1,10 +1,6 @@
-/**
- * msalAccessToken.ts — Bearer token acquisition for API calls.
- * (Now backed by Firebase Auth)
- */
-
 import { auth } from '../config/firebaseConfig';
 import { waitForAuthReady } from './authReady';
+import { getMsalInstance } from '../contexts/AuthContext';
 
 // ─── Session-expiry notification ─────────────────────────────────────────────
 
@@ -22,19 +18,39 @@ export async function getAccessTokenForApiRequest(): Promise<string | null> {
     if (mock) return mock;
   }
 
+  // 1. Try Firebase Auth User
   const currentUser = auth.currentUser;
-  if (!currentUser) {
-    console.warn('[Auth] No current Firebase user found when acquiring token.');
-    return null;
+  if (currentUser) {
+    try {
+      const token = await currentUser.getIdToken(false);
+      if (token) return token;
+    } catch (err) {
+      console.error('[Auth] Error getting Firebase ID token:', err);
+    }
   }
 
+  // 2. Try MSAL Account (Microsoft Auth)
   try {
-    // getIdToken(false) gets the cached token if it's not expired, otherwise refreshes it.
-    const token = await currentUser.getIdToken(false);
-    return token;
-  } catch (err) {
-    console.error('[Auth] Error getting Firebase ID token:', err);
-    notifySessionExpired(true);
-    return null;
+    const msal = await getMsalInstance();
+    const accounts = msal.getAllAccounts();
+    if (accounts.length > 0) {
+      const activeAccount = msal.getActiveAccount() || accounts[0];
+      const response = await msal.acquireTokenSilent({
+        scopes: ['openid', 'profile', 'email'],
+        account: activeAccount
+      }).catch(() => null);
+
+      if (response?.idToken) {
+        return response.idToken;
+      }
+    }
+  } catch (msalErr) {
+    console.warn('[Auth] MSAL token acquisition warning:', msalErr);
   }
+
+  // 3. Fallback to stored token
+  const storedToken = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+  if (storedToken) return storedToken;
+
+  return null;
 }

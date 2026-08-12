@@ -15,7 +15,7 @@ import { trackEvent } from '../utils/analytics';
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { user, login, isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
     sessionStorage.removeItem('redirect_in_progress');
@@ -54,18 +54,22 @@ export const LoginPage: React.FC = () => {
       sessionStorage.removeItem('autoLoginAttempted');
       sessionStorage.removeItem('redirect_in_progress');
       sessionStorage.removeItem('last_redirect_path');
+
+      // If new user has no assigned role, direct them to role selection screen
+      const hasRole = user?.roles && user.roles.length > 0;
+      const targetPath = hasRole ? from : '/select-role';
       
-      console.log('✅ Already authenticated, redirecting to:', from);
+      console.log('✅ Already authenticated, redirecting to:', targetPath);
       trackEvent('login_success', {
-        redirect_to: from,
+        redirect_to: targetPath,
       });
       
       // Use setTimeout to ensure this happens after current render cycle
       setTimeout(() => {
-        navigate(from, { replace: true });
+        navigate(targetPath, { replace: true });
       }, 0);
     }
-  }, [isAuthenticated, navigate, from]);
+  }, [isAuthenticated, user?.roles, navigate, from]);
 
   // Store the target redirect path when landing on login page
   useEffect(() => {

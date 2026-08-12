@@ -210,15 +210,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const { loginRequest } = await import('../config/authConfig');
           const response = await msal.loginPopup(loginRequest);
           if (response?.account) {
-            const email = response.account.username || response.account.name || 'user@proptii.co';
-            const name = response.account.name || email.split('@')[0];
-            const role = email.includes('landlord') ? 'landlord' : 'tenant';
+            const claims = (response.account.idTokenClaims || {}) as any;
+            const email = response.account.username || claims.email || 'user@proptii.co';
+            const name = response.account.name || claims.name || email.split('@')[0];
+            const phone = claims.extension_PhoneNumber || claims.phoneNumber || claims.phone_number || claims.phone || claims.mobilePhone || undefined;
+            const userId = response.account.homeAccountId || response.account.localAccountId;
+
+            let roles: string[] = [];
+            let roleResolved = false;
+            try {
+              const { resolveRole } = await import('../services/roleService');
+              const role = await resolveRole(userId, email);
+              if (role) {
+                roles = [role];
+              }
+              roleResolved = true;
+            } catch (err) {
+              console.warn('[Auth] Role resolution failed for MSAL user:', err);
+              roleResolved = true;
+            }
+
             setUser({
-              id: response.account.homeAccountId || response.account.localAccountId,
+              id: userId,
               email,
               name,
-              roles: [role],
-              roleResolved: true,
+              givenName: name.split(' ')[0],
+              familyName: name.split(' ').slice(1).join(' '),
+              phone,
+              roles,
+              roleResolved,
             });
             setIsAuthenticated(true);
             setIsLoading(false);
