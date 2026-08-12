@@ -45,15 +45,13 @@ export const msalConfig: Configuration = {
     iframeHashTimeout: 10_000,
     loadFrameTimeout:  10_000,
     loggerOptions: {
-      logLevel: import.meta.env.PROD ? LogLevel.Warning : LogLevel.Verbose,
+      logLevel: LogLevel.Warning,
       loggerCallback: (level, message, containsPii) => {
         if (containsPii) return;
         switch (level) {
           case LogLevel.Error:   console.error(message); break;
           case LogLevel.Warning: console.warn(message);  break;
-          case LogLevel.Info:    console.info(message);  break;
-          case LogLevel.Verbose: console.debug(message); break;
-          default:               console.log(message);
+          default:               break;
         }
       },
     },
