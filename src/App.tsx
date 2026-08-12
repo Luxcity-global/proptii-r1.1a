@@ -24,7 +24,6 @@ import Dashboard from './components/dashboard/Dashboard';
 import { DashboardHome } from './components/dashboard/index';
 
 // ─── Lazily loaded (heavy pages — split into async chunks) ─────────────────
-const HomeLegacy          = lazy(() => import('./pages/HomeLegacy'));
 const ClaimListing        = lazy(() => import('./pages/ClaimListing'));
 const ClaimAccount        = lazy(() => import('./pages/ClaimAccount'));
 const Referencing         = lazy(() => import('./pages/Referencing'));
@@ -120,7 +119,6 @@ export const App: React.FC = () => {
                 {/* Public Routes - / is default landing; onboarding shows as modal overlay */}
                 <Route path="/" element={<HomeVariant />} />
                 <Route path="/home-v2" element={<Navigate to="/" replace />} />
-                <Route path="/home-legacy" element={<HomeLegacy />} />
                 <Route path="/home" element={<Navigate to="/" replace />} />
                 <Route path="/tenant-onboarding" element={<OnboardingOptionsModalRoute type="tenant" />} />
                 <Route path="/landlord-onboarding" element={<OnboardingOptionsModalRoute type="landlord" />} />

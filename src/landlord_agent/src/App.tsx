@@ -1,4 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { ThemeProvider } from 'next-themes';
+import { TooltipProvider } from './components/ui/tooltip';
 import { Routes, Route, useLocation, MemoryRouter } from 'react-router-dom';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { LandlordEmptyState } from './components/LandlordEmptyState';
