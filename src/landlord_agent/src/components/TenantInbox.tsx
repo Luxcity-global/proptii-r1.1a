@@ -252,7 +252,7 @@ export const TenantInbox: React.FC = () => {
                                             conversation={conv}
                                             isActive={conv.id === activeConversationId}
                                             onClick={handleSelect}
-                                            participantName={conv.tenantName || 'Tenant'}
+                                            participantName={!conv.tenantId ? `${conv.tenantName || 'Guest'} (Guest)` : (conv.tenantName || 'Tenant')}
                                             propertyAddress={conv.propertyTitle || conv.propertyId}
                                             lastReadAt={readCursors[conv.id] ?? null}
                                         />

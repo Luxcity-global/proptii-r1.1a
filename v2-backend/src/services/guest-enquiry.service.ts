@@ -15,14 +15,14 @@ export class GuestEnquiryService {
     }
   }
 
-  private get threadsCol() {
+  private get conversationsCol() {
     const db = this.db;
-    return db ? db.collection('guest_threads') : null;
+    return db ? db.collection('conversations') : null;
   }
 
   private get messagesCol() {
     const db = this.db;
-    return db ? db.collection('guest_messages') : null;
+    return db ? db.collection('messages') : null;
   }
 
   async submitEnquiry(body: any) {
@@ -31,38 +31,41 @@ export class GuestEnquiryService {
     const messageId = randomUUID();
     const now = new Date().toISOString();
 
+    // Unified Conversation Schema
     const threadPayload = {
       id: threadId,
-      threadToken,
-      listingId: body.listingId,
-      listingTitle: body.listingTitle || 'Property Listing',
-      listingSource: body.listingSource || 'native',
-      tenantEmail: body.email,
-      tenantName: body.name || 'Guest Tenant',
+      propertyId: body.listingId,
+      tenantId: null, // Unclaimed guest
       landlordId: body.landlordId || '',
-      agentEmail: body.agentEmail || '',
-      agentName: body.agentName || '',
-      status: 'active',
-      messageCount: 1,
+      propertyTitle: body.listingTitle || 'Property Listing',
+      tenantName: body.name || 'Guest Tenant',
+      guestEmail: body.email,
+      guestToken: threadToken,
       createdAt: now,
       updatedAt: now,
+      lastMessageAt: now,
+      isDeleted: false,
+      status: 'active',
     };
 
+    // Unified Message Schema
     const messagePayload = {
       id: messageId,
-      threadToken,
-      threadId,
-      senderType: 'ghost_tenant',
-      senderName: body.name || 'Guest Tenant',
+      conversationId: threadId,
+      senderId: 'guest',
+      senderRole: 'ghost_tenant',
+      senderName: body.name || 'Guest Tenant', // Extra field for guest display
       body: body.message,
+      attachmentIds: [],
       sentAt: now,
       readAt: null,
+      isDeleted: false,
     };
 
-    const col = this.threadsCol;
+    const col = this.conversationsCol;
     if (col) {
       try {
-        await col.doc(threadToken).set(threadPayload);
+        await col.doc(threadId).set(threadPayload);
         if (this.messagesCol) {
           await this.messagesCol.doc(messageId).set(messagePayload);
         }
@@ -82,36 +85,37 @@ export class GuestEnquiryService {
   }
 
   async getThreadByToken(token: string) {
-    const col = this.threadsCol;
+    const col = this.conversationsCol;
     if (!col) {
       return {
         data: {
-          thread: { id: token, status: 'active', message_count: 1 },
+          thread: { id: token, status: 'active', message_count: 0 },
           messages: [],
         },
       };
     }
 
     try {
-      const doc = await col.doc(token).get();
-      if (!doc.exists) {
+      const snap = await col.where('guestToken', '==', token).limit(1).get();
+      if (snap.empty) {
         throw new BadRequestException('Thread not found');
       }
 
-      const threadData = doc.data();
+      const threadData = snap.docs[0].data();
       let messages: any[] = [];
       if (this.messagesCol) {
-        const msgSnap = await this.messagesCol.where('threadToken', '==', token).get();
+        const msgSnap = await this.messagesCol.where('conversationId', '==', threadData.id).get();
         messages = msgSnap.docs
           .map(d => d.data())
           .sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
       }
 
+      // Map back to what the frontend expects for guest threads
       return {
         data: {
           thread: {
-            id: doc.id,
-            listing_title: threadData?.listingTitle,
+            id: token, // Frontend expects token as id for replies
+            listing_title: threadData?.propertyTitle,
             status: threadData?.status || 'active',
             message_count: messages.length,
             created_at: threadData?.createdAt,
@@ -119,8 +123,8 @@ export class GuestEnquiryService {
           },
           messages: messages.map(m => ({
             id: m.id,
-            sender_type: m.senderType,
-            sender_name: m.senderName,
+            sender_type: m.senderRole,
+            sender_name: m.senderName || (m.senderRole === 'landlord' ? 'Landlord' : 'Guest'),
             body: m.body,
             sent_at: m.sentAt,
           })),
@@ -141,23 +145,40 @@ export class GuestEnquiryService {
     const messageId = randomUUID();
     const now = new Date().toISOString();
 
-    const payload = {
-      id: messageId,
-      threadToken: token,
-      senderType: body.senderType || 'ghost_tenant',
-      senderId: body.senderId || 'guest',
-      senderName: body.senderName || 'User',
-      body: body.message || '',
-      sentAt: now,
-      readAt: null,
-    };
-
-    const col = this.messagesCol;
+    const col = this.conversationsCol;
+    let threadId = '';
+    
     if (col) {
       try {
-        await col.doc(messageId).set(payload);
-        if (this.threadsCol) {
-          await this.threadsCol.doc(token).set({ updatedAt: now }, { merge: true });
+        const snap = await col.where('guestToken', '==', token).limit(1).get();
+        if (!snap.empty) {
+          threadId = snap.docs[0].id;
+        }
+      } catch {}
+    }
+
+    if (!threadId) {
+      return { data: { id: messageId, sent_at: now } }; // Fallback
+    }
+
+    const payload = {
+      id: messageId,
+      conversationId: threadId,
+      senderId: body.senderId || 'guest',
+      senderRole: body.senderType || 'ghost_tenant',
+      senderName: body.senderName || 'User',
+      body: body.message || '',
+      attachmentIds: [],
+      sentAt: now,
+      readAt: null,
+      isDeleted: false,
+    };
+
+    if (this.messagesCol) {
+      try {
+        await this.messagesCol.doc(messageId).set(payload);
+        if (col) {
+          await col.doc(threadId).set({ updatedAt: now, lastMessageAt: now }, { merge: true });
         }
       } catch {}
     }
@@ -171,13 +192,17 @@ export class GuestEnquiryService {
   }
 
   async autoMerge(email: string, userId: string) {
-    const col = this.threadsCol;
+    const col = this.conversationsCol;
     let migratedCount = 0;
     if (col) {
       try {
-        const snap = await col.where('tenantEmail', '==', email.toLowerCase().trim()).get();
+        const snap = await col.where('guestEmail', '==', email.toLowerCase().trim()).get();
         for (const doc of snap.docs) {
-          await doc.ref.set({ tenantId: userId, status: 'claimed' }, { merge: true });
+          await doc.ref.set({ 
+            tenantId: userId, 
+            status: 'claimed',
+            guestToken: null // Clear token after claim
+          }, { merge: true });
           migratedCount++;
         }
       } catch {}
@@ -193,16 +218,17 @@ export class GuestEnquiryService {
 
   /** Validate a claim token — check it exists in Firestore and is not expired */
   async validateClaimToken(token: string) {
-    const col = this.threadsCol;
+    const col = this.conversationsCol;
     if (!col) return { data: { valid: false } };
     try {
-      const doc = await col.doc(token).get();
-      if (!doc.exists) return { data: { valid: false } };
-      const data = doc.data();
+      const snap = await col.where('guestToken', '==', token).limit(1).get();
+      if (snap.empty) return { data: { valid: false } };
+      
+      const data = snap.docs[0].data();
       return {
         data: {
           valid: true,
-          email: data?.tenantEmail || '',
+          email: data?.guestEmail || '',
           name: data?.tenantName || null,
           role: 'ghost_tenant',
           expires_at: null,
@@ -215,21 +241,21 @@ export class GuestEnquiryService {
 
   /** Resend a claim link email (no-op if SMTP not configured) */
   async resendClaimToken(email: string) {
-    // In production, send a claim email via SMTP if configured
     const smtpHost = process.env.SMTP_HOST;
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASS;
 
     if (smtpHost && smtpUser && smtpPass) {
-      const col = this.threadsCol;
+      const col = this.conversationsCol;
       let threadToken: string | null = null;
       if (col) {
         try {
           const snap = await col
-            .where('tenantEmail', '==', email.toLowerCase().trim())
+            .where('guestEmail', '==', email.toLowerCase().trim())
+            .where('guestToken', '!=', null)
             .limit(1)
             .get();
-          if (!snap.empty) threadToken = snap.docs[0].id;
+          if (!snap.empty) threadToken = snap.docs[0].data().guestToken;
         } catch {}
       }
 
@@ -261,20 +287,30 @@ export class GuestEnquiryService {
 
   /** Confirm a claim — merge thread ownership to the authenticated user */
   async confirmClaim(token: string, email: string, userId: string) {
-    const col = this.threadsCol;
+    const col = this.conversationsCol;
     let migratedCount = 0;
     if (col) {
       try {
         // Claim by specific token
-        const doc = await col.doc(token).get();
-        if (doc.exists) {
-          await doc.ref.set({ tenantId: userId, status: 'claimed', claimedAt: new Date().toISOString() }, { merge: true });
+        const tokenSnap = await col.where('guestToken', '==', token).limit(1).get();
+        if (!tokenSnap.empty) {
+          await tokenSnap.docs[0].ref.set({ 
+            tenantId: userId, 
+            status: 'claimed', 
+            guestToken: null,
+            claimedAt: new Date().toISOString() 
+          }, { merge: true });
           migratedCount = 1;
         }
+        
         // Also merge any threads matching the email
-        const snap = await col.where('tenantEmail', '==', (email || '').toLowerCase().trim()).get();
-        for (const d of snap.docs) {
-          await d.ref.set({ tenantId: userId, status: 'claimed' }, { merge: true });
+        const emailSnap = await col.where('guestEmail', '==', (email || '').toLowerCase().trim()).get();
+        for (const d of emailSnap.docs) {
+          await d.ref.set({ 
+            tenantId: userId, 
+            status: 'claimed',
+            guestToken: null
+          }, { merge: true });
           migratedCount++;
         }
       } catch {}
