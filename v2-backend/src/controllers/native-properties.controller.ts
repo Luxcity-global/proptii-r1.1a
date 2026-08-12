@@ -42,7 +42,7 @@ function normaliseForSearch(doc: any): Record<string, any> {
   };
 }
 
-@Controller('native-properties')
+@Controller(['native-properties', 'properties'])
 export class NativePropertiesController {
   constructor(private readonly propertiesService: NativePropertiesService) {}
 

@@ -48,6 +48,21 @@ async function bootstrap() {
   });
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`🚀 Consolidated v2 Backend running on http://localhost:${port}/api`);
+  console.log(`🚀 Proptii v2-backend running on port ${port}`);
+
+  // ── Production Keep-Alive Ping Loop (prevents Render/Fly spin-down) ──
+  const keepAliveInterval = 4 * 60 * 1000; // 4 minutes
+  const backendUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || `http://127.0.0.1:${port}`;
+
+  setInterval(() => {
+    try {
+      const http = require('http');
+      const https = require('https');
+      const client = backendUrl.startsWith('https') ? https : http;
+      client.get(`${backendUrl}/api/health`, (res: any) => {
+        res.resume();
+      }).on('error', () => {});
+    } catch {}
+  }, keepAliveInterval);
 }
 bootstrap();

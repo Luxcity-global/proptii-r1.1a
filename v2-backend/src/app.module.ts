@@ -20,9 +20,12 @@ import { BillingService } from './services/billing.service';
 import { UserProfileController } from './controllers/user-profile.controller';
 import { UserProfileService } from './services/user-profile.service';
 
+import { HealthController } from './controllers/health.controller';
+
 @Module({
   imports: [],
   controllers: [
+    HealthController,
     AuthController,
     NativePropertiesController,
     SavedPropertiesController,

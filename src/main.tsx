@@ -34,6 +34,10 @@ root.render(
       });
     }
 
+    // Start keep-alive ping loop so production backend never spins down
+    const { startKeepAlivePing } = await import('./services/keepAlive');
+    startKeepAlivePing();
+
     // Only load the ~200 KB App Insights SDK when explicitly enabled.
     if (import.meta.env.VITE_ENABLE_PERFORMANCE_MONITORING === 'true') {
       const { initPerformanceMonitoring } = await import('./utils/performanceMonitor');
