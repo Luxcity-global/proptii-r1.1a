@@ -147,10 +147,14 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
       try {
         const response = await apiService.get('/users/me/saved-properties');
         if (isMounted) {
-          // The backend currently returns an object with a 'data' array based on standard formatting,
-          // or possibly the array directly depending on the service implementation.
           const items = Array.isArray(response) ? response : (response.data || []);
-          setSavedProperties(items);
+          if (items.length > 0) {
+            setSavedProperties(prev => {
+              const existingIds = new Set(items.map((i: any) => i.id));
+              const localOnly = prev.filter(p => !existingIds.has(p.id));
+              return [...items, ...localOnly];
+            });
+          }
         }
       } catch (err) {
         console.error('Failed to fetch saved properties from backend:', err);
