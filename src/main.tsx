@@ -25,7 +25,7 @@ root.render(
 // Background init — none of this blocks the first paint.
 (async () => {
   try {
-    const msalInstance = getMsalInstance();
+    const msalInstance = await getMsalInstance();
 
     if (import.meta.env.VITE_AZURE_AD_CLIENT_ID && import.meta.env.VITE_AZURE_AD_TENANT_NAME) {
       await waitForMsalReady();
