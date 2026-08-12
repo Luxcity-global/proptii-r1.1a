@@ -1956,11 +1956,10 @@ const SearchResults = () => {
                           key={index} 
                           property={property} 
                           onClick={() => openModal(property)}
-                          isSaved={isPropertySaved(`${property.title}-${property.location}-${property.price}`)}
+                          isSaved={isPropertySaved(property)}
                           onToggleSave={(e) => {
                             e.stopPropagation();
-                            const propertyId = `${property.title}-${property.location}-${property.price}`;
-                            const wasSaved = isPropertySaved(propertyId);
+                            const wasSaved = isPropertySaved(property);
                             toggleSaveProperty(property);
                             setToastMessage(wasSaved ? 'Property removed from saved' : 'Property saved!');
                             setShowToast(true);
@@ -1981,11 +1980,10 @@ const SearchResults = () => {
                         key={index} 
                         property={property} 
                         onClick={() => openModal(property)}
-                        isSaved={isPropertySaved(`${property.title}-${property.location}-${property.price}`)}
+                        isSaved={isPropertySaved(property)}
                         onToggleSave={(e) => {
                           e.stopPropagation();
-                          const propertyId = `${property.title}-${property.location}-${property.price}`;
-                          const wasSaved = isPropertySaved(propertyId);
+                          const wasSaved = isPropertySaved(property);
                           toggleSaveProperty(property);
                           setToastMessage(wasSaved ? 'Property removed from saved' : 'Property saved!');
                           setShowToast(true);

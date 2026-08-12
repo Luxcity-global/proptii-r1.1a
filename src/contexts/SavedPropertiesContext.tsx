@@ -188,8 +188,27 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-  const isPropertySaved = useCallback((propertyId: string): boolean => {
-    return savedProperties.some(prop => prop.id === propertyId);
+  const isPropertySaved = useCallback((target: any): boolean => {
+    if (!target) return false;
+
+    if (typeof target === 'string') {
+      const cleanTarget = target.trim();
+      return savedProperties.some(prop =>
+        prop.id === cleanTarget ||
+        (prop as any).url === cleanTarget ||
+        `${prop.title}-${prop.location}-${prop.price}` === cleanTarget
+      );
+    }
+
+    const targetId = target.id || target.url || stablePropertyId(target);
+    const targetKey = `${target.title}-${target.location}-${target.price}`;
+
+    return savedProperties.some(prop => {
+      if (prop.id && (prop.id === targetId || prop.id === target.id || prop.id === target.url)) return true;
+      if ((prop as any).url && (prop as any).url === target.url) return true;
+      const propKey = `${prop.title}-${prop.location}-${prop.price}`;
+      return propKey === targetKey;
+    });
   }, [savedProperties]);
 
   const saveProperty = useCallback(async (property: any) => {

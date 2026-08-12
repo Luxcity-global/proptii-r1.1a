@@ -21,22 +21,9 @@ import type {
     SendMessageDto,
 } from '../types/messaging';
 
-// Azure Functions base endpoint — single source of truth is VITE_API_ENDPOINT.
-// Falls back to window.location.origin in production (same-origin deployment)
-// and http://localhost:7071 in development.
-const FUNCTIONS_BASE = (() => {
-    const env = import.meta.env.VITE_API_ENDPOINT?.trim();
-    if (env) return env.replace(/\/api$/, '').replace(/\/$/, '');
-    if (import.meta.env.DEV) return 'http://localhost:7071';
-    if (typeof window !== 'undefined') return window.location.origin;
-    return '';
-})();
+import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
 
-if (!FUNCTIONS_BASE && import.meta.env.DEV) {
-    console.error('[communicationService] VITE_API_ENDPOINT is not set — messaging will not work. Add it to .env.local.');
-}
-
-const BASE = `${FUNCTIONS_BASE}/api/communication`;
+const BASE = `${getResolvedApiBaseUrl()}/communication`;
 
 /** Axios 1.x may use AxiosHeaders — set Authorization in a way that always applies. */
 function setBearerAuth(config: InternalAxiosRequestConfig, accessToken: string): void {
