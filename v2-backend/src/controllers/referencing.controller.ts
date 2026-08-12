@@ -69,15 +69,22 @@ export class ReferencingController {
   @Get('referencing/forms/:formId')
   async getReferencingForm(@Param('formId') formId: string) {
     const data = await this.referencingService.getFormData(formId).catch(() => null);
-    if (!data) {
+    if (!data || !(data as any).data) {
       return {
-        id: formId,
-        status: 'draft',
-        progress: 0,
-        data: {},
+        success: true,
+        data: {
+          id: formId,
+          formData: {},
+          currentStep: 1,
+          stepStatus: {},
+          isSubmitted: false,
+        },
       };
     }
-    return data;
+    return {
+      success: true,
+      data: (data as any).data || data,
+    };
   }
 
   @Post(['referencing/:userId/submit', 'applications/:userId/submit'])
