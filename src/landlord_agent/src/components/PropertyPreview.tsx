@@ -470,10 +470,13 @@ export function PropertyPreview({
                     <div className="space-y-4">
                       {property.amenities.length > 0 && (
                         <div>
-                          <h3 className="mb-2">Amenities</h3>
+                          <h3 className="mb-2 text-sm font-semibold text-slate-800">Amenities</h3>
                           <div className="flex flex-wrap gap-2">
                             {property.amenities.map((amenity) => (
-                              <Badge key={amenity} variant="secondary">
+                              <Badge
+                                key={amenity}
+                                className="bg-slate-100 text-slate-900 border border-slate-300 font-medium capitalize px-3 py-1 text-xs shadow-sm hover:bg-slate-200"
+                              >
                                 {amenity}
                               </Badge>
                             ))}

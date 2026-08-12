@@ -235,6 +235,15 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
               </button>
 
               {/* Proptii Home Button */}
+              {(user?.role === 'landlord' || user?.role === 'agent' || user?.roles?.includes('landlord') || user?.roles?.includes('agent')) && (
+                <button
+                  onClick={() => { window.location.href = user?.role === 'agent' ? '/agent' : '/landlord'; }}
+                  className={`w-full flex items-center justify-center h-8 px-2 rounded-full bg-orange-600 text-white hover:bg-orange-700 transition-colors text-xs font-semibold mb-2`}
+                  title="Return to Landlord Portal"
+                >
+                  {isCollapsed ? 'L' : 'Return to Landlord'}
+                </button>
+              )}
               {isCollapsed ? (
                 <button
                   onClick={handleLogoClick}

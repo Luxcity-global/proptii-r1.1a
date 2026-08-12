@@ -52,4 +52,7 @@ public/landlord/assets/
 search/backend/.cache/
 search/backend/.cache/ms-playwright/
 search/backend/.cache/puppeteer/
-.env.production.*
+# Deployment templates (tracked in repository)
+!.env.production.frontend
+!.env.production.backend
+!.env.production.search

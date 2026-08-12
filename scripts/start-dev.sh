@@ -139,10 +139,10 @@ if [ "$START_SEARCH" = true ] && check_dir "proptii-search"; then
   sleep 1
 fi
 
-# 3. proptii-backend (NestJS)
-if [ "$START_BACKEND" = true ] && check_dir "proptii-backend"; then
-  echo -e "${GREEN}[backend]${RESET}        Starting proptii-backend → ${BOLD}http://localhost:3000${RESET}"
-  (cd proptii-backend && npm run start:dev) &
+# 3. v2-backend (NestJS)
+if [ "$START_BACKEND" = true ] && check_dir "v2-backend"; then
+  echo -e "${GREEN}[backend]${RESET}        Starting v2-backend      → ${BOLD}http://localhost:3000${RESET}"
+  (cd v2-backend && node dist/main.js) &
   PIDS+=($!)
   sleep 1
 fi

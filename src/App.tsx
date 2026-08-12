@@ -177,15 +177,10 @@ export const App: React.FC = () => {
                 <Route path="/booking" element={<Navigate to="/bookviewing" replace />} />
                 <Route path="/book-viewing" element={<Navigate to="/bookviewing" replace />} />
 
-                {/* Protected Routes */}
-                <Route path="/agent" element={
+                {/* Protected Routes — Harmonized Landlord & Agent Portal */}
+                <Route path="/agent/*" element={
                   <ProtectedRoute requiredRoles={['landlord', 'agent']}>
-                    <AgentHome />
-                  </ProtectedRoute>
-                } />
-                <Route path="/Agent" element={
-                  <ProtectedRoute requiredRoles={['landlord', 'agent']}>
-                    <AgentHome />
+                    <LandlordDemo />
                   </ProtectedRoute>
                 } />
                 <Route path="/landlord/index.html" element={<Navigate to="/landlord" replace />} />

@@ -15,8 +15,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "clean": "rm -rf node_modules/.vite dist",
-    "start:dev": "npm run clean && concurrently -n \"frontend,backend,search\" -c \"cyan,magenta,yellow\" \"npm run dev\" \"cd proptii-backend && npm run start:dev\" \"cd proptii-search && npm run dev\"",
-    "start:backend": "cd proptii-backend && npm run start:dev",
+    "start:dev": "npm run clean && npx concurrently -n \"frontend,backend,search\" -c \"cyan,magenta,yellow\" \"npm run dev\" \"npm run start:backend\" \"cd proptii-search && npm run dev\"",
+    "start:backend": "cd v2-backend && npm run build && node dist/main.js",
     "start:frontend": "npm run dev",
     "validate-build": "node scripts/validate-build.cjs",
     "copy-spa-fallbacks": "node scripts/copy-spa-fallbacks.cjs",
@@ -254,5 +254,18 @@
   },
   "engines": {
     "node": "20.11.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@firebase/util",
+      "@nestjs/core",
+      "@scarf/scarf",
+      "core-js",
+      "esbuild",
+      "msgpackr-extract",
+      "protobufjs",
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }

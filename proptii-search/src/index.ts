@@ -20,18 +20,20 @@ const PORT = process.env.PORT || 3001;
 const connectDB = async () => {
   try {
     const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/proptii-search';
-    await mongoose.connect(mongoUri);
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 3000 });
     console.log('✅ MongoDB Connected');
-  } catch (err) {
-    console.error('❌ MongoDB Connection Error:', err);
-    process.exit(1);
+  } catch (err: any) {
+    console.warn('⚠️ MongoDB Connection warning for proptii-search (running in fallback mode):', err?.message || err);
   }
 };
 
 // Redis Connection Check
-export const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+export const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+  maxRetriesPerRequest: 1,
+  retryStrategy: () => null,
+});
 redis.on('connect', () => console.log('✅ Redis Connected'));
-redis.on('error', (err) => console.error('❌ Redis error:', err));
+redis.on('error', (err) => console.warn('⚠️ Redis connection warning:', err?.message || err));
 
 const startServer = async () => {
   await connectDB();

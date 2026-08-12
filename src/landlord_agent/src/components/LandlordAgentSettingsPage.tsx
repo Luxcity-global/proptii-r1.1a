@@ -477,6 +477,24 @@ const LandlordAgentSettingsPage: React.FC<LandlordAgentSettingsPageProps> = ({
             icon={<Shield className="w-4 h-4" style={{ color: '#136C9E' }} />}
           >
             <SettingsRow
+              title="View as Tenant"
+              description="Preview the tenant portal and dashboard features without changing your account role."
+              onClick={() => { window.location.href = '/dashboard'; }}
+              action={
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.location.href = '/dashboard';
+                  }}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-orange-50"
+                  style={{ color: '#DC5F12', borderColor: '#DC5F12', whiteSpace: 'nowrap' }}
+                >
+                  View as Tenant
+                </button>
+              }
+            />
+            <SettingsRow
               title="Edit profile"
               description="Update your name, email, or password via your account provider."
               onClick={handleEditProfile}

@@ -12,7 +12,6 @@
 
 import apiService from './api';
 import { getRoleIntent, clearRoleIntent } from '../utils/roleIntent';
-import { getAccessTokenForApiRequest } from './msalAccessToken';
 
 export type UserRole = 'tenant' | 'landlord' | 'agent';
 
@@ -27,16 +26,10 @@ export interface UserRoleDoc {
 async function fetchBackendRole(uid: string, email: string): Promise<UserRole | null> {
   try {
     const res = await apiService.get('/auth/me');
-    return res.role;
+    const role = res.data?.role || (res as any).role;
+    if (role) return role as UserRole;
   } catch (e) {
     console.warn('[Auth] Could not fetch role from backend:', e);
-    // Fallback: try to fetch user directly if auth/me is not providing role
-    try {
-      const userRes = await apiService.get(`/users/${uid}`);
-      return userRes.role;
-    } catch (err) {
-      console.warn('[Auth] Fallback user role fetch failed:', err);
-    }
   }
   return null;
 }
@@ -69,9 +62,8 @@ export async function resolveRole(
     return intent as UserRole;
   }
 
-  // 4. No role found
-  console.warn('[Auth] No role found for uid:', uid, '— routing to /select-role');
-  return null;
+  // 4. Default fallback to tenant if no role specified yet
+  return 'tenant';
 }
 
 export async function setRole(
@@ -83,18 +75,7 @@ export async function setRole(
   localStorage.setItem(`proptii_role_${uid}`, role);
 
   try {
-    const token = await getAccessTokenForApiRequest().catch(() => null);
-    if (token) {
-      const apiBase = (import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000').replace(/\/$/, '');
-      const res = await fetch(`${apiBase}/api/auth/role`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ role }),
-      });
-      if (!res.ok) throw new Error(`Backend role update failed: ${res.status}`);
-    } else {
-      await apiService.post('/auth/role', { role, source });
-    }
+    await apiService.post('/auth/role', { role, source });
   } catch (err) {
     console.warn('[Auth] Backend role update failed:', err);
   }
@@ -103,7 +84,7 @@ export async function setRole(
 export async function getStoredRole(uid: string): Promise<UserRole | null> {
   try {
     const res = await apiService.get('/auth/me');
-    return res.role ?? null;
+    return res.data?.role || (res as any).role || null;
   } catch {
     return null;
   }

@@ -17,8 +17,16 @@ const RoleSelect: React.FC = () => {
   const [saving,  setSaving]  = useState(false);
   const [hovered, setHovered] = useState<'tenant' | 'landlord' | null>(null);
 
+  const isExistingTenant = user?.roles?.includes('tenant') && !user?.roles?.includes('landlord') && !user?.roles?.includes('agent');
+
   const handleSelect = async (role: UserRole) => {
     if (!user || saving) return;
+    
+    if (isExistingTenant && (role === 'landlord' || role === 'agent')) {
+      alert('Tenant accounts cannot switch to a Landlord profile.');
+      return;
+    }
+
     setSaving(true);
 
     try {

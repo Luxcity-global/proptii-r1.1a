@@ -67,47 +67,13 @@ export const LoginPage: React.FC = () => {
     }
   }, [isAuthenticated, navigate, from]);
 
-  // Auto-trigger login when landing on this page with a redirect parameter
-  // This skips the intermediate "Sign in with Microsoft" button and goes straight to Azure B2C
-  // Only runs ONCE when component mounts
+  // Store the target redirect path when landing on login page
   useEffect(() => {
-    console.log('🔍 Auto-login check:', { isLoading, isAuthenticated, autoLoginTriggered, hasRedirected: hasRedirectedRef.current });
-    
-    // Don't do anything while auth is loading
-    if (isLoading) {
-      console.log('⏳ Auth is loading, waiting...');
-      return;
+    const queryRedirect = new URLSearchParams(window.location.search).get('redirect');
+    if (queryRedirect) {
+      sessionStorage.setItem('redirectAfterLogin', queryRedirect);
     }
-
-    // If already authenticated, don't trigger auto-login
-    if (isAuthenticated) {
-      console.log('✅ Already authenticated, skipping auto-login');
-      return;
-    }
-
-    // If we've already redirected, don't do anything
-    if (hasRedirectedRef.current) {
-      console.log('✅ Already redirected, skipping auto-login');
-      return;
-    }
-
-    // Only auto-login if we haven't triggered it yet in this session
-    const shouldAutoLogin = new URLSearchParams(window.location.search).get('redirect');
-    const hasAutoLoginRun = sessionStorage.getItem('autoLoginAttempted');
-    
-    if (shouldAutoLogin && !autoLoginTriggered && !hasAutoLoginRun) {
-      console.log('🔐 Auto-triggering login for redirect:', shouldAutoLogin);
-      setAutoLoginTriggered(true);
-      sessionStorage.setItem('autoLoginAttempted', 'true');
-      
-      // Small delay to ensure the page is fully loaded
-      setTimeout(() => {
-        handleLogin();
-      }, 500);
-    } else {
-      console.log('⏭️ Skipping auto-login:', { shouldAutoLogin, autoLoginTriggered, hasAutoLoginRun });
-    }
-  }, [isLoading, isAuthenticated, autoLoginTriggered]); // Only re-run when loading state or auth state changes
+  }, []);
 
   // Listen for auth state changes (for MSAL popup login) as a backup
   // The main redirect is handled by the useEffect above that watches isAuthenticated
@@ -129,14 +95,14 @@ export const LoginPage: React.FC = () => {
     };
   }, []);
 
-  const handleLogin = async () => {
+  const handleLogin = async (providerType?: 'microsoft' | 'google') => {
     try {
       setError('');
       trackEvent('login_started', {
         redirect_to: from,
         has_redirect_param: new URLSearchParams(location.search).has('redirect'),
       });
-      await login();
+      await login(providerType);
       // Note: MSAL popup login will trigger auth-state-changed event
       // The useEffect above will handle the redirect
     } catch (error: any) {
@@ -167,13 +133,20 @@ export const LoginPage: React.FC = () => {
             <Button
               fullWidth
               variant="contained"
-              sx={{ mt: 3, mb: 2 }}
-              onClick={handleLogin}
+              sx={{ mt: 3, mb: 1, backgroundColor: '#136C9E', '&:hover': { backgroundColor: '#0e5278' } }}
+              onClick={() => handleLogin('microsoft')}
             >
               Sign In with Microsoft
             </Button>
 
-
+            <Button
+              fullWidth
+              variant="outlined"
+              sx={{ mb: 2 }}
+              onClick={() => handleLogin('google')}
+            >
+              Sign In with Google
+            </Button>
 
             <Button
               fullWidth
