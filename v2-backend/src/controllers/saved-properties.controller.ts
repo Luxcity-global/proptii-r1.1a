@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { SavedPropertiesService } from '../services/saved-properties.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 
@@ -19,9 +19,15 @@ export class SavedPropertiesController {
     return await this.savedPropertiesService.saveProperty(userId, body.propertyId, body.property);
   }
 
-  @Delete(['saved-properties/:propertyId', 'users/me/saved-properties/:propertyId'])
-  async unsaveProperty(@Req() req: any, @Param('propertyId') propertyId: string) {
+  @Delete(['saved-properties/:propertyId(*)', 'users/me/saved-properties/:propertyId(*)', 'saved-properties', 'users/me/saved-properties'])
+  async unsaveProperty(
+    @Req() req: any,
+    @Param('propertyId') propertyIdParam?: string,
+    @Query('propertyId') propertyIdQuery?: string,
+  ) {
     const userId = req.user.uid;
+    const rawId = propertyIdParam || propertyIdQuery || '';
+    const propertyId = decodeURIComponent(rawId);
     return await this.savedPropertiesService.unsaveProperty(userId, propertyId);
   }
 }

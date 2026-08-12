@@ -17,14 +17,17 @@ export class SavedPropertiesService {
   }
 
   async saveProperty(userId: string, propertyId: string, propertyData?: any) {
-    const docId = `${userId}_${propertyId}`;
+    const safePropertyId = encodeURIComponent(propertyId);
+    const docId = `${userId}_${safePropertyId}`;
     const docRef = this.collection.doc(docId);
     
     const payload = {
-      id: docId,
+      id: propertyId,
+      docId,
       userId,
       propertyId,
       property: propertyData || null,
+      ...(propertyData || {}),
       savedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
@@ -33,9 +36,29 @@ export class SavedPropertiesService {
   }
 
   async unsaveProperty(userId: string, propertyId: string) {
-    const docId = `${userId}_${propertyId}`;
-    const docRef = this.collection.doc(docId);
-    await docRef.delete();
+    const safePropertyId = encodeURIComponent(propertyId);
+    const docId = `${userId}_${safePropertyId}`;
+    await this.collection.doc(docId).delete().catch(() => null);
+
+    // Query fallback for legacy saved documents
+    const snapshot = await this.collection
+      .where('userId', '==', userId)
+      .get()
+      .catch(() => null);
+
+    if (snapshot && !snapshot.empty) {
+      const docsToDelete = snapshot.docs.filter(doc => {
+        const data = doc.data();
+        return data.propertyId === propertyId || data.propertyId === safePropertyId || data.id === propertyId;
+      });
+
+      if (docsToDelete.length > 0) {
+        const batch = this.db.batch();
+        docsToDelete.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+      }
+    }
+
     return { success: true, message: 'Property unsaved successfully' };
   }
 }

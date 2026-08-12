@@ -236,7 +236,8 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
 
     if (user?.id) {
       try {
-        await apiService.delete(`/users/me/saved-properties/${propertyId}`);
+        const encodedId = encodeURIComponent(propertyId);
+        await apiService.delete(`/users/me/saved-properties/${encodedId}`);
       } catch (err) {
         console.error('Failed to delete property from backend:', err);
       }
