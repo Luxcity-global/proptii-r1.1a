@@ -62,8 +62,8 @@ export async function resolveRole(
     return intent as UserRole;
   }
 
-  // 4. Default fallback to tenant if no role specified yet
-  return 'tenant';
+  // 4. No role assigned or specified yet → return null to prompt /select-role
+  return null;
 }
 
 export async function setRole(
