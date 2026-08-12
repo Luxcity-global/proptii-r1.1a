@@ -48,7 +48,7 @@ class SignedContractsFirestoreService {
         return { success: false, error: 'Device is offline.' };
       }
 
-      const response = await apiService.post('/signed-contracts', contractData);
+      const response = await apiService.post('/contracts', contractData);
       logDev('✅ Signed contract saved successfully:', response.id);
       return { success: true, contractId: response.id };
     } catch (error: any) {
@@ -59,8 +59,9 @@ class SignedContractsFirestoreService {
 
   async getUserSignedContracts(userId: string): Promise<{ success: boolean; contracts?: SignedContractData[]; error?: string }> {
     try {
-      const response = await apiService.get(`/signed-contracts`);
-      const contracts = (response.contracts || []).map((c: any) => ({
+      const response = await apiService.get(`/contracts`);
+      // Backend returns { success, data } — map to contracts
+      const contracts = (response.data || response.contracts || []).map((c: any) => ({
         ...c,
         createdAt: new Date(c.createdAt),
         updatedAt: new Date(c.updatedAt)
@@ -73,7 +74,7 @@ class SignedContractsFirestoreService {
 
   async getSignedContractById(contractId: string): Promise<{ success: boolean; contract?: SignedContractData; error?: string }> {
     try {
-      const response = await apiService.get(`/signed-contracts/${contractId}`);
+      const response = await apiService.get(`/contracts/${contractId}`);
       if (!response.contract) return { success: false, error: 'Contract not found' };
       const contract = {
         ...response.contract,
@@ -97,7 +98,7 @@ class SignedContractsFirestoreService {
         payload.emailSent = true;
         payload.emailSentDate = new Date().toISOString();
       }
-      await apiService.put(`/signed-contracts/${contractId}/status`, payload);
+      await apiService.put(`/contracts/${contractId}/status`, payload);
       return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message };
@@ -106,7 +107,7 @@ class SignedContractsFirestoreService {
 
   async deleteSignedContract(contractId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      await apiService.delete(`/signed-contracts/${contractId}`);
+      await apiService.delete(`/contracts/${contractId}`);
       return { success: true };
     } catch (error: any) {
       return { success: false, error: error.message };
