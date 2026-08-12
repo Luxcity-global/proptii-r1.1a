@@ -66,6 +66,20 @@ export class ReferencingController {
     return await this.referencingService.getFormData(userId);
   }
 
+  @Get('referencing/forms/:formId')
+  async getReferencingForm(@Param('formId') formId: string) {
+    const data = await this.referencingService.getFormData(formId).catch(() => null);
+    if (!data) {
+      return {
+        id: formId,
+        status: 'draft',
+        progress: 0,
+        data: {},
+      };
+    }
+    return data;
+  }
+
   @Post(['referencing/:userId/submit', 'applications/:userId/submit'])
   @HttpCode(200)
   @UseGuards(FirebaseAuthGuard)
