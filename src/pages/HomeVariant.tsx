@@ -236,8 +236,8 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full py-8 md:py-0">
-          {/* Primary CTAs – HeroToggle horizontal pill with dropdown (fixed vertical position) */}
-          <div className="absolute left-1/2 top-[5rem] z-30 w-full max-w-2xl -translate-x-1/2 -translate-y-[192px] flex justify-center px-4 md:top-[6rem]">
+          {/* Primary CTAs – HeroToggle horizontal pill with dropdown (clean relative positioning) */}
+          <div className="relative z-30 w-full max-w-2xl mx-auto flex justify-center px-4 pt-24 md:pt-28 mb-6">
             <div className="relative inline-flex flex-col items-center">
               {/* Toggle Pill Container */}
               <div ref={toggleRef} className="relative">
@@ -381,18 +381,27 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
                   />
 
                   {/* Header */}
-                  <div className="flex items-center gap-2 px-5 pt-4 pb-2">
-                    <Sparkles
-                      className="h-3.5 w-3.5 transition-colors duration-500"
-                      style={{ color: activeMode === 'search' ? '#6BB2E8' : '#D4C090' }}
-                    />
-                    <p
-                      className="text-xs font-medium uppercase tracking-widest transition-colors duration-500"
-                      style={{ color: activeMode === 'search' ? 'rgba(107, 178, 232, 0.92)' : 'rgba(212, 192, 144, 0.8)' }}
-                    >
-                      {activeMode === 'search' ? 'For Renters & Buyers' : 'For Landlords & Agents'}
-                    </p>
+                  <div className="flex items-center justify-between px-5 pt-4 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Sparkles
+                        className="h-3.5 w-3.5 transition-colors duration-500"
+                        style={{ color: activeMode === 'search' ? '#6BB2E8' : '#D4C090' }}
+                      />
+                      <p
+                        className="text-xs font-medium uppercase tracking-widest transition-colors duration-500"
+                        style={{ color: activeMode === 'search' ? 'rgba(107, 178, 232, 0.92)' : 'rgba(212, 192, 144, 0.8)' }}
+                      >
+                        {activeMode === 'search' ? 'For Renters & Buyers' : 'For Landlords & Agents'}
+                      </p>
+                    </div>
                   </div>
+
+                  {/* Role awareness info banner for pure Tenants attempting to list */}
+                  {activeMode === 'list' && isAuthenticated && user?.roles?.includes('tenant') && !user?.roles?.includes('landlord') && !user?.roles?.includes('agent') && (
+                    <div className="mx-4 mb-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 text-left">
+                      ℹ️ You are signed in with a <strong>Tenant</strong> profile. Landlord features are available for Landlord/Agent accounts.
+                    </div>
+                  )}
 
                   {/* Menu Items */}
                   <div className="p-2">
@@ -505,9 +514,6 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
               </div>
             </div>
           </div>
-
-          {/* Spacer so heading/content start below the fixed pillbox */}
-          <div className="h-36 md:h-40 shrink-0" aria-hidden="true" />
 
           {/* Main Heading */}
           <h3 className="text-2xl md:text-6xl font-bold mb-4 md:mb-6 font-archive leading-tight">
