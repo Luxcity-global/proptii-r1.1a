@@ -65,6 +65,40 @@ export const useAuth = (): AuthContextType => {
 const LANDLORD_ROLES = new Set(['landlord', 'agent']);
 const LOCAL_STORAGE_KEYS = ['mock_token', 'auth_token', 'proptii_auth_state'];
 
+export function parseMsalAccountUser(account: any): { email: string; name: string; phone?: string; userId: string } {
+  const claims = (account.idTokenClaims || {}) as any;
+
+  // Azure B2C returns emails as an array in `claims.emails`
+  const email =
+    (Array.isArray(claims.emails) && claims.emails[0]) ||
+    claims.email ||
+    claims.upn ||
+    claims.preferred_username ||
+    account.username ||
+    'user@proptii.co';
+
+  const name =
+    claims.name ||
+    (claims.given_name ? `${claims.given_name} ${claims.family_name || ''}`.trim() : '') ||
+    account.name ||
+    email.split('@')[0];
+
+  const phone =
+    claims.extension_PhoneNumber ||
+    claims.extension_phone_number ||
+    claims.extension_Phone ||
+    claims.phoneNumber ||
+    claims.phone_number ||
+    claims.phone ||
+    claims.mobilePhone ||
+    claims.telephoneNumber ||
+    undefined;
+
+  const userId = account.homeAccountId || account.localAccountId || claims.oid || claims.sub;
+
+  return { email, name, phone, userId };
+}
+
 function clearAuthStorage(): void {
   LOCAL_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k));
   sessionStorage.removeItem('redirectAfterLogin');
@@ -102,10 +136,55 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (cancelled) return;
 
       if (!firebaseUser) {
-        setUser(null);
-        setIsAuthenticated(false);
-        setIsLoading(false);
-        notifyAuthReady();
+        // Try restoring MSAL session if logged in via Microsoft Azure B2C
+        try {
+          const msal = await getMsalInstance();
+          const accounts = msal.getAllAccounts();
+          if (accounts.length > 0) {
+            const account = msal.getActiveAccount() || accounts[0];
+            const { email, name, phone, userId } = parseMsalAccountUser(account);
+
+            let roles: string[] = [];
+            let roleResolved = false;
+            try {
+              const { resolveRole } = await import('../services/roleService');
+              const role = await resolveRole(userId, email);
+              if (role) {
+                roles = [role];
+              }
+              roleResolved = true;
+            } catch (err) {
+              console.warn('[Auth] MSAL role resolution error:', err);
+              roleResolved = true;
+            }
+
+            if (!cancelled) {
+              setUser({
+                id: userId,
+                email,
+                name,
+                givenName: name.split(' ')[0],
+                familyName: name.split(' ').slice(1).join(' '),
+                phone,
+                roles,
+                roleResolved,
+              });
+              setIsAuthenticated(true);
+              setIsLoading(false);
+              notifyAuthReady();
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('[Auth] MSAL session restore error:', e);
+        }
+
+        if (!cancelled) {
+          setUser(null);
+          setIsAuthenticated(false);
+          setIsLoading(false);
+          notifyAuthReady();
+        }
         return;
       }
 
@@ -210,11 +289,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const { loginRequest } = await import('../config/authConfig');
           const response = await msal.loginPopup(loginRequest);
           if (response?.account) {
-            const claims = (response.account.idTokenClaims || {}) as any;
-            const email = response.account.username || claims.email || 'user@proptii.co';
-            const name = response.account.name || claims.name || email.split('@')[0];
-            const phone = claims.extension_PhoneNumber || claims.phoneNumber || claims.phone_number || claims.phone || claims.mobilePhone || undefined;
-            const userId = response.account.homeAccountId || response.account.localAccountId;
+            const { email, name, phone, userId } = parseMsalAccountUser(response.account);
 
             let roles: string[] = [];
             let roleResolved = false;
