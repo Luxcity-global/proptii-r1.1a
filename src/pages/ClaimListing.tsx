@@ -3,7 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getAccessTokenForApiRequest } from '../services/msalAccessToken';
 
-const FUNCTIONS_BASE = (import.meta.env.VITE_API_ENDPOINT || 'http://localhost:7071').replace(/\/$/, '');
+import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
+
+const API_BASE = getResolvedApiBaseUrl();
 
 // ---------------------------------------------------------------------------
 // Icons
@@ -61,7 +63,7 @@ const ClaimListing: React.FC = () => {
         setStatus('claiming');
         try {
             const token = await getAccessTokenForApiRequest();
-            const response = await fetch(`${FUNCTIONS_BASE}/api/properties/${propId}/claim`, {
+            const response = await fetch(`${API_BASE}/native-properties/${propId}/claim`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

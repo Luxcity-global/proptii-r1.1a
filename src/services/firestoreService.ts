@@ -125,7 +125,9 @@ export interface SupportFormData {
   updatedAt?: any;
 }
 
-const API_BASE = (import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000').replace(/\/$/, '');
+import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
+
+const API_BASE = getResolvedApiBaseUrl().replace(/\/api$/, '');
 
 async function authHeaders(): Promise<Record<string, string>> {
   let token = null;

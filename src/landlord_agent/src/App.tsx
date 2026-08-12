@@ -712,10 +712,8 @@ export function AppContent() {
       return [];
     }
 
-    console.log(`Uploading ${imageFiles.length} images...`);
-    const { getAccessTokenForApiRequest } = await import('../../services/msalAccessToken');
-    const token = await getAccessTokenForApiRequest();
-    const API_URL = import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000';
+    const { getResolvedApiBaseUrl } = await import('../../config/apiBaseUrl');
+    const API_URL = getResolvedApiBaseUrl().replace(/\/api$/, '');
 
     const photoPromises = imageFiles.map(async (file, index) => {
       try {
@@ -783,7 +781,8 @@ export function AppContent() {
     console.log(`Uploading ${documentFiles.length} documents...`);
     const { getAccessTokenForApiRequest } = await import('../../services/msalAccessToken');
     const token = await getAccessTokenForApiRequest();
-    const API_URL = import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000';
+    const { getResolvedApiBaseUrl } = await import('../../config/apiBaseUrl');
+    const API_URL = getResolvedApiBaseUrl().replace(/\/api$/, '');
 
     const documentPromises = documentFiles.map(async (file, index) => {
       try {

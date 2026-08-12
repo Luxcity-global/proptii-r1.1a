@@ -40,7 +40,6 @@ const toIpv4Loopback = (url: string) =>
 // for a connection-refused before moving on.
 const LOCAL_FALLBACKS = [
   DEV_LOCAL_API_BASE,             // NestJS backend (npm run start:backend)
-  'http://127.0.0.1:7071/api',   // Azure Functions (api/, rare in dev)
 ];
 
 const isLocalApiUrl = (url: string) => /localhost|127\.0\.0\.1/i.test(url);

@@ -18,7 +18,12 @@ function isRemoteUrl(url: string): boolean {
 }
 
 export function getResolvedApiBaseUrl(): string {
-  const envUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/$/, '');
+  const envUrl = (
+    import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_NEST_API_ENDPOINT ||
+    import.meta.env.VITE_API_ENDPOINT ||
+    ''
+  ).trim().replace(/\/$/, '');
 
   const forceLocalBecauseRemoteEnvWhileOnLocalhost =
     import.meta.env.DEV &&

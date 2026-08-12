@@ -16,6 +16,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { getResolvedApiBaseUrl } from '../../config/apiBaseUrl';
 
 const MOCK_USERS = [
     { id: 'landlord-test-001', role: 'landlord', label: 'John Smith (Landlord 1)', color: '#1d4ed8' },
@@ -106,7 +107,7 @@ const DevAuthToolbar: React.FC = () => {
                     <div style={{ borderTop: '1px solid #334155', paddingTop: 10, marginTop: 10 }}>
                         <div style={{ color: '#94a3b8', marginBottom: 4 }}>API endpoint:</div>
                         <div style={{ color: '#7dd3fc', wordBreak: 'break-all' }}>
-                            {import.meta.env.VITE_API_ENDPOINT || 'http://localhost:7071'}
+                            {getResolvedApiBaseUrl()}
                         </div>
                     </div>
                 </div>

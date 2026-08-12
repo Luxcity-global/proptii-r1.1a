@@ -67,8 +67,10 @@ export interface ReferencingDocument {
   submittedAt?: any;
 }
 
+import { getResolvedApiBaseUrl } from '../../../config/apiBaseUrl';
+
 class ReferencingService {
-  private API_URL = (import.meta.env.VITE_NEST_API_ENDPOINT || "http://localhost:3000").replace(/\/$/, '');
+  private API_URL = getResolvedApiBaseUrl().replace(/\/api$/, '');
 
   private async getAuthHeaders(): Promise<Record<string, string>> {
     try {

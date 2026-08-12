@@ -38,13 +38,14 @@ export interface DocuSignSigningRequest {
   userName?: string;
 }
 
+import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
+
 export class DocuSignService {
   private mockMode: boolean = false;
   private readonly backendApiUrl: string;
 
   constructor() {
-    // Use your existing backend API URL
-    this.backendApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:7071/api';
+    this.backendApiUrl = getResolvedApiBaseUrl();
   }
 
   // Check if running in mock mode
