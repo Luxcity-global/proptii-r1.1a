@@ -1,8 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { initializeFirestore, getFirestore, connectFirestoreEmulator, enableNetwork, disableNetwork } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { getStorage } from 'firebase/storage';
 
-// Firebase configuration
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyC0UZxzkhsebn-gSuo7HDRGVid30URQVvA",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "proptii-16946.firebaseapp.com",
@@ -13,7 +12,6 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-88HC0TG6JJ"
 };
 
-// Debug: Check if environment variables are loaded (remove in production)
 if (import.meta.env.DEV) {
   console.log('Firebase Config:', {
     apiKey: firebaseConfig.apiKey.substring(0, 10) + '...',
@@ -22,36 +20,9 @@ if (import.meta.env.DEV) {
   });
 }
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with long-polling fallback to avoid intermittent Listen disconnects on some networks/browsers
-export const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true,
-  useFetchStreams: false
-});
-
-// Enable offline persistence and better error handling
-if (typeof window !== 'undefined') {
-  // Handle network status changes
-  const handleOnline = () => {
-    enableNetwork(db).catch(console.error);
-  };
-  
-  const handleOffline = () => {
-    disableNetwork(db).catch(console.error);
-  };
-  
-  window.addEventListener('online', handleOnline);
-  window.addEventListener('offline', handleOffline);
-}
-
-// Initialize Auth (for future use if needed)
 export const auth = getAuth(app);
-
-// Initialize Firebase Storage
-import { getStorage } from 'firebase/storage';
 export const storage = getStorage(app);
 
 export default app;
-

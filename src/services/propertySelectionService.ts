@@ -1,19 +1,4 @@
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  getDocs,
-  orderBy,
-  onSnapshot,
-  serverTimestamp,
-  Timestamp 
-} from 'firebase/firestore';
-import { db } from '../config/firebaseConfig';
+import apiService from './api';
 
 export interface PropertySelection {
   id: string;
@@ -44,12 +29,12 @@ export interface PropertySelection {
   };
   status: 'interested' | 'viewing_requested' | 'viewing_scheduled' | 'viewing_completed' | 'rejected';
   source: 'search_results' | 'direct_booking' | 'agent_recommendation';
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: Date;
+  updatedAt: Date;
   notes?: string;
-  viewingRequestedAt?: Timestamp;
-  viewingScheduledAt?: Timestamp;
-  viewingCompletedAt?: Timestamp;
+  viewingRequestedAt?: Date;
+  viewingScheduledAt?: Date;
+  viewingCompletedAt?: Date;
 }
 
 export interface PropertySelectionStats {
@@ -62,11 +47,6 @@ export interface PropertySelectionStats {
 }
 
 class PropertySelectionService {
-  private readonly collectionName = 'propertySelections';
-
-  /**
-   * Save a property selection (when user clicks on a listing)
-   */
   async savePropertySelection(
     userId: string,
     propertyData: PropertySelection['property'],
@@ -74,331 +54,136 @@ class PropertySelectionService {
     source: PropertySelection['source'] = 'search_results'
   ): Promise<{ success: boolean; selectionId?: string; error?: string }> {
     try {
-      // Check if we're online
       if (!navigator.onLine) {
-        console.warn('⚠️ Device is offline, property selection will be saved when connection is restored');
-        return { 
-          success: false, 
-          error: 'Device is offline. Property selection will be saved when connection is restored.' 
-        };
+        return { success: false, error: 'Device is offline.' };
       }
-
-      const selectionId = `${userId}_${propertyId}_${Date.now()}`;
-      const docRef = doc(db, this.collectionName, selectionId);
-      
-      const selectionData: PropertySelection = {
-        id: selectionId,
-        userId,
+      const response = await apiService.post('/property-selections', {
+        propertyData,
         propertyId,
-        property: propertyData,
-        status: 'interested',
-        source,
-        createdAt: serverTimestamp() as Timestamp,
-        updatedAt: serverTimestamp() as Timestamp
-      };
-
-      await setDoc(docRef, selectionData);
-      
-      console.log('✅ Property selection saved to Firestore successfully');
-      return { success: true, selectionId };
+        source
+      });
+      return { success: true, selectionId: response.id };
     } catch (error: any) {
-      console.error('❌ Error saving property selection to Firestore:', error);
-      
-      // Handle specific Firebase errors
-      if (error.code === 'unavailable') {
-        return { 
-          success: false, 
-          error: 'Firestore is currently unavailable. Please check your internet connection and try again.' 
-        };
-      }
-      
-      if (error.code === 'permission-denied') {
-        console.warn('⚠️ Firestore permission denied - this is expected if Firestore security rules are not configured yet');
-        return { 
-          success: false, 
-          error: 'Firestore access denied. Please configure Firestore security rules or check your Firebase setup.' 
-        };
-      }
-      
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
+      console.error('❌ Error saving property selection:', error);
+      return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Get all property selections for a user
-   */
   async getUserPropertySelections(userId: string): Promise<{ success: boolean; selections?: PropertySelection[]; error?: string }> {
     try {
-      console.log('Getting user property selections for userId:', userId);
-      const q = query(
-        collection(db, this.collectionName),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const selections: PropertySelection[] = [];
-      
-      console.log('Property selections query snapshot size:', querySnapshot.size);
-      querySnapshot.forEach((doc) => {
-        console.log('Found property selection document:', doc.id, doc.data());
-        selections.push(doc.data() as PropertySelection);
-      });
-      
-      console.log('Retrieved property selections:', selections);
+      const response = await apiService.get(`/property-selections`);
+      const selections = (response.selections || []).map((s: any) => ({
+        ...s,
+        createdAt: new Date(s.createdAt),
+        updatedAt: new Date(s.updatedAt),
+        viewingRequestedAt: s.viewingRequestedAt ? new Date(s.viewingRequestedAt) : undefined,
+        viewingScheduledAt: s.viewingScheduledAt ? new Date(s.viewingScheduledAt) : undefined,
+        viewingCompletedAt: s.viewingCompletedAt ? new Date(s.viewingCompletedAt) : undefined,
+      }));
       return { success: true, selections };
-    } catch (error) {
-      console.error('❌ Error getting user property selections:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
+    } catch (error: any) {
+      return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Get property selections by status
-   */
   async getPropertySelectionsByStatus(
     userId: string, 
     status: PropertySelection['status']
   ): Promise<{ success: boolean; selections?: PropertySelection[]; error?: string }> {
     try {
-      console.log(`Getting property selections for userId: ${userId}, status: ${status}`);
-      const q = query(
-        collection(db, this.collectionName),
-        where('userId', '==', userId),
-        where('status', '==', status),
-        orderBy('createdAt', 'desc')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const selections: PropertySelection[] = [];
-      
-      console.log(`Property selections query snapshot size for status ${status}:`, querySnapshot.size);
-      querySnapshot.forEach((doc) => {
-        console.log(`Found property selection document for status ${status}:`, doc.id, doc.data());
-        selections.push(doc.data() as PropertySelection);
-      });
-      
-      console.log(`Retrieved property selections for status ${status}:`, selections);
+      const response = await apiService.get(`/property-selections?status=${status}`);
+      const selections = (response.selections || []).map((s: any) => ({
+        ...s,
+        createdAt: new Date(s.createdAt),
+        updatedAt: new Date(s.updatedAt),
+      }));
       return { success: true, selections };
-    } catch (error) {
-      console.error('❌ Error getting property selections by status:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
+    } catch (error: any) {
+      return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Update property selection status
-   */
   async updatePropertySelectionStatus(
     selectionId: string,
     status: PropertySelection['status'],
     notes?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const docRef = doc(db, this.collectionName, selectionId);
-      const updateData: any = {
-        status,
-        updatedAt: serverTimestamp()
-      };
-
-      // Add timestamp based on status
-      switch (status) {
-        case 'viewing_requested':
-          updateData.viewingRequestedAt = serverTimestamp();
-          break;
-        case 'viewing_scheduled':
-          updateData.viewingScheduledAt = serverTimestamp();
-          break;
-        case 'viewing_completed':
-          updateData.viewingCompletedAt = serverTimestamp();
-          break;
-      }
-
-      if (notes) updateData.notes = notes;
-
-      await updateDoc(docRef, updateData);
-      
-      console.log(`✅ Property selection status updated to ${status}`);
+      await apiService.put(`/property-selections/${selectionId}/status`, { status, notes });
       return { success: true };
-    } catch (error) {
-      console.error('❌ Error updating property selection status:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
+    } catch (error: any) {
+      return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Get property selection statistics for a user
-   */
   async getPropertySelectionStats(userId: string): Promise<{ success: boolean; stats?: PropertySelectionStats; error?: string }> {
     try {
-      const q = query(
-        collection(db, this.collectionName),
-        where('userId', '==', userId)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const stats: PropertySelectionStats = {
-        total: 0,
-        interested: 0,
-        viewingRequested: 0,
-        viewingScheduled: 0,
-        viewingCompleted: 0,
-        rejected: 0
-      };
-      
-      querySnapshot.forEach((doc) => {
-        const selection = doc.data() as PropertySelection;
-        stats.total++;
-        
-        switch (selection.status) {
-          case 'interested':
-            stats.interested++;
-            break;
-          case 'viewing_requested':
-            stats.viewingRequested++;
-            break;
-          case 'viewing_scheduled':
-            stats.viewingScheduled++;
-            break;
-          case 'viewing_completed':
-            stats.viewingCompleted++;
-            break;
-          case 'rejected':
-            stats.rejected++;
-            break;
-        }
-      });
-      
-      return { success: true, stats };
-    } catch (error) {
-      console.error('❌ Error getting property selection stats:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
+      const response = await apiService.get(`/property-selections/stats`);
+      return { success: true, stats: response.stats };
+    } catch (error: any) {
+      return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Delete a property selection
-   */
   async deletePropertySelection(selectionId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const docRef = doc(db, this.collectionName, selectionId);
-      await deleteDoc(docRef);
-      
-      console.log('✅ Property selection deleted successfully');
+      await apiService.delete(`/property-selections/${selectionId}`);
       return { success: true };
-    } catch (error) {
-      console.error('❌ Error deleting property selection:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
+    } catch (error: any) {
+      return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Subscribe to real-time updates for user property selections
-   */
   subscribeToUserPropertySelections(
     userId: string,
     callback: (selections: PropertySelection[]) => void,
     onError?: (error: Error) => void
   ): () => void {
-    const q = query(
-      collection(db, this.collectionName),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
+    let isActive = true;
+    let timer: any;
 
-    return onSnapshot(
-      q,
-      (querySnapshot) => {
-        const selections: PropertySelection[] = [];
-        querySnapshot.forEach((doc) => {
-          selections.push(doc.data() as PropertySelection);
-        });
-        callback(selections);
-      },
-      (error) => {
-        console.error('❌ Error in property selections subscription:', error);
-        if (onError) {
-          onError(error);
-        }
+    const poll = async () => {
+      if (!isActive) return;
+      try {
+        const { success, selections } = await this.getUserPropertySelections(userId);
+        if (isActive && success && selections) callback(selections);
+      } catch (err: any) {
+        if (onError) onError(err);
       }
-    );
+      if (isActive) timer = setTimeout(poll, 15000);
+    };
+
+    poll();
+    return () => {
+      isActive = false;
+      if (timer) clearTimeout(timer);
+    };
   }
 
-  /**
-   * Subscribe to real-time updates for property selection stats
-   */
   subscribeToPropertySelectionStats(
     userId: string,
     callback: (stats: PropertySelectionStats) => void,
     onError?: (error: Error) => void
   ): () => void {
-    const q = query(
-      collection(db, this.collectionName),
-      where('userId', '==', userId)
-    );
+    let isActive = true;
+    let timer: any;
 
-    return onSnapshot(
-      q,
-      (querySnapshot) => {
-        const stats: PropertySelectionStats = {
-          total: 0,
-          interested: 0,
-          viewingRequested: 0,
-          viewingScheduled: 0,
-          viewingCompleted: 0,
-          rejected: 0
-        };
-        
-        querySnapshot.forEach((doc) => {
-          const selection = doc.data() as PropertySelection;
-          stats.total++;
-          
-          switch (selection.status) {
-            case 'interested':
-              stats.interested++;
-              break;
-            case 'viewing_requested':
-              stats.viewingRequested++;
-              break;
-            case 'viewing_scheduled':
-              stats.viewingScheduled++;
-              break;
-            case 'viewing_completed':
-              stats.viewingCompleted++;
-              break;
-            case 'rejected':
-              stats.rejected++;
-              break;
-          }
-        });
-        
-        callback(stats);
-      },
-      (error) => {
-        console.error('❌ Error in property selection stats subscription:', error);
-        if (onError) {
-          onError(error);
-        }
+    const poll = async () => {
+      if (!isActive) return;
+      try {
+        const { success, stats } = await this.getPropertySelectionStats(userId);
+        if (isActive && success && stats) callback(stats);
+      } catch (err: any) {
+        if (onError) onError(err);
       }
-    );
+      if (isActive) timer = setTimeout(poll, 15000);
+    };
+
+    poll();
+    return () => {
+      isActive = false;
+      if (timer) clearTimeout(timer);
+    };
   }
 }
 

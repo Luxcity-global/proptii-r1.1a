@@ -32,6 +32,12 @@ import { TenantDashboardController } from './controllers/tenant-dashboard.contro
 import { TenantDashboardService } from './services/tenant-dashboard.service';
 import { SavedPropertiesController } from './controllers/saved-properties.controller';
 import { SavedPropertiesService } from './services/saved-properties.service';
+import { AlertsModule } from './alerts/alerts.module';
+import { InsightsModule } from './insights/insights.module';
+import { PaymentsModule } from './payments/payments.module';
+import { HomeownerProjectsModule } from './homeowner-projects/homeowner-projects.module';
+import { HomeownerMaintenanceModule } from './homeowner-maintenance/homeowner-maintenance.module';
+import { TenantsModule } from './tenants/tenants.module';
 
 @Module({
   imports: [
@@ -77,6 +83,12 @@ import { SavedPropertiesService } from './services/saved-properties.service';
     NativePropertiesModule,
     BillingModule,
     CommunicationModule,
+    AlertsModule,
+    InsightsModule,
+    PaymentsModule,
+    HomeownerProjectsModule,
+    HomeownerMaintenanceModule,
+    TenantsModule,
   ],
   controllers: [AppController, PropertyDocumentController, AnalyticsController, ClientsController, TenantDashboardController, SavedPropertiesController],
   providers: [

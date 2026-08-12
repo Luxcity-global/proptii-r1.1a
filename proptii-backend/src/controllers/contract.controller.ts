@@ -1,4 +1,4 @@
-import { Body, Controller, Logger, Post, Get, UseInterceptors, UploadedFile, UseGuards, Req } from '@nestjs/common';
+import { Body, Controller, Logger, Post, Get, Put, Delete, Param, Query, UseInterceptors, UploadedFile, UseGuards, Req } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
@@ -57,6 +57,128 @@ export class ContractController {
       return { success: true, data };
     } catch (error: any) {
       this.logger.error('❌ Error getting contracts:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  @Post('templates')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async saveContractTemplate(@Req() req: any, @Body() body: any) {
+    try {
+      const userId = req.user?.id || req.user?.sub;
+      if (!userId) return { success: false, error: 'User ID not found' };
+      
+      const admin = await import('firebase-admin');
+      const db = admin.firestore();
+      
+      const templateId = `${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const docRef = db.collection('contractTemplates').doc(templateId);
+      
+      const contractData = {
+        id: templateId,
+        userId,
+        ...body,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      
+      await docRef.set(contractData);
+      return { success: true, templateId };
+    } catch (error: any) {
+      this.logger.error('❌ Error saving contract template:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  @Get('templates')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async getContractTemplates(@Req() req: any, @Query('status') status: string = 'active') {
+    try {
+      const userId = req.user?.id || req.user?.sub;
+      if (!userId) return { success: false, error: 'User ID not found' };
+      
+      const admin = await import('firebase-admin');
+      const db = admin.firestore();
+      
+      const snapshot = await db.collection('contractTemplates')
+        .where('userId', '==', userId)
+        .where('status', '==', status)
+        .orderBy('createdAt', 'desc')
+        .get();
+        
+      const data = snapshot.docs.map(doc => {
+        const docData = doc.data();
+        return {
+          ...docData,
+          createdAt: docData.createdAt?.toDate?.() || docData.createdAt,
+          updatedAt: docData.updatedAt?.toDate?.() || docData.updatedAt,
+        };
+      });
+      return { success: true, templates: data };
+    } catch (error: any) {
+      this.logger.error('❌ Error getting contract templates:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  @Put('templates/:id/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async updateContractTemplateStatus(@Req() req: any, @Param('id') id: string, @Body() body: { status: string }) {
+    try {
+      const admin = await import('firebase-admin');
+      const db = admin.firestore();
+      await db.collection('contractTemplates').doc(id).update({
+        status: body.status,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  @Delete('templates/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async permanentlyDeleteContractTemplate(@Req() req: any, @Param('id') id: string) {
+    try {
+      const admin = await import('firebase-admin');
+      const db = admin.firestore();
+      await db.collection('contractTemplates').doc(id).delete();
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  @Get('stats/templates')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async getContractStats(@Req() req: any) {
+    try {
+      const userId = req.user?.id || req.user?.sub;
+      if (!userId) return { success: false, error: 'User ID not found' };
+      
+      const admin = await import('firebase-admin');
+      const db = admin.firestore();
+      const snapshot = await db.collection('contractTemplates')
+        .where('userId', '==', userId)
+        .get();
+        
+      const stats = { total: 0, active: 0, deleted: 0, totalSize: 0 };
+      snapshot.forEach(doc => {
+        const template = doc.data();
+        stats.total++;
+        stats.totalSize += template.fileSize || 0;
+        if (template.status === 'active') stats.active++;
+        else if (template.status === 'deleted') stats.deleted++;
+      });
+      
+      return { success: true, stats };
+    } catch (error: any) {
       return { success: false, error: error.message };
     }
   }

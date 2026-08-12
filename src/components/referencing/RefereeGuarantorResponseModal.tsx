@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import apiService from '../../services/api';
 
 interface RefereeGuarantorResponseModalProps {
   isOpen: boolean;
@@ -60,28 +61,21 @@ const RefereeGuarantorResponseModal: React.FC<RefereeGuarantorResponseModalProps
     setSubmitError('');
 
     try {
-      // Save directly to Firestore (no backend needed)
-      const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
-      const { db } = await import('../../config/firebaseConfig');
-      
       const responseData = {
         id: `${responseType}_response_${formData.email}_${Date.now()}`,
         responseType,
         type: `${responseType}_response`,
         applicantName,
         applicantEmail: tenantEmail,
-        tenantEmail: tenantEmail, // Used for querying
+        tenantEmail: tenantEmail,
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
         consent: formData.consent,
-        reason: formData.reason,
-        submittedAt: new Date().toISOString(),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        reason: formData.reason
       };
 
-      await addDoc(collection(db, 'referee_guarantor_responses'), responseData);
+      await apiService.post('/referee-guarantor-responses', responseData);
       
       console.log('✅ Response saved to Firestore:', responseData.id);
 

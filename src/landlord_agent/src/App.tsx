@@ -42,9 +42,8 @@ import { tenantService } from './services/tenantService';
 import { marketInsightService } from './services/marketInsightService';
 import ViewingsPage from './components/ViewingsPage';
 import LandlordAgentSettingsPage from './components/LandlordAgentSettingsPage';
-import { storage, db } from './config/firebase';
+import { storage } from './config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, query, where, onSnapshot, Unsubscribe, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import AuthContext, { useAuth } from '../../contexts/AuthContext';
 import { MessagingProvider } from '../../contexts/MessagingContext';
 import { trackEvent } from '../../utils/analytics';
@@ -1138,125 +1137,32 @@ export function AppContent() {
       }, 3000); // 3 seconds delay
     };
 
-    // Listen to tenants collection changes
-    try {
-      const tenantsQuery = query(
-        collection(db, 'tenants'),
-        where('userId', '==', currentUserId)
-      );
-      const tenantsUnsubscribe = onSnapshot(tenantsQuery,
-        async (snapshot) => {
-          if (shouldLogRealtimeDebug) {
-            console.log('👥 Real-time tenant update detected:', snapshot.docChanges().length, 'changes');
-          }
-          try {
-            await loadScopedTenants();
-          } catch (error) {
-            console.error('Error refreshing tenants after snapshot update:', error);
-          }
-          // Only trigger alert generation if not already generating
-          if (!isGeneratingAlerts) {
-            debouncedGenerateAlerts();
-          }
-        },
-        (error) => {
-          console.error('Error listening to tenants:', error);
-        }
-      );
-      unsubscribes.push(tenantsUnsubscribe);
-    } catch (error) {
-      console.error('Error setting up tenants listener:', error);
-    }
+    // Start polling since we removed the real-time listeners
+    let isPolling = true;
+    const pollInterval = setInterval(async () => {
+      if (!isPolling) return;
+      try {
+        await loadScopedTenants();
+        const activeAlerts = await alertService.getActiveAlerts(currentUserId);
+        processAlerts(activeAlerts);
+      } catch (err) {
+        console.error('Error during fallback polling:', err);
+      }
+    }, 15000); // 15 seconds polling
 
-    // Listen to properties collection changes
-    try {
-      const propertiesQuery = query(
-        collection(db, 'properties'),
-        where('userId', '==', currentUserId)
-      );
-      const propertiesUnsubscribe = onSnapshot(propertiesQuery,
-        (snapshot) => {
-          if (shouldLogRealtimeDebug) {
-            console.log('🏠 Real-time property update detected:', snapshot.docChanges().length, 'changes');
-          }
-          // Only trigger alert generation if not already generating
-          if (!isGeneratingAlerts) {
-            debouncedGenerateAlerts();
-          }
-        },
-        (error) => {
-          console.error('Error listening to properties:', error);
-        }
-      );
-      unsubscribes.push(propertiesUnsubscribe);
-    } catch (error) {
-      console.error('Error setting up properties listener:', error);
-    }
-
-    // Listen to alerts collection changes (real-time alert updates)
-    try {
-      const alertsQuery = query(
-        collection(db, 'alerts'),
-        where('userId', '==', currentUserId),
-        where('status', '==', 'active')
-      );
-      const alertsUnsubscribe = onSnapshot(alertsQuery,
-        async (snapshot) => {
-          if (shouldLogRealtimeDebug) {
-            console.log('🔔 Real-time alert update detected:', snapshot.docs.length, 'active alerts');
-          }
-          // Map Firestore documents to Alert objects
-          const activeAlerts = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              type: data.type,
-              status: data.status,
-              severity: data.severity,
-              userId: data.userId,
-              tenantId: data.tenantId,
-              contractId: data.contractId,
-              propertyId: data.propertyId,
-              title: data.title,
-              description: data.description,
-              leaseExpiryDate: data.leaseExpiryDate?.toDate(),
-              daysUntilExpiry: data.daysUntilExpiry,
-              contractTitle: data.contractTitle,
-              contractSentDate: data.contractSentDate?.toDate(),
-              overdueAmount: data.overdueAmount,
-              daysPastDue: data.daysPastDue,
-              lastPaymentDate: data.lastPaymentDate?.toDate(),
-              paymentFrequency: data.paymentFrequency,
-              propertyAddress: data.propertyAddress,
-              tenantName: data.tenantName,
-              createdAt: data.createdAt?.toDate() || new Date(),
-              updatedAt: data.updatedAt?.toDate() || new Date(),
-              resolvedAt: data.resolvedAt?.toDate(),
-              dismissedAt: data.dismissedAt?.toDate()
-            } as Alert;
-          });
-          processAlerts(activeAlerts);
-        },
-        (error) => {
-          console.error('Error listening to alerts:', error);
-        }
-      );
-      unsubscribes.push(alertsUnsubscribe);
-    } catch (error) {
-      console.error('Error setting up alerts listener:', error);
-      // Fallback: if listener fails, try initial load
-      alertService.getActiveAlerts(currentUserId).then(processAlerts).catch(console.error);
-    }
-
-    // Initial alert generation
-    alertService.generateAlerts(currentUserId).catch(console.error);
+    // Initial alert generation and loading
+    alertService.generateAlerts(currentUserId)
+      .then(() => alertService.getActiveAlerts(currentUserId))
+      .then(processAlerts)
+      .catch(console.error);
 
     // Cleanup
     return () => {
       if (shouldLogRealtimeDebug) {
-        console.log('🧹 Cleaning up real-time Firestore listeners');
+        console.log('🧹 Cleaning up polling timers');
       }
-      unsubscribes.forEach(unsub => unsub());
+      isPolling = false;
+      clearInterval(pollInterval);
       if (alertGenerationTimeout) {
         clearTimeout(alertGenerationTimeout);
       }
@@ -2519,12 +2425,9 @@ export function AppContent() {
                 console.log(`✅ Updated tenant ${tenantId} to remove property assignment`);
 
                 // Update property: remove tenantId field and set status to vacant
-                const { deleteField } = await import('firebase/firestore');
-                const propertyDocRef = doc(db, 'properties', propertyId);
-                await updateDoc(propertyDocRef, {
+                await propertyService.updateProperty(propertyId, {
                   status: 'vacant',
-                  tenantId: deleteField(),
-                  updatedAt: Timestamp.now()
+                  tenantId: null
                 });
                 console.log(`✅ Updated property ${propertyId} to remove tenantId and set status to vacant`);
 

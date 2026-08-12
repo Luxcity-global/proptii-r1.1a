@@ -1,5 +1,4 @@
-import { collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, Timestamp, query, orderBy } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import apiService from '../../../services/api';
 
 export interface LandlordRecord {
   id: string;
@@ -18,61 +17,42 @@ export interface LandlordRecord {
 }
 
 class LandlordService {
-  private landlordsCollection = collection(db, 'landlords');
-
   async createLandlord(landlord: Omit<LandlordRecord, 'id' | 'createdAt'>): Promise<string> {
-    const payload: any = {
-      ...landlord,
-      createdAt: Timestamp.now(),
-    };
-    const ref = await addDoc(this.landlordsCollection, payload);
-    return ref.id;
+    const data = await apiService.post('/clients/landlords', landlord);
+    return data.id;
   }
 
   async getLandlords(): Promise<LandlordRecord[]> {
     try {
-      const q = query(this.landlordsCollection, orderBy('createdAt', 'desc'));
-      const snap = await getDocs(q);
-      return snap.docs.map(d => this.fromFirestore(d.id, d.data()));
+      const response = await apiService.get('/clients/landlords');
+      return (response.data || []).map((d: any) => ({
+        ...d,
+        createdAt: d.createdAt ? new Date(d.createdAt) : new Date(),
+      }));
     } catch {
-      const snap = await getDocs(this.landlordsCollection);
-      return snap.docs.map(d => this.fromFirestore(d.id, d.data()));
+      return [];
     }
   }
 
   async getLandlord(id: string): Promise<LandlordRecord | null> {
-    const ref = doc(db, 'landlords', id);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return null;
-    return this.fromFirestore(snap.id, snap.data());
+    try {
+      const response = await apiService.get(`/clients/landlords/${id}`);
+      return {
+        ...response.data,
+        createdAt: response.data.createdAt ? new Date(response.data.createdAt) : new Date(),
+      };
+    } catch {
+      return null;
+    }
   }
 
   async updateLandlord(id: string, updates: Partial<LandlordRecord>): Promise<void> {
-    const ref = doc(db, 'landlords', id);
-    const payload: any = { ...updates };
-    await updateDoc(ref, payload);
+    await apiService.put(`/clients/landlords/${id}`, updates);
   }
 
   async deleteLandlord(id: string): Promise<void> {
-    const ref = doc(db, 'landlords', id);
-    await deleteDoc(ref);
-  }
-
-  private fromFirestore(id: string, data: any): LandlordRecord {
-    return {
-      id,
-      name: data.name || '',
-      email: data.email || '',
-      phone: data.phone || '',
-      company: data.company,
-      address: data.address,
-      notes: data.notes,
-      portfolio: data.portfolio,
-      createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
-    };
+    await apiService.delete(`/clients/landlords/${id}`);
   }
 }
 
 export const landlordService = new LandlordService();
-
-
