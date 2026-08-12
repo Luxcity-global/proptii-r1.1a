@@ -14,21 +14,44 @@ function initializeFirebase() {
 
   const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
+  // ── Pre-flight: print what credential source we found ─────────────────────
+  if (!serviceAccountEnv) {
+    const hasIndividualCreds = !!(process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY);
+    console.warn(
+      '⚠️  FIREBASE_SERVICE_ACCOUNT_JSON is not set.' +
+      (hasIndividualCreds
+        ? ' Will try FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY.'
+        : ' No Firebase credentials found — Firestore calls will fail.\n' +
+          '   FIX: In the Render dashboard → Environment, add a secret:\n' +
+          '   Key: FIREBASE_SERVICE_ACCOUNT_JSON\n' +
+          '   Value: paste the full contents of your Firebase service account JSON\n' +
+          '   (Download from Firebase Console → Project Settings → Service Accounts → Generate new private key)')
+    );
+  } else {
+    const preview = serviceAccountEnv.trim().slice(0, 40).replace(/\n/g, '');
+    console.log(`[Firebase] Credential env var detected (preview: ${preview}…)`);
+  }
+
   try {
     // Case 1: env var contains a raw JSON string (production on Render)
     if (serviceAccountEnv && serviceAccountEnv.trim().startsWith('{')) {
       try {
         const serviceAccountObj = JSON.parse(serviceAccountEnv);
-        // Handle refresh-token / authorized_user JSON (write to tmp ADC file)
+
+        // IMPORTANT: authorized_user / refresh_token credentials are GCP user
+        // credentials (from `gcloud auth application-default login`). They do NOT
+        // work with Firebase Admin SDK — Admin SDK requires a service account key.
+        // Detect this early and fail with an actionable message.
         if (serviceAccountObj.type === 'authorized_user' || serviceAccountObj.refresh_token) {
-          const os = require('os');
-          const path = require('path');
-          const fs = require('fs');
-          const tempPath = path.join(os.tmpdir(), 'gcp_adc.json');
-          fs.writeFileSync(tempPath, JSON.stringify(serviceAccountObj));
-          process.env.GOOGLE_APPLICATION_CREDENTIALS = tempPath;
-          admin.initializeApp({ credential: admin.credential.applicationDefault() });
-          console.log('✅ Firebase Admin initialized from authorized_user JSON env var.');
+          console.error(
+            '❌ FIREBASE_SERVICE_ACCOUNT_JSON contains an authorized_user / OAuth2 credential.\n' +
+            '   This credential type does NOT work with Firebase Admin SDK.\n' +
+            '   FIX: Replace it with a Firebase service account JSON:\n' +
+            '   1. Go to Firebase Console → Project Settings → Service Accounts\n' +
+            '   2. Click "Generate new private key"\n' +
+            '   3. Paste the downloaded JSON as the FIREBASE_SERVICE_ACCOUNT_JSON secret in Render'
+          );
+          // Fall through to try individual creds or project-ID-only init
         } else {
           // Standard service account JSON string
           if (!serviceAccountObj.project_id) {
@@ -36,8 +59,8 @@ function initializeFirebase() {
           }
           admin.initializeApp({ credential: admin.credential.cert(serviceAccountObj) });
           console.log('✅ Firebase Admin initialized from service account JSON env var.');
+          return;
         }
-        return;
       } catch (parseErr: any) {
         console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON as JSON:', parseErr?.message);
       }
@@ -48,6 +71,7 @@ function initializeFirebase() {
       const serviceAccount = require(serviceAccountEnv);
       admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
       console.log('✅ Firebase Admin initialized from service account file:', serviceAccountEnv);
+
       return;
     }
 
