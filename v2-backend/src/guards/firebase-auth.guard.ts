@@ -4,21 +4,50 @@ import * as admin from 'firebase-admin';
 function ensureFirebaseInitialized() {
   if (admin.apps.length) return;
 
-  const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  
+  const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
   try {
-    if (serviceAccountPath && require('fs').existsSync(serviceAccountPath)) {
-      const serviceAccount = require(serviceAccountPath);
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
-    } else if (process.env.FIREBASE_PROJECT_ID) {
-      admin.initializeApp({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-      });
-    } else {
-      admin.initializeApp();
+    // Raw JSON string (production Render env var)
+    if (serviceAccountEnv && serviceAccountEnv.trim().startsWith('{')) {
+      const obj = JSON.parse(serviceAccountEnv);
+      if (obj.type === 'authorized_user' || obj.refresh_token) {
+        const os = require('os');
+        const path = require('path');
+        const fs = require('fs');
+        const tmp = path.join(os.tmpdir(), 'gcp_adc_guard.json');
+        fs.writeFileSync(tmp, JSON.stringify(obj));
+        process.env.GOOGLE_APPLICATION_CREDENTIALS = tmp;
+        admin.initializeApp({ credential: admin.credential.applicationDefault() });
+      } else {
+        if (!obj.project_id) obj.project_id = process.env.FIREBASE_PROJECT_ID || 'proptii-16946';
+        admin.initializeApp({ credential: admin.credential.cert(obj) });
+      }
+      return;
     }
+
+    // File path (local dev)
+    if (serviceAccountEnv && require('fs').existsSync(serviceAccountEnv)) {
+      const serviceAccount = require(serviceAccountEnv);
+      admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+      return;
+    }
+
+    // Individual credential vars
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    const projectId = process.env.FIREBASE_PROJECT_ID || 'proptii-16946';
+    if (clientEmail && privateKey) {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId,
+          clientEmail,
+          privateKey: privateKey.replace(/\\n/g, '\n'),
+        }),
+      });
+      return;
+    }
+
+    admin.initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID || 'proptii-16946' });
   } catch (e) {
     console.error('[FirebaseAuthGuard] Failed to initialize Firebase Admin SDK:', e);
   }

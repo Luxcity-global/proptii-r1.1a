@@ -199,8 +199,8 @@ services:
     name: proptii-backend
     env: node
     plan: free
-    buildCommand: cd proptii-backend && npm install --include=dev && npm run build
-    startCommand: cd proptii-backend && npm run start:render
+    buildCommand: cd v2-backend && npm install --include=dev && npm run build
+    startCommand: cd v2-backend && npm run start:render
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
@@ -314,11 +314,34 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      - key: STRIPE_PRICE_RENTER_PRO_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_RENTER_PRO_ANNUAL
+        sync: false
+      - key: STRIPE_PRICE_LANDLORD_PRO_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_LANDLORD_PRO_ANNUAL
+        sync: false
+      - key: STRIPE_PRICE_AGENT_PRO_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_AGENT_PRO_ANNUAL
+        sync: false
 
       # ── Keep-alive: search service URL ────────────────────────────────────────
       # KeepAliveService pings this URL every 14 min to prevent cold starts
       - key: SEARCH_BACKEND_URL
         value: https://proptii-r1-1a-q95f.onrender.com
+
+      # ── Backend self keep-alive URL ───────────────────────────────────────────
+      - key: BACKEND_URL
+        value: https://proptii-r1-1a-1-hcw6.onrender.com
+
+      # ── Firebase Admin SDK — individual credential fallback ───────────────────
+      # Set these in the Render dashboard if FIREBASE_SERVICE_ACCOUNT_JSON is not used
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
 
       # ── Misc ──────────────────────────────────────────────────────────────────
       - key: PROMO_FREE_MONTH_ACTIVE

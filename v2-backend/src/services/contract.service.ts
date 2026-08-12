@@ -117,4 +117,136 @@ export class ContractService {
       stats: { total, active: total, deleted: 0, totalSize: 0 },
     };
   }
+
+  async sendContractToTenant(landlordId: string, landlordEmail: string, body: any) {
+    const col = this.contractsCol;
+    const docId = `contract_${landlordId}_${Date.now()}`;
+    const payload = {
+      id: docId,
+      landlordId,
+      landlordEmail,
+      tenantEmail: (body.tenantEmail || '').toLowerCase().trim(),
+      tenantName: body.tenantName || '',
+      propertyId: body.propertyId || '',
+      propertyAddress: body.propertyAddress || '',
+      contractName: body.contractName || 'Tenancy Agreement',
+      fileUrl: body.fileUrl || '',
+      templateId: body.templateId || '',
+      status: 'sent',
+      sentDate: new Date().toISOString(),
+      expiryDate: body.expiryDate || null,
+    };
+
+    if (col) {
+      try {
+        await col.doc(docId).set(payload);
+      } catch (err: any) {
+        this.logger.warn(`sendContractToTenant error: ${err?.message || err}`);
+      }
+    }
+
+    return { success: true, contractId: docId, ...payload };
+  }
+
+  async syncContractToLandlord(body: any) {
+    const col = this.contractsCol;
+    const docId = `landlord_contract_${Date.now()}`;
+    const payload = {
+      id: docId,
+      ...body,
+      tenantEmail: (body.tenantEmail || '').toLowerCase().trim(),
+      landlordEmail: (body.landlordEmail || '').toLowerCase().trim(),
+      syncedAt: new Date().toISOString(),
+    };
+    if (col) {
+      try {
+        await col.doc(docId).set(payload);
+      } catch (err: any) {
+        this.logger.warn(`syncContractToLandlord error: ${err?.message || err}`);
+      }
+    }
+    return { success: true, id: docId, contractId: docId };
+  }
+
+  async contractExists(tenantEmail: string, title: string, landlordEmail: string) {
+    const col = this.contractsCol;
+    if (!col) return { exists: false };
+    try {
+      const snap = await col
+        .where('tenantEmail', '==', tenantEmail.toLowerCase().trim())
+        .where('landlordEmail', '==', landlordEmail.toLowerCase().trim())
+        .where('title', '==', title)
+        .limit(1)
+        .get();
+      return { exists: !snap.empty };
+    } catch (err: any) {
+      this.logger.warn(`contractExists error: ${err?.message || err}`);
+      return { exists: false };
+    }
+  }
+
+  async sendSignedContract(body: any) {
+    // Persist the signed contract record to Firestore
+    const db = this.db;
+    if (db) {
+      try {
+        const docId = `signed_${Date.now()}`;
+        await db.collection('signed_contracts').doc(docId).set({
+          id: docId,
+          to: body.to,
+          recipientName: body.recipientName,
+          contractName: body.contractName,
+          senderName: body.senderName || 'Proptii',
+          sentAt: new Date().toISOString(),
+          status: 'sent',
+        });
+      } catch (err: any) {
+        this.logger.warn(`sendSignedContract persist error: ${err?.message || err}`);
+      }
+    }
+
+    // Email delivery via SMTP if configured
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (smtpHost && smtpUser && smtpPass) {
+      try {
+        const nodemailer = require('nodemailer');
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: parseInt(process.env.SMTP_PORT || '465'),
+          secure: true,
+          auth: { user: smtpUser, pass: smtpPass },
+        });
+
+        const mailOptions: any = {
+          from: `"${body.senderName || 'Proptii'}" <${process.env.SMTP_FROM_EMAIL || smtpUser}>`,
+          to: body.to,
+          subject: `Signed Contract: ${body.contractName}`,
+          html: body.htmlContent || `<p>Please find your signed contract attached: ${body.contractName}</p>`,
+        };
+
+        // Attachment handled via base64 if present in body
+        if (body.attachmentBase64) {
+          mailOptions.attachments = [{
+            filename: body.documentName || `${body.contractName}_signed.pdf`,
+            content: body.attachmentBase64,
+            encoding: 'base64',
+            contentType: 'application/pdf',
+          }];
+        }
+
+        await transporter.sendMail(mailOptions);
+        this.logger.log(`Signed contract email sent to ${body.to}`);
+        return { success: true, message: 'Signed contract emailed successfully' };
+      } catch (err: any) {
+        this.logger.error(`sendSignedContract email error: ${err?.message || err}`);
+        return { success: false, error: err?.message || 'Email delivery failed' };
+      }
+    }
+
+    this.logger.warn('SMTP not configured — signed contract email not sent');
+    return { success: true, message: 'Contract saved. Email delivery requires SMTP configuration.' };
+  }
 }

@@ -30,4 +30,25 @@ export class GuestEnquiryController {
     const email = body.email || req.user.email;
     return await this.guestEnquiryService.autoMerge(email, userId);
   }
+
+  /** POST /api/guest/claim/validate — validate a claim token */
+  @Post('claim/validate')
+  async validateClaimToken(@Body() body: { token: string }) {
+    return await this.guestEnquiryService.validateClaimToken(body.token);
+  }
+
+  /** POST /api/guest/claim/resend — resend a claim email */
+  @Post('claim/resend')
+  async resendClaimToken(@Body() body: { email: string }) {
+    return await this.guestEnquiryService.resendClaimToken(body.email);
+  }
+
+  /** POST /api/guest/claim/confirm — confirm claim and merge guest account */
+  @Post('claim/confirm')
+  @UseGuards(FirebaseAuthGuard)
+  async confirmClaim(@Req() req: any, @Body() body: { token: string }) {
+    const userId = req.user.uid;
+    const email = req.user.email;
+    return await this.guestEnquiryService.confirmClaim(body.token, email, userId);
+  }
 }

@@ -186,4 +186,52 @@ export class CommunicationService {
     }
     return { data: { success: true } };
   }
+
+  // ── Attachments ───────────────────────────────────────────────────────────
+
+  private get attachmentsCol() {
+    const db = this.db;
+    return db ? db.collection('message_attachments') : null;
+  }
+
+  async getAttachment(attachmentId: string) {
+    const col = this.attachmentsCol;
+    if (!col) return { data: null };
+    try {
+      const doc = await col.doc(attachmentId).get();
+      if (!doc.exists) return { data: null };
+      return { data: { id: doc.id, ...doc.data() } };
+    } catch {
+      return { data: null };
+    }
+  }
+
+  async saveAttachment(userId: string, dto: any) {
+    const col = this.attachmentsCol;
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    const payload = {
+      id,
+      uploadedBy: userId,
+      filename: dto.filename || dto.name || 'attachment',
+      mimeType: dto.mimeType || dto.contentType || 'application/octet-stream',
+      size: dto.size || 0,
+      blobUrl: dto.blobUrl || dto.url || '',
+      conversationId: dto.conversationId || null,
+      messageId: dto.messageId || null,
+      createdAt: now,
+    };
+    if (col) {
+      try { await col.doc(id).set(payload); } catch {}
+    }
+    return { data: payload };
+  }
+
+  async deleteAttachment(attachmentId: string) {
+    const col = this.attachmentsCol;
+    if (col) {
+      try { await col.doc(attachmentId).delete(); } catch {}
+    }
+    return { data: { success: true } };
+  }
 }

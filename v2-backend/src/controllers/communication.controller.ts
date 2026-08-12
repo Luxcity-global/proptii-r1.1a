@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, HttpCode, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, HttpCode, Req, NotFoundException } from '@nestjs/common';
 import { CommunicationService } from '../services/communication.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 
@@ -45,5 +45,29 @@ export class CommunicationController {
   @HttpCode(200)
   async markRead(@Param('id') messageId: string) {
     return await this.communicationService.markRead(messageId);
+  }
+
+  // ── Attachments ───────────────────────────────────────────────────────────
+  // The frontend communicationService references /communication/attachments/*
+  // These routes persist attachment metadata in Firestore; actual file bytes
+  // are stored in Azure Blob Storage directly from the frontend using a SAS token.
+
+  @Get('attachments/:id')
+  @HttpCode(200)
+  async getAttachment(@Param('id') attachmentId: string) {
+    return await this.communicationService.getAttachment(attachmentId);
+  }
+
+  @Post('attachments')
+  @HttpCode(201)
+  async saveAttachment(@Req() req: any, @Body() dto: any) {
+    const userId = req.user.uid;
+    return await this.communicationService.saveAttachment(userId, dto);
+  }
+
+  @Delete('attachments/:id')
+  @HttpCode(200)
+  async deleteAttachment(@Param('id') attachmentId: string) {
+    return await this.communicationService.deleteAttachment(attachmentId);
   }
 }

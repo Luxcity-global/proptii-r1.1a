@@ -190,4 +190,95 @@ export class GuestEnquiryService {
       },
     };
   }
+
+  /** Validate a claim token — check it exists in Firestore and is not expired */
+  async validateClaimToken(token: string) {
+    const col = this.threadsCol;
+    if (!col) return { data: { valid: false } };
+    try {
+      const doc = await col.doc(token).get();
+      if (!doc.exists) return { data: { valid: false } };
+      const data = doc.data();
+      return {
+        data: {
+          valid: true,
+          email: data?.tenantEmail || '',
+          name: data?.tenantName || null,
+          role: 'ghost_tenant',
+          expires_at: null,
+        },
+      };
+    } catch {
+      return { data: { valid: false } };
+    }
+  }
+
+  /** Resend a claim link email (no-op if SMTP not configured) */
+  async resendClaimToken(email: string) {
+    // In production, send a claim email via SMTP if configured
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (smtpHost && smtpUser && smtpPass) {
+      const col = this.threadsCol;
+      let threadToken: string | null = null;
+      if (col) {
+        try {
+          const snap = await col
+            .where('tenantEmail', '==', email.toLowerCase().trim())
+            .limit(1)
+            .get();
+          if (!snap.empty) threadToken = snap.docs[0].id;
+        } catch {}
+      }
+
+      if (threadToken) {
+        try {
+          const nodemailer = require('nodemailer');
+          const transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: parseInt(process.env.SMTP_PORT || '465'),
+            secure: true,
+            auth: { user: smtpUser, pass: smtpPass },
+          });
+          const frontendUrl = process.env.FRONTEND_URL || 'https://proptii-r1-1a-2.onrender.com';
+          await transporter.sendMail({
+            from: `"Proptii" <${process.env.SMTP_FROM_EMAIL || smtpUser}>`,
+            to: email,
+            subject: 'Claim your Proptii account',
+            html: `<p>Click the link to claim your account and view your messages:</p>
+                   <p><a href="${frontendUrl}/claim?token=${threadToken}">Claim Account</a></p>`,
+          });
+        } catch (err: any) {
+          this.logger.warn(`resendClaimToken email error: ${err?.message || err}`);
+        }
+      }
+    }
+
+    return { data: { sent: true } };
+  }
+
+  /** Confirm a claim — merge thread ownership to the authenticated user */
+  async confirmClaim(token: string, email: string, userId: string) {
+    const col = this.threadsCol;
+    let migratedCount = 0;
+    if (col) {
+      try {
+        // Claim by specific token
+        const doc = await col.doc(token).get();
+        if (doc.exists) {
+          await doc.ref.set({ tenantId: userId, status: 'claimed', claimedAt: new Date().toISOString() }, { merge: true });
+          migratedCount = 1;
+        }
+        // Also merge any threads matching the email
+        const snap = await col.where('tenantEmail', '==', (email || '').toLowerCase().trim()).get();
+        for (const d of snap.docs) {
+          await d.ref.set({ tenantId: userId, status: 'claimed' }, { merge: true });
+          migratedCount++;
+        }
+      } catch {}
+    }
+    return { data: { success: true, migratedCount } };
+  }
 }

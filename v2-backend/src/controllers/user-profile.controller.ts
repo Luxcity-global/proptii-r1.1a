@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { UserProfileService } from '../services/user-profile.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 
@@ -6,29 +6,71 @@ import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 export class UserProfileController {
   constructor(private readonly userProfileService: UserProfileService) {}
 
-  @Get(['users/profile', 'users/me', 'users/:id'])
+  // ── Profile ───────────────────────────────────────────────────────────────
+
+  @Get(['users/profile', 'users/me'])
   @UseGuards(FirebaseAuthGuard)
-  async getProfile(@Req() req: any, @Param('id') id?: string) {
-    const uid = id || req.user.uid;
-    return await this.userProfileService.getProfile(uid);
+  async getOwnProfile(@Req() req: any) {
+    return this.userProfileService.getProfile(req.user.uid);
   }
 
-  @Put(['users/profile', 'users/:id'])
+  @Get('users/:id')
   @UseGuards(FirebaseAuthGuard)
-  async updateProfile(@Req() req: any, @Body() body: any) {
-    const uid = req.user.uid;
-    return await this.userProfileService.updateProfile(uid, body);
+  async getProfileById(@Param('id') id: string) {
+    return this.userProfileService.getProfile(id);
   }
+
+  @Put(['users/profile', 'users/me'])
+  @UseGuards(FirebaseAuthGuard)
+  async updateOwnProfile(@Req() req: any, @Body() body: any) {
+    return this.userProfileService.updateProfile(req.user.uid, body);
+  }
+
+  @Put('users/:id')
+  @UseGuards(FirebaseAuthGuard)
+  async updateProfileById(@Param('id') id: string, @Body() body: any) {
+    return this.userProfileService.updateProfile(id, body);
+  }
+
+  // ── Users admin ───────────────────────────────────────────────────────────
+
+  /** GET /api/users — list all users */
+  @Get('users')
+  @UseGuards(FirebaseAuthGuard)
+  async getAllUsers() {
+    return this.userProfileService.getAllUsers();
+  }
+
+  /** POST /api/users — create a user record */
+  @Post('users')
+  @UseGuards(FirebaseAuthGuard)
+  async createUser(@Body() body: any) {
+    return this.userProfileService.createUser(body);
+  }
+
+  /** DELETE /api/users/:id */
+  @Delete('users/:id')
+  @UseGuards(FirebaseAuthGuard)
+  async deleteUser(@Param('id') id: string) {
+    return this.userProfileService.deleteUser(id);
+  }
+
+  // ── Reviews ───────────────────────────────────────────────────────────────
 
   @Get('reviews')
   async getReviews(@Query('propertyId') propertyId?: string) {
-    return await this.userProfileService.getReviews(propertyId);
+    return this.userProfileService.getReviews(propertyId);
   }
 
   @Post('reviews')
   @UseGuards(FirebaseAuthGuard)
   async createReview(@Req() req: any, @Body() body: any) {
-    const uid = req.user.uid;
-    return await this.userProfileService.createReview(uid, body);
+    return this.userProfileService.createReview(req.user.uid, body);
+  }
+
+  /** GET /api/reviews/stats */
+  @Get('reviews/stats')
+  async getReviewStats(@Query('propertyId') propertyId?: string) {
+    return this.userProfileService.getReviewStats(propertyId);
   }
 }

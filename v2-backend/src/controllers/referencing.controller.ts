@@ -108,6 +108,20 @@ export class ReferencingController {
     return await this.referencingService.getUserFiles(userId);
   }
 
+  /**
+   * GET /api/referencing/forms/all
+   * Returns all referencing forms for the authenticated user.
+   * Must be declared BEFORE the /:userId wildcard to avoid route shadowing.
+   */
+  @Get('referencing/forms/all')
+  @UseGuards(FirebaseAuthGuard)
+  async getAllForms(@Req() req: any) {
+    const userId = req.user.uid;
+    const data = await this.referencingService.getFormData(userId);
+    // Wrap single-doc in array for the dashboard service which expects an array
+    return { success: true, data: data && Object.keys(data).length ? [data] : [] };
+  }
+
   @Post(['referencing/files/save', 'applications/:id/upload', 'property/upload-photo', 'property/upload-document'])
   @HttpCode(200)
   @UseGuards(FirebaseAuthGuard)

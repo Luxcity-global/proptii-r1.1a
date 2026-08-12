@@ -93,4 +93,63 @@ export class UserProfileService {
       return payload;
     }
   }
+
+  async getAllUsers() {
+    const col = this.usersCol;
+    if (!col) return [];
+    try {
+      const snap = await col.limit(500).get();
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (err: any) {
+      this.logger.warn(`getAllUsers error: ${err?.message || err}`);
+      return [];
+    }
+  }
+
+  async createUser(data: any) {
+    const col = this.usersCol;
+    const uid = data.uid || data.id || `user_${Date.now()}`;
+    const payload = {
+      uid,
+      ...data,
+      email: (data.email || '').toLowerCase().trim(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (col) {
+      try {
+        await col.doc(uid).set(payload, { merge: true });
+      } catch (err: any) {
+        this.logger.warn(`createUser error: ${err?.message || err}`);
+      }
+    }
+    return payload;
+  }
+
+  async deleteUser(uid: string) {
+    const col = this.usersCol;
+    if (col) {
+      try {
+        await col.doc(uid).delete();
+      } catch (err: any) {
+        this.logger.warn(`deleteUser error: ${err?.message || err}`);
+      }
+    }
+    return { success: true };
+  }
+
+  async getReviewStats(propertyId?: string) {
+    const reviews = await this.getReviews(propertyId);
+    const arr = Array.isArray(reviews) ? reviews : [];
+    const total = arr.length;
+    const avg = total > 0
+      ? arr.reduce((sum: number, r: any) => sum + (Number(r.rating) || 0), 0) / total
+      : 0;
+    const breakdown: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    arr.forEach((r: any) => {
+      const rating = Math.round(Number(r.rating));
+      if (rating >= 1 && rating <= 5) breakdown[rating]++;
+    });
+    return { total, average: Math.round(avg * 10) / 10, breakdown };
+  }
 }
