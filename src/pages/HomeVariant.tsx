@@ -31,7 +31,7 @@ const PAUSE_AFTER_DELETING_MS = 400;
 const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [, forceOnboardingRefresh] = useState(0);
 
   // Typing/deleting animation for hero headline
