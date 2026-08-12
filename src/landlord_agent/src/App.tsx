@@ -3169,10 +3169,19 @@ export function AppContent() {
 // crashed the landlord dashboard with the ErrorBoundary showing "Something went wrong / Error".
 export default function App() {
   return (
-    <ThemeProvider defaultTheme="light" storageKey="proptii-theme">
-      <TooltipProvider>
-        <AppContent />
-      </TooltipProvider>
-    </ThemeProvider>
+    // MemoryRouter gives AppContent its own isolated router context.
+    // The parent app uses createBrowserRouter (data mode), which assigns
+    // route.id to every route. A plain <Routes> / useLocation() inside a
+    // data-mode router calls useRouteId() internally; when route.id is
+    // undefined it throws a bare Error("") — the exact "Error Error" you see
+    // in the ErrorBoundary. Wrapping with MemoryRouter provides a real router
+    // context so all hooks work correctly.
+    <MemoryRouter>
+      <ThemeProvider defaultTheme="light" storageKey="proptii-theme">
+        <TooltipProvider>
+          <AppContent />
+        </TooltipProvider>
+      </ThemeProvider>
+    </MemoryRouter>
   );
 }

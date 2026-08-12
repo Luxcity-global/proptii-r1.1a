@@ -11,6 +11,8 @@ import {
     ChevronLeft,
     ChevronRight
 } from 'lucide-react';
+import { resolveSearchBackendUrl } from '../../utils/searchBackendUrl';
+
 
 interface VendorSearchResult {
     placeId: string;
@@ -132,7 +134,8 @@ export function VendorSearch({
             console.log('Searching with postcode:', formattedPostcode, 'search term:', searchTermValue, 'page:', page);
 
             // Call the backend API server with pagination
-            const response = await fetch(`http://localhost:3001/api/vendors/search`, {
+            const searchBackendUrl = resolveSearchBackendUrl();
+            const response = await fetch(`${searchBackendUrl}/api/vendors/search`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

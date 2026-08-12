@@ -7,6 +7,7 @@
  */
 
 import apiService from './api';
+import { resolveSearchBackendUrl } from '../utils/searchBackendUrl';
 
 const PING_INTERVAL_MS = 4 * 60 * 1000; // 4 minutes
 
@@ -21,7 +22,8 @@ export function startKeepAlivePing(): void {
       await apiService.get('/health').catch(() => null);
 
       // 2. Search Service Keep-Alive
-      const searchServiceUrl = import.meta.env.VITE_SEARCH_SERVICE_URL || 'http://localhost:3001';
+      const searchServiceUrl = resolveSearchBackendUrl();
+
       await fetch(`${searchServiceUrl.replace(/\/$/, '')}/health`, { method: 'GET', mode: 'cors' }).catch(() => null);
     } catch {
       // Ignore background keepalive failures
