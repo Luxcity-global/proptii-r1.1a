@@ -64,24 +64,60 @@ class ApiService {
       timeout: 30000, // 30 seconds timeout
     });
 
-    // Request interceptor: attach Bearer token (MSAL silent → popup → auth_token fallback)
+    // Request interceptor: attach Bearer token + log outgoing request
     this.api.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
         const token = await getAccessTokenForApiRequest();
         if (token) {
           setBearerAuth(config, token);
         }
+        // Stamp request start time for duration tracking
+        (config as any)._t = Date.now();
+        const method = config.method?.toUpperCase() ?? 'GET';
+        const url = `${config.baseURL ?? ''}${config.url ?? ''}`;
+        console.groupCollapsed(
+          `%c[API] → ${method} ${config.url}`,
+          'color:#1776B6;font-weight:bold'
+        );
+        console.log('URL:', url);
+        if (config.params && Object.keys(config.params).length) {
+          console.log('Params:', config.params);
+        }
+        if (config.data) {
+          console.log('Body:', config.data);
+        }
+        console.groupEnd();
         return config;
       },
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor: on 401, clear the stale cached token and retry once
-    // with a freshly acquired MSAL token before giving up.
+    // Response interceptor: log success/error + on 401, clear stale token and retry once
     this.api.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        const ms = Date.now() - ((response.config as any)._t ?? Date.now());
+        const method = response.config.method?.toUpperCase() ?? '?';
+        console.log(
+          `%c[API] ← ${response.status} ${method} ${response.config.url} (${ms}ms)`,
+          'color:#22c55e;font-weight:bold',
+          response.data
+        );
+        return response;
+      },
       async (error: AxiosError) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & { _retried?: boolean };
+        const ms = Date.now() - ((originalRequest as any)?._t ?? Date.now());
+        const method = originalRequest?.method?.toUpperCase() ?? '?';
+        const status = error.response?.status ?? 'NETWORK';
+        console.groupCollapsed(
+          `%c[API] ✖ ${status} ${method} ${originalRequest?.url} (${ms}ms)`,
+          'color:#ef4444;font-weight:bold'
+        );
+        console.error('Status:', error.response?.status);
+        console.error('Response data:', error.response?.data);
+        console.error('Message:', error.message);
+        console.groupEnd();
+
         if (
           error.response?.status === 401 &&
           originalRequest &&

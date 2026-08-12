@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { LoggingMiddleware } from './middleware/logging.middleware';
 
 // ── Existing controllers ──────────────────────────────────────────────────────
 import { AuthController } from './controllers/auth.controller';
@@ -87,4 +88,9 @@ import { RefereeGuarantorService } from './services/referee-guarantor.service';
     RefereeGuarantorService,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Apply HTTP request/response logging to every route
+    consumer.apply(LoggingMiddleware).forRoutes('*');
+  }
+}
