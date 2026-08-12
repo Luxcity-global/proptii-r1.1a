@@ -3112,18 +3112,16 @@ export function AppContent() {
 
   return (
     <AuthContext.Provider value={authContextValue as any}>
-      <MessagingProvider>
-        <div className="min-h-screen bg-background">
-          <div
-            className={`transition-all duration-[4ms] ease-out ${isTransitioning
-                ? 'opacity-0 transform scale-75'
-                : 'opacity-100 transform scale-100'
-              }`}
-          >
-            {renderScreen()}
-          </div>
+      <div className="min-h-screen bg-background">
+        <div
+          className={`transition-all duration-[4ms] ease-out ${isTransitioning
+              ? 'opacity-0 transform scale-75'
+              : 'opacity-100 transform scale-100'
+            }`}
+        >
+          {renderScreen()}
         </div>
-      </MessagingProvider>
+      </div>
     </AuthContext.Provider>
   );
 }

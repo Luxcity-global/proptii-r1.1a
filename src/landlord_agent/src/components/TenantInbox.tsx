@@ -130,7 +130,7 @@ export const TenantInbox: React.FC = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    useMessagingPoller();
+    // Poller is already started by LandlordDemoInner — do not start a second one here.
 
     const [activeTab, setActiveTab] = useState<TabId>('inbox');
     const [optimisticMessages, setOptimisticMessages] = useState<Record<string, Array<{ message: Message; file?: File }>>>({});
