@@ -13,7 +13,7 @@ export class AuthController {
     return {
       uid: user.uid,
       email: user.email,
-      role: user.role || 'tenant',
+      role: user.role || null,
     };
   }
 

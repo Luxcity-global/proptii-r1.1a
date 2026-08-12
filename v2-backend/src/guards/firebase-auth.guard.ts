@@ -82,7 +82,7 @@ export class FirebaseAuthGuard implements CanActivate {
           uid: decodedToken.uid,
           sub: decodedToken.uid,
           email: decodedToken.email,
-          role: role || 'tenant',
+          role: role || null,
           ...decodedToken,
         };
 
@@ -109,7 +109,7 @@ export class FirebaseAuthGuard implements CanActivate {
           uid,
           sub: uid,
           email,
-          role: role || 'tenant',
+          role: role || null,
           name: msalPayload.name,
         };
         return true;
@@ -128,7 +128,7 @@ export class FirebaseAuthGuard implements CanActivate {
         uid,
         sub: uid,
         email,
-        role: 'tenant',
+        role: null,
         name: msalPayload.name,
       };
       return true;
