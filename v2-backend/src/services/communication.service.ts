@@ -1,10 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { randomUUID } from 'crypto';
-
+import { EmailService } from './email.service';
+import { UserProfileService } from './user-profile.service';
 @Injectable()
 export class CommunicationService {
   private readonly logger = new Logger(CommunicationService.name);
+
+  constructor(
+    private readonly emailService: EmailService,
+    private readonly userProfileService: UserProfileService,
+  ) {}
 
   private get db() {
     if (!admin.apps.length) return null;
@@ -169,12 +175,62 @@ export class CommunicationService {
             { merge: true }
           );
         }
+
+        // Fire email notification asynchronously
+        this.notifyRecipient(conversationId, message, userId).catch(err => {
+          this.logger.error(`Background email notification failed: ${err?.message || err}`);
+        });
+
       } catch (err: any) {
         this.logger.warn(`Error sending message: ${err?.message || err}`);
       }
     }
 
     return { data: message };
+  }
+
+  private async notifyRecipient(conversationId: string, message: any, senderId: string) {
+    if (!this.conversationsCol) return;
+    const convSnap = await this.conversationsCol.doc(conversationId).get();
+    if (!convSnap.exists) return;
+    const conv = convSnap.data();
+    if (!conv) return;
+
+    let recipientId = '';
+    let isGuest = false;
+
+    // Determine recipient
+    if (senderId === conv.tenantId) {
+      recipientId = conv.landlordId; // Tenant to Landlord
+    } else if (senderId === conv.landlordId) {
+      recipientId = conv.tenantId; // Landlord to Tenant
+      if (!recipientId && conv.guestEmail) {
+        isGuest = true; // Landlord replying to unverified guest
+      }
+    } else if (senderId === 'guest') {
+      recipientId = conv.landlordId; // Guest to Landlord
+    } else {
+      return; // Unknown flow
+    }
+
+    let recipientEmail = '';
+    if (isGuest && conv.guestEmail) {
+      recipientEmail = conv.guestEmail;
+    } else if (recipientId) {
+      const profile = await this.userProfileService.getProfile(recipientId) as any;
+      recipientEmail = profile?.email || '';
+    }
+
+    if (recipientEmail) {
+      const senderName = message.senderName || (senderId === conv.landlordId ? 'Landlord' : (conv.tenantName || 'Tenant'));
+      await this.emailService.sendNewMessageNotification(
+        recipientEmail,
+        senderName,
+        conv.propertyTitle || 'a property',
+        isGuest,
+        isGuest ? conv.guestToken : undefined
+      );
+    }
   }
 
   async markRead(messageId: string) {

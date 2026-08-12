@@ -1,10 +1,13 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { randomUUID } from 'crypto';
+import { EmailService } from './email.service';
 
 @Injectable()
 export class GuestEnquiryService {
   private readonly logger = new Logger(GuestEnquiryService.name);
+
+  constructor(private readonly emailService: EmailService) {}
 
   private get db() {
     if (!admin.apps.length) return null;
@@ -239,47 +242,22 @@ export class GuestEnquiryService {
     }
   }
 
-  /** Resend a claim link email (no-op if SMTP not configured) */
   async resendClaimToken(email: string) {
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
+    const col = this.conversationsCol;
+    let threadToken: string | null = null;
+    if (col) {
+      try {
+        const snap = await col
+          .where('guestEmail', '==', email.toLowerCase().trim())
+          .where('guestToken', '!=', null)
+          .limit(1)
+          .get();
+        if (!snap.empty) threadToken = snap.docs[0].data().guestToken;
+      } catch {}
+    }
 
-    if (smtpHost && smtpUser && smtpPass) {
-      const col = this.conversationsCol;
-      let threadToken: string | null = null;
-      if (col) {
-        try {
-          const snap = await col
-            .where('guestEmail', '==', email.toLowerCase().trim())
-            .where('guestToken', '!=', null)
-            .limit(1)
-            .get();
-          if (!snap.empty) threadToken = snap.docs[0].data().guestToken;
-        } catch {}
-      }
-
-      if (threadToken) {
-        try {
-          const nodemailer = require('nodemailer');
-          const transporter = nodemailer.createTransport({
-            host: smtpHost,
-            port: parseInt(process.env.SMTP_PORT || '465'),
-            secure: true,
-            auth: { user: smtpUser, pass: smtpPass },
-          });
-          const frontendUrl = process.env.FRONTEND_URL || 'https://proptii-r1-1a-2.onrender.com';
-          await transporter.sendMail({
-            from: `"Proptii" <${process.env.SMTP_FROM_EMAIL || smtpUser}>`,
-            to: email,
-            subject: 'Claim your Proptii account',
-            html: `<p>Click the link to claim your account and view your messages:</p>
-                   <p><a href="${frontendUrl}/claim?token=${threadToken}">Claim Account</a></p>`,
-          });
-        } catch (err: any) {
-          this.logger.warn(`resendClaimToken email error: ${err?.message || err}`);
-        }
-      }
+    if (threadToken) {
+      await this.emailService.sendClaimAccountEmail(email, threadToken);
     }
 
     return { data: { sent: true } };

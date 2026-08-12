@@ -44,6 +44,8 @@ import { InsightsService } from './services/insights.service';
 import { SheetsService } from './services/sheets.service';
 import { RefereeGuarantorService } from './services/referee-guarantor.service';
 
+import { EmailService } from './services/email.service';
+
 @Module({
   imports: [],
   controllers: [
@@ -69,6 +71,7 @@ import { RefereeGuarantorService } from './services/referee-guarantor.service';
     RefereeGuarantorController,
   ],
   providers: [
+    EmailService,
     NativePropertiesService,
     SavedPropertiesService,
     ViewingRequestService,
