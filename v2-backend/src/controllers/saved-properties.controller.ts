@@ -14,9 +14,10 @@ export class SavedPropertiesController {
   }
 
   @Post(['saved-properties', 'users/me/saved-properties'])
-  async saveProperty(@Req() req: any, @Body() body: { propertyId: string; property?: any }) {
+  async saveProperty(@Req() req: any, @Body() body: any) {
     const userId = req.user.uid;
-    return await this.savedPropertiesService.saveProperty(userId, body.propertyId, body.property);
+    const propId = body?.propertyId || body?.id || body?.property?.id || body?.property?.propertyId || `prop_${Date.now()}`;
+    return await this.savedPropertiesService.saveProperty(userId, propId, body);
   }
 
   @Delete(['saved-properties/:propertyId(*)', 'users/me/saved-properties/:propertyId(*)', 'saved-properties', 'users/me/saved-properties'])

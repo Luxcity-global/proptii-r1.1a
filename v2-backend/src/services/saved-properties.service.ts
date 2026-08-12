@@ -1,6 +1,21 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 
+function sanitizeFirestoreData(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) return obj.map(sanitizeFirestoreData);
+  if (typeof obj === 'object') {
+    const clean: Record<string, any> = {};
+    for (const [key, val] of Object.entries(obj)) {
+      if (val !== undefined) {
+        clean[key] = sanitizeFirestoreData(val);
+      }
+    }
+    return clean;
+  }
+  return obj;
+}
+
 @Injectable()
 export class SavedPropertiesService {
   private get db() {
@@ -17,19 +32,19 @@ export class SavedPropertiesService {
   }
 
   async saveProperty(userId: string, propertyId: string, propertyData?: any) {
-    const safePropertyId = encodeURIComponent(propertyId);
+    const validId = propertyId || `prop_${Date.now()}`;
+    const safePropertyId = encodeURIComponent(validId);
     const docId = `${userId}_${safePropertyId}`;
     const docRef = this.collection.doc(docId);
     
-    const payload = {
-      id: propertyId,
+    const payload = sanitizeFirestoreData({
+      id: validId,
       docId,
       userId,
-      propertyId,
-      property: propertyData || null,
+      propertyId: validId,
       ...(propertyData || {}),
-      savedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
+      savedAt: new Date().toISOString(),
+    });
 
     await docRef.set(payload, { merge: true });
     return payload;
