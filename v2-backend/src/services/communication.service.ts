@@ -214,17 +214,22 @@ export class CommunicationService {
     }
 
     let recipientEmail = '';
+    let recipientName = '';
+    
     if (isGuest && conv.guestEmail) {
       recipientEmail = conv.guestEmail;
+      recipientName = conv.tenantName || 'Guest';
     } else if (recipientId) {
       const profile = await this.userProfileService.getProfile(recipientId) as any;
       recipientEmail = profile?.email || '';
+      recipientName = profile?.name || profile?.displayName || (recipientId === conv.landlordId ? 'Landlord' : (conv.tenantName || 'Tenant'));
     }
 
     if (recipientEmail) {
       const senderName = message.senderName || (senderId === conv.landlordId ? 'Landlord' : (conv.tenantName || 'Tenant'));
       await this.emailService.sendNewMessageNotification(
         recipientEmail,
+        recipientName,
         senderName,
         conv.propertyTitle || 'a property',
         isGuest,

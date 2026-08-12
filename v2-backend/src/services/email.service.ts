@@ -40,10 +40,11 @@ export class EmailService {
     return str.length > maxLength ? str.substring(0, maxLength - 3) + '...' : str;
   }
 
-  async sendNewMessageNotification(recipientEmail: string, senderName: string, propertyTitle: string, isGuest: boolean, guestToken?: string) {
+  async sendNewMessageNotification(recipientEmail: string, recipientName: string, senderName: string, propertyTitle: string, isGuest: boolean, guestToken?: string) {
     if (!recipientEmail) return;
 
     // Truncate variables to prevent layout spill-over
+    const safeRecipientName = this.truncate(recipientName || '', 50);
     const safeSenderName = this.truncate(senderName || 'A user', 50);
     const safePropertyTitle = this.truncate(propertyTitle || 'a property', 60);
 
@@ -51,10 +52,12 @@ export class EmailService {
       ? `${this.frontendUrl}/claim?token=${guestToken}` 
       : `${this.frontendUrl}/login`;
 
+    const greeting = safeRecipientName ? `Hello ${safeRecipientName},` : 'Hello,';
+
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
         <h2 style="color: #3b82f6;">New Message on Proptii</h2>
-        <p>Hello,</p>
+        <p>${greeting}</p>
         <p>You have received a new message from <strong>${safeSenderName}</strong> regarding <strong>${safePropertyTitle}</strong>.</p>
         <div style="margin: 30px 0;">
           <a href="${actionUrl}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
