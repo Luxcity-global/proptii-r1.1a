@@ -309,36 +309,38 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                         <div className="pointer-events-none absolute inset-0 rounded-full" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 50%)' }} />
                       )}
                     </button>
-                    {/* List / Landlords side (gold) */}
-                    <button
-                      type="button"
-                      onClick={() => handleServiceModeSwitch('list')}
-                      className="group relative flex items-center gap-1.5 sm:gap-2 rounded-full px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-                      style={
-                        activeServiceMode === 'list'
-                          ? {
-                              background: 'linear-gradient(135deg, #F5E6CC 0%, #E8D5B0 80%, #DBC8A0 100%)',
-                              color: '#3D2E1A',
-                              boxShadow: '0 4px 16px rgba(232, 213, 176, 0.35), 0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -2px 4px rgba(0, 0, 0, 0.05)',
-                              transform: 'translateY(-1px)',
-                            }
-                          : { background: 'transparent', color: 'rgba(255, 255, 255, 0.55)' }
-                      }
-                      aria-pressed={activeServiceMode === 'list'}
-                      aria-label="List & Manage Properties"
-                    >
-                      <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" strokeWidth={2.5} />
-                      <span className="whitespace-nowrap tracking-wide">List &amp; Manage Properties</span>
-                      <ChevronDown
-                        className={`h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 transition-all duration-300 ${
-                          activeServiceMode === 'list' && isServiceDropdownOpen ? 'rotate-180 opacity-100' : activeServiceMode === 'list' ? 'opacity-70' : 'opacity-0'
-                        }`}
-                        strokeWidth={2.5}
-                      />
-                      {activeServiceMode === 'list' && (
-                        <div className="pointer-events-none absolute inset-0 rounded-full" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 50%)' }} />
-                      )}
-                    </button>
+                    {/* List / Landlords side (gold) – Hidden for pure Tenants */}
+                    {(!isAuthenticated || !user || user.roles?.includes('landlord') || user.roles?.includes('agent')) && (
+                      <button
+                        type="button"
+                        onClick={() => handleServiceModeSwitch('list')}
+                        className="group relative flex items-center gap-1.5 sm:gap-2 rounded-full px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+                        style={
+                          activeServiceMode === 'list'
+                            ? {
+                                background: 'linear-gradient(135deg, #F5E6CC 0%, #E8D5B0 80%, #DBC8A0 100%)',
+                                color: '#3D2E1A',
+                                boxShadow: '0 4px 16px rgba(232, 213, 176, 0.35), 0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -2px 4px rgba(0, 0, 0, 0.05)',
+                                transform: 'translateY(-1px)',
+                              }
+                            : { background: 'transparent', color: 'rgba(255, 255, 255, 0.55)' }
+                        }
+                        aria-pressed={activeServiceMode === 'list'}
+                        aria-label="List & Manage Properties"
+                      >
+                        <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" strokeWidth={2.5} />
+                        <span className="whitespace-nowrap tracking-wide">List &amp; Manage Properties</span>
+                        <ChevronDown
+                          className={`h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 transition-all duration-300 ${
+                            activeServiceMode === 'list' && isServiceDropdownOpen ? 'rotate-180 opacity-100' : activeServiceMode === 'list' ? 'opacity-70' : 'opacity-0'
+                          }`}
+                          strokeWidth={2.5}
+                        />
+                        {activeServiceMode === 'list' && (
+                          <div className="pointer-events-none absolute inset-0 rounded-full" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 50%)' }} />
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
                 {/* Contextual dropdown – same design as home-v2, centered below pill */}
