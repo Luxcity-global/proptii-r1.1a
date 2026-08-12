@@ -8,37 +8,36 @@ import {
 } from '@azure/msal-browser';
 import { msalConfig, loginRequest, b2cPolicies } from '../config/authConfig';
 import SessionManager from '../services/SessionManager';
-
 import { notifyAuthReady } from '../services/authReady';
 
 // ─── MSAL singleton ───────────────────────────────────────────────────────────
+// One instance per page — stored on the module scope so the same object is
+// returned across Hot Module Replacement cycles in dev.
+
+let msalInstance: PublicClientApplication | null = null;
+let msalInitPromise: Promise<void> | null = null;
 
 export const getMsalInstance = (): PublicClientApplication => {
-  const win = window as any;
-  if (!win.__msalInstance) {
-    win.__msalInstance = new PublicClientApplication(msalConfig);
-    win.__msalInitPromise = win.__msalInstance.initialize() as Promise<void>;
-    win.__msalInitPromise.catch((err: any) => console.error('[Auth] MSAL initialize() failed:', err));
+  if (!msalInstance) {
+    msalInstance = new PublicClientApplication(msalConfig);
+    msalInitPromise = msalInstance.initialize() as Promise<void>;
+    msalInitPromise.catch((err) => console.error('[Auth] MSAL initialize() failed:', err));
 
-    win.__msalInstance.addEventCallback((event: EventMessage) => {
-      const succeeded =
-        event.eventType === EventType.LOGIN_SUCCESS ||
-        event.eventType === EventType.LOGOUT_SUCCESS;
-      const failed =
-        event.eventType === EventType.LOGIN_FAILURE ||
+    msalInstance.addEventCallback((event: EventMessage) => {
+      const relevant =
+        event.eventType === EventType.LOGIN_SUCCESS  ||
+        event.eventType === EventType.LOGOUT_SUCCESS ||
+        event.eventType === EventType.LOGIN_FAILURE  ||
         event.eventType === EventType.ACQUIRE_TOKEN_FAILURE;
-      if (succeeded || failed) {
-        window.dispatchEvent(new CustomEvent('auth-state-changed'));
-      }
+      if (relevant) window.dispatchEvent(new CustomEvent('auth-state-changed'));
     });
   }
-  return win.__msalInstance;
+  return msalInstance;
 };
 
 export async function waitForMsalReady(): Promise<void> {
-  const win = window as any;
-  if (!win.__msalInstance) getMsalInstance();
-  if (win.__msalInitPromise) await win.__msalInitPromise;
+  if (!msalInstance) getMsalInstance();
+  if (msalInitPromise) await msalInitPromise;
 }
 
 export { isAuthReady, waitForAuthReady } from '../services/authReady';
@@ -111,10 +110,32 @@ const LOCAL_STORAGE_KEYS = ['mock_token', 'auth_token', 'proptii_auth_state'];
 function clearAuthStorage(): void {
   LOCAL_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k));
   sessionStorage.removeItem('redirectAfterLogin');
-  // Clear all role cache entries (keyed by uid)
+  // Clear role cache for all users so no role bleeds across accounts
   Object.keys(localStorage)
     .filter(k => k.startsWith('proptii_role_'))
     .forEach(k => localStorage.removeItem(k));
+}
+
+async function syncFirebaseAuth(b2cIdToken: string): Promise<void> {
+  const { signInWithCustomToken } = await import('firebase/auth');
+  const { auth } = await import('../config/firebaseConfig');
+  const base = (import.meta.env.VITE_NEST_API_ENDPOINT || 'http://localhost:3000').replace(/\/$/, '');
+  try {
+    const res = await fetch(`${base}/api/auth/firebase-token`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${b2cIdToken}`, 'Content-Type': 'application/json' },
+    });
+    if (res.ok) {
+      const { firebaseToken } = await res.json();
+      if (firebaseToken) await signInWithCustomToken(auth, firebaseToken);
+    } else {
+      window.dispatchEvent(new CustomEvent('firebase-auth-sync-failed', { detail: { status: res.status } }));
+    }
+  } catch (err) {
+    window.dispatchEvent(new CustomEvent('firebase-auth-sync-failed', {
+      detail: { message: err instanceof Error ? err.message : 'Unknown' },
+    }));
+  }
 }
 
 // ─── AuthProvider ─────────────────────────────────────────────────────────────
@@ -146,38 +167,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return;
         }
 
-        // Process any pending B2C redirect response — MUST be awaited before
-        // any other MSAL call to avoid racing MSAL's internal hydration.
-        console.warn('[Auth:init] Calling handleRedirectPromise...');
+        // Process any pending B2C redirect. Must be called before any other MSAL
+        // API to avoid racing the internal cache hydration.
         const redirect = await instance.handleRedirectPromise();
-        console.warn('[Auth:init] handleRedirectPromise resolved:', !!redirect);
-        if (redirect) console.warn('[Auth:init] Redirect payload:', { account: redirect.account?.username, state: redirect.state });
-
         if (redirect?.account) instance.setActiveAccount(redirect.account);
         if (redirect?.state) {
           try {
             const parsed = JSON.parse(redirect.state);
-            if (parsed.redirect) {
-              console.warn('[Auth:init] Found redirect state:', parsed.redirect);
-              sessionStorage.setItem('redirectAfterLogin', parsed.redirect);
-            }
+            if (parsed.redirect) sessionStorage.setItem('redirectAfterLogin', parsed.redirect);
           } catch { /* state is not JSON */ }
         }
 
-        const logoutInProgress = sessionStorage.getItem('logout_in_progress');
-        if (accounts.length === 0) {
-          if (logoutInProgress) {
-            sessionStorage.removeItem('logout_in_progress');
-          }
-          return;
-        }
-
-        if (logoutInProgress === 'true') {
-          setIsAuthenticated(false);
-          setUser(null);
-          setIsLoading(false);
-          return;
-        }
+        if (accounts.length === 0) return;
 
         const account = accounts[0];
         instance.setActiveAccount(account);
@@ -187,20 +188,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         let roles: string[]  = [];
         let roleResolved      = false;
         try {
-          console.warn('[Auth:init] Resolving role for user:', account.username);
           const { resolveRole } = await import('../services/roleService');
           const role = await resolveRole(userId, account.username);
-          console.warn('[Auth:init] Role resolved to:', role);
           if (role) {
             roles = [role];
             if (LANDLORD_ROLES.has(role)) {
-              console.warn('[Auth:init] Landlord role detected. Proceeding without forced redirect.');
+              const redir = sessionStorage.getItem('redirectAfterLogin');
+              if (!redir || redir === '/dashboard' || redir === '/') {
+                sessionStorage.setItem('redirectAfterLogin', '/landlord');
+              }
             }
           }
           roleResolved = true;
         } catch (err) {
           console.error('[Auth] Role resolution failed:', err);
-          // roleResolved stays false — ProtectedRoute holds on spinner
+          // roleResolved stays false — ProtectedRoute shows spinner until retry
         }
 
         if (!cancelled) {
@@ -217,7 +219,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setIsAuthenticated(true);
         }
 
-        // Using MSAL exclusively for frontend authentication.
+        // Firebase sync — get token directly from MSAL to avoid a deadlock
+        // with waitForAuthReady() (notifyAuthReady hasn't fired yet here).
+        instance.acquireTokenSilent({ ...loginRequest, account })
+          .then((r) => { if (r.idToken) syncFirebaseAuth(r.idToken); })
+          .catch(() => { /* non-fatal */ });
 
         sessionManager.updateActivity('authentication', 'Session initialized');
 
@@ -287,16 +293,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
+  /**
+   * Sign in via full-page redirect to Azure B2C.
+   * Redirect is used (not popup) because B2C sets COOP: same-origin on their
+   * auth pages, which nullifies window.opener after the popup returns, causing
+   * MSAL to throw BrowserAuthError with empty .message → ErrorBoundary crash.
+   */
   const login = async (): Promise<void> => {
     const redirectPath = sessionStorage.getItem('redirectAfterLogin');
-    console.warn('[Auth:login] Initiating login. Target redirect:', redirectPath);
     const req = {
       ...loginRequest,
       state: redirectPath ? JSON.stringify({ redirect: redirectPath }) : undefined,
       redirectStartPage: window.location.href,
     };
     try {
-      console.warn('[Auth:login] Calling msal.loginRedirect() with payload:', req);
       await instance.loginRedirect(req);
     } catch (err) {
       console.error('[Auth] loginRedirect() failed:', err);
@@ -304,32 +314,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  /**
+   * Sign out: clears local state immediately and uses a LOCAL-ONLY logout
+   * (onRedirectNavigate returns false) so MSAL clears its localStorage cache
+   * without navigating to B2C's end-session URL.
+   *
+   * Why not full logoutRedirect? Because it redirects back to window.location.origin,
+   * re-renders the app, and init() finds the account still in the MSAL cache
+   * (cache is cleared only after B2C's end-session response returns, which races
+   * with the next render) — logging the user back in immediately.
+   */
   const logout = async (): Promise<void> => {
     sessionManager.updateActivity('interaction', 'User logout');
 
-    // Set logout in progress to prevent init() from re-authenticating the user
-    // during the redirect round-trip.
-    sessionStorage.setItem('logout_in_progress', 'true');
-
-    // Clear local state immediately — do not wait for any MSAL round-trip.
+    // Clear local state first so the UI is immediately unauthenticated
     setIsAuthenticated(false);
     setUser(null);
     clearAuthStorage();
 
-    // Mock user: nothing further needed.
-    if (user?.id?.startsWith('tenant-test-') || user?.id?.startsWith('landlord-test-')) {
-      sessionStorage.removeItem('logout_in_progress');
-      return;
-    }
+    // Mock user — nothing more needed
+    if (user?.id?.startsWith('tenant-test-') || user?.id?.startsWith('landlord-test-')) return;
 
     try {
       const activeAccount = instance.getActiveAccount() ?? instance.getAllAccounts()[0];
       await instance.logoutRedirect({
         account: activeAccount ?? undefined,
+        // Return false → MSAL clears its cache locally, skips B2C end-session URL
+        onRedirectNavigate: () => false,
       });
     } catch (err) {
       console.warn('[Auth] logoutRedirect() threw (local state already cleared):', err);
-      sessionStorage.removeItem('logout_in_progress');
     }
   };
 

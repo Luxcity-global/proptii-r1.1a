@@ -5,356 +5,491 @@ import { setRole } from '../services/roleService';
 import type { UserRole } from '../services/roleService';
 
 /**
- * RoleSelect
+ * RoleSelect — shown to authenticated users with no role assigned yet,
+ * and to landlords/agents switching to tenant view from Settings.
  *
- * Shown to authenticated users whose role has not yet been resolved,
- * and to landlords/agents switching roles from DashboardSettings.
- *
- * After the user picks a role:
- *   1. Write to Firestore via setRole() (3-second timeout; falls back to
- *      localStorage so the app still works if Firestore is unreachable).
- *   2. Patch the in-memory AuthContext user immediately via patchUser() so
- *      the updated role is visible to every component in the tree before we
- *      navigate — no full page reload, no re-run of resolveRole() with stale
- *      Firestore data, no MSAL redirect loop.
- *   3. Use React Router navigate() (soft navigation) to reach the dashboard.
+ * Design: centred card on a soft gradient background, two side-by-side
+ * role panels following the Proptii brand reference.
  */
 const RoleSelect: React.FC = () => {
   const { user, isLoading, patchUser } = useAuth();
   const navigate = useNavigate();
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [saving,  setSaving]  = useState(false);
   const [hovered, setHovered] = useState<'tenant' | 'landlord' | null>(null);
 
   const handleSelect = async (role: UserRole) => {
-    if (!user) return;
+    if (!user || saving) return;
     setSaving(true);
-    setError(null);
 
     try {
-      // Write to Firestore (race against 3 s so we never hang indefinitely).
       await Promise.race([
         setRole(user.id, user.email, role, 'manual_select'),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Firestore write timeout')), 3000),
+          setTimeout(() => reject(new Error('timeout')), 3000),
         ),
       ]);
-    } catch (err) {
-      // Non-fatal: persist locally so the role survives the session even if
-      // Firestore is offline or security rules block the write.
-      console.warn('[RoleSelect] setRole timed out or failed — falling back to localStorage:', err);
+    } catch {
+      // Non-fatal — persist locally so the role survives this session
       localStorage.setItem(`proptii_role_${user.id}`, role);
     }
 
-    // Update the in-memory user BEFORE navigating so ProtectedRoute sees
-    // the new role immediately and never redirects back to /login or /select-role.
+    // Patch in-memory user BEFORE navigating so ProtectedRoute sees the new role
     patchUser({ roles: [role], roleResolved: true });
 
-    // Soft navigation — React Router keeps the app mounted; no page reload,
-    // no re-run of resolveRole(), no MSAL redirect.
-    if (role === 'landlord' || role === 'agent') {
-      navigate('/landlord', { replace: true });
-    } else {
-      navigate('/dashboard', { replace: true });
-    }
-    // Reset saving state — the component stays mounted briefly during navigation.
+    navigate(role === 'landlord' || role === 'agent' ? '/landlord' : '/dashboard', {
+      replace: true,
+    });
     setSaving(false);
   };
 
   if (isLoading) {
     return (
-      <div style={styles.page}>
-        <div style={styles.spinner} />
+      <div style={S.loadingPage}>
+        <div style={S.loadingSpinner} />
       </div>
     );
   }
 
   return (
-    <div style={styles.page}>
-      {/* Subtle background blobs */}
-      <div style={styles.blob1} aria-hidden="true" />
-      <div style={styles.blob2} aria-hidden="true" />
+    <div style={S.page}>
+      {/* ── Outer card ────────────────────────────────────────────────── */}
+      <div style={S.card}>
 
-      <div style={styles.card}>
-        {/* Logo */}
-        <img
-          src="/images/proptii-logo.png"
-          alt="Proptii"
-          style={styles.logo}
-        />
+        {/* ── Header ──────────────────────────────────────────────────── */}
+        <div style={S.header}>
+          <div style={S.logoRow}>
+            <img src="/images/Logo-only.png" alt="" style={S.logoIcon} />
+            <span style={S.logoText}>proptii</span>
+          </div>
+          <h1 style={S.heading}>Refining the way you<br />experience property.</h1>
+          <p style={S.subheading}>
+            Select your profile to personalise your dashboard and tools.<br />
+            This can be updated later in your account settings.
+          </p>
+        </div>
 
-        <h1 style={styles.heading}>Welcome to Proptii</h1>
-        <p style={styles.subheading}>
-          Tell us how you'll be using the platform so we can set up
-          the right experience for you.
-        </p>
+        {/* ── Role cards ──────────────────────────────────────────────── */}
+        <div style={S.cardsRow}>
 
-        <div style={styles.optionsRow}>
-          {/* Tenant card */}
+          {/* ── Tenant card ─────────────────────────────────────────── */}
           <button
-            id="role-select-tenant"
             disabled={saving}
             onClick={() => handleSelect('tenant')}
             onMouseEnter={() => setHovered('tenant')}
             onMouseLeave={() => setHovered(null)}
-            aria-label="I'm looking for a home — select tenant role"
             style={{
-              ...styles.optionCard,
-              ...(hovered === 'tenant' ? styles.optionCardHover : {}),
-              ...(saving ? styles.optionCardDisabled : {}),
+              ...S.roleCard,
+              ...S.tenantCard,
+              ...(hovered === 'tenant' ? S.tenantCardHover : {}),
+              ...(saving ? S.cardDisabled : {}),
             }}
+            aria-label="I'm looking for a home — tenant"
           >
-            <div style={{ ...styles.optionIcon, background: 'linear-gradient(135deg, #136C9E22, #136C9E44)' }}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-                <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"
-                  stroke="#136C9E" strokeWidth="1.8" strokeLinejoin="round" />
-                <path d="M9 21V12h6v9" stroke="#136C9E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+            {/* Badge + CTA row */}
+            <div style={S.cardTopRow}>
+              <span style={{ ...S.badge, ...S.tenantBadge }}>RESIDENTIAL / EXPLORER</span>
+              <span style={{ ...S.ctaPill, ...S.tenantCta }}>
+                {saving ? 'Setting up…' : 'Tenant Dashboard →'}
+              </span>
             </div>
-            <h2 style={styles.optionTitle}>I'm looking for a home</h2>
-            <p style={styles.optionDesc}>
-              Search listings, book viewings, sign contracts, and manage
-              your entire rental journey in one place.
-            </p>
-            <div style={{ ...styles.optionBadge, borderColor: '#136C9E', color: '#136C9E' }}>
-              Tenant dashboard →
+
+            {/* Content + photo row */}
+            <div style={S.cardBody}>
+              <div style={S.cardText}>
+                <h2 style={{ ...S.cardHeading, color: '#030712' }}>Find a home</h2>
+                <p style={S.cardDesc}>
+                  Browse verified listings, schedule seamless viewings, and manage
+                  your rental agreements in one unified interface.
+                </p>
+
+                {/* Stats */}
+                <div style={S.statsRow}>
+                  <div style={S.stat}>
+                    <span style={{ ...S.statValue, color: '#136C9E' }}>5k+</span>
+                    <span style={S.statLabel}>live listings</span>
+                  </div>
+                  <div style={S.stat}>
+                    <span style={{ ...S.statValue, color: '#136C9E' }}>0%</span>
+                    <span style={S.statLabel}>platform fees</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Property photo */}
+              <div style={S.photoWrap}>
+                <img
+                  src="/images/British-home-w2974.jpg"
+                  alt=""
+                  style={{
+                    ...S.photo,
+                    transform: hovered === 'tenant' ? 'scale(1.04)' : 'scale(1)',
+                  }}
+                  loading="eager"
+                />
+              </div>
             </div>
+
+            {/* Saving overlay */}
+            {saving && (
+              <div style={S.savingOverlay}>
+                <div style={S.spinnerSmall} />
+              </div>
+            )}
           </button>
 
-          {/* Divider */}
-          <div style={styles.divider}>
-            <span style={styles.dividerLabel}>or</span>
+          {/* ── Divider dot ─────────────────────────────────────────── */}
+          <div style={S.dividerDot}>
+            <span style={S.dot} />
           </div>
 
-          {/* Landlord card */}
+          {/* ── Landlord card ───────────────────────────────────────── */}
           <button
-            id="role-select-landlord"
             disabled={saving}
             onClick={() => handleSelect('landlord')}
             onMouseEnter={() => setHovered('landlord')}
             onMouseLeave={() => setHovered(null)}
-            aria-label="I manage properties — select landlord role"
             style={{
-              ...styles.optionCard,
-              ...(hovered === 'landlord' ? styles.optionCardHover : {}),
-              ...(saving ? styles.optionCardDisabled : {}),
+              ...S.roleCard,
+              ...S.landlordCard,
+              ...(hovered === 'landlord' ? S.landlordCardHover : {}),
+              ...(saving ? S.cardDisabled : {}),
             }}
+            aria-label="I manage properties — landlord or agent"
           >
-            <div style={{ ...styles.optionIcon, background: 'linear-gradient(135deg, #DC5F1222, #DC5F1244)' }}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-                <rect x="2" y="7" width="20" height="14" rx="1" stroke="#DC5F12" strokeWidth="1.8" />
-                <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" stroke="#DC5F12" strokeWidth="1.8" strokeLinejoin="round" />
-                <path d="M12 12v4M10 14h4" stroke="#DC5F12" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
+            {/* Badge + CTA row */}
+            <div style={S.cardTopRow}>
+              <span style={{ ...S.badge, ...S.landlordBadge }}>MANAGEMENT · SCALE</span>
+              <span style={{ ...S.ctaPill, ...S.landlordCta }}>
+                {saving ? 'Setting up…' : 'Landlord/Agent Dashboard →'}
+              </span>
             </div>
-            <h2 style={styles.optionTitle}>I manage properties</h2>
-            <p style={styles.optionDesc}>
-              List properties, handle tenancy applications, collect references,
-              and manage your portfolio from one dashboard.
-            </p>
-            <div style={{ ...styles.optionBadge, borderColor: '#DC5F12', color: '#DC5F12' }}>
-              Landlord / Agent dashboard →
+
+            {/* Content + photo row */}
+            <div style={S.cardBody}>
+              <div style={S.cardText}>
+                <h2 style={{ ...S.cardHeading, color: '#261A00' }}>Manage assets</h2>
+                <p style={S.cardDesc}>
+                  List properties, handle tenancy applications, collect references,
+                  and manage your portfolio from one dashboard.
+                </p>
+
+                {/* Stats */}
+                <div style={S.statsRow}>
+                  <div style={S.stat}>
+                    <span style={{ ...S.statValue, color: '#9A6000' }}>Enterprise</span>
+                    <span style={S.statLabel}>tools</span>
+                  </div>
+                  <div style={S.stat}>
+                    <span style={{ ...S.statValue, color: '#9A6000' }}>Real-time</span>
+                    <span style={S.statLabel}>analytics</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Property photo */}
+              <div style={S.photoWrap}>
+                <img
+                  src="/images/modern-building.jpg"
+                  alt=""
+                  style={{
+                    ...S.photo,
+                    transform: hovered === 'landlord' ? 'scale(1.04)' : 'scale(1)',
+                  }}
+                  loading="eager"
+                />
+              </div>
             </div>
+
+            {/* Saving overlay */}
+            {saving && (
+              <div style={S.savingOverlay}>
+                <div style={S.spinnerSmall} />
+              </div>
+            )}
           </button>
         </div>
 
-        {saving && (
-          <div style={styles.savingBar}>
-            <div style={styles.savingSpinner} />
-            <span style={{ color: '#555', fontSize: 14 }}>Setting up your account…</span>
-          </div>
-        )}
-
-        {error && (
-          <p style={styles.error} role="alert">{error}</p>
-        )}
-
-        <p style={styles.footer}>
-          You can update this later in your account settings.
-        </p>
+        {/* ── Footer note ─────────────────────────────────────────────── */}
+        <p style={S.footer}>You can update this later in your account settings.</p>
       </div>
     </div>
   );
 };
 
-/* ─── styles ────────────────────────────────────────────────────────────────── */
+/* ─── Styles ─────────────────────────────────────────────────────────────── */
 
-const styles: Record<string, React.CSSProperties> = {
+const S: Record<string, React.CSSProperties> = {
+  loadingPage: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'linear-gradient(135deg, #CBE6FF 0%, #f8fbff 40%, #fff8ee 70%, #FFEFD4 100%)',
+  },
+  loadingSpinner: {
+    width: 36,
+    height: 36,
+    borderRadius: '50%',
+    border: '3px solid #E5E7EB',
+    borderTopColor: '#136C9E',
+    animation: 'spin 0.8s linear infinite',
+  },
+
+  // Page: soft gradient matching the reference colour stops
   page: {
     minHeight: '100vh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8F9FA',
-    fontFamily: 'Archivo, Inter, sans-serif',
-    position: 'relative',
-    overflow: 'hidden',
     padding: '24px 16px',
+    background: 'linear-gradient(135deg, #CBE6FF 0%, #f0f7ff 35%, #fffdf8 65%, #FFEFD4 100%)',
+    fontFamily: 'Archivo, Inter, sans-serif',
   },
-  blob1: {
-    position: 'absolute',
-    top: '-120px',
-    right: '-120px',
-    width: '400px',
-    height: '400px',
-    borderRadius: '50%',
-    background: 'radial-gradient(circle, #136C9E18, transparent 70%)',
-    pointerEvents: 'none',
-  },
-  blob2: {
-    position: 'absolute',
-    bottom: '-100px',
-    left: '-100px',
-    width: '350px',
-    height: '350px',
-    borderRadius: '50%',
-    background: 'radial-gradient(circle, #DC5F1218, transparent 70%)',
-    pointerEvents: 'none',
-  },
+
+  // Outer card — white, large radius, subtle shadow
   card: {
-    background: '#fff',
-    borderRadius: '20px',
-    boxShadow: '0 8px 40px rgba(0,0,0,0.10)',
-    padding: '48px 40px 36px',
-    maxWidth: '820px',
+    background: '#ffffff',
+    borderRadius: 24,
+    boxShadow: '0 8px 48px rgba(54,65,83,0.12)',
+    padding: '40px 36px 28px',
+    maxWidth: 900,
     width: '100%',
-    position: 'relative',
-    textAlign: 'center',
   },
-  logo: {
-    height: '40px',
-    marginBottom: '32px',
+
+  // ── Header ──────────────────────────────────────────────────────────────
+
+  header: {
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  logoRow: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 16,
+  },
+  logoIcon: {
+    height: 24,
+    width: 24,
     objectFit: 'contain',
   },
-  heading: {
-    fontSize: '28px',
+  logoText: {
+    fontSize: 16,
     fontWeight: 700,
-    color: '#0F2537',
-    marginBottom: '12px',
+    color: '#136C9E',
+    letterSpacing: '-0.02em',
+  },
+  heading: {
+    fontSize: 'clamp(22px, 3.5vw, 32px)',
+    fontWeight: 700,
+    color: '#364153',
     lineHeight: 1.2,
+    marginBottom: 10,
   },
   subheading: {
-    fontSize: '16px',
+    fontSize: 14,
     color: '#6B7280',
-    marginBottom: '40px',
-    maxWidth: '480px',
-    marginLeft: 'auto',
-    marginRight: 'auto',
     lineHeight: 1.6,
+    maxWidth: 400,
+    margin: '0 auto',
   },
-  optionsRow: {
+
+  // ── Cards row ────────────────────────────────────────────────────────────
+
+  cardsRow: {
     display: 'flex',
-    gap: '0',
+    gap: 0,
     alignItems: 'stretch',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
   },
-  optionCard: {
-    flex: '1 1 260px',
-    maxWidth: '320px',
-    border: '2px solid #E5E7EB',
-    borderRadius: '16px',
-    padding: '32px 24px',
-    cursor: 'pointer',
-    background: '#fff',
-    textAlign: 'center',
-    transition: 'all 0.2s ease',
-    outline: 'none',
+
+  dividerDot: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0 12px',
+    flexShrink: 0,
+  },
+  dot: {
+    display: 'block',
+    width: 6,
+    height: 6,
+    borderRadius: '50%',
+    background: '#364153',
+    opacity: 0.25,
+  },
+
+  // ── Shared role card ─────────────────────────────────────────────────────
+
+  roleCard: {
+    flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-    gap: '12px',
+    gap: 16,
+    padding: '20px 20px 16px',
+    borderRadius: 16,
+    border: 'none',
+    cursor: 'pointer',
+    textAlign: 'left',
+    position: 'relative',
+    overflow: 'hidden',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+    outline: 'none',
   },
-  optionCardHover: {
-    borderColor: '#003450',
-    boxShadow: '0 4px 20px rgba(0,52,80,0.12)',
-    transform: 'translateY(-3px)',
-  },
-  optionCardDisabled: {
-    opacity: 0.6,
+  cardDisabled: {
+    opacity: 0.7,
     cursor: 'not-allowed',
-    transform: 'none',
   },
-  optionIcon: {
-    width: '80px',
-    height: '80px',
-    borderRadius: '50%',
+
+  // Tenant card: #CBE6FF tint
+  tenantCard: {
+    background: '#EFF8FF',
+  },
+  tenantCardHover: {
+    transform: 'translateY(-3px)',
+    boxShadow: '0 12px 32px rgba(19,108,158,0.18)',
+  },
+
+  // Landlord card: #FFEFD4 tint
+  landlordCard: {
+    background: '#FFFAF0',
+  },
+  landlordCardHover: {
+    transform: 'translateY(-3px)',
+    boxShadow: '0 12px 32px rgba(154,96,0,0.18)',
+  },
+
+  // ── Card internals ───────────────────────────────────────────────────────
+
+  cardTopRow: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: '4px',
-    flexShrink: 0,
+    justifyContent: 'space-between',
+    gap: 8,
+    flexWrap: 'wrap',
   },
-  optionTitle: {
-    fontSize: '18px',
+
+  badge: {
+    fontSize: 10,
     fontWeight: 700,
-    color: '#0F2537',
-    margin: '0',
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase' as const,
+    padding: '3px 10px',
+    borderRadius: 999,
   },
-  optionDesc: {
-    fontSize: '14px',
-    color: '#6B7280',
-    lineHeight: 1.6,
-    margin: '0',
-    flexGrow: 1,
+  tenantBadge: {
+    background: '#8FCDFF',
+    color: '#030712',
   },
-  optionBadge: {
-    fontSize: '13px',
+  landlordBadge: {
+    background: '#FEDFA0',
+    color: '#261A00',
+  },
+
+  ctaPill: {
+    fontSize: 12,
     fontWeight: 600,
-    border: '1px solid',
-    borderRadius: '20px',
-    padding: '6px 16px',
-    marginTop: '8px',
+    padding: '5px 14px',
+    borderRadius: 999,
+    whiteSpace: 'nowrap' as const,
+    transition: 'background 0.2s',
   },
-  divider: {
+  tenantCta: {
+    background: '#CBE6FF',
+    color: '#0F4A70',
+  },
+  landlordCta: {
+    background: '#FFEFD4',
+    color: '#7A4A00',
+  },
+
+  cardBody: {
     display: 'flex',
-    alignItems: 'center',
-    padding: '0 20px',
-    color: '#D1D5DB',
-    fontSize: '13px',
-    flexShrink: 0,
+    gap: 12,
+    alignItems: 'flex-end',
+    flex: 1,
   },
-  dividerLabel: {
-    padding: '0 4px',
+  cardText: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  },
+  cardHeading: {
+    fontSize: 'clamp(20px, 2.5vw, 26px)',
+    fontWeight: 700,
+    lineHeight: 1.15,
+    margin: 0,
+  },
+  cardDesc: {
+    fontSize: 12,
+    color: '#4B5563',
+    lineHeight: 1.6,
+    margin: 0,
+    maxWidth: 220,
+  },
+
+  statsRow: {
+    display: 'flex',
+    gap: 16,
+    marginTop: 6,
+  },
+  stat: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 1,
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: 700,
+    lineHeight: 1,
+  },
+  statLabel: {
+    fontSize: 11,
     color: '#9CA3AF',
-    fontWeight: 500,
   },
-  savingBar: {
+
+  photoWrap: {
+    flexShrink: 0,
+    width: 130,
+    height: 120,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    transition: 'transform 0.4s ease',
+    display: 'block',
+  },
+
+  savingOverlay: {
+    position: 'absolute',
+    inset: 0,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '10px',
-    marginTop: '24px',
+    background: 'rgba(255,255,255,0.5)',
+    borderRadius: 16,
+    backdropFilter: 'blur(2px)',
   },
-  savingSpinner: {
-    width: '18px',
-    height: '18px',
+  spinnerSmall: {
+    width: 24,
+    height: 24,
+    borderRadius: '50%',
     border: '2px solid #E5E7EB',
-    borderTop: '2px solid #003450',
-    borderRadius: '50%',
+    borderTopColor: '#136C9E',
     animation: 'spin 0.8s linear infinite',
   },
-  error: {
-    color: '#DC2626',
-    fontSize: '14px',
-    marginTop: '16px',
-    background: '#FEF2F2',
-    border: '1px solid #FECACA',
-    borderRadius: '8px',
-    padding: '10px 16px',
-  },
+
+  // ── Footer ───────────────────────────────────────────────────────────────
+
   footer: {
-    fontSize: '12px',
+    textAlign: 'center',
+    fontSize: 12,
     color: '#9CA3AF',
-    marginTop: '28px',
-  },
-  spinner: {
-    width: '32px',
-    height: '32px',
-    border: '3px solid #E5E7EB',
-    borderTop: '3px solid #003450',
-    borderRadius: '50%',
-    animation: 'spin 0.8s linear infinite',
+    marginTop: 20,
+    marginBottom: 0,
   },
 };
 

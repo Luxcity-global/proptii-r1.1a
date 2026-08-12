@@ -49,8 +49,14 @@ const RoleGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       redirectedRef.current = true;
       navigate('/select-role', { replace: true });
     }
-  }, [settled, isAuthenticated, isLoading, user, navigate, location.pathname]);
 
+    // Also redirect when role resolution completed but found no role (new user).
+    if (user && user.roleResolved === true && user.roles.length === 0) {
+      console.warn('[Auth] RoleGate: authenticated but no role assigned — redirecting to /select-role');
+      redirectedRef.current = true;
+      navigate('/select-role', { replace: true });
+    }
+  }, [settled, isAuthenticated, isLoading, user, navigate, location.pathname]);
   return <>{children}</>;
 };
 

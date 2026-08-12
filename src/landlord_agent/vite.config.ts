@@ -1,9 +1,11 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
+import fs from 'fs';
 
 export default defineConfig(({ mode }) => {
   const rootEnvDir = path.resolve(__dirname, '../..');
+  const rootNodeModules = path.resolve(__dirname, '../../node_modules');
   const env = loadEnv(mode, rootEnvDir, '');
   const measurementId = env.VITE_GA_MEASUREMENT_ID || 'G-88HC0TG6JJ';
 
@@ -16,6 +18,19 @@ export default defineConfig(({ mode }) => {
           return html.replace(/%VITE_GA_MEASUREMENT_ID%/g, measurementId);
         },
       },
+      {
+        name: 'resolve-from-root-node-modules',
+        resolveId(source) {
+          if (!source.startsWith('.') && !source.startsWith('/') && !source.startsWith('@/')) {
+            try {
+              return require.resolve(source, { paths: [rootNodeModules] });
+            } catch (e) {
+              // Fallback if require.resolve throws
+            }
+          }
+          return null;
+        },
+      },
     ],
     define: {
       'import.meta.env.VITE_GA_MEASUREMENT_ID': JSON.stringify(measurementId),
@@ -25,6 +40,9 @@ export default defineConfig(({ mode }) => {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       dedupe: ['react', 'react-dom'],
       alias: {
+        'react-hot-toast': path.resolve(__dirname, '../../node_modules/react-hot-toast'),
+        '@azure/msal-react': path.resolve(__dirname, '../../node_modules/@azure/msal-react'),
+        '@azure/msal-browser': path.resolve(__dirname, '../../node_modules/@azure/msal-browser'),
         'vaul@1.1.2': 'vaul',
         'sonner@2.0.3': 'sonner',
         'recharts@2.15.2': 'recharts',
