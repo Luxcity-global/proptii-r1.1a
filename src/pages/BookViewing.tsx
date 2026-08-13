@@ -7,6 +7,7 @@ import BookViewingModal from '../components/viewings/BookViewingModal';
 import ReviewModal from '../components/ReviewModal';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { bookViewingRequestService } from '../services/bookViewingRequestService';
+import { normalizeViewingProperty } from '../services/viewingService';
 import { trackEvent } from '../utils/analytics';
 import 'swiper/css';
 import 'swiper/css/navigation';
@@ -162,7 +163,7 @@ const BookViewing = () => {
             .saveRequest(
               user.id,
               parsedData.id || `property_${Date.now()}`,
-              {
+              normalizeViewingProperty({
                 street: parsedData.street,
                 town: parsedData.town,
                 city: parsedData.city,
@@ -171,7 +172,7 @@ const BookViewing = () => {
                 description: parsedData.description,
                 imageUrls: Array.isArray(parsedData.imageUrls) ? parsedData.imageUrls : [],
                 agent: agentDetails
-              },
+              }),
               managerInfo
             )
             .then((r) => {

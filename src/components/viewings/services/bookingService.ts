@@ -1,5 +1,6 @@
 import { PropertyDetails, ViewingDetails } from '../context/BookViewingContext';
 import { fetchWithApiFallback } from '../../../utils/apiEndpoints';
+import { getAccessTokenForApiRequest } from '../../../services/msalAccessToken';
 
 const VIEWINGS_PATH = '/viewing-requests';
 const SEARCH_PATH = '/search';
@@ -55,6 +56,12 @@ export const bookingService = {
 
   scheduleViewing: async (property: PropertyDetails, viewingDetails: ViewingDetails): Promise<void> => {
     try {
+      const token = await getAccessTokenForApiRequest();
+      if (!token) {
+        console.warn('Skipping /viewing-requests: no auth token (dashboard uses Firestore)');
+        return;
+      }
+
       // Extract city and postcode from property if available
       // PropertyDetails may have city and postcode as optional fields
       const propertyData: any = {
@@ -87,14 +94,17 @@ export const bookingService = {
 
       const init: RequestInit = {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           property: propertyData,
           agent: {
-            name: property.agent.name,
-            email: property.agent.email,
-            phone: property.agent.phone,
-            company: property.agent.company
+            name: property.agent.name || 'Unknown',
+            email: property.agent.email || 'unknown@example.com',
+            phone: property.agent.phone?.trim() || 'N/A',
+            company: property.agent.company?.trim() || 'N/A',
           },
           viewing_date: viewingDetails.date,
           viewing_time: viewingDetails.time,

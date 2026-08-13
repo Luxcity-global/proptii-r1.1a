@@ -28,13 +28,13 @@ class AgentDto {
   @IsString()
   email: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  phone: string;
+  phone?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  company: string;
+  company?: string;
 }
 
 export class CreateViewingRequestDto {

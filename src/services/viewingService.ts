@@ -67,6 +67,42 @@ export interface ViewingStats {
   total: number;
 }
 
+/** Firestore rejects `undefined` field values — only persist defined strings/arrays. */
+export function normalizeViewingProperty(property: {
+  street?: string;
+  town?: string;
+  city?: string;
+  postcode?: string;
+  title?: string;
+  description?: string;
+  imageUrls?: Array<string | undefined | null>;
+  agent?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    company?: string;
+  };
+}): ViewingBooking['property'] {
+  const imageUrls = (property.imageUrls || []).filter((url): url is string => Boolean(url));
+  return {
+    street: property.street || '',
+    town: property.town || '',
+    city: property.city || '',
+    postcode: property.postcode || '',
+    ...(property.title ? { title: property.title } : {}),
+    ...(property.description ? { description: property.description } : {}),
+    ...(imageUrls.length ? { imageUrls } : {}),
+    agent: {
+      id: property.agent?.id || '',
+      name: property.agent?.name || '',
+      email: property.agent?.email || '',
+      phone: property.agent?.phone || '',
+      company: property.agent?.company || '',
+    },
+  };
+}
+
 class ViewingService {
   private readonly collectionName = 'viewingBookings';
 
@@ -95,16 +131,27 @@ class ViewingService {
 
       const bookingId = `${userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const docRef = doc(db, this.collectionName, bookingId);
+      const normalizedProperty = normalizeViewingProperty(property);
 
       const bookingData: ViewingBooking = {
         id: bookingId,
         userId,
         propertyId: propertyId || null, // Handle undefined propertyId
-        landlordId: managerInfo?.landlordId ?? property.agent?.id ?? null,
-        agentId: managerInfo?.agentId ?? property.agent?.id ?? null,
-        agentEmail: property.agent?.email?.toLowerCase().trim() || null, // OPTIMIZATION: Denormalize for fast queries
-        property,
-        viewingDetails,
+        landlordId: managerInfo?.landlordId ?? normalizedProperty.agent?.id ?? null,
+        agentId: managerInfo?.agentId ?? normalizedProperty.agent?.id ?? null,
+        agentEmail: normalizedProperty.agent?.email?.toLowerCase().trim() || null, // OPTIMIZATION: Denormalize for fast queries
+        property: normalizedProperty,
+        viewingDetails: {
+          date: viewingDetails.date || '',
+          time: viewingDetails.time || '',
+          preference: viewingDetails.preference || '',
+          userDetails: {
+            fullName: viewingDetails.userDetails?.fullName || '',
+            email: viewingDetails.userDetails?.email || '',
+            phoneNumber: viewingDetails.userDetails?.phoneNumber || '',
+          },
+          ...(viewingDetails.whatsappNumber ? { whatsappNumber: viewingDetails.whatsappNumber } : {}),
+        },
         status: 'pending',
         createdAt: serverTimestamp() as Timestamp,
         updatedAt: serverTimestamp() as Timestamp
@@ -206,14 +253,26 @@ class ViewingService {
       const bookings: ViewingBooking[] = [];
 
       console.log('Query snapshot size:', querySnapshot.size);
-      querySnapshot.forEach((doc) => {
-        console.log('Found document:', doc.id, doc.data());
-        bookings.push(doc.data() as ViewingBooking);
+      querySnapshot.forEach((docSnap) => {
+        console.log('Found document:', docSnap.id, docSnap.data());
+        bookings.push(docSnap.data() as ViewingBooking);
       });
 
       console.log('Retrieved bookings:', bookings);
       return { success: true, bookings };
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === 'failed-precondition' || String(error?.message || '').includes('index')) {
+        try {
+          const fallbackQuery = query(collection(db, this.collectionName), where('userId', '==', userId));
+          const fallbackSnap = await getDocs(fallbackQuery);
+          const bookings: ViewingBooking[] = [];
+          fallbackSnap.forEach((docSnap) => bookings.push(docSnap.data() as ViewingBooking));
+          bookings.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+          return { success: true, bookings };
+        } catch (fallbackError) {
+          console.error('❌ Fallback user viewing query failed:', fallbackError);
+        }
+      }
       console.error('❌ Error getting user viewing bookings:', error);
       return {
         success: false,
@@ -249,7 +308,23 @@ class ViewingService {
 
       console.log(`Retrieved bookings for status ${status}:`, bookings);
       return { success: true, bookings };
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === 'failed-precondition' || String(error?.message || '').includes('index')) {
+        try {
+          const fallbackQuery = query(
+            collection(db, this.collectionName),
+            where('userId', '==', userId),
+            where('status', '==', status),
+          );
+          const fallbackSnap = await getDocs(fallbackQuery);
+          const fallbackBookings: ViewingBooking[] = [];
+          fallbackSnap.forEach((docSnap) => fallbackBookings.push(docSnap.data() as ViewingBooking));
+          fallbackBookings.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+          return { success: true, bookings: fallbackBookings };
+        } catch (fallbackError) {
+          console.error('❌ Fallback status viewing query failed:', fallbackError);
+        }
+      }
       console.error('❌ Error getting viewing bookings by status:', error);
       return {
         success: false,
@@ -632,28 +707,46 @@ class ViewingService {
     callback: (bookings: ViewingBooking[]) => void,
     onError?: (error: Error) => void
   ): () => void {
-    const q = query(
+    const emit = (querySnapshot: { forEach: (cb: (doc: { data: () => unknown }) => void) => void }) => {
+      const bookings: ViewingBooking[] = [];
+      querySnapshot.forEach((docSnap) => {
+        bookings.push(docSnap.data() as ViewingBooking);
+      });
+      bookings.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      callback(bookings);
+    };
+
+    const indexedQuery = query(
       collection(db, this.collectionName),
       where('userId', '==', userId),
       orderBy('createdAt', 'desc')
     );
 
-    return onSnapshot(
-      q,
-      (querySnapshot) => {
-        const bookings: ViewingBooking[] = [];
-        querySnapshot.forEach((doc) => {
-          bookings.push(doc.data() as ViewingBooking);
-        });
-        callback(bookings);
-      },
+    let unsubscribeFallback: (() => void) | null = null;
+    const unsubscribeIndexed = onSnapshot(
+      indexedQuery,
+      emit,
       (error) => {
         console.error('❌ Error in viewing bookings subscription:', error);
-        if (onError) {
-          onError(error);
+        const needsFallback =
+          (error as { code?: string }).code === 'failed-precondition' ||
+          String(error.message || '').includes('index');
+        if (needsFallback) {
+          const fallbackQuery = query(collection(db, this.collectionName), where('userId', '==', userId));
+          unsubscribeFallback = onSnapshot(fallbackQuery, emit, (fallbackError) => {
+            console.error('❌ Fallback viewing subscription failed:', fallbackError);
+            onError?.(fallbackError);
+          });
+          return;
         }
+        onError?.(error);
       }
     );
+
+    return () => {
+      unsubscribeIndexed();
+      unsubscribeFallback?.();
+    };
   }
 
   subscribeToManagerViewingBookings(

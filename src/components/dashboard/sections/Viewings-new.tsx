@@ -35,6 +35,7 @@ const Viewings: React.FC = () => {
     rejected: 0
   });
   
+  const [viewingsVersion, setViewingsVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isBookViewingOpen, setIsBookViewingOpen] = useState(false);
@@ -267,7 +268,7 @@ const Viewings: React.FC = () => {
     };
 
     loadViewingData();
-  }, [user?.id]);
+  }, [user?.id, viewingsVersion]);
 
   // Set up real-time subscriptions
   useEffect(() => {
@@ -288,23 +289,26 @@ const Viewings: React.FC = () => {
         console.log('Filtered upcoming:', upcoming);
         console.log('Filtered past:', past);
         setUpcomingViewings(prev => {
-          // Get request placeholders from previous state
+          const drafts = prev.filter(v => String(v.id).startsWith('draft_'));
           const requests = prev.filter(v => String(v.id).startsWith('request_'));
-          
-          // Only keep request placeholders that don't have real bookings
+
+          if (upcoming.length === 0 && prev.some(v => !String(v.id).startsWith('request_') && !String(v.id).startsWith('draft_'))) {
+            return prev;
+          }
+
           const realBookingKeys = new Set<string>();
           upcoming.forEach(b => {
             const key = b.propertyId || `${b.property.street}-${b.property.town}`;
             realBookingKeys.add(key);
           });
-          
+
           const filteredRequests = requests.filter(r => {
             const key = r.propertyId || `${r.property.street}-${r.property.town}`;
             return !realBookingKeys.has(key);
           });
-          
-          // Combine real bookings with filtered request placeholders
-          return [...upcoming, ...filteredRequests];
+
+          const combined = [...upcoming, ...filteredRequests].filter(v => !String(v.id).startsWith('draft_'));
+          return drafts.length ? [...drafts, ...combined] : combined;
         });
         setPastViewings(past);
       },
@@ -1070,8 +1074,8 @@ const Viewings: React.FC = () => {
         open={isBookViewingOpen}
         onClose={() => setIsBookViewingOpen(false)}
         onSubmissionComplete={() => {
-          // After successful submission, close modal and refresh data via existing subscriptions
           setIsBookViewingOpen(false);
+          setViewingsVersion((v) => v + 1);
         }}
       />
 

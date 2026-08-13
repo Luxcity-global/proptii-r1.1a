@@ -25,10 +25,10 @@ import { BookViewingProvider, useBookViewing } from './context/BookViewingContex
 import { bookingService } from './services/bookingService';
 import { viewingEmailService } from './services/viewingEmailService';
 import { generateAgentEmailTemplate, generateUserEmailTemplate } from './services/emailTemplates';
-import { viewingService } from '../../services/viewingService';
+import { viewingService, normalizeViewingProperty } from '../../services/viewingService';
 import { bookViewingRequestService } from '../../services/bookViewingRequestService';
 import landlordUserService from '../../services/landlordUserService';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth, getMsalInstance } from '../../contexts/AuthContext';
 
 import { Home, Event, DoneAll, Close, Warning } from '@mui/icons-material';
 import CheckIcon from '@mui/icons-material/Check';
@@ -369,8 +369,20 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
         console.log('Starting viewing submission...', { property, viewing, userId: user?.id });
         console.log('User object in BookViewingModal:', user);
 
-        // Save to Firestore
-        const userIdToUse = user?.id || 'anonymous';
+        // Save to Firestore — never fall back to anonymous if an MSAL account exists
+        let userIdToUse = user?.id || '';
+        if (!userIdToUse) {
+          try {
+            const account = getMsalInstance().getActiveAccount() ?? getMsalInstance().getAllAccounts()[0];
+            const oid = account?.idTokenClaims?.oid || account?.idTokenClaims?.sub;
+            if (typeof oid === 'string' && oid) userIdToUse = oid;
+          } catch (msalError) {
+            console.warn('Could not resolve MSAL user id for viewing save:', msalError);
+          }
+        }
+        if (!userIdToUse) {
+          userIdToUse = 'anonymous';
+        }
         console.log('Using user ID for Firestore save:', userIdToUse);
 
         // Look up the landlord/agent by email to get their ID
@@ -446,6 +458,25 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           // You might want to show a warning to the user
         } else {
           console.log('✅ Successfully saved to Firestore');
+        }
+
+        try {
+          const draftViewing = {
+            id: firestoreResult.bookingId || `draft_${Date.now()}`,
+            userId: userIdToUse,
+            propertyId: property.id || null,
+            property: normalizeViewingProperty(property),
+            viewingDetails: {
+              date: viewingBookingDetails.date,
+              time: viewingBookingDetails.time,
+              preference: viewingBookingDetails.preference,
+              userDetails: viewingBookingDetails.userDetails,
+            },
+            status: 'pending' as const,
+          };
+          sessionStorage.setItem('draft_viewing', JSON.stringify(draftViewing));
+        } catch (draftError) {
+          console.warn('Failed to store draft viewing placeholder:', draftError);
         }
 
         // Save to existing database (for backward compatibility) - Optional

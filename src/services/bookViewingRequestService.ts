@@ -12,6 +12,7 @@ import {
   deleteDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
+import { normalizeViewingProperty } from './viewingService';
 
 export interface BookViewingRequest {
   id: string;
@@ -60,15 +61,16 @@ class BookViewingRequestService {
 
       const requestId = `${userId}_${propertyId}_${Date.now()}`;
       const docRef = doc(db, this.collectionName, requestId);
+      const normalizedProperty = normalizeViewingProperty(property);
 
       const payload: BookViewingRequest = {
         id: requestId,
         userId,
         propertyId,
-        landlordId: managerInfo?.landlordId ?? property.agent?.id ?? null,
-        agentId: managerInfo?.agentId ?? property.agent?.id ?? null,
-        agentEmail: property.agent?.email?.toLowerCase().trim() || null, // OPTIMIZATION: Denormalize for fast queries
-        property,
+        landlordId: managerInfo?.landlordId ?? normalizedProperty.agent?.id ?? null,
+        agentId: managerInfo?.agentId ?? normalizedProperty.agent?.id ?? null,
+        agentEmail: normalizedProperty.agent?.email?.toLowerCase().trim() || null, // OPTIMIZATION: Denormalize for fast queries
+        property: normalizedProperty,
         status: 'requested',
         createdAt: serverTimestamp() as Timestamp,
         updatedAt: serverTimestamp() as Timestamp
@@ -94,6 +96,18 @@ class BookViewingRequestService {
       snap.forEach(d => out.push(d.data() as BookViewingRequest));
       return { success: true, requests: out };
     } catch (error: any) {
+      if (error?.code === 'failed-precondition' || String(error?.message || '').includes('index')) {
+        try {
+          const fallbackQuery = query(collection(db, this.collectionName), where('userId', '==', userId));
+          const fallbackSnap = await getDocs(fallbackQuery);
+          const out: BookViewingRequest[] = [];
+          fallbackSnap.forEach(d => out.push(d.data() as BookViewingRequest));
+          out.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+          return { success: true, requests: out };
+        } catch (fallbackError) {
+          console.error('Fallback book viewing request query failed:', fallbackError);
+        }
+      }
       console.error('Error getting book viewing requests:', error);
       return { success: false, error: error?.message || 'Unknown error' };
     }
@@ -315,24 +329,44 @@ class BookViewingRequestService {
     callback: (requests: BookViewingRequest[]) => void,
     onError?: (error: Error) => void
   ): () => void {
-    const q = query(
+    const emit = (snap: { forEach: (cb: (doc: { data: () => unknown }) => void) => void }) => {
+      const out: BookViewingRequest[] = [];
+      snap.forEach(d => out.push(d.data() as BookViewingRequest));
+      out.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      callback(out);
+    };
+
+    const indexedQuery = query(
       collection(db, this.collectionName),
       where('userId', '==', userId),
       orderBy('createdAt', 'desc')
     );
 
-    return onSnapshot(
-      q,
-      (snap) => {
-        const out: BookViewingRequest[] = [];
-        snap.forEach(d => out.push(d.data() as BookViewingRequest));
-        callback(out);
-      },
+    let unsubscribeFallback: (() => void) | null = null;
+    const unsubscribeIndexed = onSnapshot(
+      indexedQuery,
+      emit,
       (err) => {
         console.error('Error in requests subscription:', err);
-        if (onError) onError(err as any);
+        const needsFallback =
+          (err as { code?: string }).code === 'failed-precondition' ||
+          String(err.message || '').includes('index');
+        if (needsFallback) {
+          const fallbackQuery = query(collection(db, this.collectionName), where('userId', '==', userId));
+          unsubscribeFallback = onSnapshot(fallbackQuery, emit, (fallbackError) => {
+            console.error('Fallback requests subscription failed:', fallbackError);
+            onError?.(fallbackError as Error);
+          });
+          return;
+        }
+        onError?.(err as Error);
       }
     );
+
+    return () => {
+      unsubscribeIndexed();
+      unsubscribeFallback?.();
+    };
   }
 
   subscribeToManagerRequests(
