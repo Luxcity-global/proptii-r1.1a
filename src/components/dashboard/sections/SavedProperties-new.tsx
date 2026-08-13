@@ -142,7 +142,8 @@ const SavedProperties: React.FC = () => {
             <div className={`border-t border-gray-200 ${isMobile ? 'pt-4 mb-4' : 'pt-6 mb-6'}`}>
               <h4 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-gray-900 ${isMobile ? 'mb-2' : 'mb-3'}`}>Description</h4>
               <p className={`text-gray-700 leading-relaxed ${isMobile ? 'text-sm' : ''}`}>
-                {property.description || 'No description provided for this property.'}
+                {property.description ||
+                  `This ${property.propertyType || 'property'} offers ${property.bedrooms || ''} bedrooms and is located in ${property.location || 'the listed area'}.`}
               </p>
             </div>
 
@@ -169,7 +170,7 @@ const SavedProperties: React.FC = () => {
                   <div className={`${isMobile ? 'mt-3 flex-col' : 'mt-4 flex'} items-center ${isMobile ? 'gap-2' : 'gap-3'}`}>
                     <button className={`${isMobile ? 'w-full' : 'px-4'} py-2 bg-[#E65D24] text-white rounded-lg ${isMobile ? 'text-sm' : ''}`}>Chat</button>
                     <button className={`${isMobile ? 'w-full' : 'px-4'} py-2 bg-green-600 text-white rounded-lg ${isMobile ? 'text-sm' : ''}`}>Call</button>
-                    <button className={`${isMobile ? 'w-full' : 'px-4'} py-2 bg-white border border-gray-300 text-gray-700 rounded-lg ${isMobile ? 'text-sm' : ''}`}>Message</button>
+                    <button className={`${isMobile ? 'w-full' : 'px-4'} py-2 bg-white border border-gray-300 text-gray-700 rounded-lg ${isMobile ? 'text-sm' : ''}`}>Book Viewing</button>
                   </div>
                 </div>
               </div>
@@ -340,7 +341,7 @@ const SavedProperties: React.FC = () => {
       bedrooms: Number(p.bedrooms) || 0,
       propertyType: p.propertyType,
       source: p.source,
-      description: p.description,
+      description: p.description || p.summary || p.notes || '',
       imageUrls: (p.imageUrls && p.imageUrls.length ? p.imageUrls : ['/images/detached-house.jpg']),
       agent: p.agent ? {
         name: p.agent.name || p.agentName || 'Estate Agent',
@@ -370,6 +371,9 @@ const SavedProperties: React.FC = () => {
       town: locationParts[1] || '',
       city: locationParts[0] || property.location?.split(',')[0]?.trim() || '',
       postcode: locationParts[locationParts.length - 1] || '',
+      title: property.title,
+      description: property.description,
+      imageUrls: property.imageUrls || [],
       agent: {
         id: agent.id || agent.name || property.source || `agent-${Date.now()}`,
         name: agent.name || property.source || 'Estate Agent',

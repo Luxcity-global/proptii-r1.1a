@@ -172,7 +172,8 @@ const SavedPropertyDetailsModal: React.FC<SavedPropertyDetailsModalProps> = ({
               Description
             </h4>
             <p className={`text-gray-700 leading-relaxed ${isMobile ? 'text-sm' : ''}`}>
-              {property.description || 'No description provided for this property.'}
+              {property.description ||
+                `This ${property.propertyType || 'property'} offers ${property.bedrooms || ''} bedrooms and is located in ${property.location || 'the listed area'}.`}
             </p>
           </div>
 
@@ -216,7 +217,7 @@ const SavedPropertyDetailsModal: React.FC<SavedPropertyDetailsModalProps> = ({
                     Call
                   </button>
                   <button className={`${isMobile ? 'w-full' : 'px-4'} py-2 bg-white border border-gray-300 text-gray-700 rounded-lg ${isMobile ? 'text-sm' : ''}`}>
-                    Message
+                    Book Viewing
                   </button>
                 </div>
               </div>

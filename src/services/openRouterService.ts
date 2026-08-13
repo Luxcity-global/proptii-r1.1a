@@ -1,4 +1,5 @@
 import axios from 'axios';
+import referencingService from './referencingService';
 
 export interface ExtractedData {
     firstName?: string;
@@ -29,24 +30,15 @@ class OpenRouterService {
             const base64Data = await this.fileToBase64(file);
             const mimeType = file.type;
 
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-            console.log('Sending AI extraction request to backend:', API_URL);
+            console.log('Sending AI extraction request to backend');
 
-            const response = await axios.post(
-                `${API_URL}/api/referencing/ai-extract`,
-                { base64Data, mimeType },
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
+            const result = await referencingService.extractDataFromDocument(base64Data, mimeType);
 
-            if (response.data && response.data.success) {
+            if (result && result.success) {
                 console.log('Successfully received data from backend AI service');
-                return response.data.data as ExtractedData;
+                return result.data as ExtractedData;
             } else {
-                console.error('Backend returned an unsuccessful response:', response.data);
+                console.error('Backend returned an unsuccessful response:', result);
                 throw new Error('AI extraction failed in backend');
             }
         } catch (error) {

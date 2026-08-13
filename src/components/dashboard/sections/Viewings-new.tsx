@@ -63,6 +63,10 @@ const Viewings: React.FC = () => {
   }, [propertySelections]);
 
   const getViewingImage = (viewing: ViewingBooking) => {
+    const storedImage = viewing.property?.imageUrls?.find(Boolean);
+    if (storedImage) {
+      return storedImage;
+    }
     if (viewing.propertyId && selectionImageByPropertyId.has(viewing.propertyId)) {
       return selectionImageByPropertyId.get(viewing.propertyId) as string;
     }
@@ -78,7 +82,23 @@ const Viewings: React.FC = () => {
         s.property?.images?.length
       );
     });
-    return (match?.property?.images?.[0]) || '/images/detached-house.jpg';
+    if (match?.property?.images?.[0]) {
+      return match.property.images[0];
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem('savedProperties') || '[]') as Array<{ location?: string; title?: string; imageUrls?: string[] }>;
+      const street = (viewing.property.street || '').toLowerCase();
+      const savedMatch = saved.find((p) => {
+        const loc = `${p.location || ''} ${p.title || ''}`.toLowerCase();
+        return street && loc.includes(street) && p.imageUrls?.[0];
+      });
+      if (savedMatch?.imageUrls?.[0]) {
+        return savedMatch.imageUrls[0];
+      }
+    } catch {
+      // ignore localStorage parse errors
+    }
+    return '/images/detached-house.jpg';
   };
 
   // Load any draft viewing from sessionStorage to show an immediate placeholder
@@ -167,6 +187,9 @@ const Viewings: React.FC = () => {
             town: r.property.town,
             city: r.property.city,
             postcode: r.property.postcode,
+            title: r.property.title,
+            description: r.property.description,
+            imageUrls: r.property.imageUrls,
             agent: r.property.agent
           },
           viewingDetails: {
@@ -300,6 +323,9 @@ const Viewings: React.FC = () => {
             town: r.property.town,
             city: r.property.city,
             postcode: r.property.postcode,
+            title: r.property.title,
+            description: r.property.description,
+            imageUrls: r.property.imageUrls,
             agent: r.property.agent
           },
           viewingDetails: { date: '', time: '', preference: 'In-Person Viewing', userDetails: { fullName: '', email: '', phoneNumber: '' } },

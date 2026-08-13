@@ -481,6 +481,7 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
             bedrooms: bedrooms,
             propertyType: propertyType,
             imageUrls: validImageUrls.slice(0, 10), // Limit to 10 images max per property
+            description: '',
             agent: {
               name: agentName,
               email: '', // Will be filled later with email lookup
@@ -588,6 +589,16 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
             .map(u => u.startsWith('//') ? 'https:' + u : (u.startsWith('/') ? 'https://www.rightmove.co.uk' + u : u))
             .filter(u => u && !u.toLowerCase().includes('logo') && !u.toLowerCase().includes('icon'));
 
+          const dDescription = (
+            $$('[data-testid="property-description"]').first().text().trim() ||
+            $$('#description').first().text().trim() ||
+            $$('[class*="description"]').filter((_i, el) => {
+              const text = $$(el).text().trim();
+              return text.length > 80 && !/cookie|privacy|marketing/i.test(text);
+            }).first().text().trim() ||
+            ''
+          ).replace(/\s+/g, ' ').slice(0, 1200);
+
           // Merge into existing property
           const current = properties[index];
           if (current) {
@@ -599,6 +610,7 @@ export async function scrapeRightmove(url: string, apiKey: string): Promise<Prop
               bedrooms: current.bedrooms !== 'Not specified' ? current.bedrooms : (dBedrooms || current.bedrooms),
               propertyType: current.propertyType && current.propertyType !== 'Property' ? current.propertyType : (dPropertyType || current.propertyType),
               imageUrls: Array.from(new Set([...(current.imageUrls || []), ...normalizedDetailImages])).slice(0, 10),
+              description: current.description && current.description.length > 40 ? current.description : (dDescription || current.description),
               agent: {
                 ...current.agent,
                 website: current.agent.website || detailUrl,

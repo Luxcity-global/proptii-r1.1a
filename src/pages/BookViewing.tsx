@@ -17,6 +17,12 @@ import { Pagination, Navigation } from "swiper/modules";
 interface PropertyDetails {
   id?: string;
   street: string;
+  town?: string;
+  city?: string;
+  postcode?: string;
+  title?: string;
+  description?: string;
+  imageUrls?: string[];
   agent: {
     id: string;
     name: string;
@@ -112,6 +118,12 @@ const BookViewing = () => {
         setPrefilledPropertyData({
           id: parsedData.id,
           street: parsedData.street || '',
+          town: parsedData.town,
+          city: parsedData.city,
+          postcode: parsedData.postcode,
+          title: parsedData.title,
+          description: parsedData.description,
+          imageUrls: Array.isArray(parsedData.imageUrls) ? parsedData.imageUrls : [],
           agent: agentDetails
         });
         // Persist request to Firestore so Viewings page can source from it
@@ -124,6 +136,12 @@ const BookViewing = () => {
                 propertyId: parsedData.id || 'unknown-property',
                 property: {
                   street: parsedData.street,
+                  town: parsedData.town,
+                  city: parsedData.city,
+                  postcode: parsedData.postcode,
+                  title: parsedData.title,
+                  description: parsedData.description,
+                  imageUrls: Array.isArray(parsedData.imageUrls) ? parsedData.imageUrls : [],
                   agent: agentDetails
                 },
                 viewingDetails: { date: '', time: '', preference: 'In-Person Viewing', userDetails: { fullName: '', email: '', phoneNumber: '' } },
@@ -146,6 +164,12 @@ const BookViewing = () => {
               parsedData.id || `property_${Date.now()}`,
               {
                 street: parsedData.street,
+                town: parsedData.town,
+                city: parsedData.city,
+                postcode: parsedData.postcode,
+                title: parsedData.title,
+                description: parsedData.description,
+                imageUrls: Array.isArray(parsedData.imageUrls) ? parsedData.imageUrls : [],
                 agent: agentDetails
               },
               managerInfo

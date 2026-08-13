@@ -177,7 +177,9 @@ export const useSearchBackend = () => {
             if (event.type === 'initial' || event.type === 'results') {
               const incoming = (event.data as any[]).map(p => ({
                 ...p,
-                price: cleanPropertyPrice(p.price)
+                price: cleanPropertyPrice(p.price),
+                description: p.description || p.summary || p.notes || p.overview || '',
+                imageUrls: p.imageUrls || p.images || [],
               }));
 
               allScraped = [...allScraped, ...incoming];

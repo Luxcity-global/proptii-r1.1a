@@ -974,7 +974,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
         toast.error('Firestore save failed, but data will be saved locally');
       }
 
-      // Also save to Cosmos DB for backward compatibility
+      // Also save to Cosmos DB for backward compatibility (non-fatal if API validation fails)
       const section = getCurrentSection();
       if (section) {
         const currentSectionData = {
@@ -982,32 +982,36 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
           userId: user.id
         };
 
-        let cosmosSaveResult;
-        switch (currentStep) {
-          case 1:
-            cosmosSaveResult = await referencingService.saveIdentityData(currentSectionData);
-            break;
-          case 2:
-            cosmosSaveResult = await referencingService.saveEmploymentData(currentSectionData);
-            break;
-          case 3:
-            cosmosSaveResult = await referencingService.saveResidentialData(currentSectionData);
-            break;
-          case 4:
-            cosmosSaveResult = await referencingService.saveFinancialData(currentSectionData);
-            break;
-          case 5:
-            cosmosSaveResult = await referencingService.saveGuarantorData(currentSectionData);
-            break;
-          case 7:
-            cosmosSaveResult = await referencingService.saveAgentDetailsData(currentSectionData);
-            break;
-          default:
-            cosmosSaveResult = { success: true };
-        }
+        try {
+          let cosmosSaveResult;
+          switch (currentStep) {
+            case 1:
+              cosmosSaveResult = await referencingService.saveIdentityData(currentSectionData);
+              break;
+            case 2:
+              cosmosSaveResult = await referencingService.saveEmploymentData(currentSectionData);
+              break;
+            case 3:
+              cosmosSaveResult = await referencingService.saveResidentialData(currentSectionData);
+              break;
+            case 4:
+              cosmosSaveResult = await referencingService.saveFinancialData(currentSectionData);
+              break;
+            case 5:
+              cosmosSaveResult = await referencingService.saveGuarantorData(currentSectionData);
+              break;
+            case 7:
+              cosmosSaveResult = await referencingService.saveAgentDetailsData(currentSectionData);
+              break;
+            default:
+              cosmosSaveResult = { success: true };
+          }
 
-        if (!cosmosSaveResult.success) {
-          console.warn('Failed to save to Cosmos DB:', cosmosSaveResult.error);
+          if (!cosmosSaveResult.success) {
+            console.warn('Failed to save to Cosmos DB:', cosmosSaveResult.error);
+          }
+        } catch (cosmosError) {
+          console.warn('Failed to save to Cosmos DB:', cosmosError);
         }
       }
 
@@ -1019,7 +1023,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({ isOpen, onClose, on
 
       // Show success message
       if (saveResult.success) {
-        toast.success('Progress saved successfully to Firestore');
+        toast.success('Progress saved successfully');
       } else {
         toast.success('Progress saved successfully (local storage)');
       }

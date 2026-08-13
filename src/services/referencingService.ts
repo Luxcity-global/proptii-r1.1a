@@ -78,6 +78,23 @@ class ReferencingService {
   /** Submit waits on Cosmos writes + multi-email send — allow longer than default 30s axios timeout. */
   private static readonly SUBMIT_TIMEOUT_MS = 120_000;
 
+  /** AI document extraction can exceed the default 30s axios timeout. */
+  private static readonly AI_EXTRACT_TIMEOUT_MS = 90_000;
+
+  async extractDataFromDocument(base64Data: string, mimeType: string) {
+    try {
+      const response = await apiService.post(
+        referencingPath('ai-extract'),
+        { base64Data, mimeType },
+        { timeout: ReferencingService.AI_EXTRACT_TIMEOUT_MS },
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error extracting data from document:', error);
+      throw error;
+    }
+  }
+
   async submitApplication(userId: string, data: any) {
     try {
       const response = await apiService.post(

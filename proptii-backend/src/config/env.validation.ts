@@ -7,6 +7,7 @@ function applyEnvAliases(): void {
   process.env.MSAL_AUTHORITY ||= process.env.AZURE_AD_B2C_AUTHORITY;
 
   process.env.AZURE_OPENAI_DEPLOYMENT_NAME ||= process.env.AZURE_OPENAI_DEPLOYMENT;
+  process.env.AZURE_OPENAI_API_KEY ||= process.env.AZURE_OPENAI_KEY;
   process.env.COSMOS_DB_CONNECTION_STRING ||= process.env.COSMOS_DB_ENDPOINT;
   process.env.COSMOS_DB_DATABASE_NAME ||= process.env.COSMOS_DB_NAME;
 }

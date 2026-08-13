@@ -186,6 +186,12 @@ const steps = [
 interface PropertyDetails {
   id?: string;
   street: string;
+  town?: string;
+  city?: string;
+  postcode?: string;
+  title?: string;
+  description?: string;
+  imageUrls?: string[];
   agent: {
     id: string;
     name: string;

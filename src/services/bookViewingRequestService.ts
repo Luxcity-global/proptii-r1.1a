@@ -25,6 +25,9 @@ export interface BookViewingRequest {
     town?: string;
     city?: string;
     postcode?: string;
+    title?: string;
+    description?: string;
+    imageUrls?: string[];
     agent: {
       id: string;
       name: string;

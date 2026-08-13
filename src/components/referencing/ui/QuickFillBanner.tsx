@@ -34,7 +34,11 @@ const QuickFillBanner: React.FC<QuickFillBannerProps> = ({ onDataExtracted }) =>
             }
         } catch (error) {
             console.error('AI Extraction error during handleFileChange:', error);
-            toast.error('Failed to process document. Please try manual entry.', { id: toastId });
+            const message =
+                error && typeof error === 'object' && 'message' in error && typeof (error as { message: unknown }).message === 'string'
+                    ? (error as { message: string }).message
+                    : 'Failed to process document. Please try manual entry.';
+            toast.error(message, { id: toastId });
         } finally {
             setIsProcessing(false);
             // Reset file input

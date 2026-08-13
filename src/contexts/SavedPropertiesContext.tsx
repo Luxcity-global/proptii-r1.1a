@@ -73,7 +73,7 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
           location: String(prop.location ?? ''),
           bedrooms: String(prop.bedrooms ?? ''),
           propertyType: String(prop.propertyType ?? ''),
-          imageUrls: Array.isArray(prop.imageUrls) ? prop.imageUrls as string[] : [],
+          imageUrls: Array.isArray(prop.imageUrls) ? prop.imageUrls as string[] : (Array.isArray(prop.images) ? prop.images as string[] : []),
           agent: {
             id: agentData.id as string | undefined,
             name: String(agentData.name ?? prop.source ?? 'Unknown Agent'),
@@ -83,7 +83,7 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
             website: agentData.website as string | undefined
           },
           source: prop.source as string | undefined,
-          description: prop.description as string | undefined,
+          description: (prop.description || prop.summary || prop.notes) as string | undefined,
           savedAt: new Date().toISOString()
         });
       }
@@ -121,7 +121,7 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
       location: property.location,
       bedrooms: property.bedrooms,
       propertyType: property.propertyType,
-      imageUrls: property.imageUrls || [],
+      imageUrls: property.imageUrls || property.images || [],
       agent: {
         id: agentData.id || agentData.name || property.source || `agent-${Date.now()}`,
         name: agentData.name || property.source || 'Unknown Agent',
@@ -131,7 +131,7 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
         website: agentData.website
       },
       source: property.source,
-      description: property.description,
+      description: property.description || property.summary || property.notes || '',
       savedAt: new Date().toISOString()
     };
 

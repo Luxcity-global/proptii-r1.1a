@@ -415,7 +415,7 @@ function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNav
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                   )}
-                  {isNavigatingToBooking ? 'Loading...' : 'Message'}
+                  {isNavigatingToBooking ? 'Loading...' : 'Book Viewing'}
                 </button>
               </div>
             </div>
@@ -1340,6 +1340,9 @@ const SearchResults = () => {
       town: property.town || property.location?.split(',')[1]?.trim() || '',
       city: property.city || property.location?.split(',')[0]?.trim() || property.location || '',
       postcode: property.postcode || property.location?.split(',')[2]?.trim() || '',
+      title: property.title,
+      description: property.description,
+      imageUrls: property.imageUrls || [],
       agent: {
         id: property.agent?.id || property.agent?.name || `agent-${Date.now()}`,
         name: property.agent?.name || property.source || 'Estate Agent',

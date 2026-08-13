@@ -13,6 +13,7 @@ export interface Property {
   bedrooms: string;
   propertyType: string;
   imageUrls: string[];
+  description?: string;
   agent: {
     name: string;
     email: string;
