@@ -294,37 +294,44 @@ class EmailService {
           const targetUrl = buildApiUrl(base, '/email/send');
           try {
             console.info(`[EmailService] Sending viewing email via ${targetUrl} (no JWT)`);
-            const response = await axios.post(
-              targetUrl,
-              {
-                to: emailContent.to,
-                subject: emailContent.subject,
-                html: emailContent.html,
-                emailType: emailContent.emailType,
-              },
-              {
+            const controller = new AbortController();
+            const timeoutId = window.setTimeout(() => controller.abort(), 60000);
+            try {
+              const response = await fetch(targetUrl, {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                timeout: 60000,
+                body: JSON.stringify({
+                  to: emailContent.to,
+                  subject: emailContent.subject,
+                  html: emailContent.html,
+                  emailType: emailContent.emailType,
+                }),
+                signal: controller.signal,
+              });
+              const data = await response.json().catch(() => ({}));
+              if (!response.ok || !data?.success) {
+                throw new Error(data?.error || data?.message || `Failed to send email (${response.status})`);
               }
-            );
-            if (!response.data?.success) {
-              throw new Error(response.data?.error || 'Failed to send email');
+              console.log('Server response:', data);
+              return {
+                success: true,
+                messageId: data.messageId,
+              };
+            } finally {
+              window.clearTimeout(timeoutId);
             }
-            console.log('Server response:', response.data);
-            return {
-              success: true,
-              messageId: response.data.messageId,
-            };
           } catch (error) {
-            const shouldRetry = axios.isAxiosError(error) ? !error.response : false;
-            const errMessage = axios.isAxiosError(error)
-              ? `${error.message}${error.code ? ` (${error.code})` : ''}`
-              : error instanceof Error
-                ? error.message
-                : 'Unknown error';
+            const errMessage = error instanceof Error ? error.message : 'Unknown error';
             errorLog.push(`[${targetUrl}] ${errMessage}`);
+            const shouldRetry =
+              errMessage.includes('Failed to fetch') ||
+              errMessage.includes('NetworkError') ||
+              errMessage.includes('aborted');
             if (!shouldRetry) {
-              throw new Error(`Email submission failed: ${errorLog.join(' | ')}`);
+              return {
+                success: false,
+                error: `Email submission failed: ${errorLog.join(' | ')}`,
+              };
             }
             console.warn(`[EmailService] Retrying with next API base after error at ${targetUrl}`);
           }
@@ -532,35 +539,46 @@ class EmailService {
     };
 
     try {
-      // Send email to agent
+      const jobs: Array<Promise<void>> = [];
+
       if (data.property.agent?.email) {
-        const agentResult = await this.sendEmail({
-          to: data.property.agent.email,
-          subject: `New Viewing Request - ${data.property.street}`,
-          formData: data,
-          html: data.agentHtml,
-          attachments: [],
-          emailType: 'viewing-agent'
-        });
-        results.agent = agentResult.success;
+        jobs.push(
+          this.sendEmail({
+            to: data.property.agent.email,
+            subject: `New Viewing Request - ${data.property.street}`,
+            formData: data,
+            html: data.agentHtml,
+            attachments: [],
+            emailType: 'viewing-agent'
+          }).then((agentResult) => {
+            results.agent = agentResult.success;
+          }).catch((error) => {
+            console.warn('Viewing agent email failed:', error);
+            results.agent = false;
+          })
+        );
       }
 
-      // Send confirmation email to user
       if (data.user.email) {
-        const userResult = await this.sendEmail({
-          to: data.user.email,
-          subject: 'Your Viewing Request Confirmation',
-          formData: data,
-          html: data.userHtml,
-          attachments: [],
-          emailType: 'viewing-user'
-        });
-        results.user = userResult.success;
+        jobs.push(
+          this.sendEmail({
+            to: data.user.email,
+            subject: 'Your Viewing Request Confirmation',
+            formData: data,
+            html: data.userHtml,
+            attachments: [],
+            emailType: 'viewing-user'
+          }).then((userResult) => {
+            results.user = userResult.success;
+          }).catch((error) => {
+            console.warn('Viewing user email failed:', error);
+            results.user = false;
+          })
+        );
       }
 
-      // Set overall success if at least one email was sent
+      await Promise.allSettled(jobs);
       results.success = !!(results.agent || results.user);
-
       return results;
     } catch (error) {
       console.error('Error sending viewing emails:', error);

@@ -24,16 +24,18 @@ export class HealthController {
       // ── Cosmos DB ─────────────────────────────────────────────────────────
       async (): Promise<HealthIndicatorResult> => {
         const key = 'cosmos_db';
-        const endpoint = process.env.COSMOS_DB_CONNECTION_STRING;
-        const dbKey = process.env.COSMOS_DB_KEY;
+        const { resolveCosmosConnection, createCosmosClientFromEnv } = await import('../config/cosmos.config');
+        const creds = resolveCosmosConnection();
 
-        if (!endpoint || !dbKey) {
+        if (!creds) {
           return { [key]: { status: 'down', message: 'COSMOS_DB_CONNECTION_STRING or COSMOS_DB_KEY not configured' } };
         }
 
         try {
-          const { CosmosClient } = await import('@azure/cosmos');
-          const client = new CosmosClient({ endpoint, key: dbKey });
+          const client = createCosmosClientFromEnv();
+          if (!client) {
+            return { [key]: { status: 'down', message: 'Cosmos DB client could not be created' } };
+          }
           // Lightweight check — list databases (low-cost operation)
           await client.databases.readAll().fetchAll();
           return { [key]: { status: 'up' } };

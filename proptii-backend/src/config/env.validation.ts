@@ -24,7 +24,7 @@ const envSchema = z.object({
 
   // ── Cosmos DB ───────────────────────────────────────────────────────────────
   COSMOS_DB_CONNECTION_STRING: z.string().min(1, 'COSMOS_DB_CONNECTION_STRING is required'),
-  COSMOS_DB_KEY: z.string().min(1, 'COSMOS_DB_KEY is required'),
+  COSMOS_DB_KEY: z.string().optional().default(''),
   COSMOS_DB_DATABASE_NAME: z.string().default('proptii-db'),
 
   // ── Azure OpenAI ────────────────────────────────────────────────────────────
@@ -114,6 +114,16 @@ export function validateEnv(): Env {
       '\n[FATAL] Environment variable validation failed. Fix the following before starting:\n' +
         errors +
         '\n',
+    );
+    process.exit(1);
+  }
+
+  const conn = result.data.COSMOS_DB_CONNECTION_STRING || '';
+  const hasKeyInConn = /AccountKey=/i.test(conn);
+  if (!hasKeyInConn && !result.data.COSMOS_DB_KEY) {
+    const logger = new Logger('EnvValidation');
+    logger.error(
+      '\n[FATAL] COSMOS_DB_KEY is required unless COSMOS_DB_CONNECTION_STRING includes AccountKey=…\n',
     );
     process.exit(1);
   }

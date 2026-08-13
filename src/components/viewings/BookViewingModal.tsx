@@ -22,7 +22,6 @@ import PropertySelector from './components/PropertySelector';
 import ViewingScheduler from './components/ViewingScheduler';
 import ViewingComparison from './components/ViewingComparison';
 import { BookViewingProvider, useBookViewing } from './context/BookViewingContext';
-import { bookingService } from './services/bookingService';
 import { viewingEmailService } from './services/viewingEmailService';
 import { generateAgentEmailTemplate, generateUserEmailTemplate } from './services/emailTemplates';
 import { viewingService, normalizeViewingProperty } from '../../services/viewingService';
@@ -479,15 +478,8 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           console.warn('Failed to store draft viewing placeholder:', draftError);
         }
 
-        // Save to existing database (for backward compatibility) - Optional
-        try {
-          await bookingService.scheduleViewing(property, viewing);
-          console.log('✅ Successfully saved to existing backend');
-        } catch (backendError) {
-          const errorMessage = backendError instanceof Error ? backendError.message : 'Unknown error';
-          console.warn('⚠️ Backend service not available (this is optional):', errorMessage);
-          // Continue with success flow - backend is optional
-        }
+        // Nest /viewing-requests is optional and currently fails on Cosmos auth.
+        // Dashboard Viewings are loaded from client Firestore, already saved above.
 
         // Send emails - Optional
         try {
