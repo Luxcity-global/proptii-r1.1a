@@ -16,27 +16,26 @@ describe('SearchLoadingAnimation', () => {
 
     expect(screen.getByRole('status', { name: 'Searching for properties' })).toBeInTheDocument();
     expect(screen.getByText('Searching for properties...')).toBeInTheDocument();
-    expect(screen.getByText('Scout is sniffing out homes for you')).toBeInTheDocument();
-    expect(screen.getByAltText('Scout')).toHaveAttribute('src', '/images/scout1.png');
+    expect(screen.getAllByText('Understanding your search').length).toBeGreaterThan(0);
+    expect(screen.getByAltText('Scout')).toHaveAttribute('src', '/images/Scout ava.png');
   });
 
   it('echoes the current search query', () => {
     render(<SearchLoadingAnimation query="2 bed flats in Leeds" />);
 
-    expect(screen.getByText('2 bed flats in Leeds')).toBeInTheDocument();
-    expect(screen.getByText(/Looking for/)).toBeInTheDocument();
+    expect(screen.getByText(/2 bed flats in Leeds/)).toBeInTheDocument();
     expect(screen.getByText('Searching for properties...')).toBeInTheDocument();
   });
 
-  it('cycles status copy while waiting', () => {
+  it('advances through search stages while waiting', () => {
     render(<SearchLoadingAnimation />);
 
-    expect(screen.getByText('Scout is sniffing out homes for you')).toBeInTheDocument();
+    expect(screen.getAllByText('Understanding your search').length).toBeGreaterThan(0);
 
     act(() => {
-      vi.advanceTimersByTime(2400);
+      vi.advanceTimersByTime(2600);
     });
 
-    expect(screen.getByText('Checking listings across the UK')).toBeInTheDocument();
+    expect(screen.getAllByText('Scanning live listings').length).toBeGreaterThan(0);
   });
 });

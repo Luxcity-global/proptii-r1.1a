@@ -1392,7 +1392,7 @@ const SearchResults = () => {
             </div>
           </div>
         </header>
-        <div className="flex-1 bg-gray-50 px-4 py-12 flex items-center justify-center">
+        <div className="flex-1 flex">
           <SearchLoadingAnimation query={searchQuery} />
         </div>
         <Footer />

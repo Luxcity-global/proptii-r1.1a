@@ -1,187 +1,184 @@
 import { useEffect, useState } from 'react';
 import '../styles/search-loading.css';
 
-const STATUS_MESSAGES = [
-  'Scout is sniffing out homes for you',
-  'Checking listings across the UK',
-  'Matching places to your brief',
-  'Hunting for the best-value homes',
-  'Lining up your top matches',
+const SCOUT_IMAGE = '/images/Scout ava.png';
+
+const STEPS = [
+  { label: 'Understanding your search', duration: 2600 },
+  { label: 'Scanning live listings', duration: 3000 },
+  { label: 'Ranking best matches', duration: 2200 },
 ];
 
 const TIPS = [
-  'Save listings with the heart so you can compare them later.',
-  'You can book a viewing straight from a property card.',
-  'Try must-haves like “pet-friendly” or “near a station”.',
-  'We’re matching your brief, not just keywords.',
+  { heading: 'Did you know?', body: 'Adding “south-facing garden” finds homes that get the most afternoon sun.' },
+  { heading: 'Pro tip', body: 'Homes near a station sell 12% faster — mention it to prioritise commuter-friendly listings.' },
+  { heading: 'Scout says', body: 'Try “quiet street” or “corner plot” for more outdoor space.' },
+  { heading: 'Good to know', body: 'Ofsted-rated schools are factored in when you say “near good schools”.' },
 ];
 
-const STAGES = ['Understanding your search', 'Scanning live listings', 'Ranking the best matches'];
-const SCOUT_IMAGE = '/images/scout1.png';
+const TOTAL_MS = STEPS.reduce((sum, step) => sum + step.duration, 0);
+
+const BLIPS = [
+  { top: '22%', left: '68%', delay: '0.3s', size: 5 },
+  { top: '62%', left: '20%', delay: '0.9s', size: 4 },
+  { top: '72%', left: '65%', delay: '1.4s', size: 3 },
+  { top: '30%', left: '28%', delay: '0.6s', size: 4 },
+];
 
 interface SearchLoadingAnimationProps {
   query?: string;
 }
 
-function House({
-  roof,
-  wall,
-  door,
-  delay,
-}: {
-  roof: string;
-  wall: string;
-  door: string;
-  delay: string;
-}) {
+function Radar() {
   return (
-    <svg viewBox="0 0 88 92" className="h-[5.75rem] w-[5.5rem] shrink-0" aria-hidden>
-      <rect x="38" y="10" width="10" height="18" rx="1.5" fill="#7a4a32" />
-      <path d="M8 38 L44 8 L80 38 Z" fill={roof} />
-      <rect x="14" y="36" width="60" height="50" rx="3" fill={wall} />
-      <rect x="36" y="58" width="16" height="28" rx="1.5" fill={door} />
-      <circle cx="49" cy="73" r="1.4" fill="#f4d7b0" />
-      <rect
-        className="search-load-window-lit"
-        x="20"
-        y="46"
-        width="12"
-        height="12"
-        rx="1.5"
-        fill="#ffe8c7"
-        style={{ animationDelay: delay }}
-      />
-      <rect
-        className="search-load-window-lit"
-        x="56"
-        y="46"
-        width="12"
-        height="12"
-        rx="1.5"
-        fill="#ffe8c7"
-        style={{ animationDelay: delay }}
-      />
+    <div className="search-load-radar">
+      {[1, 2, 3].map((ring) => (
+        <div
+          key={ring}
+          className="search-load-ring-static"
+          style={{ width: ring * 56, height: ring * 56 }}
+          aria-hidden
+        />
+      ))}
+      <div className="search-load-ring-ping" aria-hidden />
+      <div className="search-load-ring-ping search-load-ring-ping-delay" aria-hidden />
+      {BLIPS.map((blip, index) => (
+        <div
+          key={index}
+          className="search-load-blip"
+          style={{
+            top: blip.top,
+            left: blip.left,
+            width: blip.size,
+            height: blip.size,
+            animationDelay: blip.delay,
+          }}
+          aria-hidden
+        />
+      ))}
+      <div className="search-load-avatar">
+        <img src={SCOUT_IMAGE} alt="Scout" className="search-load-avatar-img" draggable={false} />
+      </div>
+    </div>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+      <path d="M2 5l2 2 4-4" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-function MagnifyingGlass() {
+function ActiveDots() {
   return (
-    <svg className="search-load-glass h-12 w-12" viewBox="0 0 48 48" aria-hidden>
-      <circle cx="20" cy="20" r="12" fill="rgba(255,255,255,0.55)" stroke="#F15A22" strokeWidth="3.5" />
-      <circle cx="20" cy="20" r="6" fill="none" stroke="#136C9E" strokeWidth="1.5" opacity="0.5" />
-      <path d="M29 29 L40 40" stroke="#002B49" strokeWidth="4.5" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function Pin({ className }: { className: string }) {
-  return (
-    <svg className={`search-load-pin h-7 w-7 ${className}`} viewBox="0 0 24 24" aria-hidden>
-      <path
-        d="M12 22s7-7.2 7-12.2A7 7 0 0 0 5 9.8C5 14.8 12 22 12 22z"
-        fill="#F15A22"
-      />
-      <circle cx="12" cy="9.5" r="2.6" fill="#fff" />
-    </svg>
+    <span className="search-load-dots">
+      {[0, 1, 2].map((dot) => (
+        <span key={dot} className="search-load-dot" style={{ animationDelay: `${dot * 0.16}s` }} />
+      ))}
+    </span>
   );
 }
 
 export const SearchLoadingAnimation = ({ query = '' }: SearchLoadingAnimationProps) => {
-  const [statusIndex, setStatusIndex] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [activeStep, setActiveStep] = useState(0);
   const [tipIndex, setTipIndex] = useState(0);
-  const [stageIndex, setStageIndex] = useState(0);
+  const [tipVisible, setTipVisible] = useState(true);
 
   useEffect(() => {
-    const statusTimer = window.setInterval(() => {
-      setStatusIndex((current) => (current + 1) % STATUS_MESSAGES.length);
-    }, 2400);
-    const tipTimer = window.setInterval(() => {
-      setTipIndex((current) => (current + 1) % TIPS.length);
-    }, 4200);
-    const stageTimer = window.setInterval(() => {
-      setStageIndex((current) => (current + 1) % STAGES.length);
-    }, 2800);
+    const start = Date.now();
+    const id = window.setInterval(() => {
+      const elapsed = Date.now() - start;
+      setProgress(Math.min(97, (elapsed / TOTAL_MS) * 100));
+
+      let accumulated = 0;
+      for (let index = 0; index < STEPS.length; index += 1) {
+        accumulated += STEPS[index].duration;
+        if (elapsed < accumulated) {
+          setActiveStep(index);
+          break;
+        }
+        if (index === STEPS.length - 1) {
+          setActiveStep(STEPS.length - 1);
+        }
+      }
+    }, 50);
+
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    let fadeTimer: number | undefined;
+    const id = window.setInterval(() => {
+      setTipVisible(false);
+      fadeTimer = window.setTimeout(() => {
+        setTipIndex((current) => (current + 1) % TIPS.length);
+        setTipVisible(true);
+      }, 380);
+    }, 3800);
 
     return () => {
-      window.clearInterval(statusTimer);
-      window.clearInterval(tipTimer);
-      window.clearInterval(stageTimer);
+      window.clearInterval(id);
+      if (fadeTimer) window.clearTimeout(fadeTimer);
     };
   }, []);
 
-  const houses = (
-    <>
-      <House roof="#F15A22" wall="#fff" door="#002B49" delay="0s" />
-      <House roof="#136C9E" wall="#f7fbff" door="#7a4a32" delay="0.4s" />
-      <House roof="#E65D24" wall="#fff8f4" door="#002B49" delay="0.8s" />
-      <House roof="#002B49" wall="#fff" door="#F15A22" delay="1.2s" />
-    </>
-  );
+  const tip = TIPS[tipIndex];
 
   return (
     <div
-      className="search-load-root mx-auto text-center"
+      className="search-load-root"
       role="status"
       aria-live="polite"
       aria-busy="true"
       aria-label="Searching for properties"
     >
-      <div className="overflow-hidden rounded-3xl bg-white shadow-xl shadow-orange-100/70 ring-1 ring-orange-100">
-        <div className="search-load-scene">
-          <div className="search-load-cloud search-load-cloud-a" />
-          <div className="search-load-cloud search-load-cloud-b" />
-          <div className="search-load-street">
-            <div className="search-load-house-row">{houses}</div>
-            <div className="search-load-house-row" aria-hidden>
-              {houses}
-            </div>
+      <div className="search-load-inner">
+        <Radar />
+
+        <div className="search-load-status">
+          <p className="search-load-headline">{STEPS[activeStep].label}</p>
+          {query ? <p className="search-load-query">“{query}”</p> : null}
+        </div>
+
+        <div className="search-load-progress-wrap">
+          <div
+            className="search-load-bar"
+            role="progressbar"
+            aria-valuenow={Math.round(progress)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div className="search-load-bar-fill" style={{ width: `${progress}%` }} />
           </div>
-          <Pin className="search-load-pin-a" />
-          <Pin className="search-load-pin-b" />
-          <div className="search-load-ring" />
-          <MagnifyingGlass />
-          <div className="search-load-scout-wrap">
-            <img
-              src={SCOUT_IMAGE}
-              alt="Scout"
-              className="search-load-scout"
-            />
+
+          <div className="search-load-steps">
+            {STEPS.map((step, index) => {
+              const done = index < activeStep;
+              const active = index === activeStep;
+              return (
+                <div key={step.label} className="search-load-step">
+                  <div
+                    className={`search-load-step-icon${done ? ' is-done' : ''}${active ? ' is-active' : ''}`}
+                  >
+                    {done ? <CheckIcon /> : active ? <ActiveDots /> : <span className="search-load-step-idle" />}
+                  </div>
+                  <span
+                    className={`search-load-step-label${done ? ' is-done' : ''}${active ? ' is-active' : ''}`}
+                  >
+                    {step.label}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        <div className="px-6 pb-7 pt-5">
-          <p key={statusIndex} className="search-load-copy text-lg font-semibold text-[#002B49]">
-            {STATUS_MESSAGES[statusIndex]}
-          </p>
-          {query ? (
-            <p className="mt-1 truncate text-sm text-gray-500">
-              Looking for “<span className="font-medium text-gray-700">{query}</span>”
-            </p>
-          ) : null}
-
-          <div className="search-load-bar mx-auto mt-5 max-w-xs" aria-hidden>
-            <div className="search-load-bar-fill" />
-          </div>
-
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-            {STAGES.map((stage, index) => (
-              <span
-                key={stage}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-all duration-500 ${
-                  index === stageIndex
-                    ? 'bg-[#F15A22] text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-500'
-                }`}
-              >
-                {stage}
-              </span>
-            ))}
-          </div>
-
-          <p key={tipIndex} className="search-load-tip mx-auto mt-5 max-w-sm text-sm leading-relaxed text-gray-500">
-            {TIPS[tipIndex]}
-          </p>
+        <div className={`search-load-tip${tipVisible ? ' is-visible' : ''}`}>
+          <p className="search-load-tip-heading">{tip.heading}</p>
+          <p className="search-load-tip-body">{tip.body}</p>
         </div>
       </div>
       <span className="sr-only">Searching for properties...</span>

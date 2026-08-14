@@ -233,7 +233,7 @@ export const SearchResults = ({ properties, isLoading, error, onRetry }: SearchR
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center py-20 px-4">
+      <div className="flex min-h-[24rem]">
         <SearchLoadingAnimation />
       </div>
     );
