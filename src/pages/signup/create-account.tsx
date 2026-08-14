@@ -18,6 +18,7 @@ const CreateAccountPage: React.FC = () => {
   const planId = searchParams.get('plan') ?? 'explorer';
   const cycle = (searchParams.get('cycle') as BillingCycle) || 'annual';
   const plan = usePlan(planId);
+  const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -25,6 +26,9 @@ const CreateAccountPage: React.FC = () => {
     setSubmitting(true);
     setFormError(null);
     sessionStorage.setItem('redirectAfterLogin', welcomeUrl(planId, cycle));
+    if (phone.trim()) {
+      sessionStorage.setItem('pending_registration_phone', phone.trim());
+    }
 
     try {
       await login('google');
@@ -68,7 +72,45 @@ const CreateAccountPage: React.FC = () => {
               Get started with Proptii using your Google account for secure, instant access.
             </p>
 
-            <div style={{ marginTop: 24 }}>
+            <div style={{ marginTop: 20 }}>
+              {/* Optional Phone Number input */}
+              <div style={{ marginBottom: 18, textAlign: 'left' }}>
+                <label
+                  htmlFor="signup-phone"
+                  style={{
+                    display: 'block',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: 6,
+                  }}
+                >
+                  Phone Number <span style={{ color: '#9CA3AF', fontWeight: 400 }}>(Optional)</span>
+                </label>
+                <input
+                  id="signup-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="e.g. +44 7123 456789"
+                  disabled={submitting}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    borderRadius: 10,
+                    border: '1px solid #D1D5DB',
+                    fontSize: 14,
+                    color: '#111827',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    transition: 'border-color 0.2s',
+                  }}
+                />
+                <p style={{ fontSize: 11, color: '#6B7280', marginTop: 4, marginBlockEnd: 0 }}>
+                  Used for viewing updates and booking confirmations.
+                </p>
+              </div>
+
               <button
                 type="button"
                 onClick={handleGoogleSignUp}

@@ -192,8 +192,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const userId = firebaseUser.uid;
       const email = firebaseUser.email || '';
-      const name = firebaseUser.displayName || email.split('@')[0];
-      const phone = firebaseUser.phoneNumber || undefined;
+      let name = firebaseUser.displayName || email.split('@')[0];
+      let phone = firebaseUser.phoneNumber || undefined;
+
+      // Check if a phone number was captured during registration flow
+      const pendingRegistrationPhone = sessionStorage.getItem('pending_registration_phone');
+      if (pendingRegistrationPhone) {
+        phone = pendingRegistrationPhone;
+        sessionStorage.removeItem('pending_registration_phone');
+        void userService.updateUser(userId, { name, phone });
+      } else {
+        // Load saved profile data from Firestore
+        try {
+          const userDoc = await userService.getUserById(userId);
+          if (userDoc.success && userDoc.user) {
+            if (userDoc.user.name) name = userDoc.user.name;
+            if (userDoc.user.phone) phone = userDoc.user.phone;
+          }
+        } catch (e) {
+          console.warn('[Auth] User document fetch notice:', e);
+        }
+      }
 
       let roles: string[] = [];
       let roleResolved = false;
@@ -202,12 +221,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const role = await resolveRole(userId, email);
         if (role) {
           roles = [role];
-          if (LANDLORD_ROLES.has(role)) {
-            const redir = sessionStorage.getItem('redirectAfterLogin');
-            if (!redir || redir === '/dashboard' || redir === '/') {
-              sessionStorage.setItem('redirectAfterLogin', '/landlord');
-            }
-          }
         }
         roleResolved = true;
       } catch (err) {
