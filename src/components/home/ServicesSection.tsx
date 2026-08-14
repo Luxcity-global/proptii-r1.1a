@@ -97,19 +97,11 @@ const ServicesLayoutV1: React.FC = () => {
                   />
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-[#062536] via-[#0B3D5B]/70 to-transparent opacity-0 origin-bottom scale-y-75 group-hover:opacity-100 group-hover:scale-y-100 transition-all duration-500 ease-out"
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-[#062536] via-[#0B3D5B]/70 to-transparent"
                   />
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 md:p-6">
-                    <span className="flex flex-wrap text-white text-xl md:text-2xl font-semibold tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
-                      {card.title.split('').map((char, charIndex) => (
-                        <span
-                          key={`${card.id}-${charIndex}`}
-                          className="inline-block opacity-0 translate-y-3 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 ease-out"
-                          style={{ transitionDelay: `${90 + charIndex * 45}ms` }}
-                        >
-                          {char === ' ' ? '\u00A0' : char}
-                        </span>
-                      ))}
+                    <span className="flex text-white text-xl md:text-2xl font-semibold tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
+                      {card.title}
                     </span>
                   </div>
                 </button>

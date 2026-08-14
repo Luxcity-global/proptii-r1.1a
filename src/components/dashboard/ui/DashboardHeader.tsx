@@ -10,12 +10,24 @@ interface DashboardHeaderProps {
   userPhone?: string;
 }
 
+const MOCK_PHONE_NUMBERS = ['+44 7911 123456', '447911123456'];
+
+const resolveDisplayPhone = (phone?: string): string => {
+  const trimmed = (phone || '').trim();
+  const digits = trimmed.replace(/\D/g, '');
+  if (!trimmed || MOCK_PHONE_NUMBERS.includes(trimmed) || MOCK_PHONE_NUMBERS.includes(digits)) {
+    return '';
+  }
+  return trimmed;
+};
+
 /**
  * Dashboard header component with user information and welcome message
  */
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName, userEmail, userPhone }) => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const displayPhone = resolveDisplayPhone(userPhone || user?.phone);
   
   return (
     <div 
@@ -99,7 +111,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ userName, userEmail, 
             >
               <Phone className="w-4 h-4 flex-shrink-0" style={{ color: '#374957' }} />
               <span className="text-sm" style={{ color: '#374957' }}>
-                {userPhone || user?.phone || '+44 7911 123456'}
+                {displayPhone}
               </span>
             </div>
             

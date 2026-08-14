@@ -83,6 +83,16 @@ export interface UserProfile {
   companyProfile?: CompanyProfile;
 }
 
+const MOCK_USER_PHONE = '+44 7911 123456';
+
+const resolveAuthPhone = (phone?: string | null): string => {
+  const value = (phone || '').trim();
+  if (!value || value === MOCK_USER_PHONE || value.replace(/\D/g, '') === '447911123456') {
+    return '';
+  }
+  return value;
+};
+
 export interface Property {
   id: string;
   address: string;
@@ -458,7 +468,7 @@ function AppContent() {
       return {
         name: user?.name || user?.givenName || user?.displayName || '',
         email: user?.email || user?.username || '',
-        phone: user?.phone || '+44 7911 123456',
+        phone: resolveAuthPhone(user?.phone),
         isAuthenticated: true,
       };
     } catch (error) {
@@ -559,7 +569,7 @@ function AppContent() {
           setUserProfile({
             name: userInfo.name,
             email: userInfo.email,
-            phone: '+44 7911 123456', // Default phone, could be enhanced later
+            phone: resolveAuthPhone((userInfo as { phone?: string }).phone),
             companyName: 'Proptii',
             logo: undefined
           });
@@ -577,7 +587,7 @@ function AppContent() {
         setUserProfile({
           name: cachedUser.name || '',
           email: cachedUser.email || '',
-          phone: cachedUser.phone || '+44 7911 123456',
+          phone: resolveAuthPhone(cachedUser.phone),
           companyName: 'Proptii',
           logo: undefined
         });
@@ -632,7 +642,7 @@ function AppContent() {
           setUserProfile({
             name: user.name || user.givenName || '',
             email: user.email || '',
-            phone: user.phone || '+44 7911 123456',
+            phone: resolveAuthPhone(user.phone),
             companyName: 'Proptii',
             logo: undefined
           });
