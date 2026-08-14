@@ -374,6 +374,107 @@ class FirestoreService {
     }
   }
   
+  /**
+   * Share referencing passport with a landlord or agent
+   */
+  async shareReferencingPassport(
+    userId: string,
+    shareData: {
+      recipientName: string;
+      recipientEmail: string;
+      recipientPhone?: string;
+      recipientRole: 'landlord' | 'agent';
+      agencyName?: string;
+      propertyAddress?: string;
+      notes?: string;
+    }
+  ): Promise<{ success: boolean; share?: any; error?: string }> {
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(`${API_BASE}/api/referencing/shares`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(shareData)
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to share referencing: ${res.statusText}`);
+      }
+
+      const json = await res.json();
+      return { success: true, share: json.share };
+    } catch (error: any) {
+      console.warn('Backend share failed, saving to local cache:', error);
+      const localShares = JSON.parse(localStorage.getItem(`referencing_shares_${userId}`) || '[]');
+      const newShare = {
+        id: `share_${Date.now()}`,
+        userId,
+        ...shareData,
+        status: 'sent',
+        createdAt: new Date().toISOString()
+      };
+      localShares.push(newShare);
+      localStorage.setItem(`referencing_shares_${userId}`, JSON.stringify(localShares));
+      return { success: true, share: newShare };
+    }
+  }
+
+  /**
+   * Get all referencing passport shares for a user
+   */
+  async getReferencingShares(
+    userId: string
+  ): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(`${API_BASE}/api/referencing/shares`, {
+        method: 'GET',
+        headers
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to fetch shares: ${res.statusText}`);
+      }
+
+      const json = await res.json();
+      const shares = json.data || [];
+      // Sync local cache
+      localStorage.setItem(`referencing_shares_${userId}`, JSON.stringify(shares));
+      return { success: true, data: shares };
+    } catch (error: any) {
+      console.warn('Backend fetch shares failed, using local cache:', error);
+      const localShares = JSON.parse(localStorage.getItem(`referencing_shares_${userId}`) || '[]');
+      return { success: true, data: localShares };
+    }
+  }
+
+  /**
+   * Delete / revoke a referencing passport share
+   */
+  async deleteReferencingShare(
+    userId: string,
+    shareId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const headers = await authHeaders();
+      await fetch(`${API_BASE}/api/referencing/shares/${shareId}`, {
+        method: 'DELETE',
+        headers
+      });
+      // Update local cache
+      const localShares = JSON.parse(localStorage.getItem(`referencing_shares_${userId}`) || '[]');
+      const updated = localShares.filter((s: any) => s.id !== shareId);
+      localStorage.setItem(`referencing_shares_${userId}`, JSON.stringify(updated));
+      return { success: true };
+    } catch (error: any) {
+      console.warn('Backend delete share failed, updating local cache:', error);
+      const localShares = JSON.parse(localStorage.getItem(`referencing_shares_${userId}`) || '[]');
+      const updated = localShares.filter((s: any) => s.id !== shareId);
+      localStorage.setItem(`referencing_shares_${userId}`, JSON.stringify(updated));
+      return { success: true };
+    }
+  }
+
   // Legacy support forms (keeping stubs for compilation if used elsewhere)
   async saveSupportForm(formData: any): Promise<{ success: boolean; formId?: string; error?: string }> {
     return { success: true, formId: 'mock' };

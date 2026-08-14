@@ -214,10 +214,9 @@ const DashboardHome: React.FC = () => {
   };
   
   // Calculate remaining forms and alert status
-  // P3-3: Steps 1,2,3,4,5,7 — step 6 (credit check) is excluded from user-completion tracking.
-  // This constant must match everywhere so the displayed denominator is always accurate.
-  const REFERENCING_STEPS = [1, 2, 3, 4, 5, 7] as const;
-  const totalSections = REFERENCING_STEPS.length; // 6 sections, not 7
+  // 5 passport sections: Identity (1), Employment (2), Residential (3), Financial (4), Guarantor (5)
+  const REFERENCING_STEPS = [1, 2, 3, 4, 5] as const;
+  const totalSections = REFERENCING_STEPS.length;
   const completedCount = completedSections.size;
   const remainingCount = totalSections - completedCount;
   const allCompleted = completedCount === totalSections;
@@ -230,7 +229,7 @@ const DashboardHome: React.FC = () => {
         const firestoreResult = await firestoreService.getReferencingForm(userId, selectedPropertyId);
         if (firestoreResult.success && firestoreResult.data) {
           const formData = firestoreResult.data.formData;
-          // Capture when the form was first started for due-date computation (P3-1)
+          // Capture when the form was first started for due-date computation
           const createdAt = (firestoreResult.data as any).createdAt;
           if (createdAt) {
             const ts = createdAt?.toDate?.() ?? createdAt?._seconds
@@ -259,9 +258,6 @@ const DashboardHome: React.FC = () => {
             formData.guarantor?.email?.trim()
           ) {
             completed.add('guarantor');
-          }
-          if (formData.agentDetails?.hasAgreedToCheck) {
-            completed.add('agentDetails');
           }
           setCompletedSections(completed);
         }
@@ -952,52 +948,6 @@ const DashboardHome: React.FC = () => {
                         completedSections.has('financial') ? 'text-green-600' : 'text-blue-600'
                       }`}>
                         {isMobile ? (completedSections.has('financial') ? 'Edit' : 'View') : (completedSections.has('financial') ? 'Edit' : 'View More')}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Agent Details */}
-                <div className={`${isMobile ? 'p-3' : 'p-4'} border-0 bg-white hover:shadow-md transition-shadow cursor-pointer`}>
-                  <div className="flex items-start justify-between">
-                    <div className={`flex items-start ${isMobile ? 'space-x-2' : 'space-x-3'} flex-1`}>
-                      {completedSections.has('agentDetails') ? (
-                        <CheckCircle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-green-600 mt-1`} />
-                      ) : (
-                        <AlertTriangle className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} text-purple-600 mt-1`} />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h4 className={`font-medium ${isMobile ? 'mb-0.5' : 'mb-1'} ${isMobile ? 'text-xs' : 'text-sm'} ${
-                          completedSections.has('agentDetails') ? 'text-green-600' : 'text-purple-600'
-                        }`}>
-                          Agent Details
-                        </h4>
-                        <p className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-700 ${isMobile ? 'mb-1' : 'mb-2'}`}>
-                          {completedSections.has('agentDetails') 
-                            ? 'Agent details completed' 
-                            : 'Complete agent details'}
-                        </p>
-                        {!completedSections.has('agentDetails') && (
-                          <div className="flex items-baseline space-x-3">
-                            <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold text-purple-600`}>
-                              {getDueDateLabel('agentDetails') ?? ''}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => openReferencingModal(7)}
-                      className={`border rounded ${isMobile ? 'px-2 py-0.5' : 'px-3 py-1'} transition-colors ${
-                        completedSections.has('agentDetails')
-                          ? 'border-green-300 hover:bg-green-50'
-                          : 'border-purple-300 hover:bg-purple-50'
-                      }`}
-                    >
-                      <span className={`${isMobile ? 'text-xs' : 'text-xs'} font-bold ${
-                        completedSections.has('agentDetails') ? 'text-green-600' : 'text-purple-600'
-                      }`}>
-                        {isMobile ? (completedSections.has('agentDetails') ? 'Edit' : 'View') : (completedSections.has('agentDetails') ? 'Edit' : 'View More')}
                       </span>
                     </button>
                   </div>

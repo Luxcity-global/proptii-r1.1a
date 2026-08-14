@@ -73,6 +73,36 @@ class ReferencingService {
     }
   }
 
+  async sharePassport(data: any) {
+    try {
+      const response = await apiService.post(referencingPath('shares'), data);
+      return response.data;
+    } catch (error) {
+      console.error('Error sharing referencing passport:', error);
+      throw error;
+    }
+  }
+
+  async getShares() {
+    try {
+      const response = await apiService.get(referencingPath('shares'));
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching referencing shares:', error);
+      throw error;
+    }
+  }
+
+  async deleteShare(shareId: string) {
+    try {
+      const response = await apiService.delete(referencingPath(`shares/${shareId}`));
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting referencing share:', error);
+      throw error;
+    }
+  }
+
   /** Submit waits on Cosmos writes + multi-email send — allow longer than default 30s axios timeout. */
   private static readonly SUBMIT_TIMEOUT_MS = 120_000;
 

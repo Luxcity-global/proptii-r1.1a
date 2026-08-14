@@ -136,4 +136,26 @@ export class ReferencingController {
     const userId = req.user.uid;
     return await this.referencingService.deleteUserFile(userId, fileId);
   }
+
+  @Post('referencing/shares')
+  @HttpCode(200)
+  @UseGuards(FirebaseAuthGuard)
+  async sharePassport(@Req() req: any, @Body() shareData: any) {
+    const userId = req.user.uid;
+    return await this.referencingService.shareReferencingPassport(userId, shareData);
+  }
+
+  @Get('referencing/shares')
+  @UseGuards(FirebaseAuthGuard)
+  async getShares(@Req() req: any) {
+    const userId = req.user.uid;
+    return await this.referencingService.getReferencingShares(userId);
+  }
+
+  @Delete('referencing/shares/:shareId')
+  @UseGuards(FirebaseAuthGuard)
+  async deleteShare(@Req() req: any, @Param('shareId') shareId: string) {
+    const userId = req.user.uid;
+    return await this.referencingService.deleteReferencingShare(userId, shareId);
+  }
 }

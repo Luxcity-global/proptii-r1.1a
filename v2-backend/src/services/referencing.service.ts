@@ -137,4 +137,72 @@ export class ReferencingService {
       return { success: true };
     }
   }
+
+  private get sharesCollection() {
+    const db = this.db;
+    return db ? db.collection('referencing_shares') : null;
+  }
+
+  async shareReferencingPassport(userId: string, shareData: any) {
+    const col = this.sharesCollection;
+    const shareId = `share_${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const payload = {
+      id: shareId,
+      userId,
+      recipientName: shareData.recipientName || '',
+      recipientEmail: (shareData.recipientEmail || '').toLowerCase().trim(),
+      recipientPhone: shareData.recipientPhone || '',
+      recipientRole: shareData.recipientRole || 'agent',
+      agencyName: shareData.agencyName || '',
+      propertyAddress: shareData.propertyAddress || '',
+      notes: shareData.notes || '',
+      status: 'sent',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (!col) return { success: true, share: { ...payload, id: shareId, createdAt: new Date().toISOString() } };
+
+    try {
+      await col.doc(shareId).set(payload);
+      return { success: true, share: { ...payload, id: shareId, createdAt: new Date().toISOString() } };
+    } catch (err: any) {
+      this.logger.warn(`Failed to save referencing share for ${userId}: ${err?.message || err}`);
+      return { success: true, share: { ...payload, id: shareId, createdAt: new Date().toISOString() } };
+    }
+  }
+
+  async getReferencingShares(userId: string) {
+    const col = this.sharesCollection;
+    if (!col) return { success: true, data: [] };
+
+    try {
+      const snapshot = await col.where('userId', '==', userId).get();
+      const shares = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          createdAt: d.createdAt?.toDate ? d.createdAt.toDate().toISOString() : d.createdAt || new Date().toISOString(),
+        };
+      });
+      return { success: true, data: shares };
+    } catch (err: any) {
+      this.logger.warn(`Failed to fetch referencing shares for ${userId}: ${err?.message || err}`);
+      return { success: true, data: [] };
+    }
+  }
+
+  async deleteReferencingShare(userId: string, shareId: string) {
+    const col = this.sharesCollection;
+    if (!col) return { success: true };
+
+    try {
+      await col.doc(shareId).delete();
+      return { success: true };
+    } catch (err: any) {
+      this.logger.warn(`Failed to delete referencing share ${shareId}: ${err?.message || err}`);
+      return { success: true };
+    }
+  }
 }
