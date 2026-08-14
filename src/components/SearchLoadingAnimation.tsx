@@ -17,6 +17,7 @@ const TIPS = [
 ];
 
 const STAGES = ['Understanding your search', 'Scanning live listings', 'Ranking the best matches'];
+const SCOUT_IMAGE = '/images/scout1.png';
 
 interface SearchLoadingAnimationProps {
   query?: string;
@@ -64,37 +65,7 @@ function House({
   );
 }
 
-function Scout() {
-  return (
-    <svg className="search-load-scout" viewBox="0 0 120 90" aria-hidden>
-      <ellipse cx="58" cy="78" rx="28" ry="6" fill="rgba(0,43,73,0.12)" />
-      <g className="search-load-scout-tail">
-        <path
-          d="M22 46 C8 38, 6 22, 16 18"
-          fill="none"
-          stroke="#F15A22"
-          strokeWidth="8"
-          strokeLinecap="round"
-        />
-      </g>
-      <ellipse cx="52" cy="50" rx="26" ry="18" fill="#F15A22" />
-      <ellipse cx="48" cy="56" rx="16" ry="10" fill="#FFE8D6" />
-      <rect className="search-load-leg search-load-leg-1" x="36" y="62" width="7" height="16" rx="3.5" fill="#E65D24" />
-      <rect className="search-load-leg search-load-leg-2" x="46" y="63" width="7" height="16" rx="3.5" fill="#C94E1A" />
-      <rect className="search-load-leg search-load-leg-3" x="58" y="62" width="7" height="16" rx="3.5" fill="#E65D24" />
-      <rect className="search-load-leg search-load-leg-4" x="68" y="63" width="7" height="16" rx="3.5" fill="#C94E1A" />
-      <circle cx="84" cy="36" r="16" fill="#F15A22" />
-      <path d="M72 22 L68 6 L80 16 Z" fill="#F15A22" />
-      <path d="M90 20 L102 8 L98 24 Z" fill="#E65D24" />
-      <path d="M73 18 L70 10 L78 16 Z" fill="#FFB089" />
-      <ellipse cx="94" cy="40" rx="9" ry="7" fill="#FFE8D6" />
-      <circle cx="101" cy="40" r="2.4" fill="#002B49" />
-      <circle cx="86" cy="34" r="3.1" fill="#002B49" />
-      <circle cx="87.1" cy="33" r="1.1" fill="#fff" />
-      <path d="M90 44 Q94 48 99 44" fill="none" stroke="#002B49" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  );
-}
+const SCOUT_IMAGE = '/images/scout1.png';
 
 function MagnifyingGlass() {
   return (
@@ -173,7 +144,11 @@ export const SearchLoadingAnimation = ({ query = '' }: SearchLoadingAnimationPro
           <div className="search-load-ring" />
           <MagnifyingGlass />
           <div className="search-load-scout-wrap">
-            <Scout />
+            <img
+              src={SCOUT_IMAGE}
+              alt="Scout"
+              className="search-load-scout"
+            />
           </div>
         </div>
 

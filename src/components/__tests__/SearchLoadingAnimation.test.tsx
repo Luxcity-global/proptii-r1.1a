@@ -17,6 +17,7 @@ describe('SearchLoadingAnimation', () => {
     expect(screen.getByRole('status', { name: 'Searching for properties' })).toBeInTheDocument();
     expect(screen.getByText('Searching for properties...')).toBeInTheDocument();
     expect(screen.getByText('Scout is sniffing out homes for you')).toBeInTheDocument();
+    expect(screen.getByAltText('Scout')).toHaveAttribute('src', '/images/scout1.png');
   });
 
   it('echoes the current search query', () => {

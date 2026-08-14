@@ -11,7 +11,7 @@
 
 .search-load-scene {
   position: relative;
-  height: 13.5rem;
+  height: 15.5rem;
   overflow: hidden;
   border-radius: 1.25rem;
   background:
@@ -98,42 +98,25 @@
 .search-load-scout-wrap {
   position: absolute;
   left: 50%;
-  bottom: 1.15rem;
+  bottom: 0.55rem;
   transform: translateX(-50%);
   z-index: 3;
 }
 
 .search-load-scout {
-  width: 7.25rem;
-  height: 5.5rem;
-  overflow: visible;
-  animation: search-load-bounce 0.55s ease-in-out infinite;
-}
-
-.search-load-scout-tail {
-  transform-origin: 18px 42px;
-  animation: search-load-wag 0.35s ease-in-out infinite;
-}
-
-.search-load-leg {
-  transform-box: fill-box;
-  transform-origin: top center;
-}
-
-.search-load-leg-1,
-.search-load-leg-3 {
-  animation: search-load-leg 0.4s ease-in-out infinite;
-}
-
-.search-load-leg-2,
-.search-load-leg-4 {
-  animation: search-load-leg 0.4s ease-in-out infinite reverse;
+  display: block;
+  width: 8.75rem;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 10px rgba(0, 43, 73, 0.18));
+  animation: search-load-bounce 0.7s ease-in-out infinite;
+  transform-origin: 70% 20%;
 }
 
 .search-load-glass {
   position: absolute;
-  left: 42%;
-  bottom: 5.4rem;
+  left: 58%;
+  bottom: 8.4rem;
   z-index: 4;
   animation: search-load-scan 2.8s ease-in-out infinite;
 }
@@ -162,10 +145,10 @@
 .search-load-ring {
   position: absolute;
   left: 50%;
-  bottom: 1.35rem;
-  width: 4.5rem;
+  bottom: 0.7rem;
+  width: 5.5rem;
   height: 1.15rem;
-  margin-left: -2.25rem;
+  margin-left: -2.75rem;
   border-radius: 9999px;
   background: rgba(241, 90, 34, 0.18);
   z-index: 1;
@@ -204,11 +187,6 @@
   .search-load-cloud,
   .search-load-street,
   .search-load-scout,
-  .search-load-scout-tail,
-  .search-load-leg-1,
-  .search-load-leg-2,
-  .search-load-leg-3,
-  .search-load-leg-4,
   .search-load-glass,
   .search-load-pin,
   .search-load-window-lit,
@@ -236,30 +214,10 @@
 @keyframes search-load-bounce {
   0%,
   100% {
-    transform: translateY(0);
+    transform: translateY(0) rotate(-2deg);
   }
   50% {
-    transform: translateY(-7px);
-  }
-}
-
-@keyframes search-load-wag {
-  0%,
-  100% {
-    transform: rotate(-18deg);
-  }
-  50% {
-    transform: rotate(22deg);
-  }
-}
-
-@keyframes search-load-leg {
-  0%,
-  100% {
-    transform: rotate(22deg);
-  }
-  50% {
-    transform: rotate(-24deg);
+    transform: translateY(-10px) rotate(3deg);
   }
 }
 
