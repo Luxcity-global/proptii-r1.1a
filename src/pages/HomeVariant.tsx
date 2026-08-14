@@ -34,7 +34,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
   const { isAuthenticated, user } = useAuth();
   const [, forceOnboardingRefresh] = useState(0);
 
-  const isLandlordPersona = (isAuthenticated && (user?.roles?.includes('landlord') || user?.roles?.includes('agent'))) || searchParams.get('segment') === 'agents' || searchParams.get('role') === 'landlord';
+  const isLandlordPersona = isAuthenticated && Boolean(user?.roles?.includes('landlord') || user?.roles?.includes('agent'));
 
   const activePhrases = isLandlordPersona ? LANDLORD_TYPING_PHRASES : TENANT_TYPING_PHRASES;
 
