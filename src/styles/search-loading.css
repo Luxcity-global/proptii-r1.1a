@@ -1,0 +1,345 @@
+/* Scoped to .search-load-* so other features are unaffected. */
+
+.search-load-root {
+  --search-load-orange: #f15a22;
+  --search-load-orange-deep: #e65d24;
+  --search-load-navy: #002b49;
+  --search-load-sky: #e8f4fb;
+  width: 100%;
+  max-width: 32rem;
+}
+
+.search-load-scene {
+  position: relative;
+  height: 13.5rem;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  background:
+    linear-gradient(180deg, #d7eef9 0%, #eef7fc 48%, #f7fafc 70%, #e8f0e4 100%);
+}
+
+.search-load-cloud {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 9999px;
+  animation: search-load-cloud 12s linear infinite;
+}
+
+.search-load-cloud::before,
+.search-load-cloud::after {
+  content: '';
+  position: absolute;
+  background: inherit;
+  border-radius: 9999px;
+}
+
+.search-load-cloud-a {
+  width: 3.25rem;
+  height: 1.15rem;
+  top: 1.1rem;
+  left: -2rem;
+}
+
+.search-load-cloud-a::before {
+  width: 1.6rem;
+  height: 1.6rem;
+  top: -0.85rem;
+  left: 0.55rem;
+}
+
+.search-load-cloud-a::after {
+  width: 2.1rem;
+  height: 1.35rem;
+  top: -0.55rem;
+  left: 1.4rem;
+}
+
+.search-load-cloud-b {
+  width: 2.5rem;
+  height: 0.9rem;
+  top: 2.4rem;
+  left: 8rem;
+  animation-duration: 18s;
+  animation-delay: -6s;
+  opacity: 0.75;
+}
+
+.search-load-cloud-b::before {
+  width: 1.2rem;
+  height: 1.2rem;
+  top: -0.65rem;
+  left: 0.4rem;
+}
+
+.search-load-cloud-b::after {
+  width: 1.6rem;
+  height: 1rem;
+  top: -0.4rem;
+  left: 1.1rem;
+}
+
+.search-load-street {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 10.25rem;
+  display: flex;
+  width: 200%;
+  animation: search-load-street 8s linear infinite;
+}
+
+.search-load-house-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-evenly;
+  width: 50%;
+  padding: 0 1.25rem 2.35rem;
+}
+
+.search-load-scout-wrap {
+  position: absolute;
+  left: 50%;
+  bottom: 1.15rem;
+  transform: translateX(-50%);
+  z-index: 3;
+}
+
+.search-load-scout {
+  width: 7.25rem;
+  height: 5.5rem;
+  overflow: visible;
+  animation: search-load-bounce 0.55s ease-in-out infinite;
+}
+
+.search-load-scout-tail {
+  transform-origin: 18px 42px;
+  animation: search-load-wag 0.35s ease-in-out infinite;
+}
+
+.search-load-leg {
+  transform-box: fill-box;
+  transform-origin: top center;
+}
+
+.search-load-leg-1,
+.search-load-leg-3 {
+  animation: search-load-leg 0.4s ease-in-out infinite;
+}
+
+.search-load-leg-2,
+.search-load-leg-4 {
+  animation: search-load-leg 0.4s ease-in-out infinite reverse;
+}
+
+.search-load-glass {
+  position: absolute;
+  left: 42%;
+  bottom: 5.4rem;
+  z-index: 4;
+  animation: search-load-scan 2.8s ease-in-out infinite;
+}
+
+.search-load-pin {
+  position: absolute;
+  z-index: 2;
+  animation: search-load-pin 1.6s ease-in-out infinite;
+}
+
+.search-load-pin-a {
+  left: 18%;
+  bottom: 6.4rem;
+}
+
+.search-load-pin-b {
+  left: 68%;
+  bottom: 7.1rem;
+  animation-delay: 0.8s;
+}
+
+.search-load-window-lit {
+  animation: search-load-window 1.8s ease-in-out infinite;
+}
+
+.search-load-ring {
+  position: absolute;
+  left: 50%;
+  bottom: 1.35rem;
+  width: 4.5rem;
+  height: 1.15rem;
+  margin-left: -2.25rem;
+  border-radius: 9999px;
+  background: rgba(241, 90, 34, 0.18);
+  z-index: 1;
+  animation: search-load-pulse-ring 1.4s ease-out infinite;
+}
+
+.search-load-bar {
+  position: relative;
+  height: 0.4rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: #f3e8e2;
+}
+
+.search-load-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 42%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f15a22, #ff8a4c, #f15a22);
+  background-size: 200% 100%;
+  animation: search-load-shimmer 1.4s ease-in-out infinite;
+}
+
+.search-load-copy {
+  min-height: 1.75rem;
+  animation: search-load-fade-in 0.45s ease;
+}
+
+.search-load-tip {
+  min-height: 2.5rem;
+  animation: search-load-fade-in 0.45s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-load-cloud,
+  .search-load-street,
+  .search-load-scout,
+  .search-load-scout-tail,
+  .search-load-leg-1,
+  .search-load-leg-2,
+  .search-load-leg-3,
+  .search-load-leg-4,
+  .search-load-glass,
+  .search-load-pin,
+  .search-load-window-lit,
+  .search-load-ring,
+  .search-load-bar-fill,
+  .search-load-copy,
+  .search-load-tip {
+    animation: none !important;
+  }
+
+  .search-load-street {
+    transform: translateX(-12%);
+  }
+}
+
+@keyframes search-load-street {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes search-load-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes search-load-wag {
+  0%,
+  100% {
+    transform: rotate(-18deg);
+  }
+  50% {
+    transform: rotate(22deg);
+  }
+}
+
+@keyframes search-load-leg {
+  0%,
+  100% {
+    transform: rotate(22deg);
+  }
+  50% {
+    transform: rotate(-24deg);
+  }
+}
+
+@keyframes search-load-scan {
+  0% {
+    transform: translateX(-42px) rotate(-10deg);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translateX(48px) rotate(8deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-42px) rotate(-10deg);
+    opacity: 0.85;
+  }
+}
+
+@keyframes search-load-window {
+  0%,
+  100% {
+    fill: #ffe8c7;
+  }
+  50% {
+    fill: #fff4a8;
+  }
+}
+
+@keyframes search-load-pin {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translateY(-10px) scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes search-load-shimmer {
+  0% {
+    transform: translateX(-40%);
+  }
+  100% {
+    transform: translateX(180%);
+  }
+}
+
+@keyframes search-load-pulse-ring {
+  0% {
+    transform: scaleX(0.7);
+    opacity: 0.5;
+  }
+  80% {
+    transform: scaleX(1.7);
+    opacity: 0;
+  }
+  100% {
+    transform: scaleX(1.7);
+    opacity: 0;
+  }
+}
+
+@keyframes search-load-cloud {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(28rem);
+  }
+}
+
+@keyframes search-load-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

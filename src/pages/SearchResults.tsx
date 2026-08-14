@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSearchBackend, type Property } from '../hooks/useSearchBackend';
 import { useSavedProperties } from '../contexts/SavedPropertiesContext';
 import Footer from '../components/Footer';
+import { SearchLoadingAnimation } from '../components/SearchLoadingAnimation';
 import { getAmenityIcon } from '../utils/amenityIcons';
 
 
@@ -1391,11 +1392,8 @@ const SearchResults = () => {
             </div>
           </div>
         </header>
-        <div className="flex-1 bg-gray-50 pt-20 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-[#E65D24] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Searching for properties...</p>
-          </div>
+        <div className="flex-1 bg-gray-50 px-4 py-12 flex items-center justify-center">
+          <SearchLoadingAnimation query={searchQuery} />
         </div>
         <Footer />
       </div>

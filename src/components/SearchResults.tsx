@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Property } from '../hooks/useSearchBackend';
+import { SearchLoadingAnimation } from './SearchLoadingAnimation';
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
 const cleanPropertyPrice = (price: string): string => {
@@ -232,11 +233,8 @@ export const SearchResults = ({ properties, isLoading, error, onRetry }: SearchR
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center py-20">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#E65D24] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Searching for properties...</p>
-        </div>
+      <div className="flex justify-center items-center py-20 px-4">
+        <SearchLoadingAnimation />
       </div>
     );
   }
