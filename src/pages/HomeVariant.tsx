@@ -163,7 +163,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
         />
       )}
 
-      <Navbar hideServiceLinks />
+      <Navbar />
 
       {/* Referee/Guarantor Response Modal */}
       <RefereeGuarantorResponseModal
@@ -210,80 +210,15 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
               : 'Search verified properties, book viewings in seconds, complete instant referencing, and sign contracts online. Free for tenants.'}
           </p>
 
-          {/* Landlord Action Hub or Tenant AI Search Bar */}
-          {isLandlordPersona ? (
-            <div className="max-w-3xl mx-auto px-4 md:px-0">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-                <button
-                  type="button"
-                  onClick={() => navigateToLandlordAction('add-property')}
-                  className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 transition-all duration-300 group hover:-translate-y-1 shadow-lg"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#DC5F12] to-[#F47A1A] flex items-center justify-center text-white mb-2 shadow-md group-hover:scale-110 transition-transform">
-                    <Building2 className="w-5 h-5" />
-                  </div>
-                  <span className="text-sm font-semibold text-white">List Property</span>
-                  <span className="text-xs text-white/70 mt-0.5">Post new listing</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigate('/bookviewing')}
-                  className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 transition-all duration-300 group hover:-translate-y-1 shadow-lg"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#136C9E] to-[#2185BD] flex items-center justify-center text-white mb-2 shadow-md group-hover:scale-110 transition-transform">
-                    <CalendarCheck className="w-5 h-5" />
-                  </div>
-                  <span className="text-sm font-semibold text-white">Viewings</span>
-                  <span className="text-xs text-white/70 mt-0.5">Manage schedule</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigate('/referencing')}
-                  className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 transition-all duration-300 group hover:-translate-y-1 shadow-lg"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#136C9E] to-[#2185BD] flex items-center justify-center text-white mb-2 shadow-md group-hover:scale-110 transition-transform">
-                    <FileCheck className="w-5 h-5" />
-                  </div>
-                  <span className="text-sm font-semibold text-white">Referencing</span>
-                  <span className="text-xs text-white/70 mt-0.5">Screen tenants</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigate('/contracts')}
-                  className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 transition-all duration-300 group hover:-translate-y-1 shadow-lg"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#136C9E] to-[#2185BD] flex items-center justify-center text-white mb-2 shadow-md group-hover:scale-110 transition-transform">
-                    <FileSignature className="w-5 h-5" />
-                  </div>
-                  <span className="text-sm font-semibold text-white">Contracts</span>
-                  <span className="text-xs text-white/70 mt-0.5">AST &amp; Agreements</span>
-                </button>
-              </div>
-
-              {/* Quick Search on top for Landlords too */}
-              <div ref={searchBarRef} className="relative z-10">
-                <SearchInput
-                  onHeightChange={handleSearchInputHeightChange}
-                  value={prefilledSearchQuery}
-                  initialSearchType={prefilledSearchType}
-                  simplified
-                />
-              </div>
-            </div>
-          ) : (
-            /* Tenant AI Search Bar */
-            <div ref={searchBarRef} className="relative z-10 max-w-3xl mx-auto px-4 md:px-0">
-              <SearchInput
-                onHeightChange={handleSearchInputHeightChange}
-                value={prefilledSearchQuery}
-                initialSearchType={prefilledSearchType}
-                simplified
-              />
-            </div>
-          )}
+          {/* AI Search Bar for Both Personas */}
+          <div ref={searchBarRef} className="relative z-10 max-w-3xl mx-auto px-4 md:px-0">
+            <SearchInput
+              onHeightChange={handleSearchInputHeightChange}
+              value={prefilledSearchQuery}
+              initialSearchType={prefilledSearchType}
+              simplified
+            />
+          </div>
         </div>
       </section>
 
