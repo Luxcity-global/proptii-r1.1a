@@ -12,7 +12,7 @@ interface SearchInputProps {
   placeholder?: string;
   className?: string;
   initialSearchType?: SearchPlatform;
-  /** Simplified hero layout: single-line bar, magnifier + mic + camera, "Search" button with original icon, Try pills */
+  /** Simplified hero layout: single-line bar, magnifier, "Search" button with original icon, Try pills */
   simplified?: boolean;
 }
 
@@ -162,7 +162,7 @@ export const SearchInput = ({
       <div className={`max-w-2xl mx-auto px-2 md:px-0 ${className}`}>
         <div className="relative w-full">
           <div className="relative overflow-hidden rounded-2xl bg-white shadow-2xl shadow-black/20">
-            {/* Input area: magnifier + input + mic + camera */}
+            {/* Input area: magnifier + input + Search button */}
             <div className="flex items-center gap-3 px-5 py-4 min-w-0">
               <span className="shrink-0 text-gray-400" aria-hidden>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -181,25 +181,6 @@ export const SearchInput = ({
                 className="flex-1 min-w-0 text-base border-0 focus:outline-none focus:ring-0 bg-transparent"
                 style={{ color: '#111827' }}
               />
-              <button
-                type="button"
-                className="hidden sm:inline-flex p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
-                aria-label="Voice search"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="hidden sm:inline-flex p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
-                aria-label="Image search"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </button>
               {/* Search button: orange, "Search" + original icon (no arrow) */}
               <button
                 type="button"

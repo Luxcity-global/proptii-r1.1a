@@ -8,7 +8,6 @@ import {
   alpha
 } from '@mui/material';
 import { useBookViewing } from '../context/BookViewingContext';
-import { Tooltip } from '../../Tooltip';
 
 // Constants
 const BLUE_COLOR = '#136C9E';
@@ -98,22 +97,13 @@ const PropertySelector: React.FC = () => {
           Property Address
         </Typography>
         <Box sx={{ position: 'relative', mb: 2 }}>
-          <Tooltip
-            content="Copy the property address directly from the listing. We'll pull the remaining details automatically when available."
-            position="top"
-            trigger="hover"
-            forcePosition={true}
-          >
-            <div>
-              <TextField
-                required
-                fullWidth
-                label="First line of address"
-                value={state.selectedProperty?.street || ''}
-                onChange={(e) => handlePropertyChange('street', e.target.value)}
-              />
-            </div>
-          </Tooltip>
+          <TextField
+            required
+            fullWidth
+            label="First line of address"
+            value={state.selectedProperty?.street || ''}
+            onChange={(e) => handlePropertyChange('street', e.target.value)}
+          />
         </Box>
       </Box>
 
@@ -137,22 +127,13 @@ const PropertySelector: React.FC = () => {
           sx={{ mb: 2 }}
         />
         <Box sx={{ position: 'relative', mb: 2 }}>
-          <Tooltip
-            content="If the email isn't listed on the property page, try searching for the agency's contact details online and add the agent's email address here."
-            position="top"
-            trigger="hover"
-            forcePosition={true}
-          >
-            <div>
-              <TextField
-                fullWidth
-                label="Agent Email"
-                value={state.selectedProperty?.agent?.email || ''}
-                onChange={(e) => handleAgentChange('email', e.target.value)}
-                type="email"
-              />
-            </div>
-          </Tooltip>
+          <TextField
+            fullWidth
+            label="Agent Email"
+            value={state.selectedProperty?.agent?.email || ''}
+            onChange={(e) => handleAgentChange('email', e.target.value)}
+            type="email"
+          />
         </Box>
         <TextField
           fullWidth

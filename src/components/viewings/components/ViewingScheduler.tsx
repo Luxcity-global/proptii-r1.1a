@@ -66,8 +66,8 @@ const StyledTextField = styled(TextField)(({ theme }) => ({
 }));
 
 const NotificationCard = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'selected',
-})<{ selected?: boolean }>(({ theme, selected }) => ({
+  shouldForwardProp: (prop) => prop !== 'selected' && prop !== 'disabled',
+})<{ selected?: boolean; disabled?: boolean }>(({ theme, selected, disabled }) => ({
   flex: 1,
   padding: theme.spacing(2),
   borderRadius: 12,
@@ -77,11 +77,15 @@ const NotificationCard = styled(Box, {
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  cursor: 'pointer',
+  cursor: disabled ? 'not-allowed' : 'pointer',
   transition: 'all 0.2s ease-in-out',
   position: 'relative',
   minWidth: '110px',
-  '&:hover': {
+  filter: disabled ? 'blur(2.5px)' : 'none',
+  opacity: disabled ? 0.72 : 1,
+  pointerEvents: disabled ? 'none' : 'auto',
+  userSelect: disabled ? 'none' : 'auto',
+  '&:hover': disabled ? undefined : {
     borderColor: selected ? ORANGE_COLOR : alpha(BLUE_COLOR, 0.2),
     backgroundColor: selected ? alpha(ORANGE_COLOR, 0.06) : alpha(BLUE_COLOR, 0.02),
     transform: 'translateY(-4px)',
@@ -115,6 +119,8 @@ const CheckBadge = styled(CheckCircleIcon)(({ theme }) => ({
   borderRadius: '50%',
   zIndex: 1,
 }));
+
+const DISABLED_NOTIFICATIONS = ['sms', 'whatsapp', 'call'];
 
 const ViewingScheduler: React.FC = () => {
   const { state, dispatch } = useBookViewing();
@@ -150,16 +156,14 @@ const ViewingScheduler: React.FC = () => {
   };
 
   const handleNotificationChange = (type: string) => {
+    if (DISABLED_NOTIFICATIONS.includes(type)) return;
+
     const rawPreferences = state.viewingDetails?.notificationPreference;
     const current = Array.isArray(rawPreferences) ? rawPreferences : [];
 
-    // Safety: if it was a string from a previous state, reset it or handle it
     const updated = current.includes(type)
       ? current.filter(t => t !== type)
       : [...current, type];
-
-    // Ensure at least one is selected or allow none? 
-    // Usually at least one is better, but let's allow none for now and let user decide.
 
     dispatch({
       type: 'UPDATE_VIEWING_DETAILS',
@@ -180,16 +184,6 @@ const ViewingScheduler: React.FC = () => {
           ...state.viewingDetails?.userDetails,
           [name]: value,
         },
-      },
-    });
-  };
-
-  const handleWhatsAppNumberChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    dispatch({
-      type: 'UPDATE_VIEWING_DETAILS',
-      payload: {
-        ...state.viewingDetails,
-        whatsappNumber: event.target.value,
       },
     });
   };
@@ -320,11 +314,14 @@ const ViewingScheduler: React.FC = () => {
                   { id: 'whatsapp', label: 'WhatsApp', sub: 'DIRECT', icon: <WhatsAppIcon /> },
                   { id: 'call', label: 'Call', sub: 'VOICE', icon: <PhoneIcon /> },
                 ].map((option) => {
-                  const isSelected = state.viewingDetails?.notificationPreference?.includes(option.id);
+                  const isDisabled = DISABLED_NOTIFICATIONS.includes(option.id);
+                  const isSelected = !isDisabled && Boolean(state.viewingDetails?.notificationPreference?.includes(option.id));
                   return (
                     <NotificationCard
                       key={option.id}
                       selected={isSelected}
+                      disabled={isDisabled}
+                      aria-disabled={isDisabled}
                       onClick={() => handleNotificationChange(option.id)}
                     >
                       {isSelected && <CheckBadge />}
@@ -356,23 +353,6 @@ const ViewingScheduler: React.FC = () => {
                 })}
               </Stack>
             </Box>
-
-            {state.viewingDetails?.notificationPreference?.includes('whatsapp') && (
-              <Box sx={{ mt: 3 }}>
-                <SectionTitle variant="subtitle1" sx={{ fontSize: '1rem', mb: 1.5 }}>
-                  WhatsApp Number
-                </SectionTitle>
-                <StyledTextField
-                  name="whatsappNumber"
-                  label="Enter your WhatsApp number"
-                  value={state.viewingDetails?.whatsappNumber || ''}
-                  onChange={handleWhatsAppNumberChange}
-                  fullWidth
-                  required
-                  placeholder="e.g. +44 7700 900000"
-                />
-              </Box>
-            )}
           </Grid>
         </Grid>
       </StyledPaper>
