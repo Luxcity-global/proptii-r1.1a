@@ -285,7 +285,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (providerType?: 'microsoft' | 'google'): Promise<void> => {
     try {
-      if (providerType === 'microsoft' || !providerType) {
+      if (providerType === 'microsoft') {
         try {
           const msal = await getMsalInstance();
           const { loginRequest } = await import('../config/authConfig');
@@ -328,12 +328,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
 
-      // Firebase Google Auth fallback
+      // Default: Pure Firebase Google Auth
       const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
       await signInWithPopup(auth, provider);
     } catch (err) {
       console.error('[Auth] Login failed:', err);
       window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { success: false } }));
+      throw err;
     }
   };
 

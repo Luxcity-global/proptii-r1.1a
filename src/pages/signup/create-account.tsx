@@ -1,75 +1,41 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useMsal } from '@azure/msal-react';
+import { useAuth } from '../../contexts/AuthContext';
 import Navbar from '../../components/Navbar';
-import { loginRequest } from '../../config/authConfig';
 import { usePlan } from '../../hooks/usePlan';
 import { setPendingPlan } from '../../services/billingService';
 import { welcomeUrl } from '../../utils/pricingRoutes';
 import type { BillingCycle } from '../../components/pricing/PricingBillingToggle';
 import '../../styles/pricing.css';
 
-const schema = z.object({
-  fullName: z.string().min(2, 'Full name is required'),
-  email: z.string().email('Enter a valid email'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-});
-
-type FormValues = z.infer<typeof schema>;
-
 /**
- * S2-15–16 — Create account (MSAL B2C sign-up + pending plan upsert).
+ * Create account with pure Firebase (Google & Email).
  */
 const CreateAccountPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { instance } = useMsal();
+  const { login } = useAuth();
   const planId = searchParams.get('plan') ?? 'explorer';
   const cycle = (searchParams.get('cycle') as BillingCycle) || 'annual';
-  const emailParam = searchParams.get('email') ?? '';
   const plan = usePlan(planId);
-  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      fullName: '',
-      email: emailParam ? decodeURIComponent(emailParam) : '',
-      password: '',
-    },
-  });
-
-  const onSubmit = async (_data: FormValues) => {
+  const handleGoogleSignUp = async () => {
     setSubmitting(true);
     setFormError(null);
     sessionStorage.setItem('redirectAfterLogin', welcomeUrl(planId, cycle));
 
     try {
-      const result = await instance.loginPopup({
-        ...loginRequest,
-        prompt: 'login',
-      });
-
-      if (result?.account) {
-        instance.setActiveAccount(result.account);
-        try {
-          await setPendingPlan(planId, cycle);
-        } catch (e) {
-          console.warn('pending plan save failed', e);
-        }
-        navigate(welcomeUrl(planId, cycle), { replace: true });
+      await login('google');
+      try {
+        await setPendingPlan(planId, cycle);
+      } catch (e) {
+        console.warn('pending plan save failed', e);
       }
+      navigate(welcomeUrl(planId, cycle), { replace: true });
     } catch {
-      setFormError('Account creation was cancelled or failed. Please try again.');
+      setFormError('Account sign-up was cancelled or failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -80,7 +46,7 @@ const CreateAccountPage: React.FC = () => {
     setFormError(null);
     sessionStorage.setItem('redirectAfterLogin', welcomeUrl(planId, cycle));
     try {
-      await instance.loginPopup(loginRequest);
+      await login('google');
       await setPendingPlan(planId, cycle);
       navigate(welcomeUrl(planId, cycle), { replace: true });
     } catch {
@@ -99,65 +65,49 @@ const CreateAccountPage: React.FC = () => {
             {plan && <p className="pr-signup-eyebrow">{plan.name}</p>}
             <h1>Create your account</h1>
             <p className="lead">
-              We use secure Microsoft sign-in — your password is managed by Azure AD.
+              Get started with Proptii using your Google account for secure, instant access.
             </p>
 
-            <form onSubmit={handleSubmit(onSubmit)} noValidate>
-              <div className="pr-field">
-                <label htmlFor="fullName">Full name</label>
-                <input id="fullName" {...register('fullName')} />
-                {errors.fullName && (
-                  <span className="pr-field-error">{errors.fullName.message}</span>
-                )}
-              </div>
-
-              <div className="pr-field">
-                <label htmlFor="email">Email</label>
-                <input id="email" type="email" {...register('email')} />
-                {errors.email && (
-                  <span className="pr-field-error">{errors.email.message}</span>
-                )}
-              </div>
-
-              <div className="pr-field">
-                <label htmlFor="password">Password</label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    {...register('password')}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    style={{
-                      position: 'absolute',
-                      right: 12,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      fontSize: 12,
-                      color: 'var(--pr-muted)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {showPassword ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-                {errors.password && (
-                  <span className="pr-field-error">{errors.password.message}</span>
-                )}
-              </div>
-
+            <div style={{ marginTop: 24 }}>
               <button
-                type="submit"
-                className="pr-btn pr-btn-primary pr-btn-block"
+                type="button"
+                onClick={handleGoogleSignUp}
                 disabled={submitting}
+                className="pr-btn pr-btn-primary pr-btn-block"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 12,
+                  padding: '14px 20px',
+                  borderRadius: 12,
+                  fontSize: 16,
+                  fontWeight: 600,
+                  backgroundColor: '#136C9E',
+                  color: '#ffffff',
+                }}
               >
-                {submitting ? 'Creating account…' : 'Create account'}
+                <svg width="20" height="20" viewBox="0 0 24 24">
+                  <path
+                    fill="#EA4335"
+                    d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"
+                  />
+                  <path
+                    fill="#4285F4"
+                    d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c0-.4 0-.8 0-1.4z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z"
+                  />
+                </svg>
+                <span>{submitting ? 'Connecting…' : 'Sign up with Google'}</span>
               </button>
-            </form>
+            </div>
 
             {formError && <p className="pr-signup-error">{formError}</p>}
 

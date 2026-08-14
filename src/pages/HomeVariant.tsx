@@ -10,8 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { hasOnboardingCompleted } from '../utils/onboardingSession';
 import { OnboardingFlow } from '../components/onboarding/OnboardingFlow';
 import {
-  Search, Home, CalendarCheck, FileCheck, FileSignature,
-  Building2, Users, BarChart3, Shield, ChevronDown, Sparkles, Wrench,
+  CalendarCheck, FileCheck, FileSignature, Building2,
 } from 'lucide-react';
 
 import { useState, useEffect, useRef } from 'react';
@@ -22,7 +21,8 @@ interface HomeVariantProps {
   hideOnboardingModal?: boolean;
 }
 
-const TYPING_PHRASES = ['Move in.', 'One platform.', 'Zero hassle.'] as const;
+const TENANT_TYPING_PHRASES = ['Zero hassle.', 'Move in fast.', 'One platform.'] as const;
+const LANDLORD_TYPING_PHRASES = ['Zero vacancy.', 'Verified tenants.', 'Digital contracts.'] as const;
 const TYPING_SPEED_MS = 80;
 const DELETE_SPEED_MS = 50;
 const PAUSE_AFTER_TYPING_MS = 1800;
@@ -34,13 +34,17 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
   const { isAuthenticated, user } = useAuth();
   const [, forceOnboardingRefresh] = useState(0);
 
+  const isLandlordPersona = (isAuthenticated && (user?.roles?.includes('landlord') || user?.roles?.includes('agent'))) || searchParams.get('segment') === 'agents' || searchParams.get('role') === 'landlord';
+
+  const activePhrases = isLandlordPersona ? LANDLORD_TYPING_PHRASES : TENANT_TYPING_PHRASES;
+
   // Typing/deleting animation for hero headline
   const [typingIndex, setTypingIndex] = useState(0);
   const [typingText, setTypingText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    const phrase = TYPING_PHRASES[typingIndex];
+    const phrase = activePhrases[typingIndex % activePhrases.length];
     const fullPhraseTyped = !isDeleting && typingText.length === phrase.length;
     const fullyDeleted = isDeleting && typingText.length === 0;
 
@@ -59,7 +63,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
           setTypingText(phrase.slice(0, typingText.length - 1));
         } else {
           setIsDeleting(false);
-          setTypingIndex((prev) => (prev + 1) % TYPING_PHRASES.length);
+          setTypingIndex((prev) => (prev + 1) % activePhrases.length);
         }
       } else {
         if (typingText.length < phrase.length) {
@@ -71,7 +75,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [typingIndex, typingText, isDeleting]);
+  }, [typingIndex, typingText, isDeleting, activePhrases]);
   const showOnboarding = !hideOnboardingModal && !isAuthenticated && !hasOnboardingCompleted();
   const searchBarRef = useRef<HTMLDivElement>(null);
 
@@ -132,26 +136,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
     }
   };
 
-  // --- Pillbox toggle state ---
-  const [activeMode, setActiveMode] = useState<'search' | 'list'>('search');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [hoveredItem, setHoveredItem] = useState<number | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const toggleRef = useRef<HTMLDivElement>(null);
   const [ctaHover, setCtaHover] = useState<'tenant' | 'agent' | null>('tenant');
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        dropdownRef.current && !dropdownRef.current.contains(event.target as Node) &&
-        toggleRef.current && !toggleRef.current.contains(event.target as Node)
-      ) {
-        setIsDropdownOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const navigateToLandlordAction = (action: 'add-property' | 'clients' | 'analytics' | 'coming-soon') => {
     if (action === 'add-property') {
@@ -168,33 +153,6 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
     }
     navigate('/coming-soon');
   };
-
-  function handleModeSwitch(mode: 'search' | 'list') {
-    if (mode === activeMode) {
-      setIsDropdownOpen(!isDropdownOpen);
-    } else {
-      setActiveMode(mode);
-      setIsDropdownOpen(true);
-    }
-    setHoveredItem(null);
-  }
-
-  const searchMenuItems = [
-    { icon: <Search className="h-4 w-4" />, label: 'Search Properties', description: 'AI-powered property search across multiple platforms', action: () => { setIsDropdownOpen(false); handleSearchCta(); } },
-    { icon: <CalendarCheck className="h-4 w-4" />, label: 'Book Viewings', description: 'Schedule and manage property viewings instantly', action: () => { setIsDropdownOpen(false); navigate('/bookviewing'); } },
-    { icon: <FileCheck className="h-4 w-4" />, label: 'Referencing', description: 'Complete tenant referencing online, hassle-free', action: () => { setIsDropdownOpen(false); navigate('/referencing'); } },
-    { icon: <FileSignature className="h-4 w-4" />, label: 'Sign Contracts', description: 'Digital contract signing, legally binding', action: () => { setIsDropdownOpen(false); navigate('/contracts'); } },
-  ];
-
-  const listMenuItems = [
-    { icon: <Building2 className="h-4 w-4" />, label: 'List Property', description: 'Advertise your property to verified tenants', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('add-property'); } },
-    { icon: <Users className="h-4 w-4" />, label: 'Manage Tenants', description: 'Tenant communication and management tools', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('clients'); } },
-    { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance and enquiries', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('analytics'); } },
-    { icon: <Shield className="h-4 w-4" />, label: 'Verify Tenants', description: 'Run background and credit checks securely', action: () => { setIsDropdownOpen(false); navigateToLandlordAction('coming-soon'); } },
-    { icon: <Wrench className="h-4 w-4" />, label: 'Tools', description: 'Free rental tools and official documents for landlords and tenants', action: () => { setIsDropdownOpen(false); navigate('/tools'); } },
-  ];
-
-  const menuItems = activeMode === 'search' ? searchMenuItems : listMenuItems;
 
   return (
     <div className="min-h-screen flex flex-col font-nunito">
@@ -235,311 +193,97 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
           <div className="absolute inset-0 bg-black bg-opacity-40"></div>
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full py-8 md:py-0">
-          {/* Primary CTAs – HeroToggle horizontal pill with dropdown (clean relative positioning) */}
-          <div className="relative z-30 w-full max-w-2xl mx-auto flex justify-center px-4 pt-24 md:pt-28 mb-6">
-            <div className="relative inline-flex flex-col items-center">
-              {/* Toggle Pill Container */}
-              <div ref={toggleRef} className="relative">
-                {/* Outer glow */}
-                <div
-                  className="absolute -inset-1 rounded-full opacity-40 blur-lg transition-all duration-700 pointer-events-none"
-                  style={{
-                    background:
-                      activeMode === 'search'
-                        ? 'linear-gradient(135deg, #6BB2E8 0%, #4D97CF 100%)'
-                        : 'linear-gradient(135deg, #E8D5B0 0%, #D4C4A0 100%)',
-                  }}
-                />
-
-                {/* Glass container */}
-                <div
-                  className="relative flex items-stretch rounded-full border border-white/[0.12] p-1"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.06)',
-                    backdropFilter: 'blur(24px) saturate(180%)',
-                    WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-                    boxShadow:
-                      '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.1)',
-                  }}
-                >
-                  {/* Search / Renters Button */}
-                  <button
-                    onClick={() => handleModeSwitch('search')}
-                    className="group relative flex items-center gap-1.5 sm:gap-2.5 rounded-full px-3 sm:px-5 md:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition-all duration-500 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-                    style={
-                      activeMode === 'search'
-                        ? {
-                            background: 'linear-gradient(135deg, #6BB2E8 0%, #4D97CF 80%, #357FB7 100%)',
-                            color: '#FFFFFF',
-                            boxShadow: '0 4px 16px rgba(107, 178, 232, 0.45), 0 2px 4px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -2px 4px rgba(0, 0, 0, 0.15)',
-                            transform: 'translateY(-1px)',
-                          }
-                        : {
-                            background: 'transparent',
-                            color: 'rgba(255, 255, 255, 0.55)',
-                          }
-                    }
-                    aria-pressed={activeMode === 'search'}
-                    aria-label="Search Properties Free"
-                  >
-                    <Home className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" strokeWidth={2.5} />
-                    <span className="whitespace-nowrap tracking-wide">Search Properties Free</span>
-                    <ChevronDown
-                      className={`h-3.5 w-3.5 transition-all duration-300 ${
-                        activeMode === 'search' && isDropdownOpen
-                          ? 'rotate-180 opacity-100'
-                          : activeMode === 'search'
-                            ? 'rotate-0 opacity-70'
-                            : 'rotate-0 opacity-0'
-                      }`}
-                      strokeWidth={2.5}
-                    />
-                    {activeMode === 'search' && (
-                      <div
-                        className="pointer-events-none absolute inset-0 rounded-full"
-                        style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 50%)' }}
-                      />
-                    )}
-                  </button>
-
-                  {/* List / Landlords Button – Hidden for pure Tenants */}
-                  {(!isAuthenticated || !user || user.roles?.includes('landlord') || user.roles?.includes('agent')) && (
-                    <button
-                      onClick={() => handleModeSwitch('list')}
-                      className="group relative flex items-center gap-1.5 sm:gap-2.5 rounded-full px-3 sm:px-5 md:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold transition-all duration-500 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-                      style={
-                        activeMode === 'list'
-                          ? {
-                              background: 'linear-gradient(135deg, #F5E6CC 0%, #E8D5B0 80%, #DBC8A0 100%)',
-                              color: '#3D2E1A',
-                              boxShadow: '0 4px 16px rgba(232, 213, 176, 0.35), 0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -2px 4px rgba(0, 0, 0, 0.05)',
-                              transform: 'translateY(-1px)',
-                            }
-                          : {
-                              background: 'transparent',
-                              color: 'rgba(255, 255, 255, 0.55)',
-                            }
-                      }
-                      aria-pressed={activeMode === 'list'}
-                      aria-label="List & Manage Properties"
-                    >
-                      <Building2 className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" strokeWidth={2.5} />
-                      <span className="whitespace-nowrap tracking-wide">List &amp; Manage Properties</span>
-                      <ChevronDown
-                        className={`h-3.5 w-3.5 transition-all duration-300 ${
-                          activeMode === 'list' && isDropdownOpen
-                            ? 'rotate-180 opacity-100'
-                            : activeMode === 'list'
-                              ? 'rotate-0 opacity-70'
-                              : 'rotate-0 opacity-0'
-                        }`}
-                        strokeWidth={2.5}
-                      />
-                      {activeMode === 'list' && (
-                        <div
-                          className="pointer-events-none absolute inset-0 rounded-full"
-                          style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 50%)' }}
-                        />
-                      )}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Contextual Dropdown */}
-              <div
-                ref={dropdownRef}
-                className="absolute top-full z-50 mt-3 w-[calc(100vw-2rem)] sm:w-[420px] overflow-hidden"
-                style={{
-                  left: '50%',
-                  opacity: isDropdownOpen ? 1 : 0,
-                  transform: isDropdownOpen
-                    ? 'translateX(-50%) translateY(0) scale(1)'
-                    : 'translateX(-50%) translateY(-8px) scale(0.97)',
-                  pointerEvents: isDropdownOpen ? 'auto' as const : 'none' as const,
-                  transition: 'opacity 0.3s ease-out, transform 0.3s ease-out',
-                }}
-              >
-                {/* Dropdown glass container */}
-                <div
-                  className="relative overflow-hidden rounded-2xl border border-white/[0.1]"
-                  style={{
-                    background: 'rgba(15, 15, 20, 0.75)',
-                    backdropFilter: 'blur(40px) saturate(200%)',
-                    WebkitBackdropFilter: 'blur(40px) saturate(200%)',
-                    boxShadow: '0 24px 48px rgba(0, 0, 0, 0.4), 0 8px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
-                  }}
-                >
-                  {/* Top accent bar */}
-                  <div
-                    className="h-[2px] w-full transition-all duration-700"
-                    style={{
-                      background:
-                        activeMode === 'search'
-                          ? 'linear-gradient(90deg, transparent, #6BB2E8, transparent)'
-                          : 'linear-gradient(90deg, transparent, #E8D5B0, transparent)',
-                    }}
-                  />
-
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-5 pt-4 pb-2">
-                    <div className="flex items-center gap-2">
-                      <Sparkles
-                        className="h-3.5 w-3.5 transition-colors duration-500"
-                        style={{ color: activeMode === 'search' ? '#6BB2E8' : '#D4C090' }}
-                      />
-                      <p
-                        className="text-xs font-medium uppercase tracking-widest transition-colors duration-500"
-                        style={{ color: activeMode === 'search' ? 'rgba(107, 178, 232, 0.92)' : 'rgba(212, 192, 144, 0.8)' }}
-                      >
-                        {activeMode === 'search' ? 'For Renters & Buyers' : 'For Landlords & Agents'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Role awareness info banner for pure Tenants attempting to list */}
-                  {activeMode === 'list' && isAuthenticated && user?.roles?.includes('tenant') && !user?.roles?.includes('landlord') && !user?.roles?.includes('agent') && (
-                    <div className="mx-4 mb-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 text-left">
-                      ℹ️ You are signed in with a <strong>Tenant</strong> profile. Landlord features are available for Landlord/Agent accounts.
-                    </div>
-                  )}
-
-                  {/* Menu Items */}
-                  <div className="p-2">
-                    {menuItems.map((item, index) => (
-                      <button
-                        key={`${activeMode}-${index}`}
-                        onClick={item.action}
-                        className="group relative flex w-full items-center gap-4 rounded-xl px-4 py-3.5 text-left transition-all duration-200"
-                        style={{
-                          background:
-                            hoveredItem === index
-                              ? activeMode === 'search'
-                                ? 'rgba(33, 71, 102, 0.12)'
-                                : 'rgba(232, 213, 176, 0.08)'
-                              : 'transparent',
-                        }}
-                        onMouseEnter={() => setHoveredItem(index)}
-                        onMouseLeave={() => setHoveredItem(null)}
-                      >
-                        {/* Icon container */}
-                        <div
-                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-all duration-300"
-                          style={{
-                            borderColor:
-                              hoveredItem === index
-                                ? activeMode === 'search' ? 'rgba(33, 71, 102, 0.35)' : 'rgba(232, 213, 176, 0.2)'
-                                : 'rgba(255, 255, 255, 0.08)',
-                            background:
-                              hoveredItem === index
-                                ? activeMode === 'search' ? 'rgba(33, 71, 102, 0.18)' : 'rgba(232, 213, 176, 0.1)'
-                                : 'rgba(255, 255, 255, 0.04)',
-                            color:
-                              hoveredItem === index
-                                ? activeMode === 'search' ? '#6BB2E8' : '#E8D5B0'
-                                : 'rgba(255, 255, 255, 0.5)',
-                            boxShadow:
-                              hoveredItem === index
-                                ? activeMode === 'search' ? '0 0 20px rgba(33, 71, 102, 0.2)' : '0 0 20px rgba(232, 213, 176, 0.1)'
-                                : 'none',
-                          }}
-                        >
-                          {item.icon}
-                        </div>
-
-                        {/* Text */}
-                        <div className="flex-1 min-w-0">
-                          <p
-                            className="text-sm font-medium transition-colors duration-200"
-                            style={{ color: hoveredItem === index ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.8)' }}
-                          >
-                            {item.label}
-                          </p>
-                          <p
-                            className="mt-0.5 text-xs leading-relaxed transition-colors duration-200"
-                            style={{ color: hoveredItem === index ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.35)' }}
-                          >
-                            {item.description}
-                          </p>
-                        </div>
-
-                        {/* Arrow indicator */}
-                        <div
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all duration-300"
-                          style={{
-                            opacity: hoveredItem === index ? 1 : 0,
-                            transform: hoveredItem === index ? 'translateX(0)' : 'translateX(-4px)',
-                            background: activeMode === 'search' ? 'rgba(33, 71, 102, 0.25)' : 'rgba(232, 213, 176, 0.12)',
-                            color: activeMode === 'search' ? '#6BB2E8' : '#E8D5B0',
-                          }}
-                        >
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M4.5 2.5L8 6L4.5 9.5" />
-                          </svg>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Footer CTA */}
-                  <div className="border-t border-white/[0.06] px-5 py-3.5">
-                    <button
-                      onClick={() => {
-                        setIsDropdownOpen(false);
-                        if (activeMode === 'search') {
-                          handleSearchCta();
-                        } else {
-                          navigateToLandlordAction('add-property');
-                        }
-                      }}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold tracking-wide uppercase transition-all duration-300"
-                      style={{
-                        background: activeMode === 'search' ? 'rgba(33, 71, 102, 0.15)' : 'rgba(232, 213, 176, 0.08)',
-                        color: activeMode === 'search' ? '#6BB2E8' : '#E8D5B0',
-                        border: activeMode === 'search' ? '1px solid rgba(33, 71, 102, 0.3)' : '1px solid rgba(232, 213, 176, 0.12)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = activeMode === 'search' ? 'rgba(33, 71, 102, 0.25)' : 'rgba(232, 213, 176, 0.15)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = activeMode === 'search' ? 'rgba(33, 71, 102, 0.15)' : 'rgba(232, 213, 176, 0.08)';
-                      }}
-                    >
-                      {activeMode === 'search' ? 'Get Started Free' : 'Start Listing Today'}
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M5 3L10 7L5 11" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Main Heading */}
-          <h3 className="text-2xl md:text-6xl font-bold mb-4 md:mb-6 font-archive leading-tight">
-            Search. Verify.{' '}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white w-full py-8 md:py-0 pt-20 md:pt-16">
+          {/* Main Role-Tailored Heading */}
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold mb-4 md:mb-6 font-archive leading-tight tracking-tight">
+            {isLandlordPersona ? 'List. Screen. ' : 'Search. Verify. '}
             <span className="text-[#F15A22]">
               {typingText}
               <span className="animate-pulse" aria-hidden="true">|</span>
             </span>
-          </h3>
+          </h1>
 
           {/* Subheading */}
-          <p className="text-lg md:text-2xl mb-8 md:mb-12 max-w-2xl mx-auto font-light px-4">
-            Search properties, book viewings, complete referencing and sign contracts in one place. Free for tenants.
+          <p className="text-base sm:text-xl md:text-2xl mb-8 md:mb-10 max-w-3xl mx-auto font-light px-4 text-white/90 leading-relaxed">
+            {isLandlordPersona
+              ? 'Advertise properties to verified tenants, manage viewing requests, run instant referencing checks, and manage digital AST contracts in one place.'
+              : 'Search verified properties, book viewings in seconds, complete instant referencing, and sign contracts online. Free for tenants.'}
           </p>
 
-          {/* Search Bar */}
-          <div ref={searchBarRef} className="relative z-10 max-w-3xl mx-auto px-4 md:px-0">
-            <SearchInput
-              onHeightChange={handleSearchInputHeightChange}
-              value={prefilledSearchQuery}
-              initialSearchType={prefilledSearchType}
-              simplified
-            />
-          </div>
+          {/* Landlord Action Hub or Tenant AI Search Bar */}
+          {isLandlordPersona ? (
+            <div className="max-w-3xl mx-auto px-4 md:px-0">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                <button
+                  type="button"
+                  onClick={() => navigateToLandlordAction('add-property')}
+                  className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 transition-all duration-300 group hover:-translate-y-1 shadow-lg"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#DC5F12] to-[#F47A1A] flex items-center justify-center text-white mb-2 shadow-md group-hover:scale-110 transition-transform">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <span className="text-sm font-semibold text-white">List Property</span>
+                  <span className="text-xs text-white/70 mt-0.5">Post new listing</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/bookviewing')}
+                  className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 transition-all duration-300 group hover:-translate-y-1 shadow-lg"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#136C9E] to-[#2185BD] flex items-center justify-center text-white mb-2 shadow-md group-hover:scale-110 transition-transform">
+                    <CalendarCheck className="w-5 h-5" />
+                  </div>
+                  <span className="text-sm font-semibold text-white">Viewings</span>
+                  <span className="text-xs text-white/70 mt-0.5">Manage schedule</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/referencing')}
+                  className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 transition-all duration-300 group hover:-translate-y-1 shadow-lg"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#136C9E] to-[#2185BD] flex items-center justify-center text-white mb-2 shadow-md group-hover:scale-110 transition-transform">
+                    <FileCheck className="w-5 h-5" />
+                  </div>
+                  <span className="text-sm font-semibold text-white">Referencing</span>
+                  <span className="text-xs text-white/70 mt-0.5">Screen tenants</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/contracts')}
+                  className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 transition-all duration-300 group hover:-translate-y-1 shadow-lg"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#136C9E] to-[#2185BD] flex items-center justify-center text-white mb-2 shadow-md group-hover:scale-110 transition-transform">
+                    <FileSignature className="w-5 h-5" />
+                  </div>
+                  <span className="text-sm font-semibold text-white">Contracts</span>
+                  <span className="text-xs text-white/70 mt-0.5">AST &amp; Agreements</span>
+                </button>
+              </div>
+
+              {/* Quick Search on top for Landlords too */}
+              <div ref={searchBarRef} className="relative z-10">
+                <SearchInput
+                  onHeightChange={handleSearchInputHeightChange}
+                  value={prefilledSearchQuery}
+                  initialSearchType={prefilledSearchType}
+                  simplified
+                />
+              </div>
+            </div>
+          ) : (
+            /* Tenant AI Search Bar */
+            <div ref={searchBarRef} className="relative z-10 max-w-3xl mx-auto px-4 md:px-0">
+              <SearchInput
+                onHeightChange={handleSearchInputHeightChange}
+                value={prefilledSearchQuery}
+                initialSearchType={prefilledSearchType}
+                simplified
+              />
+            </div>
+          )}
         </div>
       </section>
 
