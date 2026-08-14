@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserCircle, ChevronDown, Settings, LogOut, Menu, X, LayoutDashboard } from 'lucide-react';
+import EditProfileModal from './profile/EditProfileModal';
 
 interface NavbarProps {
   isAgent?: boolean;
@@ -9,16 +10,29 @@ interface NavbarProps {
 }
 
 const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = false }) => {
-  const { isAuthenticated, user, login, logout, editProfile, isLoading } = useAuth();
+  const { isAuthenticated, user, login, logout, editProfile, updateUserProfile, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [loginInProgress, setLoginInProgress] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
   const pathname = location.pathname;
   const isLandlordUser = isAgent || (isAuthenticated && (user?.roles?.includes('landlord') || user?.roles?.includes('agent')));
+
+  // Listen for custom event to open Edit Profile Modal from anywhere
+  useEffect(() => {
+    const handleOpenModal = () => {
+      setIsEditProfileModalOpen(true);
+    };
+
+    window.addEventListener('open-edit-profile-modal', handleOpenModal);
+    return () => {
+      window.removeEventListener('open-edit-profile-modal', handleOpenModal);
+    };
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -83,14 +97,10 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
     logout();
   };
 
-  const handleEditProfile = async () => {
+  const handleEditProfile = () => {
     setIsDropdownOpen(false);
     setIsMobileMenuOpen(false);
-    try {
-      await editProfile();
-    } catch (error) {
-      console.error('❌ Error in handleEditProfile:', error);
-    }
+    setIsEditProfileModalOpen(true);
   };
 
   const closeMobileMenu = () => {
@@ -503,6 +513,20 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
           </div>
         )}
       </div>
+
+      {/* In-App Edit Profile Modal */}
+      {isAuthenticated && (
+        <EditProfileModal
+          isOpen={isEditProfileModalOpen}
+          onClose={() => setIsEditProfileModalOpen(false)}
+          initialName={user?.name || ''}
+          initialEmail={user?.email || ''}
+          initialPhone={user?.phone || ''}
+          onSave={async (data) => {
+            await updateUserProfile(data);
+          }}
+        />
+      )}
     </nav>
   );
 };
