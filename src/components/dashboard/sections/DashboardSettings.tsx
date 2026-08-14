@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronRight,
@@ -16,6 +16,7 @@ import { getPlanById } from '../../../config/plans';
 import { createBillingPortalSession } from '../../../services/billingService';
 import type { PlanId } from '../../../config/plans';
 import PlanCompareModal from '../../billing/PlanCompareModal';
+import EditProfileModal from '../../profile/EditProfileModal';
 
 /* ─────────────────────────── helpers ─────────────────────────── */
 
@@ -128,7 +129,7 @@ const SettingsGroup: React.FC<SettingsGroupProps> = ({ label, icon, children }) 
 /* ────────────────────── main component ───────────────────────── */
 
 const DashboardSettings: React.FC = () => {
-  const { user, logout, editProfile } = useAuth();
+  const { user, logout, editProfile, updateUserProfile } = useAuth();
   const navigate = useNavigate();
   const currentRole = user?.roles?.[0] ?? null;
   // Only landlords and agents can switch roles — tenants have no other dashboard
@@ -151,6 +152,13 @@ const DashboardSettings: React.FC = () => {
   const [portalError, setPortalError] = useState<string | null>(null);
   const [signOutBusy, setSignOutBusy] = useState(false);
   const [showPlansModal, setShowPlansModal] = useState(false);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+
+  useEffect(() => {
+    const handleOpenEdit = () => setShowEditProfileModal(true);
+    window.addEventListener('open-edit-profile-modal', handleOpenEdit);
+    return () => window.removeEventListener('open-edit-profile-modal', handleOpenEdit);
+  }, []);
 
   const displayPlanId = normalizePlanId(plan);
   const planConfig = usePlan(displayPlanId) ?? getPlanById(displayPlanId);
@@ -217,11 +225,11 @@ const DashboardSettings: React.FC = () => {
         <SettingsRow
           title="Display name"
           description={user?.name || user?.givenName || '—'}
-          onClick={editProfile}
+          onClick={() => setShowEditProfileModal(true)}
           action={
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); editProfile(); }}
+              onClick={(e) => { e.stopPropagation(); setShowEditProfileModal(true); }}
               className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-orange-50"
               style={{ color: '#DC5F12', borderColor: '#DC5F12' }}
             >
@@ -238,17 +246,21 @@ const DashboardSettings: React.FC = () => {
             </span>
           }
         />
-        {user?.phone && (
-          <SettingsRow
-            title="Phone number"
-            description={user.phone}
-            action={
-              <span className="text-xs px-2 py-1 rounded-md" style={{ background: '#f3f4f6', color: '#6b7280' }}>
-                Managed by provider
-              </span>
-            }
-          />
-        )}
+        <SettingsRow
+          title="Phone number"
+          description={user?.phone || 'No phone number added'}
+          onClick={() => setShowEditProfileModal(true)}
+          action={
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowEditProfileModal(true); }}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-orange-50"
+              style={{ color: '#DC5F12', borderColor: '#DC5F12' }}
+            >
+              {user?.phone ? 'Edit' : 'Add'}
+            </button>
+          }
+        />
       </SettingsGroup>
 
       {/* ── Plan ── */}
@@ -491,6 +503,16 @@ const DashboardSettings: React.FC = () => {
         open={showPlansModal}
         onClose={() => setShowPlansModal(false)}
         currentPlanId={plan as PlanId | null}
+      />
+
+      {/* Profile Edit Modal */}
+      <EditProfileModal
+        isOpen={showEditProfileModal}
+        onClose={() => setShowEditProfileModal(false)}
+        initialName={user?.name || user?.givenName || ''}
+        initialEmail={user?.email || ''}
+        initialPhone={user?.phone || ''}
+        onSave={updateUserProfile}
       />
     </div>
   );

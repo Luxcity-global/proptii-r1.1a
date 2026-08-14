@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { SignUpPromptModal } from '../components/onboarding/SignUpPromptModal';
 import { MessagingProvider } from '../contexts/MessagingContext';
 import { useMessagingPoller } from '../hooks/useMessagingPoller';
+import EditProfileModal from '../components/profile/EditProfileModal';
 
 // Lazy-load the Landlord App component
 const LandlordApp = React.lazy(() => import('../landlord_agent/src/App'));
@@ -13,10 +14,11 @@ const LandlordApp = React.lazy(() => import('../landlord_agent/src/App'));
  * Renders the lazy-loaded landlord App component.
  */
 const LandlordDemoInner: React.FC = () => {
-  const { isAuthenticated, user, isLoading, login, logout, editProfile } = useAuth();
+  const { isAuthenticated, user, isLoading, login, logout, editProfile, updateUserProfile } = useAuth();
   const { pathname, search } = useLocation();
   const [signUpOpen, setSignUpOpen] = useState(false);
   const [signUpTitle, setSignUpTitle] = useState('Sign up to continue');
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
 
   // Start the 30-second polling loop for conversations and unread count
   useMessagingPoller();
@@ -69,13 +71,17 @@ const LandlordDemoInner: React.FC = () => {
 
     window.addEventListener('message', handleMessage);
     window.addEventListener('require-auth', handleCustomEvent);
+    const handleOpenEdit = () => setEditProfileOpen(true);
+    window.addEventListener('open-edit-profile-modal', handleOpenEdit);
+
     return () => {
       window.removeEventListener('message', handleMessage);
       window.removeEventListener('require-auth', handleCustomEvent);
+      window.removeEventListener('open-edit-profile-modal', handleOpenEdit);
     };
   }, [logout, editProfile]);
 
-  // While MSAL is resolving auth, show a brief spinner
+  // While auth is resolving, show a brief spinner
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -115,6 +121,16 @@ const LandlordDemoInner: React.FC = () => {
           await login();
         }}
         onExploreFeatures={() => setSignUpOpen(false)}
+      />
+
+      {/* Profile Edit Modal */}
+      <EditProfileModal
+        isOpen={editProfileOpen}
+        onClose={() => setEditProfileOpen(false)}
+        initialName={user?.name || user?.givenName || ''}
+        initialEmail={user?.email || ''}
+        initialPhone={user?.phone || ''}
+        onSave={updateUserProfile}
       />
     </div>
   );

@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, updateProfile } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
 import SessionManager from '../services/SessionManager';
 import { notifyAuthReady } from '../services/authReady';
+import userService from '../services/userService';
 
 import { PublicClientApplication } from '@azure/msal-browser';
 import { msalConfig } from '../config/authConfig';
@@ -45,10 +46,11 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   userRole: 'tenant' | 'landlord' | 'agent' | null;
-  login: () => Promise<void>;
+  login: (providerType?: 'microsoft' | 'google') => Promise<void>;
   loginAsMockUser: (id: string, role: string) => void;
   logout: () => Promise<void>;
   editProfile: () => Promise<void>;
+  updateUserProfile: (data: { name: string; phone?: string }) => Promise<void>;
   refreshUserData: () => Promise<void>;
   patchUser: (patch: Partial<User>) => void;
 }
@@ -366,8 +368,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(false);
   };
 
+  const updateUserProfile = async (data: { name: string; phone?: string }): Promise<void> => {
+    if (!user) throw new Error('No authenticated user found.');
+
+    const name = data.name.trim();
+    const phone = data.phone?.trim() || undefined;
+
+    // 1. Update Firebase Auth displayName if currentUser exists
+    if (auth.currentUser) {
+      try {
+        await updateProfile(auth.currentUser, { displayName: name });
+      } catch (fbErr) {
+        console.warn('[Auth] Firebase displayName update notice:', fbErr);
+      }
+    }
+
+    // 2. Persist to Firestore / backend
+    try {
+      await userService.updateUser(user.id, {
+        name,
+        phone,
+      });
+    } catch (apiErr) {
+      console.warn('[Auth] UserService profile update warning:', apiErr);
+    }
+
+    // 3. Update local user state
+    const givenName = name.split(' ')[0];
+    const familyName = name.split(' ').slice(1).join(' ');
+    setUser((prev) => (prev ? { ...prev, name, givenName, familyName, phone } : prev));
+  };
+
   const editProfile = async (): Promise<void> => {
-    console.warn('editProfile not implemented for Firebase yet.');
+    window.dispatchEvent(new CustomEvent('open-edit-profile-modal'));
   };
 
   const refreshUserData = async (): Promise<void> => {
@@ -385,7 +418,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated, isLoading, userRole, login, loginAsMockUser, logout, editProfile, refreshUserData, patchUser }}
+      value={{
+        user,
+        isAuthenticated,
+        isLoading,
+        userRole,
+        login,
+        loginAsMockUser,
+        logout,
+        editProfile,
+        updateUserProfile,
+        refreshUserData,
+        patchUser,
+      }}
     >
       {children}
     </AuthContext.Provider>
