@@ -201,6 +201,33 @@ export const SendReferencingModal: React.FC<SendReferencingModalProps> = ({
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Passport Ready Banner */}
+              <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3.5 flex items-center justify-between gap-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-900">Your Referencing Passport is Loaded</h4>
+                    <p className="text-[11px] text-gray-600">
+                      Your saved documents & 5 verified sections will be shared with this recipient.
+                    </p>
+                  </div>
+                </div>
+                {onEditPassport && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onEditPassport();
+                    }}
+                    className="text-xs font-semibold text-blue-700 hover:text-blue-900 whitespace-nowrap px-2.5 py-1 rounded-lg bg-white border border-blue-200 shadow-2xs hover:bg-blue-50 transition-colors"
+                  >
+                    Edit Details
+                  </button>
+                )}
+              </div>
+
               {/* Recipient Type Selector */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
