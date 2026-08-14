@@ -2,14 +2,8 @@
  * SessionManager — lightweight inactivity tracker.
  *
  * Responsibility: track the last user interaction timestamp and emit
- * `sessionWarning` / `sessionEnd` custom events when the tab is idle.
- * MSAL handles token lifetimes; we do not duplicate that work here.
- *
- * Design decisions:
- *  - No AES-GCM encryption of UI interaction timestamps (no sensitive data).
- *  - No fetch monkey-patching (breaks SSE streams and interferes with MSAL).
- *  - No 5-second cross-tab sync interval (localStorage `storage` event is sufficient).
- *  - Singleton — call SessionManager.getInstance() anywhere.
+ * `sessionWarning` / `sessionEnd` / `sessionTimeout` / `sessionExpired` events.
+ * Singleton — call SessionManager.getInstance() anywhere.
  */
 
 const ACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 min → session end
@@ -24,6 +18,7 @@ export class SessionManager {
   private lastActivity = Date.now();
   private checkTimer: ReturnType<typeof setInterval> | null = null;
   private warned = false;
+  private listeners: Map<string, Set<Function>> = new Map();
 
   private constructor() {
     this.setupListeners();
@@ -35,6 +30,43 @@ export class SessionManager {
       SessionManager.instance = new SessionManager();
     }
     return SessionManager.instance;
+  }
+
+  // ─── Event Emitter API ──────────────────────────────────────────────────────
+
+  public on(event: string, callback: Function): void {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
+    }
+    this.listeners.get(event)!.add(callback);
+  }
+
+  public off(event: string, callback: Function): void {
+    const set = this.listeners.get(event);
+    if (set) {
+      set.delete(callback);
+    }
+  }
+
+  public addEventListener(event: string, callback: Function): void {
+    this.on(event, callback);
+  }
+
+  public removeEventListener(event: string, callback: Function): void {
+    this.off(event, callback);
+  }
+
+  public emit(event: string, ...args: any[]): void {
+    const set = this.listeners.get(event);
+    if (set) {
+      set.forEach((cb) => {
+        try {
+          cb(...args);
+        } catch (e) {
+          console.error(`Error in SessionManager listener for ${event}:`, e);
+        }
+      });
+    }
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
@@ -75,6 +107,7 @@ export class SessionManager {
       this.warned = true;
       const remaining = Math.floor((ACTIVITY_TIMEOUT_MS - idle) / 1000);
       window.dispatchEvent(new CustomEvent('sessionWarning', { detail: { remaining } }));
+      this.emit('sessionWarning', { remaining });
     }
   }
 
@@ -84,6 +117,9 @@ export class SessionManager {
       this.checkTimer = null;
     }
     window.dispatchEvent(new CustomEvent('sessionEnd', { detail: { reason } }));
+    this.emit('sessionEnd', { reason });
+    this.emit('sessionTimeout');
+    this.emit('sessionExpired');
   }
 }
 
