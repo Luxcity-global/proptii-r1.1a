@@ -4,10 +4,13 @@ import '../styles/search-loading.css';
 const SCOUT_IMAGE = '/images/Scout ava.png';
 
 const STEPS = [
-  { label: 'Understanding your search', duration: 2600 },
-  { label: 'Scanning live listings', duration: 3000 },
-  { label: 'Ranking best matches', duration: 2200 },
+  { label: 'Understanding your search' },
+  { label: 'Scanning live listings' },
+  { label: 'Ranking best matches' },
 ];
+
+const STEP_DURATION_MS = 15000;
+const FILL_DURATION_MS = 45000;
 
 const TIPS = [
   { heading: 'Did you know?', body: 'Adding “south-facing garden” finds homes that get the most afternoon sun.' },
@@ -15,8 +18,6 @@ const TIPS = [
   { heading: 'Scout says', body: 'Try “quiet street” or “corner plot” for more outdoor space.' },
   { heading: 'Good to know', body: 'Ofsted-rated schools are factored in when you say “near good schools”.' },
 ];
-
-const TOTAL_MS = STEPS.reduce((sum, step) => sum + step.duration, 0);
 
 const BLIPS = [
   { top: '22%', left: '68%', delay: '0.3s', size: 5 },
@@ -65,7 +66,7 @@ function Radar() {
 
 function CheckIcon() {
   return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+    <svg width="12" height="12" viewBox="0 0 10 10" fill="none" aria-hidden>
       <path d="M2 5l2 2 4-4" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -91,19 +92,8 @@ export const SearchLoadingAnimation = ({ query = '' }: SearchLoadingAnimationPro
     const start = Date.now();
     const id = window.setInterval(() => {
       const elapsed = Date.now() - start;
-      setProgress(Math.min(97, (elapsed / TOTAL_MS) * 100));
-
-      let accumulated = 0;
-      for (let index = 0; index < STEPS.length; index += 1) {
-        accumulated += STEPS[index].duration;
-        if (elapsed < accumulated) {
-          setActiveStep(index);
-          break;
-        }
-        if (index === STEPS.length - 1) {
-          setActiveStep(STEPS.length - 1);
-        }
-      }
+      setProgress(Math.min(96, (elapsed / FILL_DURATION_MS) * 96));
+      setActiveStep(Math.min(STEPS.length - 1, Math.floor(elapsed / STEP_DURATION_MS)));
     }, 50);
 
     return () => window.clearInterval(id);

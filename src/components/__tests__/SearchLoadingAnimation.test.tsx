@@ -27,15 +27,29 @@ describe('SearchLoadingAnimation', () => {
     expect(screen.getByText('Searching for properties...')).toBeInTheDocument();
   });
 
-  it('advances through search stages while waiting', () => {
+  it('starts on the first step instead of marking earlier steps complete', () => {
     render(<SearchLoadingAnimation />);
 
-    expect(screen.getAllByText('Understanding your search').length).toBeGreaterThan(0);
+    expect(document.querySelector('.search-load-headline')?.textContent).toBe('Understanding your search');
+    expect(document.querySelectorAll('.search-load-step-icon.is-done')).toHaveLength(0);
+    expect(document.querySelectorAll('.search-load-step-icon.is-active')).toHaveLength(1);
+  });
+
+  it('ticks the next step only after the progress bar has moved on', () => {
+    render(<SearchLoadingAnimation />);
 
     act(() => {
-      vi.advanceTimersByTime(2600);
+      vi.advanceTimersByTime(14900);
     });
 
-    expect(screen.getAllByText('Scanning live listings').length).toBeGreaterThan(0);
+    expect(document.querySelector('.search-load-headline')?.textContent).toBe('Understanding your search');
+    expect(document.querySelectorAll('.search-load-step-icon.is-done')).toHaveLength(0);
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    expect(document.querySelector('.search-load-headline')?.textContent).toBe('Scanning live listings');
+    expect(document.querySelectorAll('.search-load-step-icon.is-done')).toHaveLength(1);
   });
 });
