@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserCircle, ChevronDown, Settings, LogOut, Menu, X, LayoutDashboard } from 'lucide-react';
-import EditProfileModal from './profile/EditProfileModal';
 
 interface NavbarProps {
   isAgent?: boolean;
@@ -10,29 +9,16 @@ interface NavbarProps {
 }
 
 const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = false }) => {
-  const { isAuthenticated, user, login, logout, editProfile, updateUserProfile, isLoading } = useAuth();
+  const { isAuthenticated, user, login, logout, editProfile, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
   const [loginInProgress, setLoginInProgress] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
   const pathname = location.pathname;
   const isLandlordUser = isAgent || (isAuthenticated && (user?.roles?.includes('landlord') || user?.roles?.includes('agent')));
-
-  // Listen for custom event to open Edit Profile Modal from anywhere
-  useEffect(() => {
-    const handleOpenModal = () => {
-      setIsEditProfileModalOpen(true);
-    };
-
-    window.addEventListener('open-edit-profile-modal', handleOpenModal);
-    return () => {
-      window.removeEventListener('open-edit-profile-modal', handleOpenModal);
-    };
-  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -52,26 +38,31 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
     };
   }, [isDropdownOpen, isMobileMenuOpen]);
 
-  // Listen for auth state changes
+  // Reset login state whenever authentication completes
   useEffect(() => {
-    const handleAuthStateChange = () => {
-      if (loginInProgress) {
-        if (isAuthenticated) {
-          setLoginInProgress(false);
-          setLoginError(null);
-        } else if (!isLoading) {
-          setLoginInProgress(false);
-          setLoginError('Login failed. Please try again.');
-          setTimeout(() => setLoginError(null), 5000);
-        }
+    if (isAuthenticated) {
+      setLoginInProgress(false);
+      setLoginError(null);
+    }
+  }, [isAuthenticated]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (isDropdownOpen && !target.closest('.user-dropdown')) {
+        setIsDropdownOpen(false);
+      }
+      if (isMobileMenuOpen && !target.closest('.mobile-menu') && !target.closest('.mobile-menu-button')) {
+        setIsMobileMenuOpen(false);
       }
     };
 
-    window.addEventListener('auth-state-changed', handleAuthStateChange);
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
-      window.removeEventListener('auth-state-changed', handleAuthStateChange);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isAuthenticated, isLoading, loginInProgress]);
+  }, [isDropdownOpen, isMobileMenuOpen]);
 
   const handleLogin = async () => {
     try {
@@ -83,6 +74,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
       }
 
       await login('google');
+      setLoginInProgress(false);
     } catch (error: any) {
       console.error('Login error in Navbar:', error);
       setLoginInProgress(false);
@@ -100,7 +92,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
   const handleEditProfile = () => {
     setIsDropdownOpen(false);
     setIsMobileMenuOpen(false);
-    setIsEditProfileModalOpen(true);
+    void editProfile();
   };
 
   const closeMobileMenu = () => {
@@ -513,20 +505,6 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
           </div>
         )}
       </div>
-
-      {/* In-App Edit Profile Modal */}
-      {isAuthenticated && (
-        <EditProfileModal
-          isOpen={isEditProfileModalOpen}
-          onClose={() => setIsEditProfileModalOpen(false)}
-          initialName={user?.name || ''}
-          initialEmail={user?.email || ''}
-          initialPhone={user?.phone || ''}
-          onSave={async (data) => {
-            await updateUserProfile(data);
-          }}
-        />
-      )}
     </nav>
   );
 };
