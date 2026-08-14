@@ -6,24 +6,38 @@ node_modules/
 # Testing
 coverage/
 
-# Production
+# Production builds
 build/
 dist/
+.next/
+out/
 
 # Environment files
 .env
-.env.local
-.env.development
-.env.test
-.env.production
+.env.*
+!.env.example
+!.env.production.frontend
+!.env.production.backend
+!.env.production.search
+**/.env
+**/.env.*
+!**/.env.example
 api/.env*
 api/local.settings.json
+
+# Service Account Keys & GCP Secrets
+*firebase*.json
+*adminsdk*.json
+*service-account*.json
+*service_account*.json
+*serviceAccount*.json
+*.key.json
+credentials/
 
 # Azure Functions
 bin/
 obj/
 appsettings.json
-credentials/
 
 # IDE
 .idea/
@@ -32,6 +46,7 @@ credentials/
 *.njsproj
 *.sln
 *.sw?
+.vscode/
 
 # Logs
 logs
@@ -44,15 +59,9 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 proptii-backend/.env
-
 public/landlord/assets/
-
 
 **/.cache/
 search/backend/.cache/
 search/backend/.cache/ms-playwright/
 search/backend/.cache/puppeteer/
-# Deployment templates (tracked in repository)
-!.env.production.frontend
-!.env.production.backend
-!.env.production.search

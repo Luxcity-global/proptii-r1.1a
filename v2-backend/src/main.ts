@@ -33,27 +33,26 @@ function initializeFirebase() {
   }
 
   try {
-    // Case 1: env var contains a raw JSON string (production on Render)
+    // Case 1: env var contains a raw JSON string (production on Render or ADC JSON)
     if (serviceAccountEnv && serviceAccountEnv.trim().startsWith('{')) {
       try {
         const serviceAccountObj = JSON.parse(serviceAccountEnv);
 
-        // IMPORTANT: authorized_user / refresh_token credentials are GCP user
-        // credentials (from `gcloud auth application-default login`). They do NOT
-        // work with Firebase Admin SDK — Admin SDK requires a service account key.
-        // Detect this early and fail with an actionable message.
         if (serviceAccountObj.type === 'authorized_user' || serviceAccountObj.refresh_token) {
-          console.error(
-            '❌ FIREBASE_SERVICE_ACCOUNT_JSON contains an authorized_user / OAuth2 credential.\n' +
-            '   This credential type does NOT work with Firebase Admin SDK.\n' +
-            '   FIX: Replace it with a Firebase service account JSON:\n' +
-            '   1. Go to Firebase Console → Project Settings → Service Accounts\n' +
-            '   2. Click "Generate new private key"\n' +
-            '   3. Paste the downloaded JSON as the FIREBASE_SERVICE_ACCOUNT_JSON secret in Render'
-          );
-          // Fall through to try individual creds or project-ID-only init
+          const os = require('os');
+          const path = require('path');
+          const fs = require('fs');
+          const tmpAdc = path.join(os.tmpdir(), 'gcp_adc_main.json');
+          fs.writeFileSync(tmpAdc, JSON.stringify(serviceAccountObj));
+          process.env.GOOGLE_APPLICATION_CREDENTIALS = tmpAdc;
+          admin.initializeApp({
+            credential: admin.credential.applicationDefault(),
+            projectId: process.env.FIREBASE_PROJECT_ID || 'proptii-16946',
+          });
+          console.log('✅ Firebase Admin initialized from ADC OAuth2 credentials.');
+          return;
         } else {
-          // Standard service account JSON string
+          // Standard service account JSON string with private_key
           if (!serviceAccountObj.project_id) {
             serviceAccountObj.project_id = process.env.FIREBASE_PROJECT_ID || 'proptii-16946';
           }
