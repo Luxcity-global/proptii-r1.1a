@@ -65,8 +65,6 @@ function House({
   );
 }
 
-const SCOUT_IMAGE = '/images/scout1.png';
-
 function MagnifyingGlass() {
   return (
     <svg className="search-load-glass h-12 w-12" viewBox="0 0 48 48" aria-hidden>
