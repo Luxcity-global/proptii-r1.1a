@@ -5,6 +5,10 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 
+process.env.GRPC_KEEPALIVE_TIME_MS = process.env.GRPC_KEEPALIVE_TIME_MS || '15000';
+process.env.GRPC_KEEPALIVE_TIMEOUT_MS = process.env.GRPC_KEEPALIVE_TIMEOUT_MS || '5000';
+process.env.GRPC_KEEPALIVE_PERMIT_WITHOUT_CALLS = process.env.GRPC_KEEPALIVE_PERMIT_WITHOUT_CALLS || '1';
+
 let firestoreInstance: Firestore | null = null;
 const logger = new Logger('FirestoreConfig');
 

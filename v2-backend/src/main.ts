@@ -5,6 +5,12 @@ import * as path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
+// Configure gRPC KeepAlive to prevent idle deadline timeouts (4 DEADLINE_EXCEEDED)
+process.env.GRPC_KEEPALIVE_TIME_MS = process.env.GRPC_KEEPALIVE_TIME_MS || '15000';
+process.env.GRPC_KEEPALIVE_TIMEOUT_MS = process.env.GRPC_KEEPALIVE_TIMEOUT_MS || '5000';
+process.env.GRPC_KEEPALIVE_PERMIT_WITHOUT_CALLS = process.env.GRPC_KEEPALIVE_PERMIT_WITHOUT_CALLS || '1';
+process.env.GRPC_HTTP2_MIN_PING_INTERVAL_WITHOUT_DATA_MS = process.env.GRPC_HTTP2_MIN_PING_INTERVAL_WITHOUT_DATA_MS || '5000';
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as admin from 'firebase-admin';
