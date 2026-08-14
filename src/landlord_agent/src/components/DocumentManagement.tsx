@@ -162,33 +162,26 @@ export function DocumentManagement({ property, onBack, onDocumentAdd }: Document
     setIsUploading(true);
 
     try {
-      // Upload file to backend (which handles Azure Storage upload)
-      const API_BASE_URL = PRIMARY_API_BASE_URL;
+      // Upload files to Google Firebase Storage
+      const { storage } = await import('../config/firebase');
+      const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
 
       const uploadedCount = selectedDocuments.length;
 
       for (const docForm of selectedDocuments) {
-        console.log('Uploading document:', docForm.file.name);
+        console.log('Uploading document to Firebase Storage:', docForm.file.name);
 
         let documentUrl = '';
         try {
-          const formData = new FormData();
-          formData.append('document', docForm.file);
-          const token = localStorage.getItem('proptii_access_token');
-          const headers: Record<string, string> = { 'Content-Type': 'multipart/form-data' };
-          if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-          }
+          const timestamp = Date.now();
+          const cleanName = docForm.file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const docRef = ref(storage, `properties/documents/${property.id || 'general'}/${timestamp}_${cleanName}`);
 
-          const uploadResponse = await axios.post(`${API_BASE_URL}/property/upload-document`, formData, {
-            headers,
-            timeout: 30000
-          });
-
-          console.log('Document uploaded successfully to backend:', uploadResponse.data);
-          documentUrl = uploadResponse.data?.document?.url || '';
-        } catch (apiErr) {
-          console.warn('Backend upload unavailable or unauthenticated, creating local Data URL:', apiErr);
+          await uploadBytes(docRef, docForm.file);
+          documentUrl = await getDownloadURL(docRef);
+          console.log('Document uploaded successfully to Firebase Storage:', documentUrl);
+        } catch (storageErr) {
+          console.warn('Firebase Storage upload unavailable, creating local Data URL fallback:', storageErr);
           documentUrl = await new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);

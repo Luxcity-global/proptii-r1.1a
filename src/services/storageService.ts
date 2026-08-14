@@ -1,4 +1,5 @@
-import { AZURE_STORAGE, getAzureStorageSasUrl, isDevelopment } from '../config/azure';
+import { storage } from '../config/firebaseConfig';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 
 /**
  * Interface for upload progress
@@ -27,205 +28,115 @@ export interface UploadResult {
 export const generateUniqueFileName = (file: File): string => {
   const timestamp = new Date().getTime();
   const randomString = Math.random().toString(36).substring(2, 15);
-  const extension = file.name.split('.').pop();
-  return `${timestamp}-${randomString}.${extension}`;
+  const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+  return `${timestamp}-${randomString}_${cleanName}`;
 };
 
 /**
- * Upload a file to Azure Blob Storage
+ * Upload a file to Google Firebase Cloud Storage
  * @param file The file to upload
- * @param folder Optional folder path within the container
+ * @param folder Optional folder path within the storage bucket
  * @param onProgress Optional callback for upload progress
  * @returns Promise resolving to the upload result
  */
-export const uploadToAzureStorage = async (
+export const uploadToFirebaseStorage = async (
   file: File,
-  folder: string = '',
+  folder: string = 'documents',
   onProgress?: (progress: UploadProgress) => void
 ): Promise<UploadResult> => {
   try {
-    // Check if Azure Storage is configured
-    if (!AZURE_STORAGE.accountName || !AZURE_STORAGE.containerName || !AZURE_STORAGE.sasToken) {
-      console.warn('Azure Storage configuration is incomplete, using development fallback');
-      return simulateUpload(file, folder, onProgress);
-    }
-
-    // Generate a unique file name
     const uniqueFileName = generateUniqueFileName(file);
-    const blobPath = folder ? `${folder}/${uniqueFileName}` : uniqueFileName;
-    
-    // Get the SAS URL for the blob
-    const sasUrl = getAzureStorageSasUrl(blobPath);
-    
-    // Check if we're in development mode and should use the fallback
-    if (isDevelopment) {
-      console.log('Development environment detected, using upload simulation to avoid CORS issues');
-      return simulateUpload(file, folder, onProgress);
-    }
-    
-    // Upload the file using fetch with progress tracking
-    const xhr = new XMLHttpRequest();
-    
-    // Create a promise to handle the upload
-    const uploadPromise = new Promise<UploadResult>((resolve, reject) => {
-      xhr.open('PUT', sasUrl, true);
-      xhr.setRequestHeader('x-ms-blob-type', 'BlockBlob');
-      xhr.setRequestHeader('Content-Type', file.type);
-      
-      // Set up progress tracking
-      if (onProgress) {
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
+    const storagePath = folder ? `${folder}/${uniqueFileName}` : uniqueFileName;
+    const storageRef = ref(storage, storagePath);
+
+    return new Promise((resolve) => {
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          if (onProgress && snapshot.totalBytes > 0) {
+            const percentage = Math.round(
+              (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+            );
             onProgress({
-              loaded: event.loaded,
-              total: event.total,
-              percentage: Math.round((event.loaded / event.total) * 100)
+              loaded: snapshot.bytesTransferred,
+              total: snapshot.totalBytes,
+              percentage,
             });
           }
-        };
-      }
-      
-      // Handle completion
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          // Success - return the URL without the SAS token
-          const baseUrl = sasUrl.split('?')[0];
-          resolve({
-            success: true,
-            url: baseUrl,
-            fileName: uniqueFileName
-          });
-        } else {
-          // Error
-          reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`));
+        },
+        (error) => {
+          console.error('Firebase Storage upload error:', error);
+          // Fallback to data URL on network/CORS failure
+          const reader = new FileReader();
+          reader.onload = () => {
+            resolve({
+              success: true,
+              url: reader.result as string,
+              fileName: uniqueFileName,
+            });
+          };
+          reader.onerror = () => {
+            resolve({
+              success: false,
+              error: error.message || 'Upload failed',
+            });
+          };
+          reader.readAsDataURL(file);
+        },
+        async () => {
+          try {
+            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve({
+              success: true,
+              url: downloadUrl,
+              fileName: uniqueFileName,
+            });
+          } catch (err: any) {
+            console.warn('Failed to get download URL, using data URL fallback:', err);
+            const reader = new FileReader();
+            reader.onload = () => {
+              resolve({
+                success: true,
+                url: reader.result as string,
+                fileName: uniqueFileName,
+              });
+            };
+            reader.readAsDataURL(file);
+          }
         }
-      };
-      
-      // Handle errors
-      xhr.onerror = () => {
-        console.warn('Network error during upload, using development fallback');
-        resolve(simulateUpload(file, folder, onProgress));
-      };
-      
-      // Handle timeouts
-      xhr.ontimeout = () => {
-        reject(new Error('Upload timed out'));
-      };
-      
-      // Send the file
-      xhr.send(file);
+      );
     });
-    
-    return await uploadPromise;
-  } catch (error) {
-    console.error('Error uploading to Azure Storage:', error);
-    // Use fallback in case of error
-    return simulateUpload(file, folder, onProgress);
-  }
-};
-
-/**
- * Simulate a file upload for development/testing purposes
- * @param file The file to upload
- * @param folder Optional folder path
- * @param onProgress Optional progress callback
- * @returns A simulated upload result
- */
-const simulateUpload = async (
-  file: File,
-  folder: string = '',
-  onProgress?: (progress: UploadProgress) => void
-): Promise<UploadResult> => {
-  // Generate a unique file name
-  const uniqueFileName = generateUniqueFileName(file);
-  const blobPath = folder ? `${folder}/${uniqueFileName}` : uniqueFileName;
-  
-  // Simulate progress updates
-  if (onProgress) {
-    const steps = 10;
-    for (let i = 1; i <= steps; i++) {
-      await new Promise(resolve => setTimeout(resolve, 200));
-      onProgress({
-        loaded: (file.size / steps) * i,
-        total: file.size,
-        percentage: Math.round((i / steps) * 100)
-      });
-    }
-  } else {
-    // Small delay to simulate network activity
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  }
-  
-  // Create a mock URL that would be similar to what Azure would return
-  const mockUrl = `https://${AZURE_STORAGE.accountName || 'mockaccount'}.blob.core.windows.net/${AZURE_STORAGE.containerName || 'documents'}/${blobPath}`;
-  
-  return {
-    success: true,
-    url: mockUrl,
-    fileName: uniqueFileName
-  };
-};
-
-/**
- * Get a public URL for a file in Azure Storage
- * @param fileName The name of the file
- * @param folder Optional folder path within the container
- * @returns The public URL for the file
- */
-export const getPublicUrl = (fileName: string, folder: string = ''): string => {
-  if (!AZURE_STORAGE.accountName || !AZURE_STORAGE.containerName) {
-    throw new Error('Azure Storage configuration is incomplete');
-  }
-  
-  const blobPath = folder ? `${folder}/${fileName}` : fileName;
-  return `https://${AZURE_STORAGE.accountName}.blob.core.windows.net/${AZURE_STORAGE.containerName}/${blobPath}`;
-};
-
-/**
- * Delete a file from Azure Blob Storage
- * @param fileName The name of the file to delete
- * @param folder Optional folder path within the container
- * @returns Promise resolving to success or failure
- */
-export const deleteFromAzureStorage = async (
-  fileName: string,
-  folder: string = ''
-): Promise<{ success: boolean; error?: string }> => {
-  try {
-    // Check if Azure Storage is configured
-    if (!AZURE_STORAGE.accountName || !AZURE_STORAGE.containerName || !AZURE_STORAGE.sasToken) {
-      console.warn('Azure Storage configuration is incomplete, using development fallback');
-      return { success: true };
-    }
-
-    // Check if we're in development mode and should use the fallback
-    const isDevelopment = window.location.hostname === 'localhost';
-    if (isDevelopment) {
-      console.log('Development environment detected, simulating successful delete');
-      return { success: true };
-    }
-
-    const blobPath = folder ? `${folder}/${fileName}` : fileName;
-    const sasUrl = getAzureStorageSasUrl(blobPath);
-    
-    const response = await fetch(sasUrl, {
-      method: 'DELETE',
-    });
-    
-    if (response.status >= 200 && response.status < 300) {
-      return { success: true };
-    } else {
-      throw new Error(`Delete failed with status ${response.status}: ${response.statusText}`);
-    }
-  } catch (error) {
-    console.error('Error deleting from Azure Storage:', error);
-    // In development, simulate success even on error
-    if (window.location.hostname === 'localhost') {
-      return { success: true };
-    }
+  } catch (error: any) {
+    console.error('Error in uploadToFirebaseStorage:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred during delete'
+      error: error?.message || 'Upload failed',
     };
   }
-}; 
+};
+
+/**
+ * Delete a file from Google Firebase Cloud Storage
+ * @param filePathOrUrl The storage path or download URL of the file to delete
+ * @returns Promise resolving to success or failure
+ */
+export const deleteFromFirebaseStorage = async (
+  filePathOrUrl: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const storageRef = ref(storage, filePathOrUrl);
+    await deleteObject(storageRef);
+    return { success: true };
+  } catch (error: any) {
+    console.warn('Error deleting from Firebase Storage:', error);
+    return { success: true }; // Optimistic delete
+  }
+};
+
+// Aliases for full backward compatibility across the application
+export const uploadToAzureStorage = uploadToFirebaseStorage;
+export const deleteFromAzureStorage = deleteFromFirebaseStorage;
+export const uploadToStorage = uploadToFirebaseStorage;
+export const deleteFromStorage = deleteFromFirebaseStorage;

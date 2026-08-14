@@ -706,14 +706,14 @@ export function AppContent() {
     });
   };
 
-  // Upload images to secure backend endpoint and return PropertyPhoto objects
+  // Upload images to Google Firebase Cloud Storage and return PropertyPhoto objects
   const uploadPropertyImages = async (imageFiles: File[]): Promise<PropertyPhoto[]> => {
     if (imageFiles.length === 0) {
       return [];
     }
 
-    const { getResolvedApiBaseUrl } = await import('../../config/apiBaseUrl');
-    const API_URL = getResolvedApiBaseUrl().replace(/\/api$/, '');
+    const { storage } = await import('./config/firebase');
+    const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
 
     const photoPromises = imageFiles.map(async (file, index) => {
       try {
@@ -724,40 +724,22 @@ export function AppContent() {
           processedFile = await compressImage(file, 150);
         }
 
-        const formData = new FormData();
-        formData.append('photo', processedFile);
+        const uniqueName = `${timestamp}_${Math.random().toString(36).substring(2, 9)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+        const photoRef = ref(storage, `properties/photos/${uniqueName}`);
 
-        const res = await fetch(`${API_URL}/api/property/upload-photo`, {
-          method: 'POST',
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
-          },
-          body: formData
-        });
-
-        if (!res.ok) {
-          console.warn(`Upload endpoint returned ${res.status}, using local fallback.`);
-          return {
-            id: `photo-${timestamp}-${index}`,
-            url: URL.createObjectURL(file),
-            filename: file.name,
-            isCover: index === 0,
-            room: index === 0 ? 'Exterior' : undefined
-          };
-        }
-
-        const json = await res.json();
-        console.log(`✅ Uploaded image ${index + 1}/${imageFiles.length}`);
+        await uploadBytes(photoRef, processedFile);
+        const downloadUrl = await getDownloadURL(photoRef);
+        console.log(`✅ Uploaded image ${index + 1}/${imageFiles.length} to Firebase Storage: ${downloadUrl}`);
 
         return {
           id: `photo-${timestamp}-${index}`,
-          url: json.data?.url || json.url || URL.createObjectURL(file),
-          filename: json.data?.filename || file.name,
+          url: downloadUrl,
+          filename: file.name,
           isCover: index === 0,
           room: index === 0 ? 'Exterior' : undefined
         };
       } catch (error) {
-        console.warn(`⚠️ Error uploading image ${index + 1}, using object URL fallback:`, error);
+        console.warn(`⚠️ Error uploading image ${index + 1} to Firebase Storage, using data URL fallback:`, error);
         return {
           id: `photo-${Date.now()}-${index}`,
           url: URL.createObjectURL(file),
@@ -778,52 +760,30 @@ export function AppContent() {
       return [];
     }
 
-    console.log(`Uploading ${documentFiles.length} documents...`);
-    const { getAccessTokenForApiRequest } = await import('../../services/msalAccessToken');
-    const token = await getAccessTokenForApiRequest();
-    const { getResolvedApiBaseUrl } = await import('../../config/apiBaseUrl');
-    const API_URL = getResolvedApiBaseUrl().replace(/\/api$/, '');
+    console.log(`Uploading ${documentFiles.length} documents to Firebase Storage...`);
+    const { storage } = await import('./config/firebase');
+    const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
 
     const documentPromises = documentFiles.map(async (file, index) => {
       try {
         const timestamp = Date.now();
-        
-        const formData = new FormData();
-        formData.append('document', file);
+        const uniqueName = `${timestamp}_${Math.random().toString(36).substring(2, 9)}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+        const docRef = ref(storage, `properties/documents/${uniqueName}`);
 
-        const res = await fetch(`${API_URL}/api/property/upload-document`, {
-          method: 'POST',
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
-          },
-          body: formData
-        });
-
-        if (!res.ok) {
-          console.warn(`Document upload endpoint returned ${res.status}, using local fallback.`);
-          return {
-            id: `doc-${timestamp}-${index}`,
-            name: file.name,
-            type: 'other',
-            url: URL.createObjectURL(file),
-            issueDate: new Date(),
-            status: 'valid'
-          } as PropertyDocument;
-        }
-
-        const json = await res.json();
-        console.log(`✅ Uploaded document ${index + 1}/${documentFiles.length}: ${file.name}`);
+        await uploadBytes(docRef, file);
+        const downloadUrl = await getDownloadURL(docRef);
+        console.log(`✅ Uploaded document ${index + 1}/${documentFiles.length} to Firebase Storage: ${file.name}`);
 
         return {
           id: `doc-${timestamp}-${index}`,
           name: file.name,
           type: 'other',
-          url: json.data?.url || json.url || URL.createObjectURL(file),
+          url: downloadUrl,
           issueDate: new Date(),
           status: 'valid'
         } as PropertyDocument;
       } catch (error) {
-        console.warn(`⚠️ Error uploading document ${file.name}, using fallback:`, error);
+        console.warn(`⚠️ Error uploading document ${file.name} to Firebase Storage, using fallback:`, error);
         return {
           id: `doc-${Date.now()}-${index}`,
           name: file.name,

@@ -78,26 +78,49 @@ export function PhotoManagement({ property, onBack, onPhotoAdd, updateProperty }
     'Other'
   ];
 
-  const handleFileSelect = (files: FileList | null) => {
+  const handleFileSelect = async (files: FileList | null) => {
     if (!files || !property) return;
 
-    Array.from(files).forEach((file, index) => {
+    const { storage } = await import('../config/firebase');
+    const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+
+    for (let index = 0; index < files.length; index++) {
+      const file = files[index];
       if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
+        try {
+          const timestamp = Date.now();
+          const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+          const photoRef = ref(storage, `properties/photos/${property.id || 'new'}/${timestamp}_${index}_${cleanName}`);
+          await uploadBytes(photoRef, file);
+          const downloadUrl = await getDownloadURL(photoRef);
+
           const newPhoto: PropertyPhoto = {
-            id: `temp-${Date.now()}-${index}`,
-            url: e.target?.result as string,
+            id: `${timestamp}-${index}`,
+            url: downloadUrl,
             filename: file.name,
             isCover: localPhotos.length === 0 && index === 0,
             room: undefined
           };
           setLocalPhotos(prev => [...prev, newPhoto]);
           setHasUnsavedChanges(true);
-        };
-        reader.readAsDataURL(file);
+        } catch (err) {
+          console.warn('Firebase storage upload failed, using Data URL fallback:', err);
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const newPhoto: PropertyPhoto = {
+              id: `temp-${Date.now()}-${index}`,
+              url: e.target?.result as string,
+              filename: file.name,
+              isCover: localPhotos.length === 0 && index === 0,
+              room: undefined
+            };
+            setLocalPhotos(prev => [...prev, newPhoto]);
+            setHasUnsavedChanges(true);
+          };
+          reader.readAsDataURL(file);
+        }
       }
-    });
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
