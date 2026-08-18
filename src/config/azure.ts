@@ -54,5 +54,6 @@ export const getAzureStorageSasUrl = (blobName: string): string => {
     throw new Error('Azure Storage configuration is incomplete');
   }
 
-  return `https://${AZURE_STORAGE.accountName}.blob.core.windows.net/${AZURE_STORAGE.containerName}/${blobName}${AZURE_STORAGE.sasToken}`;
+  const token = AZURE_STORAGE.sasToken.startsWith('?') ? AZURE_STORAGE.sasToken : `?${AZURE_STORAGE.sasToken}`;
+  return `https://${AZURE_STORAGE.accountName}.blob.core.windows.net/${AZURE_STORAGE.containerName}/${blobName}${token}`;
 }; 

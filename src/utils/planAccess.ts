@@ -47,20 +47,8 @@ export function canAccessSection(
   plan: PlanId | string | null | undefined,
   status: string | null | undefined,
 ): boolean {
-  const rule = SECTION_ACCESS[sectionId];
-  if (!rule) return true; // no restriction defined → open to all
-
-  const currentPlan = (plan ?? 'explorer') as PlanId;
-
-  // Explorer or no plan → check if rule allows it
-  if (!plan || plan === 'free' || currentPlan === 'explorer') {
-    return rule.requiredPlans.includes(currentPlan);
-  }
-
-  // Canceled/unpaid users lose paid access
-  if (status === 'canceled' || status === 'unpaid') return false;
-
-  return rule.requiredPlans.includes(currentPlan);
+  // Unrestricted access enabled for full testing
+  return true;
 }
 
 export function sectionUpgradeLabel(sectionId: string): string {

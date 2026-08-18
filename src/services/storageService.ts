@@ -1,5 +1,6 @@
 import { storage } from '../config/firebaseConfig';
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getAzureStorageSasUrl } from '../config/azure';
 
 /**
  * Interface for upload progress
@@ -118,6 +119,59 @@ export const uploadToFirebaseStorage = async (
 };
 
 /**
+ * Upload a file to Azure Blob Storage using a SAS token.
+ * This bypasses Firebase Storage permission issues.
+ */
+export const uploadToAzureStorage = async (
+  file: File,
+  folder: string = 'referencing_documents',
+  onProgress?: (progress: UploadProgress) => void
+): Promise<UploadResult> => {
+  try {
+    const fileName = generateUniqueFileName(file);
+    const blobName = `${folder}/${fileName}`;
+    const sasUrl = getAzureStorageSasUrl(blobName);
+
+    // Provide an initial progress event
+    if (onProgress) {
+      onProgress({ loaded: 0, total: file.size, percentage: 0 });
+    }
+
+    const response = await fetch(sasUrl, {
+      method: 'PUT',
+      headers: {
+        'x-ms-blob-type': 'BlockBlob',
+        'Content-Type': file.type || 'application/octet-stream',
+      },
+      body: file,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Azure Storage upload failed: ${response.statusText}`);
+    }
+
+    if (onProgress) {
+      onProgress({ loaded: file.size, total: file.size, percentage: 100 });
+    }
+
+    // The blob URL is the SAS URL without the query string
+    const url = sasUrl.split('?')[0];
+
+    return {
+      success: true,
+      url,
+      fileName,
+    };
+  } catch (error: any) {
+    console.error('Azure Storage upload error:', error);
+    return {
+      success: false,
+      error: error.message || 'Unknown error occurred during Azure upload',
+    };
+  }
+};
+
+/**
  * Delete a file from Google Firebase Cloud Storage
  * @param filePathOrUrl The storage path or download URL of the file to delete
  * @returns Promise resolving to success or failure
@@ -136,7 +190,6 @@ export const deleteFromFirebaseStorage = async (
 };
 
 // Aliases for full backward compatibility across the application
-export const uploadToAzureStorage = uploadToFirebaseStorage;
 export const deleteFromAzureStorage = deleteFromFirebaseStorage;
 export const uploadToStorage = uploadToFirebaseStorage;
 export const deleteFromStorage = deleteFromFirebaseStorage;

@@ -14,6 +14,7 @@ process.env.GRPC_HTTP2_MIN_PING_INTERVAL_WITHOUT_DATA_MS = process.env.GRPC_HTTP
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as admin from 'firebase-admin';
+import { json, urlencoded } from 'express';
 
 function initializeFirebase() {
   if (admin.apps.length) return;
@@ -112,12 +113,18 @@ function initializeFirebase() {
 async function bootstrap() {
   initializeFirebase();
 
-  const app = await NestFactory.create(AppModule);
+  // Disable default body parser so we can set a custom payload limit
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
   app.setGlobalPrefix('api');
   app.enableCors({
     origin: '*',
     credentials: true,
   });
+
+  // Increase payload limit for base64 file uploads (413 Payload Too Large)
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ extended: true, limit: '50mb' }));
+
   const port = process.env.PORT || 3000;
   await app.listen(port);
   console.log(`🚀 Proptii v2-backend running on port ${port}`);

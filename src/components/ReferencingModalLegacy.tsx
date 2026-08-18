@@ -100,7 +100,8 @@ interface StoredFile {
   type: string;
   size: number;
   lastModified: number;
-  dataUrl: string;
+  dataUrl?: string;
+  url?: string;
 }
 
 interface NavigationItem {
@@ -142,7 +143,6 @@ function mergeLoadedFormData(prev: FormData, patch: Partial<FormData>): FormData
   };
 }
 
-// Fast file processing
 const fileToStoredFile = async (file: File): Promise<StoredFile> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -180,6 +180,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+  const [showPostSaveDialog, setShowPostSaveDialog] = useState(false);
 
   const [formData, setFormData] = useState<FormData>({
     identity: {
@@ -428,7 +429,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
         const propertyId = `general_${user.id}`;
         const result = await firestoreService.getReferencingForm(user.id, propertyId);
         if (result.success && result.data && result.data.formData) {
-          setFormData(prev => mergeLoadedFormData(prev, result.data!.formData));
+          setFormData(prev => mergeLoadedFormData(prev, result.data!.formData as any));
         } else {
           const localData = localStorage.getItem(`referencing_${user.id}_formData`);
           if (localData) {
@@ -446,6 +447,36 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
   const saveCurrentStep = async () => {
     if (!user?.id) return;
     setIsSaving(true);
+    
+    // Evaluate if the current step is complete
+    let isComplete = false;
+    switch(currentStep) {
+      case 1:
+        isComplete = !!(formData.identity.firstName && formData.identity.lastName && formData.identity.email && formData.identity.phoneNumber && formData.identity.dateOfBirth && formData.identity.identityProof);
+        break;
+      case 2:
+        isComplete = !!(formData.employment.employmentStatus && formData.employment.companyDetails && formData.employment.jobPosition && formData.employment.proofDocument);
+        break;
+      case 3:
+        isComplete = !!(formData.residential.currentAddress && formData.residential.durationAtCurrentAddress && formData.residential.proofDocument);
+        break;
+      case 4:
+        isComplete = !!(formData.financial.monthlyIncome && (formData.financial.proofOfIncomeDocument || formData.financial.useOpenBanking));
+        break;
+      case 5:
+        isComplete = !!(formData.guarantor.firstName && formData.guarantor.lastName && formData.guarantor.email);
+        // If empty, mark as partial or empty. But actually step 5 is optional for some, let's strictly check if filled.
+        if (!formData.guarantor.firstName && !formData.guarantor.lastName) isComplete = true; // treat as complete if intentionally skipped
+        break;
+    }
+
+    const newStepStatus = {
+      ...stepStatus,
+      [currentStep]: isComplete ? 'complete' : 'partial'
+    } as any;
+    
+    setStepStatus(newStepStatus);
+
     try {
       const propertyId = `general_${user.id}`;
       await firestoreService.saveReferencingForm(
@@ -453,7 +484,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
         propertyId,
         formData as any,
         currentStep,
-        stepStatus
+        newStepStatus
       );
       setLastSavedSteps(prev => ({ ...prev, [currentStep]: new Date() }));
       setShowSaveSuccess(true);
@@ -466,13 +497,18 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     }
   };
 
-  const nextStep = () => {
-    saveCurrentStep();
+  const handleSaveAndClose = async () => {
+    await saveCurrentStep();
+    onClose();
+  };
+
+  const nextStep = async () => {
+    await saveCurrentStep();
     if (currentStep < 5) {
       setCurrentStep(prev => prev + 1);
     } else {
-      // Step 5 completed: Save passport and open Send to Landlord/Agent modal
-      handleCompleteAndShare();
+      // Step 5 completed: Save passport and show post-save dialog
+      handleCompleteAndSave();
     }
   };
 
@@ -482,38 +518,30 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     }
   };
 
-  const handleCompleteAndShare = async () => {
+  const handleCompleteAndSave = async () => {
     const userId = user?.id || 'anonymous_tenant';
     setIsSubmitting(true);
     try {
-      const propertyId = `general_${userId}`;
-      await firestoreService.saveReferencingForm(
-        userId,
-        propertyId,
-        formData as any,
-        5,
-        stepStatus
-      );
+      // Save is already handled by saveCurrentStep before this is called
       localStorage.setItem(`referencing_${userId}_submitted`, 'true');
-      toast.success('Referencing Passport completed & saved!');
-      setIsSendModalOpen(true);
+      toast.success('Referencing Passport saved!');
+      setShowPostSaveDialog(true);
     } catch (err) {
-      console.error('Error completing referencing passport:', err);
+      console.error('Error saving referencing passport:', err);
+      toast.error('Failed to save. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // AI data extracted handler
   const handleAIDataExtracted = (data: ExtractedData) => {
-    if (data.fullName) {
-      const parts = data.fullName.trim().split(' ');
+    if (data.firstName || data.lastName) {
       setFormData(prev => ({
         ...prev,
         identity: {
           ...prev.identity,
-          firstName: parts[0] || prev.identity.firstName,
-          lastName: parts.slice(1).join(' ') || prev.identity.lastName
+          firstName: data.firstName || prev.identity.firstName,
+          lastName: data.lastName || prev.identity.lastName
         }
       }));
     }
@@ -523,28 +551,28 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
         identity: { ...prev.identity, email: data.email! }
       }));
     }
-    if (data.phone) {
+    if (data.phoneNumber) {
       setFormData(prev => ({
         ...prev,
-        identity: { ...prev.identity, phoneNumber: data.phone! }
+        identity: { ...prev.identity, phoneNumber: data.phoneNumber! }
       }));
     }
-    if (data.companyName) {
+    if (data.companyDetails) {
       setFormData(prev => ({
         ...prev,
-        employment: { ...prev.employment, companyDetails: data.companyName! }
+        employment: { ...prev.employment, companyDetails: data.companyDetails! }
       }));
     }
-    if (data.jobTitle) {
+    if (data.jobPosition) {
       setFormData(prev => ({
         ...prev,
-        employment: { ...prev.employment, jobPosition: data.jobTitle! }
+        employment: { ...prev.employment, jobPosition: data.jobPosition! }
       }));
     }
-    if (data.salary) {
+    if (data.monthlyIncome) {
       setFormData(prev => ({
         ...prev,
-        financial: { ...prev.financial, monthlyIncome: String(Math.round(data.salary! / 12)) }
+        financial: { ...prev.financial, monthlyIncome: data.monthlyIncome! }
       }));
     }
     toast.success('AI Extracted document details populated!');
@@ -961,11 +989,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
                   </button>
                 )}
                 <button
-                  onClick={saveCurrentStep}
+                  onClick={handleSaveAndClose}
                   className="px-4 py-2 text-sm bg-gray-100 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
                   disabled={isSaving}
                 >
-                  {isSaving ? 'Saving...' : 'Save Draft'}
+                  {isSaving ? 'Saving...' : 'Save & Close'}
                 </button>
 
                 {currentStep < 5 ? (
@@ -978,12 +1006,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
                   </button>
                 ) : (
                   <button
-                    onClick={handleCompleteAndShare}
+                    onClick={handleCompleteAndSave}
                     className="px-5 py-2 text-sm font-semibold bg-[#DC5F12] text-white rounded-xl hover:bg-opacity-95 transition-all shadow-md flex items-center gap-1.5"
                     disabled={isSubmitting}
                   >
-                    <Send className="w-4 h-4" />
-                    <span>Save & Share with Landlord/Agent</span>
+                    <CheckCircle className="w-4 h-4" />
+                    <span>{isSubmitting ? 'Saving...' : 'Save Passport'}</span>
                   </button>
                 )}
               </div>
@@ -991,6 +1019,57 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Post-save dialog: send now or just close */}
+      {showPostSaveDialog && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4">
+          {(() => {
+            const steps = [1, 2, 3, 4, 5];
+            const completedSteps = steps.filter(step => stepStatus[step] === 'complete').length;
+            const progress = Math.round((completedSteps / steps.length) * 100);
+            const canSend = progress >= 75;
+
+            return (
+              <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900">Passport Saved!</h3>
+                    <p className="text-xs text-gray-500">Would you like to send it to a landlord or agent now?</p>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2 pt-1">
+                  <button
+                    onClick={() => {
+                      setShowPostSaveDialog(false);
+                      setIsSendModalOpen(true);
+                    }}
+                    disabled={!canSend}
+                    title={!canSend ? "Your passport must be at least 75% complete before you can send it" : ""}
+                    className={`w-full py-2.5 text-sm font-semibold text-white rounded-xl flex items-center justify-center gap-2 ${!canSend ? 'opacity-50 cursor-not-allowed hover:opacity-50' : 'hover:opacity-95'}`}
+                    style={{ backgroundColor: !canSend ? '#9CA3AF' : '#DC5F12' }}
+                  >
+                    <Send className="w-4 h-4" />
+                    Send to Landlord / Agent Now
+                  </button>
+              <button
+                onClick={() => {
+                  setShowPostSaveDialog(false);
+                  if (onSubmissionComplete) onSubmissionComplete();
+                  onClose();
+                }}
+                className="w-full py-2.5 text-sm font-medium border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50"
+              >
+                Save Only — I'll send later
+              </button>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Standalone Send/Share Modal */}
       <SendReferencingModal

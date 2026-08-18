@@ -119,15 +119,17 @@ const YourFiles: React.FC = () => {
           const sectionData = formData[section as keyof ReferencingFormData];
           if (sectionData && (sectionData as any)[field]) {
             const document = (sectionData as any)[field];
-            if (document && document.name && document.dataUrl) {
+            // Accept files that have a name + either a dataUrl (base64) or a url (legacy Azure)
+            if (document && document.name && (document.dataUrl || document.url)) {
               referencingFilesList.push({
-                id: Date.now() + Math.random(), // Generate unique ID
+                id: Date.now() + Math.random(),
                 name: document.name,
                 category,
                 type: document.type || 'application/pdf',
                 size: document.size || 0,
                 uploadDate: new Date(document.lastModified || Date.now()).toLocaleDateString(),
-                url: document.dataUrl // Use the actual dataUrl from Firestore
+                // Prefer the durable base64 dataUrl; fall back to the Azure url
+                url: document.dataUrl || document.url,
               });
             }
           }

@@ -1,5 +1,14 @@
-import { uploadToAzureStorage } from './storageService';
 import { firestoreService, UserFile } from './firestoreService';
+
+/** Read a File as a base64 data URL. */
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('FileReader failed'));
+    reader.readAsDataURL(file);
+  });
+}
 
 export interface FileItem {
   id: number;
@@ -64,9 +73,13 @@ class FileService {
             category: firestoreFile.category,
             type: firestoreFile.type,
             size: firestoreFile.size,
-            uploadDate: firestoreFile.uploadDate.toDate().toLocaleDateString(),
+            uploadDate: firestoreFile.uploadDate?.toDate
+              ? firestoreFile.uploadDate.toDate().toLocaleDateString()
+              : firestoreFile.uploadDate
+                ? new Date(firestoreFile.uploadDate).toLocaleDateString()
+                : new Date().toLocaleDateString(),
             url: firestoreFile.url,
-            firestoreId: firestoreFile.id // Store the Firestore document ID
+            firestoreId: firestoreFile.id,
           }));
           
           return [...contractFiles, ...userFiles];
@@ -80,90 +93,72 @@ class FileService {
     }
   }
 
-  // Upload files
+  // Upload files — reads each file as base64 and saves directly to Firestore
   async uploadFiles(
     files: File[], 
     category: string,
     onProgress?: (fileName: string, progress: number) => void
   ): Promise<FileUploadResult[]> {
     const results: FileUploadResult[] = [];
-    
+
     for (const file of files) {
       try {
-        // Simulate upload progress
-        if (onProgress) {
-          for (let i = 0; i <= 100; i += 10) {
-            onProgress(file.name, i);
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
-        }
+        // Signal start
+        if (onProgress) onProgress(file.name, 10);
 
-        // Upload to Azure Storage (or simulate in development)
-        const uploadResult = await uploadToAzureStorage(
-          file,
-          `files/${category.toLowerCase()}`,
-          (progress) => {
-            if (onProgress) {
-              onProgress(file.name, progress.percentage);
-            }
-          }
-        );
+        // Read file as base64 data URL — no Azure dependency
+        const dataUrl = await readAsDataUrl(file);
 
-        if (uploadResult.success && uploadResult.url) {
-          // Save to Firestore if user is logged in
-          if (this.currentUserId) {
-            const firestoreResult = await firestoreService.saveUserFile(this.currentUserId, {
-              name: file.name,
-              category,
-              type: file.type,
-              size: file.size,
-              url: uploadResult.url
-            });
+        if (onProgress) onProgress(file.name, 60);
 
-            if (firestoreResult.success) {
-              const newFile: FileItem = {
+        if (this.currentUserId) {
+          // Save to backend (Firestore via v2-backend) using the dataUrl as the url field
+          const firestoreResult = await firestoreService.saveUserFile(this.currentUserId, {
+            name: file.name,
+            category,
+            type: file.type,
+            size: file.size,
+            url: dataUrl,
+          });
+
+          if (onProgress) onProgress(file.name, 100);
+
+          if (firestoreResult.success) {
+            results.push({
+              success: true,
+              file: {
                 id: this.nextId++,
                 name: file.name,
                 category,
                 type: file.type,
                 size: file.size,
                 uploadDate: new Date().toLocaleDateString(),
-                url: uploadResult.url,
-                firestoreId: firestoreResult.fileId // Store the Firestore document ID
-              };
-
-              results.push({ success: true, file: newFile });
-            } else {
-              results.push({ 
-                success: false, 
-                error: firestoreResult.error || 'Failed to save file to database' 
-              });
-            }
+                url: dataUrl,
+                firestoreId: firestoreResult.fileId,
+              },
+            });
           } else {
-            // Fallback to local storage if no user
-            const newFile: FileItem = {
-              id: this.nextId++,
-              name: file.name,
-              category,
-              type: file.type,
-              size: file.size,
-              uploadDate: new Date().toLocaleDateString(),
-              url: uploadResult.url
-            };
-
-            this.files.push(newFile);
-            results.push({ success: true, file: newFile });
+            results.push({ success: false, error: firestoreResult.error || 'Failed to save file' });
           }
         } else {
-          results.push({ 
-            success: false, 
-            error: uploadResult.error || 'Upload failed' 
-          });
+          // No user — keep in memory only
+          const newFile: FileItem = {
+            id: this.nextId++,
+            name: file.name,
+            category,
+            type: file.type,
+            size: file.size,
+            uploadDate: new Date().toLocaleDateString(),
+            url: dataUrl,
+          };
+          this.files.push(newFile);
+          if (onProgress) onProgress(file.name, 100);
+          results.push({ success: true, file: newFile });
         }
       } catch (error) {
-        results.push({ 
-          success: false, 
-          error: error instanceof Error ? error.message : 'Upload failed' 
+        results.push({
+          success: false,
+          error: error instanceof Error ? error.message : 'Upload failed',
         });
       }
     }

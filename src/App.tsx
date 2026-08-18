@@ -59,6 +59,8 @@ const TimelineGenerator   = lazy(() => import('./pages/tools/TimelineGenerator')
 const KnowYourRights      = lazy(() => import('./pages/tools/KnowYourRights'));
 const ComingSoon          = lazy(() => import('./pages/ComingSoon'));
 const GuestThreadPage     = lazy(() => import('./pages/GuestThreadPage'));
+const ClaimReferencing     = lazy(() => import('./pages/ClaimReferencing'));
+const ReferencingView      = lazy(() => import('./pages/ReferencingView'));
 const RoleSelect          = lazy(() => import('./pages/RoleSelect'));
 // Dashboard sections
 const SavedProperties     = lazy(() => import('./components/dashboard/sections/SavedProperties-new'));
@@ -136,6 +138,8 @@ export const App: React.FC = () => {
                 <Route path="/claim-listing" element={<ClaimListing />} />
                 <Route path="/claim" element={<ClaimAccount />} />
                 <Route path="/thread/:token" element={<GuestThreadPage />} />
+                <Route path="/referencing/view/:viewToken" element={<ReferencingView />} />
+                <Route path="/claim-referencing" element={<ClaimReferencing />} />
                 <Route path="/signup" element={<SignupModalPage />} />
                 <Route path="/signup/create-account" element={<CreateAccountPage />} />
                 <Route path="/signup/welcome" element={<SignupWelcomePage />} />

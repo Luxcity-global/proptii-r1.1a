@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -56,10 +57,13 @@ const preloadHeroImage = () => {
 
 const Referencing = () => {
   const { isAuthenticated, login, user } = useAuth();
+  const navigate = useNavigate();
   const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
   const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [hasExistingPassport, setHasExistingPassport] = useState(false);
+  const [checkingPassport, setCheckingPassport] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -88,19 +92,39 @@ const Referencing = () => {
     preloadHeroImage();
   }, []);
 
+  // Redirect authenticated tenants to their dashboard referencing page
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const isLandlord = user.roles?.includes('landlord') || user.roles?.includes('agent');
+      if (!isLandlord) {
+        navigate('/dashboard/tenant-referencing');
+      } else {
+        navigate('/dashboard'); // Landlords shouldn't be here either
+      }
+    }
+  }, [isAuthenticated, user, navigate]);
+
+  // Check if authenticated user already has a saved referencing passport
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return;
+    setCheckingPassport(true);
+    const localKey = `referencing_${user.id}_submitted`;
+    const alreadySubmitted = localStorage.getItem(localKey) === 'true';
+    if (alreadySubmitted) {
+      // Has existing passport — open the form directly
+      setHasExistingPassport(true);
+      setIsReferencingModalOpen(true);
+    }
+    setCheckingPassport(false);
+  }, [isAuthenticated, user?.id]);
+
   const handleGetStarted = () => {
     if (!isAuthenticated) {
-      // Redirect to login or trigger login modal
       login();
       return;
     }
-
-    const shouldSkipChecklist = localStorage.getItem('skipDocumentChecklist') === 'true';
-    if (shouldSkipChecklist) {
-      setIsReferencingModalOpen(true);
-    } else {
-      setIsChecklistModalOpen(true);
-    }
+    // Open referencing form directly — loads saved data via useEffect inside the modal
+    setIsReferencingModalOpen(true);
   };
 
   const handleChecklistComplete = () => {

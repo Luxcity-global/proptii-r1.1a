@@ -71,11 +71,11 @@ import { EmailService } from './services/email.service';
     RefereeGuarantorController,
   ],
   providers: [
-    EmailService,
+    EmailService,       // must be before any service that injects it
     NativePropertiesService,
     SavedPropertiesService,
     ViewingRequestService,
-    ReferencingService,
+    ReferencingService,  // injects EmailService — declared after it above
     CommunicationService,
     GuestEnquiryService,
     ContractService,

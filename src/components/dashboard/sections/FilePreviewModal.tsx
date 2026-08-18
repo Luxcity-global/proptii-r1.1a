@@ -1,197 +1,155 @@
-import React, { useState, useEffect } from 'react';
-import { X, Download, FileText, Image, File, AlertCircle, Loader } from 'lucide-react';
+import React from 'react';
+import { X, Download, FileText, File, AlertTriangle } from 'lucide-react';
+import { FileItem } from '../../../services/fileService';
 
 interface FilePreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  file: {
-    id: number;
-    name: string;
-    category: string;
-    type: string;
-    size: number;
-    uploadDate: string;
-    url?: string;
-  } | null;
-  onDownload?: (file: any) => void;
+  file: FileItem | null;
+  onDownload: (file: FileItem) => void;
 }
 
-const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  file, 
-  onDownload 
-}) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+function isDataUrl(url: string): boolean {
+  return url.startsWith('data:');
+}
 
-  useEffect(() => {
-    if (isOpen && file) {
-      setLoading(true);
-      setError(null);
-      
-      // Simulate loading the file preview
-      // In a real implementation, you would fetch the file from the server
-      setTimeout(() => {
-        setLoading(false);
-        // For demo purposes, we'll create a mock preview URL
-        if (file.type === 'application/pdf') {
-          setPreviewUrl('/api/preview/' + file.id);
-        } else if (file.type.startsWith('image/')) {
-          setPreviewUrl('/api/preview/' + file.id);
-        } else {
-          setError('Preview not available for this file type');
-        }
-      }, 1000);
-    }
-  }, [isOpen, file]);
+function isImage(type: string, url: string): boolean {
+  if (type.startsWith('image/')) return true;
+  const ext = url.split('.').pop()?.split('?')[0]?.toLowerCase();
+  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext || '');
+}
 
-  const getFileIcon = (type: string) => {
-    if (type === 'application/pdf') {
-      return <FileText className="w-8 h-8 text-red-600" />;
-    } else if (type.startsWith('image/')) {
-      return <Image className="w-8 h-8 text-blue-600" />;
-    } else {
-      return <File className="w-8 h-8 text-gray-600" />;
-    }
-  };
+function isPdf(type: string, url: string): boolean {
+  if (type === 'application/pdf') return true;
+  const ext = url.split('.').pop()?.split('?')[0]?.toLowerCase();
+  return ext === 'pdf';
+}
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const handleDownload = () => {
-    if (file && onDownload) {
-      onDownload(file);
-    }
-  };
-
-  const renderPreview = () => {
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <Loader className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-            <p className="text-gray-600">Loading preview...</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (error) {
-      return (
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <AlertCircle className="w-8 h-8 text-red-600 mx-auto mb-4" />
-            <p className="text-gray-600">{error}</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (!file) {
-      return (
-        <div className="flex items-center justify-center h-96">
-          <p className="text-gray-600">No file selected</p>
-        </div>
-      );
-    }
-
-    if (file.type === 'application/pdf') {
-      return (
-        <div className="h-96">
-          <iframe
-            src={file.url || previewUrl || ''}
-            className="w-full h-full border-0 rounded-lg"
-            title={file.name}
-          />
-        </div>
-      );
-    } else if (file.type.startsWith('image/')) {
-      return (
-        <div className="h-96 flex items-center justify-center">
-          <img
-            src={file.url || previewUrl || ''}
-            alt={file.name}
-            className="max-w-full max-h-full object-contain rounded-lg"
-          />
-        </div>
-      );
-    } else {
-      return (
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            {getFileIcon(file.type)}
-            <p className="text-gray-600 mt-4">Preview not available</p>
-            <p className="text-sm text-gray-500">Download the file to view it</p>
-          </div>
-        </div>
-      );
-    }
-  };
-
+const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ isOpen, onClose, file, onDownload }) => {
   if (!isOpen || !file) return null;
 
+  const url = file.url || '';
+  const type = file.type || '';
+  const canPreview = isDataUrl(url);
+  const isImg = isImage(type, url);
+  const isPdfFile = isPdf(type, url);
+
+  const renderContent = () => {
+    // ── Base64 data URL — always safe to display inline ─────────────────────
+    if (canPreview) {
+      if (isImg) {
+        return (
+          <div className="flex items-center justify-center p-4 bg-gray-50 rounded-xl min-h-[300px]">
+            <img
+              src={url}
+              alt={file.name}
+              className="max-w-full max-h-[60vh] object-contain rounded shadow"
+            />
+          </div>
+        );
+      }
+
+      if (isPdfFile) {
+        return (
+          <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height: '65vh' }}>
+            <embed
+              src={url}
+              type="application/pdf"
+              width="100%"
+              height="100%"
+              title={file.name}
+            />
+          </div>
+        );
+      }
+
+      // Other file types with a dataUrl — offer download, can't render inline
+      return (
+        <div className="flex flex-col items-center justify-center gap-4 p-8 bg-gray-50 rounded-xl min-h-[200px]">
+          <File className="w-16 h-16 text-gray-400" />
+          <p className="text-gray-600 text-sm text-center">
+            This file type can't be previewed inline.
+          </p>
+          <button
+            onClick={() => onDownload(file)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#136C9E] text-white rounded-xl text-sm font-medium hover:bg-[#0F5A82] transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Download to view
+          </button>
+        </div>
+      );
+    }
+
+    // ── External / Azure URL — do NOT fetch it (would cause the public access error)
+    // Show a friendly message with a download option instead
+    if (url.startsWith('http')) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-4 p-8 bg-amber-50 rounded-xl border border-amber-200 min-h-[200px]">
+          <AlertTriangle className="w-12 h-12 text-amber-500" />
+          <div className="text-center">
+            <p className="font-semibold text-gray-800 mb-1">Preview unavailable</p>
+            <p className="text-sm text-gray-500 max-w-xs">
+              This file was uploaded to cloud storage and can't be previewed directly.
+              Download the file to view it.
+            </p>
+          </div>
+          <button
+            onClick={() => onDownload(file)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#136C9E] text-white rounded-xl text-sm font-medium hover:bg-[#0F5A82] transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Download file
+          </button>
+        </div>
+      );
+    }
+
+    // ── No URL at all
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 p-8 bg-gray-50 rounded-xl min-h-[200px]">
+        <FileText className="w-12 h-12 text-gray-300" />
+        <p className="text-gray-500 text-sm">No preview available for this file.</p>
+      </div>
+    );
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div className="flex items-center space-x-3">
-            {getFileIcon(file.type)}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">{file.name}</h2>
-              <p className="text-sm text-gray-500">
-                {formatFileSize(file.size)} • {file.category} • {file.uploadDate}
-              </p>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <FileText className="w-5 h-5 text-[#136C9E] flex-shrink-0" />
+            <div className="min-w-0">
+              <h3 className="font-semibold text-gray-900 truncate text-sm">{file.name}</h3>
+              <p className="text-xs text-gray-400 mt-0.5">{file.category} · {file.uploadDate}</p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2 flex-shrink-0 ml-4">
             <button
-              onClick={handleDownload}
-              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Download file"
+              onClick={() => onDownload(file)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#136C9E] border border-[#136C9E] rounded-lg hover:bg-blue-50 transition-colors"
             >
-              <Download className="w-5 h-5" />
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Preview Content */}
-        <div className="p-6">
-          {renderPreview()}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200">
-          <div className="text-sm text-gray-500">
-            {file.type} • {formatFileSize(file.size)}
-          </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              Close
-            </button>
-            <button
-              onClick={handleDownload}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
+              <Download className="w-3.5 h-3.5" />
               Download
             </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="Close preview"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
           </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          {renderContent()}
         </div>
       </div>
     </div>

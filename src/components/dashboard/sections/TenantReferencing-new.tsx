@@ -96,17 +96,8 @@ interface ReferencingShareItem {
 }
 
 const TenantReferencing: React.FC = () => {
+  // ── All hooks must be called unconditionally before any early returns ──────
   const { plan, status } = useBillingStatus();
-  if (!canAccessSection('tenant-referencing', plan, status)) {
-    return (
-      <PlanUpgradeWall
-        featureName="Referencing toolkit"
-        upgradeLabel={sectionUpgradeLabel('tenant-referencing')}
-        segment="renters"
-      />
-    );
-  }
-
   const { user, isAuthenticated } = useAuth();
   const isMobile = useIsMobile();
   const [formData, setFormData] = useState<FormData | null>(null);
@@ -114,7 +105,7 @@ const TenantReferencing: React.FC = () => {
   const [shares, setShares] = useState<ReferencingShareItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Modal states
   const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
@@ -227,6 +218,16 @@ const TenantReferencing: React.FC = () => {
     }
   };
 
+  if (!canAccessSection('tenant-referencing', plan, status)) {
+    return (
+      <PlanUpgradeWall
+        featureName="Referencing toolkit"
+        upgradeLabel={sectionUpgradeLabel('tenant-referencing')}
+        segment="renters"
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64 font-sans">
@@ -245,6 +246,56 @@ const TenantReferencing: React.FC = () => {
           <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <p className="text-red-600">{error}</p>
         </div>
+      </div>
+    );
+  }
+
+  // No passport started yet – show a friendly onboarding CTA
+  if (!formData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 space-y-6 font-sans">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl p-10 max-w-lg w-full text-center shadow-sm border border-blue-100">
+          <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <ShieldCheck className="w-8 h-8 text-blue-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2" style={{ fontFamily: 'Archivo, sans-serif' }}>
+            Create Your Referencing Passport
+          </h2>
+          <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+            Fill in your details once and share your referencing passport with as many landlords or agents as you need. No re-filling required.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={() => openReferencingModal(1)}
+              className="px-6 py-3 bg-[#136C9E] text-white rounded-xl text-sm font-semibold hover:bg-[#0F5A82] transition-colors shadow-md flex items-center justify-center gap-2"
+            >
+              <Edit3 className="w-4 h-4" />
+              Start My Passport
+            </button>
+          </div>
+          <div className="mt-6 grid grid-cols-3 gap-4 text-center">
+            {[
+              { label: 'Fill once', sub: 'No repeat forms' },
+              { label: 'Share freely', sub: 'Multiple recipients' },
+              { label: 'Edit anytime', sub: 'Always up-to-date' },
+            ].map((f) => (
+              <div key={f.label} className="bg-white rounded-xl p-3 shadow-sm border border-blue-50">
+                <p className="text-xs font-bold text-gray-800">{f.label}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{f.sub}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Referencing Modal */}
+        {isReferencingModalOpen && (
+          <ReferencingModal
+            isOpen={isReferencingModalOpen}
+            onClose={() => { setIsReferencingModalOpen(false); loadReferencingData(); }}
+            initialStep={referencingStep}
+            onSubmissionComplete={loadReferencingData}
+          />
+        )}
       </div>
     );
   }
@@ -365,7 +416,9 @@ const TenantReferencing: React.FC = () => {
 
           <button
             onClick={() => setIsSendModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm hover:opacity-95"
+            disabled={summaryOverallProgress < 75}
+            title={summaryOverallProgress < 75 ? "Your passport must be at least 75% complete before you can send it" : ""}
+            className={`px-4 py-2.5 rounded-xl text-white text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 shadow-sm ${summaryOverallProgress < 75 ? 'opacity-50 cursor-not-allowed hover:opacity-50' : 'hover:opacity-95'}`}
             style={{ backgroundColor: '#DC5F12' }}
           >
             <Plus className="w-4 h-4" />
@@ -384,7 +437,9 @@ const TenantReferencing: React.FC = () => {
             </p>
             <button
               onClick={() => setIsSendModalOpen(true)}
-              className="px-5 py-2.5 rounded-full text-white text-xs sm:text-sm font-semibold transition-all shadow-sm"
+              disabled={summaryOverallProgress < 75}
+              title={summaryOverallProgress < 75 ? "Your passport must be at least 75% complete before you can send it" : ""}
+              className={`px-5 py-2.5 rounded-full text-white text-xs sm:text-sm font-semibold transition-all shadow-sm ${summaryOverallProgress < 75 ? 'opacity-50 cursor-not-allowed hover:opacity-50' : 'hover:opacity-95'}`}
               style={{ backgroundColor: '#136C9E' }}
             >
               Send Referencing Passport

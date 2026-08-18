@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { ThemeProvider } from 'next-themes';
 import { TooltipProvider } from './components/ui/tooltip';
-import { Routes, Route, useLocation, MemoryRouter } from 'react-router-dom';
+import { Routes, Route, useLocation, MemoryRouter, useInRouterContext } from 'react-router-dom';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { LandlordEmptyState } from './components/LandlordEmptyState';
 import { RoleSelection } from './components/RoleSelection';
@@ -3128,20 +3128,23 @@ export function AppContent() {
 // throws "Error" with an empty message when route.id is undefined — this is what
 // crashed the landlord dashboard with the ErrorBoundary showing "Something went wrong / Error".
 export default function App() {
+  const inRouter = useInRouterContext();
+
+  const content = (
+    <ThemeProvider defaultTheme="light" storageKey="proptii-theme">
+      <TooltipProvider>
+        <AppContent />
+      </TooltipProvider>
+    </ThemeProvider>
+  );
+
+  if (inRouter) {
+    return content;
+  }
+
   return (
-    // MemoryRouter gives AppContent its own isolated router context.
-    // The parent app uses createBrowserRouter (data mode), which assigns
-    // route.id to every route. A plain <Routes> / useLocation() inside a
-    // data-mode router calls useRouteId() internally; when route.id is
-    // undefined it throws a bare Error("") — the exact "Error Error" you see
-    // in the ErrorBoundary. Wrapping with MemoryRouter provides a real router
-    // context so all hooks work correctly.
     <MemoryRouter>
-      <ThemeProvider defaultTheme="light" storageKey="proptii-theme">
-        <TooltipProvider>
-          <AppContent />
-        </TooltipProvider>
-      </ThemeProvider>
+      {content}
     </MemoryRouter>
   );
 }
