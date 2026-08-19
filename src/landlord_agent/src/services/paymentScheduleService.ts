@@ -193,16 +193,14 @@ class PaymentScheduleService {
     }
   }
 
-  // Replacing onSnapshot with polling
   subscribeToTenantPeriods(
     tenantId: string,
     callback: (periods: RentPaymentPeriod[]) => void,
     onError?: (error: Error) => void
   ): () => void {
     let isActive = true;
-    let timer: any;
 
-    const poll = async () => {
+    const fetchPeriods = async () => {
       if (!isActive) return;
       try {
         const periods = await this.getTenantPeriods(tenantId);
@@ -210,15 +208,11 @@ class PaymentScheduleService {
       } catch (err: any) {
         if (onError) onError(err);
       }
-      if (isActive) {
-        timer = setTimeout(poll, 15000); // 15 seconds poll
-      }
     };
 
-    poll();
+    fetchPeriods();
     return () => {
       isActive = false;
-      if (timer) clearTimeout(timer);
     };
   }
 

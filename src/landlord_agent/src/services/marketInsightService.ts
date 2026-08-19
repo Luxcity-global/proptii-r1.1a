@@ -52,32 +52,26 @@ class MarketInsightService {
     }
   }
 
-  // Polling implementation to replace onSnapshot
   subscribeToInsights(
     callback: (insights: MarketInsight[]) => void,
     userId?: string
   ): () => void {
     let isActive = true;
-    let timer: any;
 
-    const poll = async () => {
+    const fetchInsights = async () => {
       if (!isActive) return;
       try {
         const insights = await this.getActiveInsights(userId);
         if (isActive) callback(insights);
       } catch (err) {
-        console.error('Error polling insights:', err);
-      }
-      if (isActive) {
-        timer = setTimeout(poll, 30000); // poll every 30 seconds
+        console.error('Error fetching insights:', err);
       }
     };
 
-    poll();
+    fetchInsights();
 
     return () => {
       isActive = false;
-      if (timer) clearTimeout(timer);
     };
   }
 

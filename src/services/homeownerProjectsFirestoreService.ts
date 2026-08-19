@@ -27,16 +27,14 @@ class HomeownerProjectsFirestoreService {
     }
   }
 
-  // Replacing onSnapshot with polling
   subscribeToProjects(
     userId: string,
     callback: (projects: HomeProject[]) => void,
     onError?: (error: Error) => void
   ): () => void {
     let isActive = true;
-    let timer: any;
 
-    const poll = async () => {
+    const fetchProjects = async () => {
       if (!isActive) return;
       try {
         const projects = await this.getProjects(userId);
@@ -44,15 +42,11 @@ class HomeownerProjectsFirestoreService {
       } catch (err: any) {
         if (onError) onError(err);
       }
-      if (isActive) {
-        timer = setTimeout(poll, 15000);
-      }
     };
 
-    poll();
+    fetchProjects();
     return () => {
       isActive = false;
-      if (timer) clearTimeout(timer);
     };
   }
 

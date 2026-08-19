@@ -140,9 +140,8 @@ class PropertySelectionService {
     onError?: (error: Error) => void
   ): () => void {
     let isActive = true;
-    let timer: any;
 
-    const poll = async () => {
+    const fetchSelections = async () => {
       if (!isActive) return;
       try {
         const { success, selections } = await this.getUserPropertySelections(userId);
@@ -150,13 +149,11 @@ class PropertySelectionService {
       } catch (err: any) {
         if (onError) onError(err);
       }
-      if (isActive) timer = setTimeout(poll, 15000);
     };
 
-    poll();
+    fetchSelections();
     return () => {
       isActive = false;
-      if (timer) clearTimeout(timer);
     };
   }
 
@@ -166,9 +163,8 @@ class PropertySelectionService {
     onError?: (error: Error) => void
   ): () => void {
     let isActive = true;
-    let timer: any;
 
-    const poll = async () => {
+    const fetchStats = async () => {
       if (!isActive) return;
       try {
         const { success, stats } = await this.getPropertySelectionStats(userId);
@@ -176,13 +172,11 @@ class PropertySelectionService {
       } catch (err: any) {
         if (onError) onError(err);
       }
-      if (isActive) timer = setTimeout(poll, 15000);
     };
 
-    poll();
+    fetchStats();
     return () => {
       isActive = false;
-      if (timer) clearTimeout(timer);
     };
   }
 }

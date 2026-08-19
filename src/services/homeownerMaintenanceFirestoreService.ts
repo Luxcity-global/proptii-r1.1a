@@ -32,9 +32,8 @@ class HomeownerMaintenanceFirestoreService {
     onError?: (error: Error) => void
   ): () => void {
     let isActive = true;
-    let timer: any;
 
-    const poll = async () => {
+    const fetchTasks = async () => {
       if (!isActive) return;
       try {
         const tasks = await this.getTasks(userId);
@@ -42,15 +41,11 @@ class HomeownerMaintenanceFirestoreService {
       } catch (err: any) {
         if (onError) onError(err);
       }
-      if (isActive) {
-        timer = setTimeout(poll, 15000);
-      }
     };
 
-    poll();
+    fetchTasks();
     return () => {
       isActive = false;
-      if (timer) clearTimeout(timer);
     };
   }
 

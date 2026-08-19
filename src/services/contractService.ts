@@ -84,19 +84,8 @@ export class ContractPollingCoordinator {
         if (onError) onError(err instanceof Error ? err : new Error(err?.message || 'Fetch error'));
       });
 
-    // Start single interval timer if this is the first subscriber
-    if (this.subscriptions.size === 1 && !this.intervalId) {
-      this.intervalId = setInterval(() => {
-        this.refreshAll();
-      }, this.pollIntervalMs);
-    }
-
     return () => {
       this.subscriptions.delete(id);
-      if (this.subscriptions.size === 0 && this.intervalId) {
-        clearInterval(this.intervalId);
-        this.intervalId = null;
-      }
     };
   }
 

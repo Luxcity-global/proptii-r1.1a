@@ -1,4 +1,5 @@
 import apiService from './api';
+import sseService from './sseService';
 
 const logDev = (...args: any[]) => {
   if (import.meta.env.DEV) {
@@ -139,25 +140,31 @@ class SignedContractsFirestoreService {
     callback: (contracts: SignedContractData[]) => void
   ): () => void {
     let isActive = true;
-    let timer: any;
 
-    const poll = async () => {
+    const fetchContracts = async () => {
       if (!isActive) return;
       try {
         const { success, contracts } = await this.getUserSignedContracts(userId);
         if (isActive && success && contracts) callback(contracts);
       } catch (err) {
-        console.error('Error polling signed contracts:', err);
-      }
-      if (isActive) {
-        timer = setTimeout(poll, 15000);
+        console.error('Error fetching signed contracts:', err);
       }
     };
 
-    poll();
+    // Initial fetch on subscribe
+    fetchContracts();
+
+    // Real-time SSE push listener (no polling timer)
+    const unsubscribeSse = sseService.on(
+      ['contract_sent', 'contract_synced', 'contract_template_updated'],
+      () => {
+        fetchContracts();
+      }
+    );
+
     return () => {
       isActive = false;
-      if (timer) clearTimeout(timer);
+      unsubscribeSse();
     };
   }
 }

@@ -133,15 +133,6 @@ export class ViewingPollingCoordinator {
       }
     }
 
-    // Start single interval timer if this is the first subscriber
-    if (this.subscribers.size === 1 && !this.intervalId) {
-      this.intervalId = setInterval(() => {
-        this.fetchAll().catch(err => {
-          console.debug('Background viewing polling error:', err?.message);
-        });
-      }, this.pollIntervalMs);
-    }
-
     // Always fetch fresh data on new subscriber
     this.fetchAll().catch(err => {
       if (onError) onError(err instanceof Error ? err : new Error(err?.message || 'Failed to fetch'));
@@ -149,10 +140,6 @@ export class ViewingPollingCoordinator {
 
     return () => {
       this.subscribers.delete(id);
-      if (this.subscribers.size === 0 && this.intervalId) {
-        clearInterval(this.intervalId);
-        this.intervalId = null;
-      }
     };
   }
 
