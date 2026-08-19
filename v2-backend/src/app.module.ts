@@ -45,6 +45,8 @@ import { SheetsService } from './services/sheets.service';
 import { RefereeGuarantorService } from './services/referee-guarantor.service';
 import { EmailService } from './services/email.service';
 import { EventsService } from './services/events.service';
+import { StorageService } from './services/storage.service';
+import { StorageController } from './controllers/storage.controller';
 
 @Module({
   imports: [],
@@ -69,10 +71,12 @@ import { EventsService } from './services/events.service';
     InsightsController,
     SheetsController,
     RefereeGuarantorController,
+    StorageController,
   ],
   providers: [
     EventsService,      // SSE Central Event Broadcaster
     EmailService,       // must be before any service that injects it
+    StorageService,     // Firebase Cloud Storage uploader
     NativePropertiesService,
     SavedPropertiesService,
     ViewingRequestService,
