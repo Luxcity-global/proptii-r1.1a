@@ -43,8 +43,8 @@ import { AlertsService } from './services/alerts.service';
 import { InsightsService } from './services/insights.service';
 import { SheetsService } from './services/sheets.service';
 import { RefereeGuarantorService } from './services/referee-guarantor.service';
-
 import { EmailService } from './services/email.service';
+import { EventsService } from './services/events.service';
 
 @Module({
   imports: [],
@@ -71,6 +71,7 @@ import { EmailService } from './services/email.service';
     RefereeGuarantorController,
   ],
   providers: [
+    EventsService,      // SSE Central Event Broadcaster
     EmailService,       // must be before any service that injects it
     NativePropertiesService,
     SavedPropertiesService,
@@ -90,6 +91,7 @@ import { EmailService } from './services/email.service';
     SheetsService,
     RefereeGuarantorService,
   ],
+  exports: [EventsService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

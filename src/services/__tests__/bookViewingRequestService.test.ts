@@ -1,104 +1,82 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import bookViewingRequestService from '../bookViewingRequestService';
-import { onSnapshot } from 'firebase/firestore';
+import { viewingPollingCoordinator } from '../viewingService';
+import apiService from '../api';
 
-vi.mock('firebase/firestore', async (importOriginal) => {
-  const original = await importOriginal<typeof import('firebase/firestore')>();
-  return {
-    ...original,
-    collection: vi.fn(),
-    query: vi.fn(),
-    where: vi.fn(),
-    orderBy: vi.fn(),
-    onSnapshot: vi.fn(),
-  };
-});
-
-vi.mock('../config/firebaseConfig', () => ({
-  db: {},
+vi.mock('../api', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
 }));
 
-describe('bookViewingRequestService Firestore subscription fallbacks', () => {
+describe('bookViewingRequestService with shared polling coordinator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    viewingPollingCoordinator.clearCache();
   });
 
-  describe('subscribeToUserRequests', () => {
-    it('attempts ordered query first, and falls back to unordered query on failed-precondition error', () => {
-      let isFirstCall = true;
-      const unsubscribeMock = vi.fn();
-
-      vi.mocked(onSnapshot).mockImplementation((q: any, onNext: any, onError?: any) => {
-        if (isFirstCall) {
-          isFirstCall = false;
-          // Simulate missing index error
-          const error = new Error('Index required') as any;
-          error.code = 'failed-precondition';
-          if (onError) onError(error);
-        } else {
-          // Success callback on fallback query
-          const mockSnapshot = {
-            forEach: (cb: any) => {
-              cb({
-                data: () => ({ id: '1', userId: 'user-1', createdAt: { toMillis: () => 1000 } }),
-              });
-            },
-          };
-          onNext(mockSnapshot);
-        }
-        return unsubscribeMock;
-      });
-
-      const callback = vi.fn();
-      const unsubscribe = bookViewingRequestService.subscribeToUserRequests('user-1', callback);
-
-      expect(vi.mocked(onSnapshot)).toHaveBeenCalledTimes(2);
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback.mock.calls[0][0][0].id).toBe('1');
-      expect(callback.mock.calls[0][0][0].userId).toBe('user-1');
-      
-      unsubscribe();
-      expect(unsubscribeMock).toHaveBeenCalled();
-    });
+  afterEach(() => {
+    viewingPollingCoordinator.clearCache();
   });
 
-  describe('subscribeToRequestsByEmail', () => {
-    it('falls back sequentially: ordered -> unordered -> nested', () => {
-      let stepCalls = 0;
-      const unsubscribeMock = vi.fn();
+  const mockRequests = [
+    {
+      id: 'req-1',
+      userId: 'user-1',
+      propertyId: 'prop-1',
+      landlordId: 'landlord-1',
+      agentId: 'agent-1',
+      agentEmail: 'agent@example.com',
+      status: 'requested' as const,
+      property: {
+        street: '123 Test St',
+        agent: { id: 'agent-1', name: 'Agent', email: 'agent@example.com', phone: '123', company: 'Co' },
+      },
+      createdAt: '2026-08-19',
+      updatedAt: '2026-08-19',
+    },
+  ];
 
-      vi.mocked(onSnapshot).mockImplementation((q: any, onNext: any, onError?: any) => {
-        stepCalls++;
-        if (stepCalls < 3) {
-          // Trigger failed-precondition for the first two attempts
-          const error = new Error('Index required') as any;
-          error.code = 'failed-precondition';
-          if (onError) onError(error);
-        } else {
-          // Success on the 3rd attempt (nested query fallback)
-          const mockSnapshot = {
-            forEach: (cb: any) => {
-              cb({
-                data: () => ({ 
-                  id: '1', 
-                  agentEmail: 'test@example.com', 
-                  property: { agent: { email: 'test@example.com' } }, 
-                  createdAt: { toMillis: () => 1000 } 
-                }),
-              });
-            },
-          };
-          onNext(mockSnapshot);
-        }
-        return unsubscribeMock;
-      });
+  it('shares the polling coordinator and fetches viewing requests', async () => {
+    vi.mocked(apiService.get).mockResolvedValue(mockRequests);
 
-      const callback = vi.fn();
-      bookViewingRequestService.subscribeToRequestsByEmail('test@example.com', callback);
+    const cb1 = vi.fn();
+    const unsub = bookViewingRequestService.subscribeToUserRequests('user-1', cb1);
 
-      // Verify that it went through 3 steps: ordered, unordered, then nested
-      expect(stepCalls).toBe(3);
-      expect(callback).toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(cb1).toHaveBeenCalledWith(mockRequests);
     });
+
+    expect(apiService.get).toHaveBeenCalledTimes(1);
+    expect(apiService.get).toHaveBeenCalledWith('/viewing-requests');
+
+    unsub();
+    expect(viewingPollingCoordinator.getActiveSubscriberCount()).toBe(0);
+  });
+
+  it('triggers immediate refresh on request deletion', async () => {
+    vi.mocked(apiService.get).mockResolvedValue(mockRequests);
+    vi.mocked(apiService.delete).mockResolvedValue({ success: true });
+
+    const callback = vi.fn();
+    const unsub = bookViewingRequestService.subscribeToManagerRequests('landlord-1', callback);
+
+    await vi.waitFor(() => {
+      expect(callback).toHaveBeenCalledWith(mockRequests);
+    });
+
+    expect(apiService.get).toHaveBeenCalledTimes(1);
+
+    await bookViewingRequestService.deleteRequest('req-1');
+    expect(apiService.delete).toHaveBeenCalledWith('/viewing-requests/req-1');
+
+    await vi.waitFor(() => {
+      expect(apiService.get).toHaveBeenCalledTimes(2);
+    });
+
+    unsub();
   });
 });

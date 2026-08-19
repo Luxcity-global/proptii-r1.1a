@@ -1,22 +1,19 @@
 /**
- * useMessagingPoller — tab-aware 30-second polling hook.
+ * useMessagingPoller — SSE-driven real-time messaging hook with tab-aware fallback polling.
  *
- * Polls GET /api/communication/conversations and
- * GET /api/communication/conversations/unread-count every 30 seconds while
- * the browser tab is visible. Pauses when the tab is hidden and resumes
- * immediately (with a fresh fetch) when the tab becomes visible again.
+ * Listens to Server-Sent Events ('message_new', 'message_read') for instant inbox updates.
+ * Also runs a background safety poll every 60s while the browser tab is visible.
  *
  * Must be called inside a component that is a descendant of MessagingProvider.
- *
- * Requirements: 8.1, 8.2, 8.3, 8.4
  */
 
 import { useEffect, useContext } from 'react';
 import { MessagingContext } from '../contexts/MessagingContext';
 import communicationService from '../services/communicationService';
+import sseService from '../services/sseService';
 import { useAuth } from '../contexts/AuthContext';
 
-const DEFAULT_INTERVAL_MS = 30_000;
+const DEFAULT_INTERVAL_MS = 60_000; // 60s backup interval (SSE is primary)
 
 export function useMessagingPoller(intervalMs: number = DEFAULT_INTERVAL_MS): void {
     const { _setConversations, _setUnreadCount } = useContext(MessagingContext);
@@ -35,7 +32,7 @@ export function useMessagingPoller(intervalMs: number = DEFAULT_INTERVAL_MS): vo
                 _setConversations(convs);
                 _setUnreadCount(count);
             } catch {
-                // Silently ignore — the next tick will retry
+                // Silently ignore — the next tick or SSE event will retry
             }
         }
 
@@ -68,7 +65,13 @@ export function useMessagingPoller(intervalMs: number = DEFAULT_INTERVAL_MS): vo
         // Fire an initial fetch on mount
         void fetchData();
 
-        // Start the interval (only if the tab is currently visible)
+        // Register SSE real-time listener for instant push updates
+        const unsubscribeSse = sseService.on(['message_new', 'message_read'], () => {
+            console.debug('[useMessagingPoller] SSE message event received, updating inbox immediately');
+            void fetchData();
+        });
+
+        // Start the fallback interval (only if the tab is currently visible)
         if (document.visibilityState !== 'hidden') {
             startInterval();
         }
@@ -77,6 +80,7 @@ export function useMessagingPoller(intervalMs: number = DEFAULT_INTERVAL_MS): vo
 
         // Cleanup on unmount
         return () => {
+            unsubscribeSse();
             stopInterval();
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };

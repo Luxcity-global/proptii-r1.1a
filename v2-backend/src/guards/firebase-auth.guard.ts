@@ -71,12 +71,19 @@ export class FirebaseAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
+    let token: string | undefined;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Missing or invalid Authorization header');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split('Bearer ')[1]?.trim();
+    } else if (request.query?.token) {
+      token = (request.query.token as string).replace(/^Bearer\s+/i, '').trim();
+    } else if (request.query?.authorization) {
+      token = (request.query.authorization as string).replace(/^Bearer\s+/i, '').trim();
     }
 
-    const token = authHeader.split('Bearer ')[1];
+    if (!token) {
+      throw new UnauthorizedException('Missing or invalid Authorization header or token query parameter');
+    }
 
     // Support local dev mock tokens
     if (token.startsWith('mock-') || token.startsWith('mock_')) {

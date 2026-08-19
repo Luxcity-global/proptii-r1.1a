@@ -1,5 +1,7 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req, Logger, Sse, MessageEvent } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { ViewingRequestService } from '../services/viewing-request.service';
+import { EventsService } from '../services/events.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 
 @Controller('viewing-requests')
@@ -7,7 +9,19 @@ import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 export class ViewingRequestController {
   private readonly logger = new Logger(ViewingRequestController.name);
 
-  constructor(private readonly viewingRequestService: ViewingRequestService) {}
+  constructor(
+    private readonly viewingRequestService: ViewingRequestService,
+    private readonly eventsService: EventsService,
+  ) {}
+
+  @Sse('events')
+  sendViewingEvents(@Req() req: any): Observable<MessageEvent> {
+    const userId = req.user.uid;
+    const email = req.user.email;
+    const role = req.user.role;
+    this.logger.log(`[SSE:Viewing] Client connected uid=${userId} email=${email} role=${role}`);
+    return this.eventsService.subscribe(userId, email, role);
+  }
 
   @Post()
   async createViewing(@Req() req: any, @Body() body: any) {
@@ -16,7 +30,25 @@ export class ViewingRequestController {
     this.logger.log(`[createViewing] uid=${tenantId} email=${tenantEmail} body=${JSON.stringify(body).slice(0, 200)}`);
     try {
       const result = await this.viewingRequestService.createViewing(tenantId, tenantEmail, body);
-      this.logger.log(`[createViewing] uid=${tenantId} → created id=${(result as any)?.id ?? 'unknown'}`);
+      const createdId = (result as any)?.id || (result as any)?.requestId || 'unknown';
+      this.logger.log(`[createViewing] uid=${tenantId} → created id=${createdId}`);
+
+      // Broadcast SSE event
+      this.eventsService.emit({
+        type: 'viewing_created',
+        userId: tenantId,
+        targetEmail: body.agentEmail || body.property?.agent?.email,
+        data: {
+          id: createdId,
+          tenantId,
+          tenantEmail,
+          propertyId: body.propertyId,
+          landlordId: body.landlordId,
+          agentId: body.agentId,
+          status: 'pending',
+        },
+      });
+
       return result;
     } catch (err: any) {
       this.logger.error(`[createViewing] uid=${tenantId} FAILED: ${err?.message || err}`);
@@ -59,6 +91,18 @@ export class ViewingRequestController {
     try {
       const result = await this.viewingRequestService.updateViewingStatus(id, userId, body.status, body.notes);
       this.logger.log(`[updateViewingStatus] uid=${userId} id=${id} → updated OK`);
+
+      // Broadcast SSE update event
+      this.eventsService.emit({
+        type: 'viewing_updated',
+        data: {
+          id,
+          updatedBy: userId,
+          status: body.status,
+          notes: body.notes,
+        },
+      });
+
       return result;
     } catch (err: any) {
       this.logger.error(`[updateViewingStatus] uid=${userId} id=${id} FAILED: ${err?.message || err}`);
@@ -73,6 +117,16 @@ export class ViewingRequestController {
     try {
       const result = await this.viewingRequestService.cancelViewing(id, userId);
       this.logger.log(`[cancelViewing] uid=${userId} id=${id} → cancelled OK`);
+
+      // Broadcast SSE delete event
+      this.eventsService.emit({
+        type: 'viewing_deleted',
+        data: {
+          id,
+          cancelledBy: userId,
+        },
+      });
+
       return result;
     } catch (err: any) {
       this.logger.error(`[cancelViewing] uid=${userId} id=${id} FAILED: ${err?.message || err}`);

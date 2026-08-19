@@ -143,6 +143,21 @@ function mergeLoadedFormData(prev: FormData, patch: Partial<FormData>): FormData
   };
 }
 
+function sanitizeForLocalStorage(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeForLocalStorage);
+  const result: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    // Strip giant base64 strings so browser localStorage quota is never exceeded
+    if (key === 'dataUrl' && typeof val === 'string' && val.length > 500) {
+      continue;
+    }
+    result[key] = sanitizeForLocalStorage(val);
+  }
+  return result;
+}
+
 const fileToStoredFile = async (file: File): Promise<StoredFile> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -323,7 +338,12 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
       };
 
       if (user?.id) {
-        localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(updated));
+        try {
+          const sanitized = sanitizeForLocalStorage(updated);
+          localStorage.setItem(`referencing_${user.id}_formData`, JSON.stringify(sanitized));
+        } catch (storageErr) {
+          console.warn('Could not save referencing form draft to localStorage:', storageErr);
+        }
       }
 
       return updated;
@@ -336,7 +356,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     switch (step) {
       case 'identity': {
         const hasAllRequiredFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.dateOfBirth && data.nationality && !data.dateOfBirthError;
-        const hasRequiredDocument = data.identityProof?.name && data.identityProof?.dataUrl;
+        const hasRequiredDocument = data.identityProof?.name && (data.identityProof?.url || data.identityProof?.dataUrl);
         if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
         return 'partial';
       }
@@ -348,7 +368,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
         }
         if (data.employmentStatus && !nonApplicableStatus.includes(data.employmentStatus)) {
           const hasAllRequiredFields = data.employmentStatus && data.companyDetails && data.lengthOfEmployment && data.jobPosition && data.referenceFullName && data.referenceEmail && data.referencePhone && data.proofType;
-          const hasRequiredDocument = data.proofDocument?.name && data.proofDocument?.dataUrl;
+          const hasRequiredDocument = data.proofDocument?.name && (data.proofDocument?.url || data.proofDocument?.dataUrl);
           if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
         }
         return 'partial';
@@ -366,14 +386,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
           requiredFields.push('previousAddress', 'durationAtPreviousAddress');
         }
         const hasAllRequiredFields = requiredFields.every(field => !!data[field]);
-        const hasRequiredDocument = data.proofDocument?.name && data.proofDocument?.dataUrl;
+        const hasRequiredDocument = data.proofDocument?.name && (data.proofDocument?.url || data.proofDocument?.dataUrl);
         if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
         return 'partial';
       }
 
       case 'financial': {
         const hasAllRequiredFields = data.monthlyIncome && data.proofOfIncomeType;
-        const hasRequiredDocument = data.proofOfIncomeDocument?.name && data.proofOfIncomeDocument?.dataUrl;
+        const hasRequiredDocument = data.proofOfIncomeDocument?.name && (data.proofOfIncomeDocument?.url || data.proofOfIncomeDocument?.dataUrl);
         const isOpenBankingConnected = data.useOpenBanking && data.isConnectedToOpenBanking;
         if (hasAllRequiredFields && (hasRequiredDocument || isOpenBankingConnected)) return 'complete';
         return 'partial';
@@ -383,7 +403,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
         const hasAnyData = Object.values(data).some(value => !!value && value !== null && value !== '');
         if (hasAnyData) {
           const hasAllRequiredFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
-          const hasRequiredDocument = data.identityDocument?.name && data.identityDocument?.dataUrl;
+          const hasRequiredDocument = data.identityDocument?.name && (data.identityDocument?.url || data.identityDocument?.dataUrl);
           if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
           return 'partial';
         }

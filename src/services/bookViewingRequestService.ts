@@ -1,4 +1,5 @@
 import apiService from './api';
+import { viewingPollingCoordinator } from './viewingService';
 
 export interface BookViewingRequest {
   id: string;
@@ -47,6 +48,7 @@ class BookViewingRequestService {
       };
 
       const response = await apiService.post('/viewing-requests', payload);
+      viewingPollingCoordinator.invalidateAndRefresh().catch(() => {});
       return { success: true, requestId: response.id || response.data?.id };
     } catch (error: any) {
       console.error('Error saving book viewing request:', error);
@@ -56,8 +58,7 @@ class BookViewingRequestService {
 
   async getUserRequests(userId: string): Promise<{ success: boolean; requests?: BookViewingRequest[]; error?: string }> {
     try {
-      const response = await apiService.get('/viewing-requests');
-      const requests = Array.isArray(response) ? response : (response.data || []);
+      const requests = await viewingPollingCoordinator.fetchAll();
       return { success: true, requests };
     } catch (error: any) {
       console.error('Error getting book viewing requests:', error);
@@ -67,8 +68,7 @@ class BookViewingRequestService {
 
   async getManagerRequests(managerId: string): Promise<{ success: boolean; requests?: BookViewingRequest[]; error?: string }> {
     try {
-      const response = await apiService.get('/viewing-requests');
-      const requests = Array.isArray(response) ? response : (response.data || []);
+      const requests = await viewingPollingCoordinator.fetchAll();
       return { success: true, requests };
     } catch (error: any) {
       console.error('Error getting manager viewing requests:', error);
@@ -78,8 +78,7 @@ class BookViewingRequestService {
 
   async getRequestsByEmail(agentEmail: string): Promise<{ success: boolean; requests?: BookViewingRequest[]; error?: string }> {
     try {
-      const response = await apiService.get('/viewing-requests');
-      const requests = Array.isArray(response) ? response : (response.data || []);
+      const requests = await viewingPollingCoordinator.fetchAll();
       return { success: true, requests };
     } catch (error: any) {
       console.error('Error getting viewing requests by email:', error);
@@ -92,28 +91,11 @@ class BookViewingRequestService {
     callback: (requests: BookViewingRequest[]) => void,
     onError?: (error: Error) => void
   ): () => void {
-    let active = true;
-    const fetchInterval = setInterval(async () => {
-      if (!active) return;
-      const res = await this.getUserRequests(userId);
-      if (res.success && res.requests) {
-        callback(res.requests);
-      } else if (res.error && onError) {
-        onError(new Error(res.error));
-      }
-    }, 5000); // poll every 5s
-
-    // Initial fetch
-    this.getUserRequests(userId).then(res => {
-      if (active && res.success && res.requests) {
-        callback(res.requests);
-      }
-    });
-
-    return () => {
-      active = false;
-      clearInterval(fetchInterval);
-    };
+    return viewingPollingCoordinator.subscribe(
+      (items) => items as BookViewingRequest[],
+      callback,
+      onError
+    );
   }
 
   subscribeToManagerRequests(
@@ -121,27 +103,11 @@ class BookViewingRequestService {
     callback: (requests: BookViewingRequest[]) => void,
     onError?: (error: Error) => void
   ): () => void {
-    let active = true;
-    const fetchInterval = setInterval(async () => {
-      if (!active) return;
-      const res = await this.getManagerRequests(managerId);
-      if (res.success && res.requests) {
-        callback(res.requests);
-      } else if (res.error && onError) {
-        onError(new Error(res.error));
-      }
-    }, 5000);
-
-    this.getManagerRequests(managerId).then(res => {
-      if (active && res.success && res.requests) {
-        callback(res.requests);
-      }
-    });
-
-    return () => {
-      active = false;
-      clearInterval(fetchInterval);
-    };
+    return viewingPollingCoordinator.subscribe(
+      (items) => items as BookViewingRequest[],
+      callback,
+      onError
+    );
   }
 
   subscribeToRequestsByEmail(
@@ -149,32 +115,17 @@ class BookViewingRequestService {
     callback: (requests: BookViewingRequest[]) => void,
     onError?: (error: Error) => void
   ): () => void {
-    let active = true;
-    const fetchInterval = setInterval(async () => {
-      if (!active) return;
-      const res = await this.getRequestsByEmail(agentEmail);
-      if (res.success && res.requests) {
-        callback(res.requests);
-      } else if (res.error && onError) {
-        onError(new Error(res.error));
-      }
-    }, 5000);
-
-    this.getRequestsByEmail(agentEmail).then(res => {
-      if (active && res.success && res.requests) {
-        callback(res.requests);
-      }
-    });
-
-    return () => {
-      active = false;
-      clearInterval(fetchInterval);
-    };
+    return viewingPollingCoordinator.subscribe(
+      (items) => items as BookViewingRequest[],
+      callback,
+      onError
+    );
   }
 
   async deleteRequest(requestId: string): Promise<{ success: boolean; error?: string }> {
     try {
       await apiService.delete(`/viewing-requests/${requestId}`);
+      viewingPollingCoordinator.invalidateAndRefresh().catch(() => {});
       return { success: true };
     } catch (error: any) {
       console.error('Error deleting viewing request:', error);

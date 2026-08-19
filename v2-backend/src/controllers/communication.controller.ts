@@ -1,11 +1,27 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, HttpCode, Req, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, HttpCode, Req, NotFoundException, Sse, MessageEvent, Logger } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { CommunicationService } from '../services/communication.service';
+import { EventsService } from '../services/events.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 
 @Controller('communication')
 @UseGuards(FirebaseAuthGuard)
 export class CommunicationController {
-  constructor(private readonly communicationService: CommunicationService) {}
+  private readonly logger = new Logger(CommunicationController.name);
+
+  constructor(
+    private readonly communicationService: CommunicationService,
+    private readonly eventsService: EventsService,
+  ) {}
+
+  @Sse('events')
+  sendCommunicationEvents(@Req() req: any): Observable<MessageEvent> {
+    const userId = req.user.uid;
+    const email = req.user.email;
+    const role = req.user.role;
+    this.logger.log(`[SSE:Communication] Client connected uid=${userId} email=${email}`);
+    return this.eventsService.subscribe(userId, email, role);
+  }
 
   @Get('conversations')
   @HttpCode(200)
@@ -38,13 +54,36 @@ export class CommunicationController {
   @HttpCode(201)
   async sendMessage(@Param('id') conversationId: string, @Body() dto: any, @Req() req: any) {
     const userId = req.user.uid;
-    return await this.communicationService.sendMessage(conversationId, dto, userId);
+    const result = await this.communicationService.sendMessage(conversationId, dto, userId);
+
+    // Broadcast new message event to conversation participants
+    this.eventsService.emit({
+      type: 'message_new',
+      data: {
+        conversationId,
+        senderId: userId,
+        message: result,
+      },
+    });
+
+    return result;
   }
 
   @Patch('messages/:id/read')
   @HttpCode(200)
-  async markRead(@Param('id') messageId: string) {
-    return await this.communicationService.markRead(messageId);
+  async markRead(@Param('id') messageId: string, @Req() req: any) {
+    const userId = req?.user?.uid;
+    const result = await this.communicationService.markRead(messageId);
+
+    this.eventsService.emit({
+      type: 'message_read',
+      userId,
+      data: {
+        messageId,
+      },
+    });
+
+    return result;
   }
 
   // ── Attachments ───────────────────────────────────────────────────────────

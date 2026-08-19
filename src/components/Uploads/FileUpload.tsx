@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import { uploadToAzureStorage } from '../../services/storageService';
+import { uploadToFirebaseStorage } from '../../services/storageService';
 
 interface StoredFile {
   name: string;
   type: string;
   size: number;
   lastModified: number;
-  dataUrl: string;
   url?: string;
+  dataUrl?: string;
 }
 
 interface FileUploadProps {
@@ -15,26 +15,19 @@ interface FileUploadProps {
   formData: any;
 }
 
-/** Read a File as a base64 data URL. Always resolves — never rejects silently. */
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('FileReader failed'));
-    reader.readAsDataURL(file);
-  });
-}
-
 const FileUpload: React.FC<FileUploadProps> = ({ updateFormData, formData }) => {
   const [preview, setPreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // On mount/reload: restore preview from the stored dataUrl (durable, not blob://)
+  // On mount/reload: restore preview from stored URL
   useEffect(() => {
     const proof = formData?.identity?.identityProof;
-    if (proof?.dataUrl) {
-      setPreview(proof.dataUrl);
-    } else if (proof?.url) {
+    if (proof?.url) {
       setPreview(proof.url);
+    } else if (proof?.dataUrl) {
+      setPreview(proof.dataUrl);
     } else {
       setPreview(null);
     }
@@ -44,38 +37,53 @@ const FileUpload: React.FC<FileUploadProps> = ({ updateFormData, formData }) => 
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // 1. Read base64 immediately — this is what gets stored and is always available
-    let dataUrl: string;
-    try {
-      dataUrl = await readAsDataUrl(file);
-    } catch {
-      console.error('[FileUpload] Failed to read file as data URL');
-      return;
-    }
+    setUploadError(null);
 
-    // 2. Set preview and call updateFormData right away — no Azure dependency
-    const storedFile: StoredFile = {
+    // 1. Create a lightweight local blob URL for instant UI preview
+    const localBlobUrl = URL.createObjectURL(file);
+    setPreview(localBlobUrl);
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    const initialStoredFile: StoredFile = {
       name: file.name,
       type: file.type,
       size: file.size,
       lastModified: file.lastModified,
-      dataUrl,
+      url: localBlobUrl,
     };
-    setPreview(dataUrl);
-    updateFormData("identity", { identityProof: storedFile });
 
-    // 3. Optionally upgrade to an Azure URL in the background if available
-    uploadToAzureStorage(file, 'referencing_documents')
-      .then((result) => {
-        if (result.success && result.url) {
-          updateFormData("identity", {
-            identityProof: { ...storedFile, url: result.url },
-          });
+    updateFormData("identity", { identityProof: initialStoredFile });
+
+    // 2. Upload directly to Firebase Cloud Storage
+    try {
+      const result = await uploadToFirebaseStorage(
+        file,
+        'referencing_documents/identity',
+        (progress) => {
+          setUploadProgress(progress.percentage);
         }
-      })
-      .catch(() => {
-        // Azure not configured — base64 already saved, nothing to do
-      });
+      );
+
+      if (result.success && result.url) {
+        setPreview(result.url);
+        updateFormData("identity", {
+          identityProof: {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            lastModified: file.lastModified,
+            url: result.url,
+          },
+        });
+      } else {
+        setUploadError(result.error || 'Failed to upload document to Firebase Storage');
+      }
+    } catch (err: any) {
+      setUploadError(err?.message || 'Upload error');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const storedFile = formData?.identity?.identityProof;
@@ -117,11 +125,29 @@ const FileUpload: React.FC<FileUploadProps> = ({ updateFormData, formData }) => 
                   </div>
                 )}
               </div>
+
+              {isUploading && (
+                <div className="mb-3">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Uploading to Firebase Storage: {uploadProgress}%</p>
+                </div>
+              )}
+
+              {uploadError && (
+                <p className="text-xs text-red-500 mb-2">{uploadError}</p>
+              )}
+
               <button
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
                   setPreview(null);
+                  setUploadError(null);
                   updateFormData("identity", { identityProof: null });
                 }}
                 className="text-red-500 hover:text-red-700 text-sm"

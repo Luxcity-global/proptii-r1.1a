@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import { uploadToAzureStorage } from '../../services/storageService';
+import { uploadToFirebaseStorage } from '../../services/storageService';
 
 interface StoredFile {
   name: string;
   type: string;
   size: number;
   lastModified: number;
-  dataUrl: string;
   url?: string;
+  dataUrl?: string;
 }
 
 interface ResidentialUploadProps {
@@ -15,24 +15,18 @@ interface ResidentialUploadProps {
   formData: any;
 }
 
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('FileReader failed'));
-    reader.readAsDataURL(file);
-  });
-}
-
 const ResidentialUpload: React.FC<ResidentialUploadProps> = ({ updateFormData, formData }) => {
   const [preview, setPreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
     const proof = formData?.residential?.proofDocument;
-    if (proof?.dataUrl) {
-      setPreview(proof.dataUrl);
-    } else if (proof?.url) {
+    if (proof?.url) {
       setPreview(proof.url);
+    } else if (proof?.dataUrl) {
+      setPreview(proof.dataUrl);
     } else {
       setPreview(null);
     }
@@ -42,33 +36,51 @@ const ResidentialUpload: React.FC<ResidentialUploadProps> = ({ updateFormData, f
     const file = event.target.files?.[0];
     if (!file) return;
 
-    let dataUrl: string;
-    try {
-      dataUrl = await readAsDataUrl(file);
-    } catch {
-      console.error('[ResidentialUpload] Failed to read file as data URL');
-      return;
-    }
+    setUploadError(null);
 
-    const storedFile: StoredFile = {
+    const localBlobUrl = URL.createObjectURL(file);
+    setPreview(localBlobUrl);
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    const initialStoredFile: StoredFile = {
       name: file.name,
       type: file.type,
       size: file.size,
       lastModified: file.lastModified,
-      dataUrl,
+      url: localBlobUrl,
     };
-    setPreview(dataUrl);
-    updateFormData("residential", { proofDocument: storedFile });
 
-    uploadToAzureStorage(file, 'referencing_documents')
-      .then((result) => {
-        if (result.success && result.url) {
-          updateFormData("residential", {
-            proofDocument: { ...storedFile, url: result.url },
-          });
+    updateFormData("residential", { proofDocument: initialStoredFile });
+
+    try {
+      const result = await uploadToFirebaseStorage(
+        file,
+        'referencing_documents/residential',
+        (progress) => {
+          setUploadProgress(progress.percentage);
         }
-      })
-      .catch(() => {});
+      );
+
+      if (result.success && result.url) {
+        setPreview(result.url);
+        updateFormData("residential", {
+          proofDocument: {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            lastModified: file.lastModified,
+            url: result.url,
+          },
+        });
+      } else {
+        setUploadError(result.error || 'Failed to upload document to Firebase Storage');
+      }
+    } catch (err: any) {
+      setUploadError(err?.message || 'Upload error');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const storedFile = formData?.residential?.proofDocument;
@@ -110,11 +122,29 @@ const ResidentialUpload: React.FC<ResidentialUploadProps> = ({ updateFormData, f
                   </div>
                 )}
               </div>
+
+              {isUploading && (
+                <div className="mb-3">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Uploading to Firebase Storage: {uploadProgress}%</p>
+                </div>
+              )}
+
+              {uploadError && (
+                <p className="text-xs text-red-500 mb-2">{uploadError}</p>
+              )}
+
               <button
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
                   setPreview(null);
+                  setUploadError(null);
                   updateFormData("residential", { proofDocument: null });
                 }}
                 className="text-red-500 hover:text-red-700 text-sm"

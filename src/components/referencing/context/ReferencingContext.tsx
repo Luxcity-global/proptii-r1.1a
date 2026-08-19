@@ -3,8 +3,7 @@ import { FormData, FormSection, ReferencingState as FormReferencingState, Refere
 import { saveToLocalStorage, loadFromLocalStorage, saveDraft } from '../../../utils/localStorage';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import * as referencingService from '../../../services/referencingService';
-import { isAzureConfigured } from '../../../config/azure';
-import { uploadToAzureStorage } from '../../../services/storageService';
+import { uploadToFirebaseStorage } from '../../../services/storageService';
 import * as yup from 'yup';
 
 // Define the state type
@@ -420,10 +419,10 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
         
         throw new Error(response.error || 'Failed to upload document');
       } else {
-        // Upload directly to Azure Storage
-        const result = await uploadToAzureStorage(
+        // Upload directly to Firebase Storage
+        const result = await uploadToFirebaseStorage(
           file,
-          `${section}/${field}`,
+          `referencing_documents/${section}/${field}`,
           (progress) => {
             dispatch({
               type: 'SET_UPLOAD_PROGRESS',
@@ -436,7 +435,7 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
           return result.url;
         }
         
-        throw new Error(result.error || 'Failed to upload document');
+        throw new Error(result.error || 'Failed to upload document to Firebase Storage');
       }
     } catch (error) {
       console.error(`Error uploading ${field} document:`, error);

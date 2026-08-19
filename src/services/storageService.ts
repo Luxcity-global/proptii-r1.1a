@@ -1,6 +1,5 @@
 import { storage } from '../config/firebaseConfig';
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { getAzureStorageSasUrl } from '../config/azure';
 
 /**
  * Interface for upload progress
@@ -69,22 +68,10 @@ export const uploadToFirebaseStorage = async (
         },
         (error) => {
           console.error('Firebase Storage upload error:', error);
-          // Fallback to data URL on network/CORS failure
-          const reader = new FileReader();
-          reader.onload = () => {
-            resolve({
-              success: true,
-              url: reader.result as string,
-              fileName: uniqueFileName,
-            });
-          };
-          reader.onerror = () => {
-            resolve({
-              success: false,
-              error: error.message || 'Upload failed',
-            });
-          };
-          reader.readAsDataURL(file);
+          resolve({
+            success: false,
+            error: error.message || 'Upload to Firebase Storage failed',
+          });
         },
         async () => {
           try {
@@ -95,16 +82,11 @@ export const uploadToFirebaseStorage = async (
               fileName: uniqueFileName,
             });
           } catch (err: any) {
-            console.warn('Failed to get download URL, using data URL fallback:', err);
-            const reader = new FileReader();
-            reader.onload = () => {
-              resolve({
-                success: true,
-                url: reader.result as string,
-                fileName: uniqueFileName,
-              });
-            };
-            reader.readAsDataURL(file);
+            console.error('Failed to get Firebase Storage download URL:', err);
+            resolve({
+              success: false,
+              error: err?.message || 'Failed to retrieve download URL',
+            });
           }
         }
       );
@@ -114,59 +96,6 @@ export const uploadToFirebaseStorage = async (
     return {
       success: false,
       error: error?.message || 'Upload failed',
-    };
-  }
-};
-
-/**
- * Upload a file to Azure Blob Storage using a SAS token.
- * This bypasses Firebase Storage permission issues.
- */
-export const uploadToAzureStorage = async (
-  file: File,
-  folder: string = 'referencing_documents',
-  onProgress?: (progress: UploadProgress) => void
-): Promise<UploadResult> => {
-  try {
-    const fileName = generateUniqueFileName(file);
-    const blobName = `${folder}/${fileName}`;
-    const sasUrl = getAzureStorageSasUrl(blobName);
-
-    // Provide an initial progress event
-    if (onProgress) {
-      onProgress({ loaded: 0, total: file.size, percentage: 0 });
-    }
-
-    const response = await fetch(sasUrl, {
-      method: 'PUT',
-      headers: {
-        'x-ms-blob-type': 'BlockBlob',
-        'Content-Type': file.type || 'application/octet-stream',
-      },
-      body: file,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Azure Storage upload failed: ${response.statusText}`);
-    }
-
-    if (onProgress) {
-      onProgress({ loaded: file.size, total: file.size, percentage: 100 });
-    }
-
-    // The blob URL is the SAS URL without the query string
-    const url = sasUrl.split('?')[0];
-
-    return {
-      success: true,
-      url,
-      fileName,
-    };
-  } catch (error: any) {
-    console.error('Azure Storage upload error:', error);
-    return {
-      success: false,
-      error: error.message || 'Unknown error occurred during Azure upload',
     };
   }
 };
@@ -189,7 +118,18 @@ export const deleteFromFirebaseStorage = async (
   }
 };
 
-// Aliases for full backward compatibility across the application
-export const deleteFromAzureStorage = deleteFromFirebaseStorage;
+// Aliases — Route all storage operations directly through Firebase Storage
 export const uploadToStorage = uploadToFirebaseStorage;
+export const uploadToAzureStorage = uploadToFirebaseStorage;
+export const deleteFromAzureStorage = deleteFromFirebaseStorage;
 export const deleteFromStorage = deleteFromFirebaseStorage;
+
+export default {
+  uploadToFirebaseStorage,
+  uploadToStorage,
+  uploadToAzureStorage,
+  deleteFromFirebaseStorage,
+  deleteFromAzureStorage,
+  deleteFromStorage,
+  generateUniqueFileName,
+};

@@ -1,104 +1,137 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import viewingService from '../viewingService';
-import { onSnapshot } from 'firebase/firestore';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import viewingService, { viewingPollingCoordinator } from '../viewingService';
+import apiService from '../api';
 
-vi.mock('firebase/firestore', async (importOriginal) => {
-  const original = await importOriginal<typeof import('firebase/firestore')>();
-  return {
-    ...original,
-    collection: vi.fn(),
-    query: vi.fn(),
-    where: vi.fn(),
-    orderBy: vi.fn(),
-    onSnapshot: vi.fn(),
-  };
-});
-
-vi.mock('../config/firebaseConfig', () => ({
-  db: {},
+vi.mock('../api', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  },
 }));
 
-describe('viewingService Firestore subscription fallbacks', () => {
+describe('viewingService with shared polling coordinator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    viewingPollingCoordinator.clearCache();
   });
 
-  describe('subscribeToUserViewingBookings', () => {
-    it('attempts ordered query first, and falls back to unordered query on failed-precondition error', () => {
-      let isFirstCall = true;
-      const unsubscribeMock = vi.fn();
+  afterEach(() => {
+    viewingPollingCoordinator.clearCache();
+  });
 
-      vi.mocked(onSnapshot).mockImplementation((q: any, onNext: any, onError?: any) => {
-        if (isFirstCall) {
-          isFirstCall = false;
-          // Simulate missing index error
-          const error = new Error('Index required') as any;
-          error.code = 'failed-precondition';
-          if (onError) onError(error);
-        } else {
-          // Success callback on fallback query
-          const mockSnapshot = {
-            forEach: (cb: any) => {
-              cb({
-                data: () => ({ id: '1', userId: 'user-1', createdAt: { toMillis: () => 1000 } }),
-              });
-            },
-          };
-          onNext(mockSnapshot);
-        }
-        return unsubscribeMock;
+  const mockBookings = [
+    {
+      id: 'viewing-1',
+      userId: 'user-1',
+      propertyId: 'prop-1',
+      landlordId: 'landlord-1',
+      agentId: 'agent-1',
+      agentEmail: 'agent@example.com',
+      status: 'pending',
+      property: {
+        street: '123 Test St',
+        agent: { id: 'agent-1', name: 'Agent', email: 'agent@example.com', phone: '123', company: 'Co' },
+      },
+      viewingDetails: {
+        date: '2026-08-20',
+        time: '14:00',
+        preference: 'in-person',
+        userDetails: { fullName: 'Tenant 1', email: 'tenant@example.com', phoneNumber: '123' },
+      },
+      createdAt: '2026-08-19',
+      updatedAt: '2026-08-19',
+    },
+    {
+      id: 'viewing-2',
+      userId: 'user-1',
+      propertyId: 'prop-2',
+      landlordId: 'landlord-1',
+      agentId: 'agent-1',
+      agentEmail: 'agent@example.com',
+      status: 'completed',
+      property: {
+        street: '456 Test Ave',
+        agent: { id: 'agent-1', name: 'Agent', email: 'agent@example.com', phone: '123', company: 'Co' },
+      },
+      viewingDetails: {
+        date: '2026-08-18',
+        time: '11:00',
+        preference: 'in-person',
+        userDetails: { fullName: 'Tenant 1', email: 'tenant@example.com', phoneNumber: '123' },
+      },
+      createdAt: '2026-08-17',
+      updatedAt: '2026-08-18',
+    },
+  ];
+
+  it('deduplicates in-flight GET requests when multiple subscriptions are created simultaneously', async () => {
+    vi.mocked(apiService.get).mockResolvedValue(mockBookings);
+
+    const cb1 = vi.fn();
+    const cb2 = vi.fn();
+    const cbStats = vi.fn();
+
+    const unsub1 = viewingService.subscribeToUserViewingBookings('user-1', cb1);
+    const unsub2 = viewingService.subscribeToManagerViewingBookings('landlord-1', cb2);
+    const unsubStats = viewingService.subscribeToViewingStats('user-1', cbStats);
+
+    // Wait for resolution
+    await vi.waitFor(() => {
+      expect(cb1).toHaveBeenCalledWith(mockBookings);
+      expect(cb2).toHaveBeenCalledWith(mockBookings);
+      expect(cbStats).toHaveBeenCalledWith({
+        upcoming: 1,
+        completed: 1,
+        rescheduled: 0,
+        total: 2,
       });
+    });
 
-      const callback = vi.fn();
-      const unsubscribe = viewingService.subscribeToUserViewingBookings('user-1', callback);
+    // Exactly 1 network request should have been dispatched despite 3 subscriptions
+    expect(apiService.get).toHaveBeenCalledTimes(1);
+    expect(apiService.get).toHaveBeenCalledWith('/viewing-requests');
 
-      expect(vi.mocked(onSnapshot)).toHaveBeenCalledTimes(2);
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback.mock.calls[0][0][0].id).toBe('1');
-      expect(callback.mock.calls[0][0][0].userId).toBe('user-1');
-      
-      unsubscribe();
-      expect(unsubscribeMock).toHaveBeenCalled();
+    // Clean up
+    unsub1();
+    unsub2();
+    unsubStats();
+    expect(viewingPollingCoordinator.getActiveSubscriberCount()).toBe(0);
+  });
+
+  it('calculates viewing stats properly from bookings', () => {
+    const stats = viewingService.calculateStatsFromBookings(mockBookings as any);
+    expect(stats).toEqual({
+      upcoming: 1,
+      completed: 1,
+      rescheduled: 0,
+      total: 2,
     });
   });
 
-  describe('subscribeToViewingBookingsByEmail', () => {
-    it('falls back sequentially: ordered -> unordered -> nested', () => {
-      let stepCalls = 0;
-      const unsubscribeMock = vi.fn();
+  it('triggers immediate cache refresh on status update', async () => {
+    vi.mocked(apiService.get).mockResolvedValue(mockBookings);
+    vi.mocked(apiService.put).mockResolvedValue({ success: true });
 
-      vi.mocked(onSnapshot).mockImplementation((q: any, onNext: any, onError?: any) => {
-        stepCalls++;
-        if (stepCalls < 3) {
-          // Trigger failed-precondition for the first two attempts
-          const error = new Error('Index required') as any;
-          error.code = 'failed-precondition';
-          if (onError) onError(error);
-        } else {
-          // Success on the 3rd attempt (nested query fallback)
-          const mockSnapshot = {
-            forEach: (cb: any) => {
-              cb({
-                data: () => ({ 
-                  id: '1', 
-                  agentEmail: 'test@example.com', 
-                  property: { agent: { email: 'test@example.com' } }, 
-                  createdAt: { toMillis: () => 1000 } 
-                }),
-              });
-            },
-          };
-          onNext(mockSnapshot);
-        }
-        return unsubscribeMock;
-      });
+    const callback = vi.fn();
+    const unsub = viewingService.subscribeToUserViewingBookings('user-1', callback);
 
-      const callback = vi.fn();
-      viewingService.subscribeToViewingBookingsByEmail('test@example.com', callback);
-
-      // Verify that it went through 3 steps: ordered, unordered, then nested
-      expect(stepCalls).toBe(3);
-      expect(callback).toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(callback).toHaveBeenCalledWith(mockBookings);
     });
+
+    expect(apiService.get).toHaveBeenCalledTimes(1);
+
+    // Now update status
+    await viewingService.updateViewingStatus('viewing-1', 'confirmed');
+    expect(apiService.put).toHaveBeenCalledWith('/viewing-requests/viewing-1', { status: 'confirmed' });
+
+    // Refresh should have triggered a fresh get
+    await vi.waitFor(() => {
+      expect(apiService.get).toHaveBeenCalledTimes(2);
+    });
+
+    unsub();
   });
 });

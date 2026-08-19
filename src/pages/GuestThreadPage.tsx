@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, RefreshCw, AlertCircle, ShieldAlert, CheckCircle2, Check } from 'lucide-react';
 import quickRequestService, { ThreadDetails, ThreadMessage } from '../services/quickRequestService';
+import sseService from '../services/sseService';
 
 const GuestThreadPage: React.FC = () => {
   const { token } = useParams<{ token: string }>();
@@ -48,15 +49,53 @@ const GuestThreadPage: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Polling every 10 seconds for new messages
+  // Real-time SSE listener + tab-aware fallback polling for new messages
   useEffect(() => {
     if (!pollingActive || !token) return;
 
-    const interval = setInterval(() => {
+    // SSE listener for instant message push
+    const unsubscribeSse = sseService.on(['message_new'], () => {
+      console.debug('[GuestThreadPage] SSE message received, refreshing thread data');
       fetchThreadData(false);
-    }, 10000);
+    });
 
-    return () => clearInterval(interval);
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const startInterval = () => {
+      if (!intervalId) {
+        intervalId = setInterval(() => {
+          fetchThreadData(false);
+        }, 30000);
+      }
+    };
+
+    const stopInterval = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        stopInterval();
+      } else {
+        fetchThreadData(false);
+        startInterval();
+      }
+    };
+
+    if (document.visibilityState !== 'hidden') {
+      startInterval();
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      unsubscribeSse();
+      stopInterval();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [pollingActive, token]);
 
   const handleSendReply = async (e: React.FormEvent) => {
