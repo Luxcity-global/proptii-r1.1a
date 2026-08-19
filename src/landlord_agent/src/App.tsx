@@ -38,6 +38,7 @@ import { InviteTenant } from './components/InviteTenant';
 import { SelectExistingTenant } from './components/SelectExistingTenant';
 import { AddLandlord } from './components/AddLandlord';
 import { AddLandlordWizard } from './components/AddLandlordWizard';
+import { ReferencingPage } from './components/ReferencingPage';
 import { ContractsPage } from './components/ContractsPage';
 import { propertyService } from './services/propertyService';
 import { tenantService } from './services/tenantService';
@@ -322,6 +323,7 @@ const PATH_TO_NAV_SCREEN: Record<string, NavigationScreen> = {
   '/insights': 'insights',
   '/settings': 'settings',
   '/messages': 'messages',
+  '/referencing': 'referencing',
 };
 
 const SCREEN_TO_PATH: Record<NavigationScreen, string> = {
@@ -335,6 +337,7 @@ const SCREEN_TO_PATH: Record<NavigationScreen, string> = {
   inbox: '/inbox',
   settings: '/settings',
   messages: '/messages',
+  referencing: '/referencing',
 };
 
 function screenFromPathname(pathname: string): NavigationScreen | null {
@@ -2077,6 +2080,19 @@ export function AppContent() {
             userProfile={userProfile}
             userRole={userRole}
             isAuthenticated={isAuthenticated}
+          />
+        );
+
+      case 'referencing':
+        return (
+          <ReferencingPage
+            tenants={tenants}
+            userProfile={userProfile}
+            onViewTenant={(tenant) => {
+              selectTenant(tenant);
+              navigateToScreen('tenant-details');
+            }}
+            onOpenMessages={() => handleNavigation('messages')}
           />
         );
 

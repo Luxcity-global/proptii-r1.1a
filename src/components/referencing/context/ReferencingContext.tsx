@@ -684,51 +684,113 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
     return formData;
   };
 
-  // Validation schemas
-  const employmentSchema = yup.object().shape({
-    employmentStatus: yup.string().required('Employment status is required'),
-    companyDetails: yup.string().required('Company details are required'),
-    lengthOfEmployment: yup.string().required('Length of employment is required'),
-    jobPosition: yup.string().required('Job position is required'),
-    referenceFullName: yup.string().required('Reference name is required'),
-    referenceEmail: yup.string().email('Invalid email').required('Reference email is required'),
-    referencePhone: yup.string().required('Reference phone is required'),
-    proofDocument: yup.mixed().required('Proof of employment is required')
+  // ── Validation schemas — matched exactly to the actual form fields ──────────
+
+  const identitySchema = yup.object().shape({
+    firstName:     yup.string().required('First name is required'),
+    lastName:      yup.string().required('Last name is required'),
+    email:         yup.string().email('Invalid email address').required('Email is required'),
+    phoneNumber:   yup.string().required('Phone number is required'),
+    dateOfBirth:   yup.string().required('Date of birth is required'),
+    nationality:   yup.string().required('Nationality is required'),
+    identityProof: yup.mixed().required('Identity proof document is required'),
   });
 
-  const validateSection = useCallback(async (section: keyof FormData) => {
-    try {
-      let schema;
-      switch (section) {
-        case 'employment':
-          schema = employmentSchema;
-          break;
-        // Add other section schemas here
-        default:
-          return true;
-      }
+  const employmentSchema = yup.object().shape({
+    employmentStatus:  yup.string().required('Employment status is required'),
+    companyDetails:    yup.string().when('employmentStatus', {
+      is: (v: string) => v && v !== 'unemployed' && v !== 'retired',
+      then: (s) => s.required('Company name is required'),
+      otherwise: (s) => s.notRequired(),
+    }),
+    lengthOfEmployment: yup.string().when('employmentStatus', {
+      is: (v: string) => v && v !== 'unemployed' && v !== 'retired',
+      then: (s) => s.required('Length of employment is required'),
+      otherwise: (s) => s.notRequired(),
+    }),
+    jobPosition:       yup.string().when('employmentStatus', {
+      is: (v: string) => v && v !== 'unemployed' && v !== 'retired',
+      then: (s) => s.required('Job position is required'),
+      otherwise: (s) => s.notRequired(),
+    }),
+    referenceFullName: yup.string().when('employmentStatus', {
+      is: (v: string) => v && v !== 'unemployed' && v !== 'retired',
+      then: (s) => s.required('Reference name is required'),
+      otherwise: (s) => s.notRequired(),
+    }),
+    referenceEmail:    yup.string().when('employmentStatus', {
+      is: (v: string) => v && v !== 'unemployed' && v !== 'retired',
+      then: (s) => s.email('Invalid email').required('Reference email is required'),
+      otherwise: (s) => s.notRequired(),
+    }),
+    referencePhone:    yup.string().when('employmentStatus', {
+      is: (v: string) => v && v !== 'unemployed' && v !== 'retired',
+      then: (s) => s.required('Reference phone is required'),
+      otherwise: (s) => s.notRequired(),
+    }),
+    proofDocument: yup.mixed().when('employmentStatus', {
+      is: (v: string) => v && v !== 'unemployed' && v !== 'retired',
+      then: (s) => s.required('Proof of employment is required'),
+      otherwise: (s) => s.notRequired(),
+    }),
+  });
 
+  const residentialSchema = yup.object().shape({
+    currentAddress:            yup.string().required('Current address is required'),
+    durationAtCurrentAddress:  yup.string().required('Duration at current address is required'),
+    proofType:                 yup.string().required('Proof type is required'),
+    proofDocument:             yup.mixed().required('Proof of address document is required'),
+  });
+
+  const financialSchema = yup.object().shape({
+    proofOfIncomeType:     yup.string().required('Proof of income type is required'),
+    proofOfIncomeDocument: yup.mixed().when('useOpenBanking', {
+      is: true,
+      then: (s) => s.notRequired(),
+      otherwise: (s) => s.required('Proof of income document is required'),
+    }),
+  });
+
+  const guarantorSchema = yup.object().shape({
+    firstName:        yup.string().required('Guarantor first name is required'),
+    lastName:         yup.string().required('Guarantor last name is required'),
+    email:            yup.string().email('Invalid email address').required('Guarantor email is required'),
+    phoneNumber:      yup.string().required('Guarantor phone number is required'),
+    address:          yup.string().required('Guarantor address is required'),
+    identityDocument: yup.mixed().required('Guarantor identity document is required'),
+  });
+
+  const creditCheckSchema = yup.object().shape({
+    hasAgreedToCheck: yup
+      .boolean()
+      .oneOf([true], 'You must agree to the credit check to proceed')
+      .required('You must agree to the credit check to proceed'),
+  });
+
+  const sectionSchemas: Partial<Record<keyof FormData, yup.ObjectSchema<any>>> = {
+    identity:    identitySchema,
+    employment:  employmentSchema,
+    residential: residentialSchema,
+    financial:   financialSchema,
+    guarantor:   guarantorSchema,
+    creditCheck: creditCheckSchema,
+  };
+
+  const validateSection = useCallback(async (section: keyof FormData) => {
+    const schema = sectionSchemas[section];
+    if (!schema) return true; // no schema defined — allow through
+
+    try {
       await schema.validate(state.formData[section], { abortEarly: false });
-      dispatch({
-        type: 'CLEAR_ERROR',
-        payload: section
-      });
+      dispatch({ type: 'CLEAR_ERROR', payload: section });
       return true;
     } catch (error) {
       if (error instanceof yup.ValidationError) {
         const newErrors: { [key: string]: string } = {};
         error.inner.forEach(err => {
-          if (err.path) {
-            newErrors[err.path] = err.message;
-          }
+          if (err.path) newErrors[err.path] = err.message;
         });
-        dispatch({
-          type: 'SET_ERROR',
-          payload: {
-            section,
-            error: newErrors
-          }
-        });
+        dispatch({ type: 'SET_ERROR', payload: { section, error: newErrors as any } });
       }
       return false;
     }

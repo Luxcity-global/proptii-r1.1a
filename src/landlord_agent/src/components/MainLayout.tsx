@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature, CalendarDays, Menu, MessageSquare, Settings } from 'lucide-react';
+import { Home, Building2, FileText, BarChart3, User, Users, Inbox, ChevronLeft, ChevronRight, FileSignature, CalendarDays, Menu, MessageSquare, Settings, ShieldCheck } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -34,7 +34,7 @@ const requestSignIn = () => {
   }
 };
 
-export type NavigationScreen = 'dashboard' | 'properties' | 'documents' | 'viewings' | 'clients' | 'insights' | 'inbox' | 'contracts' | 'messages' | 'settings';
+export type NavigationScreen = 'dashboard' | 'properties' | 'documents' | 'viewings' | 'clients' | 'insights' | 'inbox' | 'contracts' | 'messages' | 'settings' | 'referencing';
 
 interface MainLayoutProps {
   currentScreen: NavigationScreen;
@@ -477,6 +477,11 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
       id: 'clients' as NavigationScreen,
       icon: Users,
       label: 'Clients',
+    },
+    {
+      id: 'referencing' as NavigationScreen,
+      icon: ShieldCheck,
+      label: 'Referencing',
     },
     {
       id: 'messages' as NavigationScreen,

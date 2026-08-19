@@ -14,24 +14,26 @@ export class SearchAggregator {
     const cacheKey = `search:${query.toLowerCase().trim()}`;
     const metaKey  = `meta:${cacheKey}`;
 
-    // 1. Redis cache
-    const cachedData = await redis.get(cacheKey);
-    const metaData   = await redis.get(metaKey);
+    try {
+      // 1. Redis cache
+      const cachedData = await redis.get(cacheKey).catch(() => null);
+      const metaData   = await redis.get(metaKey).catch(() => null);
 
-    if (cachedData) {
-      console.log(`[Aggregator] Found cached data for: ${query}`);
-      const results = JSON.parse(cachedData);
-      const meta    = metaData ? JSON.parse(metaData) : { timestamp: 0 };
-      const age     = (Date.now() - meta.timestamp) / 1000;
+      if (cachedData) {
+        console.log(`[Aggregator] Found cached data for: ${query}`);
+        const results = JSON.parse(cachedData);
+        const meta    = metaData ? JSON.parse(metaData) : { timestamp: 0 };
+        const age     = (Date.now() - meta.timestamp) / 1000;
 
-      if (age < CACHE_TTL_STALE) {
-        console.log(`[Cache Hit] ${age < CACHE_TTL_FRESH ? 'Fresh' : 'Stale'} results (age: ${Math.round(age)}s) for: ${query}`);
-        return results;
+        if (age < CACHE_TTL_STALE) {
+          console.log(`[Cache Hit] ${age < CACHE_TTL_FRESH ? 'Fresh' : 'Stale'} results (age: ${Math.round(age)}s) for: ${query}`);
+          return results;
+        }
       }
+    } catch (err) {
+      // Redis offline fallback
     }
 
-    // 2. MongoDB fallback removed to prevent broad irrelevant hits
-    // Historical results are now only served if they are an exact match in Redis.
     return [];
   }
 
@@ -61,15 +63,23 @@ export class SearchAggregator {
   }
 
   async triggerRevalidation(query: string, filters: any) {
-    await searchQueue.add('revalidate', { query, filters }, {
-      jobId: `revalidate-${query.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`,
-      removeOnComplete: true,
-    });
+    try {
+      await searchQueue.add('revalidate', { query, filters }, {
+        jobId: `revalidate-${query.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`,
+        removeOnComplete: true,
+      });
+    } catch (e) {
+      // Queue offline fallback
+    }
   }
 
   private async saveToCache(key: string, data: any, stale = false) {
     const timestamp = stale ? Date.now() - (CACHE_TTL_FRESH * 1000 + 1) : Date.now();
-    await redis.set(key, JSON.stringify(data), 'EX', CACHE_TTL_STALE);
-    await redis.set(`meta:${key}`, JSON.stringify({ timestamp }), 'EX', CACHE_TTL_STALE);
+    try {
+      await redis.set(key, JSON.stringify(data), 'EX', CACHE_TTL_STALE);
+      await redis.set(`meta:${key}`, JSON.stringify({ timestamp }), 'EX', CACHE_TTL_STALE);
+    } catch (e) {
+      // Redis offline fallback
+    }
   }
 }

@@ -40,6 +40,25 @@ interface ClientsPageProps {
   onAddProperty?: () => void;
 }
 
+// ─── Referencing status helpers ───────────────────────────────────────────────
+// Defined here because they are called in the tenant list render.
+
+function getReferencingStatusColor(status: 'not-started' | 'in-progress' | 'complete') {
+  switch (status) {
+    case 'complete':    return 'bg-green-100 text-green-800';
+    case 'in-progress': return 'bg-blue-100 text-blue-800';
+    default:            return 'bg-gray-100 text-gray-800';
+  }
+}
+
+function getReferencingStatusLabel(status: 'not-started' | 'in-progress' | 'complete') {
+  switch (status) {
+    case 'complete':    return 'Complete';
+    case 'in-progress': return 'In progress';
+    default:            return 'Not yet started';
+  }
+}
+
 export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onViewTenant, onViewProperty, onAddTenant, onAddLandlord, onViewLandlord, onDeleteTenant, onArchiveTenant, onExportTenants, onDeleteLandlord, onArchiveLandlord, onExportLandlords, userProfile, onAddProperty }: ClientsPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('tenants');

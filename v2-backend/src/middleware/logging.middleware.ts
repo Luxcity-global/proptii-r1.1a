@@ -2,7 +2,7 @@ import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 
 /** Paths to skip logging (noisy keep-alive pings) */
-const SKIP_PATHS = new Set(['/api/health', '/health']);
+const SKIP_PATHS = new Set(['/health', '/ping', '/api/health', '/api/ping']);
 
 /** Truncate large bodies so logs stay readable */
 function summarise(body: unknown, maxLen = 300): string {

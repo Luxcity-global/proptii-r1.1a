@@ -35,12 +35,10 @@ import {
   Phone,
   Mail,
   CheckCircle2,
-  ShieldCheck as ShieldCheckIcon,
 } from "lucide-react";
 import { useIsMobile } from "./ui/use-mobile";
 import { Property, UserProfile, MarketInsight, Tenant } from "../App";
 import { trackEvent } from "../../../utils/analytics";
-import ReceivedReferencings from "./ReceivedReferencings";
 import { LandlordPageEmptyShell } from "./LandlordPageEmptyShell";
 import { isNewPortfolioUser } from "../utils/portfolioStatus";
 import {
@@ -1133,27 +1131,7 @@ export function Dashboard({
       </div>
             </div>
 
-      {/* ── Received Referencing Passports ───────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-3 md:px-3 pb-0 mt-6">
-        <Card className="p-4 md:p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                <ShieldCheckIcon className="w-4 h-4 text-[#136C9E]" />
-              </div>
-              <div>
-                <h2 className="font-bold text-gray-900 text-sm">Referencing Passports Received</h2>
-                <p className="text-xs text-gray-500">Tenants who have shared their passport with you</p>
-              </div>
-            </div>
-          </div>
-          <ReceivedReferencings onOpenMessages={() => {
-            // Push to parent window URL for landlord messages nav
-            try { window.history.pushState(null, '', '/landlord/messages'); } catch {}
-            window.dispatchEvent(new PopStateEvent('popstate'));
-          }} />
-        </Card>
-      </div>
+      {/* ── Received Referencing Passports section moved to /landlord/referencing ── */}
 
       <div className="max-w-7xl mx-auto px-3 md:px-3 pb-6">
         {/* Filters */}

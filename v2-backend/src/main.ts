@@ -129,19 +129,26 @@ async function bootstrap() {
   await app.listen(port);
   console.log(`🚀 Proptii v2-backend running on port ${port}`);
 
-  // ── Production Keep-Alive Ping Loop (prevents Render/Fly spin-down) ──
-  const keepAliveInterval = 4 * 60 * 1000; // 4 minutes
-  const backendUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || `http://127.0.0.1:${port}`;
+  // ── Production Keep-Alive Ping Loop (prevents Render/Fly spin-down) ──────
+  // Only runs when deployed — never locally. RENDER_EXTERNAL_URL is injected
+  // automatically by Render; BACKEND_URL can be set manually on other hosts.
+  const isProduction = process.env.NODE_ENV === 'production' || !!process.env.RENDER_EXTERNAL_URL;
+  if (isProduction) {
+    const keepAliveInterval = 4 * 60 * 1000; // 4 minutes
+    const backendUrl = (process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/$/, '');
 
-  setInterval(() => {
-    try {
-      const http = require('http');
-      const https = require('https');
-      const client = backendUrl.startsWith('https') ? https : http;
-      client.get(`${backendUrl}/api/health`, (res: any) => {
-        res.resume();
-      }).on('error', () => {});
-    } catch {}
-  }, keepAliveInterval);
+    setInterval(() => {
+      try {
+        const https = require('https');
+        // /health is outside the /api prefix — lightweight, no auth, already
+        // excluded from request logging by LoggingMiddleware
+        https.get(`${backendUrl}/health`, (res: any) => {
+          res.resume();
+        }).on('error', () => {});
+      } catch {}
+    }, keepAliveInterval);
+
+    console.log(`🏓 Keep-alive loop started → ${backendUrl}/health every 4 min`);
+  }
 }
 bootstrap();

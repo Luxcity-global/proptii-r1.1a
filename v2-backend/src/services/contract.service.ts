@@ -205,48 +205,30 @@ export class ContractService {
       }
     }
 
-    // Email delivery via SMTP if configured
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
+    // Email delivery via Resend
+    try {
+      const { sendEmail } = await import('../utils/resend');
 
-    if (smtpHost && smtpUser && smtpPass) {
-      try {
-        const nodemailer = require('nodemailer');
-        const transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: parseInt(process.env.SMTP_PORT || '465'),
-          secure: true,
-          auth: { user: smtpUser, pass: smtpPass },
-        });
-
-        const mailOptions: any = {
-          from: `"${body.senderName || 'Proptii'}" <${process.env.SMTP_FROM_EMAIL || smtpUser}>`,
-          to: body.to,
-          subject: `Signed Contract: ${body.contractName}`,
-          html: body.htmlContent || `<p>Please find your signed contract attached: ${body.contractName}</p>`,
-        };
-
-        // Attachment handled via base64 if present in body
-        if (body.attachmentBase64) {
-          mailOptions.attachments = [{
+      const attachments = body.attachmentBase64
+        ? [{
             filename: body.documentName || `${body.contractName}_signed.pdf`,
             content: body.attachmentBase64,
-            encoding: 'base64',
-            contentType: 'application/pdf',
-          }];
-        }
+            content_type: 'application/pdf',
+          }]
+        : undefined;
 
-        await transporter.sendMail(mailOptions);
-        this.logger.log(`Signed contract email sent to ${body.to}`);
-        return { success: true, message: 'Signed contract emailed successfully' };
-      } catch (err: any) {
-        this.logger.error(`sendSignedContract email error: ${err?.message || err}`);
-        return { success: false, error: err?.message || 'Email delivery failed' };
-      }
+      const id = await sendEmail({
+        to: body.to,
+        subject: `Signed Contract: ${body.contractName}`,
+        html: body.htmlContent || `<p>Please find your signed contract: <strong>${body.contractName}</strong></p>`,
+        attachments,
+      });
+
+      this.logger.log(`Signed contract email sent to ${body.to} [${id}]`);
+      return { success: true, message: 'Signed contract emailed successfully' };
+    } catch (err: any) {
+      this.logger.error(`sendSignedContract email error: ${err?.message || err}`);
+      return { success: false, error: err?.message || 'Email delivery failed' };
     }
-
-    this.logger.warn('SMTP not configured — signed contract email not sent');
-    return { success: true, message: 'Contract saved. Email delivery requires SMTP configuration.' };
   }
 }

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';
-import * as nodemailer from 'nodemailer';
+import { sendEmail } from '../utils/resend';
 
 @Injectable()
 export class RefereeGuarantorService {
@@ -70,32 +70,9 @@ export class RefereeGuarantorService {
     `;
 
     try {
-      const smtpHost = process.env.SMTP_HOST;
-      const smtpUser = process.env.SMTP_USER;
-      const smtpPass = process.env.SMTP_PASS;
-
-      if (smtpHost && smtpUser && smtpPass) {
-        const transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: parseInt(process.env.SMTP_PORT || '465'),
-          secure: true,
-          auth: { user: smtpUser, pass: smtpPass },
-        });
-
-        await transporter.sendMail({
-          from: `"${senderName}" <${process.env.SMTP_FROM_EMAIL || smtpUser}>`,
-          to,
-          subject,
-          html: htmlBody,
-        });
-
-        this.logger.log(`Referencing email sent to ${to} (${type})`);
-        return { success: true, message: 'Email sent successfully' };
-      }
-
-      // Log if no SMTP configured — in production this should always be set
-      this.logger.warn('SMTP not configured — referencing email not sent');
-      return { success: false, message: 'Email service not configured' };
+      const id = await sendEmail({ to, subject, html: htmlBody });
+      this.logger.log(`Referencing email sent to ${to} (${type}) [${id}]`);
+      return { success: true, message: 'Email sent successfully' };
     } catch (err: any) {
       this.logger.error(`sendReferencingEmail error: ${err?.message || err}`);
       return { success: false, error: err?.message || 'Failed to send email' };

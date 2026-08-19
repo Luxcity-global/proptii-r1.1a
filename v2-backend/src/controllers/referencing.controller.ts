@@ -119,6 +119,12 @@ export class ReferencingController {
     return await this.referencingService.deleteUserFile(req.user.uid, fileId);
   }
 
+  @Get('referencing/files/:fileId/url')
+  @UseGuards(FirebaseAuthGuard)
+  async getFileDownloadUrl(@Req() req: any, @Param('fileId') fileId: string) {
+    return await this.referencingService.refreshFileDownloadUrl(req.user.uid, fileId);
+  }
+
   // ── Public passport view (no auth) ───────────────────────────────────────
 
   @Get('referencing/public/:viewToken')
@@ -170,6 +176,31 @@ export class ReferencingController {
   async getReceivedReferencings(@Req() req: any) {
     const email = (req.user.email || '').toLowerCase().trim();
     return await this.referencingService.getReceivedReferencings(email);
+  }
+
+  // ── Request referencing from a tenant ────────────────────────────────────
+  // Landlord/agent sends a referencing invite email to any tenant email address.
+
+  @Post('referencing/request')
+  @HttpCode(200)
+  @UseGuards(FirebaseAuthGuard)
+  async requestReferencing(@Req() req: any, @Body() body: {
+    tenantEmail: string;
+    tenantName?: string;
+    propertyAddress?: string;
+    landlordName?: string;
+  }) {
+    const landlordName = body.landlordName
+      || req.user.name
+      || req.user.email
+      || 'Your landlord/agent';
+    return await this.referencingService.sendReferencingRequest({
+      tenantEmail:     body.tenantEmail,
+      tenantName:      body.tenantName      || body.tenantEmail,
+      propertyAddress: body.propertyAddress || '',
+      landlordName,
+      landlordId:      req.user.uid,
+    });
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────

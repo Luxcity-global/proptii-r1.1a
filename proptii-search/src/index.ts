@@ -31,9 +31,15 @@ const connectDB = async () => {
 export const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
   maxRetriesPerRequest: 1,
   retryStrategy: () => null,
+  lazyConnect: true,
+  enableOfflineQueue: false,
 });
-redis.on('connect', () => console.log('✅ Redis Connected'));
-redis.on('error', (err) => console.warn('⚠️ Redis connection warning:', err?.message || err));
+redis.on('error', (err) => {
+  // Handled
+});
+redis.connect()
+  .then(() => console.log('✅ Redis Connected'))
+  .catch((err) => console.warn('⚠️ Redis connection warning for proptii-search (running without Redis cache):', err?.message || err));
 
 const startServer = async () => {
   await connectDB();
