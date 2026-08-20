@@ -11,7 +11,15 @@ import {
   CheckCircle, 
   AlertTriangle, 
   Send,
-  ArrowRight
+  ArrowRight,
+  Mail,
+  Copy,
+  Check,
+  ExternalLink,
+  ShieldCheck,
+  Clock,
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import FileUpload from "./Uploads/FileUpload";
@@ -78,12 +86,29 @@ interface FinancialData {
   isConnectedToOpenBanking: boolean;
 }
 
-interface GuarantorData {
+export interface GuarantorInvitation {
+  token?: string;
+  guarantorName?: string;
+  guarantorEmail?: string;
+  guarantorPhone?: string;
+  message?: string;
+  status?: 'invited' | 'completed' | 'cancelled';
+  invitedAt?: string;
+  completedAt?: string;
+}
+
+export interface GuarantorData {
   firstName: string;
   lastName: string;
   email: string;
   phoneNumber: string;
   address: string;
+  employmentStatus?: string;
+  annualIncome?: string;
+  relationship?: string;
+  consent?: string;
+  verifiedViaLink?: boolean;
+  submittedAt?: string;
   identityDocument: StoredFile | File | null;
 }
 
@@ -93,6 +118,7 @@ export interface FormData {
   residential: ResidentialData;
   financial: FinancialData;
   guarantor: GuarantorData;
+  guarantorInvitation?: GuarantorInvitation;
 }
 
 interface StoredFile {
@@ -261,6 +287,91 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     5: 'partial'
   });
 
+  const [guarantorMode, setGuarantorMode] = useState<'manual' | 'invite'>('manual');
+  const [inviteGuarantorName, setInviteGuarantorName] = useState('');
+  const [inviteGuarantorEmail, setInviteGuarantorEmail] = useState('');
+  const [inviteGuarantorPhone, setInviteGuarantorPhone] = useState('');
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
+
+  useEffect(() => {
+    if (formData.guarantorInvitation?.status === 'invited') {
+      setGuarantorMode('invite');
+      if (formData.guarantorInvitation.guarantorName && !inviteGuarantorName) {
+        setInviteGuarantorName(formData.guarantorInvitation.guarantorName);
+      }
+      if (formData.guarantorInvitation.guarantorEmail && !inviteGuarantorEmail) {
+        setInviteGuarantorEmail(formData.guarantorInvitation.guarantorEmail);
+      }
+    }
+  }, [formData.guarantorInvitation]);
+
+  const getGuarantorDirectLink = () => {
+    const tenantName = `${formData.identity.firstName} ${formData.identity.lastName}`.trim() || user?.name || 'Applicant';
+    const tenantEmail = formData.identity.email.trim() || user?.email || '';
+    const token = formData.guarantorInvitation?.token || `inv_${Date.now()}`;
+    return `${window.location.origin}/guarantor-reference?token=${encodeURIComponent(token)}&tenantId=${encodeURIComponent(user?.id || 'general')}&tenantEmail=${encodeURIComponent(tenantEmail)}&tenantName=${encodeURIComponent(tenantName)}`;
+  };
+
+  const handleCopyGuarantorLink = () => {
+    const link = getGuarantorDirectLink();
+    navigator.clipboard.writeText(link).then(() => {
+      setInviteCopied(true);
+      toast.success('Guarantor link copied to clipboard!');
+      setTimeout(() => setInviteCopied(false), 2500);
+    });
+  };
+
+  const handleSendGuarantorInvite = async () => {
+    const email = inviteGuarantorEmail.trim() || formData.guarantor.email.trim();
+    const name = inviteGuarantorName.trim() || `${formData.guarantor.firstName} ${formData.guarantor.lastName}`.trim();
+
+    if (!email) {
+      toast.error('Please enter the guarantor\'s email address.');
+      return;
+    }
+
+    setIsSendingInvite(true);
+    try {
+      const tenantName = `${formData.identity.firstName} ${formData.identity.lastName}`.trim() || user?.name || 'Applicant';
+      const tenantEmail = formData.identity.email.trim() || user?.email || '';
+
+      const res = await firestoreService.inviteGuarantor(user?.id || 'general', {
+        guarantorName: name || 'Guarantor',
+        guarantorEmail: email,
+        guarantorPhone: inviteGuarantorPhone.trim(),
+        message: inviteMessage.trim(),
+        tenantName,
+        tenantEmail
+      });
+
+      if (res.success) {
+        toast.success(res.message || 'Invitation sent to guarantor successfully!');
+        const updatedInvitation: GuarantorInvitation = {
+          token: (res as any).token || `inv_${Date.now()}`,
+          guarantorName: name || 'Guarantor',
+          guarantorEmail: email,
+          guarantorPhone: inviteGuarantorPhone.trim(),
+          message: inviteMessage.trim(),
+          status: 'invited',
+          invitedAt: new Date().toISOString()
+        };
+
+        updateFormData('guarantorInvitation', updatedInvitation);
+        if (!formData.guarantor.email) {
+          updateFormData('guarantor', { email });
+        }
+      } else {
+        toast.error(res.error || 'Failed to send invitation.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error sending invitation.');
+    } finally {
+      setIsSendingInvite(false);
+    }
+  };
+
   // Calculate step status based on current form data
   useEffect(() => {
     const newStatus = {
@@ -400,9 +511,15 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
       }
 
       case 'guarantor': {
+        if (formData.guarantorInvitation?.status === 'invited') {
+          return 'partial';
+        }
+        if (formData.guarantorInvitation?.status === 'completed' || data.verifiedViaLink) {
+          return 'complete';
+        }
         const hasAnyData = Object.values(data).some(value => !!value && value !== null && value !== '');
         if (hasAnyData) {
-          const hasAllRequiredFields = data.firstName && data.lastName && data.email && data.phoneNumber && data.address;
+          const hasAllRequiredFields = data.firstName && data.lastName && data.email;
           const hasRequiredDocument = data.identityDocument?.name && (data.identityDocument?.url || data.identityDocument?.dataUrl);
           if (hasAllRequiredFields && hasRequiredDocument) return 'complete';
           return 'partial';
@@ -596,6 +713,371 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
       }));
     }
     toast.success('AI Extracted document details populated!');
+  };
+
+  const renderGuarantorStep = () => {
+    const isGuarantorVerified = formData.guarantorInvitation?.status === 'completed' || !!formData.guarantor.verifiedViaLink;
+    const isGuarantorInvited = formData.guarantorInvitation?.status === 'invited';
+    const directLink = getGuarantorDirectLink();
+
+    return (
+      <div className="relative">
+        <QuickFillBanner onDataExtracted={handleAIDataExtracted} />
+        
+        <div className="mb-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800">5. Guarantor Details</h2>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              Optional
+            </span>
+            {isGuarantorVerified && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" /> Verified
+              </span>
+            )}
+            {isGuarantorInvited && !isGuarantorVerified && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 flex items-center gap-1">
+                <Clock className="w-3 h-3" /> Invite Pending
+              </span>
+            )}
+          </div>
+          <p className="text-xs sm:text-sm text-gray-500 mt-1">
+            Skip this section if you do not require a guarantor, fill details manually, or invite your guarantor to complete their own verification.
+          </p>
+        </div>
+
+        {/* Segmented Mode Toggle */}
+        <div className="flex bg-gray-100 p-1 rounded-xl mb-5 border border-gray-200 w-full sm:w-auto self-start">
+          <button
+            type="button"
+            onClick={() => setGuarantorMode('manual')}
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+              guarantorMode === 'manual'
+                ? 'bg-white text-[#136C9E] shadow-xs'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <User className="w-4 h-4" />
+            Fill in Manually
+          </button>
+          <button
+            type="button"
+            onClick={() => setGuarantorMode('invite')}
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer relative ${
+              guarantorMode === 'invite'
+                ? 'bg-white text-[#136C9E] shadow-xs'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Mail className="w-4 h-4" />
+            Send Email Invite / Share Link
+            {isGuarantorInvited && !isGuarantorVerified && (
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            )}
+            {isGuarantorVerified && (
+              <span className="w-2 h-2 rounded-full bg-green-500" />
+            )}
+          </button>
+        </div>
+
+        {guarantorMode === 'manual' ? (
+          <div className="space-y-4">
+            {isGuarantorVerified && (
+              <div className="p-3.5 rounded-xl bg-green-50 border border-green-200 text-xs text-green-800 flex items-center gap-2.5">
+                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                <span>Details have been submitted and verified directly by your guarantor. You can review or adjust fields below.</span>
+              </div>
+            )}
+
+            <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor First Name</label>
+                <input
+                  type="text"
+                  value={formData.guarantor.firstName}
+                  onChange={(e) => updateFormData('guarantor', { firstName: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="First name"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Last Name</label>
+                <input
+                  type="text"
+                  value={formData.guarantor.lastName}
+                  onChange={(e) => updateFormData('guarantor', { lastName: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="Last name"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Email</label>
+                <input
+                  type="email"
+                  value={formData.guarantor.email}
+                  onChange={(e) => updateFormData('guarantor', { email: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="guarantor@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Phone</label>
+                <input
+                  type="tel"
+                  value={formData.guarantor.phoneNumber}
+                  onChange={(e) => updateFormData('guarantor', { phoneNumber: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="07123 456789"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Address</label>
+                <input
+                  type="text"
+                  value={formData.guarantor.address}
+                  onChange={(e) => updateFormData('guarantor', { address: e.target.value })}
+                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                  placeholder="Guarantor full address"
+                />
+              </div>
+            </div>
+            <GuarantorUpload updateFormData={updateFormData} formData={formData} />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {isGuarantorVerified && (
+              <div className="bg-white rounded-2xl p-6 border border-green-200 shadow-sm">
+                <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+                  <div className="w-10 h-10 rounded-xl bg-green-100 text-green-700 flex items-center justify-center">
+                    <CheckCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-base">Guarantor Verification Complete</h3>
+                    <p className="text-xs text-gray-500">Submitted by your guarantor via secure link</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-gray-50 p-4 rounded-xl mb-4">
+                  <div>
+                    <span className="text-gray-400 block font-medium">Guarantor Name</span>
+                    <span className="font-bold text-gray-800">{formData.guarantor.firstName} {formData.guarantor.lastName}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block font-medium">Email Address</span>
+                    <span className="font-bold text-gray-800">{formData.guarantor.email}</span>
+                  </div>
+                  {formData.guarantor.phoneNumber && (
+                    <div>
+                      <span className="text-gray-400 block font-medium">Phone</span>
+                      <span className="font-bold text-gray-800">{formData.guarantor.phoneNumber}</span>
+                    </div>
+                  )}
+                  {formData.guarantor.employmentStatus && (
+                    <div>
+                      <span className="text-gray-400 block font-medium">Employment / Income</span>
+                      <span className="font-bold text-gray-800">
+                        {formData.guarantor.employmentStatus}
+                        {formData.guarantor.annualIncome ? ' · £' + formData.guarantor.annualIncome + '/yr' : ''}
+                      </span>
+                    </div>
+                  )}
+                  {formData.guarantor.address && (
+                    <div className="sm:col-span-2">
+                      <span className="text-gray-400 block font-medium">Address</span>
+                      <span className="font-bold text-gray-800">{formData.guarantor.address}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGuarantorMode('manual')}
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    View or Edit Manually
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Send a new invitation? This will update the pending invitation state.')) {
+                        updateFormData('guarantorInvitation', { status: 'cancelled' });
+                      }
+                    }}
+                    className="px-4 py-2 rounded-lg text-xs font-semibold text-blue-600 hover:bg-blue-50 transition-colors"
+                  >
+                    Invite Different Guarantor
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {isGuarantorInvited && !isGuarantorVerified && (
+              <div className="bg-white rounded-2xl p-6 border border-amber-200 shadow-sm">
+                <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                    <Clock className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-base">Guarantor Invitation Dispatched</h3>
+                    <p className="text-xs text-gray-500">
+                      Invite sent to <strong className="text-gray-800">{formData.guarantorInvitation?.guarantorEmail || formData.guarantor.email}</strong>
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-600 mb-4 leading-relaxed">
+                  Your guarantor will receive an email containing a secure link to complete their personal details, employment, annual income, and upload their ID document. Once submitted, this section will automatically update to <strong>Complete</strong>.
+                </p>
+
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Direct Invitation Link</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={directLink}
+                      className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-xs text-gray-600 select-all font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyGuarantorLink}
+                      className="px-3.5 py-2 bg-[#136C9E] hover:bg-[#0D4E73] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      {inviteCopied ? <Check className="w-3.5 h-3.5 text-green-300" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{inviteCopied ? 'Copied' : 'Copy Link'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={handleSendGuarantorInvite}
+                    disabled={isSendingInvite}
+                    className="px-4 py-2 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSendingInvite ? 'animate-spin' : ''}`} />
+                    <span>{isSendingInvite ? 'Resending...' : 'Resend Email Invitation'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setGuarantorMode('manual')}
+                    className="text-xs font-semibold text-gray-500 hover:text-gray-800 transition-colors"
+                  >
+                    Switch to Manual Fill
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!isGuarantorInvited && !isGuarantorVerified && (
+              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-[#136C9E] flex items-center justify-center">
+                    <Mail className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-base">Invite Guarantor via Email</h3>
+                    <p className="text-xs text-gray-500">Your guarantor can securely provide their details and upload their ID</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Name</label>
+                      <input
+                        type="text"
+                        value={inviteGuarantorName || `${formData.guarantor.firstName} ${formData.guarantor.lastName}`.trim()}
+                        onChange={(e) => setInviteGuarantorName(e.target.value)}
+                        placeholder="e.g. Sarah Smith"
+                        className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        Guarantor Email <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        value={inviteGuarantorEmail || formData.guarantor.email}
+                        onChange={(e) => {
+                          setInviteGuarantorEmail(e.target.value);
+                          updateFormData('guarantor', { email: e.target.value });
+                        }}
+                        required
+                        placeholder="guarantor@example.com"
+                        className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Phone (Optional)</label>
+                      <input
+                        type="tel"
+                        value={inviteGuarantorPhone || formData.guarantor.phoneNumber}
+                        onChange={(e) => setInviteGuarantorPhone(e.target.value)}
+                        placeholder="07123 456789"
+                        className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Personal Note (Optional)</label>
+                      <input
+                        type="text"
+                        value={inviteMessage}
+                        onChange={(e) => setInviteMessage(e.target.value)}
+                        placeholder="e.g. For our flat application on High Street"
+                        className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSendGuarantorInvite}
+                    disabled={isSendingInvite}
+                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[#DC5F12] hover:bg-[#C45210] text-white font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                  >
+                    {isSendingInvite ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Sending Invitation...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Send Email Invitation</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyGuarantorLink}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {inviteCopied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-500" />}
+                    <span>{inviteCopied ? 'Link Copied!' : 'Copy Direct Link'}</span>
+                  </button>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs text-gray-500">
+                  <ShieldCheck className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <span>The guarantor will receive an email with instructions. Once submitted, your passport updates automatically.</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const renderFormContent = () => {
@@ -837,77 +1319,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
             <FinancialUpload updateFormData={updateFormData} formData={formData} />
           </div>
         );
-
       case 5:
-        return (
-          <div className="relative">
-            <QuickFillBanner onDataExtracted={handleAIDataExtracted} />
-            <div className="mb-4">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-800">5. Guarantor Details</h2>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  Optional
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                Skip this section if you do not require a guarantor.
-              </p>
-            </div>
-            <div className="bg-white rounded-xl p-4 sm:p-6 mb-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor First Name</label>
-                <input
-                  type="text"
-                  value={formData.guarantor.firstName}
-                  onChange={(e) => updateFormData('guarantor', { firstName: e.target.value })}
-                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
-                  placeholder="First name"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Last Name</label>
-                <input
-                  type="text"
-                  value={formData.guarantor.lastName}
-                  onChange={(e) => updateFormData('guarantor', { lastName: e.target.value })}
-                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
-                  placeholder="Last name"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Email</label>
-                <input
-                  type="email"
-                  value={formData.guarantor.email}
-                  onChange={(e) => updateFormData('guarantor', { email: e.target.value })}
-                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
-                  placeholder="guarantor@example.com"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Phone</label>
-                <input
-                  type="tel"
-                  value={formData.guarantor.phoneNumber}
-                  onChange={(e) => updateFormData('guarantor', { phoneNumber: e.target.value })}
-                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
-                  placeholder="07123 456789"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor Address</label>
-                <input
-                  type="text"
-                  value={formData.guarantor.address}
-                  onChange={(e) => updateFormData('guarantor', { address: e.target.value })}
-                  className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#136C9E]"
-                  placeholder="Guarantor full address"
-                />
-              </div>
-            </div>
-            <GuarantorUpload updateFormData={updateFormData} formData={formData} />
-          </div>
-        );
+        return renderGuarantorStep();
 
       default:
         return null;

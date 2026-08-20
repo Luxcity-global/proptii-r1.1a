@@ -31,4 +31,34 @@ export class RefereeGuarantorController {
   }) {
     return this.service.sendReferencingEmail(body);
   }
+
+  /** POST /api/referencing/invite-guarantor — send guarantor invite and notify tenant */
+  @Post('referencing/invite-guarantor')
+  @UseGuards(FirebaseAuthGuard)
+  async inviteGuarantor(
+    @Req() req: any,
+    @Body() body: {
+      guarantorName: string;
+      guarantorEmail: string;
+      guarantorPhone?: string;
+      message?: string;
+      tenantName?: string;
+      tenantEmail?: string;
+    }
+  ) {
+    const tenantId = req.user?.uid || req.user?.id || 'anonymous';
+    const tenantEmail = body.tenantEmail || req.user?.email || '';
+    const tenantName = body.tenantName || req.user?.name || 'Applicant';
+
+    return this.service.inviteGuarantor({
+      tenantId,
+      tenantName,
+      tenantEmail,
+      guarantorName: body.guarantorName,
+      guarantorEmail: body.guarantorEmail,
+      guarantorPhone: body.guarantorPhone,
+      message: body.message,
+      frontendUrl: (body as any).frontendUrl,
+    });
+  }
 }

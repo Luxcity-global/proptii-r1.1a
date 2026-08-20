@@ -153,11 +153,11 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     if (formData.identity?.identityProof) {
       docs.push({
         id: 'ref-identity',
-        name: `Identity Document - ${formData.identity.identityProof.name}`,
+        name: `Identity Document - ${formData.identity.identityProof.name || 'Document'}`,
         type: 'id-document',
         dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
         status: 'valid',
-        downloadUrl: formData.identity.identityProof.dataUrl,
+        downloadUrl: formData.identity.identityProof.dataUrl || formData.identity.identityProof.url,
         fileSize: formData.identity.identityProof.size,
         fileType: formData.identity.identityProof.type
       });
@@ -167,11 +167,11 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     if (formData.employment?.proofDocument) {
       docs.push({
         id: 'ref-employment',
-        name: `Employment Proof - ${formData.employment.proofDocument.name}`,
+        name: `Employment Proof - ${formData.employment.proofDocument.name || 'Document'}`,
         type: 'other',
         dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
         status: 'valid',
-        downloadUrl: formData.employment.proofDocument.dataUrl,
+        downloadUrl: formData.employment.proofDocument.dataUrl || formData.employment.proofDocument.url,
         fileSize: formData.employment.proofDocument.size,
         fileType: formData.employment.proofDocument.type
       });
@@ -181,11 +181,11 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     if (formData.residential?.proofDocument) {
       docs.push({
         id: 'ref-residential',
-        name: `Proof of Address - ${formData.residential.proofDocument.name}`,
+        name: `Proof of Address - ${formData.residential.proofDocument.name || 'Document'}`,
         type: 'other',
         dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
         status: 'valid',
-        downloadUrl: formData.residential.proofDocument.dataUrl,
+        downloadUrl: formData.residential.proofDocument.dataUrl || formData.residential.proofDocument.url,
         fileSize: formData.residential.proofDocument.size,
         fileType: formData.residential.proofDocument.type
       });
@@ -195,11 +195,11 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     if (formData.financial?.proofOfIncomeDocument) {
       docs.push({
         id: 'ref-financial',
-        name: `Proof of Income - ${formData.financial.proofOfIncomeDocument.name}`,
+        name: `Proof of Income - ${formData.financial.proofOfIncomeDocument.name || 'Document'}`,
         type: 'other',
         dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
         status: 'valid',
-        downloadUrl: formData.financial.proofOfIncomeDocument.dataUrl,
+        downloadUrl: formData.financial.proofOfIncomeDocument.dataUrl || formData.financial.proofOfIncomeDocument.url,
         fileSize: formData.financial.proofOfIncomeDocument.size,
         fileType: formData.financial.proofOfIncomeDocument.type
       });
@@ -209,11 +209,11 @@ export function TenantDetails({ tenant, onBack, onEdit, onTenantUpdate }: Tenant
     if (formData.guarantor?.identityDocument) {
       docs.push({
         id: 'ref-guarantor',
-        name: `Guarantor ID - ${formData.guarantor.identityDocument.name}`,
+        name: `Guarantor ID - ${formData.guarantor.identityDocument.name || 'Document'}`,
         type: 'other',
         dateUploaded: referencingData.createdAt?.toDate?.() || new Date(),
         status: 'valid',
-        downloadUrl: formData.guarantor.identityDocument.dataUrl,
+        downloadUrl: formData.guarantor.identityDocument.dataUrl || formData.guarantor.identityDocument.url,
         fileSize: formData.guarantor.identityDocument.size,
         fileType: formData.guarantor.identityDocument.type
       });

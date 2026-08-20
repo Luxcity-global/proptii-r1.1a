@@ -160,7 +160,14 @@ const TenantReferencing: React.FC = () => {
       formData.residential?.proofDocument,
       formData.financial?.proofOfIncomeDocument,
       formData.guarantor?.identityDocument
-    ].filter(doc => doc && doc.name).length;
+    ].filter(doc => {
+      if (!doc) return false;
+      if (typeof doc === 'string') return doc.trim().length > 0;
+      if (typeof doc === 'object') {
+        return !!(doc.name || doc.url || doc.dataUrl || doc.downloadUrl || doc.storagePath);
+      }
+      return false;
+    }).length;
 
     return {
       overall: Math.round((completedSteps / totalSteps) * 100),
@@ -183,7 +190,18 @@ const TenantReferencing: React.FC = () => {
     const sectionData = formData[section];
     if (!sectionData) return false;
     const document = (sectionData as any)[documentField];
-    return document && document.name && document.dataUrl;
+    if (!document) return false;
+    if (typeof document === 'string') return document.trim().length > 0;
+    if (typeof document === 'object') {
+      return !!(
+        document.url || 
+        document.dataUrl || 
+        document.downloadUrl || 
+        document.storagePath || 
+        document.name
+      );
+    }
+    return false;
   };
 
   const progress = calculateProgress();
@@ -582,9 +600,21 @@ const TenantReferencing: React.FC = () => {
               title: "Guarantor",
               icon: <Users className="w-5 h-5 text-amber-600" />,
               progress: "5",
-              status: stepStatus[5] === 'complete' ? "Complete" : "Optional",
+              status: stepStatus[5] === 'complete' 
+                ? "Complete" 
+                : (formData as any)?.guarantorInvitation?.status === 'invited'
+                  ? "Invited (Pending)"
+                  : "Optional",
               step: 5,
-              items: [
+              items: ((formData as any)?.guarantor?.verifiedViaLink || (formData as any)?.guarantorInvitation?.status === 'completed') ? [
+                { name: "Guarantor Details", description: `${(formData as any)?.guarantor?.firstName || ''} ${(formData as any)?.guarantor?.lastName || ''} (${(formData as any)?.guarantor?.email || ''})`, status: "complete" },
+                { name: "Employment & Income", description: `${(formData as any)?.guarantor?.employmentStatus || 'Provided'} ${(formData as any)?.guarantor?.annualIncome ? `· £${(formData as any)?.guarantor?.annualIncome}/yr` : ''}`, status: "complete" },
+                { name: "Guarantor ID & Declaration", description: "Verified by guarantor via direct link", status: "complete" }
+              ] : (formData as any)?.guarantorInvitation?.status === 'invited' ? [
+                { name: "Guarantor Invitation", description: `Invite sent to ${(formData as any)?.guarantorInvitation?.guarantorEmail || (formData as any)?.guarantor?.email || 'Guarantor'}`, status: "incomplete" },
+                { name: "Guarantor Details", description: "Awaiting submission from guarantor", status: "incomplete" },
+                { name: "Guarantor ID Upload", description: "Awaiting document upload", status: "incomplete" }
+              ] : [
                 { name: "Guarantor Name", description: "Optional guarantor info", status: isFieldComplete('guarantor', 'firstName') ? "complete" : "incomplete" },
                 { name: "Guarantor Contact", description: "Email and phone", status: isFieldComplete('guarantor', 'email') ? "complete" : "incomplete" },
                 { name: "Guarantor ID Upload", description: "Guarantor ID document", status: isDocumentUploaded('guarantor', 'identityDocument') ? "complete" : "incomplete" }
@@ -610,7 +640,9 @@ const TenantReferencing: React.FC = () => {
                   <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                     card.status === "Complete" 
                       ? "bg-green-100 text-green-700" 
-                      : "bg-orange-100 text-orange-700"
+                      : card.status === "Invited (Pending)"
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-orange-100 text-orange-700"
                   }`}>
                     {card.status}
                   </span>

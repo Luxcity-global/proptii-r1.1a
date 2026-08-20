@@ -323,6 +323,14 @@ const ReferencingView: React.FC = () => {
           <Field label="Email"   value={guar.email} />
           <Field label="Phone"   value={guar.phoneNumber} />
           <Field label="Address" value={guar.address} />
+          {guar.employmentStatus && <Field label="Employment" value={guar.employmentStatus} />}
+          {guar.annualIncome && <Field label="Annual Income" value={`£${guar.annualIncome}`} />}
+          {guar.relationship && <Field label="Relationship" value={guar.relationship} />}
+          {guar.verifiedViaLink && (
+            <div className="col-span-2 flex items-center gap-2 text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2">
+              <CheckCircle className="w-3.5 h-3.5" /> Verified by Guarantor via Direct Link
+            </div>
+          )}
           {guar.identityDocument === '[document uploaded]' && (
             <div className="col-span-2 flex items-center gap-2 text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2">
               <CheckCircle className="w-3.5 h-3.5" /> Guarantor ID uploaded

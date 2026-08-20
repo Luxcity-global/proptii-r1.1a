@@ -61,6 +61,7 @@ const ComingSoon          = lazy(() => import('./pages/ComingSoon'));
 const GuestThreadPage     = lazy(() => import('./pages/GuestThreadPage'));
 const ClaimReferencing     = lazy(() => import('./pages/ClaimReferencing'));
 const ReferencingView      = lazy(() => import('./pages/ReferencingView'));
+const GuarantorReferencePage = lazy(() => import('./pages/GuarantorReferencePage'));
 const RoleSelect          = lazy(() => import('./pages/RoleSelect'));
 // Dashboard sections
 const SavedProperties     = lazy(() => import('./components/dashboard/sections/SavedProperties-new'));
@@ -140,6 +141,8 @@ export const App: React.FC = () => {
                 <Route path="/thread/:token" element={<GuestThreadPage />} />
                 <Route path="/referencing/view/:viewToken" element={<ReferencingView />} />
                 <Route path="/claim-referencing" element={<ClaimReferencing />} />
+                <Route path="/guarantor-reference" element={<GuarantorReferencePage />} />
+                <Route path="/guarantor-form" element={<GuarantorReferencePage />} />
                 <Route path="/signup" element={<SignupModalPage />} />
                 <Route path="/signup/create-account" element={<CreateAccountPage />} />
                 <Route path="/signup/welcome" element={<SignupWelcomePage />} />
@@ -207,6 +210,8 @@ export const App: React.FC = () => {
                 <Route path="/landlord-demo" element={<LandlordDemo />} />
 
                 <Route path="/referencing" element={<Referencing />} />
+                <Route path="/guarantor-reference" element={<GuarantorReferencePage />} />
+                <Route path="/guarantor-form" element={<GuarantorReferencePage />} />
 
                 <Route path="/contracts" element={<ContractsPage />} />
 

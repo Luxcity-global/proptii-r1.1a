@@ -132,15 +132,15 @@ const DashboardHome: React.FC = () => {
           const sectionData = (formData as Record<string, any>)[section];
           if (sectionData && sectionData[field]) {
             const document = sectionData[field];
-            if (document && document.name && document.dataUrl) {
+            if (document && (document.name || document.url || document.dataUrl) && (document.dataUrl || document.url)) {
               referencingFilesList.push({
                 id: Date.now() + Math.random(), // Generate unique ID
-                name: document.name,
+                name: document.name || `${category} Document`,
                 category,
                 type: document.type || 'application/pdf',
                 size: document.size || 0,
                 uploadDate: new Date(document.lastModified || Date.now()).toLocaleDateString(),
-                url: document.dataUrl // Use the actual dataUrl from Firestore
+                url: document.dataUrl || document.url // Use dataUrl or Firebase Storage url
               });
             }
           }
