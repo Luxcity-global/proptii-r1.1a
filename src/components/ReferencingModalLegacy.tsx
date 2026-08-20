@@ -19,7 +19,13 @@ import {
   ShieldCheck,
   Clock,
   Sparkles,
-  RefreshCw
+  RefreshCw,
+  Lock,
+  FileCheck,
+  Phone,
+  MapPin,
+  RotateCcw,
+  FileText
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import FileUpload from "./Uploads/FileUpload";
@@ -738,11 +744,192 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     toast.success('AI Extracted document details populated!');
   };
 
+  const handleResetGuarantor = () => {
+    if (window.confirm('Are you sure you want to remove this verified guarantor and invite someone else? This will clear the verified guarantor status.')) {
+      updateFormData('guarantor', {
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        address: '',
+        employmentStatus: '',
+        annualIncome: '',
+        relationship: '',
+        verifiedViaLink: false,
+        identityDocument: null,
+      });
+      updateFormData('guarantorInvitation', {
+        token: '',
+        status: 'cancelled',
+        guarantorName: '',
+        guarantorEmail: '',
+        guarantorPhone: '',
+      });
+      setInviteGuarantorEmail('');
+      setInviteGuarantorName('');
+      setInviteGuarantorPhone('');
+      setGuarantorMode('invite');
+      toast.success('Guarantor cleared. You can now invite a new guarantor.');
+    }
+  };
+
   const renderGuarantorStep = () => {
     const isGuarantorVerified = formData.guarantorInvitation?.status === 'completed' || !!formData.guarantor.verifiedViaLink;
     const isGuarantorInvited = formData.guarantorInvitation?.status === 'invited';
     const directLink = getGuarantorDirectLink();
 
+    // ── 1. Verified Guarantor: STRICT READ-ONLY MODE (Cannot be edited by tenant) ──
+    if (isGuarantorVerified) {
+      const g = formData.guarantor;
+      const docUrl = g.identityDocument?.url || (typeof g.identityDocument === 'string' ? g.identityDocument : null);
+      const docName = g.identityDocument?.name || 'Guarantor_ID_Document.pdf';
+
+      return (
+        <div className="space-y-5">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-green-50 rounded-2xl p-5 sm:p-6 border border-emerald-200 shadow-xs">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center space-x-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 shadow-2xs">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-gray-900 text-base sm:text-lg">
+                      Guarantor Verified &amp; Signed
+                    </h3>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <Lock className="w-3 h-3 text-emerald-600" />
+                      Locked
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-600 mt-0.5 leading-relaxed">
+                    Completed and legally verified directly by <strong>{g.firstName} {g.lastName}</strong> via secure invite link.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3.5 border-t border-emerald-200/70 flex items-center gap-2 text-xs text-emerald-800 font-medium">
+              <Lock className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <span>This section is non-editable. To maintain referencing integrity, guarantor verification details cannot be edited by the applicant.</span>
+            </div>
+          </div>
+
+          {/* Read-Only Verified Information Cards */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden divide-y divide-gray-100">
+            {/* 1. Identity & Contact */}
+            <div className="p-5">
+              <div className="flex items-center space-x-2.5 mb-3 text-gray-800 font-bold text-sm">
+                <User className="w-4 h-4 text-[#136C9E]" />
+                <h4>Guarantor Personal Details</h4>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <span className="text-gray-400 block font-medium">Full Legal Name</span>
+                  <span className="font-bold text-gray-800 text-sm">{g.firstName} {g.lastName}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block font-medium">Email Address</span>
+                  <span className="font-bold text-gray-800 flex items-center gap-1.5 text-sm">
+                    {g.email}
+                    <Lock className="w-3 h-3 text-gray-400" title="Verified email identifier" />
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block font-medium">Phone Number</span>
+                  <span className="font-semibold text-gray-800">{g.phoneNumber || 'Provided via link'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block font-medium">Relationship to Applicant</span>
+                  <span className="font-semibold text-gray-800">{g.relationship || 'Guarantor'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Residential & Employment */}
+            <div className="p-5">
+              <div className="flex items-center space-x-2.5 mb-3 text-gray-800 font-bold text-sm">
+                <Briefcase className="w-4 h-4 text-[#136C9E]" />
+                <h4>Address &amp; Financial Verification</h4>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="sm:col-span-2">
+                  <span className="text-gray-400 block font-medium">Residential Address</span>
+                  <span className="font-semibold text-gray-800">{g.address || 'Address verified by guarantor'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block font-medium">Employment Status</span>
+                  <span className="font-semibold text-gray-800">{g.employmentStatus || 'Employed'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block font-medium">Declared Annual Income</span>
+                  <span className="font-bold text-[#136C9E] text-sm">
+                    {g.annualIncome ? `£${g.annualIncome}/year` : 'Provided'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Proof of ID Document */}
+            <div className="p-5">
+              <div className="flex items-center space-x-2.5 mb-3 text-gray-800 font-bold text-sm">
+                <FileCheck className="w-4 h-4 text-emerald-600" />
+                <h4>Proof of Identification Document</h4>
+              </div>
+              {docUrl ? (
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-gray-50 border border-gray-200">
+                  <div className="flex items-center space-x-3 truncate">
+                    <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                      <FileCheck className="w-5 h-5" />
+                    </div>
+                    <div className="truncate">
+                      <p className="text-xs font-bold text-gray-800 truncate">{docName}</p>
+                      <p className="text-[11px] text-gray-400">Guarantor Passport / Driving Licence</p>
+                    </div>
+                  </div>
+                  <a
+                    href={docUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 text-[#136C9E] hover:bg-blue-50 text-xs font-semibold flex items-center gap-1.5 transition-colors flex-shrink-0 shadow-2xs"
+                  >
+                    <span>View Document</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 p-3 rounded-xl">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span>Identification verified electronically during submission.</span>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Declaration & Actions */}
+            <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gray-50/50">
+              <div>
+                <span className="text-gray-400 block text-[11px] font-medium uppercase tracking-wider">Digital Declaration</span>
+                <p className="text-xs font-serif italic text-gray-800 mt-0.5">
+                  Signed electronically by {g.firstName} {g.lastName}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleResetGuarantor}
+                className="text-xs font-semibold text-gray-500 hover:text-red-600 hover:bg-red-50 px-3.5 py-2 rounded-xl border border-gray-200 hover:border-red-200 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Remove &amp; Invite Different Guarantor</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── 2. Unverified Guarantor: Manual or Invite Mode ──
     return (
       <div className="relative">
         <QuickFillBanner onDataExtracted={handleAIDataExtracted} />
@@ -753,12 +940,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
             <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
               Optional
             </span>
-            {isGuarantorVerified && (
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 flex items-center gap-1">
-                <CheckCircle className="w-3 h-3" /> Verified
-              </span>
-            )}
-            {isGuarantorInvited && !isGuarantorVerified && (
+            {isGuarantorInvited && (
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 flex items-center gap-1">
                 <Clock className="w-3 h-3" /> Invite Pending
               </span>
@@ -794,24 +976,14 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
           >
             <Mail className="w-4 h-4" />
             Send Email Invite / Share Link
-            {isGuarantorInvited && !isGuarantorVerified && (
+            {isGuarantorInvited && (
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            )}
-            {isGuarantorVerified && (
-              <span className="w-2 h-2 rounded-full bg-green-500" />
             )}
           </button>
         </div>
 
         {guarantorMode === 'manual' ? (
           <div className="space-y-4">
-            {isGuarantorVerified && (
-              <div className="p-3.5 rounded-xl bg-green-50 border border-green-200 text-xs text-green-800 flex items-center gap-2.5">
-                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
-                <span>Details have been submitted and verified directly by your guarantor. You can review or adjust fields below.</span>
-              </div>
-            )}
-
             <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Guarantor First Name</label>
@@ -868,74 +1040,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
           </div>
         ) : (
           <div className="space-y-4">
-            {isGuarantorVerified && (
-              <div className="bg-white rounded-2xl p-6 border border-green-200 shadow-sm">
-                <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
-                  <div className="w-10 h-10 rounded-xl bg-green-100 text-green-700 flex items-center justify-center">
-                    <CheckCircle className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900 text-base">Guarantor Verification Complete</h3>
-                    <p className="text-xs text-gray-500">Submitted by your guarantor via secure link</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-gray-50 p-4 rounded-xl mb-4">
-                  <div>
-                    <span className="text-gray-400 block font-medium">Guarantor Name</span>
-                    <span className="font-bold text-gray-800">{formData.guarantor.firstName} {formData.guarantor.lastName}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400 block font-medium">Email Address</span>
-                    <span className="font-bold text-gray-800">{formData.guarantor.email}</span>
-                  </div>
-                  {formData.guarantor.phoneNumber && (
-                    <div>
-                      <span className="text-gray-400 block font-medium">Phone</span>
-                      <span className="font-bold text-gray-800">{formData.guarantor.phoneNumber}</span>
-                    </div>
-                  )}
-                  {formData.guarantor.employmentStatus && (
-                    <div>
-                      <span className="text-gray-400 block font-medium">Employment / Income</span>
-                      <span className="font-bold text-gray-800">
-                        {formData.guarantor.employmentStatus}
-                        {formData.guarantor.annualIncome ? ' · £' + formData.guarantor.annualIncome + '/yr' : ''}
-                      </span>
-                    </div>
-                  )}
-                  {formData.guarantor.address && (
-                    <div className="sm:col-span-2">
-                      <span className="text-gray-400 block font-medium">Address</span>
-                      <span className="font-bold text-gray-800">{formData.guarantor.address}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setGuarantorMode('manual')}
-                    className="px-4 py-2 rounded-lg border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    View or Edit Manually
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm('Send a new invitation? This will update the pending invitation state.')) {
-                        updateFormData('guarantorInvitation', { status: 'cancelled' });
-                      }
-                    }}
-                    className="px-4 py-2 rounded-lg text-xs font-semibold text-blue-600 hover:bg-blue-50 transition-colors"
-                  >
-                    Invite Different Guarantor
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {isGuarantorInvited && !isGuarantorVerified && (
+            {isGuarantorInvited && (
               <div className="bg-white rounded-2xl p-6 border border-amber-200 shadow-sm">
                 <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
                   <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
@@ -995,7 +1100,7 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
               </div>
             )}
 
-            {!isGuarantorInvited && !isGuarantorVerified && (
+            {!isGuarantorInvited && (
               <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
                 <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
                   <div className="w-10 h-10 rounded-xl bg-blue-100 text-[#136C9E] flex items-center justify-center">

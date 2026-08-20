@@ -702,7 +702,7 @@ const TenantReferencing: React.FC = () => {
                     }}
                     className="text-xs font-semibold text-[#136C9E] group-hover:text-white px-3 py-1.5 rounded-lg border border-blue-200 group-hover:bg-[#136C9E] group-hover:border-[#136C9E] transition-all flex items-center gap-1 shadow-2xs"
                   >
-                    <span>{card.status === "Complete" ? "Edit" : "Fill"}</span>
+                    <span>{card.status === "Complete" ? (card.step === 5 && ((formData as any)?.guarantor?.verifiedViaLink || (formData as any)?.guarantorInvitation?.status === 'completed') ? "View Verified" : "Edit") : "Fill"}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
