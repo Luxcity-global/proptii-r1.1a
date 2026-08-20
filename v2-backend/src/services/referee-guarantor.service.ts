@@ -340,12 +340,19 @@ export class RefereeGuarantorService {
       </div>
     `;
 
+    let emailSent = false;
+    let emailError: string | undefined;
+
     try {
       await sendEmail({ to: guarantorEmail, subject: subjectToGuarantor, html: htmlToGuarantor });
       this.logger.log(`Guarantor invite email sent to ${guarantorEmail}`);
+      emailSent = true;
     } catch (err: any) {
-      this.logger.error(`Failed to send invite email to guarantor: ${err?.message || err}`);
-      return { success: false, error: 'Failed to send email to guarantor' };
+      const errMsg = err?.message || String(err);
+      this.logger.error(`Failed to send invite email to guarantor: ${errMsg}`);
+      emailError = errMsg.includes('quota') || errMsg.includes('429')
+        ? 'Email provider daily limit reached. Please copy and share the direct link below.'
+        : `Email delivery failed: ${errMsg}`;
     }
 
     // 2. Send confirmation email to Tenant
@@ -380,7 +387,11 @@ export class RefereeGuarantorService {
 
     return {
       success: true,
-      message: `Invitation successfully sent to ${guarantorEmail}`,
+      emailSent,
+      error: emailError,
+      message: emailSent
+        ? `Invitation successfully sent to ${guarantorEmail}`
+        : (emailError || 'Direct link created. Please copy and send it to your guarantor.'),
       formUrl,
       token
     };

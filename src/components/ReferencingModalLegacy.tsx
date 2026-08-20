@@ -347,7 +347,15 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
       });
 
       if (res.success) {
-        toast.success(res.message || 'Invitation sent to guarantor successfully!');
+        if ((res as any).emailSent === false) {
+          toast.success('Guarantor link generated!');
+          if (res.error) {
+            toast(res.error, { icon: 'ℹ️', duration: 6000 });
+          }
+        } else {
+          toast.success(res.message || 'Invitation sent to guarantor successfully!');
+        }
+
         const updatedInvitation: GuarantorInvitation = {
           token: (res as any).token || `inv_${Date.now()}`,
           guarantorName: name || 'Guarantor',

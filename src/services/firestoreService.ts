@@ -439,6 +439,7 @@ class FirestoreService {
    * Submit a guarantor response (publicly callable by guarantor)
    */
   async submitGuarantorResponse(responseData: {
+    token?: string;
     tenantId?: string;
     tenantEmail?: string;
     applicantName?: string;

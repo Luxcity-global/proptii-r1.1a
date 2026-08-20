@@ -169,6 +169,7 @@ export const GuarantorReferencePage: React.FC = () => {
 
     try {
       const responsePayload = {
+        token: token || undefined,
         tenantId,
         tenantEmail,
         applicantName: tenantName,

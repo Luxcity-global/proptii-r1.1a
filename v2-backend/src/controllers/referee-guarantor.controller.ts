@@ -34,7 +34,6 @@ export class RefereeGuarantorController {
 
   /** POST /api/referencing/invite-guarantor — send guarantor invite and notify tenant */
   @Post('referencing/invite-guarantor')
-  @UseGuards(FirebaseAuthGuard)
   async inviteGuarantor(
     @Req() req: any,
     @Body() body: {
@@ -44,9 +43,10 @@ export class RefereeGuarantorController {
       message?: string;
       tenantName?: string;
       tenantEmail?: string;
+      tenantId?: string;
     }
   ) {
-    const tenantId = req.user?.uid || req.user?.id || 'anonymous';
+    const tenantId = req.user?.uid || req.user?.id || body.tenantId || 'anonymous';
     const tenantEmail = body.tenantEmail || req.user?.email || '';
     const tenantName = body.tenantName || req.user?.name || 'Applicant';
 
