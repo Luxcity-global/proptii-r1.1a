@@ -1,10 +1,10 @@
 /** Canonical production search service (property scraper on Render). */
-export const PROD_SEARCH_BACKEND_URL = 'https://proptii-r1-1a-search.onrender.com';
+export const PROD_SEARCH_BACKEND_URL = 'https://proptii-r1-1a-q95f.onrender.com';
 
 const LOCAL_SEARCH_BACKEND_URL = 'http://localhost:3001';
 
 /**
- * Hosts that belong to the main Nest API, not the search scraper.
+ * Hosts that belong to the main Nest API or invalid ports, not the search scraper.
  * Using them for /api/v1/search causes ERR_NAME_NOT_RESOLVED or 404.
  */
 const NON_SEARCH_API_HOST_FRAGMENTS = [
@@ -13,42 +13,17 @@ const NON_SEARCH_API_HOST_FRAGMENTS = [
   'proptii-r1-1a-1.onrender.com',
   'api.proptii.com',
   'api-staging.proptii.com',
+  'localhost:5000',
+  '127.0.0.1:5000',
 ];
 
 const normalizeBackendUrl = (rawUrl: string): string => {
   const trimmed = rawUrl.trim();
   if (!trimmed) {
-    return LOCAL_SEARCH_BACKEND_URL;
+    return PROD_SEARCH_BACKEND_URL;
   }
   const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   return withProtocol.replace(/\/$/, '');
-};
-
-const isLocalBrowserHost = (): boolean => {
-  if (typeof window === 'undefined') {
-    return import.meta.env.DEV;
-  }
-  const hostname = window.location.hostname.toLowerCase();
-  return (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname === '[::1]' ||
-    hostname === '::1'
-  );
-};
-
-const isDeployedProptiiHost = (): boolean => {
-  if (typeof window === 'undefined') {
-    return !import.meta.env.DEV;
-  }
-  const hostname = window.location.hostname.toLowerCase();
-  return (
-    hostname === 'proptii.co' ||
-    hostname.endsWith('.proptii.co') ||
-    hostname === 'proptii.com' ||
-    hostname.endsWith('.proptii.com') ||
-    hostname.includes('onrender.com')
-  );
 };
 
 const isMisconfiguredSearchBackendUrl = (url: string): boolean => {
@@ -71,13 +46,11 @@ export const resolveSearchBackendUrl = (): string => {
     return envUrl;
   }
 
-  if (isDeployedProptiiHost()) {
-    return PROD_SEARCH_BACKEND_URL;
-  }
-
-  if (isLocalBrowserHost()) {
+  // If local search is explicitly requested via VITE_USE_LOCAL_SEARCH=true
+  if (import.meta.env.VITE_USE_LOCAL_SEARCH === 'true') {
     return LOCAL_SEARCH_BACKEND_URL;
   }
 
+  // Default to live Render search service so scraping works seamlessly in all environments
   return PROD_SEARCH_BACKEND_URL;
 };
