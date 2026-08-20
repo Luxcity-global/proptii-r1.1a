@@ -3147,7 +3147,7 @@ export default function App() {
   const inRouter = useInRouterContext();
 
   const content = (
-    <ThemeProvider defaultTheme="light" storageKey="proptii-theme">
+    <ThemeProvider defaultTheme="light" enableSystem={false} forcedTheme="light" attribute="class" storageKey="proptii-theme">
       <TooltipProvider>
         <AppContent />
       </TooltipProvider>

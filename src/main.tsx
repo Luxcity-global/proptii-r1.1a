@@ -8,6 +8,11 @@ import theme from './theme/theme';
 import { ErrorBoundary } from './utils/errorHandler';
 import { Router } from './config/routerConfig';
 
+// Ensure the application sticks strictly to the Proptii light brand theme
+if (typeof document !== 'undefined') {
+  document.documentElement.classList.remove('dark');
+}
+
 // Render the React tree immediately — the page paints before any async work.
 const root = createRoot(document.getElementById('root')!);
 
