@@ -18,7 +18,8 @@ import {
   MapPin,
   Plus,
   ShieldCheck,
-  Edit3
+  Edit3,
+  ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { firestoreService } from '../../../services/firestoreService';
@@ -110,6 +111,7 @@ const TenantReferencing: React.FC = () => {
   const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [referencingStep, setReferencingStep] = useState(1);
+  const [singleSectionOnly, setSingleSectionOnly] = useState(true);
 
   // Load form data and shares from Firestore
   const loadReferencingData = async () => {
@@ -146,37 +148,6 @@ const TenantReferencing: React.FC = () => {
     loadReferencingData();
   }, [user?.id]);
 
-  // Calculate progress statistics across the 5 steps
-  const calculateProgress = () => {
-    if (!formData) return { overall: 0, completed: 0, pending: 5, documents: 0 };
-
-    const steps = [1, 2, 3, 4, 5];
-    const completedSteps = steps.filter(step => stepStatus[step] === 'complete').length;
-    const totalSteps = steps.length;
-    
-    const documents = [
-      formData.identity?.identityProof,
-      formData.employment?.proofDocument,
-      formData.residential?.proofDocument,
-      formData.financial?.proofOfIncomeDocument,
-      formData.guarantor?.identityDocument
-    ].filter(doc => {
-      if (!doc) return false;
-      if (typeof doc === 'string') return doc.trim().length > 0;
-      if (typeof doc === 'object') {
-        return !!(doc.name || doc.url || doc.dataUrl || doc.downloadUrl || doc.storagePath);
-      }
-      return false;
-    }).length;
-
-    return {
-      overall: Math.round((completedSteps / totalSteps) * 100),
-      completed: completedSteps,
-      pending: totalSteps - completedSteps,
-      documents
-    };
-  };
-
   const isFieldComplete = (section: keyof FormData, field: string): boolean => {
     if (!formData) return false;
     const sectionData = formData[section];
@@ -204,14 +175,90 @@ const TenantReferencing: React.FC = () => {
     return false;
   };
 
+  const isSectionCompleted = (step: number): boolean => {
+    if (!formData) return false;
+    if (stepStatus[step] === 'complete') return true;
+
+    switch (step) {
+      case 1: // Identity
+        return !!(
+          formData.identity?.firstName &&
+          formData.identity?.lastName &&
+          formData.identity?.email &&
+          (formData.identity?.identityProof || formData.identity?.dateOfBirth)
+        );
+      case 2: // Employment
+        return !!(
+          formData.employment?.employmentStatus &&
+          (['Unemployed', 'Retired', 'Student'].includes(formData.employment?.employmentStatus) ||
+            formData.employment?.companyDetails ||
+            formData.employment?.jobPosition)
+        );
+      case 3: // Residential
+        return !!(formData.residential?.currentAddress && formData.residential?.durationAtCurrentAddress);
+      case 4: // Financial
+        return !!(
+          formData.financial?.monthlyIncome ||
+          formData.financial?.proofOfIncomeDocument ||
+          formData.financial?.useOpenBanking
+        );
+      case 5: // Guarantor
+        return (
+          (formData as any)?.guarantor?.verifiedViaLink ||
+          (formData as any)?.guarantorInvitation?.status === 'completed' ||
+          !!(formData.guarantor?.firstName && formData.guarantor?.lastName && formData.guarantor?.email)
+        );
+      default:
+        return false;
+    }
+  };
+
+  // Calculate progress statistics across the 5 steps
+  const calculateProgress = () => {
+    if (!formData) return { overall: 0, completed: 0, pending: 5, documents: 0 };
+
+    const steps = [1, 2, 3, 4, 5];
+    const completedSteps = steps.filter(step => isSectionCompleted(step)).length;
+    const totalSteps = 5;
+    
+    const documents = [
+      formData.identity?.identityProof,
+      formData.employment?.proofDocument,
+      formData.residential?.proofDocument,
+      formData.financial?.proofOfIncomeDocument,
+      formData.guarantor?.identityDocument
+    ].filter(doc => {
+      if (!doc) return false;
+      if (typeof doc === 'string') return doc.trim().length > 0;
+      if (typeof doc === 'object') {
+        return !!(doc.name || doc.url || doc.dataUrl || doc.downloadUrl || doc.storagePath);
+      }
+      return false;
+    }).length;
+
+    return {
+      overall: Math.round((completedSteps / totalSteps) * 100),
+      completed: completedSteps,
+      pending: totalSteps - completedSteps,
+      documents
+    };
+  };
+
   const progress = calculateProgress();
   const summaryOverallProgress = isAuthenticated ? progress.overall : 0;
   const summaryCompleted = isAuthenticated ? progress.completed : 0;
   const summaryPending = isAuthenticated ? progress.pending : 0;
   const summaryDocuments = isAuthenticated ? progress.documents : 0;
 
-  const openReferencingModal = (step: number = 1) => {
+  const openSectionModal = (step: number) => {
     setReferencingStep(step);
+    setSingleSectionOnly(true);
+    setIsReferencingModalOpen(true);
+  };
+
+  const openFullPassportModal = (step: number = 1) => {
+    setReferencingStep(step);
+    setSingleSectionOnly(false);
     setIsReferencingModalOpen(true);
   };
   
@@ -280,22 +327,22 @@ const TenantReferencing: React.FC = () => {
             Create Your Referencing Passport
           </h2>
           <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-            Fill in your details once and share your referencing passport with as many landlords or agents as you need. No re-filling required.
+            Fill in your 5 referencing sections once and share your passport with multiple landlords or letting agents without repeating forms.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
-              onClick={() => openReferencingModal(1)}
+              onClick={() => openFullPassportModal(1)}
               className="px-6 py-3 bg-[#136C9E] text-white rounded-xl text-sm font-semibold hover:bg-[#0F5A82] transition-colors shadow-md flex items-center justify-center gap-2"
             >
               <Edit3 className="w-4 h-4" />
-              Start My Passport
+              Start My Passport (5 Sections)
             </button>
           </div>
           <div className="mt-6 grid grid-cols-3 gap-4 text-center">
             {[
-              { label: 'Fill once', sub: 'No repeat forms' },
+              { label: 'Fill once', sub: '5 simple sections' },
               { label: 'Share freely', sub: 'Multiple recipients' },
-              { label: 'Edit anytime', sub: 'Always up-to-date' },
+              { label: 'Edit anytime', sub: 'Section by section' },
             ].map((f) => (
               <div key={f.label} className="bg-white rounded-xl p-3 shadow-sm border border-blue-50">
                 <p className="text-xs font-bold text-gray-800">{f.label}</p>
@@ -311,6 +358,7 @@ const TenantReferencing: React.FC = () => {
             isOpen={isReferencingModalOpen}
             onClose={() => { setIsReferencingModalOpen(false); loadReferencingData(); }}
             initialStep={referencingStep}
+            singleSectionOnly={singleSectionOnly}
             onSubmissionComplete={loadReferencingData}
           />
         )}
@@ -329,21 +377,21 @@ const TenantReferencing: React.FC = () => {
             </h1>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
               <ShieldCheck className="w-3.5 h-3.5 mr-1" />
-              Reusable
+              5 Sections
             </span>
           </div>
           <p className="text-sm leading-relaxed text-gray-500">
-            Fill your details once, keep them updated, and share with multiple landlords and letting agents.
+            Fill each section once, keep details updated, and share with multiple landlords and letting agents.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
           <button 
             className="px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-full text-xs md:text-sm font-medium hover:bg-gray-50 transition-all flex items-center gap-2 shadow-sm"
-            onClick={() => openReferencingModal(1)}
+            onClick={() => openFullPassportModal(1)}
           >
-            <Edit3 className="w-4 h-4 text-blue-600" />
-            Edit My Details
+            <Edit3 className="w-4 h-4 text-[#136C9E]" />
+            Edit Full Passport
           </button>
           <button 
             className="px-5 py-2.5 text-white rounded-full text-xs md:text-sm font-medium transition-all duration-300 flex items-center gap-2 shadow-md hover:-translate-y-0.5"
@@ -385,7 +433,7 @@ const TenantReferencing: React.FC = () => {
           <div className="mb-2">
             <p className="text-2xl md:text-3xl font-bold" style={{ color: '#374957' }}>{summaryCompleted}</p>
           </div>
-          <p className="text-xs text-gray-500">Verified sections</p>
+          <p className="text-xs text-gray-500">Verified of 5 sections</p>
         </div>
 
         {/* Pending Card */}
@@ -536,9 +584,9 @@ const TenantReferencing: React.FC = () => {
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-bold text-gray-800">Passport Sections</h2>
+            <h2 className="text-lg font-bold text-gray-800">Passport Sections (5)</h2>
             <p className="text-xs sm:text-sm text-gray-500">
-              Click any section below to view or edit your details before sending.
+              Click any section below to open and edit its specific details directly.
             </p>
           </div>
         </div>
@@ -546,10 +594,10 @@ const TenantReferencing: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {[
             {
-              title: "Identity",
+              title: "Identity Verification",
               icon: <User className="w-5 h-5 text-blue-600" />,
               progress: "1",
-              status: stepStatus[1] === 'complete' ? "Complete" : "Incomplete",
+              status: isSectionCompleted(1) ? "Complete" : "Incomplete",
               step: 1,
               items: [
                 { name: "Full Name", description: "Personal identification", status: isFieldComplete('identity', 'firstName') && isFieldComplete('identity', 'lastName') ? "complete" : "incomplete" },
@@ -560,10 +608,10 @@ const TenantReferencing: React.FC = () => {
               ]
             },
             {
-              title: "Employment",
+              title: "Employment & Income",
               icon: <Briefcase className="w-5 h-5 text-blue-600" />,
               progress: "2",
-              status: stepStatus[2] === 'complete' ? "Complete" : "Incomplete",
+              status: isSectionCompleted(2) ? "Complete" : "Incomplete",
               step: 2,
               items: [
                 { name: "Employment Status", description: "Current work status", status: isFieldComplete('employment', 'employmentStatus') ? "complete" : "incomplete" },
@@ -574,10 +622,10 @@ const TenantReferencing: React.FC = () => {
               ]
             },
             {
-              title: "Residential",
+              title: "Residential History",
               icon: <Home className="w-5 h-5 text-orange-600" />,
               progress: "3",
-              status: stepStatus[3] === 'complete' ? "Complete" : "Incomplete",
+              status: isSectionCompleted(3) ? "Complete" : "Incomplete",
               step: 3,
               items: [
                 { name: "Current Address", description: "Primary residence", status: isFieldComplete('residential', 'currentAddress') ? "complete" : "incomplete" },
@@ -586,10 +634,10 @@ const TenantReferencing: React.FC = () => {
               ]
             },
             {
-              title: "Financial",
+              title: "Financial & Income Proof",
               icon: <PoundSterling className="w-5 h-5 text-orange-600" />,
               progress: "4",
-              status: stepStatus[4] === 'complete' ? "Complete" : "Incomplete",
+              status: isSectionCompleted(4) ? "Complete" : "Incomplete",
               step: 4,
               items: [
                 { name: "Monthly Income (£)", description: "Gross monthly earnings", status: isFieldComplete('financial', 'monthlyIncome') ? "complete" : "incomplete" },
@@ -597,10 +645,10 @@ const TenantReferencing: React.FC = () => {
               ]
             },
             {
-              title: "Guarantor",
+              title: "Guarantor Details",
               icon: <Users className="w-5 h-5 text-amber-600" />,
               progress: "5",
-              status: stepStatus[5] === 'complete' 
+              status: isSectionCompleted(5)
                 ? "Complete" 
                 : (formData as any)?.guarantorInvitation?.status === 'invited'
                   ? "Invited (Pending)"
@@ -620,23 +668,24 @@ const TenantReferencing: React.FC = () => {
                 { name: "Guarantor ID Upload", description: "Guarantor ID document", status: isDocumentUploaded('guarantor', 'identityDocument') ? "complete" : "incomplete" }
               ]
             }
-          ].map((card, index) => (
+          ].map((card) => (
             <div
               key={card.title}
-              className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+              onClick={() => openSectionModal(card.step)}
+              className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md hover:border-[#136C9E]/50 transition-all flex flex-col justify-between cursor-pointer group"
             >
               <div className="p-5 border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 group-hover:bg-blue-50 transition-colors flex items-center justify-center flex-shrink-0">
                     {card.icon}
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-800 text-base">{card.title}</h3>
-                    <span className="text-xs text-gray-400">Step {card.progress} of 5</span>
+                    <h3 className="font-bold text-gray-800 text-base group-hover:text-[#136C9E] transition-colors">{card.title}</h3>
+                    <span className="text-xs text-gray-400">Section {card.progress} of 5</span>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2.5">
                   <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                     card.status === "Complete" 
                       ? "bg-green-100 text-green-700" 
@@ -647,10 +696,14 @@ const TenantReferencing: React.FC = () => {
                     {card.status}
                   </span>
                   <button
-                    onClick={() => openReferencingModal(card.step)}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openSectionModal(card.step);
+                    }}
+                    className="text-xs font-semibold text-[#136C9E] group-hover:text-white px-3 py-1.5 rounded-lg border border-blue-200 group-hover:bg-[#136C9E] group-hover:border-[#136C9E] transition-all flex items-center gap-1 shadow-2xs"
                   >
-                    Edit →
+                    <span>{card.status === "Complete" ? "Edit" : "Fill"}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -675,15 +728,6 @@ const TenantReferencing: React.FC = () => {
                   </div>
                 ))}
               </div>
-
-              <div className="p-4 bg-gray-50/60 border-t border-gray-100 flex justify-end">
-                <button
-                  onClick={() => openReferencingModal(card.step)}
-                  className="w-full py-2 rounded-xl text-xs font-semibold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  Update {card.title} Details
-                </button>
-              </div>
             </div>
           ))}
         </div>
@@ -695,6 +739,7 @@ const TenantReferencing: React.FC = () => {
           isOpen={isReferencingModalOpen}
           onClose={closeReferencingModal}
           initialStep={referencingStep}
+          singleSectionOnly={singleSectionOnly}
           onSubmissionComplete={() => {
             loadReferencingData();
           }}
@@ -707,7 +752,7 @@ const TenantReferencing: React.FC = () => {
         onClose={() => setIsSendModalOpen(false)}
         onEditPassport={() => {
           setIsSendModalOpen(false);
-          openReferencingModal(1);
+          openFullPassportModal(1);
         }}
         onShareComplete={() => {
           loadReferencingData();

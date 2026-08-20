@@ -39,6 +39,7 @@ interface ReferencingModalProps {
   onClose: () => void;
   onSubmissionComplete?: () => void;
   initialStep?: number;
+  singleSectionOnly?: boolean;
 }
 
 // Form data types for the 5 Referencing Passport steps
@@ -214,14 +215,20 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
   isOpen, 
   onClose, 
   onSubmissionComplete, 
-  initialStep = 1 
+  initialStep = 1,
+  singleSectionOnly = false
 }) => {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
-  const [showPostSaveDialog, setShowPostSaveDialog] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && initialStep) {
+      setCurrentStep(initialStep);
+    }
+  }, [isOpen, initialStep]);
 
   const [formData, setFormData] = useState<FormData>({
     identity: {
@@ -589,35 +596,33 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     loadStoredData();
   }, [user?.id]);
 
-  const saveCurrentStep = async () => {
+  const saveCurrentStep = async (stepToSave: number = currentStep) => {
     if (!user?.id) return;
     setIsSaving(true);
     
-    // Evaluate if the current step is complete
+    // Evaluate if the saved step is complete
     let isComplete = false;
-    switch(currentStep) {
+    switch(stepToSave) {
       case 1:
-        isComplete = !!(formData.identity.firstName && formData.identity.lastName && formData.identity.email && formData.identity.phoneNumber && formData.identity.dateOfBirth && formData.identity.identityProof);
+        isComplete = !!(formData.identity.firstName && formData.identity.lastName && formData.identity.email && formData.identity.phoneNumber && formData.identity.dateOfBirth && (formData.identity.identityProof || formData.identity.nationality));
         break;
       case 2:
-        isComplete = !!(formData.employment.employmentStatus && formData.employment.companyDetails && formData.employment.jobPosition && formData.employment.proofDocument);
+        isComplete = !!(formData.employment.employmentStatus && (['Unemployed', 'Retired', 'Student'].includes(formData.employment.employmentStatus) || formData.employment.companyDetails || formData.employment.jobPosition));
         break;
       case 3:
-        isComplete = !!(formData.residential.currentAddress && formData.residential.durationAtCurrentAddress && formData.residential.proofDocument);
+        isComplete = !!(formData.residential.currentAddress && formData.residential.durationAtCurrentAddress);
         break;
       case 4:
-        isComplete = !!(formData.financial.monthlyIncome && (formData.financial.proofOfIncomeDocument || formData.financial.useOpenBanking));
+        isComplete = !!(formData.financial.monthlyIncome || formData.financial.proofOfIncomeDocument || formData.financial.useOpenBanking);
         break;
       case 5:
-        isComplete = !!(formData.guarantor.firstName && formData.guarantor.lastName && formData.guarantor.email);
-        // If empty, mark as partial or empty. But actually step 5 is optional for some, let's strictly check if filled.
-        if (!formData.guarantor.firstName && !formData.guarantor.lastName) isComplete = true; // treat as complete if intentionally skipped
+        isComplete = !!(formData.guarantor.firstName && formData.guarantor.lastName && formData.guarantor.email) || formData.guarantorInvitation?.status === 'completed' || !!formData.guarantor.verifiedViaLink;
         break;
     }
 
     const newStepStatus = {
       ...stepStatus,
-      [currentStep]: isComplete ? 'complete' : 'partial'
+      [stepToSave]: isComplete ? 'complete' : 'partial'
     } as any;
     
     setStepStatus(newStepStatus);
@@ -628,31 +633,35 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
         user.id,
         propertyId,
         formData as any,
-        currentStep,
+        stepToSave,
         newStepStatus
       );
-      setLastSavedSteps(prev => ({ ...prev, [currentStep]: new Date() }));
+      setLastSavedSteps(prev => ({ ...prev, [stepToSave]: new Date() }));
       setShowSaveSuccess(true);
       setTimeout(() => setShowSaveSuccess(false), 3000);
-      toast.success('Passport progress saved!');
+      const sectionName = navigationItems.find(n => n.step === stepToSave)?.label || 'Details';
+      toast.success(`${sectionName} saved successfully!`);
+      if (onSubmissionComplete) {
+        onSubmissionComplete();
+      }
     } catch (err) {
       console.error('Error saving step:', err);
+      toast.error('Failed to save. Please try again.');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleSaveAndClose = async () => {
-    await saveCurrentStep();
+    await saveCurrentStep(currentStep);
     onClose();
   };
 
   const nextStep = async () => {
-    await saveCurrentStep();
+    await saveCurrentStep(currentStep);
     if (currentStep < 5) {
       setCurrentStep(prev => prev + 1);
     } else {
-      // Step 5 completed: Save passport and show post-save dialog
       handleCompleteAndSave();
     }
   };
@@ -667,10 +676,13 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     const userId = user?.id || 'anonymous_tenant';
     setIsSubmitting(true);
     try {
-      // Save is already handled by saveCurrentStep before this is called
+      await saveCurrentStep(currentStep);
       localStorage.setItem(`referencing_${userId}_submitted`, 'true');
-      toast.success('Referencing Passport saved!');
-      setShowPostSaveDialog(true);
+      toast.success('Referencing Passport saved successfully!');
+      if (onSubmissionComplete) {
+        onSubmissionComplete();
+      }
+      onClose();
     } catch (err) {
       console.error('Error saving referencing passport:', err);
       toast.error('Failed to save. Please try again.');
@@ -1337,6 +1349,8 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
 
   if (!isOpen) return null;
 
+  const currentNav = navigationItems.find(n => n.step === currentStep) || navigationItems[0];
+
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 font-sans">
@@ -1344,173 +1358,175 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
           className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
           onClick={onClose}
         />
-        <div className="relative w-full max-w-sm sm:max-w-md md:max-w-4xl lg:max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl flex overflow-hidden h-[85vh] sm:h-[82vh] md:min-h-[600px] max-h-[92vh] z-10 animate-in fade-in zoom-in-95 duration-200">
-          {/* Desktop Sidebar */}
-          <div className="w-64 bg-gray-50/80 py-5 px-4 border-r border-gray-200 hidden md:flex flex-col">
-            <div className="mb-4 px-2">
-              <h2 className="text-lg font-bold text-orange-600">Referencing Passport</h2>
-              <p className="text-xs text-gray-500 mt-1">
-                Fill once, update anytime, and share with multiple landlords & agents.
-              </p>
-            </div>
-            <ul className="space-y-1">
-              {renderSidebarNavigation()}
-            </ul>
-            <div className="mt-auto pt-4 px-2">
-              <div className="flex justify-between text-xs text-gray-600 mb-2">
-                <span>Step {currentStep} of 5</span>
-                <span className="font-semibold">{Math.round((currentStep / 5) * 100)}%</span>
-              </div>
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-[#136C9E] transition-all duration-300"
-                  style={{ width: `${(currentStep / 5) * 100}%` }}
-                ></div>
-              </div>
-            </div>
-          </div>
 
-          {/* Main Area */}
-          <div className="flex-1 flex flex-col max-h-[92vh]">
-            {/* Top Bar */}
-            <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-200 bg-white">
-              <div className="flex items-center space-x-2">
-                <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-1.5 rounded-lg hover:bg-gray-100">
-                  <Menu size={20} />
-                </button>
-                <h2 className="text-sm sm:text-base font-bold text-gray-800">
-                  Tenant Referencing Passport
-                </h2>
+        {singleSectionOnly ? (
+          /* Focused Single-Section Modal (Opened for a specific section) */
+          <div className="relative w-full max-w-lg sm:max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh] z-10 animate-in fade-in zoom-in-95 duration-200">
+            {/* Section Header */}
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-100 bg-white">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#136C9E] flex items-center justify-center flex-shrink-0">
+                  <currentNav.Icon size={20} />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-gray-900">
+                    {currentNav.label} Details
+                  </h2>
+                  <span className="text-xs text-gray-500 font-medium">
+                    Section {currentStep} of 5 · Referencing Passport
+                  </span>
+                </div>
               </div>
-
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setIsSendModalOpen(true)}
-                  className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-white transition-all flex items-center gap-1.5 shadow-sm hover:opacity-90"
-                  style={{ backgroundColor: '#DC5F12' }}
-                  title="Send passport to a Landlord or Agent"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Send to Landlord / Agent</span>
-                  <span className="sm:hidden">Send</span>
-                </button>
-                <button
-                  onClick={onClose}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
-                  aria-label="Close modal"
-                >
-                  <X size={16} />
-                </button>
-              </div>
+              <button
+                onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                aria-label="Close modal"
+              >
+                <X size={16} />
+              </button>
             </div>
 
-            {/* Content View */}
+            {/* Section Content */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#f8fafc]">
               {renderFormContent()}
             </div>
 
-            {/* Bottom Footer Actions */}
-            <div className="px-4 sm:px-6 py-3 border-t border-gray-200 bg-white flex items-center justify-between">
-              <div>
-                {(lastSavedSteps[currentStep] || showSaveSuccess) && (
-                  <div className="flex items-center text-xs text-green-600 font-medium">
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    <span>Saved</span>
-                  </div>
+            {/* Section Footer */}
+            <div className="px-5 sm:px-6 py-3.5 border-t border-gray-100 bg-white flex items-center justify-between">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-xs sm:text-sm font-medium border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveAndClose}
+                disabled={isSaving}
+                className="px-5 py-2.5 text-xs sm:text-sm font-semibold bg-[#136C9E] text-white rounded-xl hover:bg-[#0F5A82] transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                {isSaving ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Save {currentNav.label} Details</span>
+                  </>
                 )}
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Full Passport Modal with Step Navigation */
+          <div className="relative w-full max-w-sm sm:max-w-md md:max-w-4xl lg:max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl flex overflow-hidden h-[85vh] sm:h-[82vh] md:min-h-[600px] max-h-[92vh] z-10 animate-in fade-in zoom-in-95 duration-200">
+            {/* Desktop Sidebar */}
+            <div className="w-64 bg-gray-50/80 py-5 px-4 border-r border-gray-200 hidden md:flex flex-col">
+              <div className="mb-4 px-2">
+                <h2 className="text-lg font-bold text-orange-600">Referencing Passport</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  Fill once, update anytime, and share with multiple landlords & agents.
+                </p>
+              </div>
+              <ul className="space-y-1">
+                {renderSidebarNavigation()}
+              </ul>
+              <div className="mt-auto pt-4 px-2">
+                <div className="flex justify-between text-xs text-gray-600 mb-2">
+                  <span>Step {currentStep} of 5</span>
+                  <span className="font-semibold">{Math.round((currentStep / 5) * 100)}%</span>
+                </div>
+                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#136C9E] transition-all duration-300"
+                    style={{ width: `${(currentStep / 5) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Area */}
+            <div className="flex-1 flex flex-col max-h-[92vh]">
+              {/* Top Bar */}
+              <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-200 bg-white">
+                <div className="flex items-center space-x-2">
+                  <button onClick={() => setIsMenuOpen(true)} className="md:hidden p-1.5 rounded-lg hover:bg-gray-100">
+                    <Menu size={20} />
+                  </button>
+                  <h2 className="text-sm sm:text-base font-bold text-gray-800">
+                    Tenant Referencing Passport
+                  </h2>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={onClose}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                    aria-label="Close modal"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
 
-              <div className="flex items-center space-x-2 sm:space-x-3">
-                {currentStep > 1 && (
-                  <button
-                    onClick={prevStep}
-                    className="px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
-                  >
-                    Previous
-                  </button>
-                )}
-                <button
-                  onClick={handleSaveAndClose}
-                  className="px-4 py-2 text-sm bg-gray-100 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
-                  disabled={isSaving}
-                >
-                  {isSaving ? 'Saving...' : 'Save & Close'}
-                </button>
+              {/* Content View */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#f8fafc]">
+                {renderFormContent()}
+              </div>
 
-                {currentStep < 5 ? (
+              {/* Bottom Footer Actions */}
+              <div className="px-4 sm:px-6 py-3 border-t border-gray-200 bg-white flex items-center justify-between">
+                <div>
+                  {(lastSavedSteps[currentStep] || showSaveSuccess) && (
+                    <div className="flex items-center text-xs text-green-600 font-medium">
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      <span>Saved</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  {currentStep > 1 && (
+                    <button
+                      onClick={prevStep}
+                      className="px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                    >
+                      Previous
+                    </button>
+                  )}
                   <button
-                    onClick={nextStep}
-                    className="px-5 py-2 text-sm font-semibold bg-[#136C9E] text-white rounded-xl hover:bg-[#0F5A82] transition-colors flex items-center gap-1.5"
+                    onClick={handleSaveAndClose}
+                    className="px-4 py-2 text-sm bg-gray-100 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-200 transition-colors"
+                    disabled={isSaving}
                   >
-                    <span>Continue</span>
-                    <ArrowRight className="w-4 h-4" />
+                    {isSaving ? 'Saving...' : 'Save & Close'}
                   </button>
-                ) : (
-                  <button
-                    onClick={handleCompleteAndSave}
-                    className="px-5 py-2 text-sm font-semibold bg-[#DC5F12] text-white rounded-xl hover:bg-opacity-95 transition-all shadow-md flex items-center gap-1.5"
-                    disabled={isSubmitting}
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    <span>{isSubmitting ? 'Saving...' : 'Save Passport'}</span>
-                  </button>
-                )}
+
+                  {currentStep < 5 ? (
+                    <button
+                      onClick={nextStep}
+                      className="px-5 py-2 text-sm font-semibold bg-[#136C9E] text-white rounded-xl hover:bg-[#0F5A82] transition-colors flex items-center gap-1.5"
+                    >
+                      <span>Continue</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleCompleteAndSave}
+                      className="px-5 py-2 text-sm font-semibold bg-[#DC5F12] text-white rounded-xl hover:bg-opacity-95 transition-all shadow-md flex items-center gap-1.5"
+                      disabled={isSubmitting}
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      <span>{isSubmitting ? 'Saving...' : 'Save Passport'}</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
-
-      {/* Post-save dialog: send now or just close */}
-      {showPostSaveDialog && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4">
-          {(() => {
-            const steps = [1, 2, 3, 4, 5];
-            const completedSteps = steps.filter(step => stepStatus[step] === 'complete').length;
-            const progress = Math.round((completedSteps / steps.length) * 100);
-            const canSend = progress >= 75;
-
-            return (
-              <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900">Passport Saved!</h3>
-                    <p className="text-xs text-gray-500">Would you like to send it to a landlord or agent now?</p>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2 pt-1">
-                  <button
-                    onClick={() => {
-                      setShowPostSaveDialog(false);
-                      setIsSendModalOpen(true);
-                    }}
-                    disabled={!canSend}
-                    title={!canSend ? "Your passport must be at least 75% complete before you can send it" : ""}
-                    className={`w-full py-2.5 text-sm font-semibold text-white rounded-xl flex items-center justify-center gap-2 ${!canSend ? 'opacity-50 cursor-not-allowed hover:opacity-50' : 'hover:opacity-95'}`}
-                    style={{ backgroundColor: !canSend ? '#9CA3AF' : '#DC5F12' }}
-                  >
-                    <Send className="w-4 h-4" />
-                    Send to Landlord / Agent Now
-                  </button>
-              <button
-                onClick={() => {
-                  setShowPostSaveDialog(false);
-                  if (onSubmissionComplete) onSubmissionComplete();
-                  onClose();
-                }}
-                className="w-full py-2.5 text-sm font-medium border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50"
-              >
-                Save Only — I'll send later
-              </button>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      )}
 
       {/* Standalone Send/Share Modal */}
       <SendReferencingModal

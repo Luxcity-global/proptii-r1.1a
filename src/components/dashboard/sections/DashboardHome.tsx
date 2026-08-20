@@ -1337,8 +1337,9 @@ const DashboardHome: React.FC = () => {
           isOpen={isReferencingModalOpen}
           onClose={closeReferencingModal}
           initialStep={referencingStep}
+          singleSectionOnly={true}
           onSubmissionComplete={() => {
-            window.location.reload();
+            // refresh data
           }}
         />
       )}
