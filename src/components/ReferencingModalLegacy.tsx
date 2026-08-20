@@ -318,7 +318,10 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     const tenantName = `${formData.identity.firstName} ${formData.identity.lastName}`.trim() || user?.name || 'Applicant';
     const tenantEmail = formData.identity.email.trim() || user?.email || '';
     const token = formData.guarantorInvitation?.token || `inv_${Date.now()}`;
-    return `${window.location.origin}/guarantor-reference?token=${encodeURIComponent(token)}&tenantId=${encodeURIComponent(user?.id || 'general')}&tenantEmail=${encodeURIComponent(tenantEmail)}&tenantName=${encodeURIComponent(tenantName)}`;
+    const gEmail = formData.guarantorInvitation?.guarantorEmail || inviteGuarantorEmail || formData.guarantor?.email || '';
+    const gName = formData.guarantorInvitation?.guarantorName || inviteGuarantorName || `${formData.guarantor?.firstName || ''} ${formData.guarantor?.lastName || ''}`.trim();
+    const gPhone = formData.guarantorInvitation?.guarantorPhone || inviteGuarantorPhone || formData.guarantor?.phoneNumber || '';
+    return `${window.location.origin}/guarantor-reference?token=${encodeURIComponent(token)}&tenantId=${encodeURIComponent(user?.id || 'general')}&tenantEmail=${encodeURIComponent(tenantEmail)}&tenantName=${encodeURIComponent(tenantName)}&email=${encodeURIComponent(gEmail)}&name=${encodeURIComponent(gName)}&phone=${encodeURIComponent(gPhone)}`;
   };
 
   const handleCopyGuarantorLink = () => {

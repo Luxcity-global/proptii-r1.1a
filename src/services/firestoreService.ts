@@ -426,12 +426,29 @@ class FirestoreService {
       console.warn('Backend invite-guarantor failed, creating local fallback invite:', error);
       const token = `inv_${Date.now()}`;
       const baseUrl = window.location.origin;
-      const formUrl = `${baseUrl}/guarantor-reference?token=${token}&tenantId=${encodeURIComponent(tenantId)}&tenantEmail=${encodeURIComponent(inviteData.tenantEmail || '')}&tenantName=${encodeURIComponent(inviteData.tenantName || '')}`;
+      const formUrl = `${baseUrl}/guarantor-reference?token=${token}&tenantId=${encodeURIComponent(tenantId)}&tenantEmail=${encodeURIComponent(inviteData.tenantEmail || '')}&tenantName=${encodeURIComponent(inviteData.tenantName || '')}&email=${encodeURIComponent(inviteData.guarantorEmail || '')}&name=${encodeURIComponent(inviteData.guarantorName || '')}&phone=${encodeURIComponent(inviteData.guarantorPhone || '')}`;
       return {
         success: true,
         message: `Invitation generated for ${inviteData.guarantorEmail}`,
         formUrl
       };
+    }
+  }
+
+  /**
+   * Fetch a guarantor invitation by token
+   */
+  async getGuarantorInvite(token: string): Promise<{ success: boolean; invitation?: any; error?: string }> {
+    try {
+      if (!token) return { success: false, error: 'Token is required' };
+      const res = await fetch(`${API_BASE}/api/referencing/guarantor-invite?token=${encodeURIComponent(token)}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch invite: ${res.statusText}`);
+      }
+      return await res.json();
+    } catch (error: any) {
+      console.warn('Could not fetch guarantor invite from backend:', error);
+      return { success: false, error: error?.message || 'Failed to fetch invite' };
     }
   }
 

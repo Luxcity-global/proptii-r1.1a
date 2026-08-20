@@ -61,4 +61,11 @@ export class RefereeGuarantorController {
       frontendUrl: (body as any).frontendUrl,
     });
   }
+
+  /** GET /api/referencing/guarantor-invite — fetch guarantor invite details by token */
+  @Get('referencing/guarantor-invite')
+  async getGuarantorInvite(@Req() req: any) {
+    const token = req.query?.token as string;
+    return this.service.getGuarantorInvite(token);
+  }
 }

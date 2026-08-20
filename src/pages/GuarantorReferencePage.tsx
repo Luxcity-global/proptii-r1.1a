@@ -31,27 +31,38 @@ export const GuarantorReferencePage: React.FC = () => {
   // Read URL parameters
   const token = searchParams.get('token') || '';
   const tenantId = searchParams.get('tenantId') || '';
-  const tenantName = searchParams.get('tenantName') || searchParams.get('applicant') || 'Tenant';
-  const tenantEmail = searchParams.get('tenantEmail') || '';
+  const tenantNameParam = searchParams.get('tenantName') || searchParams.get('applicant') || '';
+  const tenantEmailParam = searchParams.get('tenantEmail') || '';
   const prefilledGuarantorEmail = searchParams.get('email') || searchParams.get('guarantorEmail') || '';
+  const prefilledGuarantorName = searchParams.get('name') || searchParams.get('guarantorName') || '';
+  const prefilledGuarantorPhone = searchParams.get('phone') || searchParams.get('guarantorPhone') || '';
+  const prefilledRelationship = searchParams.get('relationship') || '';
+
+  // Initial name splitting if provided
+  const initialNameParts = prefilledGuarantorName.trim().split(' ');
+  const initialFirstName = initialNameParts[0] || '';
+  const initialLastName = initialNameParts.slice(1).join(' ') || '';
 
   // Form state
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    firstName: initialFirstName,
+    lastName: initialLastName,
     email: prefilledGuarantorEmail,
-    phoneNumber: '',
+    phoneNumber: prefilledGuarantorPhone,
     address: '',
     postcode: '',
     employmentStatus: 'Employed',
     annualIncome: '',
-    relationship: 'Parent',
+    relationship: prefilledRelationship || 'Parent',
     otherRelationship: '',
     consent: 'agree' as 'agree' | 'disagree',
     reason: '',
     agreedToTerms: false,
     signature: ''
   });
+
+  const [inviteData, setInviteData] = useState<any>(null);
+  const [inviteLoading, setInviteLoading] = useState<boolean>(!!token);
 
   // Document state
   const [documentFile, setDocumentFile] = useState<File | null>(null);
@@ -71,11 +82,76 @@ export const GuarantorReferencePage: React.FC = () => {
   const [submissionId, setSubmissionId] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Tenant display name
+  const tenantName = inviteData?.tenantName || tenantNameParam || 'Applicant';
+  const tenantEmail = inviteData?.tenantEmail || tenantEmailParam || '';
+
+  // Determine if the email field should be locked (identifier)
+  const isEmailLocked = Boolean(
+    prefilledGuarantorEmail ||
+    inviteData?.guarantorEmail ||
+    (token && (formData.email || inviteData?.guarantorEmail))
+  );
+
+  // 1. Fetch invite metadata if token is provided
   useEffect(() => {
-    if (prefilledGuarantorEmail && !formData.email) {
-      setFormData(prev => ({ ...prev, email: prefilledGuarantorEmail }));
+    let isMounted = true;
+
+    const fetchInvite = async () => {
+      if (!token) {
+        setInviteLoading(false);
+        return;
+      }
+
+      try {
+        setInviteLoading(true);
+        const res = await firestoreService.getGuarantorInvite(token);
+        if (isMounted && res.success && res.invitation) {
+          const inv = res.invitation;
+          setInviteData(inv);
+
+          const fullName = (inv.guarantorName || prefilledGuarantorName || '').trim();
+          const nameParts = fullName.split(' ');
+          const autoFirstName = nameParts[0] || '';
+          const autoLastName = nameParts.slice(1).join(' ') || '';
+
+          setFormData(prev => ({
+            ...prev,
+            email: inv.guarantorEmail || prefilledGuarantorEmail || prev.email,
+            firstName: prev.firstName || autoFirstName,
+            lastName: prev.lastName || autoLastName,
+            phoneNumber: prev.phoneNumber || inv.guarantorPhone || prefilledGuarantorPhone || '',
+            relationship: prev.relationship || prefilledRelationship || 'Parent'
+          }));
+        }
+      } catch (err) {
+        console.warn('Could not load invite from backend:', err);
+      } finally {
+        if (isMounted) setInviteLoading(false);
+      }
+    };
+
+    fetchInvite();
+    return () => { isMounted = false; };
+  }, [token]);
+
+  // 2. Synchronize query params into form state if changed
+  useEffect(() => {
+    if (prefilledGuarantorEmail || prefilledGuarantorName || prefilledGuarantorPhone) {
+      const nameParts = prefilledGuarantorName.trim().split(' ');
+      const autoFirst = nameParts[0] || '';
+      const autoLast = nameParts.slice(1).join(' ') || '';
+
+      setFormData(prev => ({
+        ...prev,
+        email: prefilledGuarantorEmail || prev.email,
+        firstName: prev.firstName || autoFirst,
+        lastName: prev.lastName || autoLast,
+        phoneNumber: prev.phoneNumber || prefilledGuarantorPhone || '',
+        relationship: prefilledRelationship || prev.relationship || 'Parent'
+      }));
     }
-  }, [prefilledGuarantorEmail]);
+  }, [prefilledGuarantorEmail, prefilledGuarantorName, prefilledGuarantorPhone, prefilledRelationship]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -383,16 +459,43 @@ export const GuarantorReferencePage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1.5">Email Address <span className="text-red-500">*</span></label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="guarantor@example.com"
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 focus:border-[#136C9E] focus:ring-2 focus:ring-blue-100 outline-none text-sm transition-all"
-                />
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-gray-700">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  {isEmailLocked && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-600 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-md">
+                      <Lock className="w-3 h-3 text-gray-500" />
+                      Identifier (Non-editable)
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
+                    readOnly={isEmailLocked}
+                    placeholder="guarantor@example.com"
+                    className={`w-full px-4 py-2.5 rounded-xl border text-sm transition-all ${
+                      isEmailLocked
+                        ? 'bg-gray-100/90 border-gray-200 text-gray-700 font-medium cursor-not-allowed select-none pl-10 shadow-none'
+                        : 'border-gray-300 focus:border-[#136C9E] focus:ring-2 focus:ring-blue-100 outline-none'
+                    }`}
+                  />
+                  {isEmailLocked && (
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                  )}
+                </div>
+                {isEmailLocked && (
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    This email is your verified guarantor identifier and cannot be modified.
+                  </p>
+                )}
               </div>
 
               <div>

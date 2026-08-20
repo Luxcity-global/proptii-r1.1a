@@ -271,7 +271,7 @@ export class RefereeGuarantorService {
 
     const baseUrl = (frontendUrl || this.frontendUrl).replace(/\/$/, '');
     const token = randomUUID();
-    const formUrl = `${baseUrl}/guarantor-reference?token=${token}&tenantId=${encodeURIComponent(tenantId)}&tenantEmail=${encodeURIComponent(tenantEmail)}&tenantName=${encodeURIComponent(tenantName)}`;
+    const formUrl = `${baseUrl}/guarantor-reference?token=${token}&tenantId=${encodeURIComponent(tenantId)}&tenantEmail=${encodeURIComponent(tenantEmail)}&tenantName=${encodeURIComponent(tenantName)}&email=${encodeURIComponent(guarantorEmail)}&name=${encodeURIComponent(guarantorName)}&phone=${encodeURIComponent(guarantorPhone)}`;
 
     const db = this.db;
     if (db) {
@@ -429,6 +429,26 @@ export class RefereeGuarantorService {
     } catch (err: any) {
       this.logger.error(`sendReferencingEmail error: ${err?.message || err}`);
       return { success: false, error: err?.message || 'Failed to send email' };
+    }
+  }
+
+  /**
+   * Look up a guarantor invitation by its token
+   */
+  async getGuarantorInvite(token: string) {
+    const db = this.db;
+    if (!token) return { success: false, error: 'Token is required' };
+    if (!db) return { success: false, error: 'Database unavailable' };
+
+    try {
+      const doc = await db.collection('guarantor_invitations').doc(token).get();
+      if (!doc.exists) {
+        return { success: false, error: 'Invitation not found or expired' };
+      }
+      return { success: true, invitation: doc.data() };
+    } catch (err: any) {
+      this.logger.warn(`getGuarantorInvite error: ${err?.message || err}`);
+      return { success: false, error: err?.message || 'Failed to fetch invitation' };
     }
   }
 }

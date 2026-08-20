@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Lock } from 'lucide-react';
 import apiService from '../../services/api';
 
 interface RefereeGuarantorResponseModalProps {
@@ -34,6 +34,12 @@ const RefereeGuarantorResponseModal: React.FC<RefereeGuarantorResponseModalProps
     consent: '',
     reason: '',
   });
+
+  useEffect(() => {
+    if (prefilledEmail) {
+      setFormData(prev => ({ ...prev, email: prefilledEmail }));
+    }
+  }, [prefilledEmail]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -180,19 +186,37 @@ const RefereeGuarantorResponseModal: React.FC<RefereeGuarantorResponseModalProps
 
           {/* Email Field */}
           <div>
-            <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
-              Email Address <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label htmlFor="email" className="block text-sm font-semibold text-gray-700">
+                Email Address <span className="text-red-500">*</span>
+              </label>
+              {prefilledEmail && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-600 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-md">
+                  <Lock className="w-3 h-3 text-gray-500" />
+                  Identifier (Non-editable)
+                </span>
+              )}
+            </div>
             <input
               type="email"
               id="email"
               name="email"
               value={formData.email}
               onChange={handleInputChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#136C9E] focus:border-transparent transition-all"
+              readOnly={!!prefilledEmail}
+              className={`w-full px-4 py-3 border rounded-lg transition-all ${
+                prefilledEmail
+                  ? 'bg-gray-100/90 border-gray-200 text-gray-700 font-medium cursor-not-allowed select-none'
+                  : 'border-gray-300 focus:ring-2 focus:ring-[#136C9E] focus:border-transparent'
+              }`}
               required
               disabled={isSubmitting || submitSuccess}
             />
+            {prefilledEmail && (
+              <p className="text-xs text-gray-400 mt-1">
+                This email address is your verified invite identifier and cannot be modified.
+              </p>
+            )}
           </div>
 
           {/* Consent Field */}
