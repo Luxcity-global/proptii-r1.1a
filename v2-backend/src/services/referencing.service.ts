@@ -779,18 +779,20 @@ export class ReferencingService {
     const openRouterKey = process.env.OPENROUTER_API_KEY;
 
     if (geminiKey) {
-      try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `Analyze this uploaded applicant document (passport, UK driving licence, payslip, utility bill, or employment contract) and extract any recognizable applicant referencing details.
+      const candidateModels = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+      for (const model of candidateModels) {
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: `Analyze this uploaded applicant document (passport, UK driving licence, payslip, utility bill, or employment contract) and extract any recognizable applicant referencing details.
 Return strictly a valid JSON object matching this structure (use empty strings for unknown fields):
 {
   "firstName": "",
@@ -805,33 +807,35 @@ Return strictly a valid JSON object matching this structure (use empty strings f
   "currentAddress": "",
   "monthlyIncome": ""
 }`
-                    },
-                    {
-                      inlineData: {
-                        mimeType: cleanMimeType,
-                        data: cleanBase64
+                      },
+                      {
+                        inlineData: {
+                          mimeType: cleanMimeType,
+                          data: cleanBase64
+                        }
                       }
-                    }
-                  ]
+                    ]
+                  }
+                ],
+                generationConfig: {
+                  responseMimeType: "application/json"
                 }
-              ],
-              generationConfig: {
-                responseMimeType: "application/json"
-              }
-            })
-          }
-        );
+              })
+            }
+          );
 
-        if (response.ok) {
-          const json = await response.json();
-          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-            const parsed = JSON.parse(text);
-            return { success: true, data: parsed };
+          if (response.ok) {
+            const json = await response.json();
+            const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              const parsed = JSON.parse(text);
+              this.logger.log(`AI Document Extraction succeeded with model ${model}`);
+              return { success: true, data: parsed };
+            }
           }
+        } catch (err: any) {
+          this.logger.warn(`Gemini AI extraction error with model ${model}: ${err?.message || err}`);
         }
-      } catch (err: any) {
-        this.logger.warn(`Gemini AI extraction error: ${err?.message || err}`);
       }
     }
 
