@@ -12,6 +12,18 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StorageService } from '../services/storage.service';
 
+export interface MulterUploadedFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+  destination?: string;
+  filename?: string;
+  path?: string;
+}
+
 @Controller('storage')
 export class StorageController {
   constructor(private readonly storageService: StorageService) {}
@@ -24,7 +36,7 @@ export class StorageController {
     },
   }))
   async uploadFile(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: MulterUploadedFile,
     @Body('folder') folderFromBody?: string,
     @Query('folder') folderFromQuery?: string,
   ) {

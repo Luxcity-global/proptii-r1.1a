@@ -9,6 +9,18 @@ export interface StorageUploadResult {
   fullPath: string;
 }
 
+export interface MulterUploadedFile {
+  fieldname?: string;
+  originalname: string;
+  encoding?: string;
+  mimetype?: string;
+  size?: number;
+  buffer: Buffer;
+  destination?: string;
+  filename?: string;
+  path?: string;
+}
+
 @Injectable()
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
@@ -19,7 +31,7 @@ export class StorageService {
   }
 
   async uploadFile(
-    file: Express.Multer.File,
+    file: MulterUploadedFile,
     folder: string = 'documents',
   ): Promise<StorageUploadResult> {
     try {
