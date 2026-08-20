@@ -98,6 +98,14 @@ export class ReferencingController {
     return await this.referencingService.getReferencingStatusByEmail(tenantEmail);
   }
 
+  // ── AI Document Extraction ────────────────────────────────────────────────
+
+  @Post('referencing/ai-extract')
+  @HttpCode(200)
+  async extractDocumentData(@Body() body: { base64Data: string; mimeType?: string }) {
+    return await this.referencingService.extractDocumentData(body.base64Data, body.mimeType);
+  }
+
   // ── Files ─────────────────────────────────────────────────────────────────
 
   @Get(['referencing/files/all', 'applications/:id/documents'])

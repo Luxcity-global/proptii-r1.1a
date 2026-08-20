@@ -700,48 +700,84 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     }
   };
 
-  const handleAIDataExtracted = (data: ExtractedData) => {
-    if (data.firstName || data.lastName) {
-      setFormData(prev => ({
-        ...prev,
-        identity: {
-          ...prev.identity,
-          firstName: data.firstName || prev.identity.firstName,
-          lastName: data.lastName || prev.identity.lastName
+  const handleAIDataExtracted = (
+    data: ExtractedData,
+    attachedDoc?: { name: string; type: string; size: number; url?: string },
+    targetSection?: string
+  ) => {
+    const activeSection = targetSection || (
+      currentStep === 1 ? 'identity' :
+      currentStep === 2 ? 'employment' :
+      currentStep === 3 ? 'residential' :
+      currentStep === 4 ? 'financial' :
+      currentStep === 5 ? 'guarantor' : 'identity'
+    );
+
+    setFormData(prev => {
+      const next = { ...prev };
+
+      // 1. Identity
+      if (data.firstName || data.lastName || data.email || data.phoneNumber || data.dateOfBirth || data.nationality) {
+        next.identity = {
+          ...next.identity,
+          firstName: data.firstName || next.identity.firstName,
+          lastName: data.lastName || next.identity.lastName,
+          email: data.email || next.identity.email,
+          phoneNumber: data.phoneNumber || next.identity.phoneNumber,
+          dateOfBirth: data.dateOfBirth || next.identity.dateOfBirth,
+          nationality: data.nationality || next.identity.nationality,
+        };
+      }
+
+      // 2. Employment
+      if (data.companyDetails || data.jobPosition || data.employmentStatus) {
+        next.employment = {
+          ...next.employment,
+          companyDetails: data.companyDetails || next.employment.companyDetails,
+          jobPosition: data.jobPosition || next.employment.jobPosition,
+          employmentStatus: data.employmentStatus || next.employment.employmentStatus,
+        };
+      }
+
+      // 3. Residential
+      if (data.currentAddress) {
+        next.residential = {
+          ...next.residential,
+          currentAddress: data.currentAddress || next.residential.currentAddress,
+        };
+      }
+
+      // 4. Financial
+      if (data.monthlyIncome) {
+        next.financial = {
+          ...next.financial,
+          monthlyIncome: data.monthlyIncome || next.financial.monthlyIncome,
+        };
+      }
+
+      // 5. Attach document to corresponding section if attachedDoc exists
+      if (attachedDoc && attachedDoc.url) {
+        if (activeSection === 'identity') {
+          next.identity = { ...next.identity, identityProof: attachedDoc };
+        } else if (activeSection === 'employment') {
+          next.employment = { ...next.employment, proofDocument: attachedDoc };
+        } else if (activeSection === 'residential') {
+          next.residential = { ...next.residential, proofDocument: attachedDoc };
+        } else if (activeSection === 'financial') {
+          next.financial = { ...next.financial, proofOfIncomeDocument: attachedDoc };
+        } else if (activeSection === 'guarantor') {
+          next.guarantor = { ...next.guarantor, identityDocument: attachedDoc };
         }
-      }));
-    }
-    if (data.email) {
-      setFormData(prev => ({
-        ...prev,
-        identity: { ...prev.identity, email: data.email! }
-      }));
-    }
-    if (data.phoneNumber) {
-      setFormData(prev => ({
-        ...prev,
-        identity: { ...prev.identity, phoneNumber: data.phoneNumber! }
-      }));
-    }
-    if (data.companyDetails) {
-      setFormData(prev => ({
-        ...prev,
-        employment: { ...prev.employment, companyDetails: data.companyDetails! }
-      }));
-    }
-    if (data.jobPosition) {
-      setFormData(prev => ({
-        ...prev,
-        employment: { ...prev.employment, jobPosition: data.jobPosition! }
-      }));
-    }
-    if (data.monthlyIncome) {
-      setFormData(prev => ({
-        ...prev,
-        financial: { ...prev.financial, monthlyIncome: data.monthlyIncome! }
-      }));
-    }
-    toast.success('AI Extracted document details populated!');
+      }
+
+      return next;
+    });
+
+    toast.success(
+      attachedDoc
+        ? '✨ Document attached & details auto-populated by AI!'
+        : 'AI Extracted document details populated!'
+    );
   };
 
   const handleResetGuarantor = () => {
@@ -932,7 +968,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
     // ── 2. Unverified Guarantor: Manual or Invite Mode ──
     return (
       <div className="relative">
-        <QuickFillBanner onDataExtracted={handleAIDataExtracted} />
+        <QuickFillBanner
+          onDataExtracted={(data, doc) => handleAIDataExtracted(data, doc, 'guarantor')}
+          sectionKey="guarantor"
+          descriptionText="Upload your guarantor's passport, driving licence, or ID. AI will auto-populate guarantor fields and attach their document."
+        />
         
         <div className="mb-4">
           <div className="flex items-center gap-2">
@@ -1213,7 +1253,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
       case 1:
         return (
           <div className="relative">
-            <QuickFillBanner onDataExtracted={handleAIDataExtracted} />
+            <QuickFillBanner
+              onDataExtracted={(data, doc) => handleAIDataExtracted(data, doc, 'identity')}
+              sectionKey="identity"
+              descriptionText="Upload your Passport, UK Driving Licence, or National ID. AI will auto-populate your personal details and attach your identity document."
+            />
             <div className="mb-4">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">1. Identity Verification</h2>
               <p className="text-xs sm:text-sm text-gray-500">Your verified identity details for tenancy checks</p>
@@ -1286,7 +1330,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
       case 2:
         return (
           <div className="relative">
-            <QuickFillBanner onDataExtracted={handleAIDataExtracted} />
+            <QuickFillBanner
+              onDataExtracted={(data, doc) => handleAIDataExtracted(data, doc, 'employment')}
+              sectionKey="employment"
+              descriptionText="Upload a payslip, P60, or employment contract. AI will auto-fill your employer, position, and attach proof of employment."
+            />
             <div className="mb-4">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">2. Employment & Referee Details</h2>
               <p className="text-xs sm:text-sm text-gray-500">Provide employment details or reference contact</p>
@@ -1366,6 +1414,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
       case 3:
         return (
           <div className="relative">
+            <QuickFillBanner
+              onDataExtracted={(data, doc) => handleAIDataExtracted(data, doc, 'residential')}
+              sectionKey="residential"
+              descriptionText="Upload a utility bill, council tax statement, or tenancy agreement. AI will auto-fill your address and attach proof of residency."
+            />
             <div className="mb-4">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">3. Residential History</h2>
               <p className="text-xs sm:text-sm text-gray-500">Current & previous address records</p>
@@ -1413,6 +1466,11 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
       case 4:
         return (
           <div className="relative">
+            <QuickFillBanner
+              onDataExtracted={(data, doc) => handleAIDataExtracted(data, doc, 'financial')}
+              sectionKey="financial"
+              descriptionText="Upload a bank statement or proof of income. AI will auto-fill your declared income and attach your financial statement."
+            />
             <div className="mb-4">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">4. Financial & Affordability</h2>
               <p className="text-xs sm:text-sm text-gray-500">Monthly earnings and income verification</p>

@@ -765,4 +765,138 @@ export class ReferencingService {
       return { success: true, data: [] };
     }
   }
+
+  // ── AI Document Extraction ────────────────────────────────────────────────
+  async extractDocumentData(base64Data: string, mimeType: string = 'image/jpeg') {
+    if (!base64Data) {
+      return { success: false, error: 'No document data provided' };
+    }
+
+    const cleanBase64 = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+    const cleanMimeType = mimeType || 'image/jpeg';
+
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const openRouterKey = process.env.OPENROUTER_API_KEY;
+
+    if (geminiKey) {
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: `Analyze this uploaded applicant document (passport, UK driving licence, payslip, utility bill, or employment contract) and extract any recognizable applicant referencing details.
+Return strictly a valid JSON object matching this structure (use empty strings for unknown fields):
+{
+  "firstName": "",
+  "lastName": "",
+  "email": "",
+  "phoneNumber": "",
+  "dateOfBirth": "YYYY-MM-DD",
+  "nationality": "",
+  "employmentStatus": "Employed" | "Self-Employed" | "Student" | "Retired",
+  "jobPosition": "",
+  "companyDetails": "",
+  "currentAddress": "",
+  "monthlyIncome": ""
+}`
+                    },
+                    {
+                      inlineData: {
+                        mimeType: cleanMimeType,
+                        data: cleanBase64
+                      }
+                    }
+                  ]
+                }
+              ],
+              generationConfig: {
+                responseMimeType: "application/json"
+              }
+            })
+          }
+        );
+
+        if (response.ok) {
+          const json = await response.json();
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            const parsed = JSON.parse(text);
+            return { success: true, data: parsed };
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`Gemini AI extraction error: ${err?.message || err}`);
+      }
+    }
+
+    if (openRouterKey) {
+      try {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openRouterKey}`,
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Extract applicant details from this document. Return ONLY valid JSON with keys: firstName, lastName, email, phoneNumber, dateOfBirth, nationality, employmentStatus, jobPosition, companyDetails, currentAddress, monthlyIncome'
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: `data:${cleanMimeType};base64,${cleanBase64}`
+                    }
+                  }
+                ]
+              }
+            ]
+          })
+        });
+
+        if (response.ok) {
+          const json = await response.json();
+          const content = json.choices?.[0]?.message?.content;
+          if (content) {
+            const match = content.match(/\{[\s\S]*\}/);
+            if (match) {
+              const parsed = JSON.parse(match[0]);
+              return { success: true, data: parsed };
+            }
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`OpenRouter AI extraction error: ${err?.message || err}`);
+      }
+    }
+
+    // Default graceful response
+    return {
+      success: true,
+      data: {
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        dateOfBirth: '',
+        nationality: '',
+        employmentStatus: '',
+        jobPosition: '',
+        companyDetails: '',
+        currentAddress: '',
+        monthlyIncome: ''
+      }
+    };
+  }
 }
