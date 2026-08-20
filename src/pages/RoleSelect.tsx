@@ -17,12 +17,21 @@ const RoleSelect: React.FC = () => {
   const [saving,  setSaving]  = useState(false);
   const [hovered, setHovered] = useState<'tenant' | 'landlord' | null>(null);
 
-  const isExistingTenant = user?.roles?.includes('tenant') && !user?.roles?.includes('landlord') && !user?.roles?.includes('agent');
+  const hasExistingRole = Boolean(user?.roles && user.roles.length > 0);
+
+  // If user already has an assigned role, immediately route them to their dashboard
+  React.useEffect(() => {
+    if (!isLoading && user?.roleResolved && user.roles && user.roles.length > 0) {
+      const primaryRole = user.roles[0];
+      const target = primaryRole === 'landlord' || primaryRole === 'agent' ? '/landlord' : '/dashboard';
+      navigate(target, { replace: true });
+    }
+  }, [user, isLoading, navigate]);
 
   const handleSelect = async (role: UserRole) => {
     if (!user || saving) return;
     
-    if (isExistingTenant && (role === 'landlord' || role === 'agent')) {
+    if (user?.roles?.includes('tenant') && (role === 'landlord' || role === 'agent')) {
       alert('Tenant accounts cannot switch to a Landlord profile.');
       return;
     }
@@ -50,7 +59,7 @@ const RoleSelect: React.FC = () => {
     setSaving(false);
   };
 
-  if (isLoading) {
+  if (isLoading || (user && !user.roleResolved) || hasExistingRole) {
     return (
       <div style={S.loadingPage}>
         <div style={S.loadingSpinner} />

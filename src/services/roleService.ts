@@ -46,14 +46,31 @@ export async function resolveRole(
     return cached as UserRole;
   }
 
-  // 2. Backend role resolution
+  // 2. Direct Firestore check — fast & independent of backend cold-starts
+  try {
+    const { db } = await import('../config/firebaseConfig');
+    const { doc, getDoc } = await import('firebase/firestore');
+    const snap = await getDoc(doc(db, 'users', uid));
+    if (snap.exists()) {
+      const data = snap.data();
+      const firestoreRole = data?.role || (Array.isArray(data?.roles) ? data.roles[0] : null);
+      if (firestoreRole === 'tenant' || firestoreRole === 'landlord' || firestoreRole === 'agent') {
+        localStorage.setItem(`proptii_role_${uid}`, firestoreRole);
+        return firestoreRole as UserRole;
+      }
+    }
+  } catch (err) {
+    console.warn('[roleService] Firestore direct role check fallback notice:', err);
+  }
+
+  // 3. Backend role resolution
   const backendRole = await fetchBackendRole(uid, email);
   if (backendRole) {
     localStorage.setItem(`proptii_role_${uid}`, backendRole);
     return backendRole;
   }
 
-  // 3. sessionStorage signup intent
+  // 4. sessionStorage signup intent
   const intent = getRoleIntent();
   if (intent) {
     clearRoleIntent();
