@@ -2,7 +2,6 @@ import React, { useLayoutEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
 import { MSALProviderWrapper } from './contexts/AuthContext';
-import { GovDataLayerProvider } from './contexts/GovDataLayerContext';
 import { SavedPropertiesProvider } from './contexts/SavedPropertiesContext';
 import { SignedContractsProvider } from './contexts/SignedContractsContext';
 import { OnboardingSessionProvider } from './contexts/OnboardingSessionContext';
@@ -88,7 +87,6 @@ export const App: React.FC = () => {
     <ErrorBoundary fallback={<div>Custom fallback UI</div>}>
       <CssBaseline />
       <MSALProviderWrapper>
-        <GovDataLayerProvider>
         <SavedPropertiesProvider>
           <OnboardingSessionProvider>
           <SignedContractsProvider>
@@ -232,7 +230,6 @@ export const App: React.FC = () => {
             </SignedContractsProvider>
             </OnboardingSessionProvider>
           </SavedPropertiesProvider>
-        </GovDataLayerProvider>
       </MSALProviderWrapper>
     </ErrorBoundary>
   );

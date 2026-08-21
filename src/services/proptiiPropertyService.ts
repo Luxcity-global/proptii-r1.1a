@@ -414,8 +414,6 @@ async function transformProperty(firestoreProperty: FirestoreProperty): Promise<
   });
   
   return {
-    listingId: firestoreProperty.id,
-    uprn: (firestoreProperty as { uprn?: string | null }).uprn ?? null,
     title,
     price,
     location: firestoreProperty.address,
