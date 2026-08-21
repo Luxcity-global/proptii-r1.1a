@@ -416,7 +416,12 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           userIdToUse,
           property.id || `property_${Date.now()}`,
           property,
-          managerInfo
+          managerInfo,
+          {
+            name: viewing.userDetails.fullName || '',
+            email: viewing.userDetails.email || '',
+            phone: viewing.userDetails.phoneNumber || '',
+          }
         );
 
         console.log('Viewing request result:', requestResult);
@@ -446,7 +451,8 @@ const BookViewingModalContent: React.FC<BookViewingModalProps> = ({ open, onClos
           property,
           viewingBookingDetails,
           property.id || undefined,
-          managerInfo
+          managerInfo,
+          requestResult.requestId || null
         );
 
         console.log('Firestore result:', firestoreResult);

@@ -58,6 +58,7 @@ export interface ViewingBooking {
   rescheduledAt?: Timestamp;
   notes?: string;
   agentNotes?: string;
+  sourceRequestId?: string | null;
 }
 
 export interface ViewingStats {
@@ -117,7 +118,8 @@ class ViewingService {
     managerInfo?: {
       landlordId?: string | null;
       agentId?: string | null;
-    }
+    },
+    sourceRequestId?: string | null
   ): Promise<{ success: boolean; bookingId?: string; error?: string }> {
     try {
       // Check if we're online
@@ -153,6 +155,7 @@ class ViewingService {
           ...(viewingDetails.whatsappNumber ? { whatsappNumber: viewingDetails.whatsappNumber } : {}),
         },
         status: 'pending',
+        ...(sourceRequestId ? { sourceRequestId } : {}),
         createdAt: serverTimestamp() as Timestamp,
         updatedAt: serverTimestamp() as Timestamp
       };

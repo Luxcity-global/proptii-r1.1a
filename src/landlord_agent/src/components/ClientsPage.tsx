@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Mail, Phone, Calendar, Home, DollarSign, User, MapPin, Filter, AlertTriangle, PoundSterling, Eye, Users, TrendingUp, Shield, Clock, Trash2, Download, Upload, Archive, CheckSquare, Square, Copy, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Search, Mail, Phone, Calendar, Home, User, MapPin, Filter, AlertTriangle, PoundSterling, Eye, Users, TrendingUp, Shield, Clock, Trash2, Download, Upload, Archive, CheckSquare, Square, Copy, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -68,50 +68,58 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
   const [selectedLandlords, setSelectedLandlords] = useState<string[]>([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [referencingStatuses, setReferencingStatuses] = useState<Map<string, 'not-started' | 'in-progress' | 'complete'>>(new Map());
-  const [isLoadingReferencingStatuses, setIsLoadingReferencingStatuses] = useState(false);
+
+  // Keep landlords on the tenants view (no landlords tab)
+  useEffect(() => {
+    if (userRole !== 'agent' && activeTab !== 'tenants') {
+      setActiveTab('tenants');
+    }
+  }, [userRole, activeTab]);
 
   const TENANTS_PER_PAGE = 10;
 
-  // Fetch referencing statuses for all tenants
+  const tenantEmailsKey = useMemo(() => {
+    const emails = tenants
+      .map((t) => (t.email || '').trim())
+      .filter(Boolean);
+    // Stable unique set (case-insensitive), keep first-seen casing for Firestore queries
+    const seen = new Set<string>();
+    const unique: string[] = [];
+    for (const email of emails) {
+      const key = email.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(email);
+    }
+    return unique.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())).join('|');
+  }, [tenants]);
+
+  // Fetch referencing statuses once per unique email set (avoids reload thrash from new tenants[] refs)
   useEffect(() => {
+    let cancelled = false;
+
     const fetchReferencingStatuses = async () => {
-      if (!userProfile) {
+      if (!userProfile || !tenantEmailsKey) {
         setReferencingStatuses(new Map());
         return;
       }
-      if (tenants.length === 0) return;
-      
-      setIsLoadingReferencingStatuses(true);
-      console.log('[ClientsPage] Fetching referencing statuses for', tenants.length, 'tenants');
-      
-      const emails = tenants
-        .filter(t => t.email && t.email.trim())
-        .map(t => t.email);
-      
-      const statuses = await referencingService.getReferencingStatusForTenants(emails);
-      
-      console.log('[ClientsPage] Fetched referencing statuses:', statuses.size);
-      setReferencingStatuses(statuses);
-      setIsLoadingReferencingStatuses(false);
+
+      try {
+        const emails = tenantEmailsKey.split('|');
+        const statuses = await referencingService.getReferencingStatusForTenants(emails);
+        if (cancelled) return;
+        setReferencingStatuses(statuses);
+      } catch (error) {
+        console.error('[ClientsPage] Failed to fetch referencing statuses:', error);
+        if (!cancelled) setReferencingStatuses(new Map());
+      }
     };
 
     fetchReferencingStatuses();
-  }, [tenants, userProfile]);
-
-  if (!userProfile) {
-    return <LandlordPageEmptyShell page="clients" variant="guest" />;
-  }
-
-  if (isNewPortfolioUser(properties)) {
-    return (
-      <LandlordPageEmptyShell
-        page="clients"
-        variant="new-user"
-        onAddProperty={onAddProperty}
-        userName={userProfile.name}
-      />
-    );
-  }
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantEmailsKey, userProfile]);
 
   const getPropertyForTenant = (tenantId: string) => {
     const tenant = tenants.find(t => t.id === tenantId);
@@ -362,12 +370,13 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
     }
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | null | undefined) => {
+    const value = typeof amount === 'number' && Number.isFinite(amount) ? amount : 0;
     return new Intl.NumberFormat('en-GB', {
       style: 'currency',
       currency: 'GBP',
       minimumFractionDigits: 0,
-    }).format(amount);
+    }).format(value);
   };
 
   const formatDate = (date: Date) => {
@@ -533,40 +542,83 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
 
   const filteredLandlords = filteredAndSortedLandlords;
 
+  const isAgent = userRole === 'agent';
+  const addButtonStyle = {
+    backgroundColor: '#DC5F12',
+    borderColor: '#DC5F12',
+    minWidth: 'auto',
+    width: 'auto',
+    background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+  } as React.CSSProperties;
+
+  if (!userProfile) {
+    return <LandlordPageEmptyShell page="clients" variant="guest" />;
+  }
+
+  // Agents can manage landlords before adding their own properties.
+  if (isNewPortfolioUser(properties) && userRole !== 'agent') {
+    return (
+      <LandlordPageEmptyShell
+        page="clients"
+        variant="new-user"
+        onAddProperty={onAddProperty}
+        userName={userProfile.name}
+      />
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
       <div className="flex items-center justify-between gap-3 sm:gap-4">
         <div className="flex-1 min-w-0">
-          <h1 className="text-lg sm:text-2xl md:text-3xl" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>Your Tenants</h1>
+          <h1 className="text-lg sm:text-2xl md:text-3xl" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
+            {isAgent ? 'Your Clients' : 'Your Tenants'}
+          </h1>
           <p className="text-xs sm:text-sm text-muted-foreground" style={{ fontFamily: 'Archivo, sans-serif' }}>
-            Manage your tenants and landlords
+            {isAgent ? 'Manage your tenants and landlords' : 'Manage your tenants'}
           </p>
         </div>
-        <Button 
-          onClick={onAddTenant} 
-          className="flex items-center space-x-0 px-5 sm:px-8 md:px-12 py-2.5 sm:py-3 md:py-3.5 min-h-[2.75rem] sm:min-h-[3.25rem] md:min-h-[3.5rem] rounded-full transition-all duration-300 flex-shrink-0 text-sm sm:text-base" 
-          style={{ 
-            backgroundColor: '#DC5F12', 
-            borderColor: '#DC5F12', 
-            minWidth: 'auto',
-            width: 'auto',
-            background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-            e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-            e.currentTarget.style.transform = 'translateY(-2px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
-            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-            e.currentTarget.style.transform = 'translateY(0px)';
-          }}
-        >
-          <Plus className="w-4 h-4 sm:w-4 sm:h-4" strokeWidth={2.5} />
-          <span className="ml-1.5 sm:ml-2">Add Tenant</span>
-        </Button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button 
+            onClick={onAddTenant} 
+            className="flex items-center space-x-0 px-5 sm:px-8 md:px-12 py-2.5 sm:py-3 md:py-3.5 min-h-[2.75rem] sm:min-h-[3.25rem] md:min-h-[3.5rem] rounded-full transition-all duration-300 text-sm sm:text-base" 
+            style={addButtonStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
+              e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
+              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+              e.currentTarget.style.transform = 'translateY(0px)';
+            }}
+          >
+            <Plus className="w-4 h-4 sm:w-4 sm:h-4" strokeWidth={2.5} />
+            <span className="ml-1.5 sm:ml-2">Add Tenant</span>
+          </Button>
+          {isAgent && (
+            <Button 
+              onClick={onAddLandlord} 
+              className="flex items-center space-x-0 px-5 sm:px-8 md:px-12 py-2.5 sm:py-3 md:py-3.5 min-h-[2.75rem] sm:min-h-[3.25rem] md:min-h-[3.5rem] rounded-full transition-all duration-300 text-sm sm:text-base" 
+              style={addButtonStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
+                e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
+                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.transform = 'translateY(0px)';
+              }}
+            >
+              <Plus className="w-4 h-4 sm:w-4 sm:h-4" strokeWidth={2.5} />
+              <span className="ml-1.5 sm:ml-2">Add Landlord</span>
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -597,7 +649,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                 Rent Arrears
               </p>
               <p className="text-2xl font-semibold text-red-600">
-                £{summary.totalOverdueAmount.toLocaleString()}
+                Â£{summary.totalOverdueAmount.toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground">
                 {summary.overdueCount} tenant{summary.overdueCount !== 1 ? 's' : ''} behind
@@ -657,9 +709,9 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
         </Card>
       </div>
 
-      {userRole !== 'landlord' ? (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`grid w-full ${userRole === 'agent' ? 'grid-cols-2' : 'grid-cols-1'} h-16 bg-transparent`}>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        {isAgent && (
+          <TabsList className="grid w-full grid-cols-2 h-16 bg-transparent">
             <TabsTrigger 
               value="tenants"
               style={activeTab === 'tenants' ? { backgroundColor: 'white', color: '#374957' } : { backgroundColor: 'transparent', color: '#6B7280' }}
@@ -667,16 +719,15 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
             >
               Tenants
             </TabsTrigger>
-            {userRole === 'agent' && (
-              <TabsTrigger 
-                value="landlords"
-                style={activeTab === 'landlords' ? { backgroundColor: 'white', color: '#374957' } : { backgroundColor: 'transparent', color: '#6B7280' }}
-                className="transition-colors duration-200 h-16"
-              >
-                Landlords
-              </TabsTrigger>
-            )}
+            <TabsTrigger 
+              value="landlords"
+              style={activeTab === 'landlords' ? { backgroundColor: 'white', color: '#374957' } : { backgroundColor: 'transparent', color: '#6B7280' }}
+              className="transition-colors duration-200 h-16"
+            >
+              Landlords
+            </TabsTrigger>
           </TabsList>
+        )}
 
           <TabsContent value="tenants" className="space-y-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
@@ -800,54 +851,51 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid gap-4">
             {paginatedTenants.map((tenant) => {
               const property = getPropertyForTenant(tenant.id);
               const arrears = getArrearsForTenant(tenant.id);
+              const emergency = tenant.emergencyContact;
+              const hasEmergency =
+                !!emergency &&
+                !!(emergency.name || emergency.phone || emergency.relationship);
               
               return (
                 <Card 
                   key={tenant.id} 
-                  className={`hover:shadow-md transition-shadow ${
+                  className={`hover:shadow-md transition-shadow overflow-hidden ${
                     arrears ? 'border-red-200 bg-red-50/50' : ''
                   } ${selectedTenants.includes(tenant.id) ? 'ring-2 ring-blue-500' : ''}`}
                 >
                   <CardContent className="p-6 cursor-pointer" onClick={() => onViewTenant(tenant)}>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-4 flex-1">
-                        <div className="flex items-center pt-1">
-                          <input
-                            type="checkbox"
-                            checked={selectedTenants.includes(tenant.id)}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              toggleTenantSelection(tenant.id);
-                            }}
-                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                        </div>
-                        <Avatar className="h-12 w-12">
-                          {tenant.avatar && <AvatarImage src={tenant.avatar} alt={tenant.name} />}
-                          <AvatarFallback>
-                            <User className="h-6 w-6" />
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-medium" style={{ color: '#374957' }}>{tenant.name}</h3>
+                    <div className="flex items-start gap-4">
+                      <div className="flex items-center pt-1 flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={selectedTenants.includes(tenant.id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            toggleTenantSelection(tenant.id);
+                          }}
+                          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                      </div>
+                      <Avatar className="h-12 w-12 flex-shrink-0">
+                        {tenant.avatar && <AvatarImage src={tenant.avatar} alt={tenant.name} />}
+                        <AvatarFallback>
+                          <User className="h-6 w-6" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex items-center gap-2 flex-wrap">
+                            <h3 className="font-medium truncate" style={{ color: '#374957' }}>{tenant.name}</h3>
                             <Badge className={getStatusColor(tenant.status)}>
                               {tenant.status}
                             </Badge>
-                            {isLoadingReferencingStatuses ? (
-                              <Badge className="bg-gray-100 text-gray-800">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Loading...
-                              </Badge>
-                            ) : (
-                              <Badge className={getReferencingStatusColor(referencingStatuses.get(tenant.email) || 'not-started')}>
-                                Referencing: {getReferencingStatusLabel(referencingStatuses.get(tenant.email) || 'not-started')}
-                              </Badge>
-                            )}
+                            <Badge className={getReferencingStatusColor(referencingStatuses.get((tenant.email || '').trim().toLowerCase()) || 'not-started')}>
+                              Referencing: {getReferencingStatusLabel(referencingStatuses.get((tenant.email || '').trim().toLowerCase()) || 'not-started')}
+                            </Badge>
                             {arrears && (
                               <Badge className="bg-red-100 text-red-800 border-red-200">
                                 <AlertTriangle className="h-3 w-3 mr-1" />
@@ -855,86 +903,87 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                               </Badge>
                             )}
                           </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onViewTenant(tenant);
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                        </div>
                           
-                          {/* Property Information */}
-                          <div className="flex items-center justify-between text-sm text-muted-foreground">
-                            <div className="flex items-center">
-                              <MapPin className="h-4 w-4 mr-2" />
-                              {tenant.propertyAddress}
-                            </div>
-                            {property && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onViewProperty(property);
-                                }}
-                                className="h-6 px-2 text-xs"
-                              >
-                                <Eye className="h-3 w-3 mr-1" />
-                                View Property
-                              </Button>
-                            )}
+                        {/* Property Information */}
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-muted-foreground">
+                          <div className="flex items-center min-w-0">
+                            <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <span className="truncate">{tenant.propertyAddress}</span>
                           </div>
-                          
-                          {/* Arrears Alert */}
-                          {arrears && (
-                            <div className="p-3 bg-red-100 border border-red-200 rounded-lg">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center text-red-800">
-                                  <PoundSterling className="h-4 w-4 mr-2" />
-                                  <span className="font-medium">
-                                    £{arrears.overdueAmount.toLocaleString()} overdue
-                                  </span>
-                                </div>
-                                <span className="text-sm text-red-600">
-                                  {arrears.daysPastDue} days past due
-                                </span>
-                              </div>
-                              <div className="mt-1 text-sm text-red-700">
-                                Default Risk Score: {arrears.defaultRiskScore}%
-                              </div>
-                            </div>
-                          )}
-                          
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                            <div className="flex items-center">
-                              <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-                              {tenant.email}
-                            </div>
-                            <div className="flex items-center">
-                              <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                              {tenant.phone}
-                            </div>
-                            <div className="flex items-center">
-                              <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
-                              {formatCurrency(tenant.rentAmount)}/month
-                            </div>
-                          </div>
-                          <div className="flex items-center text-sm text-muted-foreground">
-                            <Calendar className="h-4 w-4 mr-2" />
-                            Lease: {formatDate(tenant.leaseStart)} - {formatDate(tenant.leaseEnd)}
-                          </div>
-                          {tenant.emergencyContact && (
-                            <div className="text-sm text-muted-foreground">
-                              Emergency: {tenant.emergencyContact.name} ({tenant.emergencyContact.relationship}) - {tenant.emergencyContact.phone}
-                            </div>
+                          {property && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onViewProperty(property);
+                              }}
+                              className="h-6 px-2 text-xs self-start flex-shrink-0"
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              View Property
+                            </Button>
                           )}
                         </div>
-                      </div>
-                      <div className="flex flex-col gap-2 ml-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onViewTenant(tenant);
-                          }}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
+                          
+                        {/* Arrears Alert */}
+                        {arrears && (
+                          <div className="p-3 bg-red-100 border border-red-200 rounded-lg">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                              <div className="flex items-center text-red-800">
+                                <PoundSterling className="h-4 w-4 mr-2 flex-shrink-0" />
+                                <span className="font-medium">
+                                  {formatCurrency(arrears.overdueAmount)} overdue
+                                </span>
+                              </div>
+                              <span className="text-sm text-red-600">
+                                {arrears.daysPastDue} days past due
+                              </span>
+                            </div>
+                            <div className="mt-1 text-sm text-red-700">
+                              Default Risk Score: {arrears.defaultRiskScore}%
+                            </div>
+                          </div>
+                        )}
+                          
+                        <div className="flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-2">
+                          <div className="flex items-center min-w-0">
+                            <Mail className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
+                            <span className="truncate">{tenant.email}</span>
+                          </div>
+                          <div className="flex items-center min-w-0">
+                            <Phone className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
+                            <span className="truncate">{tenant.phone || 'â€”'}</span>
+                          </div>
+                          <div className="flex items-center min-w-0">
+                            <PoundSterling className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
+                            <span className="truncate">{formatCurrency(tenant.rentAmount)}/month</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center text-sm text-muted-foreground min-w-0">
+                          <Calendar className="h-4 w-4 mr-2 flex-shrink-0" />
+                          <span className="truncate">Lease: {formatDate(tenant.leaseStart)} - {formatDate(tenant.leaseEnd)}</span>
+                        </div>
+                        {hasEmergency && (
+                          <div className="text-sm text-muted-foreground truncate">
+                            Emergency: {[emergency?.name, emergency?.relationship && `(${emergency.relationship})`, emergency?.phone && `- ${emergency.phone}`]
+                              .filter(Boolean)
+                              .join(' ')}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -1186,18 +1235,18 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-                          <div className="flex items-center">
-                            <Home className="h-4 w-4 mr-2 text-muted-foreground" />
-                            {landlord.portfolio.totalProperties} properties
+                        <div className="flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-2">
+                          <div className="flex items-center min-w-0">
+                            <Home className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
+                            <span className="truncate">{landlord.portfolio.totalProperties} properties</span>
                           </div>
-                          <div className="flex items-center">
-                            <DollarSign className="h-4 w-4 mr-2 text-muted-foreground" />
-                            {formatCurrency(landlord.portfolio.monthlyIncome)}/month
+                          <div className="flex items-center min-w-0">
+                            <PoundSterling className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
+                            <span className="truncate">{formatCurrency(landlord.portfolio.monthlyIncome)}/month</span>
                           </div>
-                          <div className="flex items-center">
-                            <TrendingUp className="h-4 w-4 mr-2 text-muted-foreground" />
-                            {formatCurrency(landlord.portfolio.totalValue)} portfolio
+                          <div className="flex items-center min-w-0">
+                            <TrendingUp className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
+                            <span className="truncate">{formatCurrency(landlord.portfolio.totalValue)} portfolio</span>
                           </div>
                         </div>
                         
@@ -1208,7 +1257,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                         
                         <div className="flex items-center text-sm text-muted-foreground">
                           <Calendar className="h-4 w-4 mr-2" />
-                          Joined: {formatDate(landlord.joinDate)} • Last contact: {formatDate(landlord.lastContact)}
+                          Joined: {formatDate(landlord.joinDate)} â€¢ Last contact: {formatDate(landlord.lastContact)}
                         </div>
                         
                         {landlord.notes && (
@@ -1239,285 +1288,6 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
         </TabsContent>
         )}
       </Tabs>
-      ) : (
-        // For landlord users, show tenant list directly without tabs
-        <div className="space-y-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center bg-white border border-[#f3f3f3] rounded-lg p-4">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={selectAllTenants}
-                className="p-2"
-              >
-                {selectedTenants.length === filteredTenants.length && filteredTenants.length > 0 ? (
-                  <CheckSquare className="h-4 w-4" />
-                ) : (
-                  <Square className="h-4 w-4" />
-                )}
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                {selectedTenants.length === filteredTenants.length && filteredTenants.length > 0 ? 'Deselect All' : 'Select All'}
-              </span>
-            </div>
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search tenants..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Select value={tenantFilter} onValueChange={setTenantFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="ended">Ended</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Select value={leaseExpiryFilter} onValueChange={setLeaseExpiryFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Lease Expiry" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Leases</SelectItem>
-                <SelectItem value="expired">Expired</SelectItem>
-                <SelectItem value="30-days">Expiring within 30 days</SelectItem>
-                <SelectItem value="60-days">Expiring within 60 days</SelectItem>
-                <SelectItem value="90-days">Expiring within 90 days</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={tenantSortBy} onValueChange={setTenantSortBy}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">Default</SelectItem>
-                <SelectItem value="overdue-rent-only">Overdue Rent Only</SelectItem>
-                <SelectItem value="name-asc">Name: A to Z</SelectItem>
-                <SelectItem value="name-desc">Name: Z to A</SelectItem>
-                <SelectItem value="rent-asc">Rent: Low to High</SelectItem>
-                <SelectItem value="rent-desc">Rent: High to Low</SelectItem>
-                <SelectItem value="lease-expiry-asc">Lease Expiry: Soonest First</SelectItem>
-                <SelectItem value="lease-expiry-desc">Lease Expiry: Latest First</SelectItem>
-                <SelectItem value="overdue-desc">Overdue Amount: Highest First</SelectItem>
-                <SelectItem value="overdue-asc">Overdue Amount: Lowest First</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Bulk Actions Bar */}
-          {showBulkActions && selectedTenants.length > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 overflow-x-hidden">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                <div className="flex items-center flex-wrap gap-2 sm:space-x-4">
-                  <span className="text-sm font-medium text-blue-900">
-                    {selectedTenants.length} tenant{selectedTenants.length > 1 ? 's' : ''} selected
-                  </span>
-                  <Button variant="outline" size="sm" onClick={clearSelection} className="flex-shrink-0">
-                    Clear Selection
-                  </Button>
-                </div>
-                <div className="flex items-center flex-wrap gap-2 sm:space-x-2">
-                  <Button variant="outline" size="sm" onClick={handleBulkArchiveTenants} className="flex-shrink-0">
-                    <Archive className="h-4 w-4 mr-1" />
-                    Archive
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="flex-shrink-0">
-                        <Download className="h-4 w-4 mr-1" />
-                        Export
-                        <ChevronDown className="h-4 w-4 ml-1" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem onClick={() => handleBulkExportTenants('json')}>
-                        Export as JSON
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleBulkExportTenants('csv')}>
-                        Export as CSV
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleBulkExportTenants('excel')}>
-                        Export as Excel
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleBulkExportTenants('pdf')}>
-                        Export as PDF
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button variant="destructive" size="sm" onClick={handleBulkDeleteTenants} className="flex-shrink-0">
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {paginatedTenants.map((tenant) => {
-              const property = getPropertyForTenant(tenant.id);
-              const arrears = getArrearsForTenant(tenant.id);
-              
-              return (
-                <Card 
-                  key={tenant.id} 
-                  className={`hover:shadow-md transition-shadow ${
-                    arrears ? 'border-red-200 bg-red-50/50' : ''
-                  } ${selectedTenants.includes(tenant.id) ? 'ring-2 ring-blue-500' : ''}`}
-                >
-                  <CardContent className="p-6 cursor-pointer" onClick={() => onViewTenant(tenant)}>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedTenants.includes(tenant.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            toggleTenantSelection(tenant.id);
-                          }}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold">{tenant.name}</h3>
-                            <Badge className={tenant.paymentStatus === 'current' ? 'bg-green-100 text-green-800' : 
-                                             tenant.paymentStatus === 'overdue' ? 'bg-red-100 text-red-800' : 
-                                             'bg-orange-100 text-orange-800'}>
-                              {tenant.paymentStatus === 'current' ? 'Payment Up-to-Date' : 
-                               tenant.paymentStatus === 'overdue' ? 'Payment Overdue' : 
-                               'Payment Plan'}
-                            </Badge>
-                            {arrears && (
-                              <Badge variant="destructive" className="bg-red-100 text-red-800">
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                Overdue
-                              </Badge>
-                            )}
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-2">
-                              <Mail className="h-4 w-4" />
-                              <span>{tenant.email}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Phone className="h-4 w-4" />
-                              <span>{tenant.phone}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Home className="h-4 w-4" />
-                              <span>{tenant.propertyAddress}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <PoundSterling className="h-4 w-4" />
-                              <span>£{tenant.rentAmount}/month</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4" />
-                              <span>Lease: {formatDate(tenant.leaseStart)} - {formatDate(tenant.leaseEnd)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Users className="h-4 w-4" />
-                              <span>Emergency: {tenant.emergencyContactName} ({tenant.emergencyContactPhone})</span>
-                            </div>
-                          </div>
-
-                          {arrears && (
-                            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                              <div className="flex items-center gap-2 text-red-800 font-medium">
-                                <AlertTriangle className="h-4 w-4" />
-                                Overdue Amount: £{arrears.overdueAmount}
-                              </div>
-                              <p className="text-red-700 text-sm mt-1">
-                                Last payment: {formatDate(arrears.lastPaymentDate)}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          {/* Pagination Controls */}
-          {totalTenantPages > 1 && (
-            <div className="flex items-center justify-between bg-white border border-[#f3f3f3] rounded-lg p-4">
-              <div className="text-sm text-muted-foreground">
-                Showing {startIndex + 1} to {Math.min(endIndex, filteredTenants.length)} of {filteredTenants.length} tenants
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentTenantPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentTenantPage === 1}
-                  className="flex items-center gap-1"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalTenantPages }, (_, i) => i + 1).map((page) => {
-                    // Show first page, last page, current page, and pages around current
-                    if (
-                      page === 1 ||
-                      page === totalTenantPages ||
-                      (page >= currentTenantPage - 1 && page <= currentTenantPage + 1)
-                    ) {
-                      return (
-                        <Button
-                          key={page}
-                          variant={currentTenantPage === page ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setCurrentTenantPage(page)}
-                          className="min-w-[40px]"
-                        >
-                          {page}
-                        </Button>
-                      );
-                    } else if (
-                      page === currentTenantPage - 2 ||
-                      page === currentTenantPage + 2
-                    ) {
-                      return (
-                        <span key={page} className="text-muted-foreground px-2">
-                          ...
-                        </span>
-                      );
-                    }
-                    return null;
-                  })}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentTenantPage(prev => Math.min(totalTenantPages, prev + 1))}
-                  disabled={currentTenantPage === totalTenantPages}
-                  className="flex items-center gap-1"
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

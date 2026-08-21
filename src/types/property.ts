@@ -1,4 +1,11 @@
 export interface Property {
+  /** Stable primary key for r1.4 facts/report (Firestore id or url hash). */
+  listingId?: string;
+  /** Ordnance Survey UPRN — nullable until match job resolves it. */
+  uprn?: string | null;
+  titleNumber?: string | null;
+  /** Source listing URL when scraped. */
+  url?: string;
   title: string;
   price: string;
   location: string;

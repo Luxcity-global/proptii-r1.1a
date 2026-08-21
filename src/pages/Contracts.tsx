@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -18,7 +19,17 @@ const preloadHeroImage = () => {
 
 const ContractsPage = () => {
   const { isAuthenticated, login } = useAuth();
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const initialTab = tabParam === 'received' ? 'received' : 'uploaded';
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Auto-open modal when arriving via ?tab=received link
+  useEffect(() => {
+    if (tabParam === 'received' && isAuthenticated) {
+      setIsModalOpen(true);
+    }
+  }, [tabParam, isAuthenticated]);
 
   // Preload hero image when component mounts
   useEffect(() => {
@@ -127,7 +138,7 @@ const ContractsPage = () => {
       </section>
 
       {/*Contract Modal */}
-      {isModalOpen && <ContractModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />}
+      {isModalOpen && <ContractModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} initialTab={initialTab as 'uploaded' | 'received'} />}
 
       <FAQSection />
       <Footer />

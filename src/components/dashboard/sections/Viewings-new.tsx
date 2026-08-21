@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Calendar, Clock, MapPin, User, Mail, CheckCircle, Eye, X, Heart, MessageCircle, Send, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { viewingService, ViewingBooking, ViewingStats } from '../../../services/viewingService';
 import { bookViewingRequestService, BookViewingRequest } from '../../../services/bookViewingRequestService';
@@ -6,7 +6,28 @@ import { propertySelectionService, PropertySelection, PropertySelectionStats } f
 import { useAuth } from '../../../contexts/AuthContext';
 import BookViewingModal from '../../viewings/BookViewingModal';
 import emailService from '../../../services/emailService';
+import {
+  generateCancelViewingEmailTemplate,
+  generateRescheduleRequestEmailTemplate,
+} from '../../viewings/services/emailTemplates';
 import { useIsMobile } from '../ui/use-mobile';
+
+const REQUEST_PREFIX = 'request_';
+const DRAFT_PREFIX = 'draft_';
+
+const isRequestPlaceholder = (id: string) => String(id).startsWith(REQUEST_PREFIX);
+const isDraftPlaceholder = (id: string) => String(id).startsWith(DRAFT_PREFIX);
+
+const getPropertyKey = (item: {
+  propertyId?: string | null;
+  property?: { street?: string; town?: string };
+}) => item.propertyId || `${item.property?.street || ''}-${item.property?.town || ''}`;
+
+const isUpcomingStatus = (status: ViewingBooking['status']) =>
+  status === 'pending' || status === 'confirmed' || status === 'rescheduled';
+
+const isPastStatus = (status: ViewingBooking['status']) =>
+  status === 'completed' || status === 'cancelled';
 
 /**
  * Viewings section - redesigned to follow style guide
@@ -51,6 +72,7 @@ const Viewings: React.FC = () => {
   const [currentPastPage, setCurrentPastPage] = useState<number>(1);
   
   const ITEMS_PER_PAGE = 10;
+  const knownBookingKeysRef = useRef<Set<string>>(new Set());
 
   const selectionImageByPropertyId = useMemo(() => {
     const map = new Map<string, string>();
@@ -165,16 +187,19 @@ const Viewings: React.FC = () => {
         console.log('All bookings result:', allBookingsResult);
 
         console.log('Loading upcoming viewings...');
-        // Load upcoming viewings (pending and confirmed)
+        // Load upcoming viewings (pending, confirmed, and rescheduled)
         const upcomingResult = await viewingService.getViewingBookingsByStatus(user.id, 'pending');
         const confirmedResult = await viewingService.getViewingBookingsByStatus(user.id, 'confirmed');
+        const rescheduledResult = await viewingService.getViewingBookingsByStatus(user.id, 'rescheduled');
         
         console.log('Upcoming result:', upcomingResult);
         console.log('Confirmed result:', confirmedResult);
+        console.log('Rescheduled result:', rescheduledResult);
         
         let upcoming = [
           ...(upcomingResult.bookings || []),
-          ...(confirmedResult.bookings || [])
+          ...(confirmedResult.bookings || []),
+          ...(rescheduledResult.bookings || [])
         ];
 
         // Also include Book Viewing Requests as upcoming placeholders
@@ -209,20 +234,18 @@ const Viewings: React.FC = () => {
         if (upcoming.length === 0 && (allBookingsResult.bookings || []).length > 0) {
           console.log('Using fallback from all bookings to populate upcoming');
           upcoming = (allBookingsResult.bookings || []).filter(
-            (b: any) => b.status === 'pending' || b.status === 'confirmed'
+            (b: ViewingBooking) => isUpcomingStatus(b.status)
           );
         }
 
-        // Only add request placeholders for properties that don't have real bookings
+        // Only add request placeholders for properties that don't already have a booking
         const realBookingKeys = new Set<string>();
-        upcoming.forEach(b => {
-          const key = b.propertyId || `${b.property.street}-${b.property.town}`;
-          realBookingKeys.add(key);
+        (allBookingsResult.bookings || upcoming).forEach((b) => {
+          realBookingKeys.add(getPropertyKey(b));
         });
         
-        const filteredRequestBookings = requestBookings.filter(r => {
-          const key = r.propertyId || `${r.property.street}-${r.property.town}`;
-          return !realBookingKeys.has(key);
+        const filteredRequestBookings = requestBookings.filter((r) => {
+          return !realBookingKeys.has(getPropertyKey(r));
         });
         
         // Combine real bookings with filtered request placeholders
@@ -253,7 +276,7 @@ const Viewings: React.FC = () => {
         if (past.length === 0 && (allBookingsResult.bookings || []).length > 0) {
           console.log('Using fallback from all bookings to populate past');
           past = (allBookingsResult.bookings || []).filter(
-            (b: any) => b.status === 'completed' || b.status === 'cancelled'
+            (b: ViewingBooking) => isPastStatus(b.status)
           );
         }
         
@@ -270,6 +293,19 @@ const Viewings: React.FC = () => {
     loadViewingData();
   }, [user?.id, viewingsVersion]);
 
+  useEffect(() => {
+    const keys = new Set<string>();
+    upcomingViewings.forEach((viewing) => {
+      if (!isRequestPlaceholder(viewing.id) && !isDraftPlaceholder(viewing.id)) {
+        keys.add(getPropertyKey(viewing));
+      }
+    });
+    pastViewings.forEach((viewing) => {
+      keys.add(getPropertyKey(viewing));
+    });
+    knownBookingKeysRef.current = keys;
+  }, [upcomingViewings, pastViewings]);
+
   // Set up real-time subscriptions
   useEffect(() => {
     if (!user?.id) return;
@@ -284,30 +320,23 @@ const Viewings: React.FC = () => {
       user.id,
       (bookings) => {
         console.log('Real-time subscription received bookings:', bookings);
-        const upcoming = bookings.filter(b => b.status === 'pending' || b.status === 'confirmed');
-        const past = bookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
+        const upcoming = bookings.filter((b) => isUpcomingStatus(b.status));
+        const past = bookings.filter((b) => isPastStatus(b.status));
         console.log('Filtered upcoming:', upcoming);
         console.log('Filtered past:', past);
         setUpcomingViewings(prev => {
-          const drafts = prev.filter(v => String(v.id).startsWith('draft_'));
-          const requests = prev.filter(v => String(v.id).startsWith('request_'));
-
-          if (upcoming.length === 0 && prev.some(v => !String(v.id).startsWith('request_') && !String(v.id).startsWith('draft_'))) {
-            return prev;
-          }
+          const drafts = prev.filter((v) => isDraftPlaceholder(v.id));
+          const requests = prev.filter((v) => isRequestPlaceholder(v.id));
 
           const realBookingKeys = new Set<string>();
-          upcoming.forEach(b => {
-            const key = b.propertyId || `${b.property.street}-${b.property.town}`;
-            realBookingKeys.add(key);
+          bookings.forEach((b) => {
+            realBookingKeys.add(getPropertyKey(b));
           });
+          knownBookingKeysRef.current = realBookingKeys;
 
-          const filteredRequests = requests.filter(r => {
-            const key = r.propertyId || `${r.property.street}-${r.property.town}`;
-            return !realBookingKeys.has(key);
-          });
+          const filteredRequests = requests.filter((r) => !realBookingKeys.has(getPropertyKey(r)));
 
-          const combined = [...upcoming, ...filteredRequests].filter(v => !String(v.id).startsWith('draft_'));
+          const combined = [...upcoming, ...filteredRequests].filter((v) => !isDraftPlaceholder(v.id));
           return drafts.length ? [...drafts, ...combined] : combined;
         });
         setPastViewings(past);
@@ -339,18 +368,18 @@ const Viewings: React.FC = () => {
         }));
         setUpcomingViewings(prev => {
           // Get real bookings (not request placeholders)
-          const realBookings = prev.filter(v => !String(v.id).startsWith('request_'));
+          const realBookings = prev.filter((v) => !isRequestPlaceholder(v.id));
           
           // Only add request placeholders for properties that don't have real bookings
-          const realBookingKeys = new Set<string>();
-          realBookings.forEach(b => {
-            const key = b.propertyId || `${b.property.street}-${b.property.town}`;
-            realBookingKeys.add(key);
+          const realBookingKeys = new Set<string>(knownBookingKeysRef.current);
+          realBookings.forEach((b) => {
+            if (!isDraftPlaceholder(b.id)) {
+              realBookingKeys.add(getPropertyKey(b));
+            }
           });
           
-          const filteredRequestBookings = requestBookings.filter(r => {
-            const key = r.propertyId || `${r.property.street}-${r.property.town}`;
-            return !realBookingKeys.has(key);
+          const filteredRequestBookings = requestBookings.filter((r) => {
+            return !realBookingKeys.has(getPropertyKey(r));
           });
           
           // Combine real bookings with filtered request placeholders
@@ -545,8 +574,8 @@ const Viewings: React.FC = () => {
     }
   };
 
-  const handleReschedule = async (bookingId: string) => {
-    const viewing = upcomingViewings.find(v => v.id === bookingId);
+  const handleReschedule = (bookingId: string) => {
+    const viewing = upcomingViewings.find((v) => v.id === bookingId);
     if (viewing) {
       setSelectedViewing(viewing);
       setRescheduleMessage('');
@@ -554,13 +583,152 @@ const Viewings: React.FC = () => {
     }
   };
 
-  const handleCancel = async (bookingId: string) => {
-    const viewing = upcomingViewings.find(v => v.id === bookingId);
+  const handleCancel = (bookingId: string) => {
+    const viewing = upcomingViewings.find((v) => v.id === bookingId);
     if (viewing) {
       setSelectedViewing(viewing);
       setCancelMessage('');
       setIsCancelModalOpen(true);
     }
+  };
+
+  const getApplicantDetails = (viewing: ViewingBooking) => {
+    const details = viewing.viewingDetails?.userDetails;
+    return {
+      name: details?.fullName || user?.name || [user?.givenName, user?.familyName].filter(Boolean).join(' ') || '',
+      email: details?.email || user?.email || '',
+      phoneNumber: details?.phoneNumber || user?.phone || '',
+    };
+  };
+
+  const persistRenterViewingStatus = async (
+    viewing: ViewingBooking,
+    status: 'cancelled' | 'rescheduled',
+    notes?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    const viewingId = String(viewing.id);
+
+    if (isDraftPlaceholder(viewingId)) {
+      if (status === 'cancelled') {
+        try {
+          sessionStorage.removeItem('draft_viewing');
+        } catch {
+          // ignore storage errors
+        }
+      }
+      return { success: true };
+    }
+
+    if (isRequestPlaceholder(viewingId)) {
+      const requestId = viewingId.slice(REQUEST_PREFIX.length);
+      if (status === 'cancelled') {
+        const deleteResult = await bookViewingRequestService.deleteRequest(requestId);
+        if (!deleteResult.success) {
+          return deleteResult;
+        }
+        if (user?.id) {
+          const all = await viewingService.getUserViewingBookings(user.id);
+          const key = getPropertyKey(viewing);
+          const linked = (all.bookings || []).filter(
+            (booking) => getPropertyKey(booking) === key && isUpcomingStatus(booking.status)
+          );
+          await Promise.all(
+            linked.map((booking) => viewingService.updateViewingStatus(booking.id, 'cancelled', notes))
+          );
+        }
+      }
+      return { success: true };
+    }
+
+    const updateResult = await viewingService.updateViewingStatus(viewing.id, status, notes);
+    if (!updateResult.success) {
+      return updateResult;
+    }
+
+    if (status === 'cancelled' && user?.id) {
+      await bookViewingRequestService.deleteRequestsForProperty(user.id, {
+        propertyId: viewing.propertyId,
+        street: viewing.property?.street,
+        town: viewing.property?.town,
+      });
+    }
+
+    return { success: true };
+  };
+
+  const applyOptimisticStatus = (viewing: ViewingBooking, status: 'cancelled' | 'rescheduled') => {
+    if (status === 'cancelled') {
+      setUpcomingViewings((prev) => prev.filter((item) => item.id !== viewing.id));
+      if (!isRequestPlaceholder(viewing.id) && !isDraftPlaceholder(viewing.id)) {
+        setPastViewings((prev) => [{ ...viewing, status: 'cancelled' }, ...prev]);
+      }
+      knownBookingKeysRef.current.add(getPropertyKey(viewing));
+    } else if (!isRequestPlaceholder(viewing.id) && !isDraftPlaceholder(viewing.id)) {
+      setUpcomingViewings((prev) =>
+        prev.map((item) => (item.id === viewing.id ? { ...item, status: 'rescheduled' } : item))
+      );
+    }
+  };
+
+  const notifyAgentOfViewingChange = async (
+    viewing: ViewingBooking,
+    emailType: 'viewing-reschedule' | 'viewing-cancel',
+    message: string
+  ): Promise<{ success: boolean; skipped?: boolean; error?: string }> => {
+    const agentEmail = viewing.property?.agent?.email?.trim();
+    if (!agentEmail) {
+      return { success: true, skipped: true };
+    }
+
+    const applicant = getApplicantDetails(viewing);
+    const propertyAddress = [viewing.property?.street, viewing.property?.town, viewing.property?.city]
+      .filter(Boolean)
+      .join(', ');
+    const templateData = {
+      property: viewing.property,
+      viewing: viewing.viewingDetails,
+      user: applicant,
+      message,
+    };
+    const html =
+      emailType === 'viewing-reschedule'
+        ? generateRescheduleRequestEmailTemplate(templateData)
+        : generateCancelViewingEmailTemplate(templateData);
+
+    return emailService.sendEmail({
+      to: agentEmail,
+      subject:
+        emailType === 'viewing-reschedule'
+          ? `Viewing Reschedule Request - ${propertyAddress}`
+          : `Viewing Cancellation - ${propertyAddress}`,
+      formData: {
+        property: {
+          street: viewing.property?.street,
+          town: viewing.property?.town,
+          city: viewing.property?.city,
+          postcode: viewing.property?.postcode || '',
+          agent: {
+            name: viewing.property?.agent?.name,
+            email: agentEmail,
+          },
+        },
+        viewing: {
+          date: viewing.viewingDetails?.date,
+          time: viewing.viewingDetails?.time,
+          preference: viewing.viewingDetails?.preference || 'in-person',
+          ...(emailType === 'viewing-reschedule'
+            ? { rescheduleMessage: message }
+            : { cancelMessage: message }),
+        },
+        user: {
+          name: applicant.name,
+          email: applicant.email,
+        },
+      },
+      html,
+      attachments: [],
+      emailType,
+    });
   };
 
   const sendRescheduleEmail = async () => {
@@ -571,54 +739,34 @@ const Viewings: React.FC = () => {
 
     setIsSendingEmail(true);
     try {
-      // Structure data for reschedule email (only to agent, not user confirmation)
-      const formData = {
-        property: {
-          street: selectedViewing.property.street,
-          town: selectedViewing.property.town,
-          city: selectedViewing.property.city,
-          postcode: selectedViewing.property.postcode || '',
-          agent: {
-            name: selectedViewing.property.agent.name,
-            email: selectedViewing.property.agent.email
-          }
-        },
-        viewing: {
-          date: selectedViewing.viewingDetails.date,
-          time: selectedViewing.viewingDetails.time,
-          preference: selectedViewing.viewingDetails.preference || 'in-person',
-          rescheduleMessage: rescheduleMessage
-        },
-        user: {
-          name: selectedViewing.viewingDetails.userDetails.fullName,
-          email: selectedViewing.viewingDetails.userDetails.email
-        }
-      };
+      const persistResult = await persistRenterViewingStatus(
+        selectedViewing,
+        'rescheduled',
+        `Reschedule requested: ${rescheduleMessage}`
+      );
 
-      const propertyAddress = `${selectedViewing.property.street}, ${selectedViewing.property.town}, ${selectedViewing.property.city}`;
+      if (!persistResult.success) {
+        alert(persistResult.error || 'Failed to reschedule this viewing. Please try again.');
+        return;
+      }
 
-      // Send reschedule-specific email directly to agent (not using viewingEmailService which sends both agent and user emails)
-      const result = await emailService.sendEmail({
-        to: selectedViewing.property.agent.email,
-        subject: `Viewing Reschedule Request - ${propertyAddress}`,
-        formData: formData,
-        attachments: [],
-        emailType: 'viewing-reschedule'
-      });
+      const emailResult = await notifyAgentOfViewingChange(
+        selectedViewing,
+        'viewing-reschedule',
+        rescheduleMessage
+      );
 
-      if (result.success) {
-        await viewingService.updateViewingStatus(
-          selectedViewing.id,
-          'rescheduled',
-          `Reschedule requested: ${rescheduleMessage}`
-        );
+      applyOptimisticStatus(selectedViewing, 'rescheduled');
+      setIsRescheduleModalOpen(false);
+      setRescheduleMessage('');
+      setSelectedViewing(null);
 
+      if (emailResult.success && !emailResult.skipped) {
         alert('Reschedule request sent successfully!');
-        setIsRescheduleModalOpen(false);
-        setRescheduleMessage('');
-        setSelectedViewing(null);
+      } else if (emailResult.skipped) {
+        alert('Viewing marked as rescheduled. We could not email the agent because no agent email was on file.');
       } else {
-        alert('Failed to send reschedule request. Please try again.');
+        alert('Viewing marked as rescheduled, but the email to the agent could not be sent. Please contact them directly if needed.');
       }
     } catch (error) {
       console.error('Error sending reschedule email:', error);
@@ -635,62 +783,34 @@ const Viewings: React.FC = () => {
 
     setIsSendingEmail(true);
     try {
-      // Structure data for cancel email (only to agent, not user confirmation)
-      const formData = {
-        property: {
-          street: selectedViewing.property.street,
-          town: selectedViewing.property.town,
-          city: selectedViewing.property.city,
-          postcode: selectedViewing.property.postcode || '',
-          agent: {
-            name: selectedViewing.property.agent.name,
-            email: selectedViewing.property.agent.email
-          }
-        },
-        viewing: {
-          date: selectedViewing.viewingDetails.date,
-          time: selectedViewing.viewingDetails.time,
-          preference: selectedViewing.viewingDetails.preference || 'in-person',
-          cancelMessage: cancelMessage || ''
-        },
-        user: {
-          name: selectedViewing.viewingDetails.userDetails.fullName,
-          email: selectedViewing.viewingDetails.userDetails.email
-        }
-      };
+      const persistResult = await persistRenterViewingStatus(
+        selectedViewing,
+        'cancelled',
+        cancelMessage ? `Cancelled: ${cancelMessage}` : undefined
+      );
 
-      const propertyAddress = `${selectedViewing.property.street}, ${selectedViewing.property.town}, ${selectedViewing.property.city}`;
-      const agentEmail = selectedViewing.property.agent.email;
+      if (!persistResult.success) {
+        alert(persistResult.error || 'Failed to cancel this viewing. Please try again.');
+        return;
+      }
 
-      // Log the email details for debugging
-      console.log('Sending cancellation email:', {
-        to: agentEmail,
-        property: propertyAddress,
-        viewingDate: selectedViewing.viewingDetails.date,
-        viewingTime: selectedViewing.viewingDetails.time,
-        userMessage: cancelMessage || 'No message provided'
-      });
+      const emailResult = await notifyAgentOfViewingChange(
+        selectedViewing,
+        'viewing-cancel',
+        cancelMessage
+      );
 
-      // Send cancel-specific email directly to agent (not using viewingEmailService which sends both agent and user emails)
-      const result = await emailService.sendEmail({
-        to: agentEmail,
-        subject: `Viewing Cancellation - ${propertyAddress}`,
-        formData: formData,
-        attachments: [],
-        emailType: 'viewing-cancel'
-      });
+      applyOptimisticStatus(selectedViewing, 'cancelled');
+      setIsCancelModalOpen(false);
+      setCancelMessage('');
+      setSelectedViewing(null);
 
-      console.log('Cancellation email result:', result);
-
-      if (result.success) {
-        await viewingService.updateViewingStatus(selectedViewing.id, 'cancelled');
-
+      if (emailResult.success && !emailResult.skipped) {
         alert('Cancellation notice sent successfully!');
-        setIsCancelModalOpen(false);
-        setCancelMessage('');
-        setSelectedViewing(null);
+      } else if (emailResult.skipped) {
+        alert('Viewing cancelled. We could not email the agent because no agent email was on file.');
       } else {
-        alert('Failed to send cancellation notice. Please try again.');
+        alert('Viewing cancelled, but the email to the agent could not be sent. Please contact them directly if needed.');
       }
     } catch (error) {
       console.error('Error sending cancel email:', error);
@@ -1026,6 +1146,7 @@ const Viewings: React.FC = () => {
                   {activeTab === 'upcoming' ? (
                     <>
                         <button 
+                          type="button"
                           onClick={() => handleReschedule(viewing.id)}
                           className={`flex-1 inline-flex items-center justify-center ${isMobile ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'} text-white rounded-lg font-medium hover:opacity-90 transition-colors`} 
                           style={{ backgroundColor: '#136C9E' }}
@@ -1033,6 +1154,7 @@ const Viewings: React.FC = () => {
                         Reschedule
                       </button>
                         <button 
+                          type="button"
                           onClick={() => handleCancel(viewing.id)}
                           className={`flex-1 inline-flex items-center justify-center ${isMobile ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'} border border-red-300 text-red-600 rounded-lg font-medium hover:bg-red-50 transition-colors`}
                         >
@@ -1081,7 +1203,7 @@ const Viewings: React.FC = () => {
 
       {/* Reschedule Modal */}
       {isRescheduleModalOpen && selectedViewing && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className={`${isMobile ? 'p-4' : 'p-6'}`}>
               <div className="flex items-center justify-between mb-4">
@@ -1122,7 +1244,7 @@ const Viewings: React.FC = () => {
                   className={`w-full ${isMobile ? 'px-2.5 py-2 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none`}
                 />
                 <p className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-gray-500 mt-1`}>
-                  This message will be sent via email to {selectedViewing.property.agent.email}
+                  This message will be sent via email to {selectedViewing.property.agent?.email || 'the agent'}
                 </p>
               </div>
 
@@ -1163,7 +1285,7 @@ const Viewings: React.FC = () => {
 
       {/* Cancel Modal */}
       {isCancelModalOpen && selectedViewing && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className={`${isMobile ? 'p-4' : 'p-6'}`}>
               <div className={`flex ${isMobile ? 'items-start' : 'items-center'} ${isMobile ? 'gap-2' : 'space-x-3'} mb-4`}>
@@ -1200,7 +1322,7 @@ const Viewings: React.FC = () => {
                   className={`w-full ${isMobile ? 'px-2.5 py-2 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none`}
                 />
                 <p className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-gray-500 mt-1`}>
-                  This message will be sent via email to {selectedViewing.property.agent.email}
+                  This message will be sent via email to {selectedViewing.property.agent?.email || 'the agent'}
                 </p>
               </div>
 

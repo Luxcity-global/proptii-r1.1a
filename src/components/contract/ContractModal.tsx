@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 interface ContractModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: 'uploaded' | 'deleted' | 'received';
 }
 
 interface Template {
@@ -91,9 +92,9 @@ const convertBase64ToFile = (base64: string, fileName: string, fileType: string)
   }
 };
 
-const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
+const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose, initialTab = 'uploaded' }) => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'uploaded' | 'deleted' | 'received'>('uploaded');
+  const [activeTab, setActiveTab] = useState<'uploaded' | 'deleted' | 'received'>(initialTab);
   const [uploadedTemplates, setUploadedTemplates] = useState<Template[]>([]);
   const [deletedTemplates, setDeletedTemplates] = useState<Template[]>([]);
   const [receivedContracts, setReceivedContracts] = useState<any[]>([]);
@@ -110,6 +111,8 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const previewTemplateRef = useRef<Template | null>(null);
+  const previewBlobUrlRef = useRef<string | null>(null);
 
   // New state to track if we're in customize mode and which template is being customized
   const [customizeMode, setCustomizeMode] = useState(false);
@@ -208,25 +211,6 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
           console.log('❌ Failed to load deleted templates:', deletedResult.error);
           setDeletedTemplates([]);
         }
-
-        // Load received contracts (sent by landlords)
-        if (user?.email) {
-          console.log('🔄 Fetching received contracts for tenant:', user.email);
-          const receivedResult = await contractService.getReceivedContracts(user.email);
-          
-          if (receivedResult.success && receivedResult.contracts) {
-            // Filter out signed contracts - only show sent/unsigned contracts in the received tab
-            // Signed contracts have been completed and sent back to landlord
-            const pendingContracts = receivedResult.contracts.filter(
-              contract => contract.status !== 'signed'
-            );
-            console.log(`✅ Loaded ${pendingContracts.length} pending received contracts (${receivedResult.contracts.length} total, ${receivedResult.contracts.length - pendingContracts.length} signed filtered out)`);
-            setReceivedContracts(pendingContracts);
-          } else {
-            console.log('❌ Failed to load received contracts:', receivedResult.error);
-            setReceivedContracts([]);
-          }
-        }
       } catch (error) {
         console.error('❌ Error loading templates from Firestore:', error);
         console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
@@ -236,7 +220,120 @@ const ContractModal: React.FC<ContractModalProps> = ({ isOpen, onClose }) => {
     };
 
     loadTemplatesFromFirestore();
-  }, [isOpen, user?.id, user?.email]);
+  }, [isOpen, user?.id]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    setActiveTab(initialTab);
+
+    if (!user?.email) {
+      setReceivedContracts([]);
+      return;
+    }
+
+    let autoOpened = initialTab === 'received';
+    const unsubscribe = contractService.subscribeToReceivedContracts(
+      user.email,
+      (contracts) => {
+        const pendingContracts = contracts.filter((contract) => contract.status !== 'signed');
+        setReceivedContracts(pendingContracts);
+        if (pendingContracts.length > 0 && !autoOpened) {
+          autoOpened = true;
+          setActiveTab('received');
+        }
+      },
+      undefined,
+      (error) => {
+        console.error('❌ Failed to subscribe to received contracts:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [isOpen, user?.email, initialTab]);
+
+  useEffect(() => {
+    return () => {
+      if (previewBlobUrlRef.current) {
+        URL.revokeObjectURL(previewBlobUrlRef.current);
+        previewBlobUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  const buildTemplateFromReceivedContract = async (contract: {
+    id: string;
+    fileName: string;
+    fileUrl?: string;
+    sentDate?: Date | string;
+  }): Promise<Template> => {
+    const fileUrl = (contract.fileUrl || '').trim();
+    if (!fileUrl) {
+      throw new Error('Document file is missing. Please ask the sender to resend the contract.');
+    }
+
+    if (fileUrl.startsWith('blob:')) {
+      throw new Error('This document expired after reload. Please ask the sender to resend the contract.');
+    }
+
+    if (fileUrl.startsWith('data:')) {
+      const mimeTypeMatch = fileUrl.match(/^data:([^;]+);/);
+      const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'application/pdf';
+      const file = convertBase64ToFile(fileUrl, contract.fileName, mimeType);
+      const blobUrl = URL.createObjectURL(file);
+      if (previewBlobUrlRef.current) {
+        URL.revokeObjectURL(previewBlobUrlRef.current);
+      }
+      previewBlobUrlRef.current = blobUrl;
+      return {
+        id: contract.id,
+        name: contract.fileName,
+        uploadDate: contract.sentDate ? new Date(contract.sentDate).toLocaleDateString() : '',
+        fileUrl: blobUrl,
+        imagePreview: null,
+        file,
+      };
+    }
+
+    const response = await fetch(fileUrl, { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch contract file (${response.status})`);
+    }
+    const blob = await response.blob();
+    const mimeType = blob.type || 'application/pdf';
+    const file = new File([blob], contract.fileName, { type: mimeType });
+    const blobUrl = URL.createObjectURL(blob);
+    if (previewBlobUrlRef.current) {
+      URL.revokeObjectURL(previewBlobUrlRef.current);
+    }
+    previewBlobUrlRef.current = blobUrl;
+    return {
+      id: contract.id,
+      name: contract.fileName,
+      uploadDate: contract.sentDate ? new Date(contract.sentDate).toLocaleDateString() : '',
+      fileUrl: blobUrl,
+      imagePreview: null,
+      file,
+    };
+  };
+
+  const openReceivedContractPreview = async (contract: {
+    id: string;
+    fileName: string;
+    fileUrl?: string;
+    sentDate?: Date | string;
+  }) => {
+    try {
+      const template = await buildTemplateFromReceivedContract(contract);
+      previewTemplateRef.current = template;
+      await handlePreview(template);
+    } catch (error) {
+      console.error('Error opening received contract preview:', error);
+      alert(error instanceof Error ? error.message : 'Failed to load contract preview.');
+    }
+  };
 
   // Clear all storage (for testing) - now clears Firestore data
   const handleClearStorage = async () => {
@@ -505,6 +602,7 @@ const findCustomizedTemplate = () => {
 
   const handlePreview = async (template: Template) => {
     console.log("Starting PDF preview for:", template.name);
+    previewTemplateRef.current = template;
     setPreviewFile(template.fileUrl);
     setIsLoadingPdf(true);
     setPdfError(null);
@@ -546,6 +644,11 @@ const findCustomizedTemplate = () => {
   };
 
   const closePreview = () => {
+    if (previewBlobUrlRef.current) {
+      URL.revokeObjectURL(previewBlobUrlRef.current);
+      previewBlobUrlRef.current = null;
+    }
+    previewTemplateRef.current = null;
     setPreviewFile(null);
     setPdfDocument(null);
     setCurrentPage(1);
@@ -553,6 +656,22 @@ const findCustomizedTemplate = () => {
     setIsLoadingPdf(false);
     setPdfError(null);
   };
+
+  useEffect(() => {
+    if (!isOpen) {
+      if (previewBlobUrlRef.current) {
+        URL.revokeObjectURL(previewBlobUrlRef.current);
+        previewBlobUrlRef.current = null;
+      }
+      previewTemplateRef.current = null;
+      setPreviewFile(null);
+      setPdfDocument(null);
+      setCurrentPage(1);
+      setTotalPages(0);
+      setIsLoadingPdf(false);
+      setPdfError(null);
+    }
+  }, [isOpen]);
 
   const renderPage = async (pageNumber: number) => {
     if (!pdfDocument || !canvasRef.current) {
@@ -745,7 +864,7 @@ const findCustomizedTemplate = () => {
           : 'border-transparent text-gray-500 hover:text-gray-700'
       }`}
     >
-      {tab === 'uploaded' ? 'Uploaded Templates' : tab === 'received' ? 'Received Contracts' : 'Deleted Templates'}
+      {tab === 'uploaded' ? 'Uploaded Templates' : tab === 'received' ? `Received Contracts${receivedContracts.length ? ` (${receivedContracts.length})` : ''}` : 'Deleted Templates'}
     </button>
   ))}
 </div>
@@ -894,28 +1013,10 @@ const findCustomizedTemplate = () => {
                     Manage
                   </button>
                   <button
-                    onClick={() => {
-                      // Convert base64 to blob for preview
-                      if (contract.fileUrl.startsWith('data:')) {
-                        fetch(contract.fileUrl)
-                          .then(res => res.blob())
-                          .then(blob => {
-                            const file = new File([blob], contract.fileName, { type: 'application/pdf' });
-                            const url = URL.createObjectURL(blob);
-                            handlePreview({
-                              id: contract.id,
-                              name: contract.fileName,
-                              uploadDate: new Date(contract.sentDate).toLocaleDateString(),
-                              fileUrl: url,
-                              imagePreview: null,
-                              file: file
-                            });
-                          });
-                      } else {
-                        window.open(contract.fileUrl, '_blank');
-                      }
-                    }}
+                    onClick={() => openReceivedContractPreview(contract)}
                     className="bg-[#136C9E] text-white px-4 py-1 rounded-full hover:bg-[#0F5B88]"
+                    disabled={!contract.fileUrl}
+                    title={contract.fileUrl ? 'Preview contract' : 'Document file unavailable'}
                   >
                     Preview
                   </button>
@@ -932,86 +1033,39 @@ const findCustomizedTemplate = () => {
                               return;
                             }
 
-                          let newTemplate: Template | null = null;
-
-                          if (contract.fileUrl.startsWith('data:')) {
-                            // Extract MIME type from data URL (e.g., "data:application/pdf;base64,..." => "application/pdf")
-                            const mimeTypeMatch = contract.fileUrl.match(/^data:([^;]+);/);
-                            const mimeType = mimeTypeMatch ? mimeTypeMatch[1] : 'application/pdf';
-                            
-                            // Check if it's a PDF - CustomizePage only supports PDFs
-                            if (mimeType !== 'application/pdf') {
-                              alert(`Cannot customize ${contract.fileName}. Only PDF files can be customized. This file is: ${mimeType}\n\nPlease download the file and convert it to PDF first.`);
+                            const template = await buildTemplateFromReceivedContract(contract);
+                            if (template.file?.type && template.file.type !== 'application/pdf') {
+                              alert(`Cannot customize ${contract.fileName}. Only PDF files can be customized.`);
                               setDropdownOpen(null);
                               return;
                             }
-                            
-                            console.log('🔄 Extracting file from data URL, MIME type:', mimeType);
-                            const file = convertBase64ToFile(contract.fileUrl, contract.fileName, mimeType);
-                            const url = URL.createObjectURL(file);
 
-                            newTemplate = {
-                              id: contract.id,
-                              name: contract.fileName,
-                              uploadDate: new Date(contract.sentDate).toLocaleDateString(),
-                              fileUrl: url,
-                              imagePreview: null,
-                              file,
-                              fileData: contract.fileUrl.includes(',') ? contract.fileUrl.split(',')[1] : undefined,
-                              fileSize: file.size
-                            };
-                            } else {
-                              const res = await fetch(contract.fileUrl);
-                              if (!res.ok) {
-                                throw new Error(`Failed to fetch contract: ${res.status}`);
-                              }
-
-                              const blob = await res.blob();
-                              const mimeType = blob.type || 'application/pdf';
-                              
-                              // Check if it's a PDF - CustomizePage only supports PDFs
-                              if (mimeType !== 'application/pdf') {
-                                alert(`Cannot customize ${contract.fileName}. Only PDF files can be customized. This file is: ${mimeType}\n\nPlease download the file and convert it to PDF first.`);
-                                setDropdownOpen(null);
-                                return;
-                              }
-                              
-                              const file = new File([blob], contract.fileName, { type: mimeType });
-                              const url = URL.createObjectURL(blob);
-
-                              let fileData: string | undefined;
+                            let fileData: string | undefined;
+                            if (template.file) {
                               try {
-                                fileData = await convertFileToBase64(file);
+                                fileData = await convertFileToBase64(template.file);
                               } catch (conversionError) {
                                 console.warn('Failed to convert fetched contract to base64:', conversionError);
                               }
-
-                              newTemplate = {
-                                id: contract.id,
-                                name: contract.fileName,
-                                uploadDate: new Date(contract.sentDate).toLocaleDateString(),
-                                fileUrl: url,
-                                imagePreview: null,
-                                file,
-                                fileData,
-                                fileSize: blob.size
-                              };
                             }
 
-                            if (newTemplate) {
-                              const templateToAdd = newTemplate;
-                              setUploadedTemplates(prev => {
-                                if (prev.some(t => t.id === templateToAdd.id)) {
-                                  return prev;
-                                }
-                                return [...prev, templateToAdd];
-                              });
+                            const templateToAdd: Template = {
+                              ...template,
+                              fileData,
+                              fileSize: template.file?.size,
+                            };
 
-                              handleCustomize(contract.id, templateToAdd);
-                            }
+                            setUploadedTemplates(prev => {
+                              if (prev.some(t => t.id === templateToAdd.id)) {
+                                return prev;
+                              }
+                              return [...prev, templateToAdd];
+                            });
+
+                            handleCustomize(contract.id, templateToAdd);
                           } catch (error) {
                             console.error('Error preparing contract for customization:', error);
-                            alert('Failed to open contract for customization. Please try again.');
+                            alert(error instanceof Error ? error.message : 'Failed to open contract for customization. Please try again.');
                           } finally {
                             setDropdownOpen(null);
                           }
@@ -1021,17 +1075,19 @@ const findCustomizedTemplate = () => {
                         Customize
                       </button>
                       <button
-                        onClick={() => {
-                          // Download the contract
-                          if (contract.fileUrl.startsWith('data:')) {
+                        onClick={async () => {
+                          try {
+                            const template = await buildTemplateFromReceivedContract(contract);
                             const link = document.createElement('a');
-                            link.href = contract.fileUrl;
+                            link.href = template.fileUrl;
                             link.download = contract.fileName;
                             link.click();
-                          } else {
-                            window.open(contract.fileUrl, '_blank');
+                          } catch (error) {
+                            console.error('Error downloading contract:', error);
+                            alert(error instanceof Error ? error.message : 'Failed to download contract.');
+                          } finally {
+                            setDropdownOpen(null);
                           }
-                          setDropdownOpen(null);
                         }}
                         className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100"
                       >
@@ -1150,8 +1206,9 @@ const findCustomizedTemplate = () => {
                   </div>
                   <button 
                     onClick={() => {
-                      const template = [...uploadedTemplates, ...deletedTemplates].find(t => t.fileUrl === previewFile);
-                      if (template) handlePreview(template);
+                      if (previewTemplateRef.current) {
+                        handlePreview(previewTemplateRef.current);
+                      }
                     }}
                     className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                   >

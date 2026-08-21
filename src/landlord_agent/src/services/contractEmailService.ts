@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { PRIMARY_API_BASE_URL } from '../../../utils/apiEndpoints';
+import { generateContractReviewEmailTemplate } from '../../../components/contract/emailTemplates';
 
 interface ContractEmailParams {
   to: string;
@@ -41,122 +42,13 @@ class ContractEmailService {
    * Generate HTML email template for contract sending
    */
   private generateContractEmailTemplate(params: ContractEmailParams): string {
-    const { recipientName, contractTitle, additionalInfo, expiryDate, attachmentError } = params;
-    
-    const expiryText = expiryDate 
-      ? `<p><strong>Expiry Date:</strong> ${expiryDate.toLocaleDateString('en-GB', { 
-          day: 'numeric', 
-          month: 'long', 
-          year: 'numeric' 
-        })}</p>`
-      : '';
-
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            line-height: 1.6; 
-            color: #333; 
-            max-width: 600px; 
-            margin: 0 auto; 
-            padding: 20px;
-          }
-          .header {
-            background: linear-gradient(135deg, #DC5F12 0%, #FF6B1A 100%);
-            color: white;
-            padding: 30px;
-            border-radius: 10px 10px 0 0;
-            text-align: center;
-          }
-          .header h1 {
-            margin: 0;
-            font-size: 24px;
-          }
-          .content {
-            background-color: #ffffff;
-            padding: 30px;
-            border: 1px solid #e0e0e0;
-            border-top: none;
-          }
-          .section {
-            margin: 20px 0;
-            padding: 15px;
-            background-color: #f9f9f9;
-            border-radius: 5px;
-            border-left: 4px solid #DC5F12;
-          }
-          .button {
-            display: inline-block;
-            padding: 12px 30px;
-            background-color: #DC5F12;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            margin: 20px 0;
-            font-weight: bold;
-          }
-          .button:hover {
-            background-color: #FF6B1A;
-          }
-          .footer {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
-            font-size: 0.9em;
-            color: #666;
-            text-align: center;
-          }
-          .info-box {
-            background-color: #EEF9FF;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 20px 0;
-            border-left: 4px solid #136C9E;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>📄 Contract for Review</h1>
-        </div>
-        
-        <div class="content">
-          <p>Dear ${recipientName},</p>
-          
-          <p>You have received a new contract document for your review:</p>
-          
-          <div class="section">
-            <h2 style="margin-top: 0; color: #374957;">${contractTitle}</h2>
-            ${expiryText}
-            ${additionalInfo ? `<p><strong>Additional Information:</strong><br>${additionalInfo}</p>` : ''}
-          </div>
-          
-          ${attachmentError ? `
-          <div class="info-box" style="background-color: #FFF3CD; border-left-color: #FFC107;">
-            <p><strong>⚠️ Notice:</strong> ${attachmentError}</p>
-          </div>
-          ` : `
-          <div class="info-box">
-            <p><strong>⚠️ Important:</strong> Please review the attached contract document carefully. 
-            If you have any questions or need clarification, please contact the sender.</p>
-          </div>
-          <p>The contract document is attached to this email. Please review it and follow the instructions provided.</p>
-          `}
-          
-          <p style="margin-top: 30px;">Best regards,<br>
-          <strong>Proptii Property Management</strong></p>
-        </div>
-        
-        <div class="footer">
-          <p>This is an automated email from Proptii Property Management System.</p>
-          <p>If you have any questions, please contact your property manager.</p>
-        </div>
-      </body>
-      </html>
-    `;
+    return generateContractReviewEmailTemplate({
+      recipientName: params.recipientName,
+      contractTitle: params.contractTitle,
+      additionalInfo: params.additionalInfo,
+      expiryDate: params.expiryDate,
+      attachmentError: params.attachmentError,
+    });
   }
 
   /**

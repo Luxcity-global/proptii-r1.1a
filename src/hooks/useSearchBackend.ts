@@ -1,5 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { resolveSearchBackendUrl } from '../utils/searchBackendUrl';
+import { Property } from '../types/property';
+import { ensureListingId } from '../utils/listingId';
+
+export type { Property };
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
 const cleanPropertyPrice = (price: string): string => {
@@ -35,7 +39,12 @@ const cleanPropertyPrice = (price: string): string => {
   return cleanedPrice.trim();
 };
 
-import { Property, SearchResponse } from '../types/property';
+const normalizeProperty = (property: Property): Property =>
+  ensureListingId({
+    ...property,
+    price: cleanPropertyPrice(property.price),
+    uprn: property.uprn ?? null,
+  });
 
 export const useSearchBackend = () => {
   const [query, setQuery] = useState('');
@@ -67,10 +76,9 @@ export const useSearchBackend = () => {
       try {
         const parsed = JSON.parse(cachedData);
         // Clean the pricing for cached results as well
-        const cleanedCachedResults = (parsed.results || []).map((property: Property) => ({
-          ...property,
-          price: cleanPropertyPrice(property.price)
-        }));
+        const cleanedCachedResults = (parsed.results || []).map((property: Property) =>
+          normalizeProperty(property),
+        );
         setResults(cleanedCachedResults);
         setQuery(parsed.query || '');
         setSearchType(parsed.searchType || 'onthemarket');
@@ -102,10 +110,7 @@ export const useSearchBackend = () => {
         try {
           const { searchProptiiProperties } = await import('../services/proptiiPropertyService');
           const proptiiResults = await searchProptiiProperties(searchQuery);
-          return proptiiResults.map(property => ({
-            ...property,
-            price: cleanPropertyPrice(property.price)
-          }));
+          return proptiiResults.map((property) => normalizeProperty(property));
         } catch (e) {
           console.warn('[Search] Firestore search failed:', e);
           return [];
@@ -175,12 +180,16 @@ export const useSearchBackend = () => {
             const event = JSON.parse(trimmed.slice(6));
             
             if (event.type === 'initial' || event.type === 'results') {
-              const incoming = (event.data as any[]).map(p => ({
-                ...p,
-                price: cleanPropertyPrice(p.price),
-                description: p.description || p.summary || p.notes || p.overview || '',
-                imageUrls: p.imageUrls || p.images || [],
-              }));
+              const incoming = (event.data as any[]).map((p) =>
+                normalizeProperty({
+                  ...p,
+                  description: p.description || p.summary || p.notes || p.overview || '',
+                  imageUrls: p.imageUrls || p.images || [],
+                  url: p.url || p.link || p.propertyUrl,
+                  listingId: p.listingId || p.id,
+                  uprn: p.uprn ?? null,
+                }),
+              );
 
               allScraped = [...allScraped, ...incoming];
 

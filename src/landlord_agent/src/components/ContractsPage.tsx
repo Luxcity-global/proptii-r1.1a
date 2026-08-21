@@ -34,8 +34,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { Dialog, DialogContent } from './ui/dialog';
 import { SendContractModal } from './SendContractModal';
 import { contractService } from '../services/contractService';
+import { generateContractReviewEmailTemplate } from '../../../components/contract/emailTemplates';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import { Property, UserProfile } from '../App';
@@ -398,46 +400,16 @@ export function ContractsPage({ tenants = [], onBack, userProfile, properties = 
         
         console.log('File converted to base64, size:', base64Content.length, 'bytes');
         
+        const contractTitle = contractData.file.name.replace(/\.[^/.]+$/, '');
         const formData = new FormData();
         formData.append('to', contractData.recipientEmail);
         formData.append('subject', `Contract for Review: ${contractData.file.name}`);
-        formData.append('html', `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body {
-                font-family: Arial, sans-serif;
-                line-height: 1.6;
-                color: #333;
-                max-width: 600px;
-                margin: 0 auto;
-                padding: 20px;
-              }
-              .cta-button {
-                display: inline-block;
-                background-color: #DC5F12;
-                color: white !important;
-                padding: 12px 30px;
-                text-decoration: none;
-                border-radius: 50px;
-                margin: 20px 0;
-                font-weight: bold;
-                text-align: center;
-              }
-            </style>
-          </head>
-          <body>
-            <h2>Hello ${contractData.recipientName}!</h2>
-            <p>Please find attached your contract for review.</p>
-            ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
-            <div style="text-align: center;">
-              <a href="https://proptii-frontend.onrender.com/contracts" class="cta-button">View Contracts</a>
-            </div>
-            <p>Best regards,<br>Proptii Team</p>
-          </body>
-          </html>
-        `);
+        formData.append('html', generateContractReviewEmailTemplate({
+          recipientName: contractData.recipientName,
+          contractTitle,
+          additionalInfo: contractData.additionalEmail,
+          expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        }));
         
         // Send base64 data separately so backend can decode it
         formData.append('attachmentBase64', base64Content);
@@ -536,59 +508,76 @@ export function ContractsPage({ tenants = [], onBack, userProfile, properties = 
         }
         
         console.log('Contract email sent successfully with attachment');
-        
-        // Save contract to Firestore for tracking
-        try {
-          // Get userId if not already set
-          const currentUserId = userId || (() => {
-            try {
-              const authState = localStorage.getItem('proptii_auth_state');
-              if (authState) {
-                const parsed = JSON.parse(authState);
-                return parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId || '';
-              }
-              const params = new URLSearchParams(window.location.search);
-              return params.get('uid') || '';
-            } catch (e) {
-              console.error('Error getting userId:', e);
-              return '';
-            }
-          })();
 
-          if (!currentUserId) {
-            console.warn('⚠️ No userId found - contract will be saved without userId');
-          }
-
-          const contractId = await contractService.createContractWithBase64({
-            title: contractData.file.name.replace(/\.[^/.]+$/, ''),
-            propertyAddress: '',
-            tenantName: contractData.recipientName,
-            tenantEmail: contractData.recipientEmail,
-            contractType: 'tenancy-agreement',
-            additionalInfo: contractData.additionalEmail,
-            status: 'sent',
-            sentDate: new Date(),
-            expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-            landlordEmail: landlordEmail || undefined, // Include landlord email for filtering
-          } as any, contractData.file.name, base64Data, currentUserId || 'unknown');
-          
-          console.log('Contract saved to Firestore:', contractId);
-          
-          // Reload contracts to show the new one
-          await loadContracts();
-        } catch (firestoreError) {
-          console.error('Error saving contract to Firestore:', firestoreError);
-          // Don't fail the whole operation if Firestore save fails
-        }
-        
-        // Show success screen instead of alert
         setSuccessData({
           recipientName: contractData.recipientName,
           recipientEmail: contractData.recipientEmail,
-          fileName: contractData.file.name
+          fileName: contractData.file.name,
         });
         setShowSuccessScreen(true);
         setIsSendModalOpen(false);
+
+        void (async () => {
+          try {
+            const currentUserId = userId || (() => {
+              try {
+                const authState = localStorage.getItem('proptii_auth_state');
+                if (authState) {
+                  const parsed = JSON.parse(authState);
+                  return parsed?.user?.id || parsed?.user?.localAccountId || parsed?.user?.homeAccountId || '';
+                }
+                const params = new URLSearchParams(window.location.search);
+                return params.get('uid') || '';
+              } catch (e) {
+                console.error('Error getting userId:', e);
+                return '';
+              }
+            })();
+
+            if (!currentUserId) {
+              console.warn('⚠️ No userId found - contract will be saved without userId');
+            }
+
+            const payload = {
+              title: contractData.file.name.replace(/\.[^/.]+$/, ''),
+              propertyAddress: '',
+              tenantName: contractData.recipientName,
+              tenantEmail: contractData.recipientEmail,
+              contractType: 'tenancy-agreement' as const,
+              additionalInfo: contractData.additionalEmail,
+              status: 'sent' as const,
+              sentDate: new Date(),
+              expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+              landlordEmail: landlordEmail || undefined,
+            };
+
+            let contractId: string;
+            try {
+              contractId = await contractService.createContract(
+                payload as any,
+                contractData.file,
+                currentUserId || 'unknown',
+                false,
+                false
+              );
+            } catch (storageError) {
+              console.warn('Direct storage save failed, retrying with fallback:', storageError);
+              contractId = await contractService.createContractWithBase64(
+                payload as any,
+                contractData.file.name,
+                base64Data,
+                currentUserId || 'unknown',
+                contractData.file
+              );
+            }
+
+            console.log('Contract saved to Firestore:', contractId);
+            await loadContracts();
+          } catch (firestoreError) {
+            console.error('Error saving contract to Firestore:', firestoreError);
+            setError('Email sent successfully, but the in-app copy could not be saved for the tenant.');
+          }
+        })();
       } else {
         // Send a simple test email without contract
         const formData = new FormData();
@@ -625,7 +614,7 @@ export function ContractsPage({ tenants = [], onBack, userProfile, properties = 
             <p>This is a test email from Proptii Property Management System.</p>
             ${contractData.additionalEmail ? `<p>${contractData.additionalEmail}</p>` : ''}
             <div style="text-align: center;">
-              <a href="https://proptii-frontend.onrender.com/contracts" class="cta-button">View Contracts</a>
+              <a href="https://proptii.co/contracts?tab=received" class="cta-button">View Contract</a>
             </div>
             <p>Best regards,<br>Proptii Team</p>
           </body>
@@ -1091,53 +1080,51 @@ export function ContractsPage({ tenants = [], onBack, userProfile, properties = 
     );
   };
 
-  // Show success screen
-  if (showSuccessScreen && successData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: '#F7F7F7', fontFamily: 'Archivo, sans-serif' }}>
-        <Card className="max-w-md w-full text-center">
-          <CardContent className="p-8">
-            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-            <h2 className="text-2xl font-bold mb-4" style={{ color: '#374957', fontFamily: 'Archivo, sans-serif' }}>
-              Contract Sent Successfully!
-            </h2>
-            <p className="text-gray-600 mb-6" style={{ fontFamily: 'Archivo, sans-serif' }}>
+  const renderContractSentSuccessDialog = () => (
+    <Dialog open={showSuccessScreen} onOpenChange={(open) => {
+      if (!open) {
+        setShowSuccessScreen(false);
+        setSuccessData(null);
+      }
+    }}>
+      <DialogContent className="max-w-md text-center" style={{ fontFamily: 'Archivo, sans-serif' }}>
+        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center">
+          <CheckCircle className="w-8 h-8 text-green-600" />
+        </div>
+        <h2 className="text-2xl font-bold mb-4" style={{ color: '#374957' }}>
+          Contract Sent Successfully!
+        </h2>
+        {successData && (
+          <>
+            <p className="text-gray-600 mb-4">
               A contract has been sent to <strong>{successData.recipientName}</strong>
             </p>
-            <p className="text-gray-600 mb-6" style={{ fontFamily: 'Archivo, sans-serif' }}>
+            <p className="text-gray-600 mb-4">
               Email: <strong>{successData.recipientEmail}</strong>
             </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
               <div className="flex items-start space-x-3">
                 <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="text-left">
-                  <p className="text-sm text-blue-800" style={{ fontFamily: 'Archivo, sans-serif' }}>
-                    Attachment: <strong>{successData.fileName}</strong>
-                  </p>
-                </div>
+                <p className="text-sm text-blue-800">
+                  Attachment: <strong>{successData.fileName}</strong>
+                </p>
               </div>
             </div>
-            <Button
-              onClick={() => {
-                setShowSuccessScreen(false);
-                setSuccessData(null);
-              }}
-              className="w-full"
-              style={{ 
-                backgroundColor: '#DC5F12', 
-                borderColor: '#DC5F12',
-                fontFamily: 'Archivo, sans-serif'
-              }}
-            >
-              Done
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+          </>
+        )}
+        <Button
+          onClick={() => {
+            setShowSuccessScreen(false);
+            setSuccessData(null);
+          }}
+          className="w-full"
+          style={{ backgroundColor: '#DC5F12', borderColor: '#DC5F12' }}
+        >
+          Done
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
 
   // Show 4 cards + empty state for unauthenticated users
   if (isAuthChecked && !userId && !landlordEmail) {
@@ -1465,6 +1452,8 @@ export function ContractsPage({ tenants = [], onBack, userProfile, properties = 
         onSend={handleSendContract}
         tenants={tenants}
       />
+
+      {renderContractSentSuccessDialog()}
     </div>
   );
 }

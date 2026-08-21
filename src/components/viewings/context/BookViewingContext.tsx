@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 
 // Types
-interface Agent {
+export interface Agent {
   id: string;
   name?: string;
   email?: string;
@@ -9,7 +9,7 @@ interface Agent {
   company?: string;
 }
 
-interface PropertyDetails {
+export interface PropertyDetails {
   id?: string;
   street: string;
   town?: string;

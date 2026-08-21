@@ -163,6 +163,108 @@ export const generateAgentEmailTemplate = (data: EmailTemplateData): string => {
   `;
 };
 
+const formatViewingDateLabel = (dateString?: string): string => {
+  if (!dateString) return 'TBD';
+  const parsed = new Date(dateString);
+  if (Number.isNaN(parsed.getTime())) return dateString;
+  return parsed.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};
+
+const wrapViewingEmail = (body: string): string => `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <style>
+      body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+      .header { margin-bottom: 20px; }
+      .details { margin: 20px 0; }
+      .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      ${body}
+    </div>
+  </body>
+  </html>
+`;
+
+export const generateRescheduleRequestEmailTemplate = (
+  data: EmailTemplateData & { message: string }
+): string => {
+  const { property, viewing, user, message } = data;
+  const viewingDate = formatViewingDateLabel(viewing.date);
+  const viewingTime = viewing.time ? formatTimeString(viewing.time) : 'TBD';
+  const formattedMessage = message
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br />');
+
+  return wrapViewingEmail(`
+    <div class="header">
+      <p>Hi ${property.agent?.name || 'there'},</p>
+      <p>${user.name || 'An applicant'} would like to reschedule the viewing for <strong>${property.street || 'the property'}</strong>.</p>
+    </div>
+    <div class="details">
+      <p><strong>Current appointment</strong></p>
+      <p>Date: ${viewingDate}</p>
+      <p>Time: ${viewingTime}</p>
+      <p>Address: ${[property.street, property.town, property.city, property.postcode].filter(Boolean).join(', ') || 'Not provided'}</p>
+      <p>Requested by: ${user.name || 'Not provided'} (${user.email || 'No email provided'})</p>
+    </div>
+    <div class="details">
+      <p><strong>Message</strong></p>
+      <p>${formattedMessage}</p>
+    </div>
+    ${getCtaButton('👉 Manage Viewing on Proptii', `${BASE_URL}/landlord/viewings`)}
+    <div class="footer">
+      <p>Thanks,<br>- The Proptii Team</p>
+    </div>
+  `);
+};
+
+export const generateCancelViewingEmailTemplate = (
+  data: EmailTemplateData & { message?: string }
+): string => {
+  const { property, viewing, user, message } = data;
+  const viewingDate = formatViewingDateLabel(viewing.date);
+  const viewingTime = viewing.time ? formatTimeString(viewing.time) : 'TBD';
+  const formattedMessage = (message || 'No additional message was provided.')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br />');
+
+  return wrapViewingEmail(`
+    <div class="header">
+      <p>Hi ${property.agent?.name || 'there'},</p>
+      <p>${user.name || 'An applicant'} has cancelled the viewing for <strong>${property.street || 'the property'}</strong>.</p>
+    </div>
+    <div class="details">
+      <p><strong>Cancelled appointment</strong></p>
+      <p>Date: ${viewingDate}</p>
+      <p>Time: ${viewingTime}</p>
+      <p>Address: ${[property.street, property.town, property.city, property.postcode].filter(Boolean).join(', ') || 'Not provided'}</p>
+      <p>Requested by: ${user.name || 'Not provided'} (${user.email || 'No email provided'})</p>
+    </div>
+    <div class="details">
+      <p><strong>Reason for cancellation</strong></p>
+      <p>${formattedMessage}</p>
+    </div>
+    ${getCtaButton('👉 Manage Viewing on Proptii', `${BASE_URL}/landlord/viewings`)}
+    <div class="footer">
+      <p>Thanks,<br>- The Proptii Team</p>
+    </div>
+  `);
+};
+
 export const generateUserEmailTemplate = (data: EmailTemplateData): string => {
   const { property, viewing, user } = data;
   const viewingDate = new Date(viewing.date!).toLocaleDateString('en-GB', {
@@ -216,4 +318,39 @@ export const generateUserEmailTemplate = (data: EmailTemplateData): string => {
     </body>
     </html>
   `;
-}; 
+};
+
+export const generateTenantViewingUpdateEmailTemplate = (data: {
+  tenantName?: string;
+  propertyStreet?: string;
+  date?: string;
+  time?: string;
+  intro: string;
+  extra?: string;
+}): string => {
+  const viewingDate = data.date ? formatViewingDateLabel(data.date) : 'TBD';
+  const viewingTime = data.time ? formatTimeString(data.time) : 'TBD';
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <p>Hi ${data.tenantName || 'there'},</p>
+        <p>${data.intro}</p>
+        <p><strong>Property:</strong> ${data.propertyStreet || 'Not provided'}</p>
+        <p><strong>Date/time:</strong> ${viewingDate} at ${viewingTime}</p>
+        ${data.extra ? `<p>${data.extra}</p>` : ''}
+        ${getCtaButton('View your viewings', `${BASE_URL}/dashboard/viewings`)}
+        <p>Thanks for using Proptii<br>— The Proptii Team</p>
+      </div>
+    </body>
+    </html>
+  `;
+};
+ 

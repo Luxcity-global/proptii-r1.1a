@@ -29,7 +29,7 @@ interface SendContractModalProps {
     recipientName: string;
     recipientEmail: string;
     additionalEmail?: string;
-  }) => void;
+  }) => void | Promise<void>;
   tenants?: Array<{ id: string; name: string; email: string; propertyId?: string }>;
 }
 
@@ -182,7 +182,7 @@ export function SendContractModal({ isOpen, onClose, onSend, tenants = [] }: Sen
         setTimeout(() => clearInterval(progressInterval), 10000);
       }
 
-      onSend(contractData);
+      await onSend(contractData);
       trackEvent('landlord_contract_sent', { has_file: !!selectedFile });
       
       // Reset form

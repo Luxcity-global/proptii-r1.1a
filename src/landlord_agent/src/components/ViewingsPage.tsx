@@ -31,6 +31,7 @@ import { trackEvent } from '../../../utils/analytics';
 import { LandlordPageEmptyShell } from './LandlordPageEmptyShell';
 import { isNewPortfolioUser } from '../utils/portfolioStatus';
 import { Property, UserProfile } from '../App';
+import { generateTenantViewingUpdateEmailTemplate } from '../../../components/viewings/services/emailTemplates';
 
 // ViewingsPage component for managing property viewings and requests
 
@@ -104,6 +105,113 @@ function formatTime(time: string) {
   }
 }
 
+function bookingMatchesRequest(booking: ViewingBooking, request: BookViewingRequest) {
+  if (booking.sourceRequestId && booking.sourceRequestId === request.id) {
+    return true;
+  }
+
+  const propertyMatch =
+    (request.propertyId && booking.propertyId && booking.propertyId === request.propertyId) ||
+    (booking.property?.street || '').toLowerCase() === (request.property?.street || '').toLowerCase();
+
+  if (!propertyMatch) return false;
+
+  if (booking.userId && request.userId && booking.userId !== request.userId) {
+    return false;
+  }
+
+  return true;
+}
+
+function findMatchingBooking(
+  request: BookViewingRequest,
+  bookings: ViewingBooking[],
+  includeCancelled = false
+) {
+  const isEligible = (booking: ViewingBooking) =>
+    includeCancelled || booking.status !== 'cancelled';
+
+  const direct = bookings.find(
+    (booking) => isEligible(booking) && bookingMatchesRequest(booking, request)
+  );
+  if (direct) return direct;
+
+  if (!request.propertyId) return undefined;
+
+  const byProperty = bookings.filter(
+    (booking) =>
+      isEligible(booking) &&
+      booking.propertyId === request.propertyId &&
+      booking.status === 'pending'
+  );
+  if (byProperty.length === 1) return byProperty[0];
+
+  return undefined;
+}
+
+function getRequestApplicantName(request: BookViewingRequest, bookings: ViewingBooking[]) {
+  if (request.applicantName?.trim()) return request.applicantName.trim();
+  const match = findMatchingBooking(request, bookings, true);
+  return match?.viewingDetails?.userDetails?.fullName?.trim() || 'Applicant request';
+}
+
+function getRequestApplicantEmail(request: BookViewingRequest, bookings: ViewingBooking[]) {
+  if (request.applicantEmail?.trim()) return request.applicantEmail.trim();
+  const match = findMatchingBooking(request, bookings, true);
+  return match?.viewingDetails?.userDetails?.email?.trim() || '';
+}
+
+function formatCreatedAt(value: BookViewingRequest['createdAt']) {
+  try {
+    const date = typeof (value as { toDate?: () => Date })?.toDate === 'function'
+      ? (value as { toDate: () => Date }).toDate()
+      : new Date(value as unknown as string);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch {
+    return '';
+  }
+}
+
+function timestampFromValue(value: unknown): number {
+  if (!value) return 0;
+  const record = value as { toMillis?: () => number; toDate?: () => Date };
+  if (typeof record.toMillis === 'function') return record.toMillis();
+  if (typeof record.toDate === 'function') return record.toDate().getTime();
+  const parsed = new Date(value as string);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+}
+
+function viewingDateTimeMs(viewing: ViewingBooking): number {
+  const date = viewing.viewingDetails?.date?.trim();
+  const time = viewing.viewingDetails?.time?.trim();
+  if (date) {
+    const candidate = time
+      ? (/am|pm/i.test(time) ? `${date} ${time}` : `${date}T${time.length === 5 ? `${time}:00` : time}`)
+      : date;
+    const parsed = new Date(candidate);
+    if (!Number.isNaN(parsed.getTime())) return parsed.getTime();
+  }
+  return timestampFromValue(viewing.updatedAt) || timestampFromValue(viewing.createdAt);
+}
+
+function requestDateTimeMs(request: BookViewingRequest): number {
+  return timestampFromValue(request.createdAt) || timestampFromValue(request.updatedAt);
+}
+
+function sortByLatest<T>(items: T[], getMs: (item: T) => number): T[] {
+  return [...items].sort((a, b) => getMs(b) - getMs(a));
+}
+
+type RequestTabRow =
+  | { kind: 'request'; id: string; request: BookViewingRequest }
+  | { kind: 'pending'; id: string; viewing: ViewingBooking };
+
+const VIEWINGS_GRID_CLASS = 'grid gap-3 items-center min-w-0';
+const VIEWINGS_GRID_STYLE: React.CSSProperties = {
+  gridTemplateColumns: '44px minmax(0,1.3fr) minmax(0,1.1fr) 108px minmax(0,1fr) minmax(0,1.2fr) 252px',
+};
+
 const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, managerEmail, userProfile, properties = [], onAddProperty }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -137,250 +245,113 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
-    let unsubscribeBookings: (() => void) | undefined;
-    let unsubscribeRequests: (() => void) | undefined;
-    let unsubscribeStats: (() => void) | undefined;
-
     if (!isAuthenticatedUser) {
-      // Don't proceed if not authenticated - empty state is shown instead
       setLoading(false);
       return;
     }
 
-    const loadInitialData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+    if (!managerEmail) {
+      setError('Unable to determine your email. Please sign in again.');
+      setLoading(false);
+      return;
+    }
 
-        // Look up the landlordUser record by email to get the correct landlordUser ID
-        // This is important because the auth user ID might be different from the landlordUser ID
-        let landlordUserId: string | null = null;
-        let foundLandlordUser: any = null;
-        
-        if (managerEmail) {
-          const lookupResult = await landlordUserService.getLandlordUserByEmail(managerEmail);
-          if (lookupResult.success && lookupResult.user?.id) {
-            landlordUserId = lookupResult.user.id;
-            foundLandlordUser = lookupResult.user;
-          }
-        }
+    let cancelled = false;
+    const unsubscribers: Array<() => void> = [];
+    const bookingsById = new Map<string, ViewingBooking>();
+    const requestsById = new Map<string, BookViewingRequest>();
+    let receivedSnapshot = false;
 
-        // If we still don't have an ID after email lookup, use the managerId as fallback
-        if (!landlordUserId) {
-          landlordUserId = managerId;
-        }
-
-        if (!managerEmail) {
-          setError('Unable to determine your email. Please sign in again.');
-          setLoading(false);
-          return;
-        }
-
-        const normalizedEmail = managerEmail.toLowerCase().trim();
-
-        // PRIORITY: Always query by email first since it's more reliable
-        // Email-based queries will find records regardless of ID mismatches
-        const emailRequestsResult = await bookViewingRequestService.getRequestsByEmail(normalizedEmail);
-        const emailBookingsResult = await viewingService.getViewingBookingsByEmail(normalizedEmail);
-
-        // Also try ID-based queries (will be merged with email results)
-        let requestsResultById: { success: boolean; requests?: BookViewingRequest[]; error?: string } = { success: true, requests: [] };
-        let bookingsResultById: { success: boolean; bookings?: ViewingBooking[]; error?: string } = { success: true, bookings: [] };
-        let statsResultById: { success: boolean; stats?: ViewingStats; error?: string } = { success: true, stats: { upcoming: 0, completed: 0, rescheduled: 0, total: 0 } };
-
-        if (landlordUserId) {
-          requestsResultById = await bookViewingRequestService.getManagerRequests(landlordUserId);
-          bookingsResultById = await viewingService.getManagerViewingBookings(landlordUserId);
-          statsResultById = await viewingService.getManagerViewingStats(landlordUserId);
-        }
-
-        // Merge email-based and ID-based results
-        // Merge requests
-        const requestsMap = new Map<string, BookViewingRequest>();
-        if (emailRequestsResult.success && emailRequestsResult.requests) {
-          emailRequestsResult.requests.forEach(req => requestsMap.set(req.id, req));
-        }
-        if (landlordUserId && requestsResultById?.success && requestsResultById.requests) {
-          requestsResultById.requests.forEach(req => requestsMap.set(req.id, req));
-        }
-        const mergedRequests = Array.from(requestsMap.values());
-        
-        // Merge bookings
-        const bookingsMap = new Map<string, ViewingBooking>();
-        if (emailBookingsResult.success && emailBookingsResult.bookings) {
-          emailBookingsResult.bookings.forEach(booking => bookingsMap.set(booking.id, booking));
-        }
-        if (landlordUserId && bookingsResultById?.success && bookingsResultById.bookings) {
-          bookingsResultById.bookings.forEach(booking => bookingsMap.set(booking.id, booking));
-        }
-        const mergedBookings = Array.from(bookingsMap.values());
-
-        // Calculate stats from merged bookings
-        const stats = mergedBookings.reduce<ViewingStats>((acc, booking) => {
-          acc.total++;
-          if (['pending', 'confirmed'].includes(booking.status)) acc.upcoming++;
-          if (booking.status === 'completed') acc.completed++;
-          if (booking.status === 'rescheduled') acc.rescheduled++;
-          return acc;
-        }, { upcoming: 0, completed: 0, rescheduled: 0, total: 0 });
-
-        const requestsResult = { success: true, requests: mergedRequests };
-        const bookingsResult = { success: true, bookings: mergedBookings };
-        const statsResult = { success: true, stats };
-
-        if (requestsResult.success && requestsResult.requests) {
-          setRequests(requestsResult.requests);
-        }
-
-        if (bookingsResult.success && bookingsResult.bookings) {
-          setBookings(bookingsResult.bookings);
-        }
-
-        if (statsResult.success && statsResult.stats) {
-          setStats(statsResult.stats);
-        }
-
-        setLoading(false);
-
-        // Set up real-time subscriptions using both ID-based and email-based queries
-        const bookingUnsubscribers: (() => void)[] = [];
-        const requestUnsubscribers: (() => void)[] = [];
-        const statsUnsubscribers: (() => void)[] = [];
-
-        // ID-based subscriptions
-        if (landlordUserId) {
-          bookingUnsubscribers.push(
-            viewingService.subscribeToManagerViewingBookings(
-              landlordUserId,
-              (items) => {
-                // Merge with email-based results if available
-                setBookings(prevBookings => {
-                  const merged = new Map<string, ViewingBooking>();
-                  // Add existing bookings from email subscription
-                  prevBookings.forEach(b => merged.set(b.id, b));
-                  // Add/update with ID-based bookings
-                  items.forEach(b => merged.set(b.id, b));
-                  return Array.from(merged.values());
-                });
-              },
-              (err) => {
-                console.error('Viewing bookings subscription error (ID-based):', err);
-              }
-            )
-          );
-
-          statsUnsubscribers.push(
-            viewingService.subscribeToManagerViewingStats(
-              landlordUserId,
-              (nextStats) => {
-                setStats(nextStats);
-              },
-              (err) => console.error('Viewing stats subscription error (ID-based):', err)
-            )
-          );
-
-          requestUnsubscribers.push(
-            bookViewingRequestService.subscribeToManagerRequests(
-              landlordUserId,
-              (items) => {
-                // Merge with email-based results if available
-                setRequests(prevRequests => {
-                  const merged = new Map<string, BookViewingRequest>();
-                  // Add existing requests from email subscription
-                  prevRequests.forEach(r => merged.set(r.id, r));
-                  // Add/update with ID-based requests
-                  items.forEach(r => merged.set(r.id, r));
-                  return Array.from(merged.values());
-                });
-              },
-              (err) => console.error('Viewing requests subscription error (ID-based):', err)
-            )
-          );
-        }
-
-        // Email-based subscriptions as fallback/additional coverage
-        if (managerEmail) {
-          const normalizedEmailForSub = managerEmail.toLowerCase().trim();
-          bookingUnsubscribers.push(
-            viewingService.subscribeToViewingBookingsByEmail(
-              normalizedEmailForSub,
-              (items) => {
-                // Merge with ID-based results
-                setBookings(prevBookings => {
-                  const merged = new Map<string, ViewingBooking>();
-                  // Add existing bookings from ID subscription
-                  prevBookings.forEach(b => merged.set(b.id, b));
-                  // Add/update with email-based bookings
-                  items.forEach(b => merged.set(b.id, b));
-                  return Array.from(merged.values());
-                });
-              },
-              (err) => {
-                console.error('Viewing bookings subscription error (email-based):', err);
-              }
-            )
-          );
-
-          statsUnsubscribers.push(
-            viewingService.subscribeToViewingStatsByEmail(
-              normalizedEmailForSub,
-              (nextStats) => {
-                // Use email-based stats if ID-based stats are empty
-                setStats(prevStats => {
-                  if (prevStats.total === 0 && nextStats.total > 0) {
-                    return nextStats;
-                  }
-                  return prevStats;
-                });
-              },
-              (err) => console.error('Viewing stats subscription error (email-based):', err)
-            )
-          );
-
-          requestUnsubscribers.push(
-            bookViewingRequestService.subscribeToRequestsByEmail(
-              normalizedEmailForSub,
-              (items) => {
-                // Merge with ID-based results
-                setRequests(prevRequests => {
-                  const merged = new Map<string, BookViewingRequest>();
-                  // Add existing requests from ID subscription
-                  prevRequests.forEach(r => merged.set(r.id, r));
-                  // Add/update with email-based requests
-                  items.forEach(r => merged.set(r.id, r));
-                  return Array.from(merged.values());
-                });
-              },
-              (err) => console.error('Viewing requests subscription error (email-based):', err)
-            )
-          );
-        }
-
-        // Create combined unsubscribe functions
-        unsubscribeBookings = () => {
-          bookingUnsubscribers.forEach(unsub => unsub());
-        };
-
-        unsubscribeStats = () => {
-          statsUnsubscribers.forEach(unsub => unsub());
-        };
-
-        unsubscribeRequests = () => {
-          requestUnsubscribers.forEach(unsub => unsub());
-        };
-      } catch (err) {
-        console.error('Error loading manager viewings:', err);
-        setError('Failed to load viewings data. Please try again later.');
-        setLoading(false);
-      }
+    const markReady = () => {
+      if (receivedSnapshot || cancelled) return;
+      receivedSnapshot = true;
+      setLoading(false);
     };
 
-    loadInitialData();
+    const publishBookings = () => {
+      if (cancelled) return;
+      const next = Array.from(bookingsById.values());
+      setBookings(next);
+      setStats(next.reduce<ViewingStats>((acc, booking) => {
+        acc.total++;
+        if (['pending', 'confirmed'].includes(booking.status)) acc.upcoming++;
+        if (booking.status === 'completed') acc.completed++;
+        if (booking.status === 'rescheduled') acc.rescheduled++;
+        return acc;
+      }, { upcoming: 0, completed: 0, rescheduled: 0, total: 0 }));
+      markReady();
+    };
+
+    const publishRequests = () => {
+      if (cancelled) return;
+      setRequests(Array.from(requestsById.values()));
+      markReady();
+    };
+
+    const mergeBookings = (items: ViewingBooking[]) => {
+      items.forEach((item) => bookingsById.set(item.id, item));
+      publishBookings();
+    };
+
+    const mergeRequests = (items: BookViewingRequest[]) => {
+      items.forEach((item) => requestsById.set(item.id, item));
+      publishRequests();
+    };
+
+    setLoading(true);
+    setError(null);
+    const normalizedEmail = managerEmail.toLowerCase().trim();
+
+    unsubscribers.push(
+      viewingService.subscribeToViewingBookingsByEmail(
+        normalizedEmail,
+        mergeBookings,
+        (err) => console.error('Viewing bookings subscription error (email-based):', err)
+      )
+    );
+    unsubscribers.push(
+      bookViewingRequestService.subscribeToRequestsByEmail(
+        normalizedEmail,
+        mergeRequests,
+        (err) => console.error('Viewing requests subscription error (email-based):', err)
+      )
+    );
+
+    const timeoutId = window.setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 2500);
+
+    void (async () => {
+      let landlordUserId = managerId;
+      try {
+        const lookup = await landlordUserService.getLandlordUserByEmail(managerEmail);
+        if (lookup.success && lookup.user?.id) {
+          landlordUserId = lookup.user.id;
+        }
+      } catch {
+        // keep managerId fallback
+      }
+      if (cancelled || !landlordUserId) return;
+      unsubscribers.push(
+        viewingService.subscribeToManagerViewingBookings(
+          landlordUserId,
+          mergeBookings,
+          (err) => console.error('Viewing bookings subscription error (ID-based):', err)
+        )
+      );
+      unsubscribers.push(
+        bookViewingRequestService.subscribeToManagerRequests(
+          landlordUserId,
+          mergeRequests,
+          (err) => console.error('Viewing requests subscription error (ID-based):', err)
+        )
+      );
+    })();
 
     return () => {
-      unsubscribeBookings?.();
-      unsubscribeRequests?.();
-      unsubscribeStats?.();
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+      unsubscribers.forEach((unsub) => unsub());
     };
   }, [managerId, managerEmail, isAuthenticatedUser]);
 
@@ -446,27 +417,46 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
   const upcomingViewings = useMemo(
     () =>
-      bookings.filter((viewing) =>
-        ['confirmed', 'rescheduled'].includes(viewing.status)
+      sortByLatest(
+        bookings.filter((viewing) => ['confirmed', 'rescheduled'].includes(viewing.status)),
+        viewingDateTimeMs
       ),
     [bookings]
   );
 
   const pendingViewings = useMemo(
     () =>
-      bookings.filter((viewing) => viewing.status === 'pending'),
+      sortByLatest(
+        bookings.filter((viewing) => viewing.status === 'pending'),
+        viewingDateTimeMs
+      ),
     [bookings]
+  );
+
+  const openRequests = useMemo(
+    () =>
+      sortByLatest(
+        requests.filter((request) => !findMatchingBooking(request, bookings)),
+        requestDateTimeMs
+      ),
+    [requests, bookings]
   );
 
   const completedViewings = useMemo(
     () =>
-      bookings.filter((viewing) => viewing.status === 'completed'),
+      sortByLatest(
+        bookings.filter((viewing) => viewing.status === 'completed'),
+        viewingDateTimeMs
+      ),
     [bookings]
   );
 
   const pastViewings = useMemo(
     () =>
-      bookings.filter((viewing) => viewing.status === 'cancelled'),
+      sortByLatest(
+        bookings.filter((viewing) => viewing.status === 'cancelled'),
+        viewingDateTimeMs
+      ),
     [bookings]
   );
 
@@ -476,9 +466,9 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
     return [
       {
         title: 'Pending Requests',
-        value: requests.length + pendingViewings.length,
-        icon: <Mail className="w-5 h-5 text-blue-600" />,
-        accent: 'bg-blue-100'
+        value: openRequests.length + pendingViewings.length,
+        icon: <Mail className="w-5 h-5 text-[#136C9E]" />,
+        accent: 'bg-[#E8F3F9]'
       },
       {
         title: 'Scheduled Viewings',
@@ -499,7 +489,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         accent: 'bg-red-100'
       }
     ];
-  }, [requests.length, pendingViewings.length, upcomingViewings.length, stats.completed, bookings]);
+  }, [openRequests.length, pendingViewings.length, upcomingViewings.length, stats.completed, bookings]);
 
   // Filter function
   const filterItems = <T extends { 
@@ -537,38 +527,42 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
     });
   };
 
-  const filteredUpcomingViewings = useMemo(() => filterItems(upcomingViewings), [upcomingViewings, filterQuery, filterType]);
-  const filteredPendingViewings = useMemo(() => filterItems(pendingViewings), [pendingViewings, filterQuery, filterType]);
-  const filteredCompletedViewings = useMemo(() => filterItems(completedViewings), [completedViewings, filterQuery, filterType]);
-  const filteredPastViewings = useMemo(() => filterItems(pastViewings), [pastViewings, filterQuery, filterType]);
+  const filteredUpcomingViewings = useMemo(
+    () => sortByLatest(filterItems(upcomingViewings), viewingDateTimeMs),
+    [upcomingViewings, filterQuery, filterType]
+  );
+  const filteredPendingViewings = useMemo(
+    () => sortByLatest(filterItems(pendingViewings), viewingDateTimeMs),
+    [pendingViewings, filterQuery, filterType]
+  );
+  const filteredCompletedViewings = useMemo(
+    () => sortByLatest(filterItems(completedViewings), viewingDateTimeMs),
+    [completedViewings, filterQuery, filterType]
+  );
+  const filteredPastViewings = useMemo(
+    () => sortByLatest(filterItems(pastViewings), viewingDateTimeMs),
+    [pastViewings, filterQuery, filterType]
+  );
 
   // Pagination for requests tab (combines requests and pending viewings)
-  const allRequestsCount = requests.length + filteredPendingViewings.length;
+  const allRequestsCount = openRequests.length + filteredPendingViewings.length;
   const totalRequestsPages = Math.ceil(allRequestsCount / ITEMS_PER_PAGE);
   const requestsStartIndex = (currentRequestsPage - 1) * ITEMS_PER_PAGE;
   const requestsEndIndex = requestsStartIndex + ITEMS_PER_PAGE;
   
-  // Paginate requests and pending viewings separately but show together
-  const paginatedRequests = useMemo(() => {
-    if (requestsStartIndex < requests.length) {
-      const requestsEnd = Math.min(requests.length, requestsEndIndex);
-      const requestsSlice = requests.slice(requestsStartIndex, requestsEnd);
-      const remainingSlots = ITEMS_PER_PAGE - requestsSlice.length;
-      
-      if (remainingSlots > 0 && requestsEndIndex > requests.length) {
-        const pendingStart = Math.max(0, requestsStartIndex - requests.length);
-        const pendingEnd = Math.min(filteredPendingViewings.length, pendingStart + remainingSlots);
-        const pendingSlice = filteredPendingViewings.slice(pendingStart, pendingEnd);
-        return { requests: requestsSlice, pendingViewings: pendingSlice };
-      }
-      return { requests: requestsSlice, pendingViewings: [] };
-    } else {
-      const pendingStart = requestsStartIndex - requests.length;
-      const pendingEnd = Math.min(filteredPendingViewings.length, requestsEndIndex - requests.length);
-      const pendingSlice = filteredPendingViewings.slice(pendingStart, pendingEnd);
-      return { requests: [], pendingViewings: pendingSlice };
-    }
-  }, [requests, filteredPendingViewings, requestsStartIndex, requestsEndIndex]);
+  const sortedRequestRows = useMemo(() => {
+    const rows: RequestTabRow[] = [
+      ...openRequests.map((request) => ({ kind: 'request' as const, id: request.id, request })),
+      ...filteredPendingViewings.map((viewing) => ({ kind: 'pending' as const, id: viewing.id, viewing })),
+    ];
+    return rows.sort((a, b) => {
+      const aMs = a.kind === 'request' ? requestDateTimeMs(a.request) : viewingDateTimeMs(a.viewing);
+      const bMs = b.kind === 'request' ? requestDateTimeMs(b.request) : viewingDateTimeMs(b.viewing);
+      return bMs - aMs;
+    });
+  }, [openRequests, filteredPendingViewings]);
+
+  const paginatedRequestRows = sortedRequestRows.slice(requestsStartIndex, requestsEndIndex);
 
   const totalUpcomingPages = Math.ceil(filteredUpcomingViewings.length / ITEMS_PER_PAGE);
   const upcomingStartIndex = (currentUpcomingPage - 1) * ITEMS_PER_PAGE;
@@ -677,12 +671,16 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   };
 
   const handleScheduleRequest = (request: BookViewingRequest) => {
+    const matching = findMatchingBooking(request, bookings, true);
     setSelectedRequest(request);
     setScheduleForm({
       ...initialScheduleForm,
-      tenantName: '',
-      tenantEmail: '',
-      tenantPhone: ''
+      date: matching?.viewingDetails?.date || '',
+      time: matching?.viewingDetails?.time || '',
+      preference: matching?.viewingDetails?.preference || 'In-Person Viewing',
+      tenantName: matching?.viewingDetails?.userDetails?.fullName || request.applicantName || '',
+      tenantEmail: matching?.viewingDetails?.userDetails?.email || request.applicantEmail || '',
+      tenantPhone: matching?.viewingDetails?.userDetails?.phoneNumber || request.applicantPhone || ''
     });
     setIsScheduleModalOpen(true);
   };
@@ -710,35 +708,47 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         }
       };
 
-      // Update the existing viewing booking from 'pending' to 'confirmed' with new details
-      const result = await viewingService.updateViewingStatus(
-        selectedRequest.id,
-        'confirmed',
-        undefined,
-        undefined,
-        { viewingDetails }
-      );
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to schedule viewing');
+      const matching = findMatchingBooking(selectedRequest, bookings, true);
+      let persistOk = false;
+      if (matching && matching.status !== 'cancelled') {
+        const result = await viewingService.updateViewingStatus(
+          matching.id,
+          'confirmed',
+          undefined,
+          undefined,
+          { viewingDetails }
+        );
+        persistOk = result.success;
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to schedule viewing');
+        }
+      } else {
+        const result = await viewingService.saveViewingBooking(
+          selectedRequest.userId,
+          selectedRequest.property,
+          viewingDetails,
+          selectedRequest.propertyId,
+          { landlordId: managerId, agentId: managerId }
+        );
+        persistOk = result.success;
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to schedule viewing');
+        }
       }
 
-      if (scheduleForm.tenantEmail) {
+      await bookViewingRequestService.deleteRequest(selectedRequest.id);
+
+      if (persistOk && scheduleForm.tenantEmail) {
         await emailService.sendEmail({
           to: scheduleForm.tenantEmail,
           subject: `Viewing Scheduled - ${selectedRequest.property.street}`,
-          formData: {
-            property: selectedRequest.property,
-            viewing: viewingDetails,
-            manager: {
-              name: managerName,
-              email: managerEmail
-            },
-            user: {
-              name: scheduleForm.tenantName,
-              email: scheduleForm.tenantEmail
-            }
-          },
+          html: generateTenantViewingUpdateEmailTemplate({
+            tenantName: scheduleForm.tenantName,
+            propertyStreet: selectedRequest.property.street,
+            date: scheduleForm.date,
+            time: scheduleForm.time,
+            intro: 'Your viewing has been scheduled.',
+          }),
           attachments: [],
           emailType: 'viewing-confirmed'
         });
@@ -759,8 +769,11 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
   const handleDeclineRequest = async (request: BookViewingRequest) => {
     try {
-      // Update status from 'pending' to 'cancelled' in viewingBookings
-      await viewingService.updateViewingStatus(request.id, 'cancelled', 'Declined by agent');
+      await bookViewingRequestService.deleteRequest(request.id);
+      const matching = findMatchingBooking(request, bookings, true);
+      if (matching && matching.status !== 'cancelled') {
+        await viewingService.updateViewingStatus(matching.id, 'cancelled', 'Declined by agent');
+      }
       trackEvent('landlord_viewing_declined');
       setFeedback({ type: 'success', message: 'Viewing request declined.' });
     } catch (err) {
@@ -772,25 +785,24 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
   const handleConfirmViewing = async (viewing: ViewingBooking) => {
     try {
       setIsProcessing(true);
-      await viewingService.updateViewingStatus(viewing.id, 'confirmed');
+      const result = await viewingService.updateViewingStatus(viewing.id, 'confirmed');
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to confirm viewing');
+      }
 
       const tenantEmail = viewing.viewingDetails?.userDetails?.email;
+      const tenantName = viewing.viewingDetails?.userDetails?.fullName;
       if (tenantEmail) {
         await emailService.sendEmail({
           to: tenantEmail,
           subject: `Viewing Confirmed - ${viewing.property.street}`,
-          formData: {
-            property: viewing.property,
-            viewing: viewing.viewingDetails,
-            manager: {
-              name: managerName,
-              email: managerEmail
-            },
-            user: {
-              name: viewing.viewingDetails?.userDetails?.fullName,
-              email: tenantEmail
-            }
-          },
+          html: generateTenantViewingUpdateEmailTemplate({
+            tenantName,
+            propertyStreet: viewing.property.street,
+            date: viewing.viewingDetails?.date,
+            time: viewing.viewingDetails?.time,
+            intro: 'Your viewing has been confirmed.',
+          }),
           attachments: [],
           emailType: 'viewing-user'
         });
@@ -831,34 +843,30 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         time: rescheduleForm.time
       };
 
-      await viewingService.updateViewingStatus(
+      const result = await viewingService.updateViewingStatus(
         selectedViewing.id,
         'rescheduled',
         rescheduleForm.message ? `Reschedule requested: ${rescheduleForm.message}` : undefined,
         undefined,
         { viewingDetails: updatedDetails }
       );
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to reschedule viewing');
+      }
 
       const tenantEmail = selectedViewing.viewingDetails?.userDetails?.email;
       if (tenantEmail) {
         await emailService.sendEmail({
           to: tenantEmail,
           subject: `Viewing Rescheduled - ${selectedViewing.property.street}`,
-          formData: {
-            property: selectedViewing.property,
-            viewing: {
-              ...updatedDetails,
-              rescheduleMessage: rescheduleForm.message
-            },
-            manager: {
-              name: managerName,
-              email: managerEmail
-            },
-            user: {
-              name: selectedViewing.viewingDetails?.userDetails?.fullName,
-              email: tenantEmail
-            }
-          },
+          html: generateTenantViewingUpdateEmailTemplate({
+            tenantName: selectedViewing.viewingDetails?.userDetails?.fullName,
+            propertyStreet: selectedViewing.property.street,
+            date: rescheduleForm.date,
+            time: rescheduleForm.time,
+            intro: 'Your viewing has been rescheduled.',
+            extra: rescheduleForm.message,
+          }),
           attachments: [],
           emailType: 'viewing-reschedule'
         });
@@ -888,12 +896,23 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
 
     setIsProcessing(true);
     try {
-      await viewingService.updateViewingStatus(
+      const result = await viewingService.updateViewingStatus(
         selectedViewing.id,
         'cancelled',
         cancelMessage ? `Cancelled: ${cancelMessage}` : undefined,
         undefined
       );
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to cancel viewing');
+      }
+
+      if (selectedViewing.userId) {
+        await bookViewingRequestService.deleteRequestsForProperty(selectedViewing.userId, {
+          propertyId: selectedViewing.propertyId,
+          street: selectedViewing.property?.street,
+          town: selectedViewing.property?.town,
+        });
+      }
 
       trackEvent('landlord_viewing_cancelled');
       const tenantEmail = selectedViewing.viewingDetails?.userDetails?.email;
@@ -901,21 +920,14 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         await emailService.sendEmail({
           to: tenantEmail,
           subject: `Viewing Cancelled - ${selectedViewing.property.street}`,
-          formData: {
-            property: selectedViewing.property,
-            viewing: {
-              ...selectedViewing.viewingDetails,
-              cancelMessage
-            },
-            manager: {
-              name: managerName,
-              email: managerEmail
-            },
-            user: {
-              name: selectedViewing.viewingDetails?.userDetails?.fullName,
-              email: tenantEmail
-            }
-          },
+          html: generateTenantViewingUpdateEmailTemplate({
+            tenantName: selectedViewing.viewingDetails?.userDetails?.fullName,
+            propertyStreet: selectedViewing.property.street,
+            date: selectedViewing.viewingDetails?.date,
+            time: selectedViewing.viewingDetails?.time,
+            intro: 'Your viewing has been cancelled.',
+            extra: cancelMessage,
+          }),
           attachments: [],
           emailType: 'viewing-cancel'
         });
@@ -1059,7 +1071,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
         <h2 className="text-lg font-semibold text-red-700 mb-2">Unable to load viewings</h2>
         <p className="text-sm text-red-600 mb-4">{error}</p>
         <button
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="px-4 py-2 bg-[#136C9E] text-white rounded-lg hover:bg-[#0f5a84]"
           onClick={() => window.location.reload()}
         >
           Retry
@@ -1237,28 +1249,28 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
               <>
                 {/* Desktop Table View */}
                 {!isMobile && (
-                  <>
+                  <div className="overflow-x-auto">
                     {/* Table Header */}
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                      <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
-                        <div className="col-span-1">Select</div>
-                        <div className="col-span-2">Property</div>
-                        <div className="col-span-2">Date & Time</div>
-                        <div className="col-span-1">Status</div>
-                        <div className="col-span-2">Tenant Name</div>
-                        <div className="col-span-2">Tenant Email</div>
-                        <div className="col-span-2 text-center whitespace-nowrap">Actions</div>
+                      <div className={`${VIEWINGS_GRID_CLASS} text-sm font-semibold text-gray-700`} style={VIEWINGS_GRID_STYLE}>
+                        <div className="min-w-0 overflow-hidden">Select</div>
+                        <div className="min-w-0 overflow-hidden">Property</div>
+                        <div className="min-w-0 overflow-hidden">Date & Time</div>
+                        <div className="min-w-0 overflow-hidden">Status</div>
+                        <div className="min-w-0 overflow-hidden">Tenant Name</div>
+                        <div className="min-w-0 overflow-hidden">Tenant Email</div>
+                        <div className="min-w-0 overflow-hidden text-right">Actions</div>
                       </div>
                     </div>
 
                     {/* Table Body */}
                     <div className="divide-y divide-gray-100">
                   {/* Unscheduled Requests */}
-                  {paginatedRequests.requests.map((request) => (
+                  {paginatedRequestRows.map((row) => row.kind === 'request' ? ((request) => (
                     <div key={request.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                      <div className="grid grid-cols-12 gap-4 items-center">
+                      <div className={VIEWINGS_GRID_CLASS} style={VIEWINGS_GRID_STYLE}>
                         {/* Checkbox */}
-                        <div className="col-span-1">
+                        <div className="min-w-0 overflow-hidden">
                           <button
                             onClick={() => handleToggleSelect(request.id)}
                             className="flex items-center justify-center"
@@ -1272,8 +1284,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                           </button>
                         </div>
                         {/* Property */}
-                        <div className="col-span-2">
-                          <h3 className="text-sm font-semibold text-gray-900 truncate">
+                        <div className="min-w-0 overflow-hidden">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate" title={request.property.street}>
                             {request.property.street}
                           </h3>
                           <p className="text-xs text-gray-500 truncate">
@@ -1282,31 +1294,43 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Date & Time */}
-                        <div className="col-span-2">
-                          <span className="text-xs text-gray-500 italic">Not scheduled yet</span>
+                        <div className="min-w-0 overflow-hidden">
+                          {formatCreatedAt(request.createdAt) ? (
+                            <span className="text-xs text-gray-600">{formatCreatedAt(request.createdAt)}</span>
+                          ) : (
+                            <span className="text-xs text-gray-500 italic">Awaiting schedule</span>
+                          )}
                         </div>
 
                         {/* Status */}
-                        <div className="col-span-1">
-                          <span className="inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-blue-100 text-blue-700">
+                        <div className="min-w-0 overflow-hidden">
+                          <span className="inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-[#E8F3F9] text-[#136C9E]">
                             New Request
                           </span>
                         </div>
 
                         {/* Tenant Name */}
-                        <div className="col-span-2">
-                          <span className="text-sm text-gray-500 italic">Not provided</span>
+                        <div className="min-w-0 overflow-hidden">
+                          <span className="block min-w-0 truncate text-sm text-gray-900" title={getRequestApplicantName(request, bookings)}>
+                            {getRequestApplicantName(request, bookings)}
+                          </span>
                         </div>
 
                         {/* Tenant Email */}
-                        <div className="col-span-2">
-                          <span className="text-sm text-gray-500 italic">Not provided</span>
+                        <div className="min-w-0 overflow-hidden">
+                          {getRequestApplicantEmail(request, bookings) ? (
+                            <span className="block min-w-0 truncate text-sm text-gray-600" title={getRequestApplicantEmail(request, bookings)}>
+                              {getRequestApplicantEmail(request, bookings)}
+                            </span>
+                          ) : (
+                            <span className="block min-w-0 truncate text-sm text-gray-500" title="Email not provided">Not provided</span>
+                          )}
                         </div>
 
                         {/* Actions */}
-                        <div className="col-span-2 flex items-center justify-center gap-1.5 flex-nowrap">
+                        <div className="min-w-0 overflow-hidden flex items-center justify-end gap-1.5 flex-nowrap">
                           <button
-                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition whitespace-nowrap"
+                            className="inline-flex shrink-0 items-center justify-center px-2.5 py-1.5 rounded-lg bg-[#136C9E] text-white text-xs font-medium hover:bg-[#0f5a84] transition whitespace-nowrap"
                             onClick={() => handleScheduleRequest(request)}
                             title="Schedule viewing"
                           >
@@ -1314,7 +1338,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                             <span className="hidden sm:inline">Schedule</span>
                           </button>
                           <button
-                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 transition whitespace-nowrap"
+                            className="inline-flex shrink-0 items-center justify-center px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 transition whitespace-nowrap"
                             onClick={() => handleDeclineRequest(request)}
                             title="Decline request"
                           >
@@ -1324,14 +1348,11 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
                       </div>
                     </div>
-                  ))}
-
-                  {/* Pending Viewings (Scheduled but not confirmed) */}
-                  {paginatedRequests.pendingViewings.map((viewing) => (
+                  ))(row.request) : ((viewing) => (
                     <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                      <div className="grid grid-cols-12 gap-4 items-center">
+                      <div className={VIEWINGS_GRID_CLASS} style={VIEWINGS_GRID_STYLE}>
                         {/* Checkbox */}
-                        <div className="col-span-1">
+                        <div className="min-w-0 overflow-hidden">
                           <button
                             onClick={() => handleToggleSelect(viewing.id)}
                             className="flex items-center justify-center"
@@ -1345,8 +1366,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                           </button>
                         </div>
                         {/* Property */}
-                        <div className="col-span-2">
-                          <h3 className="text-sm font-semibold text-gray-900 truncate">
+                        <div className="min-w-0 overflow-hidden">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate" title={viewing.property.street}>
                             {viewing.property.street}
                           </h3>
                           <p className="text-xs text-gray-500 truncate">
@@ -1355,10 +1376,10 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Date & Time */}
-                        <div className="col-span-2">
+                        <div className="min-w-0 overflow-hidden">
                           <div className="flex items-center text-xs text-gray-600 mb-1">
                             <Calendar className="w-3 h-3 mr-1 flex-shrink-0" />
-                            <span className="truncate">{formatDate(viewing.viewingDetails?.date || '')}</span>
+                            <span className="min-w-0 truncate">{formatDate(viewing.viewingDetails?.date || '')}</span>
                           </div>
                           <div className="flex items-center text-xs text-gray-600">
                             <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
@@ -1367,36 +1388,36 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Status */}
-                        <div className="col-span-1">
+                        <div className="min-w-0 overflow-hidden">
                           <span className="inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-orange-100 text-orange-700">
                             Pending
                           </span>
                         </div>
 
                         {/* Tenant Name */}
-                        <div className="col-span-2">
-                          <div className="flex items-center text-sm text-gray-900">
+                        <div className="min-w-0 overflow-hidden">
+                          <div className="flex items-center min-w-0 text-sm text-gray-900">
                             <User className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
-                            <span className="truncate">
+                            <span className="min-w-0 truncate" title={viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}>
                               {viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}
                             </span>
                           </div>
                         </div>
 
                         {/* Tenant Email */}
-                        <div className="col-span-2">
-                          <div className="flex items-center text-sm text-gray-600">
+                        <div className="min-w-0 overflow-hidden">
+                          <div className="flex items-center min-w-0 text-sm text-gray-600">
                             <Mail className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
-                            <span className="truncate">
+                            <span className="min-w-0 truncate" title={viewing.viewingDetails?.userDetails?.email || 'Not provided'}>
                               {viewing.viewingDetails?.userDetails?.email || 'Not provided'}
                             </span>
                           </div>
                         </div>
 
                         {/* Actions */}
-                        <div className="col-span-2 flex items-center justify-center gap-1.5 flex-nowrap">
+                        <div className="min-w-0 overflow-hidden flex items-center justify-end gap-1.5 flex-nowrap">
                           <button
-                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition disabled:opacity-50 whitespace-nowrap"
+                            className="inline-flex shrink-0 items-center justify-center px-2.5 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition disabled:opacity-50 whitespace-nowrap"
                             onClick={() => handleConfirmViewing(viewing)}
                             disabled={isProcessing}
                             title="Confirm viewing"
@@ -1405,7 +1426,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                             <span className="hidden sm:inline">Confirm</span>
                           </button>
                           <button
-                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-blue-300 text-xs font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50 whitespace-nowrap"
+                            className="inline-flex shrink-0 items-center justify-center px-2.5 py-1.5 rounded-lg border border-[#136C9E] text-xs font-medium text-[#136C9E] hover:bg-[#E8F3F9] transition disabled:opacity-50 whitespace-nowrap"
                             onClick={() => handleOpenReschedule(viewing)}
                             disabled={isProcessing}
                             title="Reschedule viewing"
@@ -1414,7 +1435,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                             <span className="hidden sm:inline">Reschedule</span>
                           </button>
                           <button
-                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-red-300 text-xs font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50 whitespace-nowrap"
+                            className="inline-flex shrink-0 items-center justify-center px-2.5 py-1.5 rounded-lg border border-red-300 text-xs font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50 whitespace-nowrap"
                             onClick={() => handleOpenCancel(viewing)}
                             disabled={isProcessing}
                             title="Cancel viewing"
@@ -1424,16 +1445,16 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
                       </div>
                     </div>
-                  ))}
+                  ))(row.viewing))}
                     </div>
-                  </>
+                  </div>
                 )}
 
                 {/* Mobile Card View */}
                 {isMobile && (
                   <div className="space-y-4 p-4">
                     {/* Unscheduled Requests */}
-                    {paginatedRequests.requests.map((request) => (
+                    {paginatedRequestRows.map((row) => row.kind === 'request' ? ((request) => (
                       <div 
                         key={request.id} 
                         className={`bg-white border rounded-lg p-4 ${selectedViewings.has(request.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
@@ -1457,7 +1478,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                               <p className="text-xs text-gray-500 mb-2">
                                 {request.property.town}, {request.property.city}
                               </p>
-                              <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                              <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-[#E8F3F9] text-[#136C9E]">
                                 New Request
                               </span>
                             </div>
@@ -1467,17 +1488,20 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         <div className="space-y-2 mb-3 text-sm">
                           <div>
                             <span className="text-muted-foreground">Date & Time:</span>
-                            <p className="text-gray-500 italic">Not scheduled yet</p>
+                            <p className="text-gray-700">{formatCreatedAt(request.createdAt) || 'Awaiting schedule'}</p>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Tenant:</span>
-                            <p className="text-gray-500 italic">Not provided</p>
+                            <p className="text-gray-700">{getRequestApplicantName(request, bookings)}</p>
+                            {getRequestApplicantEmail(request, bookings) && (
+                              <p className="text-sm text-gray-600 truncate">{getRequestApplicantEmail(request, bookings)}</p>
+                            )}
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2 pt-3 border-t">
                           <button
-                            className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
+                            className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-[#136C9E] text-white text-sm font-medium hover:bg-[#0f5a84] transition"
                             onClick={() => handleScheduleRequest(request)}
                           >
                             <Send className="w-4 h-4 mr-2" />
@@ -1491,10 +1515,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                           </button>
                         </div>
                       </div>
-                    ))}
-
-                    {/* Pending Viewings */}
-                    {paginatedRequests.pendingViewings.map((viewing) => (
+                    ))(row.request) : ((viewing) => (
                       <div 
                         key={viewing.id} 
                         className={`bg-white border rounded-lg p-4 ${selectedViewings.has(viewing.id) ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200'}`}
@@ -1560,7 +1581,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                             Confirm
                           </button>
                           <button
-                            className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-blue-300 text-sm font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50"
+                            className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-[#136C9E] text-sm font-medium text-[#136C9E] hover:bg-[#E8F3F9] transition disabled:opacity-50"
                             onClick={() => handleOpenReschedule(viewing)}
                             disabled={isProcessing}
                           >
@@ -1575,7 +1596,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                           </button>
                         </div>
                       </div>
-                    ))}
+                    ))(row.viewing))}
                   </div>
                 )}
               </>
@@ -1610,17 +1631,17 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
               <>
                 {/* Desktop Table View */}
                 {!isMobile && (
-                  <>
+                  <div className="overflow-x-auto">
                     {/* Table Header */}
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                      <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
-                        <div className="col-span-1">Select</div>
-                        <div className="col-span-2">Property</div>
-                        <div className="col-span-2">Date & Time</div>
-                        <div className="col-span-1">Status</div>
-                        <div className="col-span-2">Tenant Name</div>
-                        <div className="col-span-2">Tenant Email</div>
-                        <div className="col-span-2 text-center whitespace-nowrap">Actions</div>
+                      <div className={`${VIEWINGS_GRID_CLASS} text-sm font-semibold text-gray-700`} style={VIEWINGS_GRID_STYLE}>
+                        <div className="min-w-0 overflow-hidden">Select</div>
+                        <div className="min-w-0 overflow-hidden">Property</div>
+                        <div className="min-w-0 overflow-hidden">Date & Time</div>
+                        <div className="min-w-0 overflow-hidden">Status</div>
+                        <div className="min-w-0 overflow-hidden">Tenant Name</div>
+                        <div className="min-w-0 overflow-hidden">Tenant Email</div>
+                        <div className="min-w-0 overflow-hidden text-right">Actions</div>
                       </div>
                     </div>
 
@@ -1628,9 +1649,9 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                     <div className="divide-y divide-gray-100">
                   {paginatedUpcomingViewings.map((viewing) => (
                     <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                      <div className="grid grid-cols-12 gap-4 items-center">
+                      <div className={VIEWINGS_GRID_CLASS} style={VIEWINGS_GRID_STYLE}>
                         {/* Checkbox */}
-                        <div className="col-span-1">
+                        <div className="min-w-0 overflow-hidden">
                           <button
                             onClick={() => handleToggleSelect(viewing.id)}
                             className="flex items-center justify-center"
@@ -1644,8 +1665,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                           </button>
                         </div>
                         {/* Property */}
-                        <div className="col-span-2">
-                          <h3 className="text-sm font-semibold text-gray-900 truncate">
+                        <div className="min-w-0 overflow-hidden">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate" title={viewing.property.street}>
                             {viewing.property.street}
                           </h3>
                           <p className="text-xs text-gray-500 truncate">
@@ -1654,10 +1675,10 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Date & Time */}
-                        <div className="col-span-2">
+                        <div className="min-w-0 overflow-hidden">
                           <div className="flex items-center text-xs text-gray-600 mb-1">
                             <Calendar className="w-3 h-3 mr-1 flex-shrink-0" />
-                            <span className="truncate">{formatDate(viewing.viewingDetails?.date || '')}</span>
+                            <span className="min-w-0 truncate">{formatDate(viewing.viewingDetails?.date || '')}</span>
                           </div>
                           <div className="flex items-center text-xs text-gray-600">
                             <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
@@ -1666,7 +1687,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Status */}
-                        <div className="col-span-1">
+                        <div className="min-w-0 overflow-hidden">
                           <span
                             className={`inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
                               viewing.status === 'confirmed'
@@ -1681,30 +1702,30 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Tenant Name */}
-                        <div className="col-span-2">
-                          <div className="flex items-center text-sm text-gray-900">
+                        <div className="min-w-0 overflow-hidden">
+                          <div className="flex items-center min-w-0 text-sm text-gray-900">
                             <User className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
-                            <span className="truncate">
+                            <span className="min-w-0 truncate" title={viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}>
                               {viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}
                             </span>
                           </div>
                         </div>
 
                         {/* Tenant Email */}
-                        <div className="col-span-2">
-                          <div className="flex items-center text-sm text-gray-600">
+                        <div className="min-w-0 overflow-hidden">
+                          <div className="flex items-center min-w-0 text-sm text-gray-600">
                             <Mail className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
-                            <span className="truncate">
+                            <span className="min-w-0 truncate" title={viewing.viewingDetails?.userDetails?.email || 'Not provided'}>
                               {viewing.viewingDetails?.userDetails?.email || 'Not provided'}
                             </span>
                           </div>
                         </div>
 
                         {/* Actions */}
-                        <div className="col-span-2 flex items-center justify-center gap-1.5 flex-nowrap">
+                        <div className="min-w-0 overflow-hidden flex items-center justify-end gap-1.5 flex-nowrap">
                           {viewing.status !== 'confirmed' && (
                             <button
-                              className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition disabled:opacity-50 whitespace-nowrap"
+                              className="inline-flex shrink-0 items-center justify-center px-2.5 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition disabled:opacity-50 whitespace-nowrap"
                               onClick={() => handleConfirmViewing(viewing)}
                               disabled={isProcessing}
                               title="Confirm viewing"
@@ -1714,7 +1735,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                             </button>
                           )}
                           <button
-                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-blue-300 text-xs font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50 whitespace-nowrap"
+                            className="inline-flex shrink-0 items-center justify-center px-2.5 py-1.5 rounded-lg border border-[#136C9E] text-xs font-medium text-[#136C9E] hover:bg-[#E8F3F9] transition disabled:opacity-50 whitespace-nowrap"
                             onClick={() => handleOpenReschedule(viewing)}
                             disabled={isProcessing}
                             title="Reschedule viewing"
@@ -1723,7 +1744,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                             <span className="hidden sm:inline">Reschedule</span>
                           </button>
                           <button
-                            className="inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg border border-red-300 text-xs font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50 whitespace-nowrap"
+                            className="inline-flex shrink-0 items-center justify-center px-2.5 py-1.5 rounded-lg border border-red-300 text-xs font-medium text-red-600 hover:bg-red-50 transition disabled:opacity-50 whitespace-nowrap"
                             onClick={() => handleOpenCancel(viewing)}
                             disabled={isProcessing}
                             title="Cancel viewing"
@@ -1735,7 +1756,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                     </div>
                   ))}
                     </div>
-                  </>
+                  </div>
                 )}
 
                 {/* Mobile Card View */}
@@ -1817,7 +1838,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                             </button>
                           )}
                           <button
-                            className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-blue-300 text-sm font-medium text-blue-600 hover:bg-blue-50 transition disabled:opacity-50"
+                            className="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-[#136C9E] text-sm font-medium text-[#136C9E] hover:bg-[#E8F3F9] transition disabled:opacity-50"
                             onClick={() => handleOpenReschedule(viewing)}
                             disabled={isProcessing}
                           >
@@ -1867,17 +1888,17 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
               <>
                 {/* Desktop Table View */}
                 {!isMobile && (
-                  <>
+                  <div className="overflow-x-auto">
                     {/* Table Header */}
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                      <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
-                        <div className="col-span-1">Select</div>
-                        <div className="col-span-2">Property</div>
-                        <div className="col-span-2">Date & Time</div>
-                        <div className="col-span-1">Status</div>
-                        <div className="col-span-2">Tenant Name</div>
-                        <div className="col-span-2">Tenant Email</div>
-                        <div className="col-span-2">Notes</div>
+                      <div className={`${VIEWINGS_GRID_CLASS} text-sm font-semibold text-gray-700`} style={VIEWINGS_GRID_STYLE}>
+                        <div className="min-w-0 overflow-hidden">Select</div>
+                        <div className="min-w-0 overflow-hidden">Property</div>
+                        <div className="min-w-0 overflow-hidden">Date & Time</div>
+                        <div className="min-w-0 overflow-hidden">Status</div>
+                        <div className="min-w-0 overflow-hidden">Tenant Name</div>
+                        <div className="min-w-0 overflow-hidden">Tenant Email</div>
+                        <div className="min-w-0 overflow-hidden">Notes</div>
                       </div>
                     </div>
 
@@ -1885,9 +1906,9 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                     <div className="divide-y divide-gray-100">
                   {paginatedCompletedViewings.map((viewing) => (
                     <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                      <div className="grid grid-cols-12 gap-4 items-center">
+                      <div className={VIEWINGS_GRID_CLASS} style={VIEWINGS_GRID_STYLE}>
                         {/* Checkbox */}
-                        <div className="col-span-1">
+                        <div className="min-w-0 overflow-hidden">
                           <button
                             onClick={() => handleToggleSelect(viewing.id)}
                             className="flex items-center justify-center"
@@ -1901,8 +1922,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                           </button>
                         </div>
                         {/* Property */}
-                        <div className="col-span-2">
-                          <h3 className="text-sm font-semibold text-gray-900 truncate">
+                        <div className="min-w-0 overflow-hidden">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate" title={viewing.property.street}>
                             {viewing.property.street}
                           </h3>
                           <p className="text-xs text-gray-500 truncate">
@@ -1911,10 +1932,10 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Date & Time */}
-                        <div className="col-span-2">
+                        <div className="min-w-0 overflow-hidden">
                           <div className="flex items-center text-xs text-gray-600 mb-1">
                             <Calendar className="w-3 h-3 mr-1 flex-shrink-0" />
-                            <span className="truncate">{formatDate(viewing.viewingDetails?.date || '')}</span>
+                            <span className="min-w-0 truncate">{formatDate(viewing.viewingDetails?.date || '')}</span>
                           </div>
                           <div className="flex items-center text-xs text-gray-600">
                             <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
@@ -1923,34 +1944,34 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Status */}
-                        <div className="col-span-1">
+                        <div className="min-w-0 overflow-hidden">
                           <span className="inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-green-100 text-green-700">
                             Completed
                           </span>
                         </div>
 
                         {/* Tenant Name */}
-                        <div className="col-span-2">
-                          <div className="flex items-center text-sm text-gray-900">
+                        <div className="min-w-0 overflow-hidden">
+                          <div className="flex items-center min-w-0 text-sm text-gray-900">
                             <User className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
-                            <span className="truncate">
+                            <span className="min-w-0 truncate" title={viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}>
                               {viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}
                             </span>
                           </div>
                         </div>
 
                         {/* Tenant Email */}
-                        <div className="col-span-2">
-                          <div className="flex items-center text-sm text-gray-600">
+                        <div className="min-w-0 overflow-hidden">
+                          <div className="flex items-center min-w-0 text-sm text-gray-600">
                             <Mail className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
-                            <span className="truncate">
+                            <span className="min-w-0 truncate" title={viewing.viewingDetails?.userDetails?.email || 'Not provided'}>
                               {viewing.viewingDetails?.userDetails?.email || 'Not provided'}
                             </span>
                           </div>
                         </div>
 
                         {/* Notes */}
-                        <div className="col-span-2">
+                        <div className="min-w-0 overflow-hidden">
                           <span className="text-xs text-gray-500 truncate">
                             {viewing.notes || viewing.agentNotes || '—'}
                           </span>
@@ -1959,7 +1980,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                     </div>
                   ))}
                     </div>
-                  </>
+                  </div>
                 )}
 
                 {/* Mobile Card View */}
@@ -2062,17 +2083,17 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
               <>
                 {/* Desktop Table View */}
                 {!isMobile && (
-                  <>
+                  <div className="overflow-x-auto">
                     {/* Table Header */}
                     <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                      <div className="grid grid-cols-12 gap-4 text-sm font-semibold text-gray-700">
-                        <div className="col-span-1">Select</div>
-                        <div className="col-span-2">Property</div>
-                        <div className="col-span-2">Date & Time</div>
-                        <div className="col-span-1">Status</div>
-                        <div className="col-span-2">Tenant Name</div>
-                        <div className="col-span-2">Tenant Email</div>
-                        <div className="col-span-2">Notes</div>
+                      <div className={`${VIEWINGS_GRID_CLASS} text-sm font-semibold text-gray-700`} style={VIEWINGS_GRID_STYLE}>
+                        <div className="min-w-0 overflow-hidden">Select</div>
+                        <div className="min-w-0 overflow-hidden">Property</div>
+                        <div className="min-w-0 overflow-hidden">Date & Time</div>
+                        <div className="min-w-0 overflow-hidden">Status</div>
+                        <div className="min-w-0 overflow-hidden">Tenant Name</div>
+                        <div className="min-w-0 overflow-hidden">Tenant Email</div>
+                        <div className="min-w-0 overflow-hidden">Notes</div>
                       </div>
                     </div>
 
@@ -2080,9 +2101,9 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                     <div className="divide-y divide-gray-100">
                   {paginatedPastViewings.map((viewing) => (
                     <div key={viewing.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                      <div className="grid grid-cols-12 gap-4 items-center">
+                      <div className={VIEWINGS_GRID_CLASS} style={VIEWINGS_GRID_STYLE}>
                         {/* Checkbox */}
-                        <div className="col-span-1">
+                        <div className="min-w-0 overflow-hidden">
                           <button
                             onClick={() => handleToggleSelect(viewing.id)}
                             className="flex items-center justify-center"
@@ -2096,8 +2117,8 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                           </button>
                         </div>
                         {/* Property */}
-                        <div className="col-span-2">
-                          <h3 className="text-sm font-semibold text-gray-900 truncate">
+                        <div className="min-w-0 overflow-hidden">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate" title={viewing.property.street}>
                             {viewing.property.street}
                           </h3>
                           <p className="text-xs text-gray-500 truncate">
@@ -2106,10 +2127,10 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Date & Time */}
-                        <div className="col-span-2">
+                        <div className="min-w-0 overflow-hidden">
                           <div className="flex items-center text-xs text-gray-600 mb-1">
                             <Calendar className="w-3 h-3 mr-1 flex-shrink-0" />
-                            <span className="truncate">{formatDate(viewing.viewingDetails?.date || '')}</span>
+                            <span className="min-w-0 truncate">{formatDate(viewing.viewingDetails?.date || '')}</span>
                           </div>
                           <div className="flex items-center text-xs text-gray-600">
                             <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
@@ -2118,7 +2139,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Status */}
-                        <div className="col-span-1">
+                        <div className="min-w-0 overflow-hidden">
                           <span
                             className={`inline-block px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
                               viewing.status === 'completed'
@@ -2133,27 +2154,27 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                         </div>
 
                         {/* Tenant Name */}
-                        <div className="col-span-2">
-                          <div className="flex items-center text-sm text-gray-900">
+                        <div className="min-w-0 overflow-hidden">
+                          <div className="flex items-center min-w-0 text-sm text-gray-900">
                             <User className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
-                            <span className="truncate">
+                            <span className="min-w-0 truncate" title={viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}>
                               {viewing.viewingDetails?.userDetails?.fullName || 'Not provided'}
                             </span>
                           </div>
                         </div>
 
                         {/* Tenant Email */}
-                        <div className="col-span-2">
-                          <div className="flex items-center text-sm text-gray-600">
+                        <div className="min-w-0 overflow-hidden">
+                          <div className="flex items-center min-w-0 text-sm text-gray-600">
                             <Mail className="w-4 h-4 mr-2 flex-shrink-0 text-gray-400" />
-                            <span className="truncate">
+                            <span className="min-w-0 truncate" title={viewing.viewingDetails?.userDetails?.email || 'Not provided'}>
                               {viewing.viewingDetails?.userDetails?.email || 'Not provided'}
                             </span>
                           </div>
                         </div>
 
                         {/* Notes */}
-                        <div className="col-span-2">
+                        <div className="min-w-0 overflow-hidden">
                           <span className="text-xs text-gray-500 truncate">
                             {viewing.notes || viewing.agentNotes || '—'}
                           </span>
@@ -2162,7 +2183,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                     </div>
                   ))}
                     </div>
-                  </>
+                  </div>
                 )}
 
                 {/* Mobile Card View */}
@@ -2351,7 +2372,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                 Cancel
               </button>
               <button
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2"
+                className="px-4 py-2 rounded-lg bg-[#136C9E] text-white hover:bg-[#0f5a84] flex items-center gap-2"
                 onClick={handleScheduleSubmit}
                 disabled={isProcessing}
               >
@@ -2424,7 +2445,7 @@ const ViewingsPage: React.FC<ViewingsPageProps> = ({ managerId, managerName, man
                 Cancel
               </button>
               <button
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2"
+                className="px-4 py-2 rounded-lg bg-[#136C9E] text-white hover:bg-[#0f5a84] flex items-center gap-2"
                 onClick={handleRescheduleSubmit}
                 disabled={isProcessing}
               >

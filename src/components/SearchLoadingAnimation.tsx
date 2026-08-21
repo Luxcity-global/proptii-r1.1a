@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import '../styles/search-loading.css';
 
-const SCOUT_IMAGE = '/images/Scout ava.png';
+const LOGO_IMAGE = '/images/Proptii-logo-icon.png';
 
 const STEPS = [
   { label: 'Understanding your search' },
@@ -15,7 +15,7 @@ const FILL_DURATION_MS = 45000;
 const TIPS = [
   { heading: 'Did you know?', body: 'Adding “south-facing garden” finds homes that get the most afternoon sun.' },
   { heading: 'Pro tip', body: 'Homes near a station sell 12% faster — mention it to prioritise commuter-friendly listings.' },
-  { heading: 'Scout says', body: 'Try “quiet street” or “corner plot” for more outdoor space.' },
+  { heading: 'Search tip', body: 'Try “quiet street” or “corner plot” for more outdoor space.' },
   { heading: 'Good to know', body: 'Ofsted-rated schools are factored in when you say “near good schools”.' },
 ];
 
@@ -58,7 +58,7 @@ function Radar() {
         />
       ))}
       <div className="search-load-avatar">
-        <img src={SCOUT_IMAGE} alt="Scout" className="search-load-avatar-img" draggable={false} />
+        <img src={LOGO_IMAGE} alt="Proptii" className="search-load-avatar-img" draggable={false} />
       </div>
     </div>
   );

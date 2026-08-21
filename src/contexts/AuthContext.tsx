@@ -1,67 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useMsal, MsalProvider } from '@azure/msal-react';
 import {
-  PublicClientApplication,
-  EventType,
-  EventMessage,
   AuthenticationResult,
   InteractionRequiredAuthError,
   AccountInfo
 } from '@azure/msal-browser';
 import { msalConfig, loginRequest, b2cPolicies } from '../config/authConfig';
+import { getMsalInstance, waitForMsalReady } from '../utils/msalInstance';
 import SessionManager from '../services/SessionManager';
 import SecurityMiddleware from '../middleware/SecurityMiddleware';
-import SecurityPolicyService from '../services/SecurityPolicyService';
 
-// Singleton pattern for MSAL instance
-let msalInstance: PublicClientApplication | null = null;
-/** First API calls must await this so getAllAccounts / acquireTokenSilent work reliably */
-let msalInitPromise: Promise<void> | null = null;
-
-// Initialize MSAL instance only once
-export const getMsalInstance = () => {
-  if (!msalInstance) {
-    msalInstance = new PublicClientApplication(msalConfig);
-
-    msalInitPromise = msalInstance.initialize();
-    msalInitPromise.catch((error) => {
-      console.error('Error initializing MSAL:', error);
-    });
-
-    // Register event callbacks for redirect handling
-    msalInstance.addEventCallback((event: EventMessage) => {
-      if (event.eventType === EventType.LOGIN_SUCCESS) {
-        console.log('Login successful');
-        window.dispatchEvent(new CustomEvent('auth-state-changed'));
-      }
-      if (event.eventType === EventType.LOGOUT_SUCCESS) {
-        console.log('Logout successful');
-        window.dispatchEvent(new CustomEvent('auth-state-changed'));
-      }
-      if (event.eventType === EventType.LOGIN_FAILURE || event.eventType === EventType.ACQUIRE_TOKEN_FAILURE) {
-        console.log('Authentication failed:', event.error && 'errorMessage' in event.error ? event.error.errorMessage : event.error?.message);
-        window.dispatchEvent(new CustomEvent('auth-state-changed'));
-      }
-    });
-  }
-  return msalInstance;
-};
-
-/** Wait until MSAL `initialize()` has finished (needed before acquireTokenSilent in axios). */
-export async function waitForMsalReady(): Promise<void> {
-  if (!msalInstance) {
-    getMsalInstance();
-  }
-  if (msalInitPromise) {
-    await msalInitPromise;
-  }
-}
+export { getMsalInstance, waitForMsalReady };
 
 // Development mode flag - set to true to bypass authentication for development
 const DEV_MODE = false; // Set to false in production
-
-// Initialize services
-const securityPolicyService = SecurityPolicyService.getInstance();
 
 interface User {
   id: string;
@@ -501,6 +453,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           phone: phoneNumber,
           roles: ['tenant'] // Default role for new users
         });
+
+        try {
+          sessionStorage.setItem('proptii_pending_post_auth', '1');
+        } catch {
+          // ignore
+        }
         
         console.log('👤 Login - User object set:', { id: stableUserId, email: result.account?.username, phone: phoneNumber });
 

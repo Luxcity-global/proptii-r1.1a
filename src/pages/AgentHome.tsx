@@ -7,6 +7,7 @@ import FAQSection from '../components/FAQSection';
 import { RoleSelectionPopup } from '../components/RoleSelectionPopup';
 import landlordUserService from '../services/landlordUserService';
 import { useAuth } from '../contexts/AuthContext';
+import { persistUserRole, readStoredUserRole } from '../landlord_agent/src/utils/landlordWorkspaceStorage';
 
 type UserRole = 'landlord' | 'agent';
 
@@ -20,11 +21,34 @@ const preloadHeroImage = () => {
   document.head.appendChild(link);
 };
 
+function shouldShowRolePicker(): boolean {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('start') === 'role-selection') return true;
+    const roleParam = params.get('role');
+    if (roleParam === 'agent' || roleParam === 'landlord') return false;
+  } catch {
+    // ignore URL parse errors
+  }
+  return !readStoredUserRole();
+}
+
+function initialSelectedRole(): UserRole {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const roleParam = params.get('role');
+    if (roleParam === 'agent' || roleParam === 'landlord') return roleParam;
+  } catch {
+    // ignore URL parse errors
+  }
+  return readStoredUserRole() || 'landlord';
+}
+
 const AgentHome = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [showRolePopup, setShowRolePopup] = useState(true);
-  const [selectedRole, setSelectedRole] = useState<UserRole>('landlord');
+  const [showRolePopup, setShowRolePopup] = useState(shouldShowRolePicker);
+  const [selectedRole, setSelectedRole] = useState<UserRole>(initialSelectedRole);
 
   // Preload hero image when component mounts
   useEffect(() => {
@@ -40,6 +64,7 @@ const AgentHome = () => {
   const handleRoleContinue = async (role: UserRole) => {
     setSelectedRole(role);
     setShowRolePopup(false);
+    persistUserRole(role);
     
     // Automatically register user if they have email
     const userEmail = user?.email || '';
@@ -55,6 +80,9 @@ const AgentHome = () => {
         if (checkResult.isLandlord) {
           console.log('✅ User already registered as', checkResult.user?.role);
           localStorage.setItem('landlordEmail', userEmail);
+          if (checkResult.user?.role !== role) {
+            await landlordUserService.updateLandlordUser(userEmail, { role });
+          }
           return;
         }
         
@@ -85,30 +113,20 @@ const AgentHome = () => {
 
 
   const handleGoToDashboard = () => {
-    // Store the selected role in localStorage for the dashboard to use
-    localStorage.setItem('userRole', selectedRole);
-    // Navigate to the landlord dashboard (served from public/landlord/)
-    window.location.href = '/landlord/index.html';
+    persistUserRole(selectedRole);
+    window.location.href = `/landlord/index.html?role=${selectedRole}`;
   };
 
   const handleAddProperty = () => {
-    // Pass selected role into landlord app
-    if (selectedRole === 'agent') {
-      localStorage.setItem('userRole', 'agent');
-    }
-    // Instruct landlord app to open property setup flow immediately
+    persistUserRole(selectedRole);
     localStorage.setItem('startScreen', 'property-setup-step1');
-    window.location.href = '/landlord/index.html?start=property-setup-step1';
+    window.location.href = `/landlord/index.html?start=property-setup-step1&role=${selectedRole}`;
   };
 
   const handleSetupProfile = () => {
-    // Respect selected role for landlord-agent app
-    if (selectedRole === 'agent') {
-      localStorage.setItem('userRole', 'agent');
-    }
-    // Deep link to the company/landlord profile setup flow
+    persistUserRole(selectedRole);
     localStorage.setItem('startScreen', 'company-profile-setup');
-    window.location.href = '/landlord/index.html?start=company-profile-setup';
+    window.location.href = `/landlord/index.html?start=company-profile-setup&role=${selectedRole}`;
   };
 
   const handleClosePopup = () => {

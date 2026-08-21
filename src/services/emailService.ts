@@ -1,6 +1,6 @@
 import axios from 'axios';
 import JSZip from 'jszip';
-import { getMsalInstance } from '../contexts/AuthContext';
+import { getMsalInstance, waitForMsalReady } from '../utils/msalInstance';
 import { API_BASE_CANDIDATES, buildApiUrl, PRIMARY_API_BASE_URL } from '../utils/apiEndpoints';
 
 interface EmailAttachment {
@@ -76,6 +76,7 @@ class EmailService {
     const msalInstance = getMsalInstance();
     if (msalInstance) {
       try {
+        await waitForMsalReady();
         const accounts = msalInstance.getAllAccounts();
         if (accounts.length > 0) {
           const silentRequest = {
@@ -275,20 +276,8 @@ class EmailService {
         emailType: emailContent.emailType || 'agent'
       });
 
-      /** Viewing notifications are often sent before login; `/referencing/send-email` requires JWT. */
-      const viewingEmailTypes: NonNullable<EmailContent['emailType']>[] = [
-        'viewing-agent',
-        'viewing-user',
-        'viewing-confirmed',
-        'viewing-reschedule',
-        'viewing-cancel',
-        'viewing-cancellation',
-      ];
-      if (
-        emailContent.html &&
-        emailContent.emailType &&
-        viewingEmailTypes.includes(emailContent.emailType)
-      ) {
+      /** HTML emails go through `/email/send` (no JWT). Referencing zips still use `/referencing/send-email`. */
+      if (emailContent.html) {
         const errorLog: string[] = [];
         for (const base of this.apiBases) {
           const targetUrl = buildApiUrl(base, '/email/send');

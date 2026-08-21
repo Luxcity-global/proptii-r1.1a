@@ -1,6 +1,6 @@
 import { ApplicationInsights } from '@microsoft/applicationinsights-web';
-import { PublicClientApplication } from '@azure/msal-browser';
-import { msalConfig, b2cPolicies } from '../config/authConfig';
+import { b2cPolicies, msalConfig } from '../config/authConfig';
+import { getMsalInstance, waitForMsalReady } from '../utils/msalInstance';
 
 interface PasswordPolicy {
     minLength: number;
@@ -41,7 +41,6 @@ interface RiskAssessment {
 export class SecurityPolicyService {
     private static instance: SecurityPolicyService;
     private appInsights: ApplicationInsights;
-    private msalInstance: PublicClientApplication;
     private readonly recoveryAttempts: Map<string, PasswordRecoveryAttempt[]> = new Map();
     private readonly maxAttemptsPerHour = 3;
     private readonly maxAttemptsPerDay = 10;
@@ -77,7 +76,7 @@ export class SecurityPolicyService {
                 enableAutoRouteTracking: true,
             }
         });
-        this.msalInstance = new PublicClientApplication(msalConfig);
+        // Passive listeners only — never trigger MSAL popups on construction/page load
         this.initializeSecurityMonitoring();
     }
 
@@ -120,11 +119,17 @@ export class SecurityPolicyService {
         };
     }
 
+    private forgotPasswordAuthority(): string {
+        const base = msalConfig.auth.authority.replace(/\/[^/]+$/, '');
+        return `${base}/${b2cPolicies.forgotPassword}`;
+    }
+
     public async initiatePasswordReset(email: string): Promise<void> {
         try {
-            await this.msalInstance.loginPopup({
-                ...msalConfig.auth,
-                authority: `${msalConfig.auth.authority}/${b2cPolicies.forgotPassword}`
+            await waitForMsalReady();
+            await getMsalInstance().loginPopup({
+                authority: this.forgotPasswordAuthority(),
+                scopes: ['openid', 'profile', 'email'],
             });
 
             this.appInsights.trackEvent({
@@ -175,20 +180,25 @@ export class SecurityPolicyService {
     }
 
     private monitorLocationChanges(): void {
-        if (this.riskConfig.unusualLocationDetection) {
-            navigator.geolocation?.getCurrentPosition(
-                (position) => {
-                    const lastLocation = localStorage.getItem('last_login_location');
-                    const currentLocation = `${position.coords.latitude},${position.coords.longitude}`;
+        if (!this.riskConfig.unusualLocationDetection) return;
+        if (typeof navigator === 'undefined' || !navigator.geolocation) return;
 
-                    if (lastLocation && this.isLocationSignificantlyDifferent(lastLocation, currentLocation)) {
-                        this.handleUnusualLocation();
-                    }
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lastLocation = localStorage.getItem('last_login_location');
+                const currentLocation = `${position.coords.latitude},${position.coords.longitude}`;
 
-                    localStorage.setItem('last_login_location', currentLocation);
+                if (lastLocation && this.isLocationSignificantlyDifferent(lastLocation, currentLocation)) {
+                    this.handleUnusualLocation();
                 }
-            );
-        }
+
+                localStorage.setItem('last_login_location', currentLocation);
+            },
+            () => {
+                // Geolocation denied/unavailable — do not block the app
+            },
+            { maximumAge: 600_000, timeout: 10_000 }
+        );
     }
 
     private monitorPasswordChanges(): void {
@@ -216,10 +226,13 @@ export class SecurityPolicyService {
             properties: { userId }
         });
 
-        // Implement account lockout logic
-        await this.msalInstance.logoutPopup();
+        try {
+            await waitForMsalReady();
+            await getMsalInstance().logoutPopup();
+        } catch (error) {
+            console.warn('Account lockout logout skipped:', error);
+        }
 
-        // Notify user
         window.dispatchEvent(new CustomEvent('account-locked', {
             detail: {
                 userId,
@@ -233,9 +246,9 @@ export class SecurityPolicyService {
             name: 'UnusualLocationDetected'
         });
 
-        // Trigger additional verification if needed
+        // Log only — do not force a login popup on page load (breaks embedded landlord app)
         if (this.mfaPolicy.riskBasedEnabled) {
-            this.requireAdditionalVerification();
+            window.dispatchEvent(new CustomEvent('unusual-location-detected'));
         }
     }
 
@@ -247,11 +260,13 @@ export class SecurityPolicyService {
         window.dispatchEvent(new CustomEvent('password-reuse-attempt'));
     }
 
-    private async requireAdditionalVerification(): Promise<void> {
+    /** Explicit user-initiated step-up auth (never called automatically on page load). */
+    public async requireAdditionalVerification(): Promise<void> {
         try {
-            await this.msalInstance.loginPopup({
-                ...msalConfig.auth,
-                prompt: 'login'
+            await waitForMsalReady();
+            await getMsalInstance().loginPopup({
+                prompt: 'login',
+                scopes: ['openid', 'profile', 'email'],
             });
         } catch (error) {
             console.error('Additional verification failed:', error);
@@ -307,9 +322,10 @@ export class SecurityPolicyService {
             }
 
             // Initialize recovery flow with Azure AD B2C
-            await this.msalInstance.loginPopup({
-                ...msalConfig.auth,
-                authority: `${msalConfig.auth.authority}/${b2cPolicies.forgotPassword}`
+            await waitForMsalReady();
+            await getMsalInstance().loginPopup({
+                authority: this.forgotPasswordAuthority(),
+                scopes: ['openid', 'profile', 'email'],
             });
 
             // Record attempt

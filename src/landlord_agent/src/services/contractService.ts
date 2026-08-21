@@ -18,29 +18,59 @@ import { db, storage } from '../config/firebase';
 import { Contract } from '../components/ContractsPage';
 import { contractEmailService } from './contractEmailService';
 
+function normalizeEmail(email?: string | null): string {
+  return (email || '').trim().toLowerCase();
+}
+
 class ContractService {
   private contractsCollection = collection(db, 'contracts');
+
+  private async uploadContractFile(file: File): Promise<{ fileUrl: string; filePath: string }> {
+    const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+    const stamp = Date.now();
+    const paths = [
+      `contracts/${stamp}_${safeName}`,
+      `properties/contracts/${stamp}_${safeName}`,
+    ];
+
+    let lastError: unknown;
+    for (const filePath of paths) {
+      try {
+        const storageRef = ref(storage, filePath);
+        await uploadBytes(storageRef, file);
+        const fileUrl = await getDownloadURL(storageRef);
+        return { fileUrl, filePath };
+      } catch (error) {
+        lastError = error;
+        console.warn('Contract file upload failed for path', filePath, error);
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Failed to upload contract file');
+  }
 
   /**
    * Create a new contract and send via email
    */
   async createContract(
-    contractData: Omit<Contract, 'id' | 'fileUrl' | 'fileName'>,
+    contractData: Omit<Contract, 'id' | 'fileUrl' | 'fileName'> & { landlordEmail?: string },
     file: File,
     ownerUserId: string,
     sendEmail: boolean = true,
     includeAttachment: boolean = false
   ): Promise<string> {
     try {
-      // 1. Upload file to Firebase Storage
-      const filePath = `contracts/${Date.now()}_${file.name}`;
-      const storageRef = ref(storage, filePath);
-      await uploadBytes(storageRef, file);
-      const fileUrl = await getDownloadURL(storageRef);
+      const tenantEmail = normalizeEmail(contractData.tenantEmail);
+      const landlordEmail = normalizeEmail((contractData as { landlordEmail?: string }).landlordEmail);
+
+      // 1. Upload file to Firebase Storage so tenants can open the document
+      const { fileUrl, filePath } = await this.uploadContractFile(file);
 
       // 2. Create contract document in Firestore
-      const contractDoc = {
+      const contractDoc: Record<string, unknown> = {
         ...contractData,
+        tenantEmail,
+        tenantEmailLower: tenantEmail,
         fileUrl,
         filePath,
         fileName: file.name,
@@ -51,6 +81,9 @@ class ContractService {
         reminderCount: 0,
         status: 'sent' as const
       };
+      if (landlordEmail) {
+        contractDoc.landlordEmail = landlordEmail;
+      }
       console.log('✅ ContractService: Creating contract with userId:', ownerUserId);
 
       const docRef = await addDoc(this.contractsCollection, contractDoc);
@@ -100,18 +133,40 @@ class ContractService {
     contractData: Omit<Contract, 'id' | 'fileUrl' | 'fileName'> & { landlordEmail?: string },
     fileName: string,
     base64Data: string,
-    ownerUserId: string
+    ownerUserId: string,
+    file?: File
   ): Promise<string> {
     try {
-      // Store the base64 data URL directly
-      const fileUrl = base64Data;
+      const tenantEmail = normalizeEmail(contractData.tenantEmail);
+      let fileUrl = '';
+      let filePath: string | undefined;
+
+      if (file) {
+        try {
+          const uploaded = await this.uploadContractFile(file);
+          fileUrl = uploaded.fileUrl;
+          filePath = uploaded.filePath;
+        } catch (uploadError) {
+          console.warn('Storage upload failed, falling back to compact Firestore fileUrl', uploadError);
+          if (base64Data && base64Data.length < 700000) {
+            fileUrl = base64Data;
+          }
+        }
+      } else if (base64Data && base64Data.length < 700000) {
+        fileUrl = base64Data;
+      }
+
+      if (!fileUrl) {
+        throw new Error('Contract file could not be stored. Please try again with a smaller PDF.');
+      }
 
       // Create contract document in Firestore
       const contractDoc: any = {
         title: contractData.title,
         propertyAddress: contractData.propertyAddress,
         tenantName: contractData.tenantName,
-        tenantEmail: contractData.tenantEmail,
+        tenantEmail,
+        tenantEmailLower: tenantEmail,
         contractType: contractData.contractType,
         fileUrl,
         fileName: fileName,
@@ -131,8 +186,12 @@ class ContractService {
       if (contractData.additionalInfo) {
         contractDoc.additionalInfo = contractData.additionalInfo;
       }
-      if ((contractData as any).landlordEmail) {
-        contractDoc.landlordEmail = (contractData as any).landlordEmail;
+      if (filePath) {
+        contractDoc.filePath = filePath;
+      }
+      const landlordEmail = normalizeEmail((contractData as any).landlordEmail);
+      if (landlordEmail) {
+        contractDoc.landlordEmail = landlordEmail;
       }
 
       const docRef = await addDoc(this.contractsCollection, contractDoc);

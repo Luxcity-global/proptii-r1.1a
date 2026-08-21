@@ -38,6 +38,9 @@ export interface BookViewingRequest {
     };
   };
   status: 'requested';
+  applicantName?: string;
+  applicantEmail?: string;
+  applicantPhone?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -52,6 +55,11 @@ class BookViewingRequestService {
     managerInfo?: {
       landlordId?: string | null;
       agentId?: string | null;
+    },
+    applicant?: {
+      name?: string;
+      email?: string;
+      phone?: string;
     }
   ): Promise<{ success: boolean; requestId?: string; error?: string }> {
     try {
@@ -72,6 +80,9 @@ class BookViewingRequestService {
         agentEmail: normalizedProperty.agent?.email?.toLowerCase().trim() || null, // OPTIMIZATION: Denormalize for fast queries
         property: normalizedProperty,
         status: 'requested',
+        ...(applicant?.name ? { applicantName: applicant.name } : {}),
+        ...(applicant?.email ? { applicantEmail: applicant.email.trim().toLowerCase() } : {}),
+        ...(applicant?.phone ? { applicantPhone: applicant.phone } : {}),
         createdAt: serverTimestamp() as Timestamp,
         updatedAt: serverTimestamp() as Timestamp
       };
@@ -522,6 +533,27 @@ class BookViewingRequestService {
       return { success: true };
     } catch (error: any) {
       console.error('Error deleting viewing request:', error);
+      return { success: false, error: error?.message || 'Unknown error' };
+    }
+  }
+
+  async deleteRequestsForProperty(
+    userId: string,
+    property: { propertyId?: string | null; street?: string; town?: string }
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const result = await this.getUserRequests(userId);
+      const requests = result.requests || [];
+      const targetKey = property.propertyId || `${property.street || ''}-${property.town || ''}`;
+      const matches = requests.filter((request) => {
+        const requestKey = request.propertyId || `${request.property?.street || ''}-${request.property?.town || ''}`;
+        return requestKey === targetKey;
+      });
+
+      await Promise.all(matches.map((request) => this.deleteRequest(request.id)));
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error deleting matching viewing requests:', error);
       return { success: false, error: error?.message || 'Unknown error' };
     }
   }

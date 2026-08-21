@@ -55,6 +55,15 @@ import {
   savePropertySetupDraft,
   type PropertySetupDraftScreen,
 } from './utils/propertySetupDraft';
+import {
+  dismissOnboardingOptions,
+  isOnboardingOptionsDismissed,
+  loadStoredCompanyProfile,
+  persistUserRole,
+  readStoredUserRole,
+  saveStoredCompanyProfile,
+} from './utils/landlordWorkspaceStorage';
+import landlordUserService from '../../services/landlordUserService';
 
 export type UserRole = 'landlord' | 'agent';
 
@@ -399,18 +408,21 @@ function AppContent() {
   
   // Wrapper function to log navigation changes and update URL
   const handleNavigation = (screen: NavigationScreen) => {
-    trackEvent('landlord_nav_click', { section: screen });
+    // Analytics is agent-only; landlords must not reach it via sidebar or deep links
+    const targetScreen = screen === 'insights' && userRole !== 'agent' ? 'dashboard' : screen;
+    trackEvent('landlord_nav_click', { section: targetScreen });
     setCurrentScreen('main-app');
-    setNavigationScreen(screen);
+    setNavigationScreen(targetScreen);
 
-    const path = SCREEN_TO_PATH[screen] || '/dashboard';
+    const path = SCREEN_TO_PATH[targetScreen] || '/dashboard';
 
     // Inside the parent iframe, stay on index.html and use hash routing only.
     // navigate() to /landlord/settings would load the parent SPA in the iframe (blank page).
     if (isEmbeddedInParent()) {
       try {
-        const base = `${window.location.pathname}${window.location.search}`;
-        window.history.replaceState(null, '', `${base}#${path}`);
+        window.history.replaceState(null, '', `${window.location.pathname}#${path}`);
+        const parentPath = path === '/dashboard' ? '/landlord' : `/landlord${path}`;
+        window.parent.postMessage({ type: 'PARENT_NAVIGATE', payload: { path: parentPath } }, '*');
       } catch {
         /* ignore */
       }
@@ -423,8 +435,10 @@ function AppContent() {
   };
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userRole, setUserRole] = useState<UserRole>('landlord');
+  const [userRole, setUserRole] = useState<UserRole>(() => readStoredUserRole() || 'landlord');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [companyProfileReturnTo, setCompanyProfileReturnTo] = useState<'dashboard' | 'settings'>('dashboard');
+  const [showGettingStarted, setShowGettingStarted] = useState(() => !isOnboardingOptionsDismissed());
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -475,6 +489,23 @@ function AppContent() {
       console.warn('Failed to parse cached auth state:', error);
       return null;
     }
+  }, []);
+
+  const applyAuthenticatedProfile = useCallback((authUser: {
+    name?: string;
+    email?: string;
+    phone?: string;
+  }) => {
+    const email = authUser.email || '';
+    const storedCompany = loadStoredCompanyProfile(email);
+    setUserProfile((prev) => ({
+      name: authUser.name || prev?.name || '',
+      email: email || prev?.email || '',
+      phone: resolveAuthPhone(authUser.phone) || prev?.phone || '',
+      companyName: storedCompany?.companyName || prev?.companyProfile?.companyName || prev?.companyName || '',
+      logo: storedCompany?.logo || prev?.logo,
+      companyProfile: storedCompany || prev?.companyProfile,
+    }));
   }, []);
 
   const resolveManagerId = useCallback((): string | null => {
@@ -566,12 +597,10 @@ function AppContent() {
         const userInfo = window.getUserInfo();
         if (userInfo && userInfo.isAuthenticated) {
           setIsAuthenticated(true);
-          setUserProfile({
+          applyAuthenticatedProfile({
             name: userInfo.name,
             email: userInfo.email,
-            phone: resolveAuthPhone((userInfo as { phone?: string }).phone),
-            companyName: 'Proptii',
-            logo: undefined
+            phone: (userInfo as { phone?: string }).phone,
           });
           clearSignInQueryParam();
           setIsAuthLoading(false);
@@ -584,13 +613,7 @@ function AppContent() {
       const cachedUser = getCachedAuthUser();
       if (cachedUser) {
         setIsAuthenticated(true);
-        setUserProfile({
-          name: cachedUser.name || '',
-          email: cachedUser.email || '',
-          phone: resolveAuthPhone(cachedUser.phone),
-          companyName: 'Proptii',
-          logo: undefined
-        });
+        applyAuthenticatedProfile(cachedUser);
         clearSignInQueryParam();
         setIsAuthLoading(false);
         console.log('✅ Restored auth state from localStorage cache');
@@ -621,7 +644,7 @@ function AppContent() {
       window.removeEventListener('authStateChanged', handleAuthStateChange);
       window.removeEventListener('userAuthenticated', handleAuthStateChange);
     };
-  }, [clearSignInQueryParam, getCachedAuthUser]);
+  }, [clearSignInQueryParam, getCachedAuthUser, applyAuthenticatedProfile]);
 
   // Listen for AUTH_STATE and NAVIGATE messages from the embedding tenant app (bridge)
   React.useEffect(() => {
@@ -639,12 +662,10 @@ function AppContent() {
           }
 
           setIsAuthenticated(true);
-          setUserProfile({
+          applyAuthenticatedProfile({
             name: user.name || user.givenName || '',
             email: user.email || '',
-            phone: resolveAuthPhone(user.phone),
-            companyName: 'Proptii',
-            logo: undefined
+            phone: user.phone,
           });
           clearSignInQueryParam();
           console.log('✅ Received AUTH_STATE from parent, updated userProfile:', user);
@@ -676,6 +697,21 @@ function AppContent() {
         setCurrentScreen('main-app');
         setNavigationScreen(targetScreen);
       }
+
+      if (data && data.type === 'DEEP_LINK' && data.payload) {
+        const start = data.payload.start as string | undefined;
+        const role = data.payload.role as string | undefined;
+        if (role === 'agent' || role === 'landlord') {
+          setUserRole(role);
+          persistUserRole(role);
+        }
+        if (start === 'property-setup-step1' || start === 'company-profile-setup' || start === 'role-selection' || start === 'add-tenant') {
+          setCurrentScreen(start);
+        } else if (start === 'contracts') {
+          setCurrentScreen('main-app');
+          setNavigationScreen('contracts');
+        }
+      }
     };
 
     window.addEventListener('message', handleMessage);
@@ -689,17 +725,77 @@ function AppContent() {
       window.removeEventListener('message', handleMessage);
       clearTimeout(timer);
     };
-  }, [clearSignInQueryParam]);
+  }, [clearSignInQueryParam, applyAuthenticatedProfile]);
 
-  // Check localStorage for role selection (from AgentHome)
+  // Restore landlord vs agent role from URL, localStorage, or registered account
   React.useEffect(() => {
-    const storedRole = localStorage.getItem('userRole');
-    if (storedRole === 'agent') {
-      setUserRole('agent');
-      // Clear the stored role after using it
-      localStorage.removeItem('userRole');
+    const applyRole = (role: UserRole) => {
+      setUserRole(role);
+      persistUserRole(role);
+    };
+
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const roleParam = params.get('role');
+      if (roleParam === 'agent' || roleParam === 'landlord') {
+        applyRole(roleParam);
+        return;
+      }
+    } catch {
+      // ignore URL parse errors
+    }
+
+    const storedRole = readStoredUserRole();
+    if (storedRole) {
+      applyRole(storedRole);
     }
   }, []);
+
+  React.useEffect(() => {
+    const email = userProfile?.email;
+    if (!email) return;
+    let cancelled = false;
+    landlordUserService.getLandlordUserByEmail(email).then((result) => {
+      if (cancelled || !result.success || !result.user) return;
+      const urlRole = (() => {
+        try {
+          const roleParam = new URLSearchParams(window.location.search).get('role');
+          return roleParam === 'agent' || roleParam === 'landlord' ? roleParam : null;
+        } catch {
+          return null;
+        }
+      })();
+      if (!urlRole && (result.user.role === 'agent' || result.user.role === 'landlord')) {
+        setUserRole(result.user.role);
+        persistUserRole(result.user.role);
+      }
+      if (result.user.companyName || result.user.companyProfile) {
+        setUserProfile((prev) => {
+          if (!prev) return prev;
+          const stored = loadStoredCompanyProfile(email);
+          const companyProfile = stored || (result.user?.companyProfile as CompanyProfile | undefined) || prev.companyProfile;
+          return {
+            ...prev,
+            companyName: result.user?.companyName || companyProfile?.companyName || prev.companyName,
+            logo: companyProfile?.logo || prev.logo,
+            companyProfile,
+          };
+        });
+      }
+    }).catch(() => {
+      // keep locally stored role/profile if lookup fails
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userProfile?.email]);
+
+  // Landlords must never stay on Analytics (e.g. deep link /insights)
+  React.useEffect(() => {
+    if (userRole !== 'agent' && navigationScreen === 'insights') {
+      setNavigationScreen('dashboard');
+    }
+  }, [userRole, navigationScreen]);
 
   // Handle URL hash navigation (from iframe src hash on initial load)
   React.useEffect(() => {
@@ -726,17 +822,20 @@ function AppContent() {
       // Prefer query param if present
       const params = new URLSearchParams(window.location.search);
       const qpStart = params.get('start');
-      if (qpStart === 'property-setup-step1' || qpStart === 'company-profile-setup') {
+      if (qpStart === 'property-setup-step1' || qpStart === 'company-profile-setup' || qpStart === 'role-selection') {
         setCurrentScreen(qpStart as Screen);
+        window.history.replaceState(null, '', `${window.location.pathname}${window.location.hash}`);
         return;
       }
       if (qpStart === 'add-tenant') {
         setCurrentScreen('add-tenant');
+        window.history.replaceState(null, '', `${window.location.pathname}${window.location.hash}`);
         return;
       }
       if (qpStart === 'contracts') {
         setCurrentScreen('main-app');
         setNavigationScreen('contracts');
+        window.history.replaceState(null, '', `${window.location.pathname}${window.location.hash}`);
         return;
       }
       const startScreen = localStorage.getItem('startScreen');
@@ -745,6 +844,9 @@ function AppContent() {
         localStorage.removeItem('startScreen');
       } else if (startScreen === 'company-profile-setup') {
         setCurrentScreen('company-profile-setup');
+        localStorage.removeItem('startScreen');
+      } else if (startScreen === 'role-selection') {
+        setCurrentScreen('role-selection');
         localStorage.removeItem('startScreen');
       }
     } catch (e) {
@@ -760,6 +862,11 @@ function AppContent() {
       if (params.get('start')) return; // Deep link takes priority
       const savedScreen = sessionStorage.getItem('proptii_current_screen') as Screen | null;
       const savedPreviousScreen = sessionStorage.getItem('proptii_previous_screen') as Screen | null;
+      if (savedScreen === 'onboarding-options') {
+        setCurrentScreen('main-app');
+        setNavigationScreen('dashboard');
+        return;
+      }
       if (savedScreen && savedScreen !== 'main-app' && savedScreen !== 'welcome') {
         console.log('🔄 Restoring screen from sessionStorage:', savedScreen);
         setCurrentScreen(savedScreen);
@@ -2347,8 +2454,13 @@ function AppContent() {
   };
 
   const renderMainAppScreen = () => {
-    console.log('🔄 renderMainAppScreen called with navigationScreen:', navigationScreen);
-    switch (navigationScreen) {
+    // Analytics is agent-only — landlords never land on the insights screen
+    const screen =
+      navigationScreen === 'insights' && userRole !== 'agent'
+        ? 'dashboard'
+        : navigationScreen;
+    console.log('🔄 renderMainAppScreen called with navigationScreen:', screen);
+    switch (screen) {
       case 'dashboard':
         return (
           <Dashboard
@@ -2776,6 +2888,21 @@ function AppContent() {
             userProfile={userProfile}
             userRole={userRole}
             isAuthenticated={isAuthenticated}
+            onSetupCompanyProfile={() => {
+              setCompanyProfileReturnTo('settings');
+              navigateToScreen('company-profile-setup');
+            }}
+            onRoleChange={(role) => {
+              setUserRole(role);
+              persistUserRole(role);
+              if (userProfile?.email) {
+                void landlordUserService.upsertLandlordUser(userProfile.email, {
+                  name: userProfile.name,
+                  role,
+                  phone: userProfile.phone,
+                });
+              }
+            }}
           />
         );
 
@@ -2832,8 +2959,22 @@ function AppContent() {
         return (
           <RoleSelection
             selectedRole={userRole}
-            onRoleSelect={setUserRole}
-            onContinue={() => navigateToScreen('profile-setup')}
+            onRoleSelect={(role) => {
+              setUserRole(role);
+              persistUserRole(role);
+            }}
+            onContinue={() => {
+              persistUserRole(userRole);
+              if (userProfile?.email) {
+                void landlordUserService.upsertLandlordUser(userProfile.email, {
+                  name: userProfile.name,
+                  role: userRole,
+                  phone: userProfile.phone,
+                });
+              }
+              navigateToScreen('main-app');
+              setNavigationScreen('dashboard');
+            }}
           />
         );
       
@@ -2843,9 +2984,13 @@ function AppContent() {
             role={userRole}
             onProfileComplete={(profile) => {
               setUserProfile(profile);
-              navigateToScreen('onboarding-options');
+              setCurrentScreen('main-app');
+              setNavigationScreen('dashboard');
             }}
-            onSkip={() => navigateToScreen('onboarding-options')}
+            onSkip={() => {
+              setCurrentScreen('main-app');
+              setNavigationScreen('dashboard');
+            }}
           />
         );
       
@@ -2853,12 +2998,21 @@ function AppContent() {
         return (
           <OnboardingOptions
             onGoToDashboard={() => {
+              dismissOnboardingOptions();
+              setShowGettingStarted(false);
               setIsOnboarding(false);
               setCurrentScreen('main-app');
               setNavigationScreen('dashboard');
             }}
-            onAddProperty={startAddPropertyFlow}
-            onSetupCompanyProfile={() => navigateToScreen('company-profile-setup')}
+            onAddProperty={() => {
+              dismissOnboardingOptions();
+              setShowGettingStarted(false);
+              startAddPropertyFlow();
+            }}
+            onSetupCompanyProfile={() => {
+              setCompanyProfileReturnTo('dashboard');
+              navigateToScreen('company-profile-setup');
+            }}
             userHasCompanyInfo={!!userProfile?.companyProfile}
           />
         );
@@ -2867,18 +3021,45 @@ function AppContent() {
         return (
           <CompanyProfileSetup
             onCompanyProfileComplete={(companyProfile) => {
-              if (userProfile) {
-                setUserProfile({
-                  ...userProfile,
-                  companyProfile,
+              const email = userProfile?.email || '';
+              if (email) {
+                saveStoredCompanyProfile(email, companyProfile);
+                void landlordUserService.upsertLandlordUser(email, {
+                  name: userProfile?.name || companyProfile.companyName,
+                  role: userRole,
+                  phone: userProfile?.phone || companyProfile.officePhone,
                   companyName: companyProfile.companyName,
-                  logo: companyProfile.logo
+                  companyProfile: { ...companyProfile } as unknown as Record<string, unknown>,
                 });
               }
-              navigateToScreen('onboarding-options');
+              setUserProfile((prev) => prev ? {
+                ...prev,
+                companyProfile,
+                companyName: companyProfile.companyName,
+                logo: companyProfile.logo
+              } : {
+                name: companyProfile.companyName,
+                email: companyProfile.officeEmail || '',
+                phone: companyProfile.officePhone || '',
+                companyName: companyProfile.companyName,
+                logo: companyProfile.logo,
+                companyProfile,
+              });
+              dismissOnboardingOptions();
+              setShowGettingStarted(false);
+              setCurrentScreen('main-app');
+              setNavigationScreen(companyProfileReturnTo);
             }}
-            onBack={() => navigateToScreen('onboarding-options')}
-            initialProfile={userProfile?.companyProfile}
+            onBack={() => {
+              setCurrentScreen('main-app');
+              setNavigationScreen(companyProfileReturnTo);
+            }}
+            initialProfile={userProfile?.companyProfile || {
+              companyName: userProfile?.companyName,
+              officeEmail: userProfile?.email,
+              officePhone: userProfile?.phone,
+              logo: userProfile?.logo,
+            }}
           />
         );
       
@@ -2887,11 +3068,9 @@ function AppContent() {
           <PropertySetupStep1
             onNext={() => navigateToScreen('property-type-selection')}
             onBack={() => {
-              if (properties.length > 0) {
-                exitPropertySetupToHome();
-              } else {
-                navigateToScreen('onboarding-options');
-              }
+              dismissOnboardingOptions();
+              setShowGettingStarted(false);
+              exitPropertySetupToHome();
             }}
             onHome={exitPropertySetupToHome}
             onSection1={() => navigateToScreen('property-type-selection')}
@@ -2975,16 +3154,16 @@ function AppContent() {
                 }
               }
             }}
-            onSkip={isOnboarding ? () => navigateToScreen('onboarding-options') : () => navigateToScreen('main-app')}
+            onSkip={isOnboarding ? () => {
+              dismissOnboardingOptions();
+              setShowGettingStarted(false);
+              navigateToScreen('main-app');
+            } : () => navigateToScreen('main-app')}
             onBack={() => {
-              // If user has properties, they're past onboarding - go to main app
-              if (properties.length > 0) {
-                setCurrentScreen('main-app');
-                setNavigationScreen('dashboard');
-              } else {
-                // No properties yet, likely in onboarding - go back to onboarding
-                navigateToScreen('onboarding-options');
-              }
+              dismissOnboardingOptions();
+              setShowGettingStarted(false);
+              setCurrentScreen('main-app');
+              setNavigationScreen('dashboard');
             }}
           />
         );
@@ -3009,6 +3188,7 @@ function AppContent() {
             currentScreen={navigationScreen}
             onNavigate={handleNavigation}
             userProfile={userProfile}
+            showAnalytics={userRole === 'agent' && isAuthenticated && properties.length > 0}
           >
             {renderMainAppScreen()}
           </MainLayout>
@@ -3304,12 +3484,6 @@ function AppContent() {
         );
 
       case 'landlord-details':
-        // Only agents can view landlord details
-        if (userRole !== 'agent') {
-          navigateToScreen('main-app');
-          setNavigationScreen('clients');
-          return null;
-        }
         return (
           <LandlordDetails
             landlord={selectedLandlord}
@@ -3738,11 +3912,6 @@ function AppContent() {
         );
       
       case 'add-landlord':
-        if (userRole !== 'agent') {
-          navigateToScreen('main-app');
-          setNavigationScreen('clients');
-          return null;
-        }
         // Use the new wizard
         return (
           <AddLandlordWizard

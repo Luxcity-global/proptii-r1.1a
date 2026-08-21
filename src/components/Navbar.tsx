@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { landlordDashboardPath, markPendingPostAuth, readStoredAccountType } from '../utils/accountType';
 import { UserCircle, ChevronDown, Settings, LogOut, Menu, X, CalendarCheck, FileCheck, FileSignature, Home, Building2, Users, BarChart3, Shield, Sparkles } from 'lucide-react';
 
 /** Routes that use the tenant service toggle (current page indicator + dropdown) instead of center nav links */
@@ -44,7 +45,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
   const currentServiceRoute = (TENANT_SERVICE_ROUTES.find((r) => pathname === r || pathname.startsWith(r + '/')) ?? '/bookviewing') as TenantServiceRoute;
   const currentServiceLabel = TENANT_SERVICE_LABELS[currentServiceRoute];
 
-  const navigateToLandlordAction = (action: 'add-property' | 'clients' | 'analytics' | 'coming-soon') => {
+  const navigateToLandlordAction = (action: 'add-property' | 'clients' | 'dashboard' | 'coming-soon') => {
     if (action === 'add-property') {
       navigate('/landlord?start=property-setup-step1');
       return;
@@ -53,8 +54,8 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
       navigate('/landlord/clients');
       return;
     }
-    if (action === 'analytics') {
-      navigate('/landlord/insights');
+    if (action === 'dashboard') {
+      navigate('/landlord');
       return;
     }
     navigate('/coming-soon');
@@ -80,7 +81,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
   const listServiceMenuItems = [
     { icon: <Building2 className="h-4 w-4" />, label: 'List Property', description: 'Advertise your property to verified tenants', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordAction('add-property'); } },
     { icon: <Users className="h-4 w-4" />, label: 'Manage Tenants', description: 'Tenant communication and management', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordAction('clients'); } },
-    { icon: <BarChart3 className="h-4 w-4" />, label: 'Analytics', description: 'Track listing performance', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordAction('analytics'); } },
+    { icon: <BarChart3 className="h-4 w-4" />, label: 'Dashboard', description: 'View your landlord dashboard', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordAction('dashboard'); } },
     { icon: <Shield className="h-4 w-4" />, label: 'Verify Tenants', description: 'Run background and credit checks', action: () => { setIsServiceDropdownOpen(false); navigateToLandlordAction('coming-soon'); } },
   ];
 
@@ -142,6 +143,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
       if (pathname === '/' || pathname === '/home-v2' || pathname === '/home-legacy' || pathname === '/home') {
         sessionStorage.setItem('redirectAfterLogin', '/');
       }
+      markPendingPostAuth();
 
       // Inform the user that they might be redirected
       console.log("Starting login process. You may be redirected to the login page.");
@@ -190,10 +192,14 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
     setIsMobileMenuOpen(false);
   };
 
-  // Navigate to the tenant dashboard
   const handleGoToDashboard = () => {
     setIsDropdownOpen(false);
     setIsMobileMenuOpen(false);
+    const accountType = readStoredAccountType(user?.email);
+    if (accountType === 'landlord' || accountType === 'agent') {
+      navigate(landlordDashboardPath(accountType));
+      return;
+    }
     navigate('/dashboard');
   };
 

@@ -2,6 +2,7 @@ import React, { useLayoutEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
 import { MSALProviderWrapper } from './contexts/AuthContext';
+import { GovDataLayerProvider } from './contexts/GovDataLayerContext';
 import { SavedPropertiesProvider } from './contexts/SavedPropertiesContext';
 import { SignedContractsProvider } from './contexts/SignedContractsContext';
 import { OnboardingSessionProvider } from './contexts/OnboardingSessionContext';
@@ -37,6 +38,7 @@ import TermsOfService from './pages/TermsOfService';
 import FAQ from './pages/FAQ';
 // import AgentContractLanding from './pages/AgentContractLanding';
 import { AuthRedirectHandler } from './components/common/AuthRedirectHandler';
+import { PostAuthAccountGate } from './components/common/PostAuthAccountGate';
 import { StripeCheckoutReturnHandler } from './components/common/StripeCheckoutReturnHandler';
 import SearchResults from './pages/SearchResults';
 import HomeVariant from './pages/HomeVariant';
@@ -86,12 +88,14 @@ export const App: React.FC = () => {
     <ErrorBoundary fallback={<div>Custom fallback UI</div>}>
       <CssBaseline />
       <MSALProviderWrapper>
+        <GovDataLayerProvider>
         <SavedPropertiesProvider>
           <OnboardingSessionProvider>
           <SignedContractsProvider>
               <AuthAnalyticsBridge />
               <StripeCheckoutReturnHandler />
               <AuthRedirectHandler />
+              <PostAuthAccountGate />
               <BillingStatusBanner />
               <ScrollToTop />
               <Routes>
@@ -163,16 +167,8 @@ export const App: React.FC = () => {
             <Route path="/book-viewing" element={<Navigate to="/bookviewing" replace />} />
 
             {/* Protected Routes */}
-            <Route path="/agent" element={
-              <ProtectedRoute>
-                <AgentHome />
-              </ProtectedRoute>
-            } />
-            <Route path="/Agent" element={
-              <ProtectedRoute>
-                <AgentHome />
-              </ProtectedRoute>
-            } />
+            <Route path="/agent" element={<AgentHome />} />
+            <Route path="/Agent" element={<AgentHome />} />
             <Route path="/landlord" element={<LandlordDemo />} />
             <Route path="/landlord/*" element={<LandlordDemo />} />
 
@@ -236,6 +232,7 @@ export const App: React.FC = () => {
             </SignedContractsProvider>
             </OnboardingSessionProvider>
           </SavedPropertiesProvider>
+        </GovDataLayerProvider>
       </MSALProviderWrapper>
     </ErrorBoundary>
   );

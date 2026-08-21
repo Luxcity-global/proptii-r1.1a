@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SearchInput } from '../SearchInput';
+import { GovDataLayerProvider } from '../../contexts/GovDataLayerContext';
+import { propertySearchFallback } from '../../types/govData';
 
 let mockNavigate: ReturnType<typeof vi.fn>;
 
@@ -14,33 +16,45 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+vi.mock('../../services/govDataService', async () => {
+  const actual = await vi.importActual<typeof import('../../services/govDataService')>(
+    '../../services/govDataService',
+  );
+  return {
+    ...actual,
+    fetchRuntimeFlags: vi.fn(async () => ({ gov_data_layer: false })),
+    classifySearchQuery: vi.fn(async () => propertySearchFallback()),
+  };
+});
+
+const renderSearch = (ui: React.ReactElement) =>
+  render(<GovDataLayerProvider>{ui}</GovDataLayerProvider>);
+
 describe('SearchInput', () => {
   beforeEach(() => {
     mockNavigate = vi.fn();
   });
 
   it('renders with default placeholder', () => {
-    render(<SearchInput />);
+    renderSearch(<SearchInput />);
     expect(screen.getByPlaceholderText('AI-assisted property search...')).toBeInTheDocument();
   });
 
   it('renders with custom placeholder', () => {
-    render(<SearchInput placeholder="Custom placeholder" />);
+    renderSearch(<SearchInput placeholder="Custom placeholder" />);
     expect(screen.getByPlaceholderText('Custom placeholder')).toBeInTheDocument();
   });
 
-  it('shows error message when submitting empty query', async () => {
-    render(<SearchInput />);
+  it('keeps the search button disabled when the query is empty', () => {
+    renderSearch(<SearchInput />);
     const searchButton = screen.getByRole('button', { name: 'Search' });
-
+    expect(searchButton).toBeDisabled();
     fireEvent.click(searchButton);
-
-    expect(await screen.findByText('Please enter a search query')).toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('navigates to search results with default platform (On the Market)', async () => {
-    render(<SearchInput />);
+    renderSearch(<SearchInput />);
 
     const textarea = screen.getByPlaceholderText('AI-assisted property search...');
     const searchButton = screen.getByRole('button', { name: 'Search' });
@@ -56,7 +70,7 @@ describe('SearchInput', () => {
   });
 
   it('switches platform to Proptii via icon button and navigates with type=proptii', async () => {
-    render(<SearchInput />);
+    renderSearch(<SearchInput />);
 
     const proptiiButton = screen.getByRole('button', { name: 'Proptii' });
     fireEvent.click(proptiiButton);
@@ -76,7 +90,7 @@ describe('SearchInput', () => {
 
   it('calls onSearch when provided (and does not navigate)', async () => {
     const onSearch = vi.fn();
-    render(<SearchInput onSearch={onSearch} />);
+    renderSearch(<SearchInput onSearch={onSearch} />);
 
     const textarea = screen.getByPlaceholderText('AI-assisted property search...');
     const searchButton = screen.getByRole('button', { name: 'Search' });
@@ -88,5 +102,10 @@ describe('SearchInput', () => {
       expect(onSearch).toHaveBeenCalledWith('test query');
     });
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('does not mount gov-data chrome when the runtime flag is off', () => {
+    renderSearch(<SearchInput />);
+    expect(screen.queryByTestId('gov-data-search-chrome')).not.toBeInTheDocument();
   });
 });

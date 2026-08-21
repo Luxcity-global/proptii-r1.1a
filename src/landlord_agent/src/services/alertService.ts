@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { Tenant } from '../App';
+import emailService from '../../../services/emailService';
 
 const isDevLoggingEnabled = import.meta.env.DEV;
 const isVerboseAlertLoggingEnabled = import.meta.env.VITE_ALERT_DEBUG === 'true';
@@ -72,8 +73,47 @@ export interface Alert {
   dismissedAt?: Date;
 }
 
-const MS_IN_DAY = 24 * 60 * 60 * 1000;
+type OverdueNotice = {
+  tenant: Tenant;
+  kind: 'first' | 'expired';
+  overdueAmount: number;
+  daysPastDue: number;
+};
+
+function readManagerEmail(): string | null {
+  try {
+    const raw = localStorage.getItem('proptii_auth_state');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.user?.email || parsed?.email || null;
+  } catch {
+    return null;
+  }
+}
+
+function overdueEmailHtml(opts: {
+  recipientName: string;
+  intro: string;
+  tenantName: string;
+  propertyAddress: string;
+  amount: number;
+  daysPastDue: number;
+}): string {
+  return `<!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+      <p>Hi ${opts.recipientName || 'there'},</p>
+      <p>${opts.intro}</p>
+      <p><strong>Tenant:</strong> ${opts.tenantName}</p>
+      <p><strong>Property:</strong> ${opts.propertyAddress}</p>
+      <p><strong>Amount overdue:</strong> £${opts.amount.toLocaleString()}</p>
+      <p><strong>Days past due:</strong> ${opts.daysPastDue}</p>
+      <p>Thanks,<br>The Proptii Team</p>
+    </body>
+    </html>`;
+}
 const MAX_FREQUENCY_ITERATIONS = 120;
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
 
 type EvaluatedPaymentStatus = {
   status: Tenant['paymentStatus'];
@@ -298,14 +338,11 @@ class AlertService {
     }
   }
 
-  /**
-   * Check if alert already exists for a given entity
-   */
-  async alertExists(
+  async getActiveAlert(
     userId: string,
     type: AlertType,
     entityId: string
-  ): Promise<boolean> {
+  ): Promise<{ id: string; data: Record<string, unknown> } | null> {
     try {
       const fieldMap: Record<AlertType, string> = {
         'lease-expiry': 'tenantId',
@@ -323,11 +360,25 @@ class AlertService {
       );
 
       const querySnapshot = await getDocs(q);
-      return !querySnapshot.empty;
+      if (querySnapshot.empty) return null;
+      const snap = querySnapshot.docs[0];
+      return { id: snap.id, data: snap.data() as Record<string, unknown> };
     } catch (error) {
-      console.error('Error checking alert existence:', error);
-      return false;
+      console.error('Error loading active alert:', error);
+      return null;
     }
+  }
+
+  /**
+   * Check if alert already exists for a given entity
+   */
+  async alertExists(
+    userId: string,
+    type: AlertType,
+    entityId: string
+  ): Promise<boolean> {
+    const existing = await this.getActiveAlert(userId, type, entityId);
+    return Boolean(existing);
   }
 
   /**
@@ -344,6 +395,7 @@ class AlertService {
     const batch = writeBatch(db);
     let alertCount = 0;
     let tenantStatusUpdates = 0;
+    const overdueNotices: OverdueNotice[] = [];
 
     try {
       // 1. Check for lease expiry alerts
@@ -483,22 +535,29 @@ class AlertService {
         // 2. Check for rent arrears alerts
         const overdueAmountValue = typeof tenant.overdueAmount === 'number' ? tenant.overdueAmount : 0;
         if (tenant.paymentStatus === 'overdue' && overdueAmountValue > 0) {
-          const exists = await this.alertExists(userId, 'rent-arrears', tenant.id);
-          
-          if (!exists) {
-            const lastPayment = tenant.lastPaymentDate instanceof Date
-              ? tenant.lastPaymentDate
-              : tenant.lastPaymentDate
-                ? new Date(tenant.lastPaymentDate)
-                : null;
+          const existing = await this.getActiveAlert(userId, 'rent-arrears', tenant.id);
 
-            const fallbackDaysPastDue = lastPayment
-              ? Math.max(1, Math.ceil((now.getTime() - lastPayment.getTime()) / MS_IN_DAY))
-              : 0;
+          const lastPayment = tenant.lastPaymentDate instanceof Date
+            ? tenant.lastPaymentDate
+            : tenant.lastPaymentDate
+              ? new Date(tenant.lastPaymentDate)
+              : null;
 
-            const daysPastDue = computedDaysPastDue ?? fallbackDaysPastDue;
+          const fallbackDaysPastDue = lastPayment
+            ? Math.max(1, Math.ceil((now.getTime() - lastPayment.getTime()) / MS_IN_DAY))
+            : 0;
 
-            const severity = daysPastDue >= 30 ? 'critical' : daysPastDue >= 14 ? 'high' : 'medium';
+          const daysPastDue = computedDaysPastDue ?? fallbackDaysPastDue;
+          const leaseEnd = tenant.leaseEnd instanceof Date
+            ? tenant.leaseEnd
+            : tenant.leaseEnd
+              ? new Date(tenant.leaseEnd)
+              : null;
+          const leaseExpired = Boolean(leaseEnd && !Number.isNaN(leaseEnd.getTime()) && leaseEnd.getTime() < today.getTime());
+          const isExpiredOverdue = daysPastDue >= 30 || leaseExpired;
+          const severity = isExpiredOverdue ? 'critical' : daysPastDue >= 14 ? 'high' : 'medium';
+
+          if (!existing) {
             const alertRef = doc(this.alertsCollection);
             const alertData: any = {
               type: 'rent-arrears',
@@ -514,6 +573,7 @@ class AlertService {
               paymentFrequency: (tenant as any).paymentFrequency || 'monthly',
               propertyAddress: tenant.propertyAddress,
               tenantName: tenant.name,
+              expiryNotified: isExpiredOverdue,
               createdAt: Timestamp.now(),
               updatedAt: Timestamp.now()
             };
@@ -524,6 +584,27 @@ class AlertService {
 
             batch.set(alertRef, alertData);
             alertCount++;
+            overdueNotices.push({
+              tenant,
+              kind: isExpiredOverdue ? 'expired' : 'first',
+              overdueAmount: overdueAmountValue,
+              daysPastDue,
+            });
+          } else if (isExpiredOverdue && !existing.data.expiryNotified) {
+            const alertRef = doc(this.alertsCollection, existing.id);
+            batch.update(alertRef, {
+              expiryNotified: true,
+              severity: 'critical',
+              daysPastDue,
+              overdueAmount: overdueAmountValue,
+              updatedAt: Timestamp.now()
+            });
+            overdueNotices.push({
+              tenant,
+              kind: 'expired',
+              overdueAmount: overdueAmountValue,
+              daysPastDue,
+            });
           }
         }
       }
@@ -671,7 +752,7 @@ class AlertService {
       }
 
       // Commit all changes (new alerts + resolved alerts)
-      const hasChanges = alertCount > 0 || resolvedCount > 0 || tenantStatusUpdates > 0;
+      const hasChanges = alertCount > 0 || resolvedCount > 0 || tenantStatusUpdates > 0 || overdueNotices.length > 0;
       if (hasChanges) {
         await batch.commit();
         if (alertCount > 0) {
@@ -691,6 +772,50 @@ class AlertService {
         debugLog('   - Alerts already exist for expiring leases');
         debugLog('   - Tenants are not active or missing leaseEnd dates');
         debugLog('   - All existing alerts are still valid');
+      }
+
+      if (overdueNotices.length > 0) {
+        const managerEmail = readManagerEmail();
+        await Promise.allSettled(overdueNotices.flatMap((notice) => {
+          const intro = notice.kind === 'expired'
+            ? 'This overdue rent reminder has now reached the expiry threshold and still remains unpaid.'
+            : 'Rent is now overdue on this tenancy.';
+          const subject = notice.kind === 'expired'
+            ? `Overdue rent has expired - ${notice.tenant.propertyAddress}`
+            : `Overdue rent reminder - ${notice.tenant.propertyAddress}`;
+          const sends: Promise<unknown>[] = [];
+          if (notice.tenant.email) {
+            sends.push(emailService.sendEmail({
+              to: notice.tenant.email,
+              subject,
+              html: overdueEmailHtml({
+                recipientName: notice.tenant.name,
+                intro,
+                tenantName: notice.tenant.name,
+                propertyAddress: notice.tenant.propertyAddress,
+                amount: notice.overdueAmount,
+                daysPastDue: notice.daysPastDue,
+              }),
+              attachments: [],
+            }));
+          }
+          if (managerEmail && managerEmail.toLowerCase() !== notice.tenant.email?.toLowerCase()) {
+            sends.push(emailService.sendEmail({
+              to: managerEmail,
+              subject,
+              html: overdueEmailHtml({
+                recipientName: 'there',
+                intro,
+                tenantName: notice.tenant.name,
+                propertyAddress: notice.tenant.propertyAddress,
+                amount: notice.overdueAmount,
+                daysPastDue: notice.daysPastDue,
+              }),
+              attachments: [],
+            }));
+          }
+          return sends;
+        }));
       }
     } catch (error) {
       console.error('❌ Error generating alerts:', error);

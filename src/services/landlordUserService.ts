@@ -6,6 +6,7 @@ import {
   query,
   where,
   setDoc,
+  updateDoc,
   serverTimestamp,
   Timestamp 
 } from 'firebase/firestore';
@@ -18,6 +19,7 @@ export interface LandlordUser {
   role: 'landlord' | 'agent';
   phone?: string;
   companyName?: string;
+  companyProfile?: Record<string, unknown>;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -113,6 +115,9 @@ class LandlordUserService {
       if (userData.companyName) {
         landlordUser.companyName = userData.companyName;
       }
+      if (userData.companyProfile) {
+        landlordUser.companyProfile = userData.companyProfile;
+      }
       
       await setDoc(docRef, landlordUser);
       
@@ -195,6 +200,60 @@ class LandlordUserService {
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
+  }
+
+  async updateLandlordUser(
+    email: string,
+    updates: Partial<Pick<LandlordUser, 'name' | 'role' | 'phone' | 'companyName' | 'companyProfile'>>
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const existing = await this.isLandlordOrAgent(email);
+      if (!existing.isLandlord || !existing.user?.id) {
+        return { success: false, error: 'User not found' };
+      }
+
+      const payload: Record<string, unknown> = {
+        updatedAt: serverTimestamp(),
+      };
+      if (updates.name !== undefined) payload.name = updates.name;
+      if (updates.role !== undefined) payload.role = updates.role;
+      if (updates.phone !== undefined) payload.phone = updates.phone;
+      if (updates.companyName !== undefined) payload.companyName = updates.companyName;
+      if (updates.companyProfile !== undefined) payload.companyProfile = updates.companyProfile;
+
+      await updateDoc(doc(db, this.collectionName, existing.user.id), payload);
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error updating landlord/agent user:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  async upsertLandlordUser(
+    email: string,
+    updates: Partial<Pick<LandlordUser, 'name' | 'role' | 'phone' | 'companyName' | 'companyProfile'>>
+  ): Promise<{ success: boolean; error?: string; userId?: string }> {
+    const existing = await this.isLandlordOrAgent(email);
+    if (existing.isLandlord && existing.user?.id) {
+      return this.updateLandlordUser(email, updates);
+    }
+
+    const name = updates.name?.trim();
+    if (!name) {
+      return { success: false, error: 'User not found' };
+    }
+
+    return this.registerLandlordUser({
+      email,
+      name,
+      role: updates.role || 'landlord',
+      phone: updates.phone,
+      companyName: updates.companyName,
+      companyProfile: updates.companyProfile,
+    });
   }
 }
 

@@ -5,6 +5,13 @@ import { useSavedProperties } from '../contexts/SavedPropertiesContext';
 import Footer from '../components/Footer';
 import { SearchLoadingAnimation } from '../components/SearchLoadingAnimation';
 import { getAmenityIcon } from '../utils/amenityIcons';
+import { useGovDataLayer } from '../contexts/GovDataLayerContext';
+import { useBatchedPropertyFacts } from '../hooks/useBatchedPropertyFacts';
+import { FactsBadgeRow } from '../components/property/FactsBadgeRow';
+import { ProptiiModule } from '../components/property/ProptiiModule';
+import { EnquiryBridge } from '../components/search/EnquiryBridge';
+import { resolveListingId } from '../utils/listingId';
+import type { FactFlag, SearchIntent } from '../types/govData';
 
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
@@ -58,11 +65,24 @@ const PropertySkeleton = () => (
 );
 
 // Property Card Component
-const PropertyCard = ({ property, onClick, isSaved, onToggleSave }: { 
-  property: Property, 
-  onClick: () => void,
-  isSaved: boolean,
-  onToggleSave: (e: React.MouseEvent) => void
+const PropertyCard = ({
+  property,
+  onClick,
+  isSaved,
+  onToggleSave,
+  factFlags,
+  factsLoading,
+  factsUnresolved,
+  showGovFacts,
+}: {
+  property: Property;
+  onClick: () => void;
+  isSaved: boolean;
+  onToggleSave: (e: React.MouseEvent) => void;
+  factFlags?: FactFlag[] | null;
+  factsLoading?: boolean;
+  factsUnresolved?: boolean;
+  showGovFacts?: boolean;
 }) => {
   const [imgError, setImgError] = useState(false);
   
@@ -130,6 +150,16 @@ const PropertyCard = ({ property, onClick, isSaved, onToggleSave }: {
           <span className="text-sm truncate">{property.location}</span>
         </div>
 
+        {showGovFacts && (
+          <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+            <FactsBadgeRow
+              flags={factFlags}
+              isLoading={factsLoading}
+              unresolvedFallback={Boolean(factsUnresolved)}
+            />
+          </div>
+        )}
+
         <div className="flex items-center justify-between text-sm text-gray-600 border-t border-gray-100 pt-3 mt-auto">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1">
@@ -165,9 +195,19 @@ interface PropertyDetailsModalProps {
   onClose: () => void;
   onMessageClick: (property: Property) => void;
   isNavigatingToBooking: boolean;
+  showGovData?: boolean;
+  audience?: import('../types/govData').Audience | null;
 }
 
-function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNavigatingToBooking }: PropertyDetailsModalProps) {
+function PropertyDetailsModal({
+  property,
+  isOpen,
+  onClose,
+  onMessageClick,
+  isNavigatingToBooking,
+  showGovData = false,
+  audience = null,
+}: PropertyDetailsModalProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -366,6 +406,14 @@ function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNav
                 })}
               </div>
             </div>
+          )}
+
+          {showGovData && (
+            <ProptiiModule
+              listingId={resolveListingId(property)}
+              uprn={property.uprn}
+              audience={audience}
+            />
           )}
 
           {/* Listed By Section */}
@@ -764,9 +812,11 @@ function LocationInsights({ searchQuery, propertyCount }: { searchQuery: string;
 }
 
 const SearchResults = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const searchQuery = searchParams.get('q') || '';
+  const intentParam = searchParams.get('intent') as SearchIntent | null;
+  const listingIdParam = searchParams.get('listingId');
   const rawSearchTypeParam = searchParams.get('type');
   const searchTypeParam =
     rawSearchTypeParam === 'proptii' || rawSearchTypeParam === 'onthemarket'
@@ -779,6 +829,19 @@ const SearchResults = () => {
 
   const { results, isLoading, error, retry, searchProperties, clearCache } = useSearchBackend();
   const { isPropertySaved, toggleSaveProperty } = useSavedProperties();
+  const { enabled: govDataEnabled, audience } = useGovDataLayer();
+  const { getFlagsFor, isUnresolved, isFactsLoading } = useBatchedPropertyFacts(
+    govDataEnabled && !intentParam,
+    results,
+  );
+
+  const enquiryIntent =
+    govDataEnabled &&
+    (intentParam === 'general_answerable' ||
+      intentParam === 'general_too_broad' ||
+      intentParam === 'off_topic')
+      ? intentParam
+      : null;
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showMap, setShowMap] = useState(false);
@@ -827,6 +890,15 @@ const SearchResults = () => {
 
   // Perform search when component mounts or search params change
   useEffect(() => {
+    if (
+      govDataEnabled &&
+      (intentParam === 'general_answerable' ||
+        intentParam === 'general_too_broad' ||
+        intentParam === 'off_topic')
+    ) {
+      return;
+    }
+
     if (searchQuery) {
       // Check if we have cached results for this exact query
       const cachedData = sessionStorage.getItem('searchResults');
@@ -846,7 +918,7 @@ const SearchResults = () => {
         searchProperties(searchQuery, searchType);
       }
     }
-  }, [searchQuery, searchTypeParam, searchProperties]);
+  }, [searchQuery, searchTypeParam, searchProperties, govDataEnabled, intentParam]);
 
   // Reset navigation state when component mounts (when returning from BookViewing)
   useEffect(() => {
@@ -1317,12 +1389,29 @@ const SearchResults = () => {
   const openModal = (property: Property) => {
     setSelectedProperty(property);
     setIsModalOpen(true);
+    const listingId = resolveListingId(property);
+    const next = new URLSearchParams(searchParams);
+    next.set('listingId', listingId);
+    setSearchParams(next, { replace: true });
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedProperty(null);
+    const next = new URLSearchParams(searchParams);
+    next.delete('listingId');
+    setSearchParams(next, { replace: true });
   };
+
+  // Deep-link: /search?q=…&listingId=… opens the shared details surface
+  useEffect(() => {
+    if (!listingIdParam || results.length === 0 || isModalOpen) return;
+    const match = results.find((p) => resolveListingId(p) === listingIdParam);
+    if (match) {
+      setSelectedProperty(match);
+      setIsModalOpen(true);
+    }
+  }, [listingIdParam, results, isModalOpen]);
 
   const handleNewSearch = () => {
     clearCache(); // Clear cached results when starting a new search
@@ -1371,7 +1460,7 @@ const SearchResults = () => {
     navigate('/');
   };
 
-  if (isLoading && results.length === 0) {
+  if (!enquiryIntent && isLoading && results.length === 0) {
     return (
       <div className="min-h-screen flex flex-col font-nunito">
         {/* Custom Header with navigation */}
@@ -1711,7 +1800,21 @@ const SearchResults = () => {
           </div>
 
           {/* Results */}
-          {results.length === 0 ? (
+          {enquiryIntent ? (
+            <div className="mb-8">
+              <EnquiryBridge
+                intent={enquiryIntent}
+                query={searchQuery}
+                onSearchInstead={() => {
+                  const next = new URLSearchParams(searchParams);
+                  next.delete('intent');
+                  setSearchParams(next, { replace: true });
+                }}
+              />
+            </div>
+          ) : null}
+
+          {enquiryIntent ? null : results.length === 0 ? (
             <div className="py-16 sm:py-20">
               <div className="max-w-5xl mx-auto px-4">
                 <div className="flex flex-col items-center text-center">
@@ -1847,7 +1950,7 @@ const SearchResults = () => {
                     <>
                       {results.map((property, index) => (
                         <PropertyCard 
-                          key={index} 
+                          key={resolveListingId(property) || index} 
                           property={property} 
                           onClick={() => openModal(property)}
                           isSaved={isPropertySaved(`${property.title}-${property.location}-${property.price}`)}
@@ -1860,6 +1963,10 @@ const SearchResults = () => {
                             setShowToast(true);
                             setTimeout(() => setShowToast(false), 3000);
                           }}
+                          showGovFacts={govDataEnabled}
+                          factFlags={getFlagsFor(property)}
+                          factsLoading={isFactsLoading}
+                          factsUnresolved={isUnresolved(property)}
                         />
                       ))}
                       {isLoading && [1, 2, 3].map(i => (
@@ -1872,7 +1979,7 @@ const SearchResults = () => {
                   <>
                     {results.map((property, index) => (
                       <PropertyCard 
-                        key={index} 
+                        key={resolveListingId(property) || index} 
                         property={property} 
                         onClick={() => openModal(property)}
                         isSaved={isPropertySaved(`${property.title}-${property.location}-${property.price}`)}
@@ -1885,6 +1992,10 @@ const SearchResults = () => {
                           setShowToast(true);
                           setTimeout(() => setShowToast(false), 3000);
                         }}
+                        showGovFacts={govDataEnabled}
+                        factFlags={getFlagsFor(property)}
+                        factsLoading={isFactsLoading}
+                        factsUnresolved={isUnresolved(property)}
                       />
                     ))}
                     {isLoading && [1, 2, 3].map(i => (
@@ -1933,6 +2044,8 @@ const SearchResults = () => {
         onClose={closeModal}
         onMessageClick={handleMessageClick}
         isNavigatingToBooking={isNavigatingToBooking}
+        showGovData={govDataEnabled}
+        audience={audience}
       />
 
       {/* Toast Notification */}

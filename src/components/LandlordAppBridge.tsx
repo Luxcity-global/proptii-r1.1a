@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LandlordAppBridgeProps {
@@ -10,38 +10,85 @@ interface LandlordAppBridgeProps {
 const LandlordAppBridge: React.FC<LandlordAppBridgeProps> = ({ className, style }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { pathname, search } = useLocation();
+  const navigate = useNavigate();
   const { isAuthenticated, user, isLoading } = useAuth();
   const landlordPathPrefix = '/landlord';
   const relativeLandlordPath = pathname.startsWith(landlordPathPrefix)
     ? pathname.slice(landlordPathPrefix.length)
     : '';
   const hashPath = relativeLandlordPath && relativeLandlordPath !== '/' ? `#${relativeLandlordPath}` : '';
-  const iframeSrc = `/landlord/index.html${search}${hashPath}`;
+
+  // Freeze iframe src after first paint so parent query/path changes do not reload the app.
+  const iframeSrcRef = useRef(`/landlord/index.html${search}${hashPath}`);
+  const skipParentSyncRef = useRef(false);
+  const didInitNavRef = useRef(false);
+  const lastDeepLinkKeyRef = useRef('');
+
+  const postToIframe = (message: unknown) => {
+    iframeRef.current?.contentWindow?.postMessage(message, '*');
+  };
+
+  const postAuthState = () => {
+    postToIframe({
+      type: 'AUTH_STATE',
+      payload: {
+        isAuthenticated,
+        user,
+        isLoading,
+      },
+    });
+  };
+
+  const postDeepLinkFromSearch = (nextSearch: string) => {
+    if (!nextSearch) return;
+    const params = new URLSearchParams(nextSearch);
+    const start = params.get('start');
+    const role = params.get('role');
+    const startAddPropertyTour = params.get('startAddPropertyTour');
+    const startAddTenantTour = params.get('startAddTenantTour');
+    if (!start && !role && !startAddPropertyTour && !startAddTenantTour) return;
+
+    const key = nextSearch;
+    if (lastDeepLinkKeyRef.current === key) return;
+    lastDeepLinkKeyRef.current = key;
+
+    postToIframe({
+      type: 'DEEP_LINK',
+      payload: { start, role, startAddPropertyTour, startAddTenantTour },
+    });
+  };
+
+  useEffect(() => {
+    if (!search) return;
+    const params = new URLSearchParams(search);
+    const hasDeepLink =
+      params.has('start') ||
+      params.has('role') ||
+      params.has('startAddPropertyTour') ||
+      params.has('startAddTenantTour');
+    if (!hasDeepLink) return;
+
+    postDeepLinkFromSearch(search);
+    navigate(
+      {
+        pathname,
+        search: '',
+        hash: relativeLandlordPath && relativeLandlordPath !== '/' ? relativeLandlordPath : '',
+      },
+      { replace: true }
+    );
+  }, [navigate, pathname, relativeLandlordPath, search]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    // Wait for iframe to load
     const handleIframeLoad = () => {
-      // Send authentication state to landlord app
-      const authState = {
-        isAuthenticated,
-        user,
-        isLoading
-      };
-
-      iframe.contentWindow?.postMessage({
-        type: 'AUTH_STATE',
-        payload: authState
-      }, '*');
-
-      console.log('Sent auth state to landlord app:', authState);
+      postAuthState();
+      postDeepLinkFromSearch(search);
     };
 
     iframe.addEventListener('load', handleIframeLoad);
-    
-    // Also send immediately if iframe is already loaded
     if (iframe.contentDocument?.readyState === 'complete') {
       handleIframeLoad();
     }
@@ -49,12 +96,45 @@ const LandlordAppBridge: React.FC<LandlordAppBridgeProps> = ({ className, style 
     return () => {
       iframe.removeEventListener('load', handleIframeLoad);
     };
-  }, [isAuthenticated, user, isLoading]);
+  }, [isAuthenticated, user, isLoading, search]);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe?.contentWindow) return;
+    if (skipParentSyncRef.current) {
+      skipParentSyncRef.current = false;
+      return;
+    }
+    if (!didInitNavRef.current) {
+      didInitNavRef.current = true;
+      return;
+    }
+    const path = relativeLandlordPath && relativeLandlordPath !== '/'
+      ? relativeLandlordPath
+      : '/dashboard';
+    iframe.contentWindow.postMessage({
+      type: 'NAVIGATE',
+      payload: { path },
+    }, '*');
+  }, [relativeLandlordPath]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: string; payload?: { path?: string } };
+      if (data?.type !== 'PARENT_NAVIGATE' || !data.payload?.path) return;
+      const nextPath = data.payload.path;
+      if (pathname === nextPath) return;
+      skipParentSyncRef.current = true;
+      navigate(nextPath);
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [navigate, pathname]);
 
   return (
     <iframe
       ref={iframeRef}
-      src={iframeSrc}
+      src={iframeSrcRef.current}
       className={className}
       style={{
         width: '100%',

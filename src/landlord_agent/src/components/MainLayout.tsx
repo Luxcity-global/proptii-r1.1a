@@ -43,6 +43,7 @@ interface MainLayoutProps {
   onNavigate: (screen: NavigationScreen) => void;
   userProfile: UserProfile | null;
   children: React.ReactNode;
+  showAnalytics?: boolean;
 }
 
 // Custom Sidebar Header with perfect alignment
@@ -442,7 +443,7 @@ function MobileSidebar({
   );
 }
 
-export function MainLayout({ currentScreen, onNavigate, userProfile, children }: MainLayoutProps) {
+export function MainLayout({ currentScreen, onNavigate, userProfile, children, showAnalytics = true }: MainLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
   
@@ -478,11 +479,13 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
       icon: Users,
       label: 'Clients',
     },
-    {
-      id: 'insights' as NavigationScreen,
-      icon: BarChart3,
-      label: 'Analytics',
-    },
+    ...(showAnalytics
+      ? [{
+          id: 'insights' as NavigationScreen,
+          icon: BarChart3,
+          label: 'Analytics',
+        }]
+      : []),
     {
       id: 'settings' as NavigationScreen,
       icon: Settings,

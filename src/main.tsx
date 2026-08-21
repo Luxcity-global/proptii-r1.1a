@@ -4,7 +4,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Toaster } from 'react-hot-toast';
 import './index.css';
-import { getMsalInstance } from './contexts/AuthContext';
+import { getMsalInstance } from './utils/msalInstance';
 import theme from './theme/theme';
 import { ErrorBoundary } from './utils/errorHandler';
 import appInsights from './utils/performanceMonitor';

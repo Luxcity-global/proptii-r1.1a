@@ -219,11 +219,11 @@ const Tools: React.FC = () => {
     },
     {
       icon: <BarChart3 className="h-4 w-4" />,
-      label: 'Analytics',
-      description: 'Track listing performance and enquiries',
+      label: 'Dashboard',
+      description: 'View your landlord dashboard',
       action: () => {
         setIsDropdownOpen(false);
-        navigate('/coming-soon');
+        navigate('/landlord');
       },
     },
     {

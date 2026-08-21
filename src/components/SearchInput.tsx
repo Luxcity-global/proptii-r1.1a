@@ -1,5 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useGovDataLayer } from '../contexts/GovDataLayerContext';
+import { useClassifyQuery } from '../hooks/useClassifyQuery';
+import { FilterPills } from './search/FilterPills';
+import { AudienceToggle } from './search/AudienceToggle';
+import { trackEvent } from '../utils/analytics';
+import type { SearchIntent } from '../types/govData';
 
 type SearchPlatform = 'onthemarket' | 'proptii';
 
@@ -42,11 +48,22 @@ export const SearchInput = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { enabled: govDataEnabled, audience, setAudience } = useGovDataLayer();
+  const { classification, isClassifying } = useClassifyQuery({
+    enabled: govDataEnabled,
+    query,
+  });
 
   // Update internal query when value prop changes
   useEffect(() => {
     setQuery(value);
   }, [value]);
+
+  // Seed audience from classifier when the user hasn't chosen one yet
+  useEffect(() => {
+    if (!govDataEnabled || audience || !classification?.audience) return;
+    setAudience(classification.audience);
+  }, [govDataEnabled, audience, classification?.audience, setAudience]);
 
   // Set initial height to 50px (standard) or fixed for simplified
   useEffect(() => {
@@ -112,6 +129,14 @@ export const SearchInput = ({
     '2 bedroom flats to rent in Leeds for 1200pcm',
   ];
 
+  const navigateToExistingSearch = (searchQuery: string, intent?: SearchIntent) => {
+    let path = `/search?q=${encodeURIComponent(searchQuery)}&type=${searchType}`;
+    if (intent && intent !== 'property_search' && intent !== 'specific_address') {
+      path += `&intent=${encodeURIComponent(intent)}`;
+    }
+    navigate(path);
+  };
+
   const handleSearch = async () => {
     if (!query.trim()) {
       setError('Please enter a search query');
@@ -127,14 +152,69 @@ export const SearchInput = ({
         return;
       }
 
-      // Navigate to search results page with the query and search type
-      navigate(`/search?q=${encodeURIComponent(query)}&type=${searchType}`);
+      // Timeout / fallback → today's search behaviour exactly
+      if (!govDataEnabled || !classification || classification.fallback) {
+        if (govDataEnabled) {
+          trackEvent('gov_data_search_submit', { intent: 'property_search', fallback: true });
+        }
+        navigateToExistingSearch(query);
+        return;
+      }
+
+      trackEvent('gov_data_search_submit', {
+        intent: classification.intent,
+        audience: audience ?? classification.audience,
+      });
+
+      const intent = classification.intent;
+      if (
+        intent === 'general_answerable' ||
+        intent === 'general_too_broad' ||
+        intent === 'off_topic'
+      ) {
+        navigateToExistingSearch(query, intent);
+        return;
+      }
+
+      // specific_address unmatched (no live match API yet) → ordinary search
+      navigateToExistingSearch(query);
     } catch (err) {
       setError('Search failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  const classifierChrome = govDataEnabled ? (
+    <div
+      className={`mt-3 flex flex-col gap-2 ${simplified ? 'items-center' : 'items-stretch px-1'}`}
+      data-testid="gov-data-search-chrome"
+    >
+      <div
+        className={`flex flex-wrap items-center gap-3 ${
+          simplified ? 'justify-center' : 'justify-between'
+        }`}
+      >
+        <FilterPills
+          entities={classification?.fallback ? null : classification?.entities}
+          isClassifying={isClassifying}
+          onDark={simplified}
+        />
+        <AudienceToggle
+          value={audience}
+          onChange={setAudience}
+          onDark={simplified}
+        />
+      </div>
+      {!query.trim() && (
+        <p
+          className={`text-xs ${simplified ? 'text-white/75 text-center' : 'text-gray-500'}`}
+        >
+          Type a search to see live filters (beds, location, budget)
+        </p>
+      )}
+    </div>
+  ) : null;
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -209,6 +289,7 @@ export const SearchInput = ({
           </div>
           {error && <div className="mt-2 text-red-500 text-sm">{error}</div>}
         </div>
+        {classifierChrome}
         {/* Try pills */}
         <div className="mt-12 flex flex-wrap items-center justify-center gap-2">
           <span className="text-white/85 font-medium">Try:</span>
@@ -401,6 +482,7 @@ export const SearchInput = ({
             {error}
           </div>
         )}
+        {classifierChrome}
       </div>
 
       {/* Example Queries */}

@@ -1,5 +1,5 @@
 import type { AuthenticationResult } from '@azure/msal-browser';
-import { getMsalInstance, waitForMsalReady } from '../contexts/AuthContext';
+import { getMsalInstance, waitForMsalReady } from '../utils/msalInstance';
 import { loginRequest, msalConfig } from '../config/authConfig';
 
 /** Three Base64url segments — opaque B2C access tokens are not valid JWTs for our Nest guard. */

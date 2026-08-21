@@ -389,99 +389,88 @@ class ContractService {
   ): Promise<{ success: boolean; contracts?: any[]; error?: string }> {
     try {
       console.log('🔄 Getting contracts received by tenant:', tenantEmail);
-      
-      const constraints = [where('tenantEmail', '==', tenantEmail)];
-      
-      if (statusFilter) {
-        constraints.push(where('status', '==', statusFilter));
-      }
-      
-      const q = query(
-        collection(db, 'contracts'), // Different collection than contractTemplates
-        ...constraints,
-        orderBy('sentDate', 'desc')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const contracts: any[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        contracts.push({
-          id: doc.id,
-          title: data.title || '',
-          propertyAddress: data.propertyAddress || '',
-          tenantName: data.tenantName || '',
-          tenantEmail: data.tenantEmail || '',
-          landlordEmail: data.landlordEmail || '',
-          status: data.status || 'sent',
-          contractType: data.contractType || 'other',
-          fileUrl: data.fileUrl || '',
-          fileName: data.fileName || '',
-          sentDate: data.sentDate?.toDate?.() || new Date(data.sentDate),
-          signedDate: data.signedDate?.toDate?.(),
-          expiryDate: data.expiryDate?.toDate?.(),
-          additionalInfo: data.additionalInfo,
-        });
-      });
-      
+      const contracts = await this.queryReceivedContracts(tenantEmail, statusFilter);
       console.log(`✅ Found ${contracts.length} contracts for tenant ${tenantEmail}`);
       return { success: true, contracts };
     } catch (error: any) {
       console.error('❌ Error getting received contracts:', error);
-      
-      // If it's an index error, try without orderBy
-      if (error.code === 'failed-precondition' && error.message?.includes('index')) {
-        console.warn('⚠️ Firestore index missing, retrying without orderBy');
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  private mapReceivedContractDoc(docSnap: { id: string; data: () => any }) {
+    const data = docSnap.data();
+    const toDate = (value: any) => {
+      if (!value) return undefined;
+      if (typeof value.toDate === 'function') return value.toDate();
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+    };
+
+    return {
+      id: docSnap.id,
+      title: data.title || '',
+      propertyAddress: data.propertyAddress || '',
+      tenantName: data.tenantName || '',
+      tenantEmail: data.tenantEmail || '',
+      landlordEmail: data.landlordEmail || '',
+      status: data.status || 'sent',
+      contractType: data.contractType || 'other',
+      fileUrl: data.fileUrl || '',
+      filePath: data.filePath || '',
+      fileName: data.fileName || data.title || 'Contract',
+      sentDate: toDate(data.sentDate) || toDate(data.createdAt) || new Date(),
+      signedDate: toDate(data.signedDate),
+      expiryDate: toDate(data.expiryDate),
+      additionalInfo: data.additionalInfo,
+    };
+  }
+
+  private receivedEmailVariants(tenantEmail: string): string[] {
+    const trimmed = (tenantEmail || '').trim();
+    const lowered = trimmed.toLowerCase();
+    return Array.from(new Set([trimmed, lowered].filter(Boolean)));
+  }
+
+  private async queryReceivedContracts(
+    tenantEmail: string,
+    statusFilter?: 'sent' | 'unsigned' | 'signed'
+  ): Promise<any[]> {
+    const variants = this.receivedEmailVariants(tenantEmail);
+    const byId = new Map<string, any>();
+
+    for (const field of ['tenantEmail', 'tenantEmailLower'] as const) {
+      for (const value of variants) {
         try {
-          const constraints = [where('tenantEmail', '==', tenantEmail)];
+          const constraints = [where(field, '==', value)];
           if (statusFilter) {
             constraints.push(where('status', '==', statusFilter));
           }
-          
-          const q = query(collection(db, 'contracts'), ...constraints);
-          const querySnapshot = await getDocs(q);
-          const contracts: any[] = [];
-          
-          querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            contracts.push({
-              id: doc.id,
-              title: data.title || '',
-              propertyAddress: data.propertyAddress || '',
-              tenantName: data.tenantName || '',
-              tenantEmail: data.tenantEmail || '',
-              landlordEmail: data.landlordEmail || '',
-              status: data.status || 'sent',
-              contractType: data.contractType || 'other',
-              fileUrl: data.fileUrl || '',
-              fileName: data.fileName || '',
-              sentDate: data.sentDate?.toDate?.() || new Date(data.sentDate),
-              signedDate: data.signedDate?.toDate?.(),
-              expiryDate: data.expiryDate?.toDate?.(),
-              additionalInfo: data.additionalInfo,
-            });
+          const snapshot = await getDocs(query(collection(db, 'contracts'), ...constraints));
+          snapshot.forEach((docSnap) => {
+            byId.set(docSnap.id, this.mapReceivedContractDoc(docSnap));
           });
-          
-          // Sort in memory
-          contracts.sort((a, b) => b.sentDate.getTime() - a.sentDate.getTime());
-          
-          console.log(`✅ Found ${contracts.length} contracts (without index)`);
-          return { success: true, contracts };
-        } catch (retryError) {
-          console.error('❌ Retry failed:', retryError);
-          return { 
-            success: false, 
-            error: retryError instanceof Error ? retryError.message : 'Unknown error' 
-          };
+        } catch (error) {
+          console.warn(`Received contracts query failed for ${field}=${value}`, error);
         }
       }
-      
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
     }
+
+    const contracts = Array.from(byId.values()).filter((contract) => {
+      const stored = String(contract.tenantEmail || '').trim().toLowerCase();
+      return !stored || variants.some((value) => value.toLowerCase() === stored);
+    });
+
+    contracts.sort((a, b) => {
+      const aTime = a.sentDate instanceof Date ? a.sentDate.getTime() : 0;
+      const bTime = b.sentDate instanceof Date ? b.sentDate.getTime() : 0;
+      return bTime - aTime;
+    });
+
+    return contracts;
   }
 
   /**
@@ -494,53 +483,64 @@ class ContractService {
     onError?: (error: Error) => void
   ): () => void {
     console.log('🔄 Subscribing to contracts for tenant:', tenantEmail);
-    
-    const constraints = [where('tenantEmail', '==', tenantEmail)];
-    if (statusFilter) {
-      constraints.push(where('status', '==', statusFilter));
-    }
-    
-    const q = query(
-      collection(db, 'contracts'),
-      ...constraints
-    );
 
-    return onSnapshot(
-      q,
-      (querySnapshot) => {
-        const contracts: any[] = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          contracts.push({
-            id: doc.id,
-            title: data.title || '',
-            propertyAddress: data.propertyAddress || '',
-            tenantName: data.tenantName || '',
-            tenantEmail: data.tenantEmail || '',
-            landlordEmail: data.landlordEmail || '',
-            status: data.status || 'sent',
-            contractType: data.contractType || 'other',
-            fileUrl: data.fileUrl || '',
-            fileName: data.fileName || '',
-            sentDate: data.sentDate?.toDate?.() || new Date(data.sentDate),
-            signedDate: data.signedDate?.toDate?.(),
-            expiryDate: data.expiryDate?.toDate?.(),
-            additionalInfo: data.additionalInfo,
-          });
+    const variants = this.receivedEmailVariants(tenantEmail);
+    const snapshotDocs = new Map<string, Map<string, any>>();
+    const unsubscribers: Array<() => void> = [];
+
+    const emit = () => {
+      const merged = new Map<string, any>();
+      snapshotDocs.forEach((docs) => {
+        docs.forEach((contract, id) => merged.set(id, contract));
+      });
+
+      const contracts = Array.from(merged.values())
+        .filter((contract) => {
+          const stored = String(contract.tenantEmail || '').trim().toLowerCase();
+          return !stored || variants.some((value) => value.toLowerCase() === stored);
+        })
+        .sort((a, b) => {
+          const aTime = a.sentDate instanceof Date ? a.sentDate.getTime() : 0;
+          const bTime = b.sentDate instanceof Date ? b.sentDate.getTime() : 0;
+          return bTime - aTime;
         });
-        
-        // Sort by sent date
-        contracts.sort((a, b) => b.sentDate.getTime() - a.sentDate.getTime());
-        
-        callback(contracts);
-      },
-      (error) => {
-        console.error('❌ Error in received contracts subscription:', error);
-        if (onError) {
-          onError(error);
+
+      callback(contracts);
+    };
+
+    for (const field of ['tenantEmail', 'tenantEmailLower'] as const) {
+      for (const value of variants) {
+        const listenerKey = `${field}:${value}`;
+        const constraints = [where(field, '==', value)];
+        if (statusFilter) {
+          constraints.push(where('status', '==', statusFilter));
         }
+
+        unsubscribers.push(
+          onSnapshot(
+            query(collection(db, 'contracts'), ...constraints),
+            (querySnapshot) => {
+              const docsForListener = new Map<string, any>();
+              querySnapshot.docs.forEach((docSnap) => {
+                docsForListener.set(docSnap.id, this.mapReceivedContractDoc(docSnap));
+              });
+              snapshotDocs.set(listenerKey, docsForListener);
+              emit();
+            },
+            (error) => {
+              console.error('❌ Error in received contracts subscription:', error);
+              if (onError) {
+                onError(error);
+              }
+            }
+          )
+        );
       }
-    );
+    }
+
+    return () => {
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
+    };
   }
 }
 

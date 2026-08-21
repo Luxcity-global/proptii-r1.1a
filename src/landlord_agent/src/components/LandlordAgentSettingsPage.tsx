@@ -137,12 +137,16 @@ interface LandlordAgentSettingsPageProps {
   userProfile: UserProfile | null;
   userRole: UserRole;
   isAuthenticated: boolean;
+  onSetupCompanyProfile?: () => void;
+  onRoleChange?: (role: UserRole) => void;
 }
 
 const LandlordAgentSettingsPage: React.FC<LandlordAgentSettingsPageProps> = ({
   userProfile,
   userRole,
   isAuthenticated,
+  onSetupCompanyProfile,
+  onRoleChange,
 }) => {
   const isMobile = useIsMobile();
   const pricingSegment = pricingSegmentForRole(userRole);
@@ -286,6 +290,44 @@ const LandlordAgentSettingsPage: React.FC<LandlordAgentSettingsPageProps> = ({
                 }
               />
             )}
+            <SettingsRow
+              title="Account type"
+              description={userRole === 'agent' ? 'Property agent' : 'Landlord'}
+              action={
+                onRoleChange ? (
+                  <button
+                    type="button"
+                    onClick={() => onRoleChange(userRole === 'agent' ? 'landlord' : 'agent')}
+                    className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-orange-50"
+                    style={{ color: '#DC5F12', borderColor: '#DC5F12' }}
+                  >
+                    Switch to {userRole === 'agent' ? 'Landlord' : 'Agent'}
+                  </button>
+                ) : null
+              }
+            />
+            <SettingsRow
+              title="Company profile"
+              description={
+                userProfile?.companyProfile?.companyName ||
+                userProfile?.companyName ||
+                'Add company details, logo, and contact information'
+              }
+              onClick={onSetupCompanyProfile}
+              action={
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSetupCompanyProfile?.();
+                  }}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors hover:bg-orange-50"
+                  style={{ color: '#DC5F12', borderColor: '#DC5F12' }}
+                >
+                  {userProfile?.companyProfile?.companyName ? 'Edit' : 'Set up'}
+                </button>
+              }
+            />
           </SettingsGroup>
 
           <SettingsGroup

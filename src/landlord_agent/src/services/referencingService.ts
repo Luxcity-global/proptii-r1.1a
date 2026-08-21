@@ -81,6 +81,14 @@ class ReferencingService {
     data?: ReferencingDocument;
     error?: string;
   }> {
+    const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([
+        promise,
+        new Promise<T>((_, reject) =>
+          setTimeout(() => reject(new Error(`Referencing status timed out after ${ms}ms`)), ms)
+        ),
+      ]);
+
     try {
       console.log(`🔍 [landlord_agent] Checking referencing status for email: ${email}`);
       
@@ -92,7 +100,7 @@ class ReferencingService {
         limit(1)
       );
       
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await withTimeout(getDocs(q), 8000);
       
       if (querySnapshot.empty) {
         console.log(`ℹ️ [landlord_agent] No referencing data found for email: ${email}`);
@@ -176,6 +184,9 @@ class ReferencingService {
     for (const batch of batches) {
       const promises = batch.map(async (email) => {
         const result = await this.getReferencingStatusByEmail(email);
+        const key = email.trim().toLowerCase();
+        statusMap.set(key, result.status);
+        // Also keep original key for callers that look up with raw email
         statusMap.set(email, result.status);
       });
       

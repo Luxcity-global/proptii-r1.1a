@@ -11,6 +11,10 @@ import {
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 import { trackEvent } from '../utils/analytics';
+import {
+  isGenericPostAuthPath,
+  markPendingPostAuth,
+} from '../utils/accountType';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -46,26 +50,31 @@ export const LoginPage: React.FC = () => {
 
   // Redirect if already authenticated (only once)
   useEffect(() => {
-    if (isAuthenticated && !hasRedirectedRef.current) {
-      hasRedirectedRef.current = true;
-      
-      // Clear all redirect-related flags
+    if (!isAuthenticated || hasRedirectedRef.current) return;
+    hasRedirectedRef.current = true;
+
+    sessionStorage.removeItem('autoLoginAttempted');
+    sessionStorage.removeItem('redirect_in_progress');
+    sessionStorage.removeItem('last_redirect_path');
+
+    const finish = (path: string) => {
       sessionStorage.removeItem('redirectAfterLogin');
-      sessionStorage.removeItem('autoLoginAttempted');
-      sessionStorage.removeItem('redirect_in_progress');
-      sessionStorage.removeItem('last_redirect_path');
-      
-      console.log('✅ Already authenticated, redirecting to:', from);
-      trackEvent('login_success', {
-        redirect_to: from,
-      });
-      
-      // Use setTimeout to ensure this happens after current render cycle
-      setTimeout(() => {
-        navigate(from, { replace: true });
-      }, 0);
+      trackEvent('login_success', { redirect_to: path });
+      navigate(path, { replace: true });
+    };
+
+    if (!isGenericPostAuthPath(from)) {
+      finish(from);
+      return;
     }
-  }, [isAuthenticated, navigate, from]);
+
+    // Leave post-auth routing to PostAuthAccountGate so the account picker stays open.
+    sessionStorage.removeItem('redirectAfterLogin');
+    trackEvent('login_success', { redirect_to: '/' });
+    if (location.pathname !== '/') {
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, navigate, from, location.pathname]);
 
   // Auto-trigger login when landing on this page with a redirect parameter
   // This skips the intermediate "Sign in with Microsoft" button and goes straight to Azure B2C
@@ -136,6 +145,7 @@ export const LoginPage: React.FC = () => {
         redirect_to: from,
         has_redirect_param: new URLSearchParams(location.search).has('redirect'),
       });
+      markPendingPostAuth();
       await login();
       // Note: MSAL popup login will trigger auth-state-changed event
       // The useEffect above will handle the redirect

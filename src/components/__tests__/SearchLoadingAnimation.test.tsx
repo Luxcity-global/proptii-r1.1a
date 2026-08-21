@@ -17,7 +17,7 @@ describe('SearchLoadingAnimation', () => {
     expect(screen.getByRole('status', { name: 'Searching for properties' })).toBeInTheDocument();
     expect(screen.getByText('Searching for properties...')).toBeInTheDocument();
     expect(screen.getAllByText('Understanding your search').length).toBeGreaterThan(0);
-    expect(screen.getByAltText('Scout')).toHaveAttribute('src', '/images/Scout ava.png');
+    expect(screen.getByAltText('Proptii')).toHaveAttribute('src', '/images/Proptii-logo-icon.png');
   });
 
   it('echoes the current search query', () => {

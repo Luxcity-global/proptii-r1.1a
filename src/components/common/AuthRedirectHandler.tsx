@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { isGenericPostAuthPath } from '../../utils/accountType';
 
 /**
  * Handles redirect after login when user returns from auth (e.g. Azure B2C redirect).
@@ -51,6 +52,12 @@ export const AuthRedirectHandler: React.FC = () => {
     sessionStorage.removeItem('redirectAfterLogin');
     sessionStorage.removeItem('redirect_in_progress');
     sessionStorage.removeItem('last_redirect_path');
+
+    if (isGenericPostAuthPath(storedPath)) {
+      // PostAuthAccountGate owns homepage/login routing after sign-in.
+      return;
+    }
+
     navigate(storedPath, { replace: true });
   }, [isAuthenticated, isLoading, navigate, location.pathname, location.search]);
 
