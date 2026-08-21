@@ -580,25 +580,27 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <Button 
-            onClick={onAddTenant} 
-            className="flex items-center space-x-0 px-5 sm:px-8 md:px-12 py-2.5 sm:py-3 md:py-3.5 min-h-[2.75rem] sm:min-h-[3.25rem] md:min-h-[3.5rem] rounded-full transition-all duration-300 text-sm sm:text-base" 
-            style={addButtonStyle}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-              e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
-              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-              e.currentTarget.style.transform = 'translateY(0px)';
-            }}
-          >
-            <Plus className="w-4 h-4 sm:w-4 sm:h-4" strokeWidth={2.5} />
-            <span className="ml-1.5 sm:ml-2">Add Tenant</span>
-          </Button>
-          {isAgent && (
+          {(activeTab === 'tenants' || !isAgent) && (
+            <Button 
+              onClick={onAddTenant} 
+              className="flex items-center space-x-0 px-5 sm:px-8 md:px-12 py-2.5 sm:py-3 md:py-3.5 min-h-[2.75rem] sm:min-h-[3.25rem] md:min-h-[3.5rem] rounded-full transition-all duration-300 text-sm sm:text-base" 
+              style={addButtonStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
+                e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
+                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.transform = 'translateY(0px)';
+              }}
+            >
+              <Plus className="w-4 h-4 sm:w-4 sm:h-4" strokeWidth={2.5} />
+              <span className="ml-1.5 sm:ml-2">Add Tenant</span>
+            </Button>
+          )}
+          {isAgent && activeTab === 'landlords' && (
             <Button 
               onClick={onAddLandlord} 
               className="flex items-center space-x-0 px-5 sm:px-8 md:px-12 py-2.5 sm:py-3 md:py-3.5 min-h-[2.75rem] sm:min-h-[3.25rem] md:min-h-[3.5rem] rounded-full transition-all duration-300 text-sm sm:text-base" 
@@ -649,7 +651,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                 Rent Arrears
               </p>
               <p className="text-2xl font-semibold text-red-600">
-                Â£{summary.totalOverdueAmount.toLocaleString()}
+                {formatCurrency(summary.totalOverdueAmount)}
               </p>
               <p className="text-xs text-muted-foreground">
                 {summary.overdueCount} tenant{summary.overdueCount !== 1 ? 's' : ''} behind
@@ -851,7 +853,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
             </div>
           )}
 
-          <div className="grid gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {paginatedTenants.map((tenant) => {
               const property = getPropertyForTenant(tenant.id);
               const arrears = getArrearsForTenant(tenant.id);
@@ -959,23 +961,23 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                           </div>
                         )}
                           
-                        <div className="flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                           <div className="flex items-center min-w-0">
                             <Mail className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
                             <span className="truncate">{tenant.email}</span>
                           </div>
                           <div className="flex items-center min-w-0">
                             <Phone className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
-                            <span className="truncate">{tenant.phone || 'â€”'}</span>
+                            <span className="truncate">{tenant.phone || '—'}</span>
                           </div>
                           <div className="flex items-center min-w-0">
                             <PoundSterling className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
                             <span className="truncate">{formatCurrency(tenant.rentAmount)}/month</span>
                           </div>
-                        </div>
-                        <div className="flex items-center text-sm text-muted-foreground min-w-0">
-                          <Calendar className="h-4 w-4 mr-2 flex-shrink-0" />
-                          <span className="truncate">Lease: {formatDate(tenant.leaseStart)} - {formatDate(tenant.leaseEnd)}</span>
+                          <div className="flex items-center text-sm text-muted-foreground min-w-0">
+                            <Calendar className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <span className="truncate">Lease: {formatDate(tenant.leaseStart)} - {formatDate(tenant.leaseEnd)}</span>
+                          </div>
                         </div>
                         {hasEmergency && (
                           <div className="text-sm text-muted-foreground truncate">
@@ -1102,14 +1104,6 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                     <SelectItem value="suspended">Suspended</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button 
-                  onClick={onAddLandlord}
-                  className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-full hover:shadow-md transition-shadow flex-shrink-0 w-auto" 
-                  style={{ backgroundColor: '#DC5F12', borderColor: '#DC5F12', minWidth: '180px' }}
-                >
-                  <Plus className="w-4 h-4" strokeWidth={2.5} />
-                  <span>Add Landlord</span>
-                </Button>
               </div>
             </div>
 
@@ -1188,7 +1182,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
             </div>
           )}
 
-          <div className="grid gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredLandlords.map((landlord) => (
               <Card key={landlord.id} className={`hover:shadow-md transition-shadow ${selectedLandlords.includes(landlord.id) ? 'ring-2 ring-blue-500' : ''}`}>
                 <CardContent className="p-6 cursor-pointer" onClick={() => onViewLandlord(landlord)}>
@@ -1235,7 +1229,7 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                           </div>
                         </div>
                         
-                        <div className="flex flex-col gap-2 text-sm sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                           <div className="flex items-center min-w-0">
                             <Home className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
                             <span className="truncate">{landlord.portfolio.totalProperties} properties</span>
@@ -1248,16 +1242,15 @@ export function ClientsPage({ tenants, properties, arrearsAlerts, userRole, onVi
                             <TrendingUp className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
                             <span className="truncate">{formatCurrency(landlord.portfolio.totalValue)} portfolio</span>
                           </div>
-                        </div>
-                        
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <MapPin className="h-4 w-4 mr-2" />
-                          {landlord.location}
+                          <div className="flex items-center text-sm text-muted-foreground min-w-0">
+                            <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+                            <span className="truncate">{landlord.location}</span>
+                          </div>
                         </div>
                         
                         <div className="flex items-center text-sm text-muted-foreground">
                           <Calendar className="h-4 w-4 mr-2" />
-                          Joined: {formatDate(landlord.joinDate)} â€¢ Last contact: {formatDate(landlord.lastContact)}
+                          Joined: {formatDate(landlord.joinDate)} • Last contact: {formatDate(landlord.lastContact)}
                         </div>
                         
                         {landlord.notes && (

@@ -315,13 +315,6 @@ export const SearchResults = ({ properties, isLoading, error, onRetry }: SearchR
               <div className="absolute top-4 left-4 bg-[#E65D24] text-white px-3 py-1 rounded-full font-semibold text-sm">
                 {cleanPropertyPrice(property.price)}
               </div>
-              
-              {/* Source Badge */}
-              {property.source && (
-                <div className="absolute top-4 right-4 bg-black/70 text-white px-2 py-1 rounded text-xs">
-                  {property.source}
-                </div>
-              )}
             </div>
 
             {/* Property Details */}
