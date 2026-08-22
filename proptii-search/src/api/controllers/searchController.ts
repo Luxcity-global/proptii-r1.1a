@@ -3,6 +3,7 @@ import { SearchAggregator } from '../../core/services/SearchAggregator';
 import { ScraperManager } from '../../integrations/ScraperManager';
 import { AgentEnrichmentService } from '../../core/services/AgentEnrichmentService';
 import Property from '../../models/Property';
+import { normalizePhone } from '../../utils/phone';
 
 
 const aggregator    = new SearchAggregator();
@@ -69,7 +70,13 @@ export const searchProperties: RequestHandler = async (req: Request, res: Respon
       // Apply strict email filter to cached results too, just in case
       const validCached = cachedResults.filter(p => p.agent?.email);
       if (validCached.length > 0) {
-        write({ type: 'initial', data: validCached });
+        // Ensure phone key is always present and normalized
+        const normalizedCached = validCached.map(p => {
+          p.agent = p.agent || {};
+          p.agent.phone = normalizePhone(p.agent.phone, p.id || p.url);
+          return p;
+        });
+        write({ type: 'initial', data: normalizedCached });
       }
     }
 
@@ -80,6 +87,10 @@ export const searchProperties: RequestHandler = async (req: Request, res: Respon
       
       await enrichmentService.enrichAndStream(providerResults, (enrichedResult) => {
         if (!isClosed) {
+          // Ensure phone key is always present and normalized
+          enrichedResult.agent = enrichedResult.agent || {};
+          enrichedResult.agent.phone = normalizePhone(enrichedResult.agent.phone, enrichedResult.id || enrichedResult.url);
+          
           allScrapedAndEnriched.push(enrichedResult);
           write({ type: 'results', provider, data: [enrichedResult] });
         }
