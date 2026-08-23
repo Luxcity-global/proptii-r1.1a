@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { X, MapPin, BedDouble, Bath, Square, Phone, Mail, MessageCircle, Building2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { ProptiiModule } from '../proptii/ProptiiModule';
+import { ReportDiagnostic } from '../report/ReportDiagnostic';
+import { ProptiiReportModal } from '../report/ProptiiReportModal';
+import { FactsOnlyExportModal } from '../export/FactsOnlyExportModal';
+import { DisclosureRecordModal } from '../export/DisclosureRecordModal';
+import { AudienceLens } from '../../data/audienceLensCopy';
 
 interface Property {
   id: string;
@@ -39,13 +45,18 @@ interface ListingDetailsModalProps {
   initialImageIndex?: number;
 }
 
-const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
+export const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
   property,
   onClose,
   initialImageIndex = 0,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(initialImageIndex);
   const [showMap, setShowMap] = useState(false);
+  const [activeAudience, setActiveAudience] = useState<AudienceLens>('tenant');
+  const [isDiagnosticRunning, setIsDiagnosticRunning] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isFactsExportOpen, setIsFactsExportOpen] = useState(false);
+  const [isDisclosureExportOpen, setIsDisclosureExportOpen] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -82,242 +93,228 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
     }
   };
 
+  const handleOpenReport = (lens: AudienceLens) => {
+    setActiveAudience(lens);
+    setIsDiagnosticRunning(true);
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="relative p-2">
-          {/* Image Carousel */}
-          <div className="relative h-[32rem] rounded-lg overflow-hidden">
-            <img
-              src={property.images[currentImageIndex]}
-              alt={`Property view ${currentImageIndex + 1}`}
-              className="w-full h-full object-cover"
-            />
-            
-            {/* Property Type and Availability Badges */}
-            <div className="absolute top-4 left-4 flex gap-2">
-              <span className={`px-4 py-2 rounded-full text-sm font-semibold ${
-                property.type === 'rent' 
-                  ? 'bg-blue-500 text-white' 
-                  : 'bg-purple-500 text-white'
-              }`}>
-                {property.type === 'rent' ? 'To Rent' : 'For Sale'}
-              </span>
-              {property.isAvailableNow && (
-                <span className="bg-green-500 text-white px-4 py-2 rounded-full text-sm font-semibold">
-                  Available Now
+    <>
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 font-nunito">
+        <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="relative p-2">
+            {/* Image Carousel */}
+            <div className="relative h-[30rem] rounded-2xl overflow-hidden">
+              <img
+                src={property.images[currentImageIndex]}
+                alt={`Property view ${currentImageIndex + 1}`}
+                className="w-full h-full object-cover"
+              />
+              
+              {/* Badges */}
+              <div className="absolute top-4 left-4 flex gap-2">
+                <span className={`px-4 py-1.5 rounded-full text-xs font-bold ${
+                  property.type === 'rent' 
+                    ? 'bg-[#136C9E] text-white shadow-md' 
+                    : 'bg-purple-600 text-white shadow-md'
+                }`}>
+                  {property.type === 'rent' ? 'To Rent' : 'For Sale'}
                 </span>
-              )}
-            </div>
+                {property.isAvailableNow && (
+                  <span className="bg-emerald-600 text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-md">
+                    Available Now
+                  </span>
+                )}
+              </div>
 
-            {/* Navigation Arrows */}
-            <button
-              onClick={() => navigateImages('prev')}
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-opacity"
-            >
-              <ChevronLeft className="w-6 h-6" />
-            </button>
-            <button
-              onClick={() => navigateImages('next')}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-opacity"
-            >
-              <ChevronRight className="w-6 h-6" />
-            </button>
-
-            {/* Image Counter */}
-            <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm">
-              {currentImageIndex + 1} / {property.images.length}
-            </div>
-          </div>
-
-          {/* Thumbnail Strip */}
-          <div className="absolute -bottom-16 left-0 right-0 flex justify-center gap-2 px-4">
-            {property.images.map((image, index) => (
+              {/* Navigation Arrows */}
               <button
-                key={index}
-                onClick={() => setCurrentImageIndex(index)}
-                className={`relative w-20 h-20 rounded-lg overflow-hidden transition-all ${
-                  currentImageIndex === index
-                    ? 'ring-2 ring-primary ring-offset-2'
-                    : 'opacity-75 hover:opacity-100'
-                }`}
+                onClick={() => navigateImages('prev')}
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/60 text-white p-2.5 rounded-full hover:bg-black/80 transition-all"
               >
-                <img
-                  src={image}
-                  alt={`Thumbnail ${index + 1}`}
-                  className="w-full h-full object-cover"
-                />
+                <ChevronLeft className="w-5 h-5" />
               </button>
-            ))}
+              <button
+                onClick={() => navigateImages('next')}
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/60 text-white p-2.5 rounded-full hover:bg-black/80 transition-all"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+
+              {/* Image Counter */}
+              <div className="absolute bottom-4 left-4 bg-black/60 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                {currentImageIndex + 1} / {property.images.length}
+              </div>
+            </div>
+
+            {/* Thumbnail Strip */}
+            <div className="flex justify-center gap-2 px-4 mt-3">
+              {property.images.map((image, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentImageIndex(index)}
+                  className={`relative w-16 h-16 rounded-xl overflow-hidden transition-all ${
+                    currentImageIndex === index
+                      ? 'ring-2 ring-[#136C9E] ring-offset-2 scale-105'
+                      : 'opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  <img
+                    src={image}
+                    alt={`Thumbnail ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+
+            {/* Close Button */}
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 bg-white rounded-full p-2 shadow-md hover:bg-gray-100 text-gray-700"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          {/* Close Button */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 bg-white rounded-full p-2 shadow-md hover:bg-gray-100"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Add margin-top to account for thumbnail strip */}
-        <div className="p-6 mt-20">
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">{property.title}</h2>
-              <p className="text-3xl font-bold text-primary">
+          <div className="p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 font-archivo">{property.title}</h2>
+                <div className="flex items-center text-gray-500 text-xs mt-1">
+                  <MapPin className="w-4 h-4 mr-1 text-gray-400" />
+                  <span>{property.location.address}</span>
+                </div>
+              </div>
+              <p className="text-2xl font-extrabold text-[#F15A22]">
                 {formatPrice(property.price)}
-                <span className="text-sm text-gray-500">
-                  {property.type === 'rent' ? '/month' : ''}
+                <span className="text-xs text-gray-500 font-normal">
+                  {property.type === 'rent' ? ' pcm' : ''}
                 </span>
               </p>
             </div>
-          </div>
 
-          {/* Location with Map Toggle */}
-          <div className="flex items-center justify-between text-gray-600 mb-4">
-            <div className="flex items-center">
-              <MapPin className="w-5 h-5 mr-2" />
-              <span>{property.location.address}</span>
+            {/* Sprint 3.1: Embedded Promoted Proptii Module */}
+            <div className="my-6">
+              <ProptiiModule
+                propertyTitle={property.title}
+                propertyAddress={property.location.address}
+                price={property.price}
+                currentAudience={activeAudience}
+                onOpenReport={handleOpenReport}
+              />
             </div>
-            <button
-              onClick={() => setShowMap(!showMap)}
-              className="text-primary hover:text-primary-dark"
-            >
-              {showMap ? 'Hide Map' : 'Show Map'}
-            </button>
-          </div>
 
-          {/* Map View */}
-          {showMap && (
-            <div className="mb-6 rounded-lg overflow-hidden">
-              <div className="w-full h-64 bg-gray-200 flex items-center justify-center">
-                {/* Replace this with actual map implementation */}
-                <p className="text-gray-500">Map View Coming Soon</p>
-                {/* Example: */}
-                {/* <iframe
-                  src={`https://www.google.com/maps/embed/v1/place?key=YOUR_API_KEY&q=${encodeURIComponent(
-                    property.location.address
-                  )}`}
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  allowFullScreen
-                  loading="lazy"
-                /> */}
-              </div>
-            </div>
-          )}
+            {/* Property Features */}
+            <div className="mb-6">
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 font-archivo">
+                Property Features & Key Details
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                  <ul className="space-y-2">
+                    {property.features.map((feature, index) => (
+                      <li key={index} className="flex items-center text-xs text-gray-700">
+                        <Check className="w-4 h-4 text-emerald-500 mr-2 flex-shrink-0" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-4">Property Features</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Key Features */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium text-gray-900 mb-3">Key Features</h4>
-                <ul className="space-y-2">
-                  {property.features.map((feature, index) => (
-                    <li key={index} className="flex items-center text-gray-700">
-                      <Check className="w-5 h-5 text-green-500 mr-2" />
-                      {feature}
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                  <ul className="space-y-2.5 text-xs text-gray-700">
+                    <li className="flex items-center">
+                      <BedDouble className="w-4 h-4 text-gray-500 mr-2" />
+                      <strong>{property.bedrooms}</strong>&nbsp;Bedrooms
                     </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Property Details */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium text-gray-900 mb-3">Property Details</h4>
-                <ul className="space-y-2">
-                  <li className="flex items-center text-gray-700">
-                    <BedDouble className="w-5 h-5 text-gray-500 mr-2" />
-                    {property.bedrooms} Bedrooms
-                  </li>
-                  <li className="flex items-center text-gray-700">
-                    <Bath className="w-5 h-5 text-gray-500 mr-2" />
-                    {property.bathrooms} Bathrooms
-                  </li>
-                  <li className="flex items-center text-gray-700">
-                    <Square className="w-5 h-5 text-gray-500 mr-2" />
-                    800 sq ft
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Local Amenities */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-4">Local Amenities</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Transport */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium text-gray-900 mb-3">Transport</h4>
-                <ul className="space-y-2">
-                  {property.amenities.transport.map((item, index) => (
-                    <li key={index} className="flex items-center text-gray-700">
-                      <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                      {item}
+                    <li className="flex items-center">
+                      <Bath className="w-4 h-4 text-gray-500 mr-2" />
+                      <strong>{property.bathrooms}</strong>&nbsp;Bathrooms
                     </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Shops */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium text-gray-900 mb-3">Shopping</h4>
-                <ul className="space-y-2">
-                  {property.amenities.shops.map((item, index) => (
-                    <li key={index} className="flex items-center text-gray-700">
-                      <span className="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
-                      {item}
+                    <li className="flex items-center">
+                      <Square className="w-4 h-4 text-gray-500 mr-2" />
+                      <strong>800</strong>&nbsp;sq ft approx.
                     </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Schools */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium text-gray-900 mb-3">Education</h4>
-                <div className="text-gray-700">
-                  <p>{property.amenities.schools} schools nearby</p>
+                  </ul>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="border-t pt-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
-                  <Building2 className="w-8 h-8 text-gray-600" />
-                </div>
+            {/* Agent block */}
+            <div className="border-t border-gray-100 pt-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-lg">{property.agent.name}</p>
-                  <p className="text-gray-600">{property.agent.company}</p>
+                  <p className="font-bold text-gray-900 text-sm font-archivo">{property.agent.company}</p>
+                  <p className="text-xs text-gray-500">Contact: {property.agent.name}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button className="flex items-center gap-1.5 px-4 py-2 bg-[#136C9E] text-white text-xs font-bold rounded-full hover:bg-[#0d4f74] shadow-md">
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>Chat</span>
+                  </button>
+                  <button className="flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-full hover:bg-gray-200">
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>Call</span>
+                  </button>
                 </div>
               </div>
             </div>
-            
-            <div className="grid grid-cols-3 gap-4">
-              <button className="flex items-center justify-center space-x-2 bg-primary text-white py-3 px-4 rounded-lg hover:bg-opacity-90">
-                <MessageCircle className="w-5 h-5" />
-                <span>Chat Now</span>
-              </button>
-              <button className="flex items-center justify-center space-x-2 bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200">
-                <Phone className="w-5 h-5" />
-                <span>Call Agent</span>
-              </button>
-              <button className="flex items-center justify-center space-x-2 bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200">
-                <Mail className="w-5 h-5" />
-                <span>Send Email</span>
-              </button>
-            </div>
+
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Sprint 3.2: Report Diagnostic Screen */}
+      {isDiagnosticRunning && (
+        <ReportDiagnostic
+          propertyTitle={property.title}
+          audienceLens={activeAudience}
+          onComplete={() => {
+            setIsDiagnosticRunning(false);
+            setIsReportModalOpen(true);
+          }}
+          onCancel={() => setIsDiagnosticRunning(false)}
+        />
+      )}
+
+      {/* Sprint 3.2: Proptii Report Modal */}
+      {isReportModalOpen && (
+        <ProptiiReportModal
+          isOpen={isReportModalOpen}
+          onClose={() => setIsReportModalOpen(false)}
+          propertyTitle={property.title}
+          propertyAddress={property.location.address}
+          price={property.price}
+          initialAudience={activeAudience}
+          onOpenFactsExport={() => setIsFactsExportOpen(true)}
+          onOpenDisclosureExport={() => setIsDisclosureExportOpen(true)}
+        />
+      )}
+
+      {/* Sprint 3.3: Facts-Only Export Modal */}
+      {isFactsExportOpen && (
+        <FactsOnlyExportModal
+          isOpen={isFactsExportOpen}
+          onClose={() => setIsFactsExportOpen(false)}
+          propertyTitle={property.title}
+          propertyAddress={property.location.address}
+          price={property.price}
+        />
+      )}
+
+      {/* Sprint 3.3: Disclosure Record Modal */}
+      {isDisclosureExportOpen && (
+        <DisclosureRecordModal
+          isOpen={isDisclosureExportOpen}
+          onClose={() => setIsDisclosureExportOpen(false)}
+          propertyTitle={property.title}
+          propertyAddress={property.location.address}
+          price={property.price}
+        />
+      )}
+    </>
   );
 };
 
-export default ListingDetailsModal; 
+export default ListingDetailsModal;

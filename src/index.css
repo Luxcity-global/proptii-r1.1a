@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,700&family=Nunito+Sans:ital,opsz,wght@0,6..12,300;0,6..12,400;0,6..12,500;0,6..12,600;0,6..12,700;0,6..12,800;0,6..12,900;1,6..12,400;1,700&display=swap');
 @import 'swiper/css';
 @import 'swiper/css/navigation';
 @import 'swiper/css/pagination';
@@ -12,8 +13,22 @@
   }
   
   body {
-    @apply antialiased;
+    font-family: 'Nunito Sans', Nunito, ui-sans-serif, system-ui, sans-serif;
+    @apply antialiased text-gray-900;
   }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Archivo', sans-serif;
+  }
+}
+
+.font-archivo {
+  font-family: 'Archivo', sans-serif !important;
+}
+
+.font-nunito,
+.font-nunito-sans {
+  font-family: 'Nunito Sans', Nunito, ui-sans-serif, system-ui, sans-serif !important;
 }
 
 input, textarea {

@@ -4,6 +4,7 @@ import { MsalAuthProvider } from './contexts/AuthContext';
 import { msalConfig } from './config/authConfig';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
+import SearchResults from './pages/SearchResults';
 import Referencing from './pages/Referencing';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -38,6 +39,7 @@ function App() {
             <div className="app-container">
               <Routes>
                 <Route path="/" element={<Home />} />
+                <Route path="/search" element={<SearchResults />} />
                 <Route path="/referencing" element={<Referencing />} />
               </Routes>
             </div>

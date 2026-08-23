@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Proptii 1.4 — Hero Section & Search Bar State Spec</title>
+  
+  <!-- Google Fonts: Archivo & Nunito Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Nunito+Sans:ital,opsz,wght@0,6..12,300;0,6..12,400;0,6..12,500;0,6..12,600;0,6..12,700;0,6..12,800;0,6..12,900;1,6..12,400&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            archivo: ['Archivo', 'sans-serif'],
+            'nunito-sans': ['"Nunito Sans"', 'sans-serif'],
+            nunito: ['"Nunito Sans"', 'sans-serif']
+          },
+          colors: {
+            brandBlue: '#136C9E',
+            brandOrange: '#E65D24',
+            brandOrangeHover: '#D54A1A',
+            pillNavy: '#0B3B5B',
+            pillNavyHover: '#0d456b',
+            pillNavyBorder: '#18537D'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Nunito Sans', sans-serif;
+    }
+    .font-archivo {
+      font-family: 'Archivo', sans-serif;
+    }
+    @keyframes pulse-fast {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.85); }
+    }
+    .dot-pulse-1 { animation: pulse-fast 1.2s infinite ease-in-out; }
+    .dot-pulse-2 { animation: pulse-fast 1.2s infinite ease-in-out; animation-delay: 0.2s; }
+    .dot-pulse-3 { animation: pulse-fast 1.2s infinite ease-in-out; animation-delay: 0.4s; }
+    
+    /* Custom scrollbar for sidebar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen relative overflow-x-hidden select-none">
+
+  <!-- ========================================================================= -->
+  <!-- COLLAPSIBLE DEVELOPER HANDOFF CONTROLLER (LEFT SIDEBAR) -->
+  <!-- ========================================================================= -->
+  <aside id="sidebar" class="fixed top-0 left-0 bottom-0 z-50 w-80 bg-slate-900/95 backdrop-blur-2xl border-r border-white/10 shadow-2xl transition-transform duration-300 transform translate-x-0 flex flex-col justify-between">
+    
+    <!-- Sidebar Header -->
+    <div class="p-5 border-b border-white/10">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-0.5 rounded-full bg-brandOrange/20 text-brandOrange text-[10px] font-extrabold uppercase tracking-wider">
+            Release 1.4 Spec
+          </span>
+        </div>
+        <button id="close-sidebar-btn" class="text-gray-400 hover:text-white text-xs font-bold p-1 rounded-lg hover:bg-white/10 transition-colors">
+          ✕ Hide
+        </button>
+      </div>
+      <h2 class="text-base font-bold text-white font-archivo mt-2">
+        Search Bar State Machine
+      </h2>
+      <p class="text-[11px] text-gray-400 mt-0.5 leading-snug">
+        Click below to preview all UI states for developer implementation.
+      </p>
+    </div>
+
+    <!-- State Buttons Navigation -->
+    <div class="p-4 overflow-y-auto space-y-2 flex-1 text-xs">
+      
+      <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-2 pt-1 pb-1">
+        Primary Search States
+      </div>
+
+      <!-- State 1: Idle -->
+      <button onclick="setSearchState('idle')" id="btn-idle" class="state-btn w-full text-left p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center justify-between font-semibold text-white active-state">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+          <span>1. Idle (Default / Empty)</span>
+        </div>
+        <span class="text-[10px] text-gray-400">Default</span>
+      </button>
+
+      <!-- State 2: Typing / In-Flight Classifier -->
+      <button onclick="setSearchState('typing')" id="btn-typing" class="state-btn w-full text-left p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center justify-between font-semibold text-white">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-brandOrange animate-pulse"></span>
+          <span>2. In-Flight Classifier</span>
+        </div>
+        <span class="text-[10px] text-brandOrange">3 Dots</span>
+      </button>
+
+      <!-- State 3: Filter Pills Extracted (3 Max) -->
+      <button onclick="setSearchState('pills-3')" id="btn-pills-3" class="state-btn w-full text-left p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center justify-between font-semibold text-white">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-brandBlue"></span>
+          <span>3. Filter Pills (3 Visible)</span>
+        </div>
+        <span class="text-[10px] text-blue-300">Standard</span>
+      </button>
+
+      <!-- State 4: Overflow Pills (+2 More) -->
+      <button onclick="setSearchState('pills-overflow')" id="btn-pills-overflow" class="state-btn w-full text-left p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center justify-between font-semibold text-white">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+          <span>4. Filter Pills (+2 More)</span>
+        </div>
+        <span class="text-[10px] text-cyan-300">+N Pill</span>
+      </button>
+
+      <!-- State 5: Overflow Dropdown Open -->
+      <button onclick="setSearchState('pills-dropdown-open')" id="btn-pills-dropdown-open" class="state-btn w-full text-left p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center justify-between font-semibold text-white">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+          <span>5. Overflow Dropdown Open</span>
+        </div>
+        <span class="text-[10px] text-purple-300">Opened</span>
+      </button>
+
+      <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-2 pt-3 pb-1">
+        Intelligence & Guidance
+      </div>
+
+      <!-- State 6: General Legal Enquiry (Pet permissions) -->
+      <button onclick="setSearchState('guidance-pets')" id="btn-guidance-pets" class="state-btn w-full text-left p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center justify-between font-semibold text-white">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span>6. Pet Guidance Card</span>
+        </div>
+        <span class="text-[10px] text-emerald-300">Sprint 4.1</span>
+      </button>
+
+      <!-- State 7: EPC Guidance -->
+      <button onclick="setSearchState('guidance-epc')" id="btn-guidance-epc" class="state-btn w-full text-left p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center justify-between font-semibold text-white">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+          <span>7. EPC / MEES Guidance</span>
+        </div>
+        <span class="text-[10px] text-amber-300">Statutory</span>
+      </button>
+
+      <!-- State 8: Broad Search Clarifier -->
+      <button onclick="setSearchState('guidance-broad')" id="btn-guidance-broad" class="state-btn w-full text-left p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center justify-between font-semibold text-white">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+          <span>8. Broad Search Clarifier</span>
+        </div>
+        <span class="text-[10px] text-blue-300">City Chips</span>
+      </button>
+
+      <!-- State 9: Button Submitting -->
+      <button onclick="setSearchState('submitting')" id="btn-submitting" class="state-btn w-full text-left p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center justify-between font-semibold text-white">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+          <span>9. Submitting / Loading</span>
+        </div>
+        <span class="text-[10px] text-yellow-300">Spinner</span>
+      </button>
+
+    </div>
+
+    <!-- Dev Token Spec Footer -->
+    <div class="p-4 border-t border-white/10 bg-slate-950/70 text-[11px] text-gray-400 space-y-1.5">
+      <div class="font-bold text-gray-300 flex items-center justify-between">
+        <span>Design System Tokens</span>
+        <span class="text-[10px] text-brandOrange">v1.4 Spec</span>
+      </div>
+      <div class="grid grid-cols-2 gap-1 text-[10px] font-mono">
+        <div>Brand Blue: <strong class="text-white">#136C9E</strong></div>
+        <div>Brand Orange: <strong class="text-white">#E65D24</strong></div>
+        <div>Pill Navy: <strong class="text-white">#0B3B5B</strong></div>
+        <div>Border: <strong class="text-white">#18537D</strong></div>
+      </div>
+      <div class="text-[10px] text-gray-500 pt-1">
+        Fonts: <strong>Archivo</strong> (Headings), <strong>Nunito</strong> (Body)
+      </div>
+    </div>
+  </aside>
+
+  <!-- Sidebar Open Toggle (Sticky Button) -->
+  <button id="open-sidebar-btn" class="fixed top-6 left-6 z-40 px-4 py-2.5 rounded-full bg-slate-900/90 text-white border border-white/20 shadow-2xl backdrop-blur-md flex items-center gap-2 text-xs font-bold hover:bg-slate-800 transition-all transform hover:scale-105">
+    <svg class="w-4 h-4 text-brandOrange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />
+    </svg>
+    <span>State Switcher Spec</span>
+  </button>
+
+  <!-- ========================================================================= -->
+  <!-- HERO SECTION VIEW (STANDALONE PRODUCTION VISUALS) -->
+  <!-- ========================================================================= -->
+  <div id="hero-wrapper" class="relative min-h-screen flex flex-col justify-between overflow-hidden pl-0 transition-all duration-300">
+    
+    <!-- Background Image with Dark Vignette Overlay -->
+    <div class="absolute inset-0 z-0">
+      <!-- High-res background image with fallback gradient -->
+      <img
+        src="/images/01_Lady_Child_Family_BG.jpg"
+        alt="Family background"
+        class="w-full h-full object-cover object-center"
+        onerror="this.src='https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=2000&q=80'"
+      />
+      <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/40"></div>
+    </div>
+
+    <!-- Top Navigation Bar -->
+    <header class="relative z-20 max-w-7xl mx-auto w-full px-6 pt-6 flex items-center justify-between">
+      
+      <!-- Proptii Logo Wordmark -->
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1 text-2xl font-extrabold tracking-tight text-white font-archivo">
+          <span class="text-white">prop</span><span class="text-brandOrange">tii</span>
+        </div>
+      </div>
+
+      <!-- Center Frosted Glassmorphism Dual Toggle (Search / Manage) -->
+      <div class="hidden md:flex items-center bg-white/15 backdrop-blur-md p-1 rounded-full border border-white/25 shadow-lg">
+        <button class="flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold bg-gradient-to-r from-[#4CA1D0]/90 to-[#2A7BAA]/90 text-white shadow-md border border-white/40">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+          </svg>
+          <span>Search Properties Free</span>
+          <svg class="w-3 h-3 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <button class="flex items-center gap-2 px-5 py-2 rounded-full text-xs font-bold text-white/85 hover:text-white hover:bg-white/10 transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+          </svg>
+          <span>List & Manage Properties</span>
+        </button>
+      </div>
+
+      <!-- Right Sign In Pill -->
+      <div>
+        <button class="px-6 py-2.5 rounded-full bg-[#E65D24] hover:bg-[#D54A1A] text-white font-bold text-xs shadow-lg shadow-orange-500/25 transition-all transform active:scale-95">
+          Sign In
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Hero Center Area -->
+    <main class="relative z-10 max-w-4xl mx-auto px-4 text-center my-auto py-12 w-full">
+      
+      <!-- Dynamic Cycling Headline -->
+      <h1 class="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-3 font-archivo tracking-tight text-white leading-tight">
+        Search. Verify. <span id="rotating-word" class="inline-flex items-center text-white">Rent.</span><span class="inline-block w-2 h-8 md:h-12 bg-brandOrange ml-1 animate-pulse"></span>
+      </h1>
+
+      <!-- Subtitle -->
+      <p class="text-sm sm:text-base md:text-lg mb-8 max-w-2xl mx-auto text-white/90 font-medium leading-relaxed">
+        Search properties, book viewings, complete referencing and sign contracts in one place. Free for tenants.
+      </p>
+
+      <!-- ===================================================================== -->
+      <!-- SEARCH INPUT CAPSULE (TARGET COMPONENT) -->
+      <!-- ===================================================================== -->
+      <div class="relative max-w-3xl mx-auto">
+        <div class="flex items-center bg-white rounded-full p-2 shadow-2xl transition-all duration-200 border-2 border-transparent focus-within:border-brandBlue focus-within:ring-4 focus-within:ring-brandBlue/10">
+          
+          <!-- Search Magnifying Glass Icon -->
+          <div class="pl-4 pr-2 text-gray-400 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+
+          <!-- Input Element -->
+          <input
+            id="search-input"
+            type="text"
+            placeholder="2-bed flat near Clapham Junction"
+            value=""
+            class="w-full py-2.5 px-2 text-gray-800 placeholder-gray-400 bg-transparent text-base font-medium focus:outline-none"
+          />
+
+          <!-- Clear X Button (Visible when input has value) -->
+          <button id="clear-btn" class="hidden p-1.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors mr-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          <!-- Search Button (Matches Screenshot: Search →) -->
+          <button
+            id="search-submit-btn"
+            class="flex items-center justify-center gap-2 px-7 md:px-9 py-3.5 rounded-full bg-[#E65D24] hover:bg-[#D54A1A] text-white font-bold text-base shadow-lg shadow-orange-500/30 transition-all transform active:scale-95 flex-shrink-0"
+          >
+            <span id="btn-text">Search</span>
+            <svg id="btn-arrow" class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+            <!-- Spinner (Hidden by default) -->
+            <svg id="btn-spinner" class="hidden w-5 h-5 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- ===================================================================== -->
+      <!-- DYNAMIC STATE CONTAINERS (BELOW THE SEARCH BAR) -->
+      <!-- ===================================================================== -->
+
+      <!-- 1. Idle State: Suggested Search Prompts -->
+      <div id="container-idle-chips" class="flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto mt-3 mb-6 transition-all">
+        <span class="text-xs text-white/75 font-semibold">Try:</span>
+        <button onclick="applyQuery('2 bedroom flat in Leeds under 1200pcm')" class="px-3.5 py-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white/95 hover:text-white text-xs font-semibold backdrop-blur-md border border-white/20 transition-all hover:scale-105">
+          2 bedroom flat in Leeds under 1200pcm
+        </button>
+        <button onclick="applyQuery('Pet-friendly studios in Manchester')" class="px-3.5 py-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white/95 hover:text-white text-xs font-semibold backdrop-blur-md border border-white/20 transition-all hover:scale-105">
+          Pet-friendly studios in Manchester
+        </button>
+        <button onclick="applyQuery('3 bed house near good schools in Bristol')" class="px-3.5 py-1.5 rounded-full bg-black/40 hover:bg-black/60 text-white/95 hover:text-white text-xs font-semibold backdrop-blur-md border border-white/20 transition-all hover:scale-105">
+          3 bed house near good schools in Bristol
+        </button>
+      </div>
+
+      <!-- 2. In-Flight State: Pulsing 3 Dots Indicator (media_1787487324998.png) -->
+      <div id="container-in-flight" class="hidden flex items-center justify-center gap-2.5 mt-4 text-white/90 text-sm font-medium transition-all">
+        <span class="flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#E65D24] dot-pulse-1"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-[#E65D24] dot-pulse-2"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-[#E65D24] dot-pulse-3"></span>
+        </span>
+        <span class="tracking-wide">understanding your search</span>
+      </div>
+
+      <!-- 3. Filter Pills Row (Dark Navy Blue Capsules matching media_1787487348765.png) -->
+      <div id="container-filter-pills" class="hidden mt-4 flex flex-wrap items-center justify-center gap-2.5 transition-all">
+        
+        <!-- Pill 1: Bedrooms -->
+        <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0B3B5B] text-white text-sm font-normal shadow-lg border border-[#18537D] backdrop-blur-md hover:bg-[#0d456b] transition-all">
+          <span id="pill-text-1">2 bedrooms</span>
+          <button onclick="removeSamplePill(1)" class="text-white/70 hover:text-white ml-1 font-bold text-xs p-0.5 rounded-full hover:bg-white/20">✕</button>
+        </div>
+
+        <!-- Pill 2: Type -->
+        <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0B3B5B] text-white text-sm font-normal shadow-lg border border-[#18537D] backdrop-blur-md hover:bg-[#0d456b] transition-all">
+          <span id="pill-text-2">Flat</span>
+          <button onclick="removeSamplePill(2)" class="text-white/70 hover:text-white ml-1 font-bold text-xs p-0.5 rounded-full hover:bg-white/20">✕</button>
+        </div>
+
+        <!-- Pill 3: Location -->
+        <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0B3B5B] text-white text-sm font-normal shadow-lg border border-[#18537D] backdrop-blur-md hover:bg-[#0d456b] transition-all">
+          <span id="pill-text-3">Near: Clapham Junction</span>
+          <button onclick="removeSamplePill(3)" class="text-white/70 hover:text-white ml-1 font-bold text-xs p-0.5 rounded-full hover:bg-white/20">✕</button>
+        </div>
+
+        <!-- Pill 4: Overflow '+2 more' Dropdown Trigger -->
+        <div id="pill-overflow-wrapper" class="hidden relative">
+          <button onclick="toggleOverflowDropdown()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#0B3B5B] text-white text-sm font-medium shadow-lg border border-[#18537D] hover:bg-[#0d456b] transition-all">
+            <span id="overflow-count-text">+2 more</span>
+            <svg id="dropdown-chevron" class="w-3.5 h-3.5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <!-- Dropdown Card (Opens DOWNWARDS) -->
+          <div id="overflow-dropdown-card" class="hidden absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60 bg-[#0B3B5B] rounded-2xl shadow-2xl border border-[#18537D] p-2 z-50 text-left">
+            <div class="px-3 py-1.5 text-[11px] font-bold text-white/60 uppercase tracking-wider border-b border-white/10 mb-1">
+              Additional Filters
+            </div>
+            <div class="space-y-1 text-sm">
+              <div class="flex items-center justify-between px-3 py-1.5 rounded-xl text-white hover:bg-white/10">
+                <span>Under: £1,200/mo</span>
+                <span class="text-white/70 hover:text-red-400 font-bold cursor-pointer">✕</span>
+              </div>
+              <div class="flex items-center justify-between px-3 py-1.5 rounded-xl text-white hover:bg-white/10">
+                <span>Pet-friendly</span>
+                <span class="text-white/70 hover:text-red-400 font-bold cursor-pointer">✕</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 4. General Enquiry Bridge Card (Pet Permissions Guidance) -->
+      <div id="container-guidance-card" class="hidden mt-4 bg-white/95 backdrop-blur-md rounded-3xl p-6 border border-white/50 shadow-2xl text-left max-w-2xl mx-auto text-gray-900">
+        <div class="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-xl bg-orange-500/10 flex items-center justify-center text-brandOrange">
+              ✨
+            </div>
+            <span class="text-xs font-extrabold uppercase tracking-wider text-brandBlue">
+              Pet Permissions in Rentals
+            </span>
+          </div>
+          <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-full text-xs">
+            <span class="text-gray-400 font-semibold px-1 text-[10px]">LENS:</span>
+            <button class="px-2.5 py-0.5 rounded-full bg-brandBlue text-white font-bold text-[11px]">Tenant</button>
+            <button class="px-2.5 py-0.5 rounded-full text-gray-600 hover:text-gray-900 font-medium text-[11px]">Landlord</button>
+            <button class="px-2.5 py-0.5 rounded-full text-gray-600 hover:text-gray-900 font-medium text-[11px]">Agent</button>
+          </div>
+        </div>
+
+        <p class="text-xs text-gray-700 leading-relaxed mb-3">
+          Under the Renters (Reform) Bill guidelines, landlords cannot unreasonably withhold consent for pets, but superior title covenants on the building register may impose building-wide restrictions.
+        </p>
+
+        <div class="pt-2 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <button class="px-3 py-1.5 rounded-full bg-blue-50 hover:bg-brandBlue text-brandBlue hover:text-white font-bold text-xs transition-all flex items-center gap-1">
+            <span>Search pet-friendly flats in Leeds</span> →
+          </button>
+          <a href="#" class="text-brandBlue font-bold hover:underline">Know Your Rights Guide →</a>
+        </div>
+      </div>
+
+      <!-- 5. Broad Search Clarifier Card -->
+      <div id="container-broad-card" class="hidden mt-4 bg-white/95 backdrop-blur-md rounded-3xl p-6 border border-white/40 shadow-2xl text-left max-w-2xl mx-auto text-gray-900">
+        <div class="text-xs font-extrabold uppercase tracking-wider text-brandBlue mb-1">
+          Refine Search Scope
+        </div>
+        <h4 class="text-sm font-bold text-gray-900 mb-3 font-archivo">
+          Which city or region would you like to search in?
+        </h4>
+        <div class="flex flex-wrap gap-2">
+          <button class="px-3.5 py-1.5 rounded-full bg-blue-50 hover:bg-brandBlue text-brandBlue hover:text-white text-xs font-bold transition-all">Leeds</button>
+          <button class="px-3.5 py-1.5 rounded-full bg-blue-50 hover:bg-brandBlue text-brandBlue hover:text-white text-xs font-bold transition-all">Manchester</button>
+          <button class="px-3.5 py-1.5 rounded-full bg-blue-50 hover:bg-brandBlue text-brandBlue hover:text-white text-xs font-bold transition-all">Bristol</button>
+          <button class="px-3.5 py-1.5 rounded-full bg-blue-50 hover:bg-brandBlue text-brandBlue hover:text-white text-xs font-bold transition-all">London</button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Scout Dog Mascot (Bottom Right Corner) -->
+    <footer class="relative z-20 max-w-7xl mx-auto w-full px-6 pb-6 flex items-center justify-end">
+      <div class="flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/30 shadow-2xl">
+        <div class="w-7 h-7 rounded-full bg-white flex items-center justify-center text-brandOrange font-bold text-xs shadow-md">
+          🐕
+        </div>
+        <span class="text-xs font-bold text-white tracking-wide">
+          Scout is checking registers
+        </span>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- STATE SWITCHER INTERACTIVE SCRIPT -->
+  <!-- ========================================================================= -->
+  <script>
+    const input = document.getElementById('search-input');
+    const clearBtn = document.getElementById('clear-btn');
+    const idleChips = document.getElementById('container-idle-chips');
+    const inFlight = document.getElementById('container-in-flight');
+    const filterPills = document.getElementById('container-filter-pills');
+    const overflowWrapper = document.getElementById('pill-overflow-wrapper');
+    const overflowDropdown = document.getElementById('overflow-dropdown-card');
+    const dropdownChevron = document.getElementById('dropdown-chevron');
+    const guidanceCard = document.getElementById('container-guidance-card');
+    const broadCard = document.getElementById('container-broad-card');
+    const btnSpinner = document.getElementById('btn-spinner');
+    const btnArrow = document.getElementById('btn-arrow');
+    const btnText = document.getElementById('btn-text');
+
+    // Sidebar toggles
+    const sidebar = document.getElementById('sidebar');
+    const openSidebarBtn = document.getElementById('open-sidebar-btn');
+    const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+
+    openSidebarBtn.addEventListener('click', () => {
+      sidebar.classList.remove('-translate-x-full');
+    });
+
+    closeSidebarBtn.addEventListener('click', () => {
+      sidebar.classList.add('-translate-x-full');
+    });
+
+    function resetAllViews() {
+      idleChips.classList.add('hidden');
+      inFlight.classList.add('hidden');
+      filterPills.classList.add('hidden');
+      overflowWrapper.classList.add('hidden');
+      overflowDropdown.classList.add('hidden');
+      guidanceCard.classList.add('hidden');
+      broadCard.classList.add('hidden');
+      btnSpinner.classList.add('hidden');
+      btnArrow.classList.remove('hidden');
+      btnText.innerText = 'Search';
+      dropdownChevron.classList.remove('rotate-180');
+    }
+
+    function setActiveBtn(btnId) {
+      document.querySelectorAll('.state-btn').forEach(btn => {
+        btn.classList.remove('bg-white/20', 'border-brandOrange');
+        btn.classList.add('bg-white/5');
+      });
+      const active = document.getElementById(btnId);
+      if (active) {
+        active.classList.remove('bg-white/5');
+        active.classList.add('bg-white/20', 'border-brandOrange');
+      }
+    }
+
+    function setSearchState(stateName) {
+      resetAllViews();
+      setActiveBtn(`btn-${stateName}`);
+
+      switch (stateName) {
+        case 'idle':
+          input.value = '';
+          clearBtn.classList.add('hidden');
+          idleChips.classList.remove('hidden');
+          break;
+
+        case 'typing':
+          input.value = '2-bed flat near Clapham Junction';
+          clearBtn.classList.remove('hidden');
+          inFlight.classList.remove('hidden');
+          break;
+
+        case 'pills-3':
+          input.value = '2-bed flat near Clapham Junction';
+          clearBtn.classList.remove('hidden');
+          filterPills.classList.remove('hidden');
+          document.getElementById('pill-text-1').innerText = '2 bedrooms';
+          document.getElementById('pill-text-2').innerText = 'Flat';
+          document.getElementById('pill-text-3').innerText = 'Near: Clapham Junction';
+          break;
+
+        case 'pills-overflow':
+          input.value = '2 bed flat in Leeds under 1200pcm pet friendly';
+          clearBtn.classList.remove('hidden');
+          filterPills.classList.remove('hidden');
+          overflowWrapper.classList.remove('hidden');
+          document.getElementById('pill-text-1').innerText = '2 bedrooms';
+          document.getElementById('pill-text-2').innerText = 'Flat';
+          document.getElementById('pill-text-3').innerText = 'Near: Leeds';
+          break;
+
+        case 'pills-dropdown-open':
+          input.value = '2 bed flat in Leeds under 1200pcm pet friendly';
+          clearBtn.classList.remove('hidden');
+          filterPills.classList.remove('hidden');
+          overflowWrapper.classList.remove('hidden');
+          overflowDropdown.classList.remove('hidden');
+          dropdownChevron.classList.add('rotate-180');
+          document.getElementById('pill-text-1').innerText = '2 bedrooms';
+          document.getElementById('pill-text-2').innerText = 'Flat';
+          document.getElementById('pill-text-3').innerText = 'Near: Leeds';
+          break;
+
+        case 'guidance-pets':
+          input.value = 'pet';
+          clearBtn.classList.remove('hidden');
+          filterPills.classList.remove('hidden');
+          document.getElementById('pill-text-1').innerText = 'Pet-friendly';
+          document.getElementById('pill-text-2').parentElement.classList.add('hidden');
+          document.getElementById('pill-text-3').parentElement.classList.add('hidden');
+          guidanceCard.classList.remove('hidden');
+          break;
+
+        case 'guidance-epc':
+          input.value = 'epc';
+          clearBtn.classList.remove('hidden');
+          guidanceCard.classList.remove('hidden');
+          break;
+
+        case 'guidance-broad':
+          input.value = 'cheap flat in england';
+          clearBtn.classList.remove('hidden');
+          broadCard.classList.remove('hidden');
+          break;
+
+        case 'submitting':
+          input.value = '2-bed flat near Clapham Junction';
+          clearBtn.classList.remove('hidden');
+          filterPills.classList.remove('hidden');
+          btnSpinner.classList.remove('hidden');
+          btnArrow.classList.add('hidden');
+          btnText.innerText = 'Searching';
+          break;
+      }
+    }
+
+    function toggleOverflowDropdown() {
+      const isHidden = overflowDropdown.classList.contains('hidden');
+      if (isHidden) {
+        overflowDropdown.classList.remove('hidden');
+        dropdownChevron.classList.add('rotate-180');
+      } else {
+        overflowDropdown.classList.add('hidden');
+        dropdownChevron.classList.remove('rotate-180');
+      }
+    }
+
+    function applyQuery(text) {
+      input.value = text;
+      setSearchState('pills-overflow');
+    }
+
+    function removeSamplePill(idx) {
+      alert(`Pill #${idx} removed. Extracted criteria dynamically recalculated.`);
+    }
+
+    // Initialize Default State
+    setSearchState('idle');
+
+    // Typewriter effect for headline
+    const rotatingWords = ['Rent.', 'Buy.', 'Move.', 'Decide.', 'Verify.'];
+    let wordIdx = 0;
+    const rotatingWordEl = document.getElementById('rotating-word');
+    setInterval(() => {
+      wordIdx = (wordIdx + 1) % rotatingWords.length;
+      rotatingWordEl.innerText = rotatingWords[wordIdx];
+    }, 2000);
+  </script>
+</body>
+</html>
