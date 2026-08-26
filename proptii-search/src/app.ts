@@ -33,6 +33,15 @@ app.use(express.json());
 // Routes
 app.use('/api/v1/search', searchRoutes);
 
+app.get('/', (_req: Request, res: Response) => {
+  res.status(200).json({
+    service: 'proptii-search',
+    status: 'ok',
+    health: '/health',
+    search: 'POST /api/v1/search',
+  });
+});
+
 // Health check
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
