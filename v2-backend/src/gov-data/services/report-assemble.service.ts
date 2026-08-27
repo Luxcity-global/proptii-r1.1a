@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { FactsStoreService } from './facts-store.service';
-import { PostcodesIoService } from './postcodes-io.service';
+import { PostcodesIoService, PostcodeResult } from './postcodes-io.service';
 import { EaFloodService } from './ea-flood.service';
 import { EpcIngestService } from './epc-ingest.service';
 import { LocalAreaService } from './local-area.service';
@@ -26,9 +26,19 @@ export class ReportAssembleService {
     const { listingId, address } = dto;
     const postcode = address.postcode!;
 
-    // 1. Resolve Centroid (Fast Path)
-    const centroidResult = await this.withTimeout(this.postcodesIo.getCentroid(postcode), 3500);
-    const centroid = centroidResult.status === 'fulfilled' ? centroidResult.value : null;
+    // 1. Resolve Centroid (via postcodes.io or directly from input coordinates)
+    let centroid: PostcodeResult | null = null;
+    if (address.coordinates && address.coordinates.lat && address.coordinates.lng) {
+      centroid = {
+        latitude: address.coordinates.lat,
+        longitude: address.coordinates.lng,
+        admin_district: address.display?.split(',')[1]?.trim() || '',
+        lsoa: ''
+      };
+    } else {
+      const centroidResult = await this.withTimeout(this.postcodesIo.getCentroid(postcode), 3500);
+      centroid = centroidResult.status === 'fulfilled' ? centroidResult.value : null;
+    }
 
     // Build base report skeleton
     const reportData = {
