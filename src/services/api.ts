@@ -425,20 +425,25 @@ export const api = {
       const decoder = new TextDecoder();
       let done = false;
       let finalData: any = null;
+      let buffer = '';
 
       while (!done) {
         const { value, done: readerDone } = await reader.read();
         done = readerDone;
         if (value) {
-          const chunkString = decoder.decode(value, { stream: true });
-          const lines = chunkString.split('\n');
+          buffer += decoder.decode(value, { stream: !done });
+          const lines = buffer.split('\n');
+          // Keep the last incomplete piece in the buffer
+          buffer = lines.pop() || '';
+
           for (const line of lines) {
-            if (line.trim()) {
+            const trimmed = line.trim();
+            if (trimmed) {
               try {
-                const chunk = JSON.parse(line);
+                const chunk = JSON.parse(trimmed);
                 if (chunk.type === 'initial') {
                   finalData = chunk.data;
-                  if (onProgress) onProgress(finalData);
+                  if (onProgress) onProgress(JSON.parse(JSON.stringify(finalData)));
                 } else if (chunk.type === 'chunk') {
                   if (!finalData) finalData = {};
                   
@@ -450,17 +455,18 @@ export const api = {
                     finalData.sources = finalData.sources.map((s: any) => s.id === 'flood' ? { ...s, state: chunk.data ? 'clear' : 'unresolved' } : s);
                     if (chunk.data) finalData.local.flood = chunk.data;
                   } else if (chunk.module === 'crime') {
-                    finalData.sources = finalData.sources.map((s: any) => s.id === 'crime' ? { ...s, state: (chunk.data && chunk.data.month && chunk.data.month !== 'Unknown') ? 'clear' : 'unresolved' } : s);
+                    const isClear = !!(chunk.data && chunk.data.month && chunk.data.month !== 'Unknown' && chunk.data.month !== 'Loading...');
+                    finalData.sources = finalData.sources.map((s: any) => s.id === 'crime' ? { ...s, state: isClear ? 'clear' : 'unresolved' } : s);
                     if (chunk.data) finalData.local.crime = chunk.data;
                   } else if (chunk.module === 'heritage') {
                     finalData.sources = finalData.sources.map((s: any) => s.id === 'heritage' ? { ...s, state: chunk.data ? 'clear' : 'unresolved' } : s);
                     if (chunk.data) finalData.local.heritage = chunk.data;
                   }
                   
-                  if (onProgress) onProgress(finalData);
+                  if (onProgress) onProgress(JSON.parse(JSON.stringify(finalData)));
                 }
               } catch (e) {
-                console.error('Failed to parse NDJSON chunk:', line);
+                console.error('Failed to parse NDJSON chunk:', trimmed, e);
               }
             }
           }
