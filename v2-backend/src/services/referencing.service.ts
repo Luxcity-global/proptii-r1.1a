@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { randomUUID } from 'crypto';
 import { EmailService } from './email.service';
+import { ComplianceTransformService } from '../gov-data/services/compliance-transform.service';
 import {
   uploadBase64ToStorage,
   uploadBufferToStorage,
@@ -28,7 +29,10 @@ const SECTION_FILE_FIELDS: Record<string, string[]> = {
 export class ReferencingService {
   private readonly logger = new Logger(ReferencingService.name);
 
-  constructor(private readonly emailService: EmailService) {}
+  constructor(
+    private readonly emailService: EmailService,
+    @Optional() private readonly complianceTransform?: ComplianceTransformService,
+  ) {}
 
   // ── Firestore helpers ──────────────────────────────────────────────────────
 
@@ -313,6 +317,15 @@ export class ReferencingService {
       } catch (err: any) {
         this.logger.warn(`saveUserFile Firestore write failed: ${err?.message || err}`);
       }
+    }
+
+    // ── Compliance flag derivation (non-fatal, fire-and-forget) ──────────────
+    // Derives a compliance flag from the saved document and upserts it into
+    // the propertyFacts collection. Failures here must never break the upload.
+    if (this.complianceTransform) {
+      this.complianceTransform.deriveAndUpsert({ ...payload, userId }).catch((err: any) => {
+        this.logger.warn(`ComplianceTransform.deriveAndUpsert failed (non-fatal): ${err?.message || err}`);
+      });
     }
 
     return { ...payload, id: docId };

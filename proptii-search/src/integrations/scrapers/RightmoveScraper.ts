@@ -102,6 +102,9 @@ export class RightmoveScraper implements IScraper {
         },
         source:       'Rightmove',
         url:          fullUrl,
+        coordinates:  p.location && p.location.latitude && p.location.longitude 
+                        ? { lat: p.location.latitude, lng: p.location.longitude } 
+                        : undefined,
       });
     }
 

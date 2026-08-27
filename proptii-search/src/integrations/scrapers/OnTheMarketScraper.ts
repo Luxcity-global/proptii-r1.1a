@@ -86,6 +86,8 @@ export class OnTheMarketScraper implements IScraper {
         },
         source:       'OnTheMarket',
         url:          fullUrl,
+        coordinates:  (p.location?.lat && p.location?.lon) ? { lat: p.location.lat, lng: p.location.lon } :
+                      (p.latitude && p.longitude) ? { lat: p.latitude, lng: p.longitude } : undefined,
       });
     }
 

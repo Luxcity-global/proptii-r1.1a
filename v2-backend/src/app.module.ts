@@ -1,5 +1,6 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { LoggingMiddleware } from './middleware/logging.middleware';
+import { GovDataModule } from './gov-data/gov-data.module';
 
 // ── Existing controllers ──────────────────────────────────────────────────────
 import { AuthController } from './controllers/auth.controller';
@@ -23,6 +24,17 @@ import { AlertsController } from './controllers/alerts.controller';
 import { InsightsController } from './controllers/insights.controller';
 import { SheetsController } from './controllers/sheets.controller';
 import { RefereeGuarantorController } from './controllers/referee-guarantor.controller';
+
+// ── R1.4 — Search Classifier (Sprint 1.3) ────────────────────────────────────
+import { ClassifierController } from './search/classifier.controller';
+import { ClassifierService }    from './search/classifier.service';
+
+// ── R1.4 — Runtime Flag (Sprint 2.1) ─────────────────────────────────────
+import { FlagsController }        from './controllers/flags.controller';
+
+// ── R1.4 — Property Facts (Sprint 2.2 + 3.1) ─────────────────────────────
+import { PropertyFactsController } from './controllers/property-facts.controller';
+import { ReportController }        from './controllers/report.controller';
 
 // ── Existing services ─────────────────────────────────────────────────────────
 import { NativePropertiesService } from './services/native-properties.service';
@@ -49,7 +61,7 @@ import { StorageService } from './services/storage.service';
 import { StorageController } from './controllers/storage.controller';
 
 @Module({
-  imports: [],
+  imports: [GovDataModule],
   controllers: [
     HealthController,
     AuthController,
@@ -72,6 +84,13 @@ import { StorageController } from './controllers/storage.controller';
     SheetsController,
     RefereeGuarantorController,
     StorageController,
+    // R1.4 Sprint 1.3
+    ClassifierController,
+    // R1.4 Sprint 2.1
+    FlagsController,
+    // R1.4 Sprint 2.2 + 3.1
+    PropertyFactsController,
+    ReportController,
   ],
   providers: [
     EventsService,      // SSE Central Event Broadcaster
@@ -94,6 +113,8 @@ import { StorageController } from './controllers/storage.controller';
     InsightsService,
     SheetsService,
     RefereeGuarantorService,
+    // R1.4 Sprint 1.3
+    ClassifierService,
   ],
   exports: [EventsService],
 })

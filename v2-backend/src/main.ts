@@ -13,6 +13,8 @@ process.env.GRPC_HTTP2_MIN_PING_INTERVAL_WITHOUT_DATA_MS = process.env.GRPC_HTTP
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as admin from 'firebase-admin';
 import { json, urlencoded } from 'express';
 
@@ -116,16 +118,54 @@ async function bootstrap() {
   // Disable default body parser so we can set a custom payload limit
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   app.setGlobalPrefix('api');
+
+  // ── Global ValidationPipe (Sprint 1.3 PRD requirement) ──────────────────────
+  // Validates all @Body() DTOs across every controller.
+  // whitelist: true  — strips unknown fields from the body (not rejected).
+  // transform: true  — automatically coerces primitives to their DTO types.
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist:            true,
+      transform:            true,
+      forbidNonWhitelisted: false,  // strip silently — don't reject
+    }),
+  );
+
+  // ── CORS (Sprint 2.1 PRD requirement) ───────────────────────────────────
+  // Explicit allowlist so the browser permits calls to:
+  //   POST /api/search/classify   (classifier — Sprint 1.3)
+  //   GET  /api/flags             (runtime flag — Sprint 2.1)
+  //   All existing endpoints (unchanged behaviour)
+  //
+  // ALLOWED_ORIGINS env var: comma-separated list for production deployments.
+  // Falls back to a wildcard in local dev (NODE_ENV !== 'production').
+  const isProd = process.env.NODE_ENV === 'production' || !!process.env.RENDER_EXTERNAL_URL;
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
+    : null;
+
   app.enableCors({
-    origin: '*',
+    origin: true, // Reflects the incoming origin, allowing any frontend to connect with credentials
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   });
+
+  // ── Swagger API Documentation ─────────────────────────────────────────────
+  const config = new DocumentBuilder()
+    .setTitle('Proptii API')
+    .setDescription('The Proptii v2 Backend API description')
+    .setVersion('1.4')
+    .addBearerAuth()
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
 
   // Increase payload limit for base64 file uploads (413 Payload Too Large)
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
 
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 3002;
   await app.listen(port);
   console.log(`🚀 Proptii v2-backend running on port ${port}`);
 

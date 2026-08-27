@@ -14,6 +14,7 @@ export interface PropertyData {
   };
   source: string;
   url: string;
+  coordinates?: { lat: number; lng: number };
 }
 
 export interface IScraper {

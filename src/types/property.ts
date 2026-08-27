@@ -14,6 +14,7 @@ export interface Property {
   bathrooms?: string | number;
   propertyType: string;
   imageUrls: string[];
+  coordinates?: { lat: number; lng: number };
   agent: {
     id?: string;
     name: string;

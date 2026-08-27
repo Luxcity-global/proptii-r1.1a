@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, BedDouble, Bath, Square, Phone, MessageSquare, Building2, ChevronLeft, ChevronRight, Check, Loader2 } from 'lucide-react';
+import { X, MapPin, BedDouble, Bath, Square, Phone, MessageSquare, Building2, ChevronLeft, ChevronRight, Check, Loader2, Droplets, ShieldAlert, Zap, AlertTriangle, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMessagingContext } from '../../contexts/MessagingContext';
 import communicationService from '../../services/communicationService';
 import QuickRequestModal from '../enquiry/QuickRequestModal';
+import { api } from '../../services/api';
 
 interface Property {
   id: string;
@@ -65,6 +66,10 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
   const [showUnclaimedConfirm, setShowUnclaimedConfirm] = useState(false);
   const [showQuickRequestModal, setShowQuickRequestModal] = useState(false);
   const isScrapedProperty = !property.landlordId && !!property.agent?.email;
+
+  const [reportData, setReportData] = useState<any>(null);
+  const [isReportLoading, setIsReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const { user, isAuthenticated, login } = useAuth();
@@ -142,6 +147,52 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentImageIndex]);
+
+  useEffect(() => {
+    let mounted = true;
+    
+    const fetchReport = async () => {
+      setIsReportLoading(true);
+      setReportError(null);
+      try {
+        const hasPostcode = !!property.location.postcode;
+        const hasCoordinates = property.location.coordinates && property.location.coordinates[0] !== 0;
+
+        if (!hasPostcode && !hasCoordinates) {
+          setReportError('No postcode or valid coordinates available to generate the area report.');
+          setIsReportLoading(false);
+          return;
+        }
+
+        const response = await api.getPropertyReport(property.id, {
+          display: property.location.address,
+          postcode: property.location.postcode,
+          coordinates: hasCoordinates 
+            ? { lat: property.location.coordinates[0], lng: property.location.coordinates[1] } 
+            : undefined
+        }, (chunkData) => {
+          if (mounted) {
+            setReportData({ ...chunkData });
+          }
+        });
+        
+        if (mounted && response.success) {
+          // The final data is also set here for completeness
+          setReportData(response.data);
+        } else if (mounted && !response.success) {
+          setReportError(response.error || 'Failed to load report');
+        }
+      } catch (err) {
+        if (mounted) setReportError('Failed to load property report');
+      } finally {
+        if (mounted) setIsReportLoading(false);
+      }
+    };
+
+    fetchReport();
+
+    return () => { mounted = false; };
+  }, [property.id, property.location.postcode]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-GB', {
@@ -274,20 +325,17 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
           {/* Map View */}
           {showMap && (
             <div className="mb-6 rounded-lg overflow-hidden">
-              <div className="w-full h-64 bg-gray-200 flex items-center justify-center">
-                {/* Replace this with actual map implementation */}
-                <p className="text-gray-500">Map View Coming Soon</p>
-                {/* Example: */}
-                {/* <iframe
-                  src={`https://www.google.com/maps/embed/v1/place?key=YOUR_API_KEY&q=${encodeURIComponent(
-                    property.location.address
-                  )}`}
+              <div className="w-full h-64 bg-gray-200 flex items-center justify-center relative">
+                <iframe
+                  src={`https://www.google.com/maps/embed/v1/place?key=${(import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY || ''}&q=${encodeURIComponent(property.location.address)}`}
                   width="100%"
                   height="100%"
                   style={{ border: 0 }}
                   allowFullScreen
                   loading="lazy"
-                /> */}
+                  className="absolute inset-0"
+                  title="Property Location Map"
+                />
               </div>
             </div>
           )}
@@ -367,6 +415,149 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Proptii Renter Report */}
+          <div className="mb-6">
+            <div className="mb-6">
+              <h3 className="text-xl font-bold mb-1 flex items-center text-gray-900">
+                Your Proptii Report <span className="ml-3 text-xs bg-[#136C9E] text-white px-3 py-1 rounded-full font-medium">Renter Report</span>
+              </h3>
+              <p className="text-sm text-gray-500 pb-4 border-b border-gray-200">
+                Correct as of {new Date().toLocaleDateString('en-GB')} · Location checks use the postcode area, not the building footprint. UPRN / title register pending.
+              </p>
+            </div>
+            
+            {isReportLoading ? (
+              <div className="bg-gray-50 p-8 rounded-lg flex flex-col items-center justify-center border border-gray-100">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+                <p className="text-gray-600 font-medium">Generating live property facts...</p>
+                <p className="text-gray-400 text-sm mt-2">Checking EPC, Crime, and Flood Risk data.</p>
+              </div>
+            ) : reportError ? (
+              <div className="bg-red-50 p-4 rounded-lg flex items-center text-red-700">
+                <AlertTriangle className="w-5 h-5 mr-3" />
+                <p>{reportError}</p>
+              </div>
+            ) : reportData && reportData.sources ? (
+              <div className="space-y-6">
+                
+                {/* What to Watch */}
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                  <h4 className="font-semibold text-orange-900 flex items-center mb-2">
+                    <AlertTriangle className="w-5 h-5 mr-2 text-[#F15A22]" /> What to watch
+                  </h4>
+                  <p className="text-sm text-orange-800">
+                    Title register and restrictive covenants are not yet verified. Please review the local area flood and crime data below carefully.
+                  </p>
+                </div>
+
+                {/* Local Area Trio */}
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 mb-3">Local Area Intelligence</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    
+                    {/* EPC Register */}
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full hover:border-[#136C9E] transition-colors">
+                      <div className="flex items-center mb-3">
+                        <Zap className="w-5 h-5 text-[#F15A22] mr-2" />
+                        <h4 className="font-medium text-gray-900">EPC Rating</h4>
+                      </div>
+                      <div className="mt-auto">
+                        {reportData.sources.find((s: any) => s.id === 'epc')?.state === 'loading' ? (
+                          <div className="flex items-center text-gray-400 text-sm py-1">
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin text-[#136C9E]" />
+                            <span>Checking EPC...</span>
+                          </div>
+                        ) : reportData.sources.find((s: any) => s.id === 'epc')?.state === 'clear' ? (
+                          <div>
+                            <span className="text-3xl font-bold text-gray-800">{reportData.partB?.epcBand || '?'}</span>
+                            <p className="text-sm text-gray-500 mt-1">Floor Area: {reportData.partB?.floorAreaM2}m²</p>
+                          </div>
+                        ) : (
+                          <div className="flex items-center text-gray-400 text-sm">
+                            <Info className="w-4 h-4 mr-1" />
+                            <span>Data unresolved</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Flood Risk */}
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full hover:border-[#136C9E] transition-colors">
+                      <div className="flex items-center mb-3">
+                        <Droplets className="w-5 h-5 text-[#136C9E] mr-2" />
+                        <h4 className="font-medium text-gray-900">Flood Risk</h4>
+                      </div>
+                      <div className="mt-auto">
+                        {reportData.sources.find((s: any) => s.id === 'flood')?.state === 'loading' ? (
+                          <div className="flex items-center text-gray-400 text-sm py-1">
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin text-[#136C9E]" />
+                            <span>Checking flood risk...</span>
+                          </div>
+                        ) : reportData.sources.find((s: any) => s.id === 'flood')?.state === 'clear' ? (
+                          <div>
+                            <span className="text-lg font-bold text-gray-800">{reportData.local?.flood?.headline || 'Unknown'}</span>
+                            <p className="text-sm text-gray-500 mt-1">{reportData.local?.flood?.caveat}</p>
+                          </div>
+                        ) : (
+                          <div className="flex items-center text-gray-400 text-sm">
+                            <Info className="w-4 h-4 mr-1" />
+                            <span>Data unresolved</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Crime (Police.uk) */}
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col h-full hover:border-[#136C9E] transition-colors">
+                      <div className="flex items-center mb-3">
+                        <ShieldAlert className="w-5 h-5 text-purple-600 mr-2" />
+                        <h4 className="font-medium text-gray-900">Local Crime</h4>
+                      </div>
+                      <div className="mt-auto">
+                        {reportData.sources.find((s: any) => s.id === 'crime')?.state === 'loading' ? (
+                          <div className="flex items-center text-purple-600 text-sm py-1">
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin text-purple-600" />
+                            <span>Analyzing police records...</span>
+                          </div>
+                        ) : reportData.sources.find((s: any) => s.id === 'crime')?.state === 'clear' ? (
+                          <div>
+                            <span className="text-lg font-bold text-gray-800">{reportData.local?.crime?.count} incidents</span>
+                            <p className="text-sm text-gray-500 mt-1 uppercase">in {reportData.local?.crime?.month}</p>
+                          </div>
+                        ) : (
+                          <div className="flex items-center text-gray-400 text-sm">
+                            <Info className="w-4 h-4 mr-1" />
+                            <span>Data unresolved</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* Part C Strip */}
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 flex flex-col items-center justify-center bg-gray-50/50">
+                  <span className="text-gray-900 font-medium mb-1">Restrictive Covenants & Title</span>
+                  <span className="text-gray-500 text-sm">To come in next release</span>
+                </div>
+
+                {/* Paid Placeholder */}
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 flex flex-col items-center justify-center bg-gray-50/50">
+                  <span className="text-gray-500 text-sm text-center">Deeper legal, compliance & professional checks — paid, coming later in this journey.</span>
+                </div>
+
+                {/* Footer */}
+                <div className="pt-6 border-t border-gray-200 text-center">
+                  <p className="text-xs text-gray-400 leading-relaxed max-w-2xl mx-auto">
+                    Generated for a prospective renter. Not a substitute for legal advice. 
+                    Location checks are postcode-area, not the building footprint. Contains public sector information licensed under the Open Government Licence v3.0, Environment Agency, and Historic England data.
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="border-t pt-6">

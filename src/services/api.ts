@@ -54,7 +54,7 @@ class ApiService {
   constructor() {
     // This will be replaced with the actual API URL from environment variables
     this.baseURL = API_BASE_URL;
-    
+
     this.api = axios.create({
       baseURL: this.baseURL,
       headers: {
@@ -150,12 +150,12 @@ class ApiService {
 
     if (error.response) {
       const data = error.response.data as any;
-      
+
       // Handle structured error responses
       if (data.message) {
         apiError.message = data.message;
       }
-      
+
       if (data.errors) {
         apiError.errors = data.errors;
       }
@@ -226,14 +226,14 @@ class ApiService {
 
   // Upload file
   public async uploadFile<T>(
-    url: string, 
-    file: File, 
+    url: string,
+    file: File,
     additionalData?: Record<string, any>,
     onProgress?: (progress: number) => void
   ): Promise<ApiResponse<T>> {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     if (additionalData) {
       Object.entries(additionalData).forEach(([key, value]) => {
         formData.append(key, value);
@@ -291,8 +291,8 @@ export const uploadDocument = async (
 ): Promise<ApiResponse<FileUploadResponse>> => {
   try {
     const response = await apiService.uploadFile<FileUploadResponse>(
-      `/applications/${applicationId}/upload`, 
-      file, 
+      `/applications/${applicationId}/upload`,
+      file,
       { section },
       onProgress
     );
@@ -335,7 +335,7 @@ export const getApplicationById = async (applicationId: string): Promise<ApiResp
 
 export const getDocuments = async (applicationId: string, section?: string): Promise<ApiResponse<any>> => {
   try {
-    const url = section 
+    const url = section
       ? `/applications/${applicationId}/documents/${section}`
       : `/applications/${applicationId}/documents`;
     const response = await apiService.get(url);
@@ -398,6 +398,85 @@ export const api = {
       console.error('Error submitting listing:', error);
       throw error;
     }
+  },
+
+  // Get Renter Report
+  getPropertyReport: async (listingId: string, address: { display: string; street?: string | null; postcode?: string | null; coordinates?: { lat: number; lng: number } }, onProgress?: (data: any) => void) => {
+    try {
+      const baseUrl = getResolvedApiBaseUrl();
+      const response = await fetch(`${baseUrl}/properties/report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
+        },
+        body: JSON.stringify({ listingId, address })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch report: ${response.statusText}`);
+      }
+
+      if (!response.body) {
+        throw new Error('No response body from report stream');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let finalData: any = null;
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          const chunkString = decoder.decode(value, { stream: true });
+          const lines = chunkString.split('\n');
+          for (const line of lines) {
+            if (line.trim()) {
+              try {
+                const chunk = JSON.parse(line);
+                if (chunk.type === 'initial') {
+                  finalData = chunk.data;
+                  if (onProgress) onProgress(finalData);
+                } else if (chunk.type === 'chunk') {
+                  if (!finalData) finalData = {};
+                  
+                  // Merge chunk data based on module
+                  if (chunk.module === 'epc') {
+                    finalData.sources = finalData.sources.map((s: any) => s.id === 'epc' ? { ...s, state: chunk.data ? 'clear' : 'unresolved' } : s);
+                    if (chunk.data) finalData.partB = { ...finalData.partB, ...chunk.data };
+                  } else if (chunk.module === 'flood') {
+                    finalData.sources = finalData.sources.map((s: any) => s.id === 'flood' ? { ...s, state: chunk.data ? 'clear' : 'unresolved' } : s);
+                    if (chunk.data) finalData.local.flood = chunk.data;
+                  } else if (chunk.module === 'crime') {
+                    finalData.sources = finalData.sources.map((s: any) => s.id === 'crime' ? { ...s, state: (chunk.data && chunk.data.month && chunk.data.month !== 'Unknown') ? 'clear' : 'unresolved' } : s);
+                    if (chunk.data) finalData.local.crime = chunk.data;
+                  } else if (chunk.module === 'heritage') {
+                    finalData.sources = finalData.sources.map((s: any) => s.id === 'heritage' ? { ...s, state: chunk.data ? 'clear' : 'unresolved' } : s);
+                    if (chunk.data) finalData.local.heritage = chunk.data;
+                  }
+                  
+                  if (onProgress) onProgress(finalData);
+                }
+              } catch (e) {
+                console.error('Failed to parse NDJSON chunk:', line);
+              }
+            }
+          }
+        }
+      }
+
+      return {
+        success: true,
+        data: finalData
+      };
+    } catch (error: any) {
+      console.error('Error fetching property report:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch property report'
+      };
+    }
   }
 };
- 
