@@ -19,5 +19,14 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false
   },
-  "exclude": ["node_modules", "dist", "test-save.ts", "test-admin-storage.js", "test-firestore.js", "vitest.config.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "test-save.ts",
+    "test-admin-storage.js",
+    "test-firestore.js",
+    "vitest.config.ts"
+  ]
 }
