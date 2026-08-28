@@ -51,7 +51,7 @@ export class ClassifyRequestDto {
 
 // ─── Controller ───────────────────────────────────────────────────────────────
 
-@Controller('api/search')
+@Controller('search')
 export class ClassifierController {
   private readonly logger = new Logger(ClassifierController.name);
 

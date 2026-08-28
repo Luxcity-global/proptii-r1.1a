@@ -484,5 +484,54 @@ export const api = {
         error: error.message || 'Failed to fetch property report'
       };
     }
+  },
+
+  // Get single property facts
+  getPropertyFacts: async (listingId: string, uprn?: string) => {
+    try {
+      const baseUrl = getResolvedApiBaseUrl();
+      const url = new URL(`${baseUrl}/properties/${encodeURIComponent(listingId)}/facts`);
+      if (uprn) {
+        url.searchParams.set('uprn', uprn);
+      }
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch property facts: ${response.statusText}`);
+      }
+      const data = await response.json();
+      return { success: true, data };
+    } catch (error: any) {
+      console.error('Error fetching property facts:', error);
+      return { success: false, error: error.message || 'Failed to fetch property facts' };
+    }
+  },
+
+  // Get batched property facts
+  getBatchPropertyFacts: async (listingIds?: string[], uprns?: string[]) => {
+    try {
+      const baseUrl = getResolvedApiBaseUrl();
+      const response = await fetch(`${baseUrl}/properties/facts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {})
+        },
+        body: JSON.stringify({ listingIds, uprns })
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch batch property facts: ${response.statusText}`);
+      }
+      const data = await response.json();
+      return { success: true, data };
+    } catch (error: any) {
+      console.error('Error fetching batch property facts:', error);
+      return { success: false, error: error.message || 'Failed to fetch batch property facts' };
+    }
   }
 };

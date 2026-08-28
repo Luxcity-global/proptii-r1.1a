@@ -60,7 +60,7 @@ export interface FlagsResponse {
 const FLAGS_CACHE_KEY = 'flags:gov_data_layer';
 const FLAGS_CACHE_TTL = 60; // seconds — propagation window after a Firestore flip
 
-@Controller('api')
+@Controller()
 export class FlagsController {
   private readonly logger = new Logger(FlagsController.name);
 

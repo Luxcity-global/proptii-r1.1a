@@ -147,8 +147,18 @@ async function bootstrap() {
   app.enableCors({
     origin: true, // Reflects the incoming origin, allowing any frontend to connect with credentials
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'Cache-Control',
+      'Pragma',
+      'X-CSRF-Token',
+      'x-csrf-token',
+    ],
   });
 
   // ── Swagger API Documentation ─────────────────────────────────────────────

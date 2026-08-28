@@ -94,7 +94,7 @@ export interface SingleFactsResponse {
 
 // ─── Controller ───────────────────────────────────────────────────────────────
 
-@Controller('api/properties')
+@Controller('properties')
 export class PropertyFactsController {
 
   constructor(

@@ -5,7 +5,7 @@
  * a deployed host (e.g. onrender.com), the browser will hit production and often
  * fail CORS. We default to local Nest unless VITE_USE_REMOTE_API=true.
  */
-const LOCAL_DEFAULT = 'http://127.0.0.1:3000/api';
+const LOCAL_DEFAULT = 'http://127.0.0.1:3002/api';
 
 function isBrowserLocalhost(): boolean {
   if (typeof window === 'undefined') return false;
@@ -41,7 +41,11 @@ export function getResolvedApiBaseUrl(): string {
   }
 
   if (envUrl) {
-    return envUrl.replace(/\/\/localhost(?=[:/])/gi, '//127.0.0.1');
+    let resolved = envUrl.replace(/\/\/localhost(?=[:/])/gi, '//127.0.0.1');
+    if (!resolved.endsWith('/api')) {
+      resolved = `${resolved}/api`;
+    }
+    return resolved;
   }
 
   return LOCAL_DEFAULT;
