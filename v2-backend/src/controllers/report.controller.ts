@@ -57,6 +57,16 @@ export class ReportRequestDto {
   @ValidateNested()
   @Type(() => ReportAddressDto)
   address: ReportAddressDto;
+
+  @ApiProperty({ required: false, description: 'The asking price / rent from the listing' })
+  @IsOptional()
+  @IsString()
+  listingPrice?: string;
+
+  @ApiProperty({ required: false, description: 'Alternative alias for asking price / rent' })
+  @IsOptional()
+  @IsString()
+  rent?: string;
 }
 
 @ApiTags('reports')
@@ -70,11 +80,26 @@ export class ReportController {
   @ApiResponse({ status: 400, description: 'Postcode missing from request' })
   @UseGuards(AddressThrottleGuard)
   async getReport(@Body() dto: ReportRequestDto, @Res() res: Response) {
-    console.log('[DEBUG] getReport DTO received:', JSON.stringify(dto, null, 2));
+    // 1. Sanitize postcode field if passed as empty string
+    if (dto.address?.postcode && !dto.address.postcode.trim()) {
+      dto.address.postcode = undefined;
+    }
+
+    // 2. Direct regex extraction from display string if postcode is missing
+    if (!dto.address?.postcode && dto.address?.display) {
+      const UK_POSTCODE_REGEX = /([Gg][Ii][Rr]\s*0[Aa]{2})|((([A-Za-z]\d{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y]\d{1,2})|(([A-Za-z]\d[A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y]\d[A-Za-z]?))))\s*\d[A-Za-z]{2})/i;
+      const match = dto.address.display.match(UK_POSTCODE_REGEX);
+      if (match) {
+        dto.address.postcode = match[0].trim();
+        console.log(`[Geocoding JIT] Extracted UK postcode '${dto.address.postcode}' from display text '${dto.address.display}'`);
+      }
+    }
+
+    // 3. Resolve via coordinates if postcode is still missing
     if (!dto.address?.postcode && dto.address?.coordinates) {
       try {
         const { lat, lng } = dto.address.coordinates;
-        // 1. Try resolving exact postcode first
+        // Try resolving exact postcode first
         let pcRes = await fetch(`https://api.postcodes.io/postcodes?lon=${lng}&lat=${lat}`);
         if (pcRes.ok) {
           const pcData = await pcRes.json();
@@ -84,7 +109,7 @@ export class ReportController {
           }
         }
 
-        // 2. Fall back to outcodes if full postcode not matched
+        // Fall back to outcodes if full postcode not matched
         if (!dto.address.postcode) {
           const outRes = await fetch(`https://api.postcodes.io/outcodes?lon=${lng}&lat=${lat}`);
           if (outRes.ok) {
@@ -100,6 +125,7 @@ export class ReportController {
       }
     }
 
+    // 4. Google Geocoding fallback if API key configured
     if (!dto.address?.postcode && dto.address?.display) {
       try {
         const apiKey = process.env.GOOGLE_MAPS_API_KEY;

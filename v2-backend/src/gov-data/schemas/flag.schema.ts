@@ -17,7 +17,14 @@ export const AUDIENCES: Audience[] = ['buyer', 'tenant', 'landlord', 'agent', 'h
 
 // ─── Flag ─────────────────────────────────────────────────────────────────────
 
-export type FlagSource = 'hmlr' | 'os_ngd' | 'epc_register' | 'compliance_upload';
+export type FlagSource =
+  | 'hmlr'
+  | 'os_ngd'
+  | 'epc_register'
+  | 'compliance_upload'
+  | 'ea_flood'
+  | 'historic_england'
+  | 'police_uk';
 export type FlagCadence = 'batch' | 'live';
 export type FlagState = 'clear' | 'flagged' | 'unresolved';
 export type FlagSeverity = 'high' | 'medium' | 'low' | 'info';

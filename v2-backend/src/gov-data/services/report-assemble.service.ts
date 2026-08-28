@@ -58,7 +58,7 @@ export class ReportAssembleService {
         { id: 'crime', label: 'police.uk', state: 'loading' },
         { id: 'heritage', label: 'Listed / conservation', state: 'loading' }
       ],
-      partA: { listingPrice: "from listing" },
+      partA: { listingPrice: dto.listingPrice || dto.rent || 'from listing' },
       partB: { epcBand: null, floorAreaM2: 0, lodged: '', winterNote: '' },
       partC: { status: 'pending_nps', message: 'To come in next release' },
       local: {
@@ -125,20 +125,65 @@ export class ReportAssembleService {
       const flags: Flag[] = [];
       const timestamp = new Date().toISOString();
 
-      if (data.epc) {
+      if (data.epc?.epcBand) {
         flags.push({
           flagId: 'epc_rating',
           source: 'epc_register',
           cadence: 'live',
-          state: data.epc.epcBand.match(/^[A-C]$/) ? 'clear' : 'flagged',
-          baseSeverity: data.epc.epcBand.match(/^[A-C]$/) ? 'info' : 'medium',
-          detail: `EPC rating ${data.epc.epcBand}`,
+          state: /^[A-C]$/i.test(data.epc.epcBand) ? 'clear' : 'flagged',
+          baseSeverity: /^[A-C]$/i.test(data.epc.epcBand) ? 'info' : 'medium',
+          detail: `EPC rating ${data.epc.epcBand}${data.epc.floorAreaM2 ? ` (${data.epc.floorAreaM2} m²)` : ''}`,
           ingestedAt: timestamp,
           sourceRef: null
         });
       }
 
-      // Minimal write to satisfy the PRD's requirement that facts are stored.
+      if (data.flood?.headline && data.flood.headline !== 'Loading...' && data.flood.headline !== 'Unknown') {
+        const isLow = /low|very low/i.test(data.flood.headline);
+        flags.push({
+          flagId: 'flood_risk',
+          source: 'ea_flood',
+          cadence: 'live',
+          state: isLow ? 'clear' : 'flagged',
+          baseSeverity: isLow ? 'info' : /high/i.test(data.flood.headline) ? 'high' : 'medium',
+          detail: `River/sea flood risk: ${data.flood.headline}; groundwater: ${data.flood.groundwater ?? 'unknown'}`,
+          ingestedAt: timestamp,
+          sourceRef: null
+        });
+      }
+
+      if (data.heritage && data.heritage.caveat !== 'loading' && data.heritage.caveat !== 'unresolved') {
+        const isDesignated = Boolean(data.heritage.listed || data.heritage.conservationArea);
+        flags.push({
+          flagId: 'conservation_area',
+          source: 'historic_england',
+          cadence: 'live',
+          state: isDesignated ? 'flagged' : 'clear',
+          baseSeverity: isDesignated ? 'info' : 'info',
+          detail: data.heritage.listed
+            ? `Listed building${data.heritage.grade ? ` (Grade ${data.heritage.grade})` : ''}`
+            : data.heritage.conservationArea
+              ? `Conservation area: ${data.heritage.name || 'designated area'}`
+              : 'Not listed; no conservation area at centroid',
+          ingestedAt: timestamp,
+          sourceRef: null
+        });
+      }
+
+      if (data.crime?.month && data.crime.month !== 'Loading...' && data.crime.month !== 'Unknown') {
+        flags.push({
+          flagId: 'crime_context',
+          source: 'police_uk',
+          cadence: 'live',
+          state: 'clear',
+          baseSeverity: 'info',
+          detail: `${data.crime.count ?? 0} incidents recorded in ${data.crime.month}`,
+          ingestedAt: timestamp,
+          sourceRef: null
+        });
+      }
+
+      // Upsert facts record
       await this.factsStore.upsert(listingId, {
         listing_id: listingId,
         matchStatus: data.centroid ? 'partial' : 'none',

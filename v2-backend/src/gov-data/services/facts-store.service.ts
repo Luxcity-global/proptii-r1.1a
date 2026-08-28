@@ -45,9 +45,13 @@ export class FactsStoreService {
     const col = this.col;
     if (!col) return null;
     try {
+      // 1. Direct doc ID lookup (fastest & no composite index required)
+      const direct = await this.safeRead(encodeURIComponent(listingId)) || await this.safeRead(listingId);
+      if (direct) return direct;
+
+      // 2. Query by listing_id field
       const snap = await col
         .where('listing_id', '==', listingId)
-        .orderBy('updatedAt', 'desc')
         .limit(1)
         .get();
       if (snap.empty) return null;
