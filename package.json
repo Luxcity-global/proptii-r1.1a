@@ -6,6 +6,7 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
+    "demo": "vite --mode demo --open",
     "build:landlord": "cd src/landlord_agent && npm install --include=dev && npm run build",
     "build": "npm run build:landlord && vite build && npm run copy-spa-fallbacks && npm run validate-build",
     "build:only": "vite build",
@@ -139,6 +140,7 @@
     "firebase": "^12.5.0",
     "glob": "^10.3.10",
     "googleapis": "^149.0.0",
+    "html2canvas": "^1.4.1",
     "jose": "^6.0.12",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^4.2.1",

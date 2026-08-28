@@ -1,5 +1,10 @@
 import { fetchWithApiFallback } from '../utils/apiEndpoints';
 import {
+  DEFAULT_EMBED_QUERY,
+  DEFAULT_REPORT_SOURCES,
+  defaultRenterContent,
+} from '../data/renterReportFixtures';
+import {
   Audience,
   BatchedFactsResponse,
   ClassifyEntities,
@@ -13,6 +18,7 @@ import {
   SearchIntent,
   propertySearchFallback,
 } from '../types/govData';
+import { reportHintFromFlags } from '../utils/reportHint';
 
 const CLASSIFY_TIMEOUT_MS = 2500;
 const FLAGS_TIMEOUT_MS = 4000;
@@ -85,11 +91,17 @@ export function mockClassifyQuery(query: string): ClassifyResponse {
   }
 
   const locationMatch = lower.match(
-    /(?:in|near|around|at)\s+([a-z][a-z\s'-]{1,40}?)(?:\s+(?:under|below|for|with|near|within|£|\d)|$)/i,
+    /\b(?:in|near|around|at)\s+([a-z][a-z\s'-]{1,40}?)(?:\s+(?:under|below|for|with|near|within|£|\d)|$)/i,
   );
   if (locationMatch) {
     entities.location = locationMatch[1].trim().replace(/\s+/g, ' ');
   }
+
+  const COUNTRY_LEVEL =
+    /^(england|scotland|wales|uk|united kingdom|britain|great britain)$/i;
+  const locationIsCountryLevel = Boolean(
+    entities.location && COUNTRY_LEVEL.test(entities.location.trim()),
+  );
 
   const postcodeMatch = trimmed.match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/i);
   const streetAddress = /^\d+\s+[A-Za-z]/.test(trimmed) && postcodeMatch;
@@ -97,16 +109,34 @@ export function mockClassifyQuery(query: string): ClassifyResponse {
     entities.address_full = trimmed;
   }
 
+  const hasPropertyShape =
+    entities.bedrooms !== null ||
+    entities.price_max !== null ||
+    (Boolean(entities.location) && !locationIsCountryLevel) ||
+    Boolean(entities.tenure) ||
+    Boolean(entities.address_full);
+
   let intent: SearchIntent = 'property_search';
   if (entities.address_full) {
     intent = 'specific_address';
-  } else if (
-    /^(what|how|when|why|can|do|does|is|are|should)\b/.test(lower) ||
-    /\b(rights?|deposit|section\s*21|evict|notice)\b/.test(lower)
-  ) {
-    intent = lower.length > 80 ? 'general_too_broad' : 'general_answerable';
   } else if (/\b(weather|recipe|football|stock|crypto)\b/.test(lower)) {
     intent = 'off_topic';
+  } else if (
+    !hasPropertyShape &&
+    (/^(what|how|when|why|can|do|does|is|are|should)\b/.test(lower) ||
+      /\b(rights?|deposit|section\s*21|evict|notice)\b/.test(lower) ||
+      /^(pets?|pet[- ]friendly|epc|mees)\s*$/.test(lower) ||
+      /\b(pet\s+permissions?|pet\s+policy|can\s+i\s+have\s+a\s+pet)\b/.test(lower) ||
+      /\b(epc|mees|energy\s+rating|energy\s+efficiency)\b/.test(lower))
+  ) {
+    intent = lower.length > 80 ? 'general_too_broad' : 'general_answerable';
+  } else if (
+    locationIsCountryLevel ||
+    (/\b(england|scotland|wales|uk|united\s+kingdom|britain|great\s+britain)\b/.test(lower) &&
+      !entities.location) ||
+    (/\b(anywhere|nationwide|whole\s+country)\b/.test(lower) && !entities.location)
+  ) {
+    intent = 'general_too_broad';
   }
 
   let audience: Audience | null = null;
@@ -138,21 +168,26 @@ export function mockBatchedFacts(listingIds: string[]): BatchedFactsResponse {
     const flagged = index % 2 === 1;
     out[id] = [
       {
-        id: 'flood',
-        label: 'Flood risk',
+        id: 'title',
+        label: flagged ? 'Covenants Noted' : 'Clean Title Pass',
         state: flagged ? 'flagged' : 'clear',
-        detail: flagged ? 'Medium risk band in area' : 'No significant flood risk recorded',
+        detail: flagged
+          ? 'Historic covenants restrict pets and exterior satellite installations without freeholder permission.'
+          : 'No material restrictive covenants noted on the mock title register.',
       },
       {
         id: 'epc',
-        label: 'EPC',
+        label: flagged ? 'EPC Band C' : 'EPC Band B',
         state: 'clear',
-        detail: 'Band C or better (mock)',
+        detail: flagged
+          ? 'Current EPC rating is Band C (69). Compliant with MEES standards with estimated bills ~£85/mo.'
+          : 'Current EPC rating is Band B (81). Fully MEES compliant with estimated bills ~£70/mo.',
       },
       {
-        id: 'title',
-        label: 'Title match',
+        id: 'flood',
+        label: 'Flood risk',
         state: flagged ? 'unresolved' : 'clear',
+        detail: flagged ? 'Flood band not fully resolved in mock registers' : 'No significant flood risk recorded',
       },
     ];
   });
@@ -188,43 +223,48 @@ export function mockReportLens(audience: Audience | null): ReportLens {
   const copy: Record<Audience, ReportLens> = {
     tenant: {
       severity: 'caution',
-      verdictText: 'As a renter, check deposit protection and repair obligations before you proceed.',
+      verdictText:
+        'HM Land Registry or EPC registers noted restrictions relevant to tenant obligations.',
       steps: [
-        'Confirm the deposit is protected in an approved scheme',
-        'Ask for the latest EPC and gas safety certificate',
-        'Note any flagged flood or title items with your agent',
+        'Ask the agent to confirm whether pet covenants can be waived in writing',
+        'Request the latest EPC certificate and gas safety record before paying a holding deposit',
+        'Verify the deposit will be protected in an approved scheme within 30 days',
       ],
     },
     buyer: {
       severity: 'info',
-      verdictText: 'As a buyer, treat flagged items as conveyancing follow-ups, not deal-breakers by default.',
+      verdictText:
+        'As a buyer, treat flagged title and EPC items as conveyancing follow-ups, not deal-breakers by default.',
       steps: [
-        'Share flagged facts with your solicitor',
-        'Request title plan and covenants',
-        'Budget for any remedial work hinted by EPC',
+        'Share flagged covenants with your solicitor before exchange',
+        'Request the full title plan and any freeholder restrictions',
+        'Budget for any EPC improvements hinted by the register',
       ],
     },
     landlord: {
       severity: 'alert',
-      verdictText: 'As a landlord, flagged compliance items may block a compliant let.',
+      verdictText:
+        'As a landlord, flagged compliance items may block a compliant let until resolved.',
       steps: [
         'Resolve unresolved title or safety flags before marketing',
-        'Update EPC if below legal minimum',
-        'Document flood disclosures for applicants',
+        'Confirm EPC meets the legal minimum for new tenancies',
+        'Document flood and covenant disclosures for applicants',
       ],
     },
     agent: {
       severity: 'info',
-      verdictText: 'As an agent, surface unresolved facts honestly — never present missing data as clear.',
+      verdictText:
+        'As an agent, surface unresolved facts honestly — never present missing data as clear.',
       steps: [
-        'Disclose flagged and unresolved items in particulars',
-        'Chase landlord for missing certificates',
+        'Disclose flagged and unresolved items in particulars (CPR Parts A–C)',
+        'Chase the landlord for missing certificates before viewings',
         'Keep the facts row unchanged when switching audience lens',
       ],
     },
     homeowner: {
       severity: 'info',
-      verdictText: 'As a homeowner, use this lens to prioritise maintenance and insurance follow-ups.',
+      verdictText:
+        'As a homeowner, use this lens to prioritise maintenance and insurance follow-ups.',
       steps: [
         'Review flood and title flags with your insurer',
         'Plan EPC improvements if selling or remortgaging',
@@ -238,6 +278,7 @@ export function mockReportLens(audience: Audience | null): ReportLens {
 export function mockPropertyReport(
   listingId: string,
   audience: Audience | null,
+  options?: { addressLabel?: string; price?: string },
 ): PropertyReportResponse {
   const facts = mockPropertyFacts(listingId).flags;
   const stableFacts =
@@ -248,10 +289,23 @@ export function mockPropertyReport(
           { id: 'epc', label: 'EPC', state: 'unresolved' },
         ] as FactFlag[]);
 
+  const renter = defaultRenterContent(stableFacts);
+  if (options?.price?.trim()) {
+    renter.partARows = renter.partARows.map((row) =>
+      row.label === 'Price / Rent' ? { ...row, value: options.price!.trim() } : row,
+    );
+  }
+
+  const embedQuery = options?.addressLabel?.trim() || DEFAULT_EMBED_QUERY;
+
   return {
     facts: stableFacts,
     lens: mockReportLens(audience),
     generatedFor: audience || 'tenant',
+    sources: DEFAULT_REPORT_SOURCES,
+    map: { embedQuery },
+    reportHint: reportHintFromFlags(stableFacts),
+    renter,
   };
 }
 
@@ -451,7 +505,9 @@ export async function fetchPropertyReport(
     return (await response.json()) as PropertyReportResponse;
   } catch {
     if (shouldUseLocalMocks()) {
-      return mockPropertyReport(listingId, audience);
+      const mock = mockPropertyReport(listingId, audience);
+      const { map: _omittedMap, ...rest } = mock;
+      return rest;
     }
     return {
       facts: [],

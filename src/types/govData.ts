@@ -69,10 +69,68 @@ export interface ReportLens {
   steps: string[];
 }
 
+/** Diagnostic overlay step, driven by backend `sources[]`. */
+export interface ReportSource {
+  id?: string;
+  title: string;
+  detail?: string;
+}
+
+export interface ReportLedgerRow {
+  label: string;
+  value: string;
+  qualifier?: string;
+}
+
+export type ReportEntryTone = 'resolved' | 'note' | 'pending';
+
+export type AreaSurface = 'seal' | 'ink' | 'stamp';
+
+export interface LocalAreaCheck {
+  id: string;
+  title: string;
+  status: string;
+  tone: ReportEntryTone;
+  surface?: AreaSurface;
+  finding: string;
+  source: string;
+}
+
+/** Structured renter report body (Parts A–C + local area). */
+export interface RenterReportContent {
+  precisionLine: string;
+  whatToWatchTitle: string;
+  whatToWatchBody: string;
+  partATitle: string;
+  partARows: ReportLedgerRow[];
+  partANote: string;
+  partASource: string;
+  partBTitle: string;
+  partBBody: string;
+  partBSource: string;
+  partCTitle: string;
+  partCBody: string;
+  partCStatus: string;
+  partCSource: string;
+  localIntro: string;
+  localArea: LocalAreaCheck[];
+  paidCopy: string;
+  mapSource: string;
+  steps: string[];
+  footerAudience: string;
+}
+
 export interface PropertyReportResponse {
   facts: FactFlag[];
   lens: ReportLens;
   generatedFor: string;
+  /** Optional diagnostic steps from the backend. */
+  sources?: ReportSource[];
+  /** Google Maps Embed query. Empty hides the iframe but keeps the reserved map slot. */
+  map?: { embedQuery?: string | null };
+  /** Optional search-card badge. Absent = no hint chip. */
+  reportHint?: string | null;
+  renter?: RenterReportContent;
 }
 
 export const EMPTY_ENTITIES: ClassifyEntities = {

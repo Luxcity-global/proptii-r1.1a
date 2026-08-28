@@ -1,6 +1,6 @@
 import Property from '../../models/Property';
-import { searchQueue } from '../../infrastructure/queue';
-import { connection as redis } from '../../infrastructure/queue';
+import { getSearchQueue } from '../../infrastructure/queue';
+import { getRedis } from '../../infrastructure/redis';
 
 const CACHE_TTL_FRESH = 3600;  // 1 hour
 const CACHE_TTL_STALE = 86400; // 24 hours
@@ -14,20 +14,25 @@ export class SearchAggregator {
     const cacheKey = `search:${query.toLowerCase().trim()}`;
     const metaKey  = `meta:${cacheKey}`;
 
-    // 1. Redis cache
-    const cachedData = await redis.get(cacheKey);
-    const metaData   = await redis.get(metaKey);
+    try {
+      const redis = getRedis();
+      // 1. Redis cache
+      const cachedData = await redis.get(cacheKey);
+      const metaData   = await redis.get(metaKey);
 
-    if (cachedData) {
-      console.log(`[Aggregator] Found cached data for: ${query}`);
-      const results = JSON.parse(cachedData);
-      const meta    = metaData ? JSON.parse(metaData) : { timestamp: 0 };
-      const age     = (Date.now() - meta.timestamp) / 1000;
+      if (cachedData) {
+        console.log(`[Aggregator] Found cached data for: ${query}`);
+        const results = JSON.parse(cachedData);
+        const meta    = metaData ? JSON.parse(metaData) : { timestamp: 0 };
+        const age     = (Date.now() - meta.timestamp) / 1000;
 
-      if (age < CACHE_TTL_STALE) {
-        console.log(`[Cache Hit] ${age < CACHE_TTL_FRESH ? 'Fresh' : 'Stale'} results (age: ${Math.round(age)}s) for: ${query}`);
-        return results;
+        if (age < CACHE_TTL_STALE) {
+          console.log(`[Cache Hit] ${age < CACHE_TTL_FRESH ? 'Fresh' : 'Stale'} results (age: ${Math.round(age)}s) for: ${query}`);
+          return results;
+        }
       }
+    } catch (error) {
+      console.warn('[Aggregator] Redis unavailable — skipping cache lookup:', (error as Error).message);
     }
 
     // 2. MongoDB fallback removed to prevent broad irrelevant hits
@@ -61,7 +66,7 @@ export class SearchAggregator {
   }
 
   async triggerRevalidation(query: string, filters: any) {
-    await searchQueue.add('revalidate', { query, filters }, {
+    await getSearchQueue()?.add('revalidate', { query, filters }, {
       jobId: `revalidate-${query.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`,
       removeOnComplete: true,
     });
@@ -69,7 +74,12 @@ export class SearchAggregator {
 
   private async saveToCache(key: string, data: any, stale = false) {
     const timestamp = stale ? Date.now() - (CACHE_TTL_FRESH * 1000 + 1) : Date.now();
-    await redis.set(key, JSON.stringify(data), 'EX', CACHE_TTL_STALE);
-    await redis.set(`meta:${key}`, JSON.stringify({ timestamp }), 'EX', CACHE_TTL_STALE);
+    try {
+      const redis = getRedis();
+      await redis.set(key, JSON.stringify(data), 'EX', CACHE_TTL_STALE);
+      await redis.set(`meta:${key}`, JSON.stringify({ timestamp }), 'EX', CACHE_TTL_STALE);
+    } catch (error) {
+      console.warn('[Aggregator] Redis unavailable — skipping cache save:', (error as Error).message);
+    }
   }
 }

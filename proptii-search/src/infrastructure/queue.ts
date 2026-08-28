@@ -1,10 +1,13 @@
-import { Queue, Worker, QueueEvents } from 'bullmq';
-import IORedis from 'ioredis';
+import { Queue } from 'bullmq';
+import { getBullMqConnection } from './redis';
 
-const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  maxRetriesPerRequest: null,
-});
+let searchQueue: Queue | null = null;
 
-export const searchQueue = new Queue('search-tasks', { connection });
-
-export { connection };
+export function getSearchQueue(): Queue | null {
+  const connection = getBullMqConnection();
+  if (!connection) return null;
+  if (!searchQueue) {
+    searchQueue = new Queue('search-tasks', { connection });
+  }
+  return searchQueue;
+}

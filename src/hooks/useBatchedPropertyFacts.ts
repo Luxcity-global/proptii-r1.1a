@@ -3,12 +3,14 @@ import type { Property } from '../types/property';
 import type { BatchedFactsResponse, FactFlag } from '../types/govData';
 import { fetchBatchedPropertyFacts } from '../services/govDataService';
 import { resolveListingId } from '../utils/listingId';
+import { reportHintFromFlags } from '../utils/reportHint';
 import { trackEvent } from '../utils/analytics';
 
 interface UseBatchedPropertyFactsResult {
   factsByListingId: BatchedFactsResponse;
   isFactsLoading: boolean;
   getFlagsFor: (property: Property) => FactFlag[] | null;
+  getHintFor: (property: Property) => string | null;
   isUnresolved: (property: Property) => boolean;
 }
 
@@ -71,11 +73,14 @@ export function useBatchedPropertyFacts(
     return factsByListingId[id];
   };
 
+  const getHintFor = (property: Property): string | null =>
+    reportHintFromFlags(getFlagsFor(property), property.reportHint);
+
   const isUnresolved = (property: Property): boolean => {
     if (isFactsLoading) return false;
     const id = resolveListingId(property);
     return !(id in factsByListingId);
   };
 
-  return { factsByListingId, isFactsLoading, getFlagsFor, isUnresolved };
+  return { factsByListingId, isFactsLoading, getFlagsFor, getHintFor, isUnresolved };
 }

@@ -1,5 +1,14 @@
 /// <reference types="vite/client" />
 
+interface ImportMetaEnv {
+  readonly VITE_GOOGLE_MAPS_API_KEY?: string;
+  readonly VITE_GOV_DATA_LAYER?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
 // Google Maps API types
 declare global {
   interface Window {
@@ -65,6 +74,8 @@ declare namespace google {
       streetViewControl?: boolean;
       fullscreenControl?: boolean;
       zoomControl?: boolean;
+      disableDefaultUI?: boolean;
+      gestureHandling?: string;
       styles?: any[];
     }
 
@@ -106,6 +117,7 @@ declare namespace google {
     namespace event {
       function addListener(instance: any, eventName: string, handler: Function): MapsEventListener;
       function removeListener(listener: MapsEventListener): void;
+      function trigger(instance: any, eventName: string, ...args: unknown[]): void;
     }
   }
 }

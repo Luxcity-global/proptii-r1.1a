@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { connection as redis } from '../../infrastructure/queue';
+import { getRedis } from '../../infrastructure/redis';
 import * as cheerio from 'cheerio';
 
 const ENRICH_CACHE_TTL = 86400; // 24 hours
@@ -13,7 +13,7 @@ export interface AgentContact {
 
 export class AgentEnrichmentService {
   private get apiKey() {
-    return process.env.BRAVE_API_KEY;
+    return process.env.BRAVE_API_KEY?.replace(/^["']|["']$/g, '').trim();
   }
   /**
    * Enriches a list of properties with agent emails.
@@ -50,28 +50,29 @@ export class AgentEnrichmentService {
    * Useful for SSE streaming to provide immediate user feedback.
    */
   async enrichAndStream(
-    properties: any[], 
-    onResult: (p: any) => void
+    properties: any[],
+    onResult: (p: any) => Promise<void> | void,
   ): Promise<void> {
     console.log(`[Enrichment] Starting streaming enrichment for ${properties.length} properties...`);
-    
-    // Process in parallel with concurrency limit (optional, but Promise.all is fine for batches of 25-50)
+
     await Promise.all(
       properties.map(async (p) => {
         try {
           const enriched = await this.enrichSingle(p);
-          if (enriched?.agent?.email) {
+          if (!enriched) return;
+
+          if (enriched.agent?.email) {
             console.log(`[Enrichment] ✅ Streaming enriched result for ${p.agent?.name || 'Unknown'} (${enriched.agent.email})`);
-            onResult(enriched);
           } else {
-            console.log(`[Enrichment] ⏭️ Skipping ${p.agent?.name || 'Unknown'} (No email found)`);
+            console.log(`[Enrichment] ⏭️ No email for ${p.agent?.name || 'Unknown'} — still streaming listing`);
           }
+          await onResult(enriched);
         } catch (e) {
-          console.warn(`[Enrichment] ❌ Failed for ${p.agent.name}`);
+          console.warn(`[Enrichment] ❌ Failed for ${p.agent?.name}`);
         }
       })
     );
-    
+
     console.log(`[Enrichment] Streaming enrichment finished.`);
   }
 
@@ -83,7 +84,7 @@ export class AgentEnrichmentService {
     
     // 1. Check Redis Cache
     try {
-      const cached = await redis.get(cacheKey);
+      const cached = await getRedis().get(cacheKey);
       if (cached) {
         const contact = JSON.parse(cached);
         return { ...property, agent: { ...property.agent, ...contact } };
@@ -97,7 +98,7 @@ export class AgentEnrichmentService {
       const contact = await this.discoverContact(agencyName);
       
       // Save to Cache
-      await redis.set(cacheKey, JSON.stringify(contact), 'EX', ENRICH_CACHE_TTL);
+      await getRedis().set(cacheKey, JSON.stringify(contact), 'EX', ENRICH_CACHE_TTL);
       
       return { ...property, agent: { ...property.agent, ...contact } };
     } catch (err) {

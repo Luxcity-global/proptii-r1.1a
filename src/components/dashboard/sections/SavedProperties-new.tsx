@@ -8,6 +8,7 @@ import { firestoreService } from '../../../services/firestoreService';
 import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
 import { useIsMobile } from '../ui/use-mobile';
 import { trackEvent } from '../../../utils/analytics';
+import { getPropertyDisplayTitle, getPropertyListingDescription } from '../../../utils/propertyDisplay';
 
 /**
  * Saved Properties section - redesigned to follow style guide
@@ -62,6 +63,9 @@ const SavedProperties: React.FC = () => {
 
     if (!isOpen || !property) return null;
 
+    const displayTitle = getPropertyDisplayTitle(property);
+    const listingDescription = getPropertyListingDescription(property);
+
     const cleanPrice = (raw: string) => {
       if (!raw) return raw;
       let cleaned = raw.replace(/Tenancy info£?/gi, '');
@@ -86,7 +90,7 @@ const SavedProperties: React.FC = () => {
           {property.imageUrls && property.imageUrls.length > 0 && (
             <div className="relative">
               <div className={`${isMobile ? 'h-48' : 'h-96'} overflow-hidden`}>
-                <img src={property.imageUrls[currentImageIndex]} alt={`${property.title} - Image ${currentImageIndex + 1}`} className="w-full h-full object-cover" />
+                <img src={property.imageUrls[currentImageIndex]} alt={`${displayTitle} - Image ${currentImageIndex + 1}`} className="w-full h-full object-cover" />
               </div>
               {property.imageUrls.length > 1 && (
                 <>
@@ -111,7 +115,7 @@ const SavedProperties: React.FC = () => {
           )}
 
           <div className={isMobile ? 'p-4' : 'p-6'}>
-            <h3 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-gray-900 mb-2`}>{property.title}</h3>
+            <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold text-gray-900 mb-2`}>{displayTitle}</h3>
             <p className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-[#E65D24] mb-4`}>{cleanPrice(property.price)}</p>
             <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} ${isMobile ? 'gap-3' : 'gap-4'} mb-6`}>
               <div className="flex items-center gap-2">
@@ -126,12 +130,6 @@ const SavedProperties: React.FC = () => {
                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                 <span className="text-gray-600">{property.propertyType}</span>
               </div>
-              {property.source && (
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9m0 9c-5 0-9-4-9-9s4-9 9-9" /></svg>
-                  <span className="text-gray-600">Source: {property.source}</span>
-                </div>
-              )}
             </div>
             {/* Availability status */}
             <div className="mb-6">
@@ -142,7 +140,7 @@ const SavedProperties: React.FC = () => {
             <div className={`border-t border-gray-200 ${isMobile ? 'pt-4 mb-4' : 'pt-6 mb-6'}`}>
               <h4 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-gray-900 ${isMobile ? 'mb-2' : 'mb-3'}`}>Description</h4>
               <p className={`text-gray-700 leading-relaxed ${isMobile ? 'text-sm' : ''}`}>
-                {property.description ||
+                {listingDescription ||
                   `This ${property.propertyType || 'property'} offers ${property.bedrooms || ''} bedrooms and is located in ${property.location || 'the listed area'}.`}
               </p>
             </div>
@@ -576,7 +574,7 @@ const SavedProperties: React.FC = () => {
             <div className="relative aspect-video overflow-hidden">
               <img 
                   src={property.imageUrls?.[0] || '/images/detached-house.jpg'} 
-                  alt={property.title} 
+                  alt={getPropertyDisplayTitle(property)} 
                 className="w-full h-full object-cover" 
               />
               {/* Heart Icon */}
@@ -593,8 +591,8 @@ const SavedProperties: React.FC = () => {
             {/* Property Details */}
             <div className={isMobile ? 'p-3' : 'p-4'}>
               {/* Address */}
-              <h3 className={`${isMobile ? 'text-sm' : 'text-base'} font-bold text-gray-800 mb-1 truncate`}>
-                  {property.title}
+              <h3 className={`${isMobile ? 'text-sm' : 'text-base'} font-semibold text-gray-800 mb-1 truncate`}>
+                  {getPropertyDisplayTitle(property)}
               </h3>
               
               {/* Property Type */}
@@ -617,11 +615,6 @@ const SavedProperties: React.FC = () => {
                   <span className={`inline-flex items-center ${isMobile ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-1'} rounded-md text-xs font-medium bg-orange-100 text-orange-600`}>
                     {property.propertyType}
                   </span>
-                  {property.source && (
-                    <span className={`inline-flex items-center ${isMobile ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-1'} rounded-md text-xs font-medium bg-blue-100 text-blue-600`}>
-                      {property.source}
-                  </span>
-                )}
               </div>
               
               {/* Action Buttons */}

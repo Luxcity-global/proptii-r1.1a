@@ -89,7 +89,9 @@ export class SecurityMiddleware {
             'https://www.google-analytics.com',
             'wss://*.googleapis.com',
             'wss://*.firebaseio.com',
-            'wss://*.firebaseapp.com'
+            'wss://*.firebaseapp.com',
+            'https://api.postcodes.io',
+            'https://nominatim.openstreetmap.org',
         ]);
 
         if (searchBackendOrigin) {
@@ -117,7 +119,7 @@ export class SecurityMiddleware {
             "font-src 'self' https://fonts.gstatic.com data:",
             "img-src 'self' data: https: blob:",
             `connect-src ${connectSrc}`,
-            "frame-src 'self' https://proptii.b2clogin.com https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://*.stripe.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net https://*.google.com",
+            "frame-src 'self' https://proptii.b2clogin.com https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com https://*.stripe.com https://demo.docusign.net https://www.docusign.net https://*.docusign.net https://*.google.com https://www.openstreetmap.org https://*.openstreetmap.org",
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",

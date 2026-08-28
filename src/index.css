@@ -242,3 +242,135 @@ button[data-onboarding-option]:focus,
 button[data-onboarding-option]:focus-visible {
   outline: none !important;
 }
+
+/* Search bar state machine — in-flight classifier dots + navy filter pills */
+@keyframes search-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.85);
+  }
+}
+
+.search-dot-pulse-1,
+.search-dot-pulse-2,
+.search-dot-pulse-3 {
+  animation: search-dot-pulse 1.2s infinite ease-in-out;
+}
+
+.search-dot-pulse-2 {
+  animation-delay: 0.2s;
+}
+
+.search-dot-pulse-3 {
+  animation-delay: 0.4s;
+}
+
+.search-filter-pill:hover {
+  background-color: #0d456b !important;
+}
+
+/* Proptii intelligence report — HTML v04 register tokens */
+#proptii-report {
+  font-family: 'Public Sans', system-ui, sans-serif;
+  color: #0e2233;
+  background-color: #e7ecee;
+  -webkit-text-size-adjust: 100%;
+}
+#proptii-report .font-sans {
+  font-family: 'Public Sans', system-ui, sans-serif;
+}
+#proptii-report .font-display {
+  font-family: Archivo, system-ui, sans-serif;
+}
+#proptii-report .font-mono {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+}
+#proptii-report .hatch {
+  background-color: #eef1f3;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(126, 140, 151, 0.16) 0px,
+    rgba(126, 140, 151, 0.16) 1px,
+    transparent 1px,
+    transparent 7px
+  );
+}
+#proptii-report .ruled-blank {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 21px,
+    rgba(126, 140, 151, 0.35) 21px,
+    rgba(126, 140, 151, 0.35) 22px
+  );
+}
+#proptii-report :focus-visible {
+  outline: 2px solid #136c9e;
+  outline-offset: 2px;
+}
+#proptii-report .stamp-edge {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    inset 0 0 0 6px #0e2233,
+    inset 0 0 0 7px rgba(255, 255, 255, 0.14);
+}
+@keyframes report-pending-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 1px 2px rgba(241, 90, 34, 0.22),
+      0 0 0 0 rgba(241, 90, 34, 0.38);
+  }
+  50% {
+    box-shadow:
+      0 2px 6px rgba(241, 90, 34, 0.28),
+      0 0 0 6px rgba(241, 90, 34, 0);
+  }
+}
+@keyframes report-pending-dance {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  20% {
+    transform: translateY(-3px) rotate(-2deg);
+  }
+  40% {
+    transform: translateY(0) rotate(0deg);
+  }
+  60% {
+    transform: translateY(-2px) rotate(2deg);
+  }
+  80% {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+#proptii-report .report-pending-chip {
+  animation:
+    report-pending-glow 2.4s ease-in-out infinite,
+    report-pending-dance 1.6s ease-in-out infinite;
+}
+#proptii-report .no-print {
+  /* used by header/footer actions that should not appear in print */
+}
+@media print {
+  #proptii-report {
+    background: #fff;
+    color: #0e2233;
+  }
+  #proptii-report .no-print {
+    display: none !important;
+  }
+  #proptii-report [data-testid='report-part-c-pending'] p,
+  #proptii-report [data-testid='report-paid-pending'] p {
+    max-height: none !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+    margin-top: 0.5rem !important;
+  }
+}

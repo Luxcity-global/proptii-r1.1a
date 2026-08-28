@@ -17,6 +17,10 @@ export interface IProperty extends Document {
   source: string;
   url: string;
   scrapedAt: Date;
+  /** Set once via Google Geocoding at ingest; reused on every read. */
+  latitude?: number;
+  longitude?: number;
+  geocodedAt?: Date;
   metadata?: Record<string, any>;
 }
 
@@ -37,6 +41,9 @@ const PropertySchema: Schema = new Schema({
   source: { type: String, required: true },
   url: { type: String, required: true, unique: true },
   scrapedAt: { type: Date, default: Date.now, index: { expires: '30d' } },
+  latitude: { type: Number },
+  longitude: { type: Number },
+  geocodedAt: { type: Date },
   metadata: { type: Object }
 });
 

@@ -13,6 +13,12 @@ const STATE_LABEL: Record<FlagState, string> = {
   unresolved: 'Unresolved',
 };
 
+const LISTING_STYLES: Record<FlagState, string> = {
+  clear: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  flagged: 'bg-amber-50 text-amber-700 border-amber-200',
+  unresolved: 'bg-gray-50 text-gray-600 border-gray-200',
+};
+
 interface FactsBadgeRowProps {
   flags?: FactFlag[] | null;
   /** True while the batch request is in flight (distinct from scrape loading). */
@@ -23,6 +29,8 @@ interface FactsBadgeRowProps {
    */
   unresolvedFallback?: boolean;
   className?: string;
+  /** Handoff listing-card style: icon + label, no Clear/Flagged prefix */
+  variant?: 'default' | 'listing';
 }
 
 export const FactsBadgeRow: React.FC<FactsBadgeRowProps> = ({
@@ -30,6 +38,7 @@ export const FactsBadgeRow: React.FC<FactsBadgeRowProps> = ({
   isLoading = false,
   unresolvedFallback = false,
   className = '',
+  variant = 'default',
 }) => {
   if (isLoading) {
     return (
@@ -56,6 +65,27 @@ export const FactsBadgeRow: React.FC<FactsBadgeRowProps> = ({
         : [];
 
   if (displayFlags.length === 0) return null;
+
+  if (variant === 'listing') {
+    return (
+      <div
+        className={`flex flex-wrap items-center gap-2 ${className}`}
+        data-testid="facts-badge-row"
+        aria-label="Government data facts"
+      >
+        {displayFlags.slice(0, 3).map((flag) => (
+          <span
+            key={flag.id}
+            title={flag.detail || `${flag.label}: ${STATE_LABEL[flag.state]}`}
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold ${LISTING_STYLES[flag.state]}`}
+          >
+            <span aria-hidden>{flag.state === 'flagged' ? '⚠' : flag.state === 'clear' ? '✓' : '·'}</span>
+            <span>{flag.label}</span>
+          </span>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div

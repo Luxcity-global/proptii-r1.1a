@@ -23,6 +23,12 @@ export interface Property {
   amenities?: string[];
   bathrooms?: string;
   squareFootage?: string;
+  /** r1.4 government-data layer — stable listing key when present */
+  listingId?: string;
+  /** Optional Ordnance Survey UPRN */
+  uprn?: string;
+  /** Optional search-grid report hint (conservation, title pending, etc.). */
+  reportHint?: string;
 }
 
 export interface SearchResponse {

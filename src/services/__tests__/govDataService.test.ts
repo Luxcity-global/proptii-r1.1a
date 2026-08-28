@@ -18,6 +18,21 @@ describe('mockClassifyQuery', () => {
     expect(result.intent).toBe('general_answerable');
   });
 
+  it('treats bare pet / epc enquiries as guidance', () => {
+    expect(mockClassifyQuery('pet').intent).toBe('general_answerable');
+    expect(mockClassifyQuery('epc').intent).toBe('general_answerable');
+  });
+
+  it('treats country-level searches as too broad', () => {
+    expect(mockClassifyQuery('cheap flat in england').intent).toBe('general_too_broad');
+  });
+
+  it('keeps pet-friendly property searches as property_search', () => {
+    expect(mockClassifyQuery('Pet-friendly studios in Manchester').intent).toBe(
+      'property_search',
+    );
+  });
+
   it('returns fallback for empty query', () => {
     const result = mockClassifyQuery('   ');
     expect(result.fallback).toBe(true);

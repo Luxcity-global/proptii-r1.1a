@@ -20,4 +20,17 @@ describe('gov data facts + lens mocks', () => {
     expect(reportTenant.facts).toEqual(reportBuyer.facts);
     expect(lensBuyer.verdictText).not.toEqual(reportTenant.lens.verdictText);
   });
+
+  it('includes demo fixtures for sources, map embed, hint and renter layout', () => {
+    const report = mockPropertyReport('listing-1', 'tenant', {
+      addressLabel: '12 Falcon Road, London SW11 2LN',
+      price: '£1,950 pcm',
+    });
+
+    expect(report.sources?.length).toBeGreaterThan(0);
+    expect(report.map?.embedQuery).toBe('12 Falcon Road, London SW11 2LN');
+    expect(report.renter?.partCStatus).toBe('To come in next release');
+    expect(report.renter?.partARows.some((row) => row.value === '£1,950 pcm')).toBe(true);
+    expect(report.renter?.localArea).toHaveLength(3);
+  });
 });

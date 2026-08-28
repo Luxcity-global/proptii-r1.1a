@@ -1,10 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Bath, BedDouble, Check, MapPin, Square } from 'lucide-react';
 import { useSearchBackend, type Property } from '../hooks/useSearchBackend';
 import { useSavedProperties } from '../contexts/SavedPropertiesContext';
+import { useGovDataLayer } from '../contexts/GovDataLayerContext';
+import { useBatchedPropertyFacts } from '../hooks/useBatchedPropertyFacts';
+import { FactsBadgeRow } from '../components/property/FactsBadgeRow';
+import { ProptiiModule } from '../components/property/ProptiiModule';
+import { resolveListingId } from '../utils/listingId';
+import { getPropertyDisplayTitle, getPropertyListingDescription } from '../utils/propertyDisplay';
 import Footer from '../components/Footer';
 import { SearchLoadingAnimation } from '../components/SearchLoadingAnimation';
-import { getAmenityIcon } from '../utils/amenityIcons';
+import type { FactFlag } from '../types/govData';
 
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
@@ -57,95 +64,203 @@ const PropertySkeleton = () => (
   </div>
 );
 
-// Property Card Component
-const PropertyCard = ({ property, onClick, isSaved, onToggleSave }: { 
+// Property Card Component — handoff ListingCard (single main photo)
+const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, factsLoading, factsUnresolved, reportHint, reserveHintSlot }: { 
   property: Property, 
   onClick: () => void,
   isSaved: boolean,
-  onToggleSave: (e: React.MouseEvent) => void
+  onToggleSave: (e: React.MouseEvent) => void,
+  factFlags?: FactFlag[] | null,
+  factsLoading?: boolean,
+  factsUnresolved?: boolean,
+  reportHint?: string | null,
+  reserveHintSlot?: boolean,
 }) => {
   const [imgError, setImgError] = useState(false);
   
-  // Modern placeholder image
   const placeholderImage = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800';
-  
   const hasImage = property.imageUrls && property.imageUrls.length > 0 && !imgError;
   const imageSrc = hasImage ? property.imageUrls[0] : placeholderImage;
+  const cleanedPrice = cleanPropertyPrice(property.price);
+  const pcmMatch = cleanedPrice.match(/^(£[\d,]+)\s*(pcm)?$/i);
+  const priceMain = pcmMatch?.[1] || cleanedPrice;
+  const showPcm = /pcm/i.test(cleanedPrice) || Boolean(pcmMatch?.[2]);
+  const isRent =
+    /pcm|pw|rent|let/i.test(`${property.price} ${property.propertyType}`) ||
+    !/sale|buy/i.test(property.propertyType || '');
+  const displayTitle = getPropertyDisplayTitle(property);
+
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+    if (navigator.share) {
+      void navigator.share({
+        title: property.title,
+        text: `${property.title} — ${cleanedPrice}`,
+        url: shareUrl,
+      }).catch(() => {});
+      return;
+    }
+    if (navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(`${property.title} — ${cleanedPrice} ${shareUrl}`);
+    }
+  };
 
   return (
     <div
-      className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
+      className="bg-white rounded-2xl shadow-md overflow-hidden cursor-pointer hover:shadow-xl transition-all border border-gray-100 group flex flex-col justify-between"
       onClick={onClick}
     >
-      {/* Property Image */}
-      <div className="relative h-48 overflow-hidden bg-gray-100">
-        <img
-          src={imageSrc}
-          alt={property.title}
-          onError={() => setImgError(true)}
-          className={`w-full h-full object-cover transition-transform duration-500 hover:scale-110 ${
-            !hasImage ? 'opacity-50 grayscale' : ''
-          }`}
-        />
-        
-        {/* Price Badge */}
-        <div className="absolute top-4 left-4 bg-[#E65D24] text-white px-3 py-1 rounded-full font-semibold text-sm shadow-md">
-          {cleanPropertyPrice(property.price)}
-        </div>
-        
-        {/* Heart Button */}
-        <button
-          onClick={onToggleSave}
-          className="absolute top-4 right-4 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
-        >
-          <svg 
-            className={`w-5 h-5 transition-colors ${
-              isSaved ? 'text-red-500 fill-red-500' : 'text-gray-600 hover:text-red-500'
-            }`}
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        </button>
-      </div>
+      <div>
+        {/* Single full-width main image with inset rounded frame */}
+        <div className="relative w-full h-60 sm:h-64 overflow-hidden p-2">
+          <div className="relative w-full h-full rounded-xl overflow-hidden bg-gray-100">
+            <img
+              src={imageSrc}
+              alt={displayTitle}
+              onError={() => setImgError(true)}
+              className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${
+                !hasImage ? 'opacity-50 grayscale' : ''
+              }`}
+            />
 
-      {/* Property Details */}
-      <div className="p-4">
-        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 min-h-[3rem]">{property.title}</h3>
-        
-        <div className="flex items-center gap-2 text-gray-600 mb-3">
-          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <span className="text-sm truncate">{property.location}</span>
-        </div>
-
-        <div className="flex items-center justify-between text-sm text-gray-600 border-t border-gray-100 pt-3 mt-auto">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
-              </svg>
-              <span>{property.bedrooms || '—'}</span>
+            <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#136C9E] text-white shadow-sm">
+                {isRent ? 'To Rent' : 'For Sale'}
+              </span>
+              <span className="bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-sm">
+                Available Now
+              </span>
             </div>
-            <div className="flex items-center gap-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-              <span className="truncate max-w-[80px]">{property.propertyType}</span>
+
+            <div className="absolute top-3 right-3 flex space-x-1 bg-white/90 backdrop-blur-sm rounded-full p-1 shadow-md">
+              <button
+                type="button"
+                onClick={onToggleSave}
+                className="p-1.5 hover:bg-gray-100 rounded-full text-gray-500 hover:text-red-500 transition-colors"
+                aria-label={isSaved ? 'Remove from saved' : 'Save property'}
+              >
+                <svg
+                  className={`w-4 h-4 ${isSaved ? 'text-red-500 fill-red-500' : ''}`}
+                  fill={isSaved ? 'currentColor' : 'none'}
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={handleShare}
+                className="p-1.5 hover:bg-gray-100 rounded-full text-gray-500 hover:text-[#136C9E] transition-colors"
+                aria-label="Share property"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+              </button>
             </div>
           </div>
-          
-          {property.agent && (
-            <div className="text-xs text-[#136C9E] font-medium max-w-[100px] truncate">
-              {property.agent.name}
+        </div>
+
+        <div className="p-5">
+          <div className="flex justify-between items-start gap-3 mb-2">
+            <div className="min-w-0">
+              <h3
+                className="text-base font-semibold text-gray-900 group-hover:text-[#136C9E] transition-colors line-clamp-2"
+                style={{ fontFamily: 'Archivo, sans-serif' }}
+              >
+                {displayTitle}
+              </h3>
+              <div className="flex items-center text-gray-500 text-xs mt-0.5">
+                <svg className="w-3.5 h-3.5 mr-1 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="truncate">{property.location}</span>
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-xl font-extrabold text-[#F15A22]">
+                {priceMain}
+                {showPcm && <span className="text-xs text-gray-500 font-normal"> pcm</span>}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-4 text-gray-500 text-xs my-3 pb-3 border-b border-gray-100">
+            <div className="flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v12a2 2 0 002 2z" />
+              </svg>
+              <span>{property.bedrooms || '—'} Beds</span>
+            </div>
+            {property.bathrooms && (
+              <div className="flex items-center gap-1">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16M6 12V7a2 2 0 012-2h8a2 2 0 012 2v5M7 17h.01M17 17h.01" />
+                </svg>
+                <span>{property.bathrooms} Baths</span>
+              </div>
+            )}
+            {property.squareFootage && (
+              <div className="flex items-center gap-1">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
+                </svg>
+                <span>{property.squareFootage} sq ft</span>
+              </div>
+            )}
+            {!property.bathrooms && !property.squareFootage && property.propertyType && (
+              <div className="flex items-center gap-1 truncate">
+                <span className="capitalize">{property.propertyType}</span>
+              </div>
+            )}
+          </div>
+
+          {(factsLoading || factFlags || factsUnresolved) && (
+            <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+              <FactsBadgeRow
+                flags={factFlags}
+                isLoading={factsLoading}
+                unresolvedFallback={Boolean(factsUnresolved)}
+                variant="listing"
+              />
+            </div>
+          )}
+
+          {reserveHintSlot && (
+            <div
+              className="h-7 mb-1"
+              data-testid="report-hint-slot"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {reportHint ? (
+                <span className="inline-flex items-center max-w-full px-2.5 py-1 rounded-md border border-[#136C9E]/25 bg-[#136C9E]/10 text-[11px] font-semibold text-[#136C9E] truncate">
+                  {reportHint}
+                </span>
+              ) : (
+                <span className="invisible inline-flex px-2.5 py-1 text-[11px]" aria-hidden>
+                  hint
+                </span>
+              )}
             </div>
           )}
         </div>
+      </div>
+
+      <div className="p-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-between">
+        <div className="text-xs text-gray-500 flex items-center gap-1.5 min-w-0">
+          <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+          <span className="font-semibold text-gray-700 truncate">
+            {property.agent?.company || property.agent?.name || 'Agent'}
+          </span>
+        </div>
+        <span className="text-xs font-bold text-[#136C9E] group-hover:translate-x-0.5 transition-transform flex items-center gap-1 flex-shrink-0">
+          View Property Details →
+        </span>
       </div>
     </div>
   );
@@ -158,11 +273,27 @@ interface PropertyDetailsModalProps {
   onClose: () => void;
   onMessageClick: (property: Property) => void;
   isNavigatingToBooking: boolean;
+  govDataEnabled?: boolean;
+  audience?: import('../types/govData').Audience | null;
+  onAudienceChange?: (audience: import('../types/govData').Audience) => void;
 }
 
-function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNavigatingToBooking }: PropertyDetailsModalProps) {
+function PropertyDetailsModal({
+  property,
+  isOpen,
+  onClose,
+  onMessageClick,
+  isNavigatingToBooking,
+  govDataEnabled = false,
+  audience = null,
+  onAudienceChange,
+}: PropertyDetailsModalProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setCurrentImageIndex(0);
+  }, [property?.title, property?.location, property?.price]);
 
   useEffect(() => {
     if (isOpen) {
@@ -191,56 +322,79 @@ function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNav
 
   if (!isOpen || !property) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div 
-        ref={modalRef}
-        className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] flex flex-col"
-        style={{ maxWidth: '900px' }}
-      >
-        {/* Modal Header - Fixed at top */}
-        <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-xl">
-          <h2 className="text-xl font-bold text-gray-900">Property Details</h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+  const images = property.imageUrls?.length
+    ? property.imageUrls
+    : ['https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800'];
+  const cleanedPrice = cleanPropertyPrice(property.price);
+  const pcmMatch = cleanedPrice.match(/^(£[\d,]+)\s*(pcm)?$/i);
+  const priceMain = pcmMatch?.[1] || cleanedPrice;
+  const showPcm = /pcm/i.test(cleanedPrice) || Boolean(pcmMatch?.[2]);
+  const isRent =
+    /pcm|pw|rent|let/i.test(`${property.price} ${property.propertyType}`) ||
+    !/sale|buy/i.test(property.propertyType || '');
+  const displayTitle = getPropertyDisplayTitle(property);
+  const reportAddress =
+    [property.street, property.town || property.city, property.postcode]
+      .map((part) => (part || '').trim())
+      .filter(Boolean)
+      .join(', ') || property.location;
+  const listingDescription = getPropertyListingDescription(property);
+  const featureItems =
+    property.amenities && property.amenities.length > 0
+      ? property.amenities.slice(0, 6)
+      : [
+          property.description?.split('.')[0]?.trim(),
+          property.propertyType ? `Property type: ${property.propertyType}` : null,
+          property.location ? `Located in ${property.location}` : null,
+        ].filter(Boolean) as string[];
 
-        {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-auto">
-          {/* Image Gallery */}
-          {property.imageUrls && property.imageUrls.length > 0 && (
-            <div className="relative">
-              <div className="h-96 overflow-hidden">
-                <img
-                  src={property.imageUrls[currentImageIndex]}
-                  alt={`${property.title} - Image ${currentImageIndex + 1}`}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800';
-                  }}
-                />
-              </div>
-            
-            {/* Navigation Arrows */}
-            {property.imageUrls.length > 1 && (
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div
+        ref={modalRef}
+        className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200 text-gray-900"
+      >
+        {/* Image carousel — handoff Step 2 */}
+        <div className="relative p-2">
+          <div className="relative h-[22rem] sm:h-[26rem] rounded-2xl overflow-hidden bg-gray-100">
+            <img
+              src={images[currentImageIndex]}
+              alt={`${displayTitle} - Image ${currentImageIndex + 1}`}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src =
+                  'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800';
+              }}
+            />
+
+            <div className="absolute top-4 left-4 flex gap-2 flex-wrap">
+              <span className="px-4 py-1.5 rounded-full text-xs font-bold bg-[#136C9E] text-white shadow-md">
+                {isRent ? 'To Rent' : 'For Sale'}
+              </span>
+              <span className="bg-emerald-600 text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-md">
+                Available Now
+              </span>
+            </div>
+
+            {images.length > 1 && (
               <>
                 <button
-                  onClick={() => setCurrentImageIndex(prev => prev > 0 ? prev - 1 : property.imageUrls.length - 1)}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors"
+                  type="button"
+                  onClick={() =>
+                    setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1))
+                  }
+                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/60 text-white p-2.5 rounded-full hover:bg-black/80 transition-all"
+                  aria-label="Previous photo"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
                 <button
-                  onClick={() => setCurrentImageIndex(prev => (prev + 1) % property.imageUrls.length)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors"
+                  type="button"
+                  onClick={() => setCurrentImageIndex((prev) => (prev + 1) % images.length)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/60 text-white p-2.5 rounded-full hover:bg-black/80 transition-all"
+                  aria-label="Next photo"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -249,123 +403,134 @@ function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNav
               </>
             )}
 
-            {/* Thumbnail Strip */}
-            {property.imageUrls.length > 1 && (
-              <div className="p-4 border-b border-gray-200">
-                <div className="flex gap-2 overflow-x-auto">
-                  {property.imageUrls.map((url, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setCurrentImageIndex(index)}
-                      className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
-                        index === currentImageIndex ? 'border-[#E65D24]' : 'border-gray-200'
-                      }`}
-                    >
-                      <img
-                        src={url}
-                        alt={`Thumbnail ${index + 1}`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=100';
-                        }}
-                      />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div className="absolute bottom-4 left-4 bg-black/60 text-white px-3 py-1 rounded-full text-xs font-semibold">
+              {currentImageIndex + 1} / {images.length} Photos
+            </div>
           </div>
-        )}
 
-        {/* Property Details */}
-        <div className="p-6">
-          {/* Property Title */}
-          <h3 className="text-2xl font-bold text-gray-900 mb-2">{property.title}</h3>
-          
-          {/* Location with map pin icon */}
-          <div className="flex items-center gap-2 mb-4">
-            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 bg-white rounded-full p-2 shadow-md hover:bg-gray-100 text-gray-700"
+            aria-label="Close property details"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
-            <span className="text-gray-600">at {property.location}</span>
-          </div>
+          </button>
+        </div>
 
-          {/* Price */}
-                          <div className="text-3xl font-bold text-[#E65D24] mb-6">{cleanPropertyPrice(property.price)}</div>
-
-          {/* Property Details Grid */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="text-center">
-              <div className="text-lg font-semibold text-gray-900">{property.bedrooms}</div>
-              <div className="text-sm text-gray-600">Bedrooms</div>
+        <div className="p-6 sm:p-8">
+          <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
+            <div className="min-w-0">
+              <h2
+                className="text-xl font-semibold text-gray-900 tracking-tight"
+                style={{ fontFamily: 'Archivo, sans-serif' }}
+              >
+                {displayTitle}
+              </h2>
+              <div className="flex items-center text-gray-500 text-xs mt-1">
+                <MapPin className="w-4 h-4 mr-1 text-gray-400 flex-shrink-0" aria-hidden />
+                <span>{property.location}</span>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold text-gray-900">{property.propertyType}</div>
-              <div className="text-sm text-gray-600">Property Type</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold text-green-600">Available</div>
-              <div className="text-sm text-gray-600">Status</div>
-            </div>
-          </div>
-
-          {/* Additional Property Details (if available) */}
-          {(property.bathrooms || property.squareFootage) && (
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              {property.bathrooms && (
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-gray-900">{property.bathrooms}</div>
-                  <div className="text-sm text-gray-600">Bathrooms</div>
-                </div>
-              )}
-              {property.squareFootage && (
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-gray-900">{property.squareFootage} sq ft</div>
-                  <div className="text-sm text-gray-600">Size</div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          {/* Property Description */}
-          <div className="mb-6">
-            <h4 className="text-lg font-semibold text-gray-900 mb-2">Description</h4>
-            <p className="text-gray-600 leading-relaxed">
-              {property.description || `This beautiful ${property.propertyType} offers ${property.bedrooms} bedrooms and is located in the desirable area of ${property.location}. The property features modern amenities and is perfect for families or professionals looking for a comfortable home.`}
+            <p className="text-2xl font-extrabold text-[#F15A22]">
+              {priceMain}{' '}
+              {showPcm && <span className="text-xs text-gray-500 font-normal">pcm</span>}
             </p>
           </div>
 
-          {/* Amenities Section */}
-          {property.amenities && Array.isArray(property.amenities) && property.amenities.length > 0 && (
-            <div className="mb-6">
-              <h4 className="text-lg font-semibold text-gray-900 mb-3">Amenities</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {property.amenities.map((amenity, index) => {
-                  const icon = getAmenityIcon(amenity);
-                  return (
-                    <div
-                      key={index}
-                      className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
-                    >
-                      <div className="text-[#E65D24] flex-shrink-0">
-                        {icon}
-                      </div>
-                      <span className="text-sm text-gray-700 font-medium capitalize">
-                        {amenity}
-                      </span>
+          {govDataEnabled && (
+            <ProptiiModule
+              listingId={resolveListingId(property)}
+              uprn={property.uprn}
+              audience={audience}
+              onAudienceChange={onAudienceChange}
+              addressLabel={reportAddress}
+              propertyTitle={property.title}
+              propertyLocation={reportAddress}
+              propertyPrice={`${priceMain}${showPcm ? ' pcm' : ''}`}
+            />
+          )}
+
+          {/* Features — handoff two-column layout */}
+          <div className="mb-6">
+            <h3
+              className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3"
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              Property Features &amp; Key Details
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-xs space-y-2">
+                {featureItems.length > 0 ? (
+                  featureItems.map((item, index) => (
+                    <div key={index} className="flex items-center text-gray-700 gap-2">
+                      <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" aria-hidden />
+                      <span className="capitalize leading-relaxed">{item}</span>
                     </div>
-                  );
-                })}
+                  ))
+                ) : (
+                  <p className="text-gray-500">No feature details listed yet.</p>
+                )}
               </div>
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-xs space-y-2.5">
+                <div className="flex items-center gap-2 text-gray-700">
+                  <BedDouble className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
+                  <span>
+                    <strong>{property.bedrooms || '—'}</strong>&nbsp;Bedrooms
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-700">
+                  <Bath className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
+                  <span>
+                    <strong>{property.bathrooms || '—'}</strong>&nbsp;Bathroom
+                    {property.bathrooms && Number(property.bathrooms) !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-700">
+                  <Square className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
+                  <span>
+                    <strong>{property.squareFootage || '—'}</strong>
+                    {property.squareFootage ? <>&nbsp;sq ft approx.</> : <>&nbsp;sq ft</>}
+                  </span>
+                </div>
+                {property.propertyType && (
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <span className="text-gray-500">⌂</span>
+                    <span className="capitalize">
+                      <strong>{property.propertyType}</strong>
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {listingDescription && (
+            <div className="mb-6">
+              <h3
+                className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3"
+                style={{ fontFamily: 'Archivo, sans-serif' }}
+              >
+                Description
+              </h3>
+              <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{listingDescription}</p>
             </div>
           )}
 
-          {/* Listed By Section */}
-          <div className="border-t border-gray-200 pt-6">
-            <h4 className="text-lg font-semibold text-gray-900 mb-3">Listed By</h4>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="font-medium text-gray-900 mb-1">{property.agent?.name || 'Agent Information'}</p>
+          {/* Listed By + existing actions preserved */}
+          <div className="border-t border-gray-100 pt-6">
+            <h3
+              className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3"
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              Listed By
+            </h3>
+            <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
+              <p className="font-medium text-gray-900 mb-1">
+                {property.agent?.name || 'Agent Information'}
+              </p>
               {property.agent?.company && (
                 <p className="text-sm text-gray-600 mb-2">{property.agent.company}</p>
               )}
@@ -373,48 +538,43 @@ function PropertyDetailsModal({ property, isOpen, onClose, onMessageClick, isNav
                 <p className="text-sm text-gray-600 mb-2">Phone: {property.agent.phone}</p>
               )}
               {property.agent?.website && (
-                <a 
-                  href={property.agent.website} 
-                  target="_blank" 
+                <a
+                  href={property.agent.website}
+                  target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#E65D24] hover:underline text-sm"
+                  className="text-[#136C9E] hover:underline text-sm font-semibold"
                 >
                   View Agency Website
                 </a>
               )}
-              
-              {/* Action Buttons */}
-              <div className="flex gap-3 mt-4">
-                <button className="bg-[#E65D24] text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
+
+              <div className="flex flex-wrap gap-3 mt-4">
+                <button
+                  type="button"
+                  className="bg-[#F15A22] text-white px-4 py-2 rounded-full hover:bg-[#D54A1A] transition-colors flex items-center gap-2 text-sm font-semibold"
+                >
                   Chat
                 </button>
-                <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-opacity-90 transition-colors flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
+                <button
+                  type="button"
+                  className="bg-emerald-600 text-white px-4 py-2 rounded-full hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm font-semibold"
+                >
                   Call
                 </button>
                 <button
+                  type="button"
                   onClick={() => onMessageClick(property)}
                   disabled={isNavigatingToBooking}
-                  className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isNavigatingToBooking ? (
                     <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  )}
+                  ) : null}
                   {isNavigatingToBooking ? 'Loading...' : 'Book Viewing'}
                 </button>
               </div>
             </div>
           </div>
-        </div>
         </div>
       </div>
     </div>
@@ -772,6 +932,11 @@ const SearchResults = () => {
 
   const { results, isLoading, error, retry, searchProperties, clearCache } = useSearchBackend();
   const { isPropertySaved, toggleSaveProperty } = useSavedProperties();
+  const { enabled: govDataEnabled, audience, setAudience } = useGovDataLayer();
+  const { getFlagsFor, getHintFor, isUnresolved, isFactsLoading } = useBatchedPropertyFacts(
+    govDataEnabled,
+    results,
+  );
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showMap, setShowMap] = useState(false);
@@ -1853,6 +2018,11 @@ const SearchResults = () => {
                             setShowToast(true);
                             setTimeout(() => setShowToast(false), 3000);
                           }}
+                          factFlags={govDataEnabled ? getFlagsFor(property) : undefined}
+                          factsLoading={govDataEnabled && isFactsLoading}
+                          factsUnresolved={govDataEnabled && isUnresolved(property)}
+                          reserveHintSlot={govDataEnabled}
+                          reportHint={govDataEnabled ? getHintFor(property) : null}
                         />
                       ))}
                       {isLoading && [1, 2, 3].map(i => (
@@ -1878,6 +2048,11 @@ const SearchResults = () => {
                           setShowToast(true);
                           setTimeout(() => setShowToast(false), 3000);
                         }}
+                        factFlags={govDataEnabled ? getFlagsFor(property) : undefined}
+                        factsLoading={govDataEnabled && isFactsLoading}
+                        factsUnresolved={govDataEnabled && isUnresolved(property)}
+                        reserveHintSlot={govDataEnabled}
+                        reportHint={govDataEnabled ? getHintFor(property) : null}
                       />
                     ))}
                     {isLoading && [1, 2, 3].map(i => (
@@ -1926,6 +2101,9 @@ const SearchResults = () => {
         onClose={closeModal}
         onMessageClick={handleMessageClick}
         isNavigatingToBooking={isNavigatingToBooking}
+        govDataEnabled={govDataEnabled}
+        audience={audience}
+        onAudienceChange={setAudience}
       />
 
       {/* Toast Notification */}

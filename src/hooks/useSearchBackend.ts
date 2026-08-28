@@ -37,6 +37,7 @@ const cleanPropertyPrice = (price: string): string => {
 
 import { Property, SearchResponse } from '../types/property';
 
+export type { Property };
 export const useSearchBackend = () => {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);

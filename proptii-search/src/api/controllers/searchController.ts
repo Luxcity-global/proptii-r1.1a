@@ -2,7 +2,7 @@ import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { SearchAggregator } from '../../core/services/SearchAggregator';
 import { ScraperManager } from '../../integrations/ScraperManager';
 import { AgentEnrichmentService } from '../../core/services/AgentEnrichmentService';
-import Property from '../../models/Property';
+import { persistProperty, type PersistableProperty } from '../../utils/persistProperty';
 import { normalizePhone } from '../../utils/phone';
 
 
@@ -67,17 +67,12 @@ export const searchProperties: RequestHandler = async (req: Request, res: Respon
     console.log(`[SSE] Checking cache/DB for: "${query}"`);
     const cachedResults = await aggregator.getCachedResults(query);
     if (cachedResults.length > 0) {
-      // Apply strict email filter to cached results too, just in case
-      const validCached = cachedResults.filter(p => p.agent?.email);
-      if (validCached.length > 0) {
-        // Ensure phone key is always present and normalized
-        const normalizedCached = validCached.map(p => {
-          p.agent = p.agent || {};
-          p.agent.phone = normalizePhone(p.agent.phone, p.id || p.url);
-          return p;
-        });
-        write({ type: 'initial', data: normalizedCached });
-      }
+      const normalizedCached = cachedResults.map(p => {
+        p.agent = p.agent || {};
+        p.agent.phone = normalizePhone(p.agent.phone, p.id || p.url);
+        return p;
+      });
+      write({ type: 'initial', data: normalizedCached });
     }
 
     // ── 3. Live Scraping + Enrichment ────────
@@ -85,15 +80,19 @@ export const searchProperties: RequestHandler = async (req: Request, res: Respon
     
     await scraperManager.scrapeAll(query, filters, async (provider, providerResults) => {
       
-      await enrichmentService.enrichAndStream(providerResults, (enrichedResult) => {
-        if (!isClosed) {
-          // Ensure phone key is always present and normalized
-          enrichedResult.agent = enrichedResult.agent || {};
-          enrichedResult.agent.phone = normalizePhone(enrichedResult.agent.phone, enrichedResult.id || enrichedResult.url);
-          
-          allScrapedAndEnriched.push(enrichedResult);
-          write({ type: 'results', provider, data: [enrichedResult] });
-        }
+      await enrichmentService.enrichAndStream(providerResults, async (enrichedResult) => {
+        if (isClosed) return;
+
+        enrichedResult.agent = enrichedResult.agent || {};
+        enrichedResult.agent.phone = normalizePhone(
+          enrichedResult.agent.phone,
+          enrichedResult.id || enrichedResult.url,
+        );
+
+        // Geocode once at ingest, then stream coordinates to the UI.
+        const saved = await persistProperty(enrichedResult as unknown as PersistableProperty);
+        allScrapedAndEnriched.push(saved);
+        write({ type: 'results', provider, data: [saved] });
       });
       
       if (!isClosed) {
@@ -103,30 +102,13 @@ export const searchProperties: RequestHandler = async (req: Request, res: Respon
     });
 
 
-    // ── 4. Persist (fire-and-forget) ──────────
+    // ── 4. Persist to cache (coordinates already saved per property above) ──
     if (!isClosed && allScrapedAndEnriched.length > 0) {
-      setImmediate(async () => {
-        try {
-          await aggregator.saveResults(query, allScrapedAndEnriched);
-          await Promise.all(allScrapedAndEnriched.map(p => {
-            // Sanitize numeric fields to avoid CastErrors
-            const sanitized = {
-              ...p,
-              bedrooms: (typeof p.bedrooms === 'number') ? p.bedrooms : (p.bedrooms ? parseInt(p.bedrooms as any) : null),
-              bathrooms: (typeof p.bathrooms === 'number') ? p.bathrooms : (p.bathrooms ? parseInt(p.bathrooms as any) : null),
-              scrapedAt: new Date()
-            };
-
-            return Property.findOneAndUpdate(
-              { url: p.url },
-              sanitized,
-              { upsert: true, returnDocument: 'after' }
-            );
-          }));
-        } catch (e) {
-          console.error('[SSE] Failed to persist results:', e);
-        }
-      });
+      try {
+        await aggregator.saveResults(query, allScrapedAndEnriched);
+      } catch (e) {
+        console.error('[SSE] Failed to cache results:', e);
+      }
     }
 
     // ── 5. Done ──────────────────────────────────────────────────────────────

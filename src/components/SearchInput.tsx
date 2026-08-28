@@ -1,5 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useGovDataLayer } from '../contexts/GovDataLayerContext';
+import { useClassifyQuery } from '../hooks/useClassifyQuery';
+import { FilterPills } from './search/FilterPills';
+import { EnquiryBridge, detectGuidanceTopic } from './search/EnquiryBridge';
+import { trackEvent } from '../utils/analytics';
+import type { SearchIntent } from '../types/govData';
 
 type SearchPlatform = 'onthemarket' | 'proptii';
 
@@ -42,11 +48,22 @@ export const SearchInput = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { enabled: govDataEnabled, audience, setAudience } = useGovDataLayer();
+  const { classification, isClassifying } = useClassifyQuery({
+    enabled: govDataEnabled,
+    query,
+  });
 
   // Update internal query when value prop changes
   useEffect(() => {
     setQuery(value);
   }, [value]);
+
+  // Seed audience from classifier when the user hasn't chosen one yet
+  useEffect(() => {
+    if (!govDataEnabled || audience || !classification?.audience) return;
+    setAudience(classification.audience);
+  }, [govDataEnabled, audience, classification?.audience, setAudience]);
 
   // Set initial height to 50px (standard) or fixed for simplified
   useEffect(() => {
@@ -112,6 +129,14 @@ export const SearchInput = ({
     '2 bedroom flats to rent in Leeds for 1200pcm',
   ];
 
+  const navigateToExistingSearch = (searchQuery: string, intent?: SearchIntent) => {
+    let path = `/search?q=${encodeURIComponent(searchQuery)}&type=${searchType}`;
+    if (intent && intent !== 'property_search' && intent !== 'specific_address') {
+      path += `&intent=${encodeURIComponent(intent)}`;
+    }
+    navigate(path);
+  };
+
   const handleSearch = async () => {
     if (!query.trim()) {
       setError('Please enter a search query');
@@ -127,14 +152,84 @@ export const SearchInput = ({
         return;
       }
 
-      // Navigate to search results page with the query and search type
-      navigate(`/search?q=${encodeURIComponent(query)}&type=${searchType}`);
+      if (!govDataEnabled || !classification || classification.fallback) {
+        if (govDataEnabled) {
+          trackEvent('gov_data_search_submit', { intent: 'property_search', fallback: true });
+        }
+        navigateToExistingSearch(query);
+        return;
+      }
+
+      trackEvent('gov_data_search_submit', {
+        intent: classification.intent,
+        audience: audience ?? classification.audience,
+      });
+
+      const intent = classification.intent;
+      if (
+        intent === 'general_answerable' ||
+        intent === 'general_too_broad' ||
+        intent === 'off_topic'
+      ) {
+        navigateToExistingSearch(query, intent);
+        return;
+      }
+
+      navigateToExistingSearch(query);
     } catch (err) {
       setError('Search failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  const guidanceIntent =
+    govDataEnabled &&
+    classification &&
+    !classification.fallback &&
+    !isClassifying &&
+    (classification.intent === 'general_answerable' ||
+      classification.intent === 'general_too_broad' ||
+      classification.intent === 'off_topic')
+      ? classification.intent
+      : null;
+
+  const handleGuidanceSearchInstead = () => {
+    const topic = detectGuidanceTopic(query);
+    if (guidanceIntent === 'general_answerable' && topic === 'pets') {
+      handleQueryChange('pet-friendly flats in Leeds');
+      return;
+    }
+    if (guidanceIntent === 'general_answerable' && topic === 'epc') {
+      handleQueryChange('2 bed flat in Leeds');
+      return;
+    }
+    // Keep the typed text but treat as an ordinary property search on next submit
+    navigateToExistingSearch(query.trim() || 'homes to rent');
+  };
+
+  const classifierChrome = govDataEnabled ? (
+    <div
+      className={`mt-3 flex flex-col gap-2 ${simplified ? 'items-center' : 'items-stretch px-1'}`}
+      data-testid="gov-data-search-chrome"
+    >
+      <FilterPills
+        entities={classification?.fallback ? null : classification?.entities}
+        isClassifying={isClassifying}
+        onDark={simplified}
+      />
+      {guidanceIntent && (
+        <EnquiryBridge
+          intent={guidanceIntent}
+          query={query}
+          audience={audience ?? classification?.audience ?? null}
+          onAudienceChange={setAudience}
+          onCitySelect={(city) => handleQueryChange(`homes in ${city}`)}
+          onSearchInstead={handleGuidanceSearchInstead}
+        />
+      )}
+    </div>
+  ) : null;
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -209,27 +304,23 @@ export const SearchInput = ({
           </div>
           {error && <div className="mt-2 text-red-500 text-sm">{error}</div>}
         </div>
-        {/* Try pills */}
-        <div className="mt-12 flex flex-wrap items-center justify-center gap-2">
-          <span className="text-white/85 font-medium">Try:</span>
-          {SIMPLIFIED_TRY_QUERIES.map((q, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => handleQueryChange(q)}
-              className="px-4 py-2 rounded-full text-sm font-medium transition-colors border"
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                color: '#FFFFFF',
-                borderColor: 'rgba(255, 255, 255, 0.95)',
-                backdropFilter: 'blur(4px)',
-                WebkitBackdropFilter: 'blur(4px)',
-              }}
-            >
-              {q}
-            </button>
-          ))}
-        </div>
+        {classifierChrome}
+        {/* Idle Try pills — only when the bar is empty (handoff state 1) */}
+        {!query.trim() && (
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto mb-2">
+            <span className="text-xs text-white/75 font-semibold">Try:</span>
+            {SIMPLIFIED_TRY_QUERIES.map((q, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => handleQueryChange(q)}
+                className="px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all border border-white/20 bg-black/40 text-white/95 hover:bg-black/60 hover:text-white hover:scale-105 backdrop-blur-md"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -401,6 +492,7 @@ export const SearchInput = ({
             {error}
           </div>
         )}
+        {classifierChrome}
       </div>
 
       {/* Example Queries */}

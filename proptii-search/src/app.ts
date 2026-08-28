@@ -1,8 +1,11 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 import { errorHandler } from './api/controllers/errorController';
 import searchRoutes from './api/routes/searchRoutes';
+import geocodeRoutes from './api/routes/geocodeRoutes';
+import { getRedis } from './infrastructure/redis';
 
 dotenv.config();
 
@@ -32,6 +35,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/v1/search', searchRoutes);
+app.use('/api/v1/geocode', geocodeRoutes);
 
 app.get('/', (_req: Request, res: Response) => {
   res.status(200).json({
@@ -43,8 +47,14 @@ app.get('/', (_req: Request, res: Response) => {
 });
 
 // Health check
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', (_req: Request, res: Response) => {
+  const redisStatus = getRedis().status;
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    redis: redisStatus === 'ready' || redisStatus === 'connect' ? 'connected' : redisStatus,
+  });
 });
 
 // Error Handling

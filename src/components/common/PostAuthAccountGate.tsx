@@ -11,7 +11,6 @@ import {
   hasPendingLandlordNextSteps,
   hasPendingPostAuth,
   isGenericPostAuthPath,
-  landlordDashboardPath,
   markAccountPickerNeeded,
   markLandlordNextStepsNeeded,
   needsAccountPicker,
@@ -101,24 +100,16 @@ export const PostAuthAccountGate: React.FC = () => {
       if (cancelled) return;
       handledSessionRef.current = sessionKey;
 
-      if (result.action === 'landlord-dashboard') {
-        consumePendingPostAuth();
-        setShowPicker(false);
-        navigate(landlordDashboardPath(result.role), { replace: true });
-        return;
-      }
-
+      // After login, always stay on the homepage (or leave /login → /).
+      // Do not auto-route to tenant/landlord dashboards.
       if (result.action === 'show-picker') {
         markAccountPickerNeeded();
         setShowPicker(true);
-        if (pathname === '/login') {
-          navigate('/', { replace: true });
-        }
-        return;
+      } else {
+        consumePendingPostAuth();
+        setShowPicker(false);
       }
 
-      consumePendingPostAuth();
-      setShowPicker(false);
       if (pathname === '/login') {
         navigate('/', { replace: true });
       }
@@ -143,7 +134,9 @@ export const PostAuthAccountGate: React.FC = () => {
     handledSessionRef.current = user?.email || user?.id || 'authenticated';
 
     if (type === 'renter') {
-      navigate('/dashboard', { replace: true });
+      if (location.pathname === '/login') {
+        navigate('/', { replace: true });
+      }
       return;
     }
 
@@ -155,9 +148,12 @@ export const PostAuthAccountGate: React.FC = () => {
       });
     }
 
+    // Stay on homepage after login; next-steps modal can still open there.
+    if (location.pathname === '/login') {
+      navigate('/', { replace: true });
+    }
     markLandlordNextStepsNeeded();
     setShowNextSteps(true);
-    navigate(landlordDashboardPath(type), { replace: true });
   };
 
   const finishNextSteps = (path: string) => {

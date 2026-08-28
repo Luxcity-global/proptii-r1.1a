@@ -528,8 +528,8 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
             Search properties, book viewings, complete referencing and sign contracts in one place. Free for tenants.
           </p>
 
-          {/* Search Bar */}
-          <div ref={searchBarRef} className="relative z-10 max-w-3xl mx-auto px-4 md:px-0">
+          {/* Search Bar + under-bar chrome (Try chips / pills) — z-20 keeps overflow above Services */}
+          <div ref={searchBarRef} className="relative z-20 max-w-3xl mx-auto px-4 md:px-0 pb-6 md:pb-10">
             <SearchInput
               onHeightChange={handleSearchInputHeightChange}
               value={prefilledSearchQuery}
@@ -540,7 +540,7 @@ const HomeVariant = ({ hideOnboardingModal = false }: HomeVariantProps) => {
         </div>
       </section>
 
-      <section className="mt-6 md:mt-8">
+      <section className="mt-6 md:mt-8 relative z-0">
         <ServicesSection variant="v1" />
       </section>
 
