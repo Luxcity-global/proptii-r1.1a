@@ -27,6 +27,12 @@ export interface Property {
   listingId?: string;
   /** Optional Ordnance Survey UPRN */
   uprn?: string;
+  /** Optional portal URL — preferred as listingId for the streaming report API. */
+  url?: string;
+  /** Scraped GPS from proptii-search (Rightmove / OnTheMarket JSON). */
+  latitude?: number;
+  longitude?: number;
+  coordinates?: { lat: number; lng: number };
   /** Optional search-grid report hint (conservation, title pending, etc.). */
   reportHint?: string;
 }

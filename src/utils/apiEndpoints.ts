@@ -8,6 +8,7 @@ export const DEV_LOCAL_API_BASE = 'http://127.0.0.1:3000/api';
 
 const RENDER_REMOTE_FALLBACKS = [
   CANONICAL_PROD_API_BASE_URL,
+  'https://proptii-r1-1a-1-hcw6.onrender.com/api',
   'https://proptii-r1-1a-1.onrender.com/api',
 ];
 
@@ -20,6 +21,7 @@ const LEGACY_REMOTE_FALLBACKS = [
 /** Origins allowed in CSP connect-src for any API base we may call. */
 export const KNOWN_API_ORIGINS = [
   'https://proptii-r1-1a-new-backend.onrender.com',
+  'https://proptii-r1-1a-1-hcw6.onrender.com',
   'https://proptii-r1-1a-1.onrender.com',
   'https://api.proptii.com',
   'https://api-staging.proptii.com',

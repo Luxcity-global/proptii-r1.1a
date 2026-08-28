@@ -1,6 +1,9 @@
 /** Canonical production search service (property scraper on Render). */
 export const PROD_SEARCH_BACKEND_URL = 'https://proptii-r1-1a-search.onrender.com';
 
+/** Search service staging URL from Renter Report handover (Aug 2026). */
+export const STAGING_SEARCH_BACKEND_URL = 'https://proptii-r1-1a-q95f.onrender.com';
+
 const LOCAL_SEARCH_BACKEND_URL = 'http://localhost:3001';
 
 /**
@@ -77,6 +80,10 @@ export const resolveSearchBackendUrl = (): string => {
 
   if (isLocalBrowserHost()) {
     return LOCAL_SEARCH_BACKEND_URL;
+  }
+
+  if (import.meta.env.VITE_USE_STAGING_SEARCH === 'true') {
+    return STAGING_SEARCH_BACKEND_URL;
   }
 
   return PROD_SEARCH_BACKEND_URL;

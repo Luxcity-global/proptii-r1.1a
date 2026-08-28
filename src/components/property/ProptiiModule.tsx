@@ -49,6 +49,8 @@ type FlowStep = 'idle' | 'multiprofile-auth' | 'audience' | 'diagnostic' | 'repo
 
 interface ProptiiModuleProps {
   listingId: string;
+  /** Portal listing URL — sent as listingId to POST /api/properties/report when set. */
+  propertyUrl?: string | null;
   uprn?: string | null;
   audience: Audience | null;
   onAudienceChange?: (audience: Audience) => void;
@@ -56,6 +58,9 @@ interface ProptiiModuleProps {
   propertyTitle?: string;
   propertyLocation?: string;
   propertyPrice?: string;
+  propertyStreet?: string | null;
+  propertyPostcode?: string | null;
+  coordinates?: { lat: number; lng: number } | null;
 }
 
 /**
@@ -65,12 +70,16 @@ interface ProptiiModuleProps {
  */
 export const ProptiiModule: React.FC<ProptiiModuleProps> = ({
   listingId,
+  propertyUrl,
   uprn,
   onAudienceChange,
   addressLabel = 'Selected property',
   propertyTitle,
   propertyLocation,
   propertyPrice,
+  propertyStreet,
+  propertyPostcode,
+  coordinates,
 }) => {
   const location = useLocation();
   const { isAuthenticated, login } = useAuth();
@@ -170,13 +179,23 @@ export const ProptiiModule: React.FC<ProptiiModuleProps> = ({
     const mapQuery = resolvedLocation || addressLabel;
     prefetchReportMap(mapQuery);
     mapWarmupRef.current = warmupReportMap(mapQuery);
-    const seeded = mockPropertyReport(listingId, flowAudience, {
+    const reportListingId = propertyUrl?.trim() || listingId;
+    const seeded = mockPropertyReport(reportListingId, flowAudience, {
       addressLabel,
       price: propertyPrice,
     });
     setPrefetchedReport(seeded);
     setFlow('diagnostic');
-    void fetchPropertyReport(listingId, flowAudience).then(setPrefetchedReport);
+    void fetchPropertyReport(reportListingId, flowAudience, {
+      address: {
+        display: resolvedLocation || addressLabel,
+        street: propertyStreet,
+        postcode: propertyPostcode,
+        coordinates,
+      },
+      listingPrice: propertyPrice,
+      onProgress: (partial) => setPrefetchedReport(partial),
+    }).then((final) => setPrefetchedReport(final));
   };
 
   const openLensChange = (e?: React.MouseEvent) => {
@@ -346,13 +365,14 @@ export const ProptiiModule: React.FC<ProptiiModuleProps> = ({
       <ProptiiReportModal
         isOpen={flow === 'report'}
         isWarming={flow === 'diagnostic'}
-        listingId={listingId}
+        listingId={propertyUrl?.trim() || listingId}
         addressLabel={addressLabel}
         propertyTitle={resolvedTitle}
         propertyLocation={resolvedLocation}
         propertyPrice={propertyPrice}
         audience={flowAudience}
         initialReport={prefetchedReport}
+        streamingReport
         onClose={() => setFlow('idle')}
         onChangeLens={openLensChange}
       />

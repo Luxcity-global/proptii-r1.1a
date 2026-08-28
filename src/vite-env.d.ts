@@ -3,6 +3,7 @@
 interface ImportMetaEnv {
   readonly VITE_GOOGLE_MAPS_API_KEY?: string;
   readonly VITE_GOV_DATA_LAYER?: string;
+  readonly VITE_USE_STAGING_SEARCH?: string;
 }
 
 interface ImportMeta {

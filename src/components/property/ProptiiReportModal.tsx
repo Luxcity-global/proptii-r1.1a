@@ -22,6 +22,8 @@ interface ProptiiReportModalProps {
   propertyPrice?: string;
   audience: Audience;
   initialReport?: PropertyReportResponse | null;
+  /** When true, report data comes from parent streaming — do not re-fetch on open. */
+  streamingReport?: boolean;
   onClose: () => void;
   onChangeLens: () => void;
 }
@@ -56,6 +58,7 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
   propertyPrice,
   audience,
   initialReport = null,
+  streamingReport = false,
   onClose,
   onChangeLens,
 }) => {
@@ -73,7 +76,6 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
     if (!isOpen && !isWarming) return;
     let cancelled = false;
     const audienceKey = audience || 'tenant';
-    const matchesPrefetch = initialReport?.generatedFor === audienceKey;
 
     const applyReport = (next: PropertyReportResponse) => {
       setReport((prev) => {
@@ -94,6 +96,16 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
       setLens(next.lens);
     };
 
+    if (streamingReport && initialReport) {
+      applyReport(initialReport);
+      trackEvent('gov_data_report_open', { listingId, audience });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const matchesPrefetch = initialReport?.generatedFor === audienceKey;
+
     if (matchesPrefetch && initialReport) {
       applyReport(initialReport);
       trackEvent('gov_data_report_open', { listingId, audience });
@@ -103,7 +115,10 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
     applyReport(mockPropertyReport(listingId, audience, { addressLabel, price: propertyPrice }));
 
     void (async () => {
-      const next: PropertyReportResponse = await fetchPropertyReport(listingId, audience);
+      const next: PropertyReportResponse = await fetchPropertyReport(listingId, audience, {
+        address: { display: resolvedLocation || addressLabel },
+        listingPrice: propertyPrice,
+      });
       if (cancelled) return;
       applyReport(next);
       trackEvent('gov_data_report_open', { listingId, audience });
@@ -112,7 +127,35 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, isWarming, listingId, audience, initialReport, addressLabel, propertyPrice, resolvedLocation]);
+  }, [
+    isOpen,
+    isWarming,
+    listingId,
+    audience,
+    initialReport,
+    streamingReport,
+    addressLabel,
+    propertyPrice,
+    resolvedLocation,
+  ]);
+
+  useEffect(() => {
+    if (!streamingReport || !initialReport || (!isOpen && !isWarming)) return;
+    setReport((prev) => {
+      const embedQuery =
+        resolvedLocation.trim() ||
+        (initialReport.map?.embedQuery || '').trim() ||
+        (prev.map?.embedQuery || '').trim() ||
+        addressLabel.trim();
+      return {
+        ...initialReport,
+        map: { embedQuery },
+      };
+    });
+    setFacts(initialReport.facts);
+    factsFingerprintRef.current = JSON.stringify(initialReport.facts);
+    setLens(initialReport.lens);
+  }, [streamingReport, initialReport, isOpen, isWarming, resolvedLocation, addressLabel]);
 
   const renter = useMemo(() => {
     const defaults = defaultRenterContent(facts);

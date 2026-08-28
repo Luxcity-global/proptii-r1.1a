@@ -88,7 +88,7 @@ export const ReportDiagnostic: React.FC<ReportDiagnosticProps> = ({
       cancelled = true;
       timers.forEach((id) => window.clearTimeout(id));
     };
-  }, [isOpen, audience]);
+  }, [isOpen, audience, sources]);
 
   useEffect(() => {
     if (!isOpen || !done) return;

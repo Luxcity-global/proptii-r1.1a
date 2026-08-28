@@ -18,7 +18,9 @@ import {
   SearchIntent,
   propertySearchFallback,
 } from '../types/govData';
-import { reportHintFromFlags } from '../utils/reportHint';
+import { streamPropertyReport } from './propertyReportStreamService';
+import { mapStreamingReportToPropertyReport } from '../utils/streamingReportMapper';
+import { buildStreamingReportAddress, type ReportAddressInput } from '../utils/reportAddress';
 
 const CLASSIFY_TIMEOUT_MS = 2500;
 const FLAGS_TIMEOUT_MS = 4000;
@@ -218,62 +220,10 @@ export function mockPropertyFacts(
   };
 }
 
-export function mockReportLens(audience: Audience | null): ReportLens {
-  const role = audience || 'tenant';
-  const copy: Record<Audience, ReportLens> = {
-    tenant: {
-      severity: 'caution',
-      verdictText:
-        'HM Land Registry or EPC registers noted restrictions relevant to tenant obligations.',
-      steps: [
-        'Ask the agent to confirm whether pet covenants can be waived in writing',
-        'Request the latest EPC certificate and gas safety record before paying a holding deposit',
-        'Verify the deposit will be protected in an approved scheme within 30 days',
-      ],
-    },
-    buyer: {
-      severity: 'info',
-      verdictText:
-        'As a buyer, treat flagged title and EPC items as conveyancing follow-ups, not deal-breakers by default.',
-      steps: [
-        'Share flagged covenants with your solicitor before exchange',
-        'Request the full title plan and any freeholder restrictions',
-        'Budget for any EPC improvements hinted by the register',
-      ],
-    },
-    landlord: {
-      severity: 'alert',
-      verdictText:
-        'As a landlord, flagged compliance items may block a compliant let until resolved.',
-      steps: [
-        'Resolve unresolved title or safety flags before marketing',
-        'Confirm EPC meets the legal minimum for new tenancies',
-        'Document flood and covenant disclosures for applicants',
-      ],
-    },
-    agent: {
-      severity: 'info',
-      verdictText:
-        'As an agent, surface unresolved facts honestly — never present missing data as clear.',
-      steps: [
-        'Disclose flagged and unresolved items in particulars (CPR Parts A–C)',
-        'Chase the landlord for missing certificates before viewings',
-        'Keep the facts row unchanged when switching audience lens',
-      ],
-    },
-    homeowner: {
-      severity: 'info',
-      verdictText:
-        'As a homeowner, use this lens to prioritise maintenance and insurance follow-ups.',
-      steps: [
-        'Review flood and title flags with your insurer',
-        'Plan EPC improvements if selling or remortgaging',
-        'Keep records of any remedial works',
-      ],
-    },
-  };
-  return copy[role];
-}
+import { reportHintFromFlags } from '../utils/reportHint';
+import { mockReportLens } from '../data/reportLensFixtures';
+
+export { mockReportLens };
 
 export function mockPropertyReport(
   listingId: string,
@@ -482,32 +432,47 @@ export async function fetchPropertyFacts(
 export async function fetchPropertyReport(
   listingId: string,
   audience: Audience | null,
+  options?: {
+    address?: ReportAddressInput | null;
+    listingPrice?: string;
+    onProgress?: (report: PropertyReportResponse) => void;
+  },
 ): Promise<PropertyReportResponse> {
-  const qs = audience ? `?audience=${encodeURIComponent(audience)}` : '';
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), FACTS_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+  const addressInput = options?.address;
+  const addressPayload = addressInput?.display?.trim()
+    ? buildStreamingReportAddress(addressInput)
+    : buildStreamingReportAddress({ display: listingId });
+
+  const mapOptions = {
+    listingPrice: options?.listingPrice,
+    addressLabel: addressPayload.display,
+  };
 
   try {
-    const { response } = await fetchWithApiFallback(
-      `/properties/${encodeURIComponent(listingId)}/report${qs}`,
-      {
-        method: 'GET',
-        signal: controller.signal,
-        headers: { Accept: 'application/json' },
+    const streamed = await streamPropertyReport({
+      listingId,
+      address: addressPayload,
+      signal: controller.signal,
+      onProgress: (data) => {
+        options?.onProgress?.(
+          mapStreamingReportToPropertyReport(data, audience, mapOptions),
+        );
       },
-      { retryOnNotFound: true },
-    );
+    });
 
-    if (!response.ok) {
-      throw new Error(`report HTTP ${response.status}`);
+    if (streamed) {
+      return mapStreamingReportToPropertyReport(streamed, audience, mapOptions);
     }
-
-    return (await response.json()) as PropertyReportResponse;
+    throw new Error('Empty streaming report');
   } catch {
     if (shouldUseLocalMocks()) {
-      const mock = mockPropertyReport(listingId, audience);
-      const { map: _omittedMap, ...rest } = mock;
-      return rest;
+      return mockPropertyReport(listingId, audience, {
+        addressLabel: addressPayload.display,
+        price: options?.listingPrice,
+      });
     }
     return {
       facts: [],

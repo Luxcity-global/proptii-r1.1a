@@ -74,6 +74,8 @@ export interface ReportSource {
   id?: string;
   title: string;
   detail?: string;
+  /** Backend streaming report module state. */
+  state?: 'loading' | 'clear' | 'unresolved';
 }
 
 export interface ReportLedgerRow {

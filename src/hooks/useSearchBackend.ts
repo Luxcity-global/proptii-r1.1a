@@ -176,11 +176,19 @@ export const useSearchBackend = () => {
             const event = JSON.parse(trimmed.slice(6));
             
             if (event.type === 'initial' || event.type === 'results') {
-              const incoming = (event.data as any[]).map(p => ({
+              const incoming = (event.data as any[]).map((p) => ({
                 ...p,
                 price: cleanPropertyPrice(p.price),
                 description: p.description || p.summary || p.notes || p.overview || '',
                 imageUrls: p.imageUrls || p.images || [],
+                url: p.url || p.listingUrl,
+                latitude: typeof p.latitude === 'number' ? p.latitude : undefined,
+                longitude: typeof p.longitude === 'number' ? p.longitude : undefined,
+                coordinates:
+                  p.coordinates ??
+                  (typeof p.latitude === 'number' && typeof p.longitude === 'number'
+                    ? { lat: p.latitude, lng: p.longitude }
+                    : undefined),
               }));
 
               allScraped = [...allScraped, ...incoming];

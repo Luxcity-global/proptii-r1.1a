@@ -443,6 +443,7 @@ function PropertyDetailsModal({
           {govDataEnabled && (
             <ProptiiModule
               listingId={resolveListingId(property)}
+              propertyUrl={property.url}
               uprn={property.uprn}
               audience={audience}
               onAudienceChange={onAudienceChange}
@@ -450,6 +451,17 @@ function PropertyDetailsModal({
               propertyTitle={property.title}
               propertyLocation={reportAddress}
               propertyPrice={`${priceMain}${showPcm ? ' pcm' : ''}`}
+              propertyStreet={property.street}
+              propertyPostcode={property.postcode}
+              coordinates={
+                property.coordinates ??
+                (typeof property.latitude === 'number' &&
+                typeof property.longitude === 'number' &&
+                Number.isFinite(property.latitude) &&
+                Number.isFinite(property.longitude)
+                  ? { lat: property.latitude, lng: property.longitude }
+                  : null)
+              }
             />
           )}
 
