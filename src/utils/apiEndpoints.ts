@@ -7,8 +7,8 @@ export const CANONICAL_PROD_API_BASE_URL =
 export const DEV_LOCAL_API_BASE = 'http://127.0.0.1:3000/api';
 
 const RENDER_REMOTE_FALLBACKS = [
-  CANONICAL_PROD_API_BASE_URL,
   'https://proptii-r1-1a-1-hcw6.onrender.com/api',
+  CANONICAL_PROD_API_BASE_URL,
   'https://proptii-r1-1a-1.onrender.com/api',
 ];
 
@@ -20,8 +20,8 @@ const LEGACY_REMOTE_FALLBACKS = [
 
 /** Origins allowed in CSP connect-src for any API base we may call. */
 export const KNOWN_API_ORIGINS = [
-  'https://proptii-r1-1a-new-backend.onrender.com',
   'https://proptii-r1-1a-1-hcw6.onrender.com',
+  'https://proptii-r1-1a-new-backend.onrender.com',
   'https://proptii-r1-1a-1.onrender.com',
   'https://api.proptii.com',
   'https://api-staging.proptii.com',
@@ -56,26 +56,31 @@ const ensureApiPathPrefix = (base: string) => {
 
 const buildCandidateList = () => {
   const envUrl = (import.meta as any)?.env?.VITE_API_URL?.trim?.() || '';
+  const useRemoteApi = (import.meta as any)?.env?.VITE_USE_REMOTE_API === 'true' || (import.meta as any)?.env?.VITE_USE_REMOTE_API === true;
   const isLocalDevOrigin = isBrowserLocalDevOrigin();
 
-  /**
-   * When the app runs on localhost but VITE_API_URL points at a deployed API, putting env first
-   * forces the browser to call production from http://localhost — which triggers CORS unless the
-   * remote server lists your origin. Prefer local Nest/API bases first; remote URL remains as fallback.
-   */
   const remoteFallbacks = isLocalDevOrigin
     ? [...RENDER_REMOTE_FALLBACKS, ...LEGACY_REMOTE_FALLBACKS]
     : RENDER_REMOTE_FALLBACKS;
 
   let candidates: string[];
-  if (isLocalDevOrigin && envUrl && !isLocalApiUrl(envUrl)) {
-    candidates = [...LOCAL_FALLBACKS, envUrl, ...remoteFallbacks];
+  if (useRemoteApi || (envUrl && !isLocalApiUrl(envUrl))) {
+    candidates = [
+      ...(envUrl ? [envUrl] : []),
+      ...remoteFallbacks,
+      ...(isLocalDevOrigin ? LOCAL_FALLBACKS : []),
+    ];
+  } else if (isLocalDevOrigin) {
+    candidates = [
+      ...LOCAL_FALLBACKS,
+      ...(envUrl ? [envUrl] : []),
+      ...remoteFallbacks,
+    ];
   } else {
     candidates = [
       ...(envUrl ? [envUrl] : []),
-      ...(isLocalDevOrigin ? LOCAL_FALLBACKS : []),
       ...remoteFallbacks,
-      ...(!isLocalDevOrigin && (import.meta as any)?.env?.DEV ? LOCAL_FALLBACKS : []),
+      ...LOCAL_FALLBACKS,
     ];
   }
 
@@ -94,7 +99,8 @@ export function getApiBaseCandidates(): string[] {
  * In dev on a local origin, never fall back to production (returns 404 for /billing/*).
  */
 export function getBillingApiBaseCandidates(): string[] {
-  if (import.meta.env.DEV && isBrowserLocalDevOrigin()) {
+  const useRemoteApi = (import.meta as any)?.env?.VITE_USE_REMOTE_API === 'true';
+  if (!useRemoteApi && import.meta.env.DEV && isBrowserLocalDevOrigin()) {
     return [DEV_LOCAL_API_BASE];
   }
   return getApiBaseCandidates();
