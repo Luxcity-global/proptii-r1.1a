@@ -378,7 +378,33 @@ export async function fetchBatchedPropertyFacts(input: {
       throw new Error(`facts HTTP ${response.status}`);
     }
 
-    return (await response.json()) as BatchedFactsResponse;
+    const raw = (await response.json()) as Record<string, any>;
+    const normalized: BatchedFactsResponse = {};
+    if (raw && typeof raw === 'object') {
+      for (const [id, value] of Object.entries(raw)) {
+        if (Array.isArray(value)) {
+          normalized[id] = value;
+        } else if (value && Array.isArray(value.flags)) {
+          normalized[id] = value.flags.map((f: any) => ({
+            id: f.flagId || f.id || 'flag',
+            label:
+              f.label ||
+              (f.flagId === 'epc_rating'
+                ? 'EPC'
+                : f.flagId === 'flood_risk'
+                  ? 'Flood risk'
+                  : f.flagId === 'conservation_area'
+                    ? 'Conservation area'
+                    : f.flagId) ||
+              f.detail ||
+              'Government Data',
+            state: f.state || 'unresolved',
+            detail: f.detail,
+          }));
+        }
+      }
+    }
+    return normalized;
   } catch {
     if (shouldUseLocalMocks()) {
       return mockBatchedFacts(listingIds);
@@ -412,7 +438,26 @@ export async function fetchPropertyFacts(
       throw new Error(`property facts HTTP ${response.status}`);
     }
 
-    return (await response.json()) as PropertyFactsResponse;
+    const data = (await response.json()) as any;
+    if (data && Array.isArray(data.flags)) {
+      data.flags = data.flags.map((f: any) => ({
+        id: f.flagId || f.id || 'flag',
+        label:
+          f.label ||
+          (f.flagId === 'epc_rating'
+            ? 'EPC'
+            : f.flagId === 'flood_risk'
+              ? 'Flood risk'
+              : f.flagId === 'conservation_area'
+                ? 'Conservation area'
+                : f.flagId) ||
+          f.detail ||
+          'Government Data',
+        state: f.state || 'unresolved',
+        detail: f.detail,
+      }));
+    }
+    return data as PropertyFactsResponse;
   } catch {
     if (shouldUseLocalMocks()) {
       return mockPropertyFacts(listingId, uprn);
