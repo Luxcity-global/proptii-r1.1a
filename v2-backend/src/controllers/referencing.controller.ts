@@ -1,10 +1,14 @@
 import { Controller, Post, Body, Get, Param, Put, HttpCode, UseGuards, Req, Delete, Query, NotFoundException } from '@nestjs/common';
 import { ReferencingService } from '../services/referencing.service';
+import { RefereeGuarantorService } from '../services/referee-guarantor.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 
 @Controller()
 export class ReferencingController {
-  constructor(private readonly referencingService: ReferencingService) {}
+  constructor(
+    private readonly referencingService: ReferencingService,
+    private readonly refereeGuarantorService: RefereeGuarantorService,
+  ) {}
 
   // ── Section saves ─────────────────────────────────────────────────────────
 
@@ -143,6 +147,19 @@ export class ReferencingController {
     return { success: true, ...(result as any) };
   }
 
+  // ── Invites — public validate (no auth) ───────────────────────────────────
+
+  @Get('referencing/invite/validate')
+  async validateInviteToken(@Query('token') token: string) {
+    if (!token) return { valid: false, error: 'No token provided' };
+    return await this.referencingService.validateInviteToken(token);
+  }
+
+  @Get('referencing/guarantor-invite')
+  async getGuarantorInvite(@Query('token') token: string) {
+    return await this.refereeGuarantorService.getGuarantorInvite(token);
+  }
+
   // ── Shares — public validate (no auth) ───────────────────────────────────
 
   @Get('referencing/shares/validate-claim')
@@ -212,6 +229,13 @@ export class ReferencingController {
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
+
+  @Post('referencing/invite/submit')
+  @HttpCode(200)
+  async submitInviteApplication(@Body() body: { token?: string; formData: any }) {
+    const userId = body.token || `tenant_${Date.now()}`;
+    return await this.referencingService.submitApplication(userId, body.formData);
+  }
 
   @Post(['referencing/:userId/submit', 'applications/:userId/submit'])
   @HttpCode(200)

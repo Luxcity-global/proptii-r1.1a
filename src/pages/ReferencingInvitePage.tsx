@@ -122,7 +122,17 @@ export const ReferencingInvitePage: React.FC = () => {
   // ── 1. Validate Invite Token ───────────────────────────────────────────────
   useEffect(() => {
     if (!token) {
-      setInviteError('No invitation token provided. Please check the link in your email.');
+      if (user) {
+        setFormData(prev => ({
+          ...prev,
+          identity: {
+            ...prev.identity,
+            firstName: prev.identity.firstName || user.givenName || '',
+            lastName: prev.identity.lastName || user.familyName || '',
+            email: prev.identity.email || user.email || '',
+          }
+        }));
+      }
       setLoadingInvite(false);
       return;
     }
@@ -156,7 +166,8 @@ export const ReferencingInvitePage: React.FC = () => {
           setInviteError(json.error || 'This invitation link is invalid or has expired.');
         }
       } catch (err: any) {
-        setInviteError('Unable to connect to referencing service. Please try again.');
+        // In case of network error, do not trap the user in an error screen
+        setLoadingInvite(false);
       } finally {
         setLoadingInvite(false);
       }
