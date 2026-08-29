@@ -14,6 +14,7 @@ export function prepareReportElementForPdfCapture(root: HTMLElement): void {
   root.style.overflow = 'visible';
   root.style.height = 'auto';
   root.style.boxShadow = 'none';
+  root.style.backgroundColor = '#ffffff';
 
   root.querySelectorAll('.no-print').forEach((node) => {
     node.remove();
@@ -40,7 +41,7 @@ export function prepareReportElementForPdfCapture(root: HTMLElement): void {
 
 /**
  * Capture a live report element and save it as a multi-page A4 PDF.
- * Uses the rendered DOM so the download matches the report page.
+ * Uses the rendered DOM with solid white background and precise page thresholding.
  */
 export async function captureElementAsPdf(element: HTMLElement, filename: string): Promise<void> {
   const previousScrollTop = element.scrollTop;
@@ -51,7 +52,7 @@ export async function captureElementAsPdf(element: HTMLElement, filename: string
       scale: 2,
       useCORS: true,
       allowTaint: true,
-      backgroundColor: '#f7f2e8',
+      backgroundColor: '#ffffff',
       logging: false,
       height: element.scrollHeight,
       width: element.scrollWidth,
@@ -64,7 +65,7 @@ export async function captureElementAsPdf(element: HTMLElement, filename: string
       },
     });
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
     const pdf = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
@@ -77,7 +78,8 @@ export async function captureElementAsPdf(element: HTMLElement, filename: string
     pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, imgHeight, undefined, 'FAST');
     heightLeft -= pageHeight;
 
-    while (heightLeft > 0) {
+    // Use a 5mm threshold to avoid empty trailing pages due to sub-pixel margins
+    while (heightLeft > 5) {
       position = heightLeft - imgHeight;
       pdf.addPage();
       pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, imgHeight, undefined, 'FAST');
