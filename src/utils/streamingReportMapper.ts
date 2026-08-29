@@ -135,15 +135,90 @@ function buildFacts(data: StreamingReportData): FactFlag[] {
     })) as FactFlag[];
 }
 
+function calculateDeposit(priceStr: string, isRental: boolean): { value: string; qualifier?: string } {
+  if (!isRental) {
+    return { value: '10% Exchange Deposit', qualifier: 'Standard Law Society Contract' };
+  }
+
+  const cleanNum = priceStr.replace(/,/g, '').match(/\d+(?:\.\d+)?/);
+  if (!cleanNum) {
+    return { value: '5 Weeks Rent', qualifier: 'TDS Protected (Statutory Max)' };
+  }
+
+  const amount = parseFloat(cleanNum[0]);
+  if (isNaN(amount) || amount <= 0) {
+    return { value: '5 Weeks Rent', qualifier: 'TDS Protected' };
+  }
+
+  let fiveWeeks = 0;
+  if (/pw|per\s*week/i.test(priceStr)) {
+    fiveWeeks = Math.round(amount * 5);
+  } else {
+    // Standard UK pcm calculation: (pcm * 12 / 52) * 5
+    fiveWeeks = Math.round(((amount * 12) / 52) * 5);
+  }
+
+  return {
+    value: `5 Weeks (£${fiveWeeks.toLocaleString()})`,
+    qualifier: 'TDS Protected (Statutory Max)',
+  };
+}
+
+function resolveTenure(priceStr: string, audience: Audience | null): { value: string; qualifier?: string } {
+  const isRental = /pcm|pw|to\s*rent|rent/i.test(priceStr) || audience === 'tenant';
+  if (isRental) {
+    return {
+      value: 'Assured Shorthold Tenancy (AST)',
+      qualifier: 'Standard Private Rented Sector Term',
+    };
+  }
+
+  return {
+    value: 'Freehold / Leasehold',
+    qualifier: 'Pending HM Land Registry title check',
+  };
+}
+
+function buildDynamicPartARows(
+  listingPrice: string,
+  audience: Audience | null,
+): { label: string; value: string; qualifier?: string }[] {
+  const isRental = /pcm|pw|to\s*rent|rent/i.test(listingPrice) || audience === 'tenant';
+  const depositInfo = calculateDeposit(listingPrice, isRental);
+  const tenureInfo = resolveTenure(listingPrice, audience);
+
+  return [
+    {
+      label: 'Price / Rent',
+      value: listingPrice || 'Price on application',
+    },
+    {
+      label: 'Council Tax Band',
+      value: 'To be confirmed by agent',
+      qualifier: 'Check with local authority',
+    },
+    {
+      label: 'Tenure / Term',
+      value: tenureInfo.value,
+      qualifier: tenureInfo.qualifier,
+    },
+    {
+      label: isRental ? 'Deposit' : 'Exchange Deposit',
+      value: depositInfo.value,
+      qualifier: depositInfo.qualifier,
+    },
+  ];
+}
+
 function buildWhatToWatch(data: StreamingReportData): { title: string; body: string } {
   const heritage = data.local?.heritage;
   const flood = data.local?.flood;
   const parts: string[] = [];
 
   if (heritage?.conservationArea) {
-    parts.push('A conservation area designation applies near this postcode.');
+    parts.push('A conservation area designation applies near this postcode centroid.');
   }
-  if (flood?.headline && flood.headline !== 'Loading...') {
+  if (flood?.headline && flood.headline !== 'Loading...' && flood.headline !== 'Unknown') {
     parts.push(`Flood context: ${flood.headline.toLowerCase()} risk at postcode centroid.`);
   }
   if (data.partC?.message) {
@@ -153,9 +228,9 @@ function buildWhatToWatch(data: StreamingReportData): { title: string; body: str
   const body =
     parts.length > 0
       ? `${parts.join(' ')} Title register and covenant checks are not in this report — see Part C.`
-      : defaultRenterContent().whatToWatchBody;
+      : 'Statutory and open government checks evaluated. Title register and covenant checks are pending live Land Registry integration.';
 
-  return { title: defaultRenterContent().whatToWatchTitle, body };
+  return { title: 'What to watch', body };
 }
 
 export function mapStreamingReportToPropertyReport(
@@ -168,15 +243,11 @@ export function mapStreamingReportToPropertyReport(
   const partBBody = buildPartBBody(data.partB);
   const listingPrice = options?.listingPrice?.trim() || data.partA?.listingPrice?.trim() || '';
 
-  const partARows = defaults.partARows.map((row) =>
-    row.label === 'Price / Rent' && listingPrice && listingPrice !== 'from listing'
-      ? { ...row, value: listingPrice }
-      : row,
-  );
+  const partARows = buildDynamicPartARows(listingPrice, audience);
 
   const partCStatus =
     data.partC?.message?.trim() ||
-    (data.partC?.status === 'pending_nps' ? 'To come in next release' : defaults.partCStatus);
+    (data.partC?.status === 'pending_nps' ? 'To come in next release' : 'To come in next release');
 
   const lens: ReportLens = {
     ...mockReportLens(audience),

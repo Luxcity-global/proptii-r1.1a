@@ -76,7 +76,11 @@ export class AgentEnrichmentService {
   }
 
   private async enrichSingle(property: any): Promise<any | null> {
-    const agencyName = this.cleanAgencyName(property.agent.name);
+    if (property.agent?.email && typeof property.agent.email === 'string' && property.agent.email.includes('@')) {
+      return property;
+    }
+
+    const agencyName = this.cleanAgencyName(property.agent?.name);
     if (!agencyName) return null;
 
     const cacheKey = `agent_contact:${agencyName.toLowerCase().replace(/\s+/g, '_')}`;

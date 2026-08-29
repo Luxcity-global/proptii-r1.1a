@@ -80,22 +80,17 @@ export const searchProperties: RequestHandler = async (req: Request, res: Respon
       }
     }
 
-    // ── 3. Live Scraping + Immediate Streaming ────────
+    // ── 3. Live Scraping + Verified Email Streaming ────────
     const allScrapedAndEnriched: any[] = [];
     
     await scraperManager.scrapeAll(query, filters, async (provider, providerResults) => {
-      if (providerResults && providerResults.length > 0 && !isClosed) {
-        // Normalize results immediately
-        const normalizedResults = providerResults.map((p: any) => {
-          const item = { ...p };
-          item.agent = item.agent || {};
-          item.agent.phone = normalizePhone(item.agent?.phone, item.id || item.url) || undefined;
-          return item;
-        });
-
-        allScrapedAndEnriched.push(...normalizedResults);
-        write({ type: 'results', provider, data: normalizedResults });
-      }
+      await enrichmentService.enrichAndStream(providerResults, (enrichedResult) => {
+        if (!isClosed && enrichedResult?.agent?.email) {
+          enrichedResult.agent.phone = normalizePhone(enrichedResult.agent.phone, enrichedResult.id || enrichedResult.url) || undefined;
+          allScrapedAndEnriched.push(enrichedResult);
+          write({ type: 'results', provider, data: [enrichedResult] });
+        }
+      });
       
       if (!isClosed) {
         write({ type: 'provider_done', provider });
