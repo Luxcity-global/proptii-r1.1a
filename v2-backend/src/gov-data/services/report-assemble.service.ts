@@ -34,7 +34,7 @@ export class ReportAssembleService {
         centroid = {
           latitude: address.coordinates.lat,
           longitude: address.coordinates.lng,
-          admin_district: address.display?.split(',')[1]?.trim() || 'Greater London',
+          admin_district: address.display?.split(',')[1]?.trim() || '',
           lsoa: '',
           postcode: postcode || '',
         };

@@ -155,12 +155,12 @@ export class ReportController {
       }
     }
 
-    // 5. Safe fallback if still unmapped so we never throw 400
-    if (!dto.address?.postcode) {
-      dto.address.postcode = 'SW1A 1AA';
-      if (!dto.address.coordinates) {
-        dto.address.coordinates = { lat: 51.5014, lng: -0.1419 };
-      }
+    // 5. If genuine resolution fails after regex, coordinates, and OSM geocoding:
+    if (!dto.address?.postcode && (!dto.address?.coordinates?.lat || !dto.address?.coordinates?.lng)) {
+      throw new HttpException(
+        'Unable to resolve a genuine UK location or postcode for the provided address.',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     
     // Set headers for chunked NDJSON streaming
