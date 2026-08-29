@@ -4,7 +4,9 @@ export default {
   content: [
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',
-    '!./src/**/node_modules/**',
+    '!**/node_modules/**',
+    '!./src/landlord_agent/node_modules/**',
+    '!./src/landlord_agent/dist/**',
   ],
   theme: {
     extend: {
