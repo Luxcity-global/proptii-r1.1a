@@ -5,6 +5,8 @@ import { useSearchBackend, type Property } from '../hooks/useSearchBackend';
 import { useSavedProperties } from '../contexts/SavedPropertiesContext';
 import { useGovDataLayer } from '../contexts/GovDataLayerContext';
 import { useBatchedPropertyFacts } from '../hooks/useBatchedPropertyFacts';
+import { useClassifyQuery } from '../hooks/useClassifyQuery';
+import { FilterPills } from '../components/search/FilterPills';
 import { FactsBadgeRow } from '../components/property/FactsBadgeRow';
 import { ProptiiModule } from '../components/property/ProptiiModule';
 import { resolveListingId } from '../utils/listingId';
@@ -949,6 +951,10 @@ const SearchResults = () => {
     govDataEnabled,
     results,
   );
+  const { classification, isClassifying } = useClassifyQuery({
+    enabled: Boolean(searchQuery),
+    query: searchQuery,
+  });
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showMap, setShowMap] = useState(false);
@@ -1820,7 +1826,7 @@ const SearchResults = () => {
                   <div className="w-2 h-8 bg-gradient-to-b from-[#136C9E] to-[#0F5A8A] rounded-full mr-4"></div>
                   <h2 className="text-xl font-bold text-gray-900">Search Summary</h2>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-center">
                     <span className="text-gray-500 font-medium w-20">Query:</span>
                     <span className="text-gray-900 font-semibold">{searchQuery}</span>
@@ -1831,6 +1837,13 @@ const SearchResults = () => {
                     {sessionStorage.getItem('searchResults') && (
                       <span className="ml-2 px-2 py-1 bg-[#136C9E]/10 text-[#136C9E] text-xs font-medium rounded-full">cached</span>
                     )}
+                  </div>
+                  {/* Search Intent / Classification Filter Pills */}
+                  <div className="pt-2">
+                    <FilterPills
+                      entities={classification?.entities}
+                      isClassifying={isClassifying}
+                    />
                   </div>
                 </div>
               </div>

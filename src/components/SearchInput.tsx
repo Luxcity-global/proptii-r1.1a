@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useClassifyQuery } from '../hooks/useClassifyQuery';
+import { FilterPills } from './search/FilterPills';
 
 type SearchPlatform = 'onthemarket' | 'proptii';
 
@@ -42,6 +44,11 @@ export const SearchInput = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  const { classification, isClassifying } = useClassifyQuery({
+    enabled: Boolean(query.trim().length >= 3),
+    query,
+  });
 
   // Update internal query when value prop changes
   useEffect(() => {
@@ -227,6 +234,17 @@ export const SearchInput = ({
             </div>
           </div>
           {error && <div className="mt-2 text-red-500 text-sm">{error}</div>}
+
+          {/* Live NLP Query Classification Filter Pills */}
+          {classification?.entities && Object.keys(classification.entities).length > 0 && (
+            <div className="mt-3 flex justify-center">
+              <FilterPills
+                entities={classification.entities}
+                isClassifying={isClassifying}
+                onDark
+              />
+            </div>
+          )}
         </div>
         {/* Try pills */}
         <div className="mt-12 flex flex-wrap items-center justify-center gap-2">
@@ -418,6 +436,16 @@ export const SearchInput = ({
         {error && (
           <div className="mt-2 text-red-500 text-sm">
             {error}
+          </div>
+        )}
+
+        {/* Live NLP Query Classification Filter Pills */}
+        {classification?.entities && Object.keys(classification.entities).length > 0 && (
+          <div className="mt-3 flex justify-center">
+            <FilterPills
+              entities={classification.entities}
+              isClassifying={isClassifying}
+            />
           </div>
         )}
       </div>
