@@ -99,7 +99,7 @@ interface ReferencingShareItem {
 const TenantReferencing: React.FC = () => {
   // ── All hooks must be called unconditionally before any early returns ──────
   const { plan, status } = useBillingStatus();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const isMobile = useIsMobile();
   const [formData, setFormData] = useState<FormData | null>(null);
   const [stepStatus, setStepStatus] = useState<{ [key: number]: 'empty' | 'partial' | 'complete' }>({});
@@ -115,17 +115,18 @@ const TenantReferencing: React.FC = () => {
 
   // Load form data and shares from Firestore
   const loadReferencingData = async () => {
-    if (!user?.id) {
+    const userId = user?.id || (isAuthenticated ? (user as any)?.uid || 'current_user' : null);
+    if (!userId) {
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      const propertyId = `general_${user.id}`;
+      const propertyId = `general_${userId}`;
       const [formResult, sharesResult] = await Promise.all([
-        firestoreService.getReferencingForm(user.id, propertyId),
-        firestoreService.getReferencingShares(user.id)
+        firestoreService.getReferencingForm(userId, propertyId),
+        firestoreService.getReferencingShares(userId)
       ]);
       
       if (formResult.success && formResult.data) {
@@ -145,8 +146,19 @@ const TenantReferencing: React.FC = () => {
   };
 
   useEffect(() => {
-    loadReferencingData();
-  }, [user?.id]);
+    let active = true;
+    if (!authLoading) {
+      loadReferencingData();
+    } else {
+      const timer = setTimeout(() => {
+        if (active) setLoading(false);
+      }, 1000);
+      return () => {
+        active = false;
+        clearTimeout(timer);
+      };
+    }
+  }, [user?.id, authLoading]);
 
   const isFieldComplete = (section: keyof FormData, field: string): boolean => {
     if (!formData) return false;
