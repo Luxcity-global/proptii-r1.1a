@@ -146,13 +146,14 @@ export class ClassifierService {
       return { ...cached, cacheHit: true };
     }
 
-    // ── 2. Race AI call against timeout ─────────────────────────────────────
+    // ── 2. Live AI call (raced against timeout) ────────────────────────────
     const aiResult = await this.classifyWithTimeout(query);
 
     if (!aiResult) {
-      // Timeout or error — return safe fallback, do NOT cache it
-      this.logger.warn(`[Classifier] Timeout/error for "${query}" — returning fallback`);
-      return { ...FALLBACK_RESULT, cacheHit: false };
+      // Heuristic entity extraction fallback so filter pills ALWAYS work instantly
+      const heuristic = extractHeuristicEntities(query);
+      this.logger.log(`[Classifier] Heuristic fallback for "${query}" → ${JSON.stringify(heuristic.entities)}`);
+      return { ...heuristic, fallback: true, cacheHit: false };
     }
 
     // ── 3. Cache successful result ───────────────────────────────────────────
@@ -376,4 +377,68 @@ export class ClassifierService {
  */
 export function normaliseQuery(query: string): string {
   return (query ?? '').toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+export function extractHeuristicEntities(query: string): {
+  intent: ClassifierIntent;
+  audience: Audience;
+  entities: Record<string, string>;
+  confidence: number;
+} {
+  const lower = query.toLowerCase();
+  const entities: Record<string, string> = {};
+
+  // Location
+  const locMatch = query.match(/\b(?:in|at|near|around)\s+([A-Za-z\s]+?)(?:\s+(?:under|<|for|to|\d+)|$)/i);
+  if (locMatch && locMatch[1]) {
+    entities.location = locMatch[1].trim();
+  } else {
+    const commonCities = ['london', 'manchester', 'birmingham', 'leeds', 'bristol', 'liverpool', 'sheffield', 'nottingham', 'newcastle', 'edinburgh', 'glasgow', 'cardiff', 'brighton', 'oxford', 'cambridge', 'hackney', 'islington', 'shoreditch', 'brixton', 'camden'];
+    for (const city of commonCities) {
+      if (lower.includes(city)) {
+        entities.location = city.charAt(0).toUpperCase() + city.slice(1);
+        break;
+      }
+    }
+  }
+
+  // Bedrooms
+  const bedMatch = query.match(/\b(\d+)\s*(?:bed|bedroom|br)\b/i);
+  if (bedMatch) {
+    entities.bedrooms = bedMatch[1];
+  } else if (lower.includes('studio')) {
+    entities.bedrooms = '0';
+  }
+
+  // Property Type
+  if (lower.includes('flat') || lower.includes('apartment')) {
+    entities.property_type = 'flat';
+  } else if (lower.includes('house') || lower.includes('terraced') || lower.includes('semi-detached') || lower.includes('detached')) {
+    entities.property_type = 'house';
+  } else if (lower.includes('studio')) {
+    entities.property_type = 'studio';
+  }
+
+  // Price Max
+  const priceMatch = query.match(/(?:under|<|max|up to|budget|£)\s*£?(\d[\d,]*)/i);
+  if (priceMatch) {
+    entities.price_max = priceMatch[1].replace(/,/g, '');
+  }
+
+  // Tenure & Audience
+  let audience: Audience = 'tenant';
+  if (lower.includes('buy') || lower.includes('sale') || lower.includes('purchase')) {
+    entities.tenure = 'buy';
+    audience = 'buyer';
+  } else if (lower.includes('rent') || lower.includes('let') || lower.includes('pcm') || lower.includes('pw')) {
+    entities.tenure = 'rent';
+    audience = 'tenant';
+  }
+
+  return {
+    intent: 'property_search',
+    audience,
+    entities,
+    confidence: 0,
+  };
 }
