@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
 import { resolveSearchBackendUrl } from '../utils/searchBackendUrl';
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
@@ -38,6 +37,7 @@ const cleanPropertyPrice = (price: string): string => {
 
 import { Property, SearchResponse } from '../types/property';
 
+export type { Property };
 export const useSearchBackend = () => {
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -50,8 +50,7 @@ export const useSearchBackend = () => {
   // Network connectivity check
   const checkNetworkConnectivity = async (): Promise<boolean> => {
     try {
-      const fetchUrl = `${searchBackendUrl}/health`;
-      const response = await fetch(fetchUrl, { 
+      const response = await fetch(`${searchBackendUrl}/health`, { 
         method: 'GET',
         signal: AbortSignal.timeout(10000) // Increased to 10 seconds
       });
@@ -62,29 +61,20 @@ export const useSearchBackend = () => {
     }
   };
 
-  // Load cached results on mount — expire after 10 minutes
+  // Load cached results on mount
   useEffect(() => {
-    const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
     const cachedData = sessionStorage.getItem('searchResults');
     if (cachedData) {
       try {
         const parsed = JSON.parse(cachedData);
-        const age = Date.now() - (parsed.timestamp ?? 0);
-        if (parsed.results && parsed.results.length > 0 && age < CACHE_TTL_MS) {
-          // Clean the pricing for cached results as well
-          const cleanedCachedResults = parsed.results.map((property: Property) => ({
-            ...property,
-            price: cleanPropertyPrice(property.price)
-          }));
-          const native = cleanedCachedResults.filter((p: Property) => p.source === 'native');
-          const scraped = cleanedCachedResults.filter((p: Property) => p.source !== 'native');
-          setResults([...native, ...scraped]);
-          setQuery(parsed.query || '');
-          setSearchType(parsed.searchType || 'onthemarket');
-        } else {
-          // Cache expired or empty — clear it
-          sessionStorage.removeItem('searchResults');
-        }
+        // Clean the pricing for cached results as well
+        const cleanedCachedResults = (parsed.results || []).map((property: Property) => ({
+          ...property,
+          price: cleanPropertyPrice(property.price)
+        }));
+        setResults(cleanedCachedResults);
+        setQuery(parsed.query || '');
+        setSearchType(parsed.searchType || 'onthemarket');
       } catch (error) {
         console.error('Error parsing cached search results:', error);
         sessionStorage.removeItem('searchResults');
@@ -108,74 +98,51 @@ export const useSearchBackend = () => {
       `${p.title?.toLowerCase().trim()}|${p.location?.toLowerCase().trim()}`;
 
     try {
-      // 1. Parallel native (Proptii-hosted) property search via API
-      // Tries /api/properties/search first (AppController alias), then
-      // /api/native-properties/search (direct controller route) as fallback.
-      const nativeApiPromise = (async (): Promise<Property[]> => {
-        const apiBase = getResolvedApiBaseUrl().replace(/\/api$/, '');
-        const primaryUrl = `${apiBase}/api/properties/search?q=${encodeURIComponent(searchQuery)}&limit=50`;
-        const fallbackUrl = `${apiBase}/api/native-properties/search?q=${encodeURIComponent(searchQuery)}&limit=50`;
-
-        const tryFetch = async (url: string): Promise<Property[]> => {
-          const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-          if (!res.ok) return [];
-          const data = await res.json();
-          return ((data.results ?? []) as any[]).map(p => ({
-            ...p,
-            source: p.source ?? 'native',
-            price: cleanPropertyPrice(p.price ?? ''),
-          }));
-        };
-
+      // 1. Parallel Firestore (Proptii) search
+      const firestorePromise = (async (): Promise<Property[]> => {
         try {
-          const primaryResults = await tryFetch(primaryUrl);
-          if (primaryResults.length > 0) return primaryResults;
-          // Primary returned empty — try the direct route
-          return await tryFetch(fallbackUrl);
+          const { searchProptiiProperties } = await import('../services/proptiiPropertyService');
+          const proptiiResults = await searchProptiiProperties(searchQuery);
+          return proptiiResults.map(property => ({
+            ...property,
+            price: cleanPropertyPrice(property.price)
+          }));
         } catch (e) {
-          console.warn('[Search] Primary native search failed, trying fallback:', e);
-          try {
-            return await tryFetch(fallbackUrl);
-          } catch (e2) {
-            console.warn('[Search] Native API search failed on both routes:', e2);
-            return [];
-          }
+          console.warn('[Search] Firestore search failed:', e);
+          return [];
         }
       })();
 
-      // Update results immediately when native API returns
-      nativeApiPromise.then(nativeResults => {
-        if (nativeResults.length > 0) {
+      // Update results immediately when Firestore returns
+      firestorePromise.then(proptiiResults => {
+        if (proptiiResults.length > 0) {
           setResults(prev => {
             const seen = new Set(prev.map(deduplicationKey));
-            const unique = nativeResults.filter(p => !seen.has(deduplicationKey(p)));
-            const combined = [...prev, ...unique];
-            const native = combined.filter(p => p.source === 'native');
-            const scraped = combined.filter(p => p.source !== 'native');
-            return [...native, ...scraped];
+            const unique = proptiiResults.filter(p => !seen.has(deduplicationKey(p)));
+            return [...prev, ...unique];
           });
         }
       });
 
-      // If user ONLY wants Proptii results, wait for native API only
+      // If user ONLY wants Proptii results, we stop here (wait for firestorePromise)
       if (type === 'proptii') {
-        const results = await nativeApiPromise;
+        const results = await firestorePromise;
         if (results.length === 0) {
           throw new Error('No properties found on Proptii. Please try a different search.');
         }
+        
         sessionStorage.setItem('searchResults', JSON.stringify({
-          results, query: searchQuery, searchType: 'proptii', timestamp: Date.now()
+          results,
+          query: searchQuery,
+          searchType: 'proptii',
+          timestamp: Date.now()
         }));
         setIsLoading(false);
         return results;
       }
 
-      // 2. SSE Scraper Search (hits proptii-search)
-      // Ensure we don't have double slashes
-      const endpoint = '/api/v1/search';
-      const fetchUrl = `${searchBackendUrl}${endpoint}`;
-      
-      const response = await fetch(fetchUrl, {
+      // 2. SSE Scraper Search (hits proptii-search port 3001)
+      const response = await fetch(`${searchBackendUrl}/api/v1/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: searchQuery, filters: {} }),
@@ -209,9 +176,19 @@ export const useSearchBackend = () => {
             const event = JSON.parse(trimmed.slice(6));
             
             if (event.type === 'initial' || event.type === 'results') {
-              const incoming = (event.data as any[]).map(p => ({
+              const incoming = (event.data as any[]).map((p) => ({
                 ...p,
-                price: cleanPropertyPrice(p.price)
+                price: cleanPropertyPrice(p.price),
+                description: p.description || p.summary || p.notes || p.overview || '',
+                imageUrls: p.imageUrls || p.images || [],
+                url: p.url || p.listingUrl,
+                latitude: typeof p.latitude === 'number' ? p.latitude : undefined,
+                longitude: typeof p.longitude === 'number' ? p.longitude : undefined,
+                coordinates:
+                  p.coordinates ??
+                  (typeof p.latitude === 'number' && typeof p.longitude === 'number'
+                    ? { lat: p.latitude, lng: p.longitude }
+                    : undefined),
               }));
 
               allScraped = [...allScraped, ...incoming];
@@ -219,10 +196,7 @@ export const useSearchBackend = () => {
               setResults(prev => {
                 const seen = new Set(prev.map(deduplicationKey));
                 const unique = incoming.filter(p => !seen.has(deduplicationKey(p)));
-                const combined = [...prev, ...unique];
-                const native = combined.filter(p => p.source === 'native');
-                const scraped = combined.filter(p => p.source !== 'native');
-                return [...native, ...scraped];
+                return [...prev, ...unique];
               });
             } else if (event.type === 'done') {
               // Scraper is finished
@@ -234,8 +208,8 @@ export const useSearchBackend = () => {
       }
 
       // Final merge for cache
-      const nativeResults = await nativeApiPromise;
-      const seenKeys = new Set(nativeResults.map(deduplicationKey));
+      const proptiiResults = await firestorePromise;
+      const seenKeys = new Set(proptiiResults.map(deduplicationKey));
       const uniqueScraped = allScraped.filter(p => {
         const key = deduplicationKey(p);
         if (seenKeys.has(key)) return false;
@@ -243,23 +217,20 @@ export const useSearchBackend = () => {
         return true;
       });
       
-      const finalResults = [...nativeResults, ...uniqueScraped];
-      const finalNative = finalResults.filter(p => p.source === 'native');
-      const finalScraped = finalResults.filter(p => p.source !== 'native');
-      const sortedFinalResults = [...finalNative, ...finalScraped];
+      const finalResults = [...proptiiResults, ...uniqueScraped];
       
-      if (sortedFinalResults.length === 0) {
+      if (finalResults.length === 0) {
         throw new Error('No properties found. Please try a different search.');
       }
 
       sessionStorage.setItem('searchResults', JSON.stringify({
-        results: sortedFinalResults,
+        results: finalResults,
         query: searchQuery,
         searchType: type,
         timestamp: Date.now()
       }));
 
-      return sortedFinalResults;
+      return finalResults;
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Search failed';

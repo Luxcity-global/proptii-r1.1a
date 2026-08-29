@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useSearchBackend } from '../hooks/useSearchBackend';
-import type { Property } from '../types/property';
-import { useAuth } from '../contexts/AuthContext';
-import { useMessagingContext } from '../contexts/MessagingContext';
-import communicationService from '../services/communicationService';
-import QuickRequestModal from '../components/enquiry/QuickRequestModal';
-
+import { Bath, BedDouble, Check, MapPin, Square } from 'lucide-react';
+import { useSearchBackend, type Property } from '../hooks/useSearchBackend';
 import { useSavedProperties } from '../contexts/SavedPropertiesContext';
+import { useGovDataLayer } from '../contexts/GovDataLayerContext';
+import { useBatchedPropertyFacts } from '../hooks/useBatchedPropertyFacts';
+import { FactsBadgeRow } from '../components/property/FactsBadgeRow';
+import { ProptiiModule } from '../components/property/ProptiiModule';
+import { resolveListingId } from '../utils/listingId';
+import { getPropertyDisplayTitle, getPropertyListingDescription } from '../utils/propertyDisplay';
 import Footer from '../components/Footer';
-import { getAmenityIcon } from '../utils/amenityIcons';
-import ListingDetailsModal from '../components/listings/ListingDetailsModal';
-import { mapScrapedToNative } from '../utils/propertyAdapter';
+import { SearchLoadingAnimation } from '../components/SearchLoadingAnimation';
+import type { FactFlag } from '../types/govData';
 
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
@@ -64,104 +64,532 @@ const PropertySkeleton = () => (
   </div>
 );
 
-// Property Card Component
-const PropertyCard = ({ property, onClick, isSaved, onToggleSave }: { 
+// Property Card Component — handoff ListingCard (single main photo)
+const PropertyCard = ({ property, onClick, isSaved, onToggleSave, factFlags, factsLoading, factsUnresolved, reportHint, reserveHintSlot }: { 
   property: Property, 
   onClick: () => void,
   isSaved: boolean,
-  onToggleSave: (e: React.MouseEvent) => void
+  onToggleSave: (e: React.MouseEvent) => void,
+  factFlags?: FactFlag[] | null,
+  factsLoading?: boolean,
+  factsUnresolved?: boolean,
+  reportHint?: string | null,
+  reserveHintSlot?: boolean,
 }) => {
   const [imgError, setImgError] = useState(false);
   
-  // Modern placeholder image
   const placeholderImage = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800';
-  
   const hasImage = property.imageUrls && property.imageUrls.length > 0 && !imgError;
   const imageSrc = hasImage ? property.imageUrls[0] : placeholderImage;
+  const cleanedPrice = cleanPropertyPrice(property.price);
+  const pcmMatch = cleanedPrice.match(/^(£[\d,]+)\s*(pcm)?$/i);
+  const priceMain = pcmMatch?.[1] || cleanedPrice;
+  const showPcm = /pcm/i.test(cleanedPrice) || Boolean(pcmMatch?.[2]);
+  const isRent =
+    /pcm|pw|rent|let/i.test(`${property.price} ${property.propertyType}`) ||
+    !/sale|buy/i.test(property.propertyType || '');
+  const displayTitle = getPropertyDisplayTitle(property);
+
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+    if (navigator.share) {
+      void navigator.share({
+        title: property.title,
+        text: `${property.title} — ${cleanedPrice}`,
+        url: shareUrl,
+      }).catch(() => {});
+      return;
+    }
+    if (navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(`${property.title} — ${cleanedPrice} ${shareUrl}`);
+    }
+  };
 
   return (
     <div
-      className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
+      className="bg-white rounded-2xl shadow-md overflow-hidden cursor-pointer hover:shadow-xl transition-all border border-gray-100 group flex flex-col justify-between"
       onClick={onClick}
     >
-      {/* Property Image */}
-      <div className="relative h-48 overflow-hidden bg-gray-100">
-        <img
-          src={imageSrc}
-          alt={property.title}
-          onError={() => setImgError(true)}
-          className={`w-full h-full object-cover transition-transform duration-500 hover:scale-110 ${
-            !hasImage ? 'opacity-50 grayscale' : ''
-          }`}
-        />
-        
-        {/* Price Badge */}
-        <div className="absolute top-4 left-4 bg-[#E65D24] text-white px-3 py-1 rounded-full font-semibold text-sm shadow-md">
-          {cleanPropertyPrice(property.price)}
-        </div>
-        
-        {/* Heart Button */}
-        <button
-          onClick={onToggleSave}
-          className="absolute top-4 right-4 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110"
-        >
-          <svg 
-            className={`w-5 h-5 transition-colors ${
-              isSaved ? 'text-red-500 fill-red-500' : 'text-gray-600 hover:text-red-500'
-            }`}
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        </button>
-        
-        {/* Source Badge */}
-        {property.source && (
-          <div className="absolute bottom-4 left-4 bg-black/70 text-white px-2 py-1 rounded text-xs backdrop-blur-sm">
-            {property.source}
-          </div>
-        )}
-      </div>
+      <div>
+        {/* Single full-width main image with inset rounded frame */}
+        <div className="relative w-full h-60 sm:h-64 overflow-hidden p-2">
+          <div className="relative w-full h-full rounded-xl overflow-hidden bg-gray-100">
+            <img
+              src={imageSrc}
+              alt={displayTitle}
+              onError={() => setImgError(true)}
+              className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${
+                !hasImage ? 'opacity-50 grayscale' : ''
+              }`}
+            />
 
-      {/* Property Details */}
-      <div className="p-4">
-        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 min-h-[3rem]">{property.title}</h3>
-        
-        <div className="flex items-center gap-2 text-gray-600 mb-3">
-          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <span className="text-sm truncate">{property.location}</span>
-        </div>
-
-        <div className="flex items-center justify-between text-sm text-gray-600 border-t border-gray-100 pt-3 mt-auto">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z" />
-              </svg>
-              <span>{property.bedrooms || '—'}</span>
+            <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#136C9E] text-white shadow-sm">
+                {isRent ? 'To Rent' : 'For Sale'}
+              </span>
+              <span className="bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-sm">
+                Available Now
+              </span>
             </div>
-            <div className="flex items-center gap-1">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-              <span className="truncate max-w-[80px]">{property.propertyType}</span>
+
+            <div className="absolute top-3 right-3 flex space-x-1 bg-white/90 backdrop-blur-sm rounded-full p-1 shadow-md">
+              <button
+                type="button"
+                onClick={onToggleSave}
+                className="p-1.5 hover:bg-gray-100 rounded-full text-gray-500 hover:text-red-500 transition-colors"
+                aria-label={isSaved ? 'Remove from saved' : 'Save property'}
+              >
+                <svg
+                  className={`w-4 h-4 ${isSaved ? 'text-red-500 fill-red-500' : ''}`}
+                  fill={isSaved ? 'currentColor' : 'none'}
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={handleShare}
+                className="p-1.5 hover:bg-gray-100 rounded-full text-gray-500 hover:text-[#136C9E] transition-colors"
+                aria-label="Share property"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+              </button>
             </div>
           </div>
-          
-          {property.agent && (
-            <div className="text-xs text-[#136C9E] font-medium max-w-[100px] truncate">
-              {property.agent.name}
+        </div>
+
+        <div className="p-5">
+          <div className="flex justify-between items-start gap-3 mb-2">
+            <div className="min-w-0">
+              <h3
+                className="text-base font-semibold text-gray-900 group-hover:text-[#136C9E] transition-colors line-clamp-2"
+                style={{ fontFamily: 'Archivo, sans-serif' }}
+              >
+                {displayTitle}
+              </h3>
+              <div className="flex items-center text-gray-500 text-xs mt-0.5">
+                <svg className="w-3.5 h-3.5 mr-1 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="truncate">{property.location}</span>
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-xl font-extrabold text-[#F15A22]">
+                {priceMain}
+                {showPcm && <span className="text-xs text-gray-500 font-normal"> pcm</span>}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-4 text-gray-500 text-xs my-3 pb-3 border-b border-gray-100">
+            <div className="flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2v12a2 2 0 002 2z" />
+              </svg>
+              <span>{property.bedrooms || '—'} Beds</span>
+            </div>
+            {property.bathrooms && (
+              <div className="flex items-center gap-1">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16M6 12V7a2 2 0 012-2h8a2 2 0 012 2v5M7 17h.01M17 17h.01" />
+                </svg>
+                <span>{property.bathrooms} Baths</span>
+              </div>
+            )}
+            {property.squareFootage && (
+              <div className="flex items-center gap-1">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
+                </svg>
+                <span>{property.squareFootage} sq ft</span>
+              </div>
+            )}
+            {!property.bathrooms && !property.squareFootage && property.propertyType && (
+              <div className="flex items-center gap-1 truncate">
+                <span className="capitalize">{property.propertyType}</span>
+              </div>
+            )}
+          </div>
+
+          {(factsLoading || factFlags || factsUnresolved) && (
+            <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+              <FactsBadgeRow
+                flags={factFlags}
+                isLoading={factsLoading}
+                unresolvedFallback={Boolean(factsUnresolved)}
+                variant="listing"
+              />
+            </div>
+          )}
+
+          {reserveHintSlot && (
+            <div
+              className="h-7 mb-1"
+              data-testid="report-hint-slot"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {reportHint ? (
+                <span className="inline-flex items-center max-w-full px-2.5 py-1 rounded-md border border-[#136C9E]/25 bg-[#136C9E]/10 text-[11px] font-semibold text-[#136C9E] truncate">
+                  {reportHint}
+                </span>
+              ) : (
+                <span className="invisible inline-flex px-2.5 py-1 text-[11px]" aria-hidden>
+                  hint
+                </span>
+              )}
             </div>
           )}
         </div>
       </div>
-    </div>// Removed inline PropertyDetailsModal - using ListingDetailsModal instead   </div>
+
+      <div className="p-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-between">
+        <div className="text-xs text-gray-500 flex items-center gap-1.5 min-w-0">
+          <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+          <span className="font-semibold text-gray-700 truncate">
+            {property.agent?.company || property.agent?.name || 'Agent'}
+          </span>
+        </div>
+        <span className="text-xs font-bold text-[#136C9E] group-hover:translate-x-0.5 transition-transform flex items-center gap-1 flex-shrink-0">
+          View Property Details →
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// Property Details Modal Component
+interface PropertyDetailsModalProps {
+  property: Property | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onMessageClick: (property: Property) => void;
+  isNavigatingToBooking: boolean;
+  govDataEnabled?: boolean;
+  audience?: import('../types/govData').Audience | null;
+  onAudienceChange?: (audience: import('../types/govData').Audience) => void;
+}
+
+function PropertyDetailsModal({
+  property,
+  isOpen,
+  onClose,
+  onMessageClick,
+  isNavigatingToBooking,
+  govDataEnabled = false,
+  audience = null,
+  onAudienceChange,
+}: PropertyDetailsModalProps) {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setCurrentImageIndex(0);
+  }, [property?.title, property?.location, property?.price]);
+
+  useEffect(() => {
+    if (isOpen) {
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') onClose();
+      };
+      const handleArrows = (e: KeyboardEvent) => {
+        if (!property?.imageUrls?.length) return;
+        if (e.key === 'ArrowLeft') {
+          setCurrentImageIndex(prev => prev > 0 ? prev - 1 : property.imageUrls.length - 1);
+        } else if (e.key === 'ArrowRight') {
+          setCurrentImageIndex(prev => (prev + 1) % property.imageUrls.length);
+        }
+      };
+      document.addEventListener('keydown', handleEscape);
+      document.addEventListener('keydown', handleArrows);
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+        document.removeEventListener('keydown', handleArrows);
+        document.body.style.overflow = 'unset';
+      };
+    }
+  }, [isOpen, onClose, property]);
+
+  if (!isOpen || !property) return null;
+
+  const images = property.imageUrls?.length
+    ? property.imageUrls
+    : ['https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800'];
+  const cleanedPrice = cleanPropertyPrice(property.price);
+  const pcmMatch = cleanedPrice.match(/^(£[\d,]+)\s*(pcm)?$/i);
+  const priceMain = pcmMatch?.[1] || cleanedPrice;
+  const showPcm = /pcm/i.test(cleanedPrice) || Boolean(pcmMatch?.[2]);
+  const isRent =
+    /pcm|pw|rent|let/i.test(`${property.price} ${property.propertyType}`) ||
+    !/sale|buy/i.test(property.propertyType || '');
+  const displayTitle = getPropertyDisplayTitle(property);
+  const reportAddress =
+    [property.street, property.town || property.city, property.postcode]
+      .map((part) => (part || '').trim())
+      .filter(Boolean)
+      .join(', ') || property.location;
+  const listingDescription = getPropertyListingDescription(property);
+  const featureItems =
+    property.amenities && property.amenities.length > 0
+      ? property.amenities.slice(0, 6)
+      : [
+          property.description?.split('.')[0]?.trim(),
+          property.propertyType ? `Property type: ${property.propertyType}` : null,
+          property.location ? `Located in ${property.location}` : null,
+        ].filter(Boolean) as string[];
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div
+        ref={modalRef}
+        className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200 text-gray-900"
+      >
+        {/* Image carousel — handoff Step 2 */}
+        <div className="relative p-2">
+          <div className="relative h-[22rem] sm:h-[26rem] rounded-2xl overflow-hidden bg-gray-100">
+            <img
+              src={images[currentImageIndex]}
+              alt={`${displayTitle} - Image ${currentImageIndex + 1}`}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src =
+                  'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=800';
+              }}
+            />
+
+            <div className="absolute top-4 left-4 flex gap-2 flex-wrap">
+              <span className="px-4 py-1.5 rounded-full text-xs font-bold bg-[#136C9E] text-white shadow-md">
+                {isRent ? 'To Rent' : 'For Sale'}
+              </span>
+              <span className="bg-emerald-600 text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-md">
+                Available Now
+              </span>
+            </div>
+
+            {images.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1))
+                  }
+                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/60 text-white p-2.5 rounded-full hover:bg-black/80 transition-all"
+                  aria-label="Previous photo"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentImageIndex((prev) => (prev + 1) % images.length)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/60 text-white p-2.5 rounded-full hover:bg-black/80 transition-all"
+                  aria-label="Next photo"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </>
+            )}
+
+            <div className="absolute bottom-4 left-4 bg-black/60 text-white px-3 py-1 rounded-full text-xs font-semibold">
+              {currentImageIndex + 1} / {images.length} Photos
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 bg-white rounded-full p-2 shadow-md hover:bg-gray-100 text-gray-700"
+            aria-label="Close property details"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="p-6 sm:p-8">
+          <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
+            <div className="min-w-0">
+              <h2
+                className="text-xl font-semibold text-gray-900 tracking-tight"
+                style={{ fontFamily: 'Archivo, sans-serif' }}
+              >
+                {displayTitle}
+              </h2>
+              <div className="flex items-center text-gray-500 text-xs mt-1">
+                <MapPin className="w-4 h-4 mr-1 text-gray-400 flex-shrink-0" aria-hidden />
+                <span>{property.location}</span>
+              </div>
+            </div>
+            <p className="text-2xl font-extrabold text-[#F15A22]">
+              {priceMain}{' '}
+              {showPcm && <span className="text-xs text-gray-500 font-normal">pcm</span>}
+            </p>
+          </div>
+
+          {govDataEnabled && (
+            <ProptiiModule
+              listingId={resolveListingId(property)}
+              propertyUrl={property.url}
+              uprn={property.uprn}
+              audience={audience}
+              onAudienceChange={onAudienceChange}
+              addressLabel={reportAddress}
+              propertyTitle={property.title}
+              propertyLocation={reportAddress}
+              propertyPrice={`${priceMain}${showPcm ? ' pcm' : ''}`}
+              propertyStreet={property.street}
+              propertyPostcode={property.postcode}
+              coordinates={
+                property.coordinates ??
+                (typeof property.latitude === 'number' &&
+                typeof property.longitude === 'number' &&
+                Number.isFinite(property.latitude) &&
+                Number.isFinite(property.longitude)
+                  ? { lat: property.latitude, lng: property.longitude }
+                  : null)
+              }
+            />
+          )}
+
+          {/* Features — handoff two-column layout */}
+          <div className="mb-6">
+            <h3
+              className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3"
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              Property Features &amp; Key Details
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-xs space-y-2">
+                {featureItems.length > 0 ? (
+                  featureItems.map((item, index) => (
+                    <div key={index} className="flex items-center text-gray-700 gap-2">
+                      <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" aria-hidden />
+                      <span className="capitalize leading-relaxed">{item}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-500">No feature details listed yet.</p>
+                )}
+              </div>
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-xs space-y-2.5">
+                <div className="flex items-center gap-2 text-gray-700">
+                  <BedDouble className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
+                  <span>
+                    <strong>{property.bedrooms || '—'}</strong>&nbsp;Bedrooms
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-700">
+                  <Bath className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
+                  <span>
+                    <strong>{property.bathrooms || '—'}</strong>&nbsp;Bathroom
+                    {property.bathrooms && Number(property.bathrooms) !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-700">
+                  <Square className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
+                  <span>
+                    <strong>{property.squareFootage || '—'}</strong>
+                    {property.squareFootage ? <>&nbsp;sq ft approx.</> : <>&nbsp;sq ft</>}
+                  </span>
+                </div>
+                {property.propertyType && (
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <span className="text-gray-500">⌂</span>
+                    <span className="capitalize">
+                      <strong>{property.propertyType}</strong>
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {listingDescription && (
+            <div className="mb-6">
+              <h3
+                className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3"
+                style={{ fontFamily: 'Archivo, sans-serif' }}
+              >
+                Description
+              </h3>
+              <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{listingDescription}</p>
+            </div>
+          )}
+
+          {/* Listed By + existing actions preserved */}
+          <div className="border-t border-gray-100 pt-6">
+            <h3
+              className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3"
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              Listed By
+            </h3>
+            <div className="bg-gray-50 rounded-2xl border border-gray-100 p-4">
+              <p className="font-medium text-gray-900 mb-1">
+                {property.agent?.name || 'Agent Information'}
+              </p>
+              {property.agent?.company && (
+                <p className="text-sm text-gray-600 mb-2">{property.agent.company}</p>
+              )}
+              {property.agent?.phone && (
+                <p className="text-sm text-gray-600 mb-2">Phone: {property.agent.phone}</p>
+              )}
+              {property.agent?.website && (
+                <a
+                  href={property.agent.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#136C9E] hover:underline text-sm font-semibold"
+                >
+                  View Agency Website
+                </a>
+              )}
+
+              <div className="flex flex-wrap gap-3 mt-4">
+                <button
+                  type="button"
+                  className="bg-[#F15A22] text-white px-4 py-2 rounded-full hover:bg-[#D54A1A] transition-colors flex items-center gap-2 text-sm font-semibold"
+                >
+                  Chat
+                </button>
+                <button
+                  type="button"
+                  className="bg-emerald-600 text-white px-4 py-2 rounded-full hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm font-semibold"
+                >
+                  Call
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onMessageClick(property)}
+                  disabled={isNavigatingToBooking}
+                  className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isNavigatingToBooking ? (
+                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  ) : null}
+                  {isNavigatingToBooking ? 'Loading...' : 'Book Viewing'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -512,9 +940,15 @@ const SearchResults = () => {
   const searchType = searchTypeParam as 'onthemarket' | 'proptii';
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [isNavigatingToBooking, setIsNavigatingToBooking] = useState(false);
 
   const { results, isLoading, error, retry, searchProperties, clearCache } = useSearchBackend();
   const { isPropertySaved, toggleSaveProperty } = useSavedProperties();
+  const { enabled: govDataEnabled, audience, setAudience } = useGovDataLayer();
+  const { getFlagsFor, getHintFor, isUnresolved, isFactsLoading } = useBatchedPropertyFacts(
+    govDataEnabled,
+    results,
+  );
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showMap, setShowMap] = useState(false);
@@ -569,8 +1003,8 @@ const SearchResults = () => {
       if (cachedData) {
         try {
           const parsed = JSON.parse(cachedData);
-          // Only perform new search if the query or search type has changed, or if cached results are empty
-          if (parsed.query !== searchQuery || parsed.searchType !== searchTypeParam || !parsed.results || parsed.results.length === 0) {
+          // Only perform new search if the query or search type has changed
+          if (parsed.query !== searchQuery || parsed.searchType !== searchTypeParam) {
             searchProperties(searchQuery, searchType);
           }
         } catch (error) {
@@ -584,6 +1018,10 @@ const SearchResults = () => {
     }
   }, [searchQuery, searchTypeParam, searchProperties]);
 
+  // Reset navigation state when component mounts (when returning from BookViewing)
+  useEffect(() => {
+    setIsNavigatingToBooking(false);
+  }, []);
 
   // Load Google Maps API script
   useEffect(() => {
@@ -596,8 +1034,7 @@ const SearchResults = () => {
       if (!document.getElementById('google-maps-script')) {
         const script = document.createElement('script');
         script.id = 'google-maps-script';
-        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+        script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyChXxNp1xBJtJB9pC5WxWoZw3__7nT3djU&libraries=places';
         script.async = true;
         script.defer = true;
         
@@ -1062,6 +1499,44 @@ const SearchResults = () => {
     navigate('/');
   };
 
+  const handleMessageClick = async (property: Property) => {
+    setIsNavigatingToBooking(true);
+    
+    
+    // Prepare property data for BookViewing page
+    // Use extended fields if available (from Proptii properties), otherwise parse from location
+    const propertyData = {
+      id: property.title || `property-${Date.now()}`, // Generate ID if not available
+      street: property.street || property.location?.split(',')[0]?.trim() || property.location || '',
+      town: property.town || property.location?.split(',')[1]?.trim() || '',
+      city: property.city || property.location?.split(',')[0]?.trim() || property.location || '',
+      postcode: property.postcode || property.location?.split(',')[2]?.trim() || '',
+      title: property.title,
+      description: property.description,
+      imageUrls: property.imageUrls || [],
+      agent: {
+        id: property.agent?.id || property.agent?.name || `agent-${Date.now()}`,
+        name: property.agent?.name || property.source || 'Estate Agent',
+        email: property.agent?.email || '',
+        phone: property.agent?.phone || '',
+        company: property.agent?.company || property.source || 'Estate Agency'
+      }
+    };
+    
+    
+    // Store in sessionStorage for BookViewing page
+    sessionStorage.setItem('prefilledProperty', JSON.stringify(propertyData));
+    
+    // Note: We don't clear the search cache here because we want to preserve results
+    // when user comes back from BookViewing page
+    
+    // Small delay for smooth transition
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Navigate to booking page
+    navigate('/bookviewing');
+  };
+
   const goToHome = () => {
     navigate('/');
   };
@@ -1087,11 +1562,8 @@ const SearchResults = () => {
             </div>
           </div>
         </header>
-        <div className="flex-1 bg-gray-50 pt-20 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-[#E65D24] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Searching for properties...</p>
-          </div>
+        <div className="flex-1 flex">
+          <SearchLoadingAnimation query={searchQuery} />
         </div>
         <Footer />
       </div>
@@ -1548,15 +2020,21 @@ const SearchResults = () => {
                           key={index} 
                           property={property} 
                           onClick={() => openModal(property)}
-                          isSaved={isPropertySaved(property)}
+                          isSaved={isPropertySaved(`${property.title}-${property.location}-${property.price}`)}
                           onToggleSave={(e) => {
                             e.stopPropagation();
-                            const wasSaved = isPropertySaved(property);
+                            const propertyId = `${property.title}-${property.location}-${property.price}`;
+                            const wasSaved = isPropertySaved(propertyId);
                             toggleSaveProperty(property);
                             setToastMessage(wasSaved ? 'Property removed from saved' : 'Property saved!');
                             setShowToast(true);
                             setTimeout(() => setShowToast(false), 3000);
                           }}
+                          factFlags={govDataEnabled ? getFlagsFor(property) : undefined}
+                          factsLoading={govDataEnabled && isFactsLoading}
+                          factsUnresolved={govDataEnabled && isUnresolved(property)}
+                          reserveHintSlot={govDataEnabled}
+                          reportHint={govDataEnabled ? getHintFor(property) : null}
                         />
                       ))}
                       {isLoading && [1, 2, 3].map(i => (
@@ -1572,15 +2050,21 @@ const SearchResults = () => {
                         key={index} 
                         property={property} 
                         onClick={() => openModal(property)}
-                        isSaved={isPropertySaved(property)}
+                        isSaved={isPropertySaved(`${property.title}-${property.location}-${property.price}`)}
                         onToggleSave={(e) => {
                           e.stopPropagation();
-                          const wasSaved = isPropertySaved(property);
+                          const propertyId = `${property.title}-${property.location}-${property.price}`;
+                          const wasSaved = isPropertySaved(propertyId);
                           toggleSaveProperty(property);
                           setToastMessage(wasSaved ? 'Property removed from saved' : 'Property saved!');
                           setShowToast(true);
                           setTimeout(() => setShowToast(false), 3000);
                         }}
+                        factFlags={govDataEnabled ? getFlagsFor(property) : undefined}
+                        factsLoading={govDataEnabled && isFactsLoading}
+                        factsUnresolved={govDataEnabled && isUnresolved(property)}
+                        reserveHintSlot={govDataEnabled}
+                        reportHint={govDataEnabled ? getHintFor(property) : null}
                       />
                     ))}
                     {isLoading && [1, 2, 3].map(i => (
@@ -1623,12 +2107,16 @@ const SearchResults = () => {
       </div>
 
       {/* Property Details Modal */}
-      {isModalOpen && selectedProperty && (
-        <ListingDetailsModal
-          property={mapScrapedToNative(selectedProperty)}
-          onClose={closeModal}
-        />
-      )}
+      <PropertyDetailsModal
+        property={selectedProperty}
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        onMessageClick={handleMessageClick}
+        isNavigatingToBooking={isNavigatingToBooking}
+        govDataEnabled={govDataEnabled}
+        audience={audience}
+        onAudienceChange={setAudience}
+      />
 
       {/* Toast Notification */}
       {showToast && (

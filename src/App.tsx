@@ -5,6 +5,7 @@ import { MSALProviderWrapper } from './contexts/AuthContext';
 import { SavedPropertiesProvider } from './contexts/SavedPropertiesContext';
 import { SignedContractsProvider } from './contexts/SignedContractsContext';
 import { OnboardingSessionProvider } from './contexts/OnboardingSessionContext';
+import { GovDataLayerProvider } from './contexts/GovDataLayerContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { AuthRedirectHandler } from './components/common/AuthRedirectHandler';
@@ -62,6 +63,7 @@ const GuestThreadPage     = lazy(() => import('./pages/GuestThreadPage'));
 const ClaimReferencing     = lazy(() => import('./pages/ClaimReferencing'));
 const ReferencingView      = lazy(() => import('./pages/ReferencingView'));
 const GuarantorReferencePage = lazy(() => import('./pages/GuarantorReferencePage'));
+const ReferencingInvitePage = lazy(() => import('./pages/ReferencingInvitePage').then(m => ({ default: m.ReferencingInvitePage })));
 const RoleSelect          = lazy(() => import('./pages/RoleSelect'));
 // Dashboard sections
 const SavedProperties     = lazy(() => import('./components/dashboard/sections/SavedProperties-new'));
@@ -108,9 +110,10 @@ export const App: React.FC = () => {
     <ErrorBoundary fallback={<div>Custom fallback UI</div>}>
       <CssBaseline />
       <MSALProviderWrapper>
-        <SavedPropertiesProvider>
-          <OnboardingSessionProvider>
-            <SignedContractsProvider>
+        <GovDataLayerProvider>
+          <SavedPropertiesProvider>
+            <OnboardingSessionProvider>
+              <SignedContractsProvider>
               <AuthAnalyticsBridge />
               <StripeCheckoutReturnHandler />
               <AuthRedirectHandler />
@@ -210,6 +213,7 @@ export const App: React.FC = () => {
                 <Route path="/landlord-demo" element={<LandlordDemo />} />
 
                 <Route path="/referencing" element={<Referencing />} />
+                <Route path="/referencing/invite" element={<ReferencingInvitePage />} />
                 <Route path="/guarantor-reference" element={<GuarantorReferencePage />} />
                 <Route path="/guarantor-form" element={<GuarantorReferencePage />} />
 
@@ -264,7 +268,8 @@ export const App: React.FC = () => {
             </SignedContractsProvider>
           </OnboardingSessionProvider>
         </SavedPropertiesProvider>
-      </MSALProviderWrapper>
+      </GovDataLayerProvider>
+    </MSALProviderWrapper>
     </ErrorBoundary>
   );
 };
