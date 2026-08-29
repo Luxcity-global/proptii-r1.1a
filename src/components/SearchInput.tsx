@@ -236,10 +236,10 @@ export const SearchInput = ({
           {error && <div className="mt-2 text-red-500 text-sm">{error}</div>}
 
           {/* Live NLP Query Classification Filter Pills */}
-          {classification?.entities && Object.keys(classification.entities).length > 0 && (
+          {(isClassifying || (classification?.entities && Object.keys(classification.entities).length > 0)) && (
             <div className="mt-3 flex justify-center">
               <FilterPills
-                entities={classification.entities}
+                entities={classification?.entities}
                 isClassifying={isClassifying}
                 onDark
               />
@@ -440,10 +440,10 @@ export const SearchInput = ({
         )}
 
         {/* Live NLP Query Classification Filter Pills */}
-        {classification?.entities && Object.keys(classification.entities).length > 0 && (
+        {(isClassifying || (classification?.entities && Object.keys(classification.entities).length > 0)) && (
           <div className="mt-3 flex justify-center">
             <FilterPills
-              entities={classification.entities}
+              entities={classification?.entities}
               isClassifying={isClassifying}
             />
           </div>

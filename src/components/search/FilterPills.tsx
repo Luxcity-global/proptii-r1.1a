@@ -130,17 +130,19 @@ export const FilterPills: React.FC<FilterPillsProps> = ({
     >
       {isClassifying && primaryPills.length === 0 && (
         <span
-          className={`inline-flex items-center gap-2.5 text-sm font-medium tracking-wide ${
-            onDark ? 'text-white/90' : 'text-gray-600'
+          className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-full text-xs sm:text-sm font-medium tracking-wide shadow-sm border backdrop-blur-md transition-all ${
+            onDark
+              ? 'bg-white/20 border-white/40 text-white'
+              : 'bg-brand-navy/10 border-brand-navy/20 text-brand-navy'
           }`}
           data-testid="filter-pills-inflight"
         >
           <span className="flex items-center gap-1.5" aria-hidden>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#E65D24] search-dot-pulse-1" />
-            <span className="w-1.5 h-1.5 rounded-full bg-[#E65D24] search-dot-pulse-2" />
-            <span className="w-1.5 h-1.5 rounded-full bg-[#E65D24] search-dot-pulse-3" />
+            <span className="w-2 h-2 rounded-full bg-[#E65D24] animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-[#E65D24] animate-pulse delay-100" />
+            <span className="w-2 h-2 rounded-full bg-[#E65D24] animate-pulse delay-200" />
           </span>
-          <span>understanding your search</span>
+          <span className="font-mono tracking-wide">understanding your search</span>
         </span>
       )}
 
