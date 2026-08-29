@@ -24,20 +24,31 @@ export class ReportAssembleService {
 
   async streamReport(dto: ReportRequestDto, res: any): Promise<void> {
     const { listingId, address } = dto;
-    const postcode = address.postcode!;
+    let postcode = address.postcode || this.postcodesIo.extractPostcode(address.display);
 
-    // 1. Resolve Centroid (via postcodes.io or directly from input coordinates)
+    // 1. Resolve Centroid (via input coordinates, postcodes.io, or OSM geocoding)
     let centroid: PostcodeResult | null = null;
     if (address.coordinates && address.coordinates.lat && address.coordinates.lng) {
-      centroid = {
-        latitude: address.coordinates.lat,
-        longitude: address.coordinates.lng,
-        admin_district: address.display?.split(',')[1]?.trim() || '',
-        lsoa: ''
-      };
-    } else {
+      centroid = await this.postcodesIo.getCentroidByCoordinates(address.coordinates.lat, address.coordinates.lng);
+      if (!centroid) {
+        centroid = {
+          latitude: address.coordinates.lat,
+          longitude: address.coordinates.lng,
+          admin_district: address.display?.split(',')[1]?.trim() || 'Greater London',
+          lsoa: '',
+          postcode: postcode || '',
+        };
+      }
+    } else if (postcode) {
       const centroidResult = await this.withTimeout(this.postcodesIo.getCentroid(postcode), 3500);
       centroid = centroidResult.status === 'fulfilled' ? centroidResult.value : null;
+    } else if (address.display) {
+      const geoResult = await this.withTimeout(this.postcodesIo.geocodeAddress(address.display), 3500);
+      centroid = geoResult.status === 'fulfilled' ? geoResult.value : null;
+    }
+
+    if (centroid?.postcode && !postcode) {
+      postcode = centroid.postcode;
     }
 
     // Build base report skeleton

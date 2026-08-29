@@ -45,13 +45,13 @@ export const ReportLocationCard: React.FC<ReportLocationCardProps> = ({
       </div>
 
       {showMapArea ? (
-        <div className="mt-4 overflow-hidden rounded-lg border border-rule print:hidden">
+        <div className="mt-4 overflow-hidden rounded-lg border border-rule">
           <ReportLocationMap query={query} onStatusChange={setMapStatus} />
         </div>
       ) : null}
 
       {addressLabel && showMapArea ? (
-        <p className="mt-4 hidden text-[14px] leading-relaxed text-ink-muted print:block">
+        <p className="mt-2 text-[12px] leading-relaxed text-ink-muted">
           {addressLabel} — postcode centroid, not the exact plot.
         </p>
       ) : null}
