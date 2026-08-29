@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Download, MapPin, Search, X } from 'lucide-react';
 import type { Audience, FactFlag, PropertyReportResponse, ReportLens } from '../../types/govData';
-import { fetchPropertyReport, mockPropertyReport } from '../../services/govDataService';
+import { fetchPropertyReport } from '../../services/govDataService';
 import { defaultRenterContent } from '../../data/renterReportFixtures';
 import { trackEvent } from '../../utils/analytics';
 import { downloadIntelligenceReportPdf } from '../../utils/intelligenceReportPdf';
@@ -62,10 +62,16 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
   onClose,
   onChangeLens,
 }) => {
-  const seed = mockPropertyReport(listingId, audience, { addressLabel, price: propertyPrice });
-  const [facts, setFacts] = useState<FactFlag[] | null>(seed.facts);
-  const [lens, setLens] = useState<ReportLens | null>(seed.lens);
-  const [report, setReport] = useState<PropertyReportResponse>(seed);
+  const [facts, setFacts] = useState<FactFlag[] | null>(initialReport?.facts ?? null);
+  const [lens, setLens] = useState<ReportLens | null>(initialReport?.lens ?? null);
+  const [report, setReport] = useState<PropertyReportResponse>(
+    initialReport ?? {
+      facts: [],
+      lens: null,
+      generatedFor: audience || 'tenant',
+      map: { embedQuery: propertyLocation || addressLabel },
+    },
+  );
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const factsFingerprintRef = useRef('');
   const resolvedTitle = propertyTitle || addressLabel.split(',')[0]?.trim() || 'Selected property';
@@ -112,12 +118,13 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
       return;
     }
 
-    applyReport(mockPropertyReport(listingId, audience, { addressLabel, price: propertyPrice }));
-
     void (async () => {
       const next: PropertyReportResponse = await fetchPropertyReport(listingId, audience, {
         address: { display: resolvedLocation || addressLabel },
         listingPrice: propertyPrice,
+        onProgress: (partial) => {
+          if (!cancelled) applyReport(partial);
+        },
       });
       if (cancelled) return;
       applyReport(next);

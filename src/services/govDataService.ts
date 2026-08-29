@@ -405,10 +405,8 @@ export async function fetchBatchedPropertyFacts(input: {
       }
     }
     return normalized;
-  } catch {
-    if (shouldUseLocalMocks()) {
-      return mockBatchedFacts(listingIds);
-    }
+  } catch (err) {
+    console.warn('[GovData] Failed to fetch batched facts:', err);
     return {};
   } finally {
     clearTimeout(timeoutId);
@@ -431,7 +429,7 @@ export async function fetchPropertyFacts(
         signal: controller.signal,
         headers: { Accept: 'application/json' },
       },
-      { retryOnNotFound: true },
+      { retryOnNotFound: false },
     );
 
     if (!response.ok) {
@@ -458,10 +456,8 @@ export async function fetchPropertyFacts(
       }));
     }
     return data as PropertyFactsResponse;
-  } catch {
-    if (shouldUseLocalMocks()) {
-      return mockPropertyFacts(listingId, uprn);
-    }
+  } catch (err) {
+    console.warn(`[GovData] Failed to fetch facts for listing ${listingId}:`, err);
     return {
       listingId,
       uprn: uprn ?? null,
@@ -512,16 +508,11 @@ export async function fetchPropertyReport(
       return mapStreamingReportToPropertyReport(streamed, audience, mapOptions);
     }
     throw new Error('Empty streaming report');
-  } catch {
-    if (shouldUseLocalMocks()) {
-      return mockPropertyReport(listingId, audience, {
-        addressLabel: addressPayload.display,
-        price: options?.listingPrice,
-      });
-    }
+  } catch (err) {
+    console.error(`[GovData] Failed to stream report for ${listingId}:`, err);
     return {
       facts: [],
-      lens: mockReportLens(audience),
+      lens: null,
       generatedFor: audience || 'tenant',
     };
   } finally {

@@ -8,7 +8,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { Audience, PropertyFactsResponse, PropertyReportResponse } from '../../types/govData';
-import { fetchPropertyFacts, fetchPropertyReport, mockPropertyReport } from '../../services/govDataService';
+import { fetchPropertyFacts, fetchPropertyReport } from '../../services/govDataService';
 import { useAuth } from '../../contexts/AuthContext';
 import { AuthPromptModal } from './AuthPromptModal';
 import { AudienceSelectorModal } from './AudienceSelectorModal';
@@ -180,11 +180,7 @@ export const ProptiiModule: React.FC<ProptiiModuleProps> = ({
     prefetchReportMap(mapQuery);
     mapWarmupRef.current = warmupReportMap(mapQuery);
     const reportListingId = propertyUrl?.trim() || listingId;
-    const seeded = mockPropertyReport(reportListingId, flowAudience, {
-      addressLabel,
-      price: propertyPrice,
-    });
-    setPrefetchedReport(seeded);
+    setPrefetchedReport(null);
     setFlow('diagnostic');
     void fetchPropertyReport(reportListingId, flowAudience, {
       address: {
