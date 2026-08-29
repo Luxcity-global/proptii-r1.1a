@@ -165,15 +165,10 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
   }, [streamingReport, initialReport, isOpen, isWarming, resolvedLocation, addressLabel]);
 
   const renter = useMemo(() => {
-    const defaults = defaultRenterContent(facts);
-    const incoming = report.renter;
-    return {
-      ...defaults,
-      ...incoming,
-      partARows: incoming?.partARows?.length ? incoming.partARows : defaults.partARows,
-      localArea: incoming?.localArea?.length ? incoming.localArea : defaults.localArea,
-      steps: incoming?.steps?.length ? incoming.steps : defaults.steps,
-    };
+    if (report.renter) {
+      return report.renter;
+    }
+    return defaultRenterContent(facts);
   }, [report.renter, facts]);
 
   const paidPending = useMemo(() => parsePaidPendingCopy(renter.paidCopy), [renter.paidCopy]);
