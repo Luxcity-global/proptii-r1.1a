@@ -1,7 +1,7 @@
 /**
  * Screen 2 — Plan Selected
  * Shown as a full page (overlaying a dimmed pricing background) after a user picks a paid plan.
- * Uses Azure AD B2C via MSAL (not Google) for sign-in / sign-up.
+ * Uses Firebase Google Auth for sign-in / sign-up.
  */
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -149,55 +149,9 @@ const PlanSelected: React.FC = () => {
             Your free month starts the moment you're in.
           </p>
 
-          {/* Azure AD B2C Sign-in button (replacing Google) */}
-          <button
-            onClick={handleSignIn}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '12px',
-              width: '100%',
-              padding: '13px',
-              border: '1.5px solid var(--pr-border-strong)',
-              borderRadius: '30px',
-              background: '#fff',
-              color: 'var(--pr-navy)',
-              fontSize: '15px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'border-color .15s, transform .15s',
-              fontFamily: 'inherit',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--pr-navy)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--pr-border-strong)'; e.currentTarget.style.transform = 'translateY(0)'; }}
-          >
-            {/* Microsoft icon */}
-            <svg width="18" height="18" viewBox="0 0 21 21" fill="none">
-              <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
-              <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
-              <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
-              <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
-            </svg>
-            Continue with Microsoft account
-          </button>
 
-          {/* Divider */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            margin: '18px 0',
-            color: 'var(--pr-muted)',
-            fontSize: '12px',
-            fontWeight: 600,
-            letterSpacing: '.12em',
-            textTransform: 'uppercase',
-          }}>
-            <span style={{ flex: 1, height: '1px', background: 'var(--pr-border)' }} />
-            or
-            <span style={{ flex: 1, height: '1px', background: 'var(--pr-border)' }} />
-          </div>
+
+
 
           {/* Email CTA — also triggers B2C (B2C handles the email signup form) */}
           <button

@@ -45,28 +45,7 @@ const CreateAccountPage: React.FC = () => {
     }
   };
 
-  const handleMicrosoftSignUp = async () => {
-    setSubmitting(true);
-    setFormError(null);
-    sessionStorage.setItem('redirectAfterLogin', welcomeUrl(planId, cycle));
-    if (phone.trim()) {
-      sessionStorage.setItem('pending_registration_phone', phone.trim());
-    }
 
-    try {
-      await login('microsoft');
-      try {
-        await setPendingPlan(planId, cycle);
-      } catch (e) {
-        console.warn('pending plan save failed', e);
-      }
-      navigate(welcomeUrl(planId, cycle), { replace: true });
-    } catch (e: any) {
-      setFormError(e?.message || 'Account sign-up was cancelled or failed. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleSignIn = async () => {
     setSubmitting(true);
@@ -173,35 +152,7 @@ const CreateAccountPage: React.FC = () => {
                 <span>{submitting ? 'Connecting…' : 'Sign up with Google'}</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleMicrosoftSignUp}
-                disabled={submitting}
-                className="pr-btn pr-btn-block"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 12,
-                  padding: '14px 20px',
-                  borderRadius: 12,
-                  fontSize: 16,
-                  fontWeight: 600,
-                  backgroundColor: '#2F2F2F',
-                  color: '#ffffff',
-                  marginTop: 12,
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                <svg width="20" height="20" viewBox="0 0 21 21">
-                  <path fill="#f35325" d="M1 1h9v9H1z"/>
-                  <path fill="#81bc06" d="M11 1h9v9h-9z"/>
-                  <path fill="#05a6f0" d="M1 11h9v9H1z"/>
-                  <path fill="#ffba08" d="M11 11h9v9h-9z"/>
-                </svg>
-                <span>{submitting ? 'Connecting…' : 'Sign up with Microsoft'}</span>
-              </button>
+
             </div>
 
             {formError && <p className="pr-signup-error">{formError}</p>}

@@ -248,7 +248,7 @@ const SignupModalPage: React.FC = () => {
 
               <h1 id="signup-modal-title">Continue to Proptii</h1>
               <p className="pr-signup-lead">
-                Sign in with your Microsoft account, or continue with email to create
+                Sign in with your Google account, or continue with email to create
                 one.
               </p>
 

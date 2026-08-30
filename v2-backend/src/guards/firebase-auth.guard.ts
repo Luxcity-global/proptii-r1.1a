@@ -53,18 +53,7 @@ function ensureFirebaseInitialized() {
   }
 }
 
-function parseJwtPayload(token: string): any {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const base64Url = parts[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = Buffer.from(base64, 'base64').toString('utf8');
-    return JSON.parse(jsonPayload);
-  } catch {
-    return null;
-  }
-}
+
 
 @Injectable()
 export class FirebaseAuthGuard implements CanActivate {
@@ -125,49 +114,8 @@ export class FirebaseAuthGuard implements CanActivate {
         return true;
       }
     } catch (error: any) {
-      // Fallback: Check MSAL / Azure B2C JWT token payload
-      const msalPayload = parseJwtPayload(token);
-      if (msalPayload && (msalPayload.iss?.includes('b2clogin') || msalPayload.iss?.includes('microsoft') || msalPayload.sub || msalPayload.oid)) {
-        const uid = msalPayload.oid || msalPayload.sub || msalPayload.emails?.[0];
-        const email = msalPayload.emails?.[0] || msalPayload.email || `${uid}@proptii.co`;
-        
-        let role = msalPayload.role;
-        if (!role && admin.apps.length) {
-          try {
-            const userDoc = await admin.firestore().collection('users').doc(uid).get();
-            if (userDoc.exists) {
-              role = userDoc.data()?.role;
-            }
-          } catch {}
-        }
-
-        request.user = {
-          uid,
-          sub: uid,
-          email,
-          role: role || null,
-          name: msalPayload.name,
-        };
-        return true;
-      }
-
       console.error('[FirebaseAuthGuard] Verification failed:', error?.message || error);
       throw new UnauthorizedException('Invalid or expired authentication token');
-    }
-
-    // Fallback if admin.apps.length is 0 but valid MSAL JWT is passed
-    const msalPayload = parseJwtPayload(token);
-    if (msalPayload && (msalPayload.sub || msalPayload.oid)) {
-      const uid = msalPayload.oid || msalPayload.sub;
-      const email = msalPayload.emails?.[0] || msalPayload.email || `${uid}@proptii.co`;
-      request.user = {
-        uid,
-        sub: uid,
-        email,
-        role: null,
-        name: msalPayload.name,
-      };
-      return true;
     }
 
     throw new UnauthorizedException('Invalid or expired authentication token');

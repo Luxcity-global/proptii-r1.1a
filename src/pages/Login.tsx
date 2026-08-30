@@ -47,6 +47,9 @@ export const LoginPage: React.FC = () => {
   // Redirect if already authenticated (only once)
   useEffect(() => {
     if (isAuthenticated && !hasRedirectedRef.current) {
+      // Wait for the background role resolution to complete
+      if (!user?.roleResolved) return;
+
       hasRedirectedRef.current = true;
       
       // Clear all redirect-related flags
@@ -69,7 +72,7 @@ export const LoginPage: React.FC = () => {
         navigate(targetPath, { replace: true });
       }, 0);
     }
-  }, [isAuthenticated, user?.roles, navigate, from]);
+  }, [isAuthenticated, user?.roles, user?.roleResolved, navigate, from]);
 
   // Store the target redirect path when landing on login page
   useEffect(() => {
@@ -99,14 +102,14 @@ export const LoginPage: React.FC = () => {
     };
   }, []);
 
-  const handleLogin = async (providerType?: 'microsoft' | 'google') => {
+  const handleLogin = async () => {
     try {
       setError('');
       trackEvent('login_started', {
         redirect_to: from,
         has_redirect_param: new URLSearchParams(location.search).has('redirect'),
       });
-      await login(providerType);
+      await login();
       // Note: MSAL popup login will trigger auth-state-changed event
       // The useEffect above will handle the redirect
     } catch (error: any) {
@@ -156,7 +159,7 @@ export const LoginPage: React.FC = () => {
                   boxShadow: '0 6px 16px rgba(19, 108, 158, 0.35)',
                 },
               }}
-              onClick={() => handleLogin('google')}
+              onClick={() => handleLogin()}
             >
               <svg width="18" height="18" viewBox="0 0 24 24">
                 <path
@@ -179,38 +182,7 @@ export const LoginPage: React.FC = () => {
               <span>Continue with Google</span>
             </Button>
 
-            <Button
-              fullWidth
-              variant="contained"
-              sx={{
-                mt: 1,
-                mb: 2,
-                py: 1.4,
-                borderRadius: 2,
-                textTransform: 'none',
-                fontSize: '0.95rem',
-                fontWeight: 600,
-                backgroundColor: '#2F2F2F',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 1.5,
-                boxShadow: '0 4px 12px rgba(47, 47, 47, 0.25)',
-                '&:hover': {
-                  backgroundColor: '#1a1a1a',
-                  boxShadow: '0 6px 16px rgba(47, 47, 47, 0.35)',
-                },
-              }}
-              onClick={() => handleLogin('microsoft')}
-            >
-              <svg width="18" height="18" viewBox="0 0 21 21">
-                <path fill="#f35325" d="M1 1h9v9H1z"/>
-                <path fill="#81bc06" d="M11 1h9v9h-9z"/>
-                <path fill="#05a6f0" d="M1 11h9v9H1z"/>
-                <path fill="#ffba08" d="M11 11h9v9h-9z"/>
-              </svg>
-              <span>Continue with Microsoft</span>
-            </Button>
+
 
             <Button
               fullWidth

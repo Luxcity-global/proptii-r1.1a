@@ -6,27 +6,7 @@ import { notifyAuthReady } from '../services/authReady';
 import userService from '../services/userService';
 import EditProfileModal from '../components/profile/EditProfileModal';
 
-import { PublicClientApplication } from '@azure/msal-browser';
-import { msalConfig } from '../config/authConfig';
 
-let msalInstance: PublicClientApplication | null = null;
-
-export async function getMsalInstance(): Promise<PublicClientApplication> {
-  if (!msalInstance) {
-    msalInstance = new PublicClientApplication(msalConfig);
-    await msalInstance.initialize().catch(() => {});
-    await msalInstance.handleRedirectPromise().catch(() => null);
-  }
-  return msalInstance;
-}
-
-export async function waitForMsalReady(): Promise<void> {
-  await getMsalInstance();
-}
-
-export const MSALProviderWrapper: React.FC<{ children: ReactNode }> = ({ children }) => (
-  <AuthProvider>{children}</AuthProvider>
-);
 
 export { isAuthReady, waitForAuthReady } from '../services/authReady';
 
@@ -47,7 +27,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   userRole: 'tenant' | 'landlord' | 'agent' | null;
-  login: (providerType?: 'microsoft' | 'google') => Promise<void>;
+  login: () => Promise<void>;
   loginAsMockUser: (id: string, role: string) => void;
   logout: () => Promise<void>;
   editProfile: () => Promise<void>;
@@ -231,57 +211,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  const login = async (providerType: 'microsoft' | 'google' = 'google'): Promise<void> => {
+  const login = async (): Promise<void> => {
     try {
-      if (providerType === 'microsoft') {
-        try {
-          const instance = await getMsalInstance();
-          const response = await instance.loginPopup({
-            scopes: ['openid', 'profile', 'email'],
-            prompt: 'select_account',
-          });
-
-          if (response?.account) {
-            const account = response.account;
-            const email = account.username || '';
-            const userId = account.homeAccountId || account.localAccountId;
-            const name = account.name || email.split('@')[0];
-            const phone = (account.idTokenClaims as any)?.phone || (account.idTokenClaims as any)?.mobilePhone || undefined;
-
-            let roles: string[] = [];
-            let roleResolved = false;
-            try {
-              const { resolveRole } = await import('../services/roleService');
-              const role = await resolveRole(userId, email);
-              if (role) {
-                roles = [role];
-              }
-              roleResolved = true;
-            } catch {
-              roleResolved = true;
-            }
-
-            setUser({
-              id: userId,
-              email,
-              name,
-              givenName: name.split(' ')[0],
-              familyName: name.split(' ').slice(1).join(' '),
-              phone,
-              roles,
-              roleResolved,
-            });
-            setIsAuthenticated(true);
-            setIsLoading(false);
-            notifyAuthReady();
-            window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { success: true } }));
-            return;
-          }
-        } catch (msalErr: any) {
-          console.warn('[Auth] MSAL popup error:', msalErr);
-          throw new Error(msalErr?.errorMessage || msalErr?.message || 'Microsoft Sign In failed or was cancelled.');
-        }
-      }
 
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });

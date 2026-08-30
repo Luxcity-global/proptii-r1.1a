@@ -1,6 +1,6 @@
 import { auth } from '../config/firebaseConfig';
 import { waitForAuthReady } from './authReady';
-import { getMsalInstance } from '../contexts/AuthContext';
+
 
 // ─── Session-expiry notification ─────────────────────────────────────────────
 
@@ -27,25 +27,6 @@ export async function getAccessTokenForApiRequest(): Promise<string | null> {
     } catch (err) {
       console.error('[Auth] Error getting Firebase ID token:', err);
     }
-  }
-
-  // 2. Try MSAL Account (Microsoft Auth)
-  try {
-    const msal = await getMsalInstance();
-    const accounts = msal.getAllAccounts();
-    if (accounts.length > 0) {
-      const activeAccount = msal.getActiveAccount() || accounts[0];
-      const response = await msal.acquireTokenSilent({
-        scopes: ['openid', 'profile', 'email'],
-        account: activeAccount
-      }).catch(() => null);
-
-      if (response?.idToken) {
-        return response.idToken;
-      }
-    }
-  } catch (msalErr) {
-    console.warn('[Auth] MSAL token acquisition warning:', msalErr);
   }
 
   // 3. Fallback to stored token
