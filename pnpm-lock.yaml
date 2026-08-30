@@ -29,12 +29,6 @@ importers:
       '@azure/monitor-opentelemetry':
         specifier: ^1.19.0
         version: 1.19.0(supports-color@5.5.0)
-      '@azure/msal-browser':
-        specifier: ^4.30.0
-        version: 4.30.0
-      '@azure/msal-react':
-        specifier: ^3.0.29
-        version: 3.0.29(@azure/msal-browser@4.30.0)(react@18.3.1)
       '@date-io/date-fns':
         specifier: ^3.2.1
         version: 3.2.1(date-fns@3.6.0)
@@ -728,16 +722,8 @@ packages:
     resolution: {integrity: sha512-QJDMgsnhA1ysyOcr7E1WHHn5gYts3kf5FP6e4gy+Y8EpUmKg2g07MRLUNXUz6fvWRmevCFqEUcPDKw2rnXVyOw==}
     engines: {node: '>=22.0.0'}
 
-  '@azure/msal-browser@4.30.0':
-    resolution: {integrity: sha512-HBBKfbZkMVzzF5bofvS1cXuNHFVc+gt4/HOnCmG/0hsHuZRJvJvDg/+7nTwIpoqvJc8BQp5o23rBUfisOLxR+w==}
-    engines: {node: '>=0.8.0'}
-
   '@azure/msal-browser@5.19.0':
     resolution: {integrity: sha512-DHe9iRcyByGJuLPkl0K31a1JjOdRY2zX38Q07mQpSbR8zOj1EIgsWfTXhSQVyyijUxlcofVy/br7qWJbrMwVXQ==}
-    engines: {node: '>=0.8.0'}
-
-  '@azure/msal-common@15.17.0':
-    resolution: {integrity: sha512-VQ5/gTLFADkwue+FohVuCqlzFPUq4xSrX8jeZe+iwZuY6moliNC8xt86qPVNYdtbQfELDf2Nu6LI+demFPHGgw==}
     engines: {node: '>=0.8.0'}
 
   '@azure/msal-common@16.13.0':
@@ -747,13 +733,6 @@ packages:
   '@azure/msal-node@5.6.0':
     resolution: {integrity: sha512-uFY9NxrWHw8PwZx7gAX6PDn+9vdfS05+levc/kwkx77IkjfaldnQbbcQzzDIZ5Hq5Zdr6/z92oAIoRWKp6MnOA==}
     engines: {node: '>=20'}
-
-  '@azure/msal-react@3.0.29':
-    resolution: {integrity: sha512-RpFfq3aIpmKajcshbaJH7Q/1CesxQRAeKorMv+uMpDw98jvi+/L0RJkNnTRmeXrV3aM34kj2LFWBQrQ9DOXs1Q==}
-    engines: {node: '>=10'}
-    peerDependencies:
-      '@azure/msal-browser': ^4.30.0
-      react: ^16.8.0 || ^17 || ^18 || ^19.2.1
 
   '@azure/opentelemetry-instrumentation-azure-sdk@1.1.0-beta.1':
     resolution: {integrity: sha512-FJCHWlMA//XMs5rxf1z/mN0gaWPbJhlAVw5l4IxKhEtZX2bgNERlqbdBWXNjjkok+nTh0UcKqV5G0rrCupo+4A==}
@@ -9005,15 +8984,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@azure/msal-browser@4.30.0':
-    dependencies:
-      '@azure/msal-common': 15.17.0
-
   '@azure/msal-browser@5.19.0':
     dependencies:
       '@azure/msal-common': 16.13.0
-
-  '@azure/msal-common@15.17.0': {}
 
   '@azure/msal-common@16.13.0': {}
 
@@ -9021,11 +8994,6 @@ snapshots:
     dependencies:
       '@azure/msal-common': 16.13.0
       jsonwebtoken: 9.0.3
-
-  '@azure/msal-react@3.0.29(@azure/msal-browser@4.30.0)(react@18.3.1)':
-    dependencies:
-      '@azure/msal-browser': 4.30.0
-      react: 18.3.1
 
   '@azure/opentelemetry-instrumentation-azure-sdk@1.1.0-beta.1(supports-color@5.5.0)':
     dependencies:
