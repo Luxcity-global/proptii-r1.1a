@@ -84,7 +84,7 @@ function RouteLoadingFallback() {
   );
 }
 
-/** Default landing: onboarding flow first. Home v2 lives at / with /home-v2 as alias. */
+/** Default landing: homepage (mascot onboarding archived; see HOMEPAGE_ONBOARDING_FLOW_ENABLED). */
 
 /** Reset window scroll on route change (SPA navigation does not scroll to top by default). */
 function ScrollToTop() {
@@ -122,7 +122,7 @@ export const App: React.FC = () => {
               <RoleGate>
                 <Suspense fallback={<RouteLoadingFallback />}>
                 <Routes>
-                {/* Public Routes - / is default landing; onboarding shows as modal overlay */}
+                {/* Public Routes - / is default landing; homepage onboarding modal is archived */}
                 <Route path="/" element={<HomeVariant />} />
                 <Route path="/home-v2" element={<Navigate to="/" replace />} />
                 <Route path="/home" element={<Navigate to="/" replace />} />

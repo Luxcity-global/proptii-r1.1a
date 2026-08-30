@@ -3,6 +3,13 @@
  * Stores anonymous session in sessionStorage for value-first onboarding.
  */
 
+/**
+ * Archived: homepage mascot startup sequence is off for now.
+ * Set to `true` to restore automatic OnboardingFlow on `/` for unauthenticated users.
+ * Component + routes remain in place; only the auto-show gate is disabled.
+ */
+export const HOMEPAGE_ONBOARDING_FLOW_ENABLED = false;
+
 const KEY_PREFIX = 'onboarding_';
 const ANONYMOUS_ID_KEY = `${KEY_PREFIX}anonymousId`;
 const USER_GROUP_KEY = `${KEY_PREFIX}userGroup`;

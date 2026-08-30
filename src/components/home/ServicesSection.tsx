@@ -37,7 +37,7 @@ const SERVICE_CARDS: ServiceCardConfig[] = [
   },
   {
     id: 'referencing',
-    title: 'Reference',
+    title: 'Referencing',
     description:
       'Verify identity, income and rental history in one secure check.',
     imageSrc: '/images/referencing-person.jpg',
@@ -83,15 +83,29 @@ const ServicesLayoutV1: React.FC = () => {
               const isMiddle = index === 1;
 
               const ImageBlock = (
-                <div className="overflow-hidden rounded-[24px] shadow-[0_16px_40px_rgba(0,0,0,0.35)] bg-slate-900/40 transform transition-transform duration-300 ease-out hover:-translate-y-1.5 hover:scale-[1.02]">
+                <button
+                  type="button"
+                  onClick={() => navigate(card.href)}
+                  aria-label={card.title}
+                  className="group relative block w-full overflow-hidden rounded-[24px] shadow-[0_16px_40px_rgba(0,0,0,0.35)] bg-slate-900/40 transform transition-transform duration-300 ease-out hover:-translate-y-1.5 hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E65D24] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B3D5B]"
+                >
                   <img
                     src={card.imageSrc}
                     alt={card.imageAlt}
                     loading="lazy"
-                    className="w-full aspect-[4/3] object-cover transition-transform duration-500 ease-out hover:scale-[1.05]"
+                    className="w-full aspect-[4/3] object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
                     sizes="(max-width: 768px) 100vw, 33vw"
                   />
-                </div>
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-[#062536] via-[#0B3D5B]/70 to-transparent"
+                  />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 md:p-6">
+                    <span className="flex text-white text-xl md:text-2xl font-semibold tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
+                      {card.title}
+                    </span>
+                  </div>
+                </button>
               );
 
               const TextBlock = (

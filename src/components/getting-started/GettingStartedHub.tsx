@@ -8,7 +8,7 @@ import {
   getHubMinimized,
   setHubMinimized,
 } from '../../utils/gettingStartedProgress';
-import { clearOnboardingCompleted } from '../../utils/onboardingSession';
+import { clearOnboardingCompleted, HOMEPAGE_ONBOARDING_FLOW_ENABLED } from '../../utils/onboardingSession';
 
 /** Minimal tool entry for modal tools tab */
 const MODAL_TOOLS: { id: string; title: string; link: string }[] = [
@@ -255,7 +255,8 @@ export function GettingStartedHub({ app, userName, placement = 'top', fabPositio
         ))}
       </ul>
 
-      {/* Resume Onboarding button - lower right */}
+      {/* Resume Onboarding — hidden while homepage onboarding is archived */}
+      {HOMEPAGE_ONBOARDING_FLOW_ENABLED && (
       <div className="mt-4 flex justify-end">
         <button
           type="button"
@@ -271,6 +272,7 @@ export function GettingStartedHub({ app, userName, placement = 'top', fabPositio
           Resume Onboarding
         </button>
       </div>
+      )}
         </>
       )}
 

@@ -1,29 +1,29 @@
 import React from 'react';
+import { Lock } from 'lucide-react';
 import type { RenterReportContent } from '../../../types/govData';
-import { ReportDataSource } from './ReportDataSource';
-import { ReportPendingSection } from './ReportPendingSection';
 import { ReportStatusChip } from './ReportStatusChip';
 
 interface ReportStatutoryBreakdownProps {
   renter: RenterReportContent;
   listingPrice?: string;
+  paidCopy?: string;
 }
 
 function EmphasisedBody({ text }: { text: string }) {
   const parts = text.split(/(Band [A-G] \(\d+\)|~£[\d.]+\/mo)/g);
   return (
-    <p className="text-[15px] leading-[1.7] text-ink sm:text-[16px]">
+    <p className="text-[13px] sm:text-[15px] leading-relaxed text-gray-900 font-normal">
       {parts.map((part, index) => {
         if (/^Band [A-G] \(\d+\)$/.test(part)) {
           return (
-            <span key={index} className="font-mono font-medium text-brand-blue">
+            <span key={index} className="font-normal text-gray-900">
               {part}
             </span>
           );
         }
         if (/^~£[\d.]+\/mo$/.test(part)) {
           return (
-            <span key={index} className="font-mono font-medium text-brand-navy">
+            <span key={index} className="font-normal text-gray-900">
               {part}
             </span>
           );
@@ -37,6 +37,7 @@ function EmphasisedBody({ text }: { text: string }) {
 export const ReportStatutoryBreakdown: React.FC<ReportStatutoryBreakdownProps> = ({
   renter,
   listingPrice,
+  paidCopy,
 }) => {
   const partARows = renter.partARows.map((row) =>
     row.label === 'Price / Rent' && listingPrice?.trim()
@@ -45,106 +46,134 @@ export const ReportStatutoryBreakdown: React.FC<ReportStatutoryBreakdownProps> =
   );
 
   return (
-    <section id="full-report-breakdown" aria-labelledby="full-report-breakdown-title">
-      <div className="border-b-2 border-brand-navy/20 pb-3">
-        <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-brand-blue">
-          Statutory record · Parts A–C
-        </p>
+    <section id="full-report-breakdown" aria-labelledby="full-report-breakdown-title" className="space-y-4">
+      <div className="space-y-1 pt-4 border-t border-gray-200">
+        <div className="text-[11px] font-normal text-slate-600 uppercase tracking-widest font-archivo">
+          NTSELAT CPR 2008 • Parts A–C
+        </div>
         <h2
           id="full-report-breakdown-title"
-          className="mt-2 font-display text-[24px] font-bold tracking-[-0.02em] text-brand-blue sm:text-[30px]"
+          className="text-[25px] sm:text-[31px] font-normal font-archivo text-gray-900"
         >
           Full Report Breakdown
         </h2>
       </div>
 
-      <ol className="mt-8 space-y-5">
-        <li>
-          <article
-            id="part-a"
-            aria-labelledby="part-a-title"
-            className="rounded-xl border border-rule bg-paper p-5 sm:p-7"
+      <article
+        id="part-a"
+        aria-labelledby="part-a-title"
+        className="p-6 rounded-2xl bg-white border border-gray-200 shadow-sm space-y-4"
+      >
+        <div className="flex items-center justify-between pb-2 border-b border-gray-100 gap-3">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <span className="text-[13px] font-normal uppercase tracking-wider text-[#136C9E] font-archivo">
+              Part A
+            </span>
+            <h3
+              id="part-a-title"
+              className="text-[15px] font-normal text-gray-900 font-archivo"
+            >
+              {renter.partATitle}
+            </h3>
+          </div>
+          <ReportStatusChip label="Required" tone="resolved" />
+        </div>
+
+        <div className="divide-y divide-gray-100 text-[13px] sm:text-[15px]">
+          {partARows.map((row) => (
+            <div key={row.label} className="py-2.5 flex items-center justify-between gap-4">
+              <span className="text-gray-500 font-normal">{row.label}</span>
+              <span className="font-normal text-gray-900 text-right">
+                {row.value}
+                {row.qualifier && (
+                  <span className="ml-1.5 text-[11px] text-gray-400 font-normal">
+                    ({row.qualifier})
+                  </span>
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="pt-2 flex flex-wrap items-center justify-between text-[11px] text-slate-600 gap-2 border-t border-gray-100 font-normal">
+          <span>{renter.partANote}</span>
+          <span className="font-medium uppercase tracking-wider text-slate-700">
+            Source: {renter.partASource}
+          </span>
+        </div>
+      </article>
+
+      <article
+        id="part-b"
+        aria-labelledby="part-b-title"
+        className="p-6 rounded-2xl bg-white border border-gray-200 shadow-sm space-y-4"
+      >
+        <div className="flex items-center justify-between pb-2 border-b border-gray-100 gap-3">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <span className="text-[13px] font-normal uppercase tracking-wider text-[#136C9E] font-archivo">
+              Part B
+            </span>
+            <h3
+              id="part-b-title"
+              className="text-[15px] font-normal text-gray-900 font-archivo"
+            >
+              {renter.partBTitle}
+            </h3>
+          </div>
+          <ReportStatusChip label="Required" tone="resolved" />
+        </div>
+        <EmphasisedBody text={renter.partBBody} />
+        <div className="pt-2 flex justify-end text-[11px] text-slate-700 font-medium uppercase tracking-wider border-t border-gray-100">
+          Source: {renter.partBSource}
+        </div>
+      </article>
+
+      <article
+        id="part-c"
+        aria-labelledby="part-c-title"
+        className="p-6 rounded-2xl bg-white border border-gray-200 shadow-sm space-y-4"
+        data-testid="report-part-c-pending"
+      >
+        <div className="flex items-center justify-between pb-2 border-b border-gray-100 gap-3">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <span className="text-[13px] font-normal uppercase tracking-wider text-[#136C9E] font-archivo">
+              Part C
+            </span>
+            <h3
+              id="part-c-title"
+              className="text-[15px] font-normal text-gray-900 font-archivo"
+            >
+              {renter.partCTitle}
+            </h3>
+          </div>
+          <ReportStatusChip label={renter.partCStatus} tone="pending" />
+        </div>
+
+        <div className="divide-y divide-gray-100 text-[13px] sm:text-[15px]">
+          <div className="py-2.5 flex items-center justify-between">
+            <span className="text-gray-500 font-normal">Title Register</span>
+            <span className="text-gray-400 font-mono font-normal">—</span>
+          </div>
+          <div className="py-2.5 flex items-center justify-between">
+            <span className="text-gray-500 font-normal">Covenant Text</span>
+            <span className="text-gray-400 font-mono font-normal">—</span>
+          </div>
+        </div>
+
+        {paidCopy ? (
+          <div
+            className="p-4 rounded-xl border-2 border-dashed border-gray-200 bg-slate-50/70 text-center flex items-center justify-center gap-2 text-[13px] font-normal text-gray-600"
+            data-testid="report-paid-pending"
           >
-            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-              <div className="min-w-0">
-                <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-brand-blue">
-                  Part A
-                </p>
-                <h3
-                  id="part-a-title"
-                  className="mt-1.5 font-display text-[19px] font-semibold leading-tight tracking-[-0.015em] text-brand-navy sm:text-[22px]"
-                >
-                  {renter.partATitle}
-                </h3>
-              </div>
-              <ReportStatusChip label="Recorded" tone="resolved" />
-            </div>
+            <Lock className="w-4 h-4 text-gray-500 shrink-0" aria-hidden />
+            <span>{paidCopy}</span>
+          </div>
+        ) : null}
 
-            <div className="mt-5">
-              <dl className="divide-y divide-rule border-y border-rule">
-                {partARows.map((row) => (
-                  <div
-                    key={row.label}
-                    className="flex flex-col gap-1 py-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6"
-                  >
-                    <dt className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-muted">
-                      {row.label}
-                    </dt>
-                    <dd className="font-mono text-[15px] font-medium text-brand-navy sm:text-right sm:text-[16px]">
-                      {row.value}
-                      {row.qualifier && (
-                        <span className="ml-2 font-sans text-[12px] font-normal italic text-ink-muted">
-                          ({row.qualifier})
-                        </span>
-                      )}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-              <p className="mt-4 text-[13px] leading-relaxed text-ink-muted">{renter.partANote}</p>
-              <ReportDataSource source={renter.partASource} />
-            </div>
-          </article>
-        </li>
-
-        <li>
-          <article
-            id="part-b"
-            aria-labelledby="part-b-title"
-            className="rounded-xl border border-rule bg-paper p-5 sm:p-7"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-              <div className="min-w-0">
-                <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-brand-blue">
-                  Part B
-                </p>
-                <h3
-                  id="part-b-title"
-                  className="mt-1.5 font-display text-[19px] font-semibold leading-tight tracking-[-0.015em] text-brand-navy sm:text-[22px]"
-                >
-                  {renter.partBTitle}
-                </h3>
-              </div>
-              <ReportStatusChip label="Recorded" tone="resolved" />
-            </div>
-            <div className="mt-5">
-              <EmphasisedBody text={renter.partBBody} />
-              <ReportDataSource source={renter.partBSource} />
-            </div>
-          </article>
-        </li>
-      </ol>
-
-      <div className="mt-5">
-        <ReportPendingSection
-          id="part-c"
-          kicker="Part C"
-          title={renter.partCTitle}
-          statusLabel={renter.partCStatus}
-          body={renter.partCBody}
-          testId="report-part-c-pending"
-        />
-      </div>
+        <p className="text-[11px] text-slate-500 leading-normal pt-1 font-normal">
+          {renter.partCBody}
+        </p>
+      </article>
     </section>
   );
 };

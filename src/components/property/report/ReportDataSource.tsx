@@ -10,15 +10,13 @@ export const ReportDataSource: React.FC<ReportDataSourceProps> = ({
   pending = false,
 }) => (
   <p
-    className={`mt-5 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t pt-3 font-mono text-[11px] leading-relaxed ${
-      pending ? 'border-dashed border-pending-line text-pending-text' : 'border-rule text-ink-muted'
+    className={`pt-3 border-t text-[11px] font-medium uppercase tracking-wider leading-relaxed ${
+      pending
+        ? 'border-dashed border-gray-200 text-gray-400'
+        : 'border-gray-200 text-slate-700'
     }`}
   >
-    <span
-      className={`text-[10px] uppercase tracking-[0.2em] ${pending ? 'text-pending-text' : 'text-brand-blue'}`}
-    >
-      Source
-    </span>
-    <span className="min-w-0 break-words">{source}</span>
+    <span className="mr-1">Source</span>
+    <span className="min-w-0 break-words font-normal tracking-wide">{source}</span>
   </p>
 );

@@ -1,15 +1,24 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Download, MapPin, Search, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Calendar,
+  CheckCircle2,
+  Download,
+  Search,
+  Tag,
+  UserCheck,
+  X,
+} from 'lucide-react';
 import type { Audience, FactFlag, PropertyReportResponse, ReportLens } from '../../types/govData';
 import { fetchPropertyReport } from '../../services/govDataService';
 import { defaultRenterContent } from '../../data/renterReportFixtures';
 import { trackEvent } from '../../utils/analytics';
 import { downloadIntelligenceReportPdf } from '../../utils/intelligenceReportPdf';
 import { getPropertyListingDescription } from '../../utils/propertyDisplay';
+import { extractUkPostcode } from '../../utils/postcodesIo';
 import { ReportLocationCard } from './report/ReportLocationCard';
 import { ReportStatutoryBreakdown } from './report/ReportStatutoryBreakdown';
 import { ReportLocalArea } from './report/ReportLocalArea';
-import { parsePaidPendingCopy, ReportPendingSection } from './report/ReportPendingSection';
 
 interface ProptiiReportModalProps {
   isOpen: boolean;
@@ -36,6 +45,23 @@ const ROLE_CHIP: Record<Audience, string> = {
   homeowner: 'Homeowner Report',
 };
 
+const LENS_SHORT: Record<Audience, string> = {
+  tenant: 'Renter',
+  buyer: 'Buyer',
+  landlord: 'Landlord',
+  agent: 'Agent',
+  homeowner: 'Homeowner',
+};
+
+type ReportTab = 'area' | 'part-a' | 'part-b' | 'part-c';
+
+const TAB_TARGETS: Record<ReportTab, string> = {
+  area: 'approximate-location',
+  'part-a': 'part-a',
+  'part-b': 'part-b',
+  'part-c': 'part-c',
+};
+
 function formatAsOf(date: Date): string {
   return date.toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -44,9 +70,15 @@ function formatAsOf(date: Date): string {
   });
 }
 
+function addressLines(value: string): string[] {
+  return value
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 /**
- * Renter intelligence report — visual match of HTML v04.
- * Profile switcher, Price Paid tables, owner-intent, and agent ledger are excluded.
+ * Renter intelligence report — visual match of the standalone HTML modal spec.
  */
 export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
   isOpen,
@@ -73,6 +105,8 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
     },
   );
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [activeTab, setActiveTab] = useState<ReportTab>('area');
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(() => new Set());
   const factsFingerprintRef = useRef('');
   const resolvedTitle = propertyTitle || addressLabel.split(',')[0]?.trim() || 'Selected property';
   const resolvedLocation =
@@ -171,8 +205,6 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
     return defaultRenterContent(facts);
   }, [report.renter, facts]);
 
-  const paidPending = useMemo(() => parsePaidPendingCopy(renter.paidCopy), [renter.paidCopy]);
-
   const isSourcesLoading = useMemo(() => {
     return report.sources?.some((s) => s.state === 'loading') ?? false;
   }, [report.sources]);
@@ -181,13 +213,6 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
     if (isDownloadingPdf) return;
     setIsDownloadingPdf(true);
     try {
-      const reportEl = document.getElementById('proptii-report');
-      if (reportEl) {
-        reportEl.scrollTop = 0;
-      }
-      await new Promise((resolve) => {
-        window.setTimeout(resolve, 350);
-      });
       await downloadIntelligenceReportPdf({
         listingId,
         audience,
@@ -209,15 +234,34 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
     }
   };
 
+  const handleTab = (tab: ReportTab) => {
+    setActiveTab(tab);
+    const target = document.getElementById(TAB_TARGETS[tab]);
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const toggleStep = (index: number) => {
+    setCompletedSteps((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
   if (!isOpen && !isWarming) return null;
 
   const asOf = formatAsOf(new Date());
   const reference = `PRP-${listingId.slice(-6).toUpperCase() || '849201'}`;
   const steps = renter.steps.length > 0 ? renter.steps : (lens?.steps ?? []);
+  const lines = addressLines(resolvedLocation);
+  const postcode = extractUkPostcode(resolvedLocation) || '';
+  const headerTrail = [lines[0]?.toUpperCase(), postcode, reference].filter(Boolean).join(' • ');
+  const sourcesVerified = report.sources?.some((s) => s.state === 'clear');
 
   return (
     <div
-      className={`fixed inset-0 z-[70] bg-black/50 flex items-stretch sm:items-center justify-center sm:p-4${
+      className={`fixed inset-0 z-[70] bg-slate-900/90 flex items-stretch sm:items-center justify-center p-3 sm:p-6 lg:p-8${
         isWarming ? ' pointer-events-none opacity-0' : ''
       }`}
       data-testid="proptii-report-modal"
@@ -228,189 +272,238 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
     >
       <div
         id="proptii-report"
-        className="relative min-h-0 h-full sm:h-auto sm:max-h-[96vh] w-full max-w-5xl overflow-y-auto bg-ground font-sans text-ink shadow-2xl sm:rounded-sm"
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#EEF6FB] via-[#F3F8FB] to-[#FAF6F2] border-2 border-[#136C9E]/25 max-w-4xl w-full max-h-[94vh] flex flex-col shadow-2xl text-gray-900 font-nunito-sans"
       >
-        <header id="report-header" className="border-b border-rule bg-paper">
-          <div className="mx-auto max-w-5xl px-5 pb-7 pt-8 sm:px-8 sm:pb-9 sm:pt-11">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-brand-blue">Proptii</p>
-                <h1
-                  id="proptii-report-title"
-                  className="mt-3 font-display text-[30px] font-bold leading-[1.05] tracking-[-0.02em] text-brand-blue sm:text-[42px]"
-                >
-                  Your Proptii Report
-                </h1>
-                <p className="mt-4 flex items-start gap-2 font-display text-[17px] font-semibold leading-snug text-brand-navy sm:text-[20px]">
-                  <MapPin aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-brand-blue" />
-                  <span>{resolvedLocation}</span>
-                </p>
-                <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-muted">
-                  Correct as of {asOf}
-                  <span className="mx-2 text-pending" aria-hidden="true">
-                    ·
-                  </span>
-                  {reference}
-                </p>
-                <p
-                  id="location-precision-disclosure"
-                  className="mt-3 max-w-2xl text-[13px] leading-relaxed text-ink-muted"
-                >
-                  {renter.precisionLine}{' '}
-                  <span className="font-mono text-[12px]">UPRN / title register pending.</span>
-                </p>
-              </div>
+        <div
+          data-pdf-hide
+          className="absolute top-0 right-0 -mr-16 -mt-16 w-80 h-80 rounded-full bg-[#E0F0F8] pointer-events-none blur-3xl z-0"
+        />
 
-              <div className="flex flex-col items-start gap-3 sm:items-end">
-                <div className="flex items-center gap-2">
-                  <button
-                    id="download-report"
-                    type="button"
-                    onClick={() => {
-                      void handleDownloadPdf();
-                    }}
-                    disabled={isDownloadingPdf || isSourcesLoading}
-                    aria-busy={isDownloadingPdf || isSourcesLoading}
-                    className="no-print inline-flex items-center justify-center gap-2 rounded-lg bg-stamp px-3.5 py-2 text-[13px] font-semibold text-paper transition-colors duration-150 ease-out hover:bg-stamp-hover disabled:cursor-wait disabled:opacity-80"
-                  >
-                    <Download aria-hidden="true" className="h-3.5 w-3.5" />
-                    {isDownloadingPdf || isSourcesLoading ? 'Preparing…' : 'Download report'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="no-print flex h-9 w-9 items-center justify-center rounded-lg border border-ink/15 text-ink-muted transition-colors duration-150 ease-out hover:bg-ground hover:text-ink"
-                    aria-label="Close report"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <span className="inline-flex items-center gap-2 rounded-md border border-brand-blue/20 bg-brand-blue-light px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-brand-blue">
-                  <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-brand-blue" />
-                  {ROLE_CHIP[audience]}
-                </span>
-                <button
-                  type="button"
-                  onClick={onChangeLens}
-                  className="no-print text-[13px] font-medium text-brand-blue-deep underline-offset-4 transition-colors duration-150 ease-out hover:text-brand-blue hover:underline"
-                >
-                  Buying, letting or managing? Sign in
-                </button>
-              </div>
+        <header className="bg-white border-b border-gray-200 px-6 py-3.5 flex items-center justify-between z-20 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="font-normal text-[13px] tracking-wider text-[#136C9E] uppercase font-archivo shrink-0">
+              Proptii Report
+            </span>
+            <span className="text-gray-300 text-[13px] hidden sm:inline">|</span>
+            <div className="text-[13px] text-gray-600 font-normal tracking-wide hidden sm:block truncate max-w-md">
+              {headerTrail}
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onChangeLens}
+              className="no-print flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-[#136C9E] hover:bg-blue-100 text-[13px] font-normal transition-all shadow-sm"
+              title="Change audience perspective"
+            >
+              <UserCheck className="w-3.5 h-3.5" aria-hidden />
+              <span>Change Lens ({LENS_SHORT[audience]})</span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="no-print w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors"
+              aria-label="Close report"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </header>
 
-        <main
-          className="mx-auto max-w-5xl space-y-8 px-5 py-8 sm:px-8 sm:py-10"
+        <div
+          data-report-scroll
+          className="p-6 sm:p-10 pb-16 overflow-y-auto space-y-9 flex-1 relative z-10"
           data-facts-fingerprint={factsFingerprintRef.current}
         >
-          <section
-            id="verdict-banner"
-            aria-labelledby="verdict-title"
-            className="rounded-xl border border-brand-blue/20 bg-brand-cream px-5 py-6 sm:px-8 sm:py-7"
-          >
-            <div className="flex items-start gap-3.5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-blue/15 text-brand-blue">
-                <AlertTriangle aria-hidden="true" className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <h2
-                  id="verdict-title"
-                  className="font-display text-[20px] font-bold leading-[1.15] tracking-[-0.02em] text-brand-blue sm:text-[24px]"
-                >
-                  {renter.whatToWatchTitle}
-                </h2>
-                <p className="mt-2.5 max-w-3xl text-[15px] leading-[1.65] text-ink-muted sm:text-[16px]">
-                  {renter.whatToWatchBody}
-                </p>
-              </div>
+          <div className="space-y-3">
+            <div className="inline-flex items-center px-3 py-1 rounded-full bg-slate-900 text-white text-[11px] font-normal tracking-wider font-archivo uppercase shadow-sm">
+              {ROLE_CHIP[audience]}
             </div>
-          </section>
+
+            <h1
+              id="proptii-report-title"
+              className="text-[25px] sm:text-[31px] lg:text-[37px] font-normal font-archivo text-gray-900 tracking-tight leading-[1.22]"
+            >
+              {lines.length > 0
+                ? lines.map((line, index) => (
+                    <React.Fragment key={`${line}-${index}`}>
+                      {line}
+                      {index < lines.length - 1 ? <br /> : null}
+                    </React.Fragment>
+                  ))
+                : resolvedTitle}
+            </h1>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-slate-600 font-normal pt-1">
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-slate-500" aria-hidden />
+                <span>Correct as of {asOf}</span>
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1">
+                <Tag className="w-3.5 h-3.5 text-slate-500" aria-hidden />
+                <span>{reference}</span>
+              </span>
+              <span>•</span>
+              <span className={sourcesVerified ? 'text-emerald-700 font-normal' : 'text-slate-500'}>
+                {isSourcesLoading
+                  ? 'Checking open registers…'
+                  : sourcesVerified
+                    ? 'Open & EPC register verified'
+                    : renter.precisionLine}
+              </span>
+            </div>
+          </div>
+
+          <div className="no-print border-b border-gray-300 flex items-center gap-8 text-[13px] font-normal tracking-wider uppercase font-archivo overflow-x-auto">
+            {(
+              [
+                ['area', 'Area Intel'],
+                ['part-a', 'Part A'],
+                ['part-b', 'Part B'],
+                ['part-c', 'Part C'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => handleTab(id)}
+                className={
+                  activeTab === id
+                    ? 'pb-3 border-b-2 border-gray-900 text-gray-900 font-medium transition-all shrink-0'
+                    : 'pb-3 border-b-2 border-transparent text-slate-600 hover:text-gray-900 transition-all shrink-0'
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative rounded-2xl bg-white border border-gray-200 p-5 pl-6 shadow-sm overflow-hidden flex items-start justify-between gap-4">
+            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#EF4444]" />
+            <div className="space-y-1.5 flex-1 pr-4">
+              <div className="flex items-center gap-1.5 text-[13px] font-normal uppercase tracking-wider text-[#EF4444] font-archivo">
+                <AlertTriangle className="w-4 h-4 text-[#EF4444]" aria-hidden />
+                <span>{renter.whatToWatchTitle}</span>
+              </div>
+              <p className="text-[13px] sm:text-[14px] text-gray-700 leading-relaxed font-normal">
+                {renter.whatToWatchBody}
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-full border-2 border-red-200/60 flex items-center justify-center text-red-300 flex-shrink-0 my-auto hidden sm:flex">
+              <span className="font-archivo text-xl font-normal">!</span>
+            </div>
+          </div>
 
           <ReportLocationCard
             embedQuery={report.map?.embedQuery}
             addressLabel={resolvedLocation}
           />
 
-          <ReportStatutoryBreakdown renter={renter} listingPrice={propertyPrice} />
-
           <ReportLocalArea intro={renter.localIntro} checks={renter.localArea} />
 
-          <ReportPendingSection
-            id="paid-features-placeholder"
-            kicker="Paid"
-            title={paidPending.title}
-            statusLabel={paidPending.statusLabel}
-            testId="report-paid-pending"
+          <ReportStatutoryBreakdown
+            renter={renter}
+            listingPrice={propertyPrice}
+            paidCopy={renter.paidCopy}
           />
 
           <section
             id="recommended-action-steps"
             aria-labelledby="recommended-action-steps-title"
-            className="rounded-xl border border-rule bg-paper p-5 sm:p-7"
+            className="space-y-4 pt-4 border-t border-gray-200"
           >
-            <div className="border-b-2 border-brand-navy/20 pb-3">
-              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-brand-blue">What to do next</p>
+            <div>
+              <div className="text-[11px] font-normal text-slate-600 uppercase tracking-widest font-archivo">
+                What to do next
+              </div>
               <h2
                 id="recommended-action-steps-title"
-                className="mt-2 font-display text-[21px] font-bold tracking-[-0.02em] text-brand-blue sm:text-[26px]"
+                className="text-[25px] sm:text-[31px] font-normal font-archivo text-gray-900"
               >
                 Recommended Action Steps
               </h2>
             </div>
 
-            <ol className="mt-5 divide-y divide-rule">
-              {steps.map((step, index) => (
-                <li key={step} className="flex gap-4 py-4 first:pt-0 last:pb-0">
-                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-brand-blue/25 bg-brand-blue-light font-mono text-[11px] font-medium text-brand-blue">
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  <p className="text-[15px] leading-[1.65] text-ink-muted">{step}</p>
-                </li>
-              ))}
-            </ol>
-          </section>
-        </main>
-
-        <footer id="report-footer" className="border-t border-rule bg-paper">
-          <div className="mx-auto flex max-w-5xl flex-col gap-3 px-5 py-7 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-muted">
-                Proptii · {reference}
-              </p>
-              <p className="mt-1.5 max-w-md text-[12px] leading-relaxed text-ink-muted">
-                {renter.footerAudience}
-              </p>
+            <div className="space-y-3">
+              {steps.map((step, index) => {
+                const done = completedSteps.has(index);
+                return (
+                  <button
+                    key={step}
+                    type="button"
+                    onClick={() => toggleStep(index)}
+                    className={`group w-full text-left p-4 sm:p-5 rounded-2xl border flex items-start gap-4 transition-all ${
+                      done
+                        ? 'bg-emerald-50/60 border-emerald-200 line-through text-gray-400'
+                        : 'bg-white border-gray-200 hover:border-[#136C9E] hover:shadow-[0_16px_32px_#E7F2FF]'
+                    }`}
+                  >
+                    <span
+                      className={`font-archivo font-normal text-[15px] sm:text-[17px] flex-shrink-0 ${
+                        done ? 'text-gray-400' : 'text-slate-500 group-hover:text-[#136C9E]'
+                      }`}
+                    >
+                      {String(index + 1).padStart(2, '0')}.
+                    </span>
+                    <span
+                      className={`text-[13px] sm:text-[15px] leading-relaxed font-normal flex-1 ${
+                        done ? 'text-gray-400' : 'text-gray-800 group-hover:text-[#136C9E]'
+                      }`}
+                    >
+                      {step}
+                    </span>
+                    {done ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" aria-hidden />
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                id="export-facts-only"
-                type="button"
-                onClick={() => {
-                  void handleDownloadPdf();
-                }}
-                disabled={isDownloadingPdf}
-                className="no-print inline-flex items-center justify-center gap-2 rounded-lg bg-stamp px-5 py-3 text-[14px] font-semibold text-paper transition-colors duration-150 ease-out hover:bg-stamp-hover disabled:cursor-wait disabled:opacity-80"
-                data-testid="download-intelligence-report-pdf"
-              >
-                <Download aria-hidden="true" className={`h-4 w-4 ${isSourcesLoading ? 'animate-pulse' : ''}`} />
+          </section>
+        </div>
+
+        <footer className="bg-[#EEF6FB] border-t border-[#136C9E]/15 px-6 sm:px-8 py-2.5 sm:py-3 flex flex-wrap items-center justify-between gap-3 z-20 flex-shrink-0">
+          <div className="text-[10px] text-gray-500 leading-tight max-w-sm font-normal">
+            <span className="font-normal text-gray-800 text-[11px] block">
+              Proptii • {reference}
+            </span>
+            <span>{renter.footerAudience}</span>
+          </div>
+
+          <div className="flex items-center gap-3 ml-auto">
+            <button
+              id="export-facts-only"
+              type="button"
+              onClick={() => {
+                void handleDownloadPdf();
+              }}
+              disabled={isDownloadingPdf}
+              className="no-print h-10 px-5 flex items-center gap-2 rounded-full bg-[#DC5F12] hover:bg-[#c34f0d] text-white text-xs font-normal shadow-sm transition-all uppercase tracking-wider font-archivo disabled:cursor-wait disabled:opacity-80"
+              data-testid="download-intelligence-report-pdf"
+            >
+              <Download
+                aria-hidden
+                className={`w-3.5 h-3.5 text-white ${isSourcesLoading ? 'animate-pulse' : ''}`}
+              />
+              <span>
                 {isDownloadingPdf
                   ? 'Preparing PDF…'
                   : isSourcesLoading
                     ? 'Gathering Live Data…'
                     : 'Export Facts-Only (Public)'}
-              </button>
-              <button
-                id="new-search"
-                type="button"
-                onClick={onClose}
-                className="no-print inline-flex items-center justify-center gap-2 rounded-lg border border-ink/25 px-5 py-3 text-[14px] font-semibold text-ink transition-colors duration-150 ease-out hover:bg-ground"
-              >
-                <Search aria-hidden="true" className="h-4 w-4" />
-                New Search
-              </button>
-            </div>
+              </span>
+            </button>
+            <button
+              id="new-search"
+              type="button"
+              onClick={onClose}
+              className="no-print h-10 px-5 flex items-center gap-2 rounded-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-800 text-xs font-normal shadow-sm transition-all uppercase tracking-wider font-archivo"
+            >
+              <Search className="w-3.5 h-3.5 text-gray-600" aria-hidden />
+              <span>New Search</span>
+            </button>
           </div>
         </footer>
       </div>

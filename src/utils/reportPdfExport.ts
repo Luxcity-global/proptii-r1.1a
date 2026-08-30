@@ -1,6 +1,3 @@
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
-
 const slugify = (value: string): string =>
   value
     .toLowerCase()
@@ -8,15 +5,12 @@ const slugify = (value: string): string =>
     .replace(/^-+|-+$/g, '')
     .slice(0, 48) || 'property';
 
-/** Prepare a cloned report node so the PDF matches the on-screen layout. */
+/**
+ * Expand pending copy and strip chrome on a cloned report node.
+ * Used only on clones — never mutate the live modal.
+ */
 export function prepareReportElementForPdfCapture(root: HTMLElement): void {
-  root.style.maxHeight = 'none';
-  root.style.overflow = 'visible';
-  root.style.height = 'auto';
-  root.style.boxShadow = 'none';
-  root.style.backgroundColor = '#ffffff';
-
-  root.querySelectorAll('.no-print').forEach((node) => {
+  root.querySelectorAll('.no-print, [data-pdf-hide]').forEach((node) => {
     node.remove();
   });
 
@@ -39,66 +33,6 @@ export function prepareReportElementForPdfCapture(root: HTMLElement): void {
     });
 }
 
-/**
- * Capture a live report element and save it as a multi-page A4 PDF.
- * Uses the rendered DOM with solid white background and precise page thresholding.
- */
-export async function captureElementAsPdf(element: HTMLElement, filename: string): Promise<void> {
-  const previousScrollTop = element.scrollTop;
-  element.scrollTop = 0;
-
-  try {
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-      height: element.scrollHeight,
-      width: element.scrollWidth,
-      windowWidth: element.scrollWidth,
-      windowHeight: element.scrollHeight,
-      scrollX: 0,
-      scrollY: 0,
-      onclone: (_document, clonedElement) => {
-        prepareReportElementForPdfCapture(clonedElement as HTMLElement);
-      },
-    });
-
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    const pdf = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgProps = pdf.getImageProperties(imgData);
-    const imgHeight = (imgProps.height * pageWidth) / imgProps.width;
-
-    let heightLeft = imgHeight;
-    let position = 0;
-
-    pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, imgHeight, undefined, 'FAST');
-    heightLeft -= pageHeight;
-
-    // Use a 5mm threshold to avoid empty trailing pages due to sub-pixel margins
-    while (heightLeft > 5) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pageHeight;
-    }
-
-    pdf.save(filename);
-  } finally {
-    element.scrollTop = previousScrollTop;
-  }
-}
-
 export function buildIntelligenceReportFilename(propertyLabel: string): string {
   return `proptii-intelligence-report-${slugify(propertyLabel)}.pdf`;
-}
-
-export async function downloadReportFromElement(
-  element: HTMLElement,
-  propertyLabel: string,
-): Promise<void> {
-  await captureElementAsPdf(element, buildIntelligenceReportFilename(propertyLabel));
 }

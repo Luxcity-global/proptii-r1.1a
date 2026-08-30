@@ -268,7 +268,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                 )}
                 <button
                   onClick={handleLogin}
-                  className="bg-[#136C9E] hover:bg-[#0e5278] text-white px-6 py-2 rounded-full font-medium text-sm transition-all flex items-center shadow-md hover:shadow-lg"
+                  className="bg-[#F15A22] hover:bg-[#d94e1c] text-white px-6 py-2 rounded-full font-medium text-sm transition-all flex items-center shadow-md hover:shadow-lg"
                   disabled={isLoading || loginInProgress}
                 >
                   {isLoading || loginInProgress ? (
@@ -454,7 +454,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                   )}
                   <button
                     onClick={handleLogin}
-                    className="w-full bg-[#136C9E] text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-[#0e5278] transition-all flex items-center justify-center shadow-md"
+                    className="w-full bg-[#F15A22] text-white px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-[#d94e1c] transition-all flex items-center justify-center shadow-md"
                     disabled={isLoading || loginInProgress}
                   >
                     {isLoading || loginInProgress ? (

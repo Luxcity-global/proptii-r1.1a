@@ -7,8 +7,8 @@ export interface FilterPill {
 }
 
 const VISIBLE_PILL_LIMIT = 3;
-const PILL_NAVY = '#0B3B5B';
-const PILL_BORDER = '#18537D';
+const PILL_BLUE = '#136C9E';
+const PILL_BORDER = '#0E5A84';
 
 export function entitiesToPills(entities: ClassifyEntities | null | undefined): FilterPill[] {
   if (!entities) return [];
@@ -59,7 +59,7 @@ function pillShellClass(extra = '') {
 }
 
 const pillShellStyle: React.CSSProperties = {
-  backgroundColor: PILL_NAVY,
+  backgroundColor: PILL_BLUE,
   borderColor: PILL_BORDER,
 };
 
@@ -192,7 +192,7 @@ export const FilterPills: React.FC<FilterPillsProps> = ({
           {overflowOpen && (
             <div
               className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-60 rounded-2xl shadow-2xl border p-2 z-50 text-left"
-              style={{ backgroundColor: PILL_NAVY, borderColor: PILL_BORDER }}
+              style={{ backgroundColor: PILL_BLUE, borderColor: PILL_BORDER }}
               role="listbox"
               aria-label="Additional filters"
               data-testid="filter-pills-overflow-menu"

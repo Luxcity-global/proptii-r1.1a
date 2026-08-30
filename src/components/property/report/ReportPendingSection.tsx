@@ -11,7 +11,7 @@ interface ReportPendingSectionProps {
   className?: string;
 }
 
-/** Collapsed “coming later” panel with a dancing orange status chip. */
+/** Collapsed “coming later” panel — body expands in PDF via reportPdfExport. */
 export const ReportPendingSection: React.FC<ReportPendingSectionProps> = ({
   id,
   kicker,
@@ -25,15 +25,17 @@ export const ReportPendingSection: React.FC<ReportPendingSectionProps> = ({
     id={id}
     aria-labelledby={id ? `${id}-title` : undefined}
     tabIndex={0}
-    className={`group rounded-xl border border-dashed border-stamp bg-stamp/10 px-5 py-3.5 transition-[padding] duration-200 hover:py-5 focus-within:py-5 sm:px-6${className ? ` ${className}` : ''}`}
+    className={`group p-6 rounded-2xl bg-white border border-gray-200 shadow-sm space-y-4${className ? ` ${className}` : ''}`}
     data-testid={testId}
   >
-    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 pb-2 border-b border-gray-100">
       <div className="min-w-0">
-        <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-brand-blue">{kicker}</p>
+        <p className="text-[13px] font-normal uppercase tracking-wider text-[#136C9E] font-archivo">
+          {kicker}
+        </p>
         <h3
           id={id ? `${id}-title` : undefined}
-          className="mt-1 font-display text-[16px] font-semibold tracking-[-0.015em] text-brand-navy sm:text-[18px]"
+          className="mt-1 text-[15px] font-normal text-gray-900 font-archivo"
         >
           {title}
         </h3>
@@ -41,7 +43,7 @@ export const ReportPendingSection: React.FC<ReportPendingSectionProps> = ({
       <ReportStatusChip label={statusLabel} tone="pending" />
     </div>
     {body ? (
-      <p className="max-h-0 overflow-hidden text-[13px] leading-relaxed text-ink-muted opacity-0 transition-all duration-200 group-hover:mt-2 group-hover:max-h-40 group-hover:opacity-100 focus-within:mt-2 focus-within:max-h-40 focus-within:opacity-100 sm:text-[14px]">
+      <p className="max-h-0 overflow-hidden text-[13px] leading-relaxed text-gray-600 opacity-0 transition-all duration-200 group-hover:mt-0 group-hover:max-h-40 group-hover:opacity-100 focus-within:mt-0 focus-within:max-h-40 focus-within:opacity-100 sm:text-[14px]">
         {body}
       </p>
     ) : null}

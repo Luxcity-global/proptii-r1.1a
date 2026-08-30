@@ -18,7 +18,7 @@ export const ReportMapZoomControls: React.FC<ReportMapZoomControlsProps> = ({
   onZoomOut,
 }) => (
   <div
-    className="absolute right-3 top-1/2 z-10 flex -translate-y-1/2 flex-col overflow-hidden rounded-sm bg-white shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
+    className="no-print absolute right-3 top-1/2 z-10 flex -translate-y-1/2 flex-col overflow-hidden rounded-sm bg-white shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
     data-testid="report-map-zoom-controls"
   >
     <button

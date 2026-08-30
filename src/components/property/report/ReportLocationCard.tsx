@@ -29,29 +29,24 @@ export const ReportLocationCard: React.FC<ReportLocationCardProps> = ({
     <section
       id="approximate-location"
       aria-labelledby="approximate-location-title"
-      className="rounded-xl border border-rule bg-paper p-5 sm:p-7"
+      className="space-y-2 pt-2"
       data-testid="report-location-card"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2
-          id="approximate-location-title"
-          className="font-display text-[17px] font-semibold tracking-[-0.01em] text-brand-blue sm:text-[19px]"
-        >
+      <div className="flex items-center justify-between text-[11px] font-normal text-slate-600 uppercase tracking-wider font-archivo px-1">
+        <h2 id="approximate-location-title" className="font-normal">
           Approximate Location
         </h2>
-        <span className="inline-flex items-center border border-brand-blue/25 bg-brand-blue-light px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-brand-blue">
-          Postcode centroid, not exact plot
-        </span>
+        <span>Postcode centroid: 100m resolution</span>
       </div>
 
       {showMapArea ? (
-        <div className="mt-4 overflow-hidden rounded-lg border border-rule">
+        <div className="relative w-full rounded-2xl border border-gray-200 bg-slate-100 overflow-hidden shadow-inner">
           <ReportLocationMap query={query} onStatusChange={setMapStatus} />
         </div>
       ) : null}
 
       {addressLabel && showMapArea ? (
-        <p className="mt-2 text-[12px] leading-relaxed text-ink-muted">
+        <p className="text-[11px] text-slate-500 leading-normal px-1 font-normal">
           {addressLabel} — postcode centroid, not the exact plot.
         </p>
       ) : null}
