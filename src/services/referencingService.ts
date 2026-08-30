@@ -111,7 +111,7 @@ class ReferencingService {
 
   /**
    * Upload a document file for a referencing section.
-   * Converts the File to a base64 data URI and POSTs it to the file-save endpoint.
+   * Posts the file as multipart/form-data to the file-save endpoint.
    * The backend uploads to Firebase Storage and returns { url, storagePath }.
    */
   async uploadDocument(
@@ -122,29 +122,20 @@ class ReferencingService {
     onProgress?: (progress: number) => void,
   ) {
     try {
-      // Read file as base64 data URI
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload  = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.readAsDataURL(file);
-      });
-
-      if (onProgress) onProgress(30);
-
-      const response = await apiService.post(referencingPath('files/save'), {
-        base64,
+      const additionalData = {
         section,
         field,
-        fileName:    file.name,
-        contentType: file.type,
-        size:        file.size,
-        userId:      applicationId,
-      });
+        userId: applicationId,
+      };
 
-      if (onProgress) onProgress(100);
+      const response = await apiService.uploadFile(
+        referencingPath('files/save'),
+        file,
+        additionalData,
+        onProgress
+      );
 
-      const data = response.data;
+      const data = response.data as any;
       if (data?.url) {
         return { success: true, data: { fileUrl: data.url, storagePath: data.storagePath } };
       }

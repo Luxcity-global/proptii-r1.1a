@@ -15,7 +15,7 @@ import communicationService from '../../../services/communicationService';
  * Saved Properties section - redesigned to follow style guide
  */
 const SavedProperties: React.FC = () => {
-  const { savedProperties, unsaveProperty } = useSavedProperties();
+  const { savedProperties, unsaveProperty, hasMore, loadMore, isLoading } = useSavedProperties();
   const { user, isAuthenticated } = useAuth();
   const { signedContracts } = useSignedContracts();
   const isMobile = useIsMobile();
@@ -645,14 +645,21 @@ const SavedProperties: React.FC = () => {
       </div>
 
       {/* Load More */}
-      {displayedProperties.length < filteredProperties.length && (
+      {(hasMore || displayedProperties.length < filteredProperties.length) && (
         <div className={`text-center ${isMobile ? 'pt-4' : 'pt-6'}`}>
           <button 
-            className={`${isMobile ? 'px-4 py-2 text-xs' : 'px-6 py-3'} border border-gray-300 rounded-lg ${isMobile ? 'text-xs' : 'text-sm'} font-medium hover:bg-gray-50 transition-colors`}
+            className={`${isMobile ? 'px-4 py-2 text-xs' : 'px-6 py-3'} border border-gray-300 rounded-lg ${isMobile ? 'text-xs' : 'text-sm'} font-medium hover:bg-gray-50 transition-colors disabled:opacity-50`}
             style={{ color: '#374957' }}
-            onClick={() => setVisibleCount((c) => c + 6)}
+            disabled={isLoading}
+            onClick={() => {
+              if (displayedProperties.length < filteredProperties.length) {
+                setVisibleCount((c) => c + 6);
+              } else {
+                loadMore().then(() => setVisibleCount((c) => c + 6));
+              }
+            }}
           >
-            Load More Properties
+            {isLoading ? 'Loading...' : 'Load More Properties'}
           </button>
         </div>
       )}

@@ -92,18 +92,10 @@ const ClaimReferencing: React.FC = () => {
     doClaim();
   }, [isAuthenticated, authLoading, meta, claiming, claimed]);
 
-  const handleLogin = async () => {
-    setLoginBusy(true);
-    setError(null);
-    // Store this URL so AuthRedirectHandler brings back after login
-    sessionStorage.setItem('redirectAfterLogin', window.location.pathname + window.location.search);
-    try {
-      await login('google');
-    } catch {
-      setError('Sign-in was cancelled or failed. Please try again.');
-    } finally {
-      setLoginBusy(false);
-    }
+  const handleLogin = () => {
+    const returnUrl = window.location.pathname + window.location.search;
+    sessionStorage.setItem('redirectAfterLogin', returnUrl);
+    navigate(`/login?redirect=${encodeURIComponent(returnUrl)}`);
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────

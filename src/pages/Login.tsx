@@ -181,6 +181,39 @@ export const LoginPage: React.FC = () => {
 
             <Button
               fullWidth
+              variant="contained"
+              sx={{
+                mt: 1,
+                mb: 2,
+                py: 1.4,
+                borderRadius: 2,
+                textTransform: 'none',
+                fontSize: '0.95rem',
+                fontWeight: 600,
+                backgroundColor: '#2F2F2F',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 1.5,
+                boxShadow: '0 4px 12px rgba(47, 47, 47, 0.25)',
+                '&:hover': {
+                  backgroundColor: '#1a1a1a',
+                  boxShadow: '0 6px 16px rgba(47, 47, 47, 0.35)',
+                },
+              }}
+              onClick={() => handleLogin('microsoft')}
+            >
+              <svg width="18" height="18" viewBox="0 0 21 21">
+                <path fill="#f35325" d="M1 1h9v9H1z"/>
+                <path fill="#81bc06" d="M11 1h9v9h-9z"/>
+                <path fill="#05a6f0" d="M1 11h9v9H1z"/>
+                <path fill="#ffba08" d="M11 11h9v9h-9z"/>
+              </svg>
+              <span>Continue with Microsoft</span>
+            </Button>
+
+            <Button
+              fullWidth
               variant="text"
               sx={{ textTransform: 'none', color: '#6b7280' }}
               onClick={() => {

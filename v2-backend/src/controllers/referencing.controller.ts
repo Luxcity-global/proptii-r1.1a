@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Get, Param, Put, HttpCode, UseGuards, Req, Delete, Query, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Put, HttpCode, UseGuards, Req, Delete, Query, NotFoundException, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ReferencingService } from '../services/referencing.service';
 import { RefereeGuarantorService } from '../services/referee-guarantor.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
@@ -106,8 +107,15 @@ export class ReferencingController {
 
   @Post('referencing/ai-extract')
   @HttpCode(200)
-  async extractDocumentData(@Body() body: { base64Data: string; mimeType?: string }) {
-    return await this.referencingService.extractDocumentData(body.base64Data, body.mimeType);
+  @UseInterceptors(FileInterceptor('file'))
+  async extractDocumentData(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: any,
+  ) {
+    if (!file) {
+      return { success: false, error: 'No file uploaded' };
+    }
+    return await this.referencingService.extractDocumentData(file);
   }
 
   // ── Files ─────────────────────────────────────────────────────────────────
@@ -121,8 +129,16 @@ export class ReferencingController {
   @Post(['referencing/files/save', 'applications/:id/upload', 'property/upload-photo', 'property/upload-document'])
   @HttpCode(200)
   @UseGuards(FirebaseAuthGuard)
-  async saveUserFile(@Req() req: any, @Body() fileData: any) {
-    return await this.referencingService.saveUserFile(req.user?.uid || 'dev-user', fileData);
+  @UseInterceptors(FileInterceptor('file'))
+  async saveUserFile(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: any,
+  ) {
+    if (!file) {
+      return { success: false, error: 'No file uploaded' };
+    }
+    return await this.referencingService.saveUserFile(req.user?.uid || 'dev-user', file, body);
   }
 
   @Delete(['referencing/files/:fileId', 'documents/:fileId'])

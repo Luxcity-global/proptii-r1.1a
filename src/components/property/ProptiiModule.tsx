@@ -91,6 +91,7 @@ export const ProptiiModule: React.FC<ProptiiModuleProps> = ({
   const [pendingAudience, setPendingAudience] = useState<Audience>('buyer');
   const [returnToReportAfterLens, setReturnToReportAfterLens] = useState(false);
   const [prefetchedReport, setPrefetchedReport] = useState<PropertyReportResponse | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const mapWarmupRef = useRef(Promise.resolve<unknown>(null));
 
   useEffect(() => {
@@ -139,7 +140,7 @@ export const ProptiiModule: React.FC<ProptiiModuleProps> = ({
     setFlow(returnReport ? 'report' : 'idle');
   }, [isAuthenticated, onAudienceChange]);
 
-  const handleMultiProfileSignIn = async () => {
+  const handleMultiProfileSignIn = () => {
     const returnPath = `${location.pathname}${location.search}${location.hash}` || '/';
     sessionStorage.setItem('redirectAfterLogin', returnPath);
     sessionStorage.setItem(PENDING_LENS_AUDIENCE_KEY, pendingAudience);
@@ -149,11 +150,7 @@ export const ProptiiModule: React.FC<ProptiiModuleProps> = ({
     markPendingPostAuth();
     setFlow('idle');
 
-    try {
-      await login();
-    } catch (error) {
-      console.error('Proptii lens auth login error:', error);
-    }
+    navigate(`/login?redirect=${encodeURIComponent(returnPath)}`);
   };
 
   const resolvedTitle = propertyTitle || addressLabel.split(',')[0]?.trim() || 'Selected property';
@@ -181,6 +178,7 @@ export const ProptiiModule: React.FC<ProptiiModuleProps> = ({
     mapWarmupRef.current = warmupReportMap(mapQuery);
     const reportListingId = propertyUrl?.trim() || listingId;
     setPrefetchedReport(null);
+    setIsGenerating(true);
     setFlow('diagnostic');
     void fetchPropertyReport(reportListingId, flowAudience, {
       address: {
@@ -191,7 +189,12 @@ export const ProptiiModule: React.FC<ProptiiModuleProps> = ({
       },
       listingPrice: propertyPrice,
       onProgress: (partial) => setPrefetchedReport(partial),
-    }).then((final) => setPrefetchedReport(final));
+    }).then((final) => {
+      setPrefetchedReport(final);
+      setIsGenerating(false);
+    }).catch(() => {
+      setIsGenerating(false);
+    });
   };
 
   const openLensChange = (e?: React.MouseEvent) => {
@@ -352,6 +355,7 @@ export const ProptiiModule: React.FC<ProptiiModuleProps> = ({
         addressLabel={addressLabel}
         audience={flowAudience}
         sources={prefetchedReport?.sources}
+        isGenerating={isGenerating}
         onClose={() => setFlow('idle')}
         onComplete={() => {
           void mapWarmupRef.current.finally(() => setFlow('report'));

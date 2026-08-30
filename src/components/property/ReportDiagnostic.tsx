@@ -12,6 +12,7 @@ interface ReportDiagnosticProps {
   addressLabel: string;
   audience: Audience;
   sources?: ReportSource[] | null;
+  isGenerating: boolean;
   onComplete: () => void;
   onClose: () => void;
 }
@@ -44,6 +45,7 @@ export const ReportDiagnostic: React.FC<ReportDiagnosticProps> = ({
   addressLabel,
   audience,
   sources,
+  isGenerating,
   onComplete,
   onClose,
 }) => {
@@ -62,41 +64,28 @@ export const ReportDiagnostic: React.FC<ReportDiagnosticProps> = ({
       return;
     }
 
-    const frozen = resolveSteps(sourcesRef.current);
-    setSteps(frozen);
-    setActiveIndex(0);
-    setDone(false);
-    let cancelled = false;
-    const timers: number[] = [];
-    frozen.forEach((_, index) => {
-      timers.push(
-        window.setTimeout(() => {
-          if (cancelled) return;
-          setActiveIndex(index);
-          if (index === frozen.length - 1) {
-            timers.push(
-              window.setTimeout(() => {
-                if (!cancelled) setDone(true);
-              }, 900),
-            );
-          }
-        }, index * 1000),
-      );
+    const currentSources = resolveSteps(sources);
+    setSteps(currentSources);
+    
+    // Find the latest source that is not 'loading' or 'unresolved'
+    let lastActiveIndex = 0;
+    currentSources.forEach((source, idx) => {
+      if (source.state === 'clear' || source.state === 'flagged') {
+        lastActiveIndex = idx;
+      }
     });
+    
+    setActiveIndex(lastActiveIndex);
 
-    return () => {
-      cancelled = true;
-      timers.forEach((id) => window.clearTimeout(id));
-    };
-  }, [isOpen, audience, sources]);
-
-  useEffect(() => {
-    if (!isOpen || !done) return;
-    const timer = window.setTimeout(() => {
-      onCompleteRef.current();
-    }, 900);
-    return () => window.clearTimeout(timer);
-  }, [isOpen, done]);
+    // If generation finished, trigger completion
+    if (!isGenerating && isOpen) {
+      setDone(true);
+      const timer = window.setTimeout(() => {
+        onCompleteRef.current();
+      }, 900);
+      return () => window.clearTimeout(timer);
+    }
+  }, [isOpen, audience, sources, isGenerating]);
 
   useEffect(() => {
     if (!isOpen) return;

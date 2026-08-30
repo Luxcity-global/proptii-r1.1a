@@ -26,6 +26,18 @@ export class ReportAssembleService {
     const { listingId, address } = dto;
     let postcode = address.postcode || this.postcodesIo.extractPostcode(address.display);
 
+    const cacheKey = listingId || postcode;
+    if (cacheKey) {
+      const cached = await this.factsStore.getCachedReport(cacheKey);
+      if (cached) {
+        this.logger.log(`[Cache Hit] Streaming cached report for ${cacheKey}`);
+        res.write(JSON.stringify({ type: 'initial', data: cached }) + '\n');
+        res.write(JSON.stringify({ type: 'done', data: cached }) + '\n');
+        res.end();
+        return;
+      }
+    }
+
     // 1. Resolve Centroid (via input coordinates, postcodes.io, or OSM geocoding)
     let centroid: PostcodeResult | null = null;
     if (address.coordinates && address.coordinates.lat && address.coordinates.lng) {
@@ -77,7 +89,7 @@ export class ReportAssembleService {
         crime: { month: 'Loading...', count: 0, topCategories: [] },
         heritage: { listed: false, grade: null, conservationArea: false, name: null, caveat: 'loading' }
       },
-      map: { embedQuery: encodeURIComponent(address.display) },
+      map: { embedQuery: address.display },
       steps: []
     };
 
@@ -109,7 +121,27 @@ export class ReportAssembleService {
     // Wait for all to finish so we can save to Firestore
     const [epc, flood, crime, heritage] = await Promise.all([epcPromise, floodPromise, crimePromise, heritagePromise]);
     
+    // Update reportData with resolved chunks for caching
+    if (epc) reportData.partB = epc;
+    if (flood) reportData.local.flood = flood;
+    if (crime) reportData.local.crime = crime;
+    if (heritage) reportData.local.heritage = heritage;
+
+    // Resolve source states so frontend doesn't hang on 'loading'
+    reportData.sources = reportData.sources.map(source => {
+      if (source.id === 'epc') source.state = epc ? 'clear' : 'unresolved';
+      if (source.id === 'flood') source.state = flood ? 'clear' : 'unresolved';
+      if (source.id === 'crime') source.state = crime ? 'clear' : 'unresolved';
+      if (source.id === 'heritage') source.state = heritage ? 'clear' : 'unresolved';
+      return source;
+    });
+
+    if (cacheKey) {
+      await this.factsStore.cacheReport(cacheKey, reportData);
+    }
+    
     await this.saveToFirestore(listingId, { centroid, epc, flood, crime, heritage });
+    res.write(JSON.stringify({ type: 'done', data: reportData }) + '\n');
     res.end();
   }
   private async withTimeout<T>(promise: Promise<T>, ms: number): Promise<{ status: 'fulfilled', value: T } | { status: 'rejected', reason: any }> {

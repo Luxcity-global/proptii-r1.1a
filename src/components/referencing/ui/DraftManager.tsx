@@ -25,7 +25,7 @@ import { useReferencing } from '../context/ReferencingContext';
 import { getDrafts, deleteDraft } from '../../../utils/localStorage';
 import { FormData } from '../../../types/referencing';
 import * as referencingService from '../../../services/referencingService';
-import { isAzureConfigured } from '../../../config/azure';
+
 
 interface Draft {
   id: string;
@@ -58,7 +58,7 @@ const DraftManager: React.FC<DraftManagerProps> = ({ propertyId }) => {
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
   
   // Determine if we should use API or localStorage
-  const useApi = isAzureConfigured();
+  const useApi = true;
   
   // Load drafts on mount
   useEffect(() => {
@@ -87,7 +87,7 @@ const DraftManager: React.FC<DraftManagerProps> = ({ propertyId }) => {
   const loadDrafts = async () => {
     try {
       // Check if API is configured
-      if (isAzureConfigured() && state.applicationId) {
+      if (useApi && state.applicationId) {
         // Try to load drafts from API
         try {
           const response = await referencingService.getDrafts(state.applicationId);

@@ -99,7 +99,6 @@
     "@azure/monitor-opentelemetry": "^1.19.0",
     "@azure/msal-browser": "^4.30.0",
     "@azure/msal-react": "^3.0.29",
-    "@azure/storage-blob": "^12.33.0",
     "@date-io/date-fns": "^3.2.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",

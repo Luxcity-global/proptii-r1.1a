@@ -9,7 +9,7 @@ import { useSignedContracts } from '../../contexts/SignedContractsContext';
 import contractEmailService from '../../services/contractEmailService';
 import signedContractsFirestoreService from '../../services/signedContractsFirestoreService';
 import { useAuth } from '../../contexts/AuthContext';
-
+import { uploadToFirebaseStorage } from '../../services/storageService';
 interface DocumentSigningViewerProps {
   template: {
     id: string;
@@ -471,20 +471,27 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
       // Save the signed PDF
       const signedPdfBytes = await pdfDoc.save();
       setSignedPdfBytes(signedPdfBytes);
-      // Build a blob URL and base64 data URL for persistence
       const signedBlob = new Blob([signedPdfBytes as any], { type: 'application/pdf' });
       const blobUrl = URL.createObjectURL(signedBlob);
-      const toBase64 = (bytes: Uint8Array) => {
-        let binary = '';
-        const len = bytes.byteLength;
-        for (let i = 0; i < len; i++) binary += String.fromCharCode(bytes[i]);
-        return btoa(binary);
-      };
-      const dataUrlBase64 = `data:application/pdf;base64,${toBase64(signedPdfBytes)}`;
       setIsCompleted(true);
       
       console.log('✅ Document signed successfully');
       
+      // Upload to Firebase Storage
+      console.log('☁️ Uploading signed document to storage...');
+      let finalDocumentUrl = blobUrl;
+      try {
+        const file = new File([signedBlob], `${template.name.replace(/[^a-zA-Z0-9]/g, '_')}_signed.pdf`, { type: 'application/pdf' });
+        const uploadRes = await uploadToFirebaseStorage(file, 'contracts');
+        if (uploadRes.success && uploadRes.url) {
+          finalDocumentUrl = uploadRes.url;
+          console.log('✅ Document uploaded successfully:', finalDocumentUrl);
+        }
+      } catch (uploadErr) {
+        console.error('❌ Failed to upload document to storage:', uploadErr);
+        // Continue with blobUrl if upload fails, though it won't persist across sessions
+      }
+
       // Add to signed contracts context
       console.log('🔄 Adding signed contract to Firestore...');
       try {
@@ -504,8 +511,7 @@ const DocumentSigningViewer: React.FC<DocumentSigningViewerProps> = ({
           tenantName: recipient.name,
           tenantEmail: recipient.email,
           signedDate: new Date().toISOString(),
-          documentUrl: blobUrl,
-          documentBase64: dataUrlBase64,
+          documentUrl: finalDocumentUrl,
           documentName: `${template.name.replace(/[^a-zA-Z0-9]/g, '_')}_signed.pdf`,
           documentSize: signedPdfBytes.length,
           documentType: 'application/pdf',

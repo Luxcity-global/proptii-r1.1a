@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { EmailService } from './email.service';
 import { ComplianceTransformService } from '../gov-data/services/compliance-transform.service';
 import {
+  getSignedDownloadUrl,
   uploadBase64ToStorage,
   uploadBufferToStorage,
   deleteFromStorage,
@@ -276,14 +277,25 @@ export class ReferencingService {
    *   a) { base64: '<data URI>', section, field, fileName } — uploads to Storage first
    *   b) { url, storagePath, contentType, size, section, field } — already uploaded
    */
-  async saveUserFile(userId: string, fileData: any) {
+  async saveUserFile(userId: string, file: Express.Multer.File | undefined, fileData: any) {
     const col = this.filesCollection;
     const docId = `${userId}_${Date.now()}`;
 
     let storageResult: any = null;
 
-    // Case (a): raw base64 sent directly to this endpoint
-    if (isBase64DataUri(fileData.base64 || fileData.fileData || fileData.content)) {
+    if (file) {
+      const section  = fileData?.section  || 'general';
+      const field    = fileData?.field    || 'document';
+      const ext      = file.originalname.split('.').pop() || 'bin';
+      const storagePath = `referencing/${userId}/${section}/${field}/${randomUUID()}.${ext}`;
+
+      try {
+        storageResult = await uploadBufferToStorage(file.buffer, storagePath, file.mimetype);
+      } catch (err: any) {
+        this.logger.error(`saveUserFile upload failed for ${userId}: ${err?.message || err}`);
+      }
+    } else if (isBase64DataUri(fileData.base64 || fileData.fileData || fileData.content)) {
+      // Fallback for old base64 payloads if still used anywhere internally
       const raw = fileData.base64 || fileData.fileData || fileData.content;
       const section  = fileData.section  || 'general';
       const field    = fileData.field    || 'document';
@@ -303,9 +315,9 @@ export class ReferencingService {
       userId,
       section:     fileData.section     || 'general',
       field:       fileData.field       || 'document',
-      fileName:    fileData.fileName    || fileData.name || 'document',
-      contentType: fileData.contentType || fileData.mimeType || storageResult?.contentType || 'application/octet-stream',
-      size:        fileData.size        || storageResult?.size || 0,
+      fileName:    file?.originalname   || fileData.fileName    || fileData.name || 'document',
+      contentType: file?.mimetype       || fileData.contentType || fileData.mimeType || storageResult?.contentType || 'application/octet-stream',
+      size:        file?.size           || fileData.size        || storageResult?.size || 0,
       url:         storageResult?.downloadUrl || fileData.url || '',
       storagePath: storageResult?.storagePath || fileData.storagePath || '',
       createdAt:   admin.firestore.FieldValue.serverTimestamp(),
@@ -873,13 +885,13 @@ export class ReferencingService {
   }
 
   // ── AI Document Extraction ────────────────────────────────────────────────
-  async extractDocumentData(base64Data: string, mimeType: string = 'image/jpeg') {
-    if (!base64Data) {
+  async extractDocumentData(file: Express.Multer.File) {
+    if (!file || !file.buffer) {
       return { success: false, error: 'No document data provided' };
     }
 
-    const cleanBase64 = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
-    const cleanMimeType = mimeType || 'image/jpeg';
+    const cleanBase64 = file.buffer.toString('base64');
+    const cleanMimeType = file.mimetype || 'image/jpeg';
 
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     const openRouterKey = process.env.OPENROUTER_API_KEY;

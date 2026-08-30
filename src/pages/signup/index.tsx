@@ -98,18 +98,7 @@ const SignupModalPage: React.FC = () => {
     if (sessionStorage.getItem('signup_auto_msal_for_paynow') === '1') return;
     sessionStorage.setItem('signup_auto_msal_for_paynow', '1');
 
-    void (async () => {
-      setBusy(true);
-      setError(null);
-      try {
-        await login();
-      } catch {
-        setError('Sign-in was cancelled or failed. Please try again.');
-        sessionStorage.removeItem('signup_auto_msal_for_paynow');
-      } finally {
-        setBusy(false);
-      }
-    })();
+    navigate('/login?redirect=' + encodeURIComponent(returnPath));
   }, [isLoading, isAuthenticated, login]);
 
   // ─── role intent handlers ────────────────────────────────────────────────────
@@ -127,24 +116,15 @@ const SignupModalPage: React.FC = () => {
 
   // ─── tenant sign-in handlers (unchanged) ────────────────────────────────────
 
-  const handleMsalSignIn = async () => {
-    setBusy(true);
-    setError(null);
+  const handleMsalSignIn = () => {
     const existingReturn = sessionStorage.getItem('redirectAfterLogin');
+    let targetUrl = existingReturn;
     if (!existingReturn?.includes('pay-now') && !existingReturn?.includes('/billing/')) {
       setPricingFlow('trial');
-      sessionStorage.setItem(
-        'redirectAfterLogin',
-        welcomeUrl(planId || 'renter_pro', cycle),
-      );
+      targetUrl = welcomeUrl(planId || 'renter_pro', cycle);
+      sessionStorage.setItem('redirectAfterLogin', targetUrl);
     }
-    try {
-      await login();
-    } catch {
-      setError('Sign-in was cancelled or failed. Please try again.');
-    } finally {
-      setBusy(false);
-    }
+    navigate(`/login?redirect=${encodeURIComponent(targetUrl || '/')}`);
   };
 
   const handleEmailContinue = () => {

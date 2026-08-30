@@ -29,7 +29,10 @@ export class ContractService {
     if (!col) return { success: true, data: [] };
 
     try {
-      const snapshot = await col.where('tenantEmail', '==', tenantEmail.toLowerCase().trim()).get();
+      const snapshot = await col
+        .where('tenantEmail', '==', tenantEmail.toLowerCase().trim())
+        .select('landlordId', 'landlordEmail', 'tenantEmail', 'tenantName', 'propertyId', 'propertyAddress', 'contractName', 'fileUrl', 'documentUrl', 'templateId', 'status', 'sentDate', 'signedDate', 'expiryDate', 'documentName', 'documentSize', 'documentType', 'agentName', 'agentEmail', 'emailSent', 'emailSentDate', 'createdAt', 'updatedAt')
+        .get();
       const data = snapshot.docs.map(doc => {
         const docData = doc.data();
         return {

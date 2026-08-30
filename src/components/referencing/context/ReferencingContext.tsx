@@ -280,7 +280,7 @@ export const ReferencingProvider: React.FC<ReferencingProviderProps> = ({
   );
   
   // Check if we should use API or localStorage
-  const useApi = isAzureConfigured();
+  const useApi = true;
   
   // Initialize form data from localStorage or API
   useEffect(() => {

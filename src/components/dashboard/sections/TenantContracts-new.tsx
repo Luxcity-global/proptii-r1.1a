@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { FileText, Download, Eye, Calendar, CheckCircle, Clock, AlertTriangle, User, Mail, Phone, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import ContractModal from '../../contract/ContractModal';
+import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
 
 import { useAuth } from '../../../contexts/AuthContext';
 import { useIsMobile } from '../ui/use-mobile';
@@ -44,27 +45,10 @@ const TenantContracts: React.FC = () => {
         email: c.email || c.tenantEmail || c.agentEmail || null,
         signedDate: c.signedDate || null,
         documentUrl: c.documentUrl || null,
-        documentBase64: c.documentBase64 || null,
         status: c.status || null,
         emailSent: c.emailSent || false
       };
       
-      // If no usable documentUrl but we have a base64 data URL, build a blob URL on the fly
-      if ((!normalizedContract.documentUrl || normalizedContract.documentUrl.startsWith('/')) && normalizedContract.documentBase64 && typeof normalizedContract.documentBase64 === 'string' && normalizedContract.documentBase64.startsWith('data:application/pdf;base64,')) {
-        try {
-          // Convert data URL to Blob URL
-          const res = fetch(normalizedContract.documentBase64);
-          // Note: fetch on data URL returns a resolved promise; convert to blob lazily
-          // We'll attach a lazy getter to avoid blocking render
-          (res as any).then?.(async (r: Response) => {
-            const blob = await r.blob();
-            const url = URL.createObjectURL(blob);
-            normalizedContract.documentUrl = url;
-          });
-        } catch (e) {
-          console.warn('Failed to convert base64 to blob url for contract', normalizedContract.id, e);
-        }
-      }
       return normalizedContract;
     });
   }, [signedContracts]);
@@ -105,19 +89,29 @@ const TenantContracts: React.FC = () => {
   };
 
   // Handle contract viewing
-  const handleViewContract = (contract: any) => {
+  const handleViewContract = async (contract: any) => {
     console.log('🔍 View button clicked for contract:', contract.id);
-    console.log('🔍 Contract details:', contract);
-    if ('documentUrl' in contract && contract.documentUrl) {
-      if (contract.documentUrl.startsWith('blob:')) {
-        console.log('🔍 Opening blob document URL:', contract.documentUrl);
-        window.open(contract.documentUrl, '_blank');
-      } else if (contract.documentUrl.startsWith('/')) {
-        console.log('🔍 Mock contract document URL:', contract.documentUrl);
-        alert(`This is a demo contract. In a real application, this would open: ${contract.documentUrl}\n\nTo test the actual view functionality, please sign a real contract document.`);
+    let viewContract = contract;
+
+    // Fetch the full contract if we don't have the document URL
+    if (!viewContract.documentUrl) {
+      console.log('🔍 Fetching full contract to get document URL...');
+      const result = await signedContractsFirestoreService.getSignedContractById(contract.id);
+      if (result.success && result.contract) {
+        viewContract = result.contract;
+      }
+    }
+
+    if ('documentUrl' in viewContract && viewContract.documentUrl) {
+      if (viewContract.documentUrl.startsWith('blob:')) {
+        console.log('🔍 Opening blob document URL:', viewContract.documentUrl);
+        window.open(viewContract.documentUrl, '_blank');
+      } else if (viewContract.documentUrl.startsWith('/')) {
+        console.log('🔍 Mock contract document URL:', viewContract.documentUrl);
+        alert(`This is a demo contract. In a real application, this would open: ${viewContract.documentUrl}\n\nTo test the actual view functionality, please sign a real contract document.`);
       } else {
-        console.log('🔍 Opening document URL:', contract.documentUrl);
-        window.open(contract.documentUrl, '_blank');
+        console.log('🔍 Opening document URL:', viewContract.documentUrl);
+        window.open(viewContract.documentUrl, '_blank');
       }
     } else {
       console.log('❌ No document URL available for contract:', contract.id);
@@ -126,28 +120,38 @@ const TenantContracts: React.FC = () => {
   };
 
   // Handle contract downloading
-  const handleDownloadContract = (contract: any) => {
+  const handleDownloadContract = async (contract: any) => {
     console.log('🔍 Download button clicked for contract:', contract.id);
-    console.log('🔍 Contract details:', contract);
-    if ('documentUrl' in contract && contract.documentUrl) {
-      if (contract.documentUrl.startsWith('blob:')) {
-        console.log('🔍 Downloading blob document URL:', contract.documentUrl);
+    let downloadContract = contract;
+
+    // Fetch the full contract if we don't have the document URL
+    if (!downloadContract.documentUrl) {
+      console.log('🔍 Fetching full contract to get document URL...');
+      const result = await signedContractsFirestoreService.getSignedContractById(contract.id);
+      if (result.success && result.contract) {
+        downloadContract = result.contract;
+      }
+    }
+
+    if ('documentUrl' in downloadContract && downloadContract.documentUrl) {
+      if (downloadContract.documentUrl.startsWith('blob:')) {
+        console.log('🔍 Downloading blob document URL:', downloadContract.documentUrl);
         const link = document.createElement('a');
-        link.href = contract.documentUrl;
-        link.download = `${('documentName' in contract && contract.documentName) ? contract.documentName : 'signed-contract'}.pdf`;
+        link.href = downloadContract.documentUrl;
+        link.download = `${('documentName' in downloadContract && downloadContract.documentName) ? downloadContract.documentName : 'signed-contract'}.pdf`;
         link.target = '_blank';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         console.log('✅ Download initiated for contract:', contract.id);
-      } else if (contract.documentUrl.startsWith('/')) {
-        console.log('🔍 Mock contract document URL:', contract.documentUrl);
-        alert(`This is a demo contract. In a real application, this would download: ${contract.documentUrl}\n\nTo test the actual download functionality, please sign a real contract document.`);
+      } else if (downloadContract.documentUrl.startsWith('/')) {
+        console.log('🔍 Mock contract document URL:', downloadContract.documentUrl);
+        alert(`This is a demo contract. In a real application, this would download: ${downloadContract.documentUrl}\n\nTo test the actual download functionality, please sign a real contract document.`);
       } else {
-        console.log('🔍 Downloading document URL:', contract.documentUrl);
+        console.log('🔍 Downloading document URL:', downloadContract.documentUrl);
         const link = document.createElement('a');
-        link.href = contract.documentUrl;
-        link.download = `${('documentName' in contract && contract.documentName) ? contract.documentName : 'signed-contract'}.pdf`;
+        link.href = downloadContract.documentUrl;
+        link.download = `${('documentName' in downloadContract && downloadContract.documentName) ? downloadContract.documentName : 'signed-contract'}.pdf`;
         link.target = '_blank';
         document.body.appendChild(link);
         link.click();
@@ -437,7 +441,7 @@ const TenantContracts: React.FC = () => {
                   {/* Actions */}
                   <div className="flex items-center gap-3">
                     <button 
-                      onClick={() => handleViewContract(contract)}
+                      onClick={() => void handleViewContract(contract)}
                       className="inline-flex items-center p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                       aria-label="View"
                       title="View"
@@ -445,7 +449,7 @@ const TenantContracts: React.FC = () => {
                       <Eye className="w-4 h-4" />
                     </button>
                     <button 
-                      onClick={() => handleDownloadContract(contract)}
+                      onClick={() => void handleDownloadContract(contract)}
                       className="inline-flex items-center p-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                       aria-label="Download"
                       title="Download"
@@ -525,14 +529,14 @@ const TenantContracts: React.FC = () => {
 
                   <div className="flex items-center gap-2 pt-3 border-t">
                     <button
-                      onClick={() => handleViewContract(contract)}
+                      onClick={() => void handleViewContract(contract)}
                       className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                     >
                       <Eye className="w-4 h-4 mr-2" />
                       View
                     </button>
                     <button
-                      onClick={() => handleDownloadContract(contract)}
+                      onClick={() => void handleDownloadContract(contract)}
                       className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                     >
                       <Download className="w-4 h-4 mr-2" />

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UserCircle, ChevronDown, Settings, LogOut, Menu, X } from 'lucide-react';
 
@@ -8,7 +8,9 @@ interface AgentNavbarProps {
 }
 
 const AgentNavbar: React.FC<AgentNavbarProps> = ({ isAgent = false }) => {
-  const { isAuthenticated, user, login, logout, editProfile, isLoading } = useAuth();
+  const { isAuthenticated, user, logout, editProfile, isLoading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [loginInProgress, setLoginInProgress] = useState(false);
@@ -57,32 +59,12 @@ const AgentNavbar: React.FC<AgentNavbarProps> = ({ isAgent = false }) => {
     };
   }, [isAuthenticated, isLoading, loginInProgress]);
 
-  const handleLogin = async () => {
-    try {
-      setLoginError(null);
-      setLoginInProgress(true);
-
-      // Inform the user that they might be redirected
-      console.log("Starting login process. You may be redirected to the login page.");
-
-      await login();
-
-      // If we get here, the popup login was successful
-      console.log("Login successful via popup");
-    } catch (error) {
-      console.error("Login error in AgentNavbar:", error);
-      setLoginInProgress(false);
-
-      // Check if the error is related to popup blocking
-      if (error instanceof Error && error.message.includes('popup')) {
-        setLoginError("Popup was blocked. Please allow popups for this site or you will be redirected.");
-      } else {
-        setLoginError("Login failed. Please try again.");
-      }
-
-      // Auto-clear error after 5 seconds
-      setTimeout(() => setLoginError(null), 5000);
+  const handleLogin = () => {
+    let redirectUrl = '/login';
+    if (location.pathname) {
+      redirectUrl = `/login?redirect=${encodeURIComponent(location.pathname)}`;
     }
+    navigate(redirectUrl);
   };
 
   const handleLogout = () => {

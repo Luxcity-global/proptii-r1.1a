@@ -116,9 +116,9 @@ const LandlordDemoInner: React.FC = () => {
         title={signUpTitle}
         reassurance="Create a free account in seconds to save your progress."
         showExploreFeaturesAsSecondary={true}
-        onSignUpEmail={async () => {
+        onSignUpEmail={() => {
           setSignUpOpen(false);
-          await login();
+          window.location.href = '/login?redirect=/landlord-demo';
         }}
         onExploreFeatures={() => setSignUpOpen(false)}
       />

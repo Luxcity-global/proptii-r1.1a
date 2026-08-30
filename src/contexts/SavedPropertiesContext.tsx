@@ -7,6 +7,7 @@
  *        localStorage remains as an offline-first cache for unauthenticated users.
  *  P2-4: The property ID now prefers the stable backend id or url over the fragile
  *        title-location-price string concatenation.
+ *  P2-5: Added cursor-based server-side pagination for efficiency.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
@@ -37,6 +38,10 @@ export interface SavedProperty {
 
 interface SavedPropertiesContextType {
   savedProperties: SavedProperty[];
+  allSavedIds: string[];
+  hasMore: boolean;
+  isLoading: boolean;
+  loadMore: () => Promise<void>;
   isPropertySaved: (propertyId: string) => boolean;
   saveProperty: (property: any) => void;
   unsaveProperty: (propertyId: string) => void;
@@ -68,8 +73,6 @@ function stablePropertyId(property: any): string {
   return `${property.title}-${property.location}-${property.price}`;
 }
 
-// Helper removed: no longer using direct Firestore references
-
 interface SavedPropertiesProviderProps {
   children: ReactNode;
 }
@@ -77,7 +80,11 @@ interface SavedPropertiesProviderProps {
 export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = ({ children }) => {
   const { user } = useAuth();
   const [savedProperties, setSavedProperties] = useState<SavedProperty[]>([]);
+  const [allSavedIds, setAllSavedIds] = useState<string[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [lastVisible, setLastVisible] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // ─── Bootstrap from localStorage (works for unauthenticated users too) ──────
   useEffect(() => {
@@ -118,6 +125,7 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
     }
 
     setSavedProperties(parsed);
+    setAllSavedIds(parsed.map(p => p.id));
     setIsInitialized(true);
   }, []);
 
@@ -129,6 +137,44 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
   }, [savedProperties, isInitialized]);
 
   // ─── Fetch from Backend when authenticated ─────────────────────────────────
+  const fetchProperties = useCallback(async (reset = false, currentLast: string | null = null) => {
+    if (!user?.id) return;
+    
+    try {
+      setIsLoading(true);
+      const limit = 6;
+      let url = `/users/me/saved-properties?limit=${limit}`;
+      if (currentLast) {
+        url += `&lastVisible=${encodeURIComponent(currentLast)}`;
+      }
+      
+      const response = await apiService.get(url);
+      
+      const items = Array.isArray(response.items) ? response.items : (Array.isArray(response) ? response : (response.data || []));
+      const fetchedAllIds = response.allIds || items.map((i: any) => i.id);
+      const hasMoreFlag = response.hasMore || false;
+      const newLast = response.lastVisible || null;
+
+      if (reset) {
+        setSavedProperties(items);
+      } else if (items.length > 0) {
+        setSavedProperties(prev => {
+          const existingIds = new Set(prev.map(i => i.id));
+          const newItems = items.filter((i: any) => !existingIds.has(i.id));
+          return [...prev, ...newItems];
+        });
+      }
+      
+      setAllSavedIds(prev => Array.from(new Set([...prev, ...fetchedAllIds])));
+      setHasMore(hasMoreFlag);
+      setLastVisible(newLast);
+    } catch (err) {
+      console.error('Failed to fetch saved properties from backend:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     if (!user?.id) {
       // Restore guest saved properties from localStorage if unauthenticated
@@ -138,35 +184,18 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
         try { parsed = JSON.parse(raw); } catch {}
       }
       setSavedProperties(parsed);
+      setAllSavedIds(parsed.map(p => p.id));
       return;
     }
 
     let isMounted = true;
 
-    const fetchProperties = async () => {
-      try {
-        const response = await apiService.get('/users/me/saved-properties');
-        if (isMounted) {
-          const items = Array.isArray(response) ? response : (response.data || []);
-          if (items.length > 0) {
-            setSavedProperties(prev => {
-              const existingIds = new Set(items.map((i: any) => i.id));
-              const localOnly = prev.filter(p => !existingIds.has(p.id));
-              return [...items, ...localOnly];
-            });
-          }
-        }
-      } catch (err) {
-        console.error('Failed to fetch saved properties from backend:', err);
-      }
-    };
-
     // On first auth, merge any local-only saves into backend
     const syncLocalToBackend = async (local: SavedProperty[]) => {
       if (!local.length) return;
       try {
-        const response = await apiService.get('/users/me/saved-properties');
-        const existing = Array.isArray(response) ? response : (response.data || []);
+        const response = await apiService.get('/users/me/saved-properties?limit=100');
+        const existing = Array.isArray(response.items) ? response.items : (Array.isArray(response) ? response : (response.data || []));
         const existingIds = new Set(existing.map((d: any) => d.id));
         for (const prop of local) {
           if (!existingIds.has(prop.id)) {
@@ -180,7 +209,7 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
 
     setSavedProperties(local => {
       syncLocalToBackend(local).then(() => {
-        fetchProperties();
+        if (isMounted) fetchProperties(true);
       });
       return local;
     });
@@ -188,7 +217,12 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
     return () => {
       isMounted = false;
     };
-  }, [user?.id]);
+  }, [user?.id, fetchProperties]);
+
+  const loadMore = useCallback(async () => {
+    if (!hasMore || isLoading || !lastVisible) return;
+    await fetchProperties(false, lastVisible);
+  }, [hasMore, isLoading, lastVisible, fetchProperties]);
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -197,7 +231,7 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
 
     if (typeof target === 'string') {
       const cleanTarget = target.trim();
-      return savedProperties.some(prop =>
+      return allSavedIds.includes(cleanTarget) || savedProperties.some(prop =>
         prop.id === cleanTarget ||
         (prop as any).url === cleanTarget ||
         `${prop.title}-${prop.location}-${prop.price}` === cleanTarget
@@ -207,13 +241,13 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
     const targetId = target.id || target.url || stablePropertyId(target);
     const targetKey = `${target.title}-${target.location}-${target.price}`;
 
-    return savedProperties.some(prop => {
+    return allSavedIds.includes(targetId) || savedProperties.some(prop => {
       if (prop.id && (prop.id === targetId || prop.id === target.id || prop.id === target.url)) return true;
       if ((prop as any).url && (prop as any).url === target.url) return true;
       const propKey = `${prop.title}-${prop.location}-${prop.price}`;
       return propKey === targetKey;
     });
-  }, [savedProperties]);
+  }, [savedProperties, allSavedIds]);
 
   const saveProperty = useCallback(async (property: any) => {
     const propertyId = stablePropertyId(property);
@@ -242,7 +276,8 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
     };
 
     // Optimistic local update
-    setSavedProperties(prev => [...prev, savedProperty]);
+    setSavedProperties(prev => [savedProperty, ...prev]);
+    setAllSavedIds(prev => [propertyId, ...prev]);
 
     if (user?.id) {
       try {
@@ -256,6 +291,7 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
 
   const unsaveProperty = useCallback(async (propertyId: string) => {
     setSavedProperties(prev => prev.filter(prop => prop.id !== propertyId));
+    setAllSavedIds(prev => prev.filter(id => id !== propertyId));
 
     if (user?.id) {
       try {
@@ -279,6 +315,10 @@ export const SavedPropertiesProvider: React.FC<SavedPropertiesProviderProps> = (
   return (
     <SavedPropertiesContext.Provider value={{
       savedProperties,
+      allSavedIds,
+      hasMore,
+      isLoading,
+      loadMore,
       isPropertySaved,
       saveProperty,
       unsaveProperty,

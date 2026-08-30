@@ -16,6 +16,7 @@ import type { PropertyFactsDoc, Flag, IngestMeta } from '../schemas/flag.schema'
 
 export const PROPERTY_FACTS_COLLECTION = 'propertyFacts';
 export const RUNTIME_FLAGS_COLLECTION  = 'runtimeFlags';
+export const PROPERTY_REPORTS_COLLECTION = 'propertyReports';
 
 @Injectable()
 export class FactsStoreService {
@@ -218,5 +219,58 @@ export class FactsStoreService {
       },
       updatedAt: toIso(data.updatedAt),
     };
+  }
+  // ── Report Caching ────────────────────────────────────────────────────────
+
+  private get reportsCol(): admin.firestore.CollectionReference | null {
+    const db = this.db;
+    return db ? db.collection(PROPERTY_REPORTS_COLLECTION) : null;
+  }
+
+  /**
+   * Fetches a cached report for a listingId or postcode if it is less than 24h old.
+   */
+  async getCachedReport(key: string): Promise<any | null> {
+    const col = this.reportsCol;
+    if (!col) return null;
+    try {
+      // Clean key for Firestore ID
+      const safeKey = encodeURIComponent(key.trim().toLowerCase());
+      const doc = await col.doc(safeKey).get();
+      if (!doc.exists) return null;
+
+      const data = doc.data();
+      if (!data || !data.cachedAt) return null;
+
+      // 24hr expiration check
+      const cacheTime = new Date(data.cachedAt).getTime();
+      const now = Date.now();
+      if (now - cacheTime > 24 * 60 * 60 * 1000) {
+        // Expired
+        return null;
+      }
+
+      return data.reportData;
+    } catch (err: any) {
+      this.logger.warn(`Failed to read cached report for ${key}: ${err?.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Caches a fully assembled report.
+   */
+  async cacheReport(key: string, reportData: any): Promise<void> {
+    const col = this.reportsCol;
+    if (!col) return;
+    try {
+      const safeKey = encodeURIComponent(key.trim().toLowerCase());
+      await col.doc(safeKey).set({
+        cachedAt: new Date().toISOString(),
+        reportData
+      }, { merge: true });
+    } catch (err: any) {
+      this.logger.warn(`Failed to cache report for ${key}: ${err?.message}`);
+    }
   }
 }

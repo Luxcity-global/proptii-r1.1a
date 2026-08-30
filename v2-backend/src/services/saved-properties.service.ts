@@ -26,15 +26,66 @@ export class SavedPropertiesService {
     return db ? db.collection('saved_properties') : null;
   }
 
-  async getSavedProperties(userId: string) {
+  async getSavedProperties(userId: string, limitNum?: number, lastVisibleId?: string) {
     const col = this.collection;
-    if (!col) return [];
+    if (!col) return { items: [], allIds: [] };
     try {
-      const snapshot = await col.where('userId', '==', userId).get();
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // First, get all IDs for global 'isPropertySaved' checks on the frontend
+      const allDocs = await col.where('userId', '==', userId).get();
+      const allIds = allDocs.docs.map(doc => {
+        const data = doc.data();
+        return data.propertyId || data.id || doc.id;
+      });
+
+      let query = col.where('userId', '==', userId).orderBy('savedAt', 'desc');
+
+      if (limitNum) {
+        query = query.limit(limitNum);
+      }
+
+      if (lastVisibleId) {
+        const lastDocRef = await col.doc(lastVisibleId).get();
+        if (lastDocRef.exists) {
+          query = query.startAfter(lastDocRef);
+        }
+      }
+
+      const snapshot = await query.get();
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      return {
+        items,
+        allIds,
+        lastVisible: snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1].id : null,
+        hasMore: limitNum ? snapshot.docs.length === limitNum : false
+      };
     } catch (err: any) {
       console.warn('[SavedPropertiesService] getSavedProperties error:', err?.message || err);
-      return [];
+      // Fallback for missing index: return all un-ordered, but still slice them manually
+      try {
+         const allDocs = await col.where('userId', '==', userId).get();
+         let items = allDocs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+         items.sort((a: any, b: any) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime());
+         
+         const allIds = items.map((i: any) => i.propertyId || i.id);
+         
+         if (lastVisibleId) {
+            const idx = items.findIndex(i => i.id === lastVisibleId);
+            if (idx !== -1) items = items.slice(idx + 1);
+         }
+         
+         const hasMore = limitNum ? items.length > limitNum : false;
+         if (limitNum) items = items.slice(0, limitNum);
+         
+         return {
+           items,
+           allIds,
+           lastVisible: items.length > 0 ? items[items.length - 1].id : null,
+           hasMore
+         };
+      } catch (fallbackErr) {
+        return { items: [], allIds: [], lastVisible: null, hasMore: false };
+      }
     }
   }
 

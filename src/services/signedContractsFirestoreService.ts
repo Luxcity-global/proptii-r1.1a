@@ -146,8 +146,10 @@ class SignedContractsFirestoreService {
       try {
         const { success, contracts } = await this.getUserSignedContracts(userId);
         if (isActive && success && contracts) callback(contracts);
+        else if (isActive) callback([]);
       } catch (err) {
         console.error('Error fetching signed contracts:', err);
+        if (isActive) callback([]);
       }
     };
 

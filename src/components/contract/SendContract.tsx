@@ -6,6 +6,7 @@ import UserService, { User } from '../../services/userService';
 import contractEmailService from '../../services/contractEmailService';
 import signedContractsFirestoreService from '../../services/signedContractsFirestoreService';
 import contractSyncService from '../../services/contractSyncService';
+import { uploadToFirebaseStorage } from '../../services/storageService';
 
 interface SendContractProps {
   contractData: {
@@ -285,12 +286,19 @@ const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfByte
         const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
         const blobUrl = URL.createObjectURL(pdfBlob);
         
-        const dataUrlBase64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(pdfBlob);
-        });
+        // Upload to Firebase Storage
+        console.log('☁️ Uploading signed document to storage...');
+        let finalDocumentUrl = blobUrl;
+        try {
+          const file = new File([pdfBlob], `${(contractData.title || 'contract').replace(/[^a-zA-Z0-9]/g, '_')}_signed.pdf`, { type: 'application/pdf' });
+          const uploadRes = await uploadToFirebaseStorage(file, 'contracts');
+          if (uploadRes.success && uploadRes.url) {
+            finalDocumentUrl = uploadRes.url;
+            console.log('✅ Document uploaded successfully:', finalDocumentUrl);
+          }
+        } catch (uploadErr) {
+          console.error('❌ Failed to upload document to storage:', uploadErr);
+        }
         
         // Save complete contract data to Firestore
         const signedContractData = {
@@ -303,8 +311,7 @@ const SendContract: React.FC<SendContractProps> = ({ contractData, signedPdfByte
           tenantName: validRecipients[0].name || 'Tenant',
           tenantEmail: validRecipients[0].email || 'tenant@example.com',
           signedDate: new Date().toISOString(),
-          documentUrl: blobUrl,
-          documentBase64: dataUrlBase64,
+          documentUrl: finalDocumentUrl,
           documentName: `${(contractData.title || 'contract').replace(/[^a-zA-Z0-9]/g, '_')}_signed.pdf`,
           documentSize: signedPdfBytes.length,
           documentType: 'application/pdf',

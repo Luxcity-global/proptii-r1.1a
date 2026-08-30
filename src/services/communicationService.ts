@@ -1,18 +1,16 @@
 /**
  * Frontend API wrapper for the Proptii Communication feature.
  *
- * Calls go directly to the Azure Functions host (VITE_API_ENDPOINT, default
- * http://localhost:7071) rather than through the NestJS apiService, because
- * the communication module is an Azure Function — not a NestJS route.
- *
- * The MSAL Bearer token (or mock-token-* in dev) is attached manually so the
- * same auth bypass that works for the NestJS service also works here.
+ * Calls go to the NestJS v2 backend (VITE_API_ENDPOINT).
  *
  * Requirements: 3.2, 6.1–6.6, 7.1, 7.4
  */
 
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getAccessTokenForApiRequest } from './msalAccessToken';
+import { storage } from '../config/firebaseConfig';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { v4 as uuidv4 } from 'uuid';
 import type {
     Conversation,
     Message,
@@ -182,27 +180,12 @@ const communicationService = {
     },
 
     /**
-     * Upload a file attachment for a conversation.
-     * POST /api/communication/attachments/upload?conversationId={conversationId}
-     *
-     * The API expects JSON with a base64-encoded file body (not multipart/form-data).
+     * Upload a file attachment for a conversation directly to Firebase Storage,
+     * then notify the backend to create the attachment record.
      * Requirements: 7.1
      */
     async uploadAttachment(file: File, conversationId: string): Promise<MessageAttachment> {
-        // Read file as base64
-        const base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const result = reader.result as string;
-                // Strip the data URL prefix (e.g. "data:application/pdf;base64,")
-                resolve(result.split(',')[1] ?? result);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-
         // Derive MIME type from the file extension when the browser doesn't provide one.
-        // The API only accepts pdf, doc, docx, and txt — map extensions explicitly.
         const extensionMimeMap: Record<string, string> = {
             pdf: 'application/pdf',
             doc: 'application/msword',
@@ -212,32 +195,34 @@ const communicationService = {
         const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
         const mimeType = file.type || extensionMimeMap[ext] || 'application/octet-stream';
 
-        const { data } = await commApi.post(
-            `/attachments/upload?conversationId=${encodeURIComponent(conversationId)}`,
-            {
-                file: base64,
-                fileName: file.name,
-                mimeType,
-                sizeBytes: file.size,
-            },
-        );
+        // 1. Upload to Firebase Storage
+        const fileId = uuidv4();
+        const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const storageRef = ref(storage, `attachments/${conversationId}/${fileId}-${safeName}`);
+        
+        await uploadBytes(storageRef, file, { contentType: mimeType });
+        const blobUrl = await getDownloadURL(storageRef);
+
+        // 2. Register attachment with backend
+        const { data } = await commApi.post('/attachments', {
+            filename: file.name,
+            mimeType,
+            size: file.size,
+            blobUrl,
+            conversationId,
+        });
+        
         return unwrap<MessageAttachment>(data);
     },
 
     /**
-     * Get a time-limited SAS URL for an attachment.
-     * GET /api/communication/attachments/{id}/url?conversationId={conversationId}
+     * Get attachment metadata (including Firebase Storage blobUrl).
+     * GET /api/communication/attachments/{id}
      * Requirements: 7.4
      */
-    async getAttachmentUrl(attachmentId: string, conversationId: string): Promise<string> {
-        const { data } = await commApi.get(`/attachments/${attachmentId}/url`, {
-            params: { conversationId },
-        });
-        const result = unwrap<{ url: string } | string>(data);
-        if (result !== null && typeof result === 'object' && 'url' in result) {
-            return (result as { url: string }).url;
-        }
-        return result as string;
+    async getAttachment(attachmentId: string): Promise<MessageAttachment> {
+        const { data } = await commApi.get(`/attachments/${attachmentId}`);
+        return unwrap<MessageAttachment>(data);
     },
 };
 

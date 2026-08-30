@@ -64,23 +64,12 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
     };
   }, [isDropdownOpen, isMobileMenuOpen]);
 
-  const handleLogin = async () => {
-    try {
-      setLoginError(null);
-      setLoginInProgress(true);
-
-      if (pathname === '/' || pathname === '/home-v2' || pathname === '/home-legacy' || pathname === '/home') {
-        sessionStorage.setItem('redirectAfterLogin', pathname);
-      }
-
-      await login('google');
-      setLoginInProgress(false);
-    } catch (error: any) {
-      console.error('Login error in Navbar:', error);
-      setLoginInProgress(false);
-      setLoginError(error?.message || 'Login failed. Please try again.');
-      setTimeout(() => setLoginError(null), 5000);
+  const handleLogin = () => {
+    let redirectUrl = '/login';
+    if (pathname === '/' || pathname === '/home-v2' || pathname === '/home-legacy' || pathname === '/home') {
+      redirectUrl = `/login?redirect=${encodeURIComponent(pathname)}`;
     }
+    navigate(redirectUrl);
   };
 
   const handleLogout = () => {

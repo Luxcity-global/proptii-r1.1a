@@ -269,12 +269,12 @@ export const ProptiiReportModal: React.FC<ProptiiReportModalProps> = ({
                     onClick={() => {
                       void handleDownloadPdf();
                     }}
-                    disabled={isDownloadingPdf}
-                    aria-busy={isDownloadingPdf}
+                    disabled={isDownloadingPdf || isSourcesLoading}
+                    aria-busy={isDownloadingPdf || isSourcesLoading}
                     className="no-print inline-flex items-center justify-center gap-2 rounded-lg bg-stamp px-3.5 py-2 text-[13px] font-semibold text-paper transition-colors duration-150 ease-out hover:bg-stamp-hover disabled:cursor-wait disabled:opacity-80"
                   >
                     <Download aria-hidden="true" className="h-3.5 w-3.5" />
-                    {isDownloadingPdf ? 'Preparing…' : 'Download report'}
+                    {isDownloadingPdf || isSourcesLoading ? 'Preparing…' : 'Download report'}
                   </button>
                   <button
                     type="button"

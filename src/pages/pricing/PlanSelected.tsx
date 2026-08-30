@@ -37,10 +37,9 @@ const PlanSelected: React.FC = () => {
     }
   }, [isAuthenticated, plan, navigate]);
 
-  const handleSignIn = async () => {
-    // Store redirect target so AuthRedirectHandler sends user to arrival page
+  const handleSignIn = () => {
     sessionStorage.setItem('redirectAfterLogin', '/pricing/arrival');
-    await login();
+    navigate('/login?redirect=/pricing/arrival');
   };
 
   const handleClose = () => {

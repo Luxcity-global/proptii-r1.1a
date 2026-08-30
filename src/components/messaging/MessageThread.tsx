@@ -15,6 +15,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { Message } from '../../types/messaging';
 import communicationService from '../../services/communicationService';
+import sseService from '../../services/sseService';
 import AttachmentPill from './AttachmentPill';
 
 // ---------------------------------------------------------------------------
@@ -35,16 +36,11 @@ const AttachmentLoader: React.FC<AttachmentLoaderProps> = ({ attachmentId, conve
     useEffect(() => {
         let cancelled = false;
         communicationService
-            .getAttachmentUrl(attachmentId, conversationId)
-            .then((sasUrl) => {
+            .getAttachment(attachmentId)
+            .then((attachment) => {
                 if (cancelled) return;
-                // Extract filename from the blob path segment of the SAS URL
-                try {
-                    const pathParts = new URL(sasUrl).pathname.split('/');
-                    const name = pathParts[pathParts.length - 1];
-                    if (name) setFileName(decodeURIComponent(name));
-                } catch { /* keep default */ }
-                setUrl(sasUrl);
+                if (attachment?.filename) setFileName(attachment.filename);
+                setUrl(attachment?.blobUrl || null);
             })
             .catch(() => { if (!cancelled) setIsError(true); });
         return () => { cancelled = true; };
@@ -121,6 +117,27 @@ const MessageThread: React.FC<MessageThreadProps> = ({ conversationId, currentUs
     useEffect(() => {
         fetchAndMarkRead();
     }, [fetchAndMarkRead]);
+
+    // Listen for new messages via SSE
+    useEffect(() => {
+        if (!conversationId) return;
+        const unsubscribe = sseService.on('message_new', (event) => {
+            const data = event.data as any;
+            if (data?.conversationId === conversationId && data?.message) {
+                setMessages((prev) => {
+                    // Check if we already have this message (prevent duplicates)
+                    if (prev.some(m => m.id === data.message.id)) return prev;
+                    return [...prev, data.message];
+                });
+                
+                // If it's not our own message, mark it as read
+                if (data.message.senderId !== currentUserId) {
+                    communicationService.markRead(data.message.id, conversationId).catch(console.error);
+                }
+            }
+        });
+        return unsubscribe;
+    }, [conversationId, currentUserId]);
 
     // Scroll to bottom whenever the message list changes (new fetch or new messages)
     useEffect(() => {

@@ -324,7 +324,7 @@ export async function classifySearchQuery(query: string): Promise<ClassifyRespon
     }
 
     const data = (await response.json()) as ClassifyResponse;
-    if (!data?.intent || data.fallback) {
+    if (!data?.intent) {
       return propertySearchFallback();
     }
 
@@ -512,7 +512,7 @@ export async function fetchPropertyReport(
     console.error(`[GovData] Failed to stream report for ${listingId}:`, err);
     return {
       facts: [],
-      lens: null,
+      lens: undefined as any,
       generatedFor: audience || 'tenant',
     };
   } finally {

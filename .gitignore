@@ -16,14 +16,12 @@ out/
 .env
 .env.*
 !.env.example
-!.env.prod
 !.env.production.frontend
 !.env.production.backend
 !.env.production.search
 **/.env
 **/.env.*
 !**/.env.example
-!**/.env.prod
 api/.env*
 api/local.settings.json
 

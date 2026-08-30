@@ -10,12 +10,17 @@ export class SavedPropertiesController {
   constructor(private readonly savedPropertiesService: SavedPropertiesService) {}
 
   @Get(['saved-properties', 'users/me/saved-properties'])
-  async getSavedProperties(@Req() req: any) {
+  async getSavedProperties(
+    @Req() req: any,
+    @Query('limit') limitStr?: string,
+    @Query('lastVisible') lastVisible?: string
+  ) {
     const userId = req.user.uid;
-    this.logger.log(`[getSavedProperties] uid=${userId}`);
+    const limit = limitStr ? parseInt(limitStr, 10) : undefined;
+    this.logger.log(`[getSavedProperties] uid=${userId} limit=${limit} lastVisible=${lastVisible}`);
     try {
-      const result = await this.savedPropertiesService.getSavedProperties(userId);
-      this.logger.log(`[getSavedProperties] uid=${userId} → returned ${result.length} item(s)`);
+      const result = await this.savedPropertiesService.getSavedProperties(userId, limit, lastVisible);
+      this.logger.log(`[getSavedProperties] uid=${userId} → returned ${result.items?.length || 0} item(s)`);
       return result;
     } catch (err: any) {
       this.logger.error(`[getSavedProperties] uid=${userId} FAILED: ${err?.message || err}`);

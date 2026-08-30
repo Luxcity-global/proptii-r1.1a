@@ -283,7 +283,25 @@ export class CommunicationService {
       createdAt: now,
     };
     if (col) {
-      try { await col.doc(id).set(payload); } catch {}
+      try { 
+        await col.doc(id).set(payload); 
+        
+        // Auto-sync to the "Files/Documents" tab globally (stored in referencing_files)
+        const filesCol = this.db?.collection('referencing_files');
+        if (filesCol && userId && userId !== 'guest') {
+          await filesCol.doc(`${userId}_${Date.now()}`).set({
+            userId,
+            fileName: payload.filename,
+            contentType: payload.mimeType,
+            size: payload.size,
+            category: 'Messaging', // Identifies this as an attachment
+            url: payload.blobUrl,
+            uploadDate: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (err: any) {
+        this.logger.warn(`Failed to save attachment or sync to files tab: ${err?.message || err}`);
+      }
     }
     return { data: payload };
   }
@@ -291,7 +309,31 @@ export class CommunicationService {
   async deleteAttachment(attachmentId: string) {
     const col = this.attachmentsCol;
     if (col) {
-      try { await col.doc(attachmentId).delete(); } catch {}
+      try {
+        const doc = await col.doc(attachmentId).get();
+        if (doc.exists) {
+          const data = doc.data();
+          if (data?.blobUrl && data.blobUrl.includes('firebasestorage.googleapis.com')) {
+            try {
+              // Extract the file path from the Firebase Storage URL
+              const urlObj = new URL(data.blobUrl);
+              const pathRegex = /\/o\/(.+?)\?/;
+              const match = urlObj.pathname.match(pathRegex);
+              if (match && match[1]) {
+                const filePath = decodeURIComponent(match[1]);
+                const bucket = admin.storage().bucket();
+                await bucket.file(filePath).delete();
+                this.logger.log(`Deleted attachment file from storage: ${filePath}`);
+              }
+            } catch (err: any) {
+              this.logger.warn(`Failed to delete attachment from storage: ${err?.message}`);
+            }
+          }
+        }
+        await col.doc(attachmentId).delete(); 
+      } catch (err: any) {
+        this.logger.error(`Error deleting attachment doc: ${err?.message}`);
+      }
     }
     return { data: { success: true } };
   }

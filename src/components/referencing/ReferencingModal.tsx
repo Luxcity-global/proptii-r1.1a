@@ -25,7 +25,7 @@ import ReferencingSidebar from './ui/ReferencingSidebar';
 import MobileStepper from './ui/MobileStepper';
 import FormContent from './ui/FormContent';
 import { FormSection } from '../../types/referencing';
-import { isAzureConfigured } from '../../config/azure';
+
 import { useAuth } from '../../contexts/AuthContext';
 import EmploymentSection from './sections/EmploymentSection';
 import IdentitySection from './sections/IdentitySection';
@@ -169,26 +169,6 @@ const ReferencingModal: React.FC<ReferencingModalProps> = ({
         <DialogContent>
           <Typography>
             We're currently experiencing technical difficulties. Please try again later.
-          </Typography>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  if (!isAzureConfigured()) {
-    return (
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6">Configuration Error</Typography>
-            <IconButton onClick={handleClose} size="small">
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Typography>
-            The application is not properly configured. Please contact support.
           </Typography>
         </DialogContent>
       </Dialog>
