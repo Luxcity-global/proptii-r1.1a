@@ -120,7 +120,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
           </div>
 
           {/* Desktop Navigation: Direct functional links + Dashboard route (only when authenticated) */}
-          {!hideServiceLinks && isAuthenticated && (
+          {!hideServiceLinks && (
             <div className="hidden md:flex flex-1 justify-center items-center space-x-7">
               {isLandlordUser ? (
                 <>
@@ -340,7 +340,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
         {isMobileMenuOpen && (
           <div className="md:hidden mobile-menu">
             <div className="px-3 pt-3 pb-4 space-y-1.5 bg-black/90 backdrop-blur-md rounded-2xl mt-2 border border-white/10 shadow-2xl">
-              {!hideServiceLinks && isAuthenticated && (
+              {!hideServiceLinks && (
                 <>
                   {isLandlordUser ? (
                     <>
