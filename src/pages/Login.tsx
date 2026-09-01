@@ -118,86 +118,56 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
-          <Typography component="h1" variant="h5" align="center" gutterBottom>
-            Sign in
-          </Typography>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          <Box sx={{ mt: 1 }}>
-            <Button
-              fullWidth
-              variant="contained"
-              sx={{
-                mt: 3,
-                mb: 2,
-                py: 1.4,
-                borderRadius: 2,
-                textTransform: 'none',
-                fontSize: '0.95rem',
-                fontWeight: 600,
-                backgroundColor: '#136C9E',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 1.5,
-                boxShadow: '0 4px 12px rgba(19, 108, 158, 0.25)',
-                '&:hover': {
-                  backgroundColor: '#0e5278',
-                  boxShadow: '0 6px 16px rgba(19, 108, 158, 0.35)',
-                },
-              }}
-              onClick={() => handleLogin()}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24">
-                <path
-                  fill="#EA4335"
-                  d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"
-                />
-                <path
-                  fill="#4285F4"
-                  d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c0-.4 0-.8 0-1.4z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z"
-                />
-              </svg>
-              <span>Continue with Google</span>
-            </Button>
+    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-blue-50 via-slate-50 to-orange-50 relative overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-[#136C9E]/10 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-[#E65D24]/10 blur-3xl pointer-events-none" />
 
+      <div className="w-full max-w-md p-8 m-4 relative z-10 bg-white/70 backdrop-blur-xl rounded-3xl shadow-[0_8px_40px_rgb(0,0,0,0.08)] border border-white">
+        <div className="text-center mb-10">
+          <div className="mx-auto flex items-center justify-center mb-6">
+            <img src="/images/proptii-logo.png" alt="Proptii Logo" className="h-12 w-auto object-contain" />
+          </div>
+          <h1 className="text-3xl font-archive font-bold text-gray-900 mb-2">Welcome Back</h1>
+          <p className="text-gray-500 font-nunito">Sign in to continue to your dashboard</p>
+        </div>
 
+        {error && (
+          <Alert severity="error" sx={{ mb: 4, borderRadius: 2 }}>
+            {error}
+          </Alert>
+        )}
 
-            <Button
-              fullWidth
-              variant="text"
-              sx={{ textTransform: 'none', color: '#6b7280' }}
+        <div className="space-y-4">
+          <button
+            onClick={handleLogin}
+            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-100 text-gray-700 px-4 py-3.5 rounded-xl font-semibold hover:bg-gray-50 hover:border-gray-200 transition-all duration-300 shadow-sm hover:shadow active:scale-[0.98]"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24">
+              <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z" />
+              <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z" />
+              <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c0-.4 0-.8 0-1.4z" />
+              <path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16.5C3.7 20.2 7.5 23.5 12 23.5z" />
+            </svg>
+            Continue with Google
+          </button>
+        </div>
+
+        <div className="mt-8 text-center">
+          <p className="text-gray-500 text-sm">
+            Don't have an account?{' '}
+            <button
               onClick={() => {
                 const search = location.search;
                 navigate(`/pricing${search}`);
               }}
+              className="text-[#DC5F12] font-bold hover:underline transition-all"
             >
-              Don't have an account? <span style={{ color: '#DC5F12', fontWeight: 600, marginLeft: 4 }}>Sign Up</span>
-            </Button>
-          </Box>
-        </Paper>
-      </Box>
-    </Container>
+              Sign Up
+            </button>
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }; 

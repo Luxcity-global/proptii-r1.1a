@@ -179,7 +179,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                     Book Viewing
                   </NavLink>
                   <NavLink
-                    to={isAuthenticated ? '/dashboard/tenant-referencing' : '/referencing'}
+                    to="/referencing"
                     className={({ isActive }) =>
                       isActive
                         ? 'text-[#F15A22] font-bold text-sm tracking-wide transition-colors'
@@ -404,7 +404,7 @@ const Navbar: React.FC<NavbarProps> = ({ isAgent = false, hideServiceLinks = fal
                         Book Viewing
                       </NavLink>
                       <NavLink
-                        to={isAuthenticated ? '/dashboard/tenant-referencing' : '/referencing'}
+                        to="/referencing"
                         onClick={closeMobileMenu}
                         className={({ isActive }) =>
                           isActive

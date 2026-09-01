@@ -92,35 +92,12 @@ const Referencing = () => {
     preloadHeroImage();
   }, []);
 
-  // Redirect authenticated tenants to their dashboard referencing page
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      const isLandlord = user.roles?.includes('landlord') || user.roles?.includes('agent');
-      if (!isLandlord) {
-        navigate('/dashboard/tenant-referencing');
-      } else {
-        navigate('/dashboard'); // Landlords shouldn't be here either
-      }
-    }
-  }, [isAuthenticated, user, navigate]);
-
-  // Check if authenticated user already has a saved referencing passport
-  useEffect(() => {
-    if (!isAuthenticated || !user?.id) return;
-    setCheckingPassport(true);
-    const localKey = `referencing_${user.id}_submitted`;
-    const alreadySubmitted = localStorage.getItem(localKey) === 'true';
-    if (alreadySubmitted) {
-      // Has existing passport — open the form directly
-      setHasExistingPassport(true);
-      setIsReferencingModalOpen(true);
-    }
-    setCheckingPassport(false);
-  }, [isAuthenticated, user?.id]);
+  // Removed auto-redirect so all users can view the marketing page.
+  // The 'Get Started' button will route authenticated users to their dashboard.
 
   const handleGetStarted = () => {
     if (!isAuthenticated) {
-      login();
+      navigate('/login?redirect=/referencing');
       return;
     }
     navigate('/dashboard/tenant-referencing');
@@ -312,12 +289,7 @@ const Referencing = () => {
         onGetStarted={handleChecklistComplete}
       />
 
-      {/* Referencing Modal */}
-      <ReferencingModal
-        isOpen={isReferencingModalOpen}
-        onClose={() => setIsReferencingModalOpen(false)}
-        onSubmissionComplete={handleSubmissionComplete}
-      />
+
 
       <ReviewModal
         isOpen={isReviewModalOpen}
