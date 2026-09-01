@@ -270,7 +270,8 @@ const TenantContracts: React.FC = () => {
         </div>
         <button
           onClick={() => setIsContractModalOpen(true)}
-          className={`${isMobile ? 'px-3 py-2 text-xs whitespace-nowrap flex-shrink-0' : 'px-4 py-2'} bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors ${isMobile ? 'min-h-[2.5rem]' : ''}`}
+          className="px-5 py-2.5 text-white rounded-full text-xs md:text-sm font-medium transition-all duration-300 shadow-md hover:-translate-y-0.5 whitespace-nowrap flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)' }}
         >
           {isMobile ? 'Go To Contract' : 'Go To Contract Page'}
         </button>

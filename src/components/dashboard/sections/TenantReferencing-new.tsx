@@ -262,6 +262,18 @@ const TenantReferencing: React.FC = () => {
   const summaryPending = isAuthenticated ? progress.pending : 0;
   const summaryDocuments = isAuthenticated ? progress.documents : 0;
 
+  const hasStartedReferencing = () => {
+    if (!formData) return false;
+    
+    const hasEmployment = !!(formData.employment?.employmentStatus || formData.employment?.companyDetails || formData.employment?.jobPosition);
+    const hasResidential = !!(formData.residential?.currentAddress || formData.residential?.durationAtCurrentAddress);
+    const hasFinancial = !!(formData.financial?.monthlyIncome || formData.financial?.proofOfIncomeType);
+    const hasGuarantor = !!(formData.guarantor?.firstName && formData.guarantor.firstName !== '' || (formData as any).guarantorInvitation?.status);
+    const hasIdentityDocs = !!(formData.identity?.dateOfBirth || formData.identity?.identityProof || formData.identity?.phoneNumber);
+    
+    return hasEmployment || hasResidential || hasFinancial || hasGuarantor || hasIdentityDocs || summaryOverallProgress > 0;
+  };
+
   const openSectionModal = (step: number) => {
     setReferencingStep(step);
     setSingleSectionOnly(true);
@@ -277,6 +289,80 @@ const TenantReferencing: React.FC = () => {
   const closeReferencingModal = () => {
     setIsReferencingModalOpen(false);
     loadReferencingData();
+  };
+
+  const handleStartPassport = async () => {
+    const userId = user?.id || (isAuthenticated ? (user as any)?.uid : null);
+    if (!userId) {
+      toast.error("You must be logged in to start a referencing passport.");
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const initialData: FormData = {
+        identity: {
+          firstName: user?.givenName || user?.name?.split(' ')[0] || '',
+          lastName: user?.familyName || user?.name?.split(' ').slice(1).join(' ') || '',
+          email: user?.email || '',
+          phoneNumber: '',
+          dateOfBirth: '',
+          isBritish: true,
+          nationality: 'British',
+        },
+        employment: {
+          employmentStatus: '',
+          companyDetails: '',
+          lengthOfEmployment: '',
+          jobPosition: '',
+          referenceFullName: '',
+          referenceEmail: '',
+          referencePhone: '',
+          proofType: '',
+        },
+        residential: {
+          currentAddress: '',
+          durationAtCurrentAddress: '',
+          previousAddress: '',
+          durationAtPreviousAddress: '',
+          reasonForLeaving: '',
+          alreadyHavePropertyAddress: '',
+          propertyAddress: '',
+          proofType: '',
+        },
+        financial: {
+          monthlyIncome: '',
+          proofOfIncomeType: '',
+          useOpenBanking: false,
+          isConnectedToOpenBanking: false,
+        },
+        guarantor: {
+          firstName: '',
+          lastName: '',
+          email: '',
+          phoneNumber: '',
+          address: '',
+        }
+      };
+
+      const propertyId = `general_${userId}`;
+      await firestoreService.saveReferencingForm(
+        userId,
+        propertyId,
+        initialData as any,
+        1,
+        {}
+      );
+      
+      setFormData(initialData);
+      setStepStatus({});
+      toast.success("Referencing passport started!");
+    } catch (err) {
+      console.error("Error starting passport:", err);
+      toast.error("Failed to start passport. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDeleteShare = async (shareId: string, recipientName: string) => {
@@ -343,7 +429,7 @@ const TenantReferencing: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
-              onClick={() => openFullPassportModal(1)}
+              onClick={handleStartPassport}
               className="px-6 py-3 bg-[#136C9E] text-white rounded-xl text-sm font-semibold hover:bg-[#0F5A82] transition-colors shadow-md flex items-center justify-center gap-2"
             >
               <Edit3 className="w-4 h-4" />
@@ -399,20 +485,20 @@ const TenantReferencing: React.FC = () => {
 
         <div className="flex items-center gap-2.5 flex-wrap">
           <button 
-            className="px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-full text-xs md:text-sm font-medium hover:bg-gray-50 transition-all flex items-center gap-2 shadow-sm"
-            onClick={() => openFullPassportModal(1)}
-          >
-            <Edit3 className="w-4 h-4 text-[#136C9E]" />
-            Edit Full Passport
-          </button>
-          <button 
             className="px-5 py-2.5 text-white rounded-full text-xs md:text-sm font-medium transition-all duration-300 flex items-center gap-2 shadow-md hover:-translate-y-0.5"
             style={{
               background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
             }}
+            onClick={() => openFullPassportModal(1)}
+          >
+            <Edit3 className="w-4 h-4" />
+            {hasStartedReferencing() ? 'Continue Referencing' : 'Start Referencing'}
+          </button>
+          <button 
+            className="px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-full text-xs md:text-sm font-medium hover:bg-gray-50 transition-all flex items-center gap-2 shadow-sm"
             onClick={() => setIsSendModalOpen(true)}
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-4 h-4 text-[#136C9E]" />
             Send to Landlord / Agent
           </button>
         </div>
