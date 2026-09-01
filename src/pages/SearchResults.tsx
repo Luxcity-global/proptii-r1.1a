@@ -1819,7 +1819,7 @@ const SearchResults = () => {
           {/* Enhanced Header Section */}
           <div className="mb-8">
             {/* Top Row: Buttons and Search Summary */}
-            <div className="flex items-center justify-between mb-6 bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 bg-white rounded-xl shadow-lg p-4 md:p-6 border border-gray-100">
               {/* Left Side: Search Summary */}
               <div className="flex-1">
                 <div className="flex items-center mb-3">
@@ -1827,12 +1827,12 @@ const SearchResults = () => {
                   <h2 className="text-xl font-bold text-gray-900">Search Summary</h2>
                 </div>
                 <div className="space-y-3">
-                  <div className="flex items-center">
-                    <span className="text-gray-500 font-medium w-20">Query:</span>
-                    <span className="text-gray-900 font-semibold">{searchQuery}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-gray-500 font-medium">Query:</span>
+                    <span className="text-gray-900 font-semibold break-words">{searchQuery}</span>
                   </div>
                   <div className="flex items-center">
-                    <span className="text-gray-500 font-medium w-20">Results:</span>
+                    <span className="text-gray-500 font-medium w-16 md:w-20">Results:</span>
                     <span className="text-gray-900 font-semibold">{results.length} properties found</span>
                     {sessionStorage.getItem('searchResults') && (
                       <span className="ml-2 px-2 py-1 bg-[#136C9E]/10 text-[#136C9E] text-xs font-medium rounded-full">cached</span>
@@ -1849,7 +1849,7 @@ const SearchResults = () => {
               </div>
               
               {/* Right Side: Action Buttons */}
-              <div className="flex gap-3 ml-8">
+              <div className="flex flex-col sm:flex-row gap-3 mt-5 md:mt-0 md:ml-8">
                 <button
                   onClick={() => {
                     setShowMap(!showMap);

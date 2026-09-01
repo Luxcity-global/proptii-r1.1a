@@ -620,7 +620,7 @@ const ListingDetailsModal: React.FC<ListingDetailsModalProps> = ({
               <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
                 <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-gray-200">
                   <div className="flex items-center gap-3 text-amber-600 mb-3">
-                    <span className="text-2xl">⚠️</span>
+                    <AlertTriangle className="w-6 h-6 text-yellow-500" />
                     <h3 className="text-lg font-bold text-gray-900">External Agent</h3>
                   </div>
                   <p className="text-sm text-gray-600 leading-relaxed mb-6">

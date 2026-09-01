@@ -448,7 +448,7 @@ const YourFiles: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
         {/* Total Files Card */}
         <div className="bg-white p-6 rounded-xl border border-gray-100">
           <div className="flex items-center justify-between mb-4">

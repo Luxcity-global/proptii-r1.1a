@@ -8,6 +8,7 @@
  */
 
 import React from 'react';
+import { AlertTriangle } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -98,7 +99,7 @@ const AttachmentPill: React.FC<AttachmentPillProps> = ({
     if (isError) {
         return (
             <div style={baseStyle}>
-                <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+                <AlertTriangle style={{ width: 18, height: 18, color: '#f59e0b' }} />
                 <span style={{ fontSize: '0.78rem', color: meta }}>
                     Attachment unavailable
                 </span>

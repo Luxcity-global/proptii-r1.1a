@@ -111,7 +111,8 @@ const TenantReferencing: React.FC = () => {
   const [isReferencingModalOpen, setIsReferencingModalOpen] = useState(false);
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [referencingStep, setReferencingStep] = useState(1);
-  const [singleSectionOnly, setSingleSectionOnly] = useState(true);
+  const [singleSectionOnly, setSingleSectionOnly] = useState(false);
+  const [activeTab, setActiveTab] = useState<'details' | 'shared'>('details');
 
   // Load form data and shares from Firestore
   const loadReferencingData = async () => {
@@ -413,56 +414,6 @@ const TenantReferencing: React.FC = () => {
     );
   }
 
-  // No passport started yet – show a friendly onboarding CTA
-  if (!formData) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 space-y-6 font-sans">
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl p-10 max-w-lg w-full text-center shadow-sm border border-blue-100">
-          <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
-            <ShieldCheck className="w-8 h-8 text-blue-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2" style={{ fontFamily: 'Archivo, sans-serif' }}>
-            Create Your Referencing Passport
-          </h2>
-          <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-            Fill in your 5 referencing sections once and share your passport with multiple landlords or letting agents without repeating forms.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button
-              onClick={handleStartPassport}
-              className="px-6 py-3 bg-[#136C9E] text-white rounded-xl text-sm font-semibold hover:bg-[#0F5A82] transition-colors shadow-md flex items-center justify-center gap-2"
-            >
-              <Edit3 className="w-4 h-4" />
-              Start My Passport (5 Sections)
-            </button>
-          </div>
-          <div className="mt-6 grid grid-cols-3 gap-4 text-center">
-            {[
-              { label: 'Fill once', sub: '5 simple sections' },
-              { label: 'Share freely', sub: 'Multiple recipients' },
-              { label: 'Edit anytime', sub: 'Section by section' },
-            ].map((f) => (
-              <div key={f.label} className="bg-white rounded-xl p-3 shadow-sm border border-blue-50">
-                <p className="text-xs font-bold text-gray-800">{f.label}</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">{f.sub}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Referencing Modal */}
-        {isReferencingModalOpen && (
-          <ReferencingModal
-            isOpen={isReferencingModalOpen}
-            onClose={() => { setIsReferencingModalOpen(false); loadReferencingData(); }}
-            initialStep={referencingStep}
-            singleSectionOnly={singleSectionOnly}
-            onSubmissionComplete={loadReferencingData}
-          />
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 pb-8" style={{ fontFamily: 'Archivo, sans-serif' }}>
@@ -504,8 +455,30 @@ const TenantReferencing: React.FC = () => {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex items-center gap-6 border-b border-gray-200 mt-2">
+        <button
+          onClick={() => setActiveTab('details')}
+          className={`pb-3 text-sm font-semibold transition-colors border-b-2 ${
+            activeTab === 'details' ? 'border-[#136C9E] text-[#136C9E]' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Your Referencing Details
+        </button>
+        <button
+          onClick={() => setActiveTab('shared')}
+          className={`pb-3 text-sm font-semibold transition-colors border-b-2 ${
+            activeTab === 'shared' ? 'border-[#136C9E] text-[#136C9E]' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Shared Passports
+        </button>
+      </div>
+
+      {activeTab === 'details' && (
+      <>
       {/* Progress Overview Cards */}
-      <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'} gap-4 md:gap-6`}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {/* Overall Progress Card */}
         <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-2xl border border-gray-100 shadow-sm`}>
           <div className={`flex items-center justify-between ${isMobile ? 'mb-3' : 'mb-4'}`}>
@@ -562,7 +535,11 @@ const TenantReferencing: React.FC = () => {
           <p className="text-xs text-gray-500">Landlords & agents sent to</p>
         </div>
       </div>
+      </>
+      )}
 
+      {activeTab === 'shared' && (
+      <>
       {/* Shared Recipients Manager (Send to Multiple Landlords/Agents) */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
@@ -677,7 +654,11 @@ const TenantReferencing: React.FC = () => {
           </div>
         )}
       </div>
+      </>
+      )}
 
+      {activeTab === 'details' && (
+      <>
       {/* Referencing Passport Sections (5 Steps) */}
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -830,6 +811,8 @@ const TenantReferencing: React.FC = () => {
           ))}
         </div>
       </div>
+      </>
+      )}
 
       {/* Referencing Modal */}
       {isReferencingModalOpen && (

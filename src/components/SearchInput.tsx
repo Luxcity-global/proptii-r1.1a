@@ -190,7 +190,7 @@ export const SearchInput = ({
               />
               <button
                 type="button"
-                className="hidden sm:inline-flex p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+                className="hidden"
                 aria-label="Voice search"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -199,7 +199,7 @@ export const SearchInput = ({
               </button>
               <button
                 type="button"
-                className="hidden sm:inline-flex p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+                className="hidden"
                 aria-label="Image search"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -226,7 +226,7 @@ export const SearchInput = ({
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>Search</span>
+                    <span className="hidden sm:inline">Search</span>
                     <img src="/images/ai-search-plane-icon-new-wht-1.png" alt="" className="w-4 h-4 sm:ml-2" aria-hidden />
                   </>
                 )}
@@ -341,16 +341,16 @@ export const SearchInput = ({
           <div className="px-2 pb-2 pt-1 flex items-center justify-between">
             {/* Left Side Icons */}
             <div className="flex items-center gap-3">
-              {/* Camera Icon */}
-              <button className="p-2 transition-colors rounded-lg hover:bg-gray-50" style={{ color: '#888' }}>
+              {/* Camera Icon - Hidden for now */}
+              <button className="hidden p-2 transition-colors rounded-lg hover:bg-gray-50" style={{ color: '#888' }}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </button>
 
-              {/* Microphone Icon */}
-              <button className="p-2 transition-colors rounded-lg hover:bg-gray-50" style={{ color: '#888' }}>
+              {/* Microphone Icon - Hidden for now */}
+              <button className="hidden p-2 transition-colors rounded-lg hover:bg-gray-50" style={{ color: '#888' }}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                 </svg>

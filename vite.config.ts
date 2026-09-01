@@ -112,6 +112,14 @@ export default defineConfig(({ mode = 'development' }) => {
       },
     ],
     server: {
+      proxy: {
+        '/api/search-backend': {
+          target: viteSearchBackendUrl || 'https://proptii-r1-1a-q95f.onrender.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/search-backend/, ''),
+          secure: false,
+        }
+      },
       watch: {
         usePolling: true,
         interval: 500,

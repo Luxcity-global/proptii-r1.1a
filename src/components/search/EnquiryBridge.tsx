@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Sparkles } from 'lucide-react';
 import type { Audience, SearchIntent } from '../../types/govData';
 
 export type GuidanceTopic = 'pets' | 'epc' | 'generic';
@@ -169,7 +170,7 @@ export const EnquiryBridge: React.FC<EnquiryBridgeProps> = ({
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100 gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-xl bg-orange-500/10 flex items-center justify-center text-[#E65D24] text-sm">
-              ✨
+              <Sparkles className="w-5 h-5 text-yellow-400" />
             </div>
             <span className="text-xs font-extrabold uppercase tracking-wider text-[#136C9E]">
               Pet Permissions in Rentals
@@ -206,7 +207,7 @@ export const EnquiryBridge: React.FC<EnquiryBridgeProps> = ({
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100 gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-xl bg-orange-500/10 flex items-center justify-center text-[#E65D24] text-sm">
-              ✨
+              <Sparkles className="w-5 h-5 text-yellow-400" />
             </div>
             <span className="text-xs font-extrabold uppercase tracking-wider text-[#136C9E]">
               EPC / MEES Requirements
@@ -242,7 +243,7 @@ export const EnquiryBridge: React.FC<EnquiryBridgeProps> = ({
       <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100 gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-xl bg-orange-500/10 flex items-center justify-center text-[#E65D24] text-sm">
-            ✨
+            <Sparkles className="w-5 h-5 text-yellow-400" />
           </div>
           <span className="text-xs font-extrabold uppercase tracking-wider text-[#136C9E]">
             Guidance

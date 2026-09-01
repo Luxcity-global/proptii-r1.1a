@@ -138,11 +138,13 @@ export const DASHBOARD_SECTIONS = [
       >
         <path
           d="M2 3C2 1.89543 2.89543 1 4 1H16C17.1046 1 18 1.89543 18 3V13C18 14.1046 17.1046 15 16 15H11.4142L8.70711 17.7071C8.31658 18.0976 7.68342 18.0976 7.29289 17.7071L4.58579 15H4C2.89543 15 2 14.1046 2 13V3Z"
-          fill={isSelected ? "#003450" : "#374957"}
+          fill={isSelected ? "#003450" : "none"}
+          stroke={isSelected ? "none" : "#374957"}
+          strokeWidth={isSelected ? "0" : "1.5"}
         />
         <path
           d="M6 7H14M6 10H11"
-          stroke="white"
+          stroke={isSelected ? "white" : "#374957"}
           strokeWidth="1.5"
           strokeLinecap="round"
         />

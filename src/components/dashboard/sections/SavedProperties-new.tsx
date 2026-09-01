@@ -144,7 +144,7 @@ const SavedProperties: React.FC = () => {
           <div className={isMobile ? 'p-4' : 'p-6'}>
             <h3 className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold text-gray-900 mb-2`}>{property.title}</h3>
             <p className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-[#E65D24] mb-4`}>{cleanPrice(property.price)}</p>
-            <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} ${isMobile ? 'gap-3' : 'gap-4'} mb-6`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-6">
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 <span className="text-gray-600">{property.location}</span>
@@ -440,7 +440,7 @@ const SavedProperties: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'} ${isMobile ? 'gap-4' : 'gap-6'}`}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {/* Saved Listings Card */}
         <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow`}>
           <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
@@ -542,7 +542,7 @@ const SavedProperties: React.FC = () => {
       </div>
 
       {/* Properties Grid */}
-      <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3'} ${isMobile ? 'gap-4' : 'gap-6'}`}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
         {filteredProperties.length === 0 ? (
           <div className="col-span-full text-center py-12">
             <div className={`${isMobile ? 'w-12 h-12' : 'w-16 h-16'} bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4`}>

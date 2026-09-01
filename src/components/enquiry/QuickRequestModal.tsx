@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Loader2 } from 'lucide-react';
+import { X, Check, Loader2, AlertTriangle } from 'lucide-react';
 import quickRequestService from '../../services/quickRequestService';
 
 interface QuickRequestModalProps {
@@ -159,7 +159,7 @@ const QuickRequestModal: React.FC<QuickRequestModalProps> = ({
 
               {agentDelivery === 'no_contact_email' && (
                 <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 text-left mb-4 flex gap-2 items-start shadow-sm">
-                  <span className="text-sm mt-0.5" role="img" aria-label="warning">⚠️</span>
+                  <AlertTriangle className="w-4 h-4 mt-0.5 text-yellow-500 flex-shrink-0" />
                   <div>
                     <span className="font-bold">No Contact Email:</span> This agent hasn't published a contact email on their listing.
                     Your enquiry is saved on Proptii and we will try to deliver it if the agent claims their listing.

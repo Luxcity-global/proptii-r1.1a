@@ -15,7 +15,8 @@ import {
   Sms as SmsIcon,
   WhatsApp as WhatsAppIcon,
   Phone as PhoneIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  NotificationsActive as NotificationsActiveIcon
 } from '@mui/icons-material';
 import { useBookViewing } from '../context/BookViewingContext';
 
@@ -294,9 +295,9 @@ const ViewingScheduler: React.FC = () => {
 
             <Box sx={{ mt: 5, position: 'relative' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Typography variant="subtitle1" sx={{ color: DARK_GREY, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <span role="img" aria-label="notification">🔔</span> Booking Notifications
-                </Typography>
+              <Typography variant="subtitle1" sx={{ color: DARK_GREY, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <NotificationsActiveIcon fontSize="small" sx={{ color: '#136C9E' }} /> Booking Notifications
+              </Typography>
               </Box>
               <Typography variant="body2" sx={{ color: LIGHT_GREY, mb: 3 }}>
                 Choose how you would like to receive booking updates.

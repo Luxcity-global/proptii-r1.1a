@@ -832,7 +832,7 @@ const Viewings: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {/* Upcoming Viewings Card */}
         <div className="bg-white p-4 sm:p-6 rounded-xl border border-gray-100 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
@@ -909,30 +909,24 @@ const Viewings: React.FC = () => {
       {/* Tabs Section */}
       <div>
         <div className={`${isMobile ? 'mb-4' : 'mb-6'}`}>
-          <div className="bg-white rounded-full border border-gray-100 p-1 inline-flex w-full sm:w-auto overflow-x-auto">
+          <div className="bg-gray-100 rounded-full p-1 inline-flex w-full sm:w-auto overflow-x-auto border border-gray-200/60">
             <button
               onClick={() => setActiveTab('upcoming')}
-              className={`${isMobile ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} font-medium transition-colors rounded-l-full whitespace-nowrap ${
+              className={`${isMobile ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} font-medium transition-colors rounded-full whitespace-nowrap ${
                 activeTab === 'upcoming'
-                  ? 'text-white'
-                  : 'text-gray-600'
+                  ? 'bg-white text-[#DC5F12] shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
-              style={{
-                backgroundColor: activeTab === 'upcoming' ? '#DC5F12' : 'transparent'
-              }}
             >
               Upcoming ({upcomingViewings.length})
             </button>
             <button
               onClick={() => setActiveTab('past')}
-              className={`${isMobile ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} font-medium transition-colors rounded-r-full whitespace-nowrap ${
+              className={`${isMobile ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} font-medium transition-colors rounded-full whitespace-nowrap ${
                 activeTab === 'past'
-                  ? 'text-white'
-                  : 'text-gray-600'
+                  ? 'bg-white text-[#DC5F12] shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
-              style={{
-                backgroundColor: activeTab === 'past' ? '#DC5F12' : 'transparent'
-              }}
             >
               Past ({pastViewings.length})
             </button>

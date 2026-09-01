@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertTriangle, Check } from 'lucide-react';
 import type { FactFlag, FlagState } from '../../types/govData';
 
 const STATE_STYLES: Record<FlagState, string> = {
@@ -79,7 +80,9 @@ export const FactsBadgeRow: React.FC<FactsBadgeRowProps> = ({
             title={flag.detail || `${flag.label}: ${STATE_LABEL[flag.state]}`}
             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold ${LISTING_STYLES[flag.state]}`}
           >
-            <span aria-hidden>{flag.state === 'flagged' ? '⚠' : flag.state === 'clear' ? '✓' : '·'}</span>
+            <span aria-hidden className="flex items-center">
+              {flag.state === 'flagged' ? <AlertTriangle className="w-3.5 h-3.5" /> : flag.state === 'clear' ? <Check className="w-3.5 h-3.5" /> : '·'}
+            </span>
             <span>{flag.label}</span>
           </span>
         ))}

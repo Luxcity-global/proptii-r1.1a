@@ -123,8 +123,7 @@ const Referencing = () => {
       login();
       return;
     }
-    // Open referencing form directly — loads saved data via useEffect inside the modal
-    setIsReferencingModalOpen(true);
+    navigate('/dashboard/tenant-referencing');
   };
 
   const handleChecklistComplete = () => {
@@ -132,7 +131,7 @@ const Referencing = () => {
       login();
       return;
     }
-    setIsReferencingModalOpen(true);
+    navigate('/dashboard/tenant-referencing');
   };
 
   const handleSubmissionComplete = () => {

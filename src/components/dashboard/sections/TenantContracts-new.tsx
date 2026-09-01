@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Download, Eye, Calendar, CheckCircle, Clock, AlertTriangle, User, Mail, Phone, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, Download, Eye, Calendar, CheckCircle, Clock, AlertTriangle, User, Mail, Phone, Trash2, ChevronLeft, ChevronRight, Edit3 } from 'lucide-react';
 import { useSignedContracts } from '../../../contexts/SignedContractsContext';
 import ContractModal from '../../contract/ContractModal';
 import signedContractsFirestoreService from '../../../services/signedContractsFirestoreService';
@@ -278,7 +278,7 @@ const TenantContracts: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-4'} ${isMobile ? 'gap-4' : 'gap-6'}`}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {/* Total Contracts */}
         <div className={`bg-white ${isMobile ? 'p-4' : 'p-6'} rounded-xl border border-gray-100 hover:shadow-lg transition-shadow`}>
           <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
@@ -377,13 +377,13 @@ const TenantContracts: React.FC = () => {
       {/* Tabs Section - requested tab disabled */}
       <div>
         <div className={isMobile ? 'mb-4' : 'mb-6'}>
-          <div className={`bg-white rounded-full border border-gray-100 p-1 ${isMobile ? 'w-full' : 'inline-flex'}`}>
+          <div className={`bg-gray-100 rounded-full border border-gray-200/60 p-1 ${isMobile ? 'w-full' : 'inline-flex'}`}>
             <button
-              className={`${isMobile ? 'w-full px-3 py-2 text-xs' : 'px-4 py-2 text-sm'} font-medium transition-colors rounded-full text-white`}
-              style={{ backgroundColor: '#DC5F12' }}
+              className={`${isMobile ? 'w-full px-3 py-2 text-xs' : 'px-4 py-2 text-sm'} font-medium transition-colors rounded-full bg-white text-[#DC5F12] shadow-sm flex items-center justify-center gap-1`}
               disabled
             >
-              Signed Contracts ({displaySignedContracts.length}) {signedContracts.length > 0 ? '📄' : '📝'}
+              Signed Contracts ({displaySignedContracts.length})
+              {signedContracts.length > 0 ? <FileText className="w-4 h-4 ml-0.5" /> : <Edit3 className="w-4 h-4 ml-0.5" />}
             </button>
           </div>
         </div>

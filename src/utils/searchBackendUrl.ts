@@ -41,6 +41,11 @@ const readEnvSearchBackendUrl = (): string => {
 
 /** Resolve the search scraper base URL (no trailing slash). */
 export const resolveSearchBackendUrl = (): string => {
+  // If in development mode (Vite), use the proxy path to avoid CORS issues
+  if (import.meta.env.DEV) {
+    return '/api/search-backend';
+  }
+
   const envUrl = readEnvSearchBackendUrl();
   if (envUrl) {
     return envUrl;
