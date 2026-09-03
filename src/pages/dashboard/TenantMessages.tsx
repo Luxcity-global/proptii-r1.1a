@@ -144,12 +144,22 @@ const TenantMessages: React.FC = () => {
     const [optimisticMessages, setOptimisticMessages] = useState<Record<string, Array<{ message: Message; file?: File }>>>({});
     const [readCursors, setReadCursors] = useState<Record<string, string | null>>({});
     const [prefilledDrafts, setPrefilledDrafts] = useState<Record<string, string>>({});
+    // Pending conversation to activate once the context is populated (avoids race on first render)
+    const pendingConversationRef = useRef<{ id: string; conversation?: Conversation; prefilledMessage?: string } | null>(null);
 
     useEffect(() => {
         const state = location.state as { prefilledMessage?: string; conversationId?: string; conversation?: Conversation } | null;
         if (state?.conversationId) {
-            setActiveConversationId(state.conversationId);
+            const convId = state.conversationId;
 
+            // Store the pending activation so the tab-selection effect can retry after conversations load
+            pendingConversationRef.current = {
+                id: convId,
+                conversation: state.conversation,
+                prefilledMessage: state.prefilledMessage,
+            };
+
+            // Optimistically insert the conversation so it appears immediately
             if (state.conversation) {
                 _setConversations((prev) => {
                     if (prev.some((c) => c.id === state.conversation!.id)) return prev;
@@ -157,19 +167,24 @@ const TenantMessages: React.FC = () => {
                 });
             }
 
-            // Immediately refresh so the newly created conversation is in the context (if not provided)
-            refreshConversations();
+            setActiveConversationId(convId);
+
+            // For UNCLAIMED (scraped) conversations jump straight to External tab
+            const isUnclaimed = state.conversation?.landlordId === 'UNCLAIMED';
+            setActiveTab(isUnclaimed ? 'external' : 'inbox');
 
             if (state.prefilledMessage) {
-                setPrefilledDrafts((prev) => ({
-                    ...prev,
-                    [state.conversationId!]: state.prefilledMessage!,
-                }));
+                setPrefilledDrafts((prev) => ({ ...prev, [convId]: state.prefilledMessage! }));
             }
-            // Clear history state immediately so refreshing doesn't re-trigger prefilling
+
+            // Do NOT call refreshConversations() here — it would overwrite the optimistically
+            // inserted conversation with the API response before the backend has propagated it.
+            // The 30-second poller in MessagingContext handles eventual sync.
+
+            // Clear router state so F5 doesn't re-trigger
             navigate(location.pathname, { replace: true, state: {} });
         }
-    }, [location.state, location.pathname, navigate, setActiveConversationId, refreshConversations, _setConversations]);
+    }, [location.state, location.pathname, navigate, setActiveConversationId, _setConversations]);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const optimisticBottomRef = useRef<HTMLDivElement>(null);
@@ -179,8 +194,18 @@ const TenantMessages: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        refreshConversations();
-    }, [refreshConversations]);
+        // Refresh conversations on mount. After refresh completes, re-apply any pending
+        // navigation activation (in case the API response includes the just-created conversation).
+        refreshConversations().then(() => {
+            const pending = pendingConversationRef.current;
+            if (pending) {
+                // Re-activate — the refreshed list should now include the conversation
+                setActiveConversationId(pending.id);
+                const isUnclaimed = pending.conversation?.landlordId === 'UNCLAIMED';
+                setActiveTab(isUnclaimed ? 'external' : 'inbox');
+            }
+        }).catch(() => { /* silent — poller will retry */ });
+    }, [refreshConversations, setActiveConversationId]);
 
     useEffect(() => {
         if (activeConversationId && conversations.length > 0) {

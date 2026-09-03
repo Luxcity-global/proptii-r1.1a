@@ -15,6 +15,7 @@ import {
   WhatsApp as WhatsAppIcon,
   Phone as PhoneIcon
 } from '@mui/icons-material';
+import { maskEmail, maskPhone } from '../../../utils/formatters';
 
 // Constants
 const BLUE_COLOR = '#136C9E';
@@ -138,8 +139,16 @@ const ViewingComparison: React.FC = () => {
             <InfoSection>
               <InfoLabel>Estate Agent</InfoLabel>
               <InfoValue>{selectedProperty?.agent?.name || 'Not specified'}</InfoValue>
-              <InfoValue>{selectedProperty?.agent?.email || 'No email provided'}</InfoValue>
-              <InfoValue>{selectedProperty?.agent?.phone || 'No phone provided'}</InfoValue>
+              <InfoValue sx={{ fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+                {selectedProperty?.agent?.email
+                  ? maskEmail(selectedProperty.agent.email)
+                  : 'No email provided'}
+              </InfoValue>
+              <InfoValue sx={{ fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+                {selectedProperty?.agent?.phone
+                  ? maskPhone(selectedProperty.agent.phone)
+                  : 'No phone provided'}
+              </InfoValue>
             </InfoSection>
 
             <Divider sx={{ my: 3 }} />

@@ -29,7 +29,12 @@ export function useMessagingPoller(intervalMs: number = DEFAULT_INTERVAL_MS): vo
                     communicationService.getConversations(),
                     communicationService.getUnreadCount(),
                 ]);
-                _setConversations(convs);
+                // Merge: keep any optimistic conversations not yet returned by the server
+                _setConversations((prev) => {
+                    const serverIds = new Set(convs.map((c) => c.id));
+                    const optimisticOnly = prev.filter((c) => !serverIds.has(c.id));
+                    return [...convs, ...optimisticOnly];
+                });
                 _setUnreadCount(count);
             } catch {
                 // Silently ignore — the next tick or SSE event will retry

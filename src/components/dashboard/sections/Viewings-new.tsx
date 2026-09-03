@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Calendar, Clock, MapPin, User, Mail, CheckCircle, Eye, X, Heart, Send, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { maskEmail } from '../../../utils/formatters';
 import { viewingService, ViewingBooking, ViewingStats } from '../../../services/viewingService';
 import { bookViewingRequestService, BookViewingRequest } from '../../../services/bookViewingRequestService';
 import { propertySelectionService, PropertySelection, PropertySelectionStats } from '../../../services/propertySelectionService';
@@ -46,6 +48,35 @@ const Viewings: React.FC = () => {
   const [rescheduleMessage, setRescheduleMessage] = useState('');
   const [cancelMessage, setCancelMessage] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+
+  // State for pre-filling the booking modal from search results navigation
+  const [prefilledPropertyData, setPrefilledPropertyData] = useState<any>(null);
+
+  const location = useLocation();
+
+  // When navigated here from search results ("Book Viewing" click), auto-open
+  // the booking modal with the property pre-filled.
+  useEffect(() => {
+    // Check router state first (preferred, no serialization)
+    const navState = location.state as { openBookingModal?: boolean; prefilledProperty?: any } | null;
+    if (navState?.openBookingModal && navState.prefilledProperty) {
+      setPrefilledPropertyData(navState.prefilledProperty);
+      setIsBookViewingOpen(true);
+      return;
+    }
+    // Fallback: sessionStorage (written by handleBookViewingClick)
+    try {
+      const stored = sessionStorage.getItem('prefilledProperty');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        sessionStorage.removeItem('prefilledProperty');
+        setPrefilledPropertyData(parsed);
+        setIsBookViewingOpen(true);
+      }
+    } catch {
+      sessionStorage.removeItem('prefilledProperty');
+    }
+  }, []);
   
   // Pagination state
   const [currentUpcomingPage, setCurrentUpcomingPage] = useState<number>(1);
@@ -1012,7 +1043,7 @@ const Viewings: React.FC = () => {
                     </div>
                   <div className={`flex items-center ${isMobile ? 'text-[10px]' : 'text-xs'} text-gray-600`}>
                     <Mail className={`${isMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'} mr-1 flex-shrink-0`} />
-                      <span className="truncate">{viewing.property.agent.email}</span>
+                      <span className="truncate font-mono tracking-wide">{maskEmail(viewing.property.agent.email)}</span>
                   </div>
                 </div>
 
@@ -1067,11 +1098,15 @@ const Viewings: React.FC = () => {
       </div>
       <BookViewingModal
         open={isBookViewingOpen}
-        onClose={() => setIsBookViewingOpen(false)}
-        onSubmissionComplete={() => {
-          // After successful submission, close modal and refresh data via existing subscriptions
+        onClose={() => {
           setIsBookViewingOpen(false);
+          setPrefilledPropertyData(null);
         }}
+        onSubmissionComplete={() => {
+          setIsBookViewingOpen(false);
+          setPrefilledPropertyData(null);
+        }}
+        prefilledPropertyData={prefilledPropertyData}
       />
 
       {/* Reschedule Modal */}
@@ -1146,7 +1181,8 @@ const Viewings: React.FC = () => {
                   className={`w-full ${isMobile ? 'px-2.5 py-2 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none`}
                 />
                 <p className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-gray-500 mt-1`}>
-                  This message will be sent via email to {selectedViewing.property.agent.email}
+                  This message will be sent via email to{' '}
+                  <span className="font-mono tracking-wide">{maskEmail(selectedViewing.property.agent.email)}</span>
                 </p>
               </div>
 
@@ -1226,7 +1262,8 @@ const Viewings: React.FC = () => {
                   className={`w-full ${isMobile ? 'px-2.5 py-2 text-xs' : 'px-3 py-2 text-sm'} border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none`}
                 />
                 <p className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-gray-500 mt-1`}>
-                  This message will be sent via email to {selectedViewing.property.agent.email}
+                  This message will be sent via email to{' '}
+                  <span className="font-mono tracking-wide">{maskEmail(selectedViewing.property.agent.email)}</span>
                 </p>
               </div>
 

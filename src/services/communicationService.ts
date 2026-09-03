@@ -21,7 +21,11 @@ import type {
 
 import { getResolvedApiBaseUrl } from '../config/apiBaseUrl';
 
-const BASE = `${getResolvedApiBaseUrl()}/communication`;
+// Resolve lazily at request time so env changes take effect without a hard refresh.
+// A module-level const would freeze the URL at import time.
+function getBase(): string {
+    return `${getResolvedApiBaseUrl()}/communication`;
+}
 
 /** Axios 1.x may use AxiosHeaders — set Authorization in a way that always applies. */
 function setBearerAuth(config: InternalAxiosRequestConfig, accessToken: string): void {
@@ -37,13 +41,15 @@ function setBearerAuth(config: InternalAxiosRequestConfig, accessToken: string):
 
 // Dedicated Axios instance for communication module
 const commApi = axios.create({
-    baseURL: BASE,
-    timeout: 30000,
+    baseURL: getBase(),
+    timeout: 10000, // Reduced from 30s — fail fast on connection errors
 });
 
-// Request interceptor: attach Bearer token (MSAL silent → popup → auth_token fallback)
+// Request interceptor: re-resolve baseURL each request (handles env changes) + attach Bearer token
 commApi.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
+        // Re-resolve on every request so URL reflects current env without page reload
+        config.baseURL = getBase();
         const token = await getAccessTokenForApiRequest();
         if (token) {
             setBearerAuth(config, token);

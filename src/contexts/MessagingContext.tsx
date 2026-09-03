@@ -26,8 +26,8 @@ export interface MessagingContextType {
      * without waiting for the next 30-second poll.
      */
     decrementUnreadCount: (by: number) => void;
-    /** Internal setter used by useMessagingPoller */
-    _setConversations: (conversations: Conversation[]) => void;
+    /** Internal setter used by useMessagingPoller — accepts array or functional updater */
+    _setConversations: (conversations: Conversation[] | ((prev: Conversation[]) => Conversation[])) => void;
     /** Internal setter used by useMessagingPoller */
     _setUnreadCount: (count: number) => void;
 }
@@ -70,7 +70,15 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 communicationService.getConversations(),
                 communicationService.getUnreadCount(),
             ]);
-            setConversations(convs);
+            // Merge with any optimistically-inserted conversations so they aren't
+            // wiped if the server response arrives before the backend has propagated
+            // the newly-created conversation.
+            setConversations((prev) => {
+                const serverIds = new Set(convs.map((c) => c.id));
+                // Keep any optimistic entries not yet returned by the server
+                const optimisticOnly = prev.filter((c) => !serverIds.has(c.id));
+                return [...convs, ...optimisticOnly];
+            });
             setUnreadCount(count);
         } catch {
             // Silently ignore errors during refresh — the poller will retry

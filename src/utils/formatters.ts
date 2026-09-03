@@ -49,3 +49,43 @@ export const formatFileSize = (bytes: number): string => {
   
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }; 
+
+/**
+ * Mask an email address for privacy.
+ * e.g. "john.smith@example.com" → "jo****h@e***.com"
+ * Returns an empty string if the input is falsy.
+ */
+export function maskEmail(email: string | undefined | null): string {
+  if (!email) return '';
+  const [local, domain] = email.split('@');
+  if (!domain) return email;
+
+  // Mask the local part: show first 2 chars, mask middle, show last char
+  const maskedLocal =
+    local.length <= 3
+      ? local[0] + '***'
+      : local.slice(0, 2) + '****' + local.slice(-1);
+
+  // Mask the domain: show first char of domain name, mask rest, keep TLD
+  const dotIndex = domain.lastIndexOf('.');
+  const domainName = dotIndex > 0 ? domain.slice(0, dotIndex) : domain;
+  const tld = dotIndex > 0 ? domain.slice(dotIndex) : '';
+  const maskedDomain = domainName[0] + '***' + tld;
+
+  return `${maskedLocal}@${maskedDomain}`;
+}
+
+/**
+ * Mask a phone number for privacy.
+ * Shows first 4 and last 2 digits, masks the rest with ****
+ * e.g. "+441174630288" → "+441*****88"
+ * Returns an empty string if the input is falsy.
+ */
+export function maskPhone(phone: string | undefined | null): string {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 6) return '•••••';
+  const prefix = phone.startsWith('+') ? phone.slice(0, 4) : phone.slice(0, 3);
+  const suffix = phone.slice(-2);
+  return `${prefix}*****${suffix}`;
+}

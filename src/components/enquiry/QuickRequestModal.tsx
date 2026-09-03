@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Loader2, AlertTriangle } from 'lucide-react';
+import { X, Check, Loader2, AlertTriangle, ShieldCheck } from 'lucide-react';
 import quickRequestService from '../../services/quickRequestService';
+import { maskEmail } from '../../utils/formatters';
 
 interface QuickRequestModalProps {
   isOpen: boolean;
@@ -48,12 +49,9 @@ const QuickRequestModal: React.FC<QuickRequestModalProps> = ({
   const [threadToken, setThreadToken] = useState<string | null>(null);
   const [agentDelivery, setAgentDelivery] = useState<'sent' | 'no_contact_email'>('sent');
   const [copied, setCopied] = useState(false);
-  const [editableAgentEmail, setEditableAgentEmail] = useState(agentEmail || '');
-  const [touchedAgentEmail, setTouchedAgentEmail] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      setEditableAgentEmail(agentEmail || '');
       setName('');
       setEmail('');
       setMessage('');
@@ -62,7 +60,6 @@ const QuickRequestModal: React.FC<QuickRequestModalProps> = ({
       setIsSuccess(false);
       setError(null);
       setTouchedEmail(false);
-      setTouchedAgentEmail(false);
     }
   }, [isOpen, agentEmail]);
 
@@ -77,9 +74,8 @@ const QuickRequestModal: React.FC<QuickRequestModalProps> = ({
   };
 
   const isEmailValid = EMAIL_REGEX.test(email.trim());
-  const isAgentEmailValid = listingSource === 'scraped' ? EMAIL_REGEX.test(editableAgentEmail.trim()) : true;
   const isMessageValid = message.trim().length >= 10 && message.trim().length <= 1000;
-  const isFormValid = isEmailValid && isMessageValid && gdprConsent && isAgentEmailValid;
+  const isFormValid = isEmailValid && isMessageValid && gdprConsent;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +94,7 @@ const QuickRequestModal: React.FC<QuickRequestModalProps> = ({
         listingTitle,
         listingSource,
         landlordId,
-        agentEmail: listingSource === 'scraped' ? editableAgentEmail.trim() : undefined,
+        agentEmail: listingSource === 'scraped' ? agentEmail : undefined,
         agentName,
         sourcePlatform,
         gdprConsent,
@@ -254,30 +250,18 @@ const QuickRequestModal: React.FC<QuickRequestModalProps> = ({
                 />
               </div>
 
-              {/* Agent/Landlord Email (only editable for scraped properties in development/test simulation) */}
-              {listingSource === 'scraped' && (
+              {/* Agent/Landlord Email — shown masked for privacy; not editable by the user */}
+              {listingSource === 'scraped' && agentEmail && (
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
-                    Landlord / Agent Email (Simulation) <span className="text-red-500">*</span>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                    Enquiry Destination
                   </label>
-                  <input
-                    type="email"
-                    value={editableAgentEmail}
-                    onChange={(e) => setEditableAgentEmail(e.target.value)}
-                    onBlur={() => setTouchedAgentEmail(true)}
-                    placeholder="agent@example.com"
-                    required
-                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm placeholder-gray-400 focus:outline-none focus:ring-1 transition-colors ${
-                      touchedAgentEmail && !isAgentEmailValid
-                        ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                        : 'border-gray-200 focus:border-[#D95B00] focus:ring-[#D95B00]'
-                    }`}
-                  />
-                  {touchedAgentEmail && !isAgentEmailValid && (
-                    <p className="text-xs text-red-500 mt-1">Please enter a valid email address.</p>
-                  )}
+                  <div className="w-full px-3.5 py-2.5 rounded-xl border border-gray-100 bg-gray-50 text-sm text-gray-500 font-mono tracking-wide select-none">
+                    {maskEmail(agentEmail)}
+                  </div>
                   <p className="text-[10px] text-gray-400 mt-1">
-                    Editable to simulate landlord claiming on your test email.
+                    Your enquiry will be forwarded to the listing agent securely.
                   </p>
                 </div>
               )}

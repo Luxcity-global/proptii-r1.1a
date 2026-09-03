@@ -22,7 +22,6 @@ function setBearerAuth(config: InternalAxiosRequestConfig, accessToken: string):
   }
 }
 
-const API_BASE_URL = getResolvedApiBaseUrl();
 // API response types
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -52,8 +51,8 @@ class ApiService {
   private baseURL: string;
 
   constructor() {
-    // This will be replaced with the actual API URL from environment variables
-    this.baseURL = API_BASE_URL;
+    // Resolve lazily — re-evaluated on each request so env changes take effect
+    this.baseURL = getResolvedApiBaseUrl();
 
     this.api = axios.create({
       baseURL: this.baseURL,
@@ -61,12 +60,14 @@ class ApiService {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      timeout: 30000, // 30 seconds timeout
+      timeout: 10000, // 10 seconds — fail fast on connection errors
     });
 
-    // Request interceptor: attach Bearer token + log outgoing request
+    // Request interceptor: re-resolve baseURL, attach Bearer token + log outgoing request
     this.api.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
+        // Re-resolve each request in case env changed since module load
+        config.baseURL = getResolvedApiBaseUrl();
         const token = await getAccessTokenForApiRequest();
         if (token) {
           setBearerAuth(config, token);

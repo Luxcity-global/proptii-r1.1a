@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Bath, BedDouble, Check, MapPin, Square } from 'lucide-react';
+import { Bath, BedDouble, Check, Loader2, Lock, MapPin, MessageSquare, Square, X as XIcon } from 'lucide-react';
 import { useSearchBackend, type Property } from '../hooks/useSearchBackend';
 import { useSavedProperties } from '../contexts/SavedPropertiesContext';
 import { useGovDataLayer } from '../contexts/GovDataLayerContext';
+import { maskEmail, maskPhone } from '../utils/formatters';
 import { useBatchedPropertyFacts } from '../hooks/useBatchedPropertyFacts';
 import { useClassifyQuery } from '../hooks/useClassifyQuery';
 import { FilterPills } from '../components/search/FilterPills';
@@ -14,6 +15,13 @@ import { getPropertyDisplayTitle, getPropertyListingDescription } from '../utils
 import Footer from '../components/Footer';
 import { SearchLoadingAnimation } from '../components/SearchLoadingAnimation';
 import type { FactFlag } from '../types/govData';
+import { useAuth } from '../contexts/AuthContext';
+import { useMessagingContext } from '../contexts/MessagingContext';
+import communicationService from '../services/communicationService';
+import QuickRequestModal from '../components/enquiry/QuickRequestModal';
+import MessageThread from '../components/messaging/MessageThread';
+import ComposeBox from '../components/messaging/ComposeBox';
+import type { Conversation, Message } from '../types/messaging';
 
 
 // Function to clean up property pricing - remove "Tenancy Info" and keep only pcm pricing
@@ -273,8 +281,12 @@ interface PropertyDetailsModalProps {
   property: Property | null;
   isOpen: boolean;
   onClose: () => void;
-  onMessageClick: (property: Property) => void;
+  onBookClick: (property: Property) => void;
+  onChatClick: (property: Property) => void;
   isNavigatingToBooking: boolean;
+  isChatLoading: boolean;
+  chatError: string | null;
+  isAuthenticated: boolean;
   govDataEnabled?: boolean;
   audience?: import('../types/govData').Audience | null;
   onAudienceChange?: (audience: import('../types/govData').Audience) => void;
@@ -284,8 +296,12 @@ function PropertyDetailsModal({
   property,
   isOpen,
   onClose,
-  onMessageClick,
+  onBookClick,
+  onChatClick,
   isNavigatingToBooking,
+  isChatLoading,
+  chatError,
+  isAuthenticated,
   govDataEnabled = false,
   audience = null,
   onAudienceChange,
@@ -549,7 +565,9 @@ function PropertyDetailsModal({
                 <p className="text-sm text-gray-600 mb-2">{property.agent.company}</p>
               )}
               {property.agent?.phone && (
-                <p className="text-sm text-gray-600 mb-2">Phone: {property.agent.phone}</p>
+                <p className="text-sm text-gray-600 mb-2 font-mono tracking-wide">
+                  {maskPhone(property.agent.phone)}
+                </p>
               )}
               {property.agent?.website && (
                 <a
@@ -563,30 +581,51 @@ function PropertyDetailsModal({
               )}
 
               <div className="flex flex-wrap gap-3 mt-4">
+                {/* Chat — unauthenticated shows "Send Enquiry" and opens ghost form */}
                 <button
                   type="button"
-                  className="bg-[#F15A22] text-white px-4 py-2 rounded-full hover:bg-[#D54A1A] transition-colors flex items-center gap-2 text-sm font-semibold"
+                  onClick={() => onChatClick(property)}
+                  disabled={isChatLoading || isNavigatingToBooking}
+                  className="bg-[#F15A22] text-white px-4 py-2 rounded-full hover:bg-[#D54A1A] transition-colors flex items-center gap-2 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Chat
+                  {isChatLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <MessageSquare className="w-4 h-4" />
+                  )}
+                  {isChatLoading
+                    ? 'Starting chat…'
+                    : isAuthenticated
+                    ? 'Chat'
+                    : 'Send Enquiry'}
                 </button>
-                <button
-                  type="button"
-                  className="bg-emerald-600 text-white px-4 py-2 rounded-full hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm font-semibold"
-                >
-                  Call
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onMessageClick(property)}
-                  disabled={isNavigatingToBooking}
-                  className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isNavigatingToBooking ? (
-                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                  ) : null}
-                  {isNavigatingToBooking ? 'Loading...' : 'Book Viewing'}
-                </button>
+
+                {/* Book Viewing — requires a logged-in account */}
+                <div className="flex flex-col items-start gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onBookClick(property)}
+                    disabled={!isAuthenticated || isNavigatingToBooking || isChatLoading}
+                    title={!isAuthenticated ? 'Sign in to book a viewing' : undefined}
+                    className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-full hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isNavigatingToBooking ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : !isAuthenticated ? (
+                      <Lock className="w-4 h-4 text-gray-400" />
+                    ) : null}
+                    {isNavigatingToBooking ? 'Loading…' : 'Book Viewing'}
+                  </button>
+                  {!isAuthenticated && (
+                    <p className="text-[11px] text-gray-400 pl-1">
+                      Sign in to book a viewing
+                    </p>
+                  )}
+                </div>
               </div>
+              {chatError && (
+                <p className="mt-2 text-xs text-red-600">{chatError}</p>
+              )}
             </div>
           </div>
         </div>
@@ -943,10 +982,17 @@ const SearchResults = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [isNavigatingToBooking, setIsNavigatingToBooking] = useState(false);
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [isLoginPromptOpen, setIsLoginPromptOpen] = useState(false);
+  const [loginPromptAction, setLoginPromptAction] = useState<'booking' | 'chat'>('booking');
+  const [quickRequestProperty, setQuickRequestProperty] = useState<Property | null>(null);
 
   const { results, isLoading, error, retry, searchProperties, clearCache } = useSearchBackend();
   const { isPropertySaved, toggleSaveProperty } = useSavedProperties();
   const { enabled: govDataEnabled, audience, setAudience } = useGovDataLayer();
+  const { user, isAuthenticated, login } = useAuth();
+  const { setActiveConversationId } = useMessagingContext();
   const { getFlagsFor, getHintFor, isUnresolved, isFactsLoading } = useBatchedPropertyFacts(
     govDataEnabled,
     results,
@@ -1009,8 +1055,13 @@ const SearchResults = () => {
       if (cachedData) {
         try {
           const parsed = JSON.parse(cachedData);
-          // Only perform new search if the query or search type has changed
-          if (parsed.query !== searchQuery || parsed.searchType !== searchTypeParam) {
+          // Re-fetch if the query/type changed OR if the cache is empty (stale failed search)
+          if (
+            parsed.query !== searchQuery ||
+            parsed.searchType !== searchTypeParam ||
+            !Array.isArray(parsed.results) ||
+            parsed.results.length === 0
+          ) {
             searchProperties(searchQuery, searchType);
           }
         } catch (error) {
@@ -1505,14 +1556,21 @@ const SearchResults = () => {
     navigate('/');
   };
 
-  const handleMessageClick = async (property: Property) => {
+  // ─── Book Viewing ────────────────────────────────────────────────────────────
+  // Requires a logged-in account. Unauthenticated users see a login prompt.
+  const handleBookViewingClick = async (property: Property) => {
+    if (!isAuthenticated) {
+      setLoginPromptAction('booking');
+      setIsLoginPromptOpen(true);
+      return;
+    }
+
     setIsNavigatingToBooking(true);
-    
-    
-    // Prepare property data for BookViewing page
-    // Use extended fields if available (from Proptii properties), otherwise parse from location
+
+    // Prepare property data for BookViewing page.
+    // Prefer explicit structured fields; fall back to parsing the location string.
     const propertyData = {
-      id: property.title || `property-${Date.now()}`, // Generate ID if not available
+      id: property.title || `property-${Date.now()}`,
       street: property.street || property.location?.split(',')[0]?.trim() || property.location || '',
       town: property.town || property.location?.split(',')[1]?.trim() || '',
       city: property.city || property.location?.split(',')[0]?.trim() || property.location || '',
@@ -1525,22 +1583,89 @@ const SearchResults = () => {
         name: property.agent?.name || property.source || 'Estate Agent',
         email: property.agent?.email || '',
         phone: property.agent?.phone || '',
-        company: property.agent?.company || property.source || 'Estate Agency'
-      }
+        company: property.agent?.company || property.source || 'Estate Agency',
+      },
     };
-    
-    
-    // Store in sessionStorage for BookViewing page
+
     sessionStorage.setItem('prefilledProperty', JSON.stringify(propertyData));
-    
-    // Note: We don't clear the search cache here because we want to preserve results
-    // when user comes back from BookViewing page
-    
-    // Small delay for smooth transition
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Navigate to booking page
-    navigate('/bookviewing');
+    // Short delay for visual feedback before navigating
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    // Navigate to the viewings dashboard section — it auto-opens the booking
+    // modal because it reads 'prefilledProperty' from sessionStorage on mount.
+    navigate('/dashboard/viewings', {
+      state: { openBookingModal: true, prefilledProperty: propertyData },
+    });
+  };
+
+  // ─── Chat / Message Agent ────────────────────────────────────────────────────
+  // Unauthenticated users get the QuickRequestModal (ghost enquiry flow — no
+  // account required). Authenticated users get a real conversation created via
+  // the communication service and are navigated to their messages dashboard.
+  const handleChatClick = async (property: Property) => {
+    if (!isAuthenticated || !user) {
+      // Ghost/unauthenticated path: show QuickRequestModal (same as ListingDetailsModal)
+      setQuickRequestProperty(property);
+      return;
+    }
+
+    setChatError(null);
+    setIsChatLoading(true);
+
+    try {
+      // Properties on the search page may be scraped listings (no landlordId).
+      // We use 'UNCLAIMED' as the sentinel value and pass the agent email so
+      // the backend can later link the conversation when the landlord registers.
+      const landlordId = property.agent?.id || 'UNCLAIMED';
+      const isUnclaimed = !property.agent?.id;
+      const agentEmail = isUnclaimed ? (property.agent?.email || undefined) : undefined;
+
+      const conversation = await communicationService.getOrCreateConversation({
+        // Use the listing URL as a stable property ID for scraped properties,
+        // falling back to title-based ID if URL is absent.
+        propertyId: property.id || property.url || `scraped-${encodeURIComponent(property.title || Date.now().toString())}`,
+        tenantId: user.id,
+        landlordId,
+        agentEmail,
+        propertyTitle: property.title,
+        tenantName: user.name || user.email,
+        // Pass a snapshot for unclaimed/scraped listings so the landlord can
+        // see property context when they eventually claim the account.
+        scrapedPropertySnapshot: isUnclaimed
+          ? {
+              url: property.url || '',
+              title: property.title,
+              location: property.location,
+              price: property.price,
+              bedrooms: typeof property.bedrooms === 'number' ? property.bedrooms : undefined,
+              bathrooms: typeof property.bathrooms === 'number' ? property.bathrooms : undefined,
+              propertyType: property.propertyType,
+              imageUrls: property.imageUrls,
+              agent: {
+                name: property.agent?.name,
+                email: property.agent?.email || '',
+                website: property.agent?.website,
+              },
+            }
+          : undefined,
+      });
+
+      setActiveConversationId(conversation.id);
+      // Close the modal before navigating so the user doesn't see a flash
+      setIsModalOpen(false);
+      setSelectedProperty(null);
+
+      navigate('/dashboard/messages', {
+        state: {
+          conversationId: conversation.id,
+          conversation,
+          prefilledMessage: 'I would like to enquire about this property.',
+        },
+      });
+    } catch {
+      setChatError('Could not start a conversation. Please try again.');
+    } finally {
+      setIsChatLoading(false);
+    }
   };
 
   const goToHome = () => {
@@ -1577,14 +1702,27 @@ const SearchResults = () => {
   }
 
   if (error) {
-    // Check if error is likely due to invalid input format vs network issue
-    const isNetworkError = error.includes('Network connection') || 
-                          error.includes('Failed to fetch') || 
-                          error.includes('ERR_CONNECTION_REFUSED') ||
-                          error.includes('timeout') ||
-                          error.includes('connect');
-    
-    const isFormatError = !isNetworkError;
+    // Only show "format error" guidance when the query is genuinely unparseable.
+    // A scraper 500, empty results, or any backend failure is NOT a format problem.
+    const isNetworkError =
+      error.includes('Network connection') ||
+      error.includes('Failed to fetch') ||
+      error.includes('ERR_CONNECTION_REFUSED') ||
+      error.includes('timeout') ||
+      error.includes('connect') ||
+      error.includes('500') ||
+      error.includes('Internal Server') ||
+      error.includes('503') ||
+      error.includes('502');
+
+    // Only treat it as a format error if the message is explicitly about the query
+    // format / no results — not infrastructure failures.
+    const isFormatError =
+      !isNetworkError &&
+      (error.includes('No properties found') ||
+        error.includes('Please try a different search') ||
+        error.includes('invalid') ||
+        error.includes('format'));
 
     return (
       <div className="min-h-screen flex flex-col font-nunito">
@@ -1616,13 +1754,18 @@ const SearchResults = () => {
               </div>
 
               <h2 className="mt-6 text-2xl sm:text-4xl font-bold" style={{ color: '#23272f' }}>
-                {isFormatError ? 'Please Use the Correct Search Format' : 'Search Error'}
+                {isFormatError
+                  ? 'Please Use the Correct Search Format'
+                  : isNetworkError
+                  ? 'Search Service Unavailable'
+                  : 'No Results Found'}
               </h2>
               <p className="mt-3 max-w-2xl text-gray-600">
-                {isFormatError 
+                {isFormatError
                   ? "We couldn't process your search. Please try using a clear property search format with location, bedrooms, and property type."
-                  : error
-                }
+                  : isNetworkError
+                  ? error
+                  : "We couldn't find properties matching your search right now. Try refining your search or try again in a moment."}
               </p>
             </div>
 
@@ -2124,12 +2267,101 @@ const SearchResults = () => {
         property={selectedProperty}
         isOpen={isModalOpen}
         onClose={closeModal}
-        onMessageClick={handleMessageClick}
+        onBookClick={handleBookViewingClick}
+        onChatClick={handleChatClick}
         isNavigatingToBooking={isNavigatingToBooking}
+        isChatLoading={isChatLoading}
+        chatError={chatError}
+        isAuthenticated={isAuthenticated}
         govDataEnabled={govDataEnabled}
         audience={audience}
         onAudienceChange={setAudience}
       />
+
+      {/* Login Required Modal — shown when an unauthenticated user clicks Book */}
+      {isLoginPromptOpen && (
+        <div
+          className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="login-prompt-title"
+          onClick={() => setIsLoginPromptOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-sm w-full p-7 shadow-2xl border border-gray-100 relative"
+            style={{ fontFamily: '"Nunito Sans", sans-serif' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setIsLoginPromptOpen(false)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors"
+              aria-label="Close"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#136C9E] to-[#0d4f74] flex items-center justify-center mb-5 shadow-lg shadow-blue-900/20">
+              {loginPromptAction === 'chat' ? (
+                <MessageSquare className="w-6 h-6 text-white" />
+              ) : (
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              )}
+            </div>
+
+            <h3
+              id="login-prompt-title"
+              className="text-xl font-extrabold text-gray-900 mb-2"
+              style={{ fontFamily: 'Archivo, sans-serif' }}
+            >
+              {loginPromptAction === 'chat' ? 'Sign in to chat with the agent' : 'Sign in to book a viewing'}
+            </h3>
+            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+              {loginPromptAction === 'chat'
+                ? 'Create a free account to message agents directly and track all your property conversations in one place.'
+                : 'Create a free account to request and manage property viewings, and keep track of your applications.'}
+            </p>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLoginPromptOpen(false);
+                  void login();
+                }}
+                className="w-full py-3 px-6 rounded-full bg-[#F15A22] hover:bg-[#D54A1A] text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                </svg>
+                Continue with Google
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ghost enquiry modal — unauthenticated users clicking Chat on a scraped listing */}
+      {quickRequestProperty && (
+        <QuickRequestModal
+          isOpen={Boolean(quickRequestProperty)}
+          onClose={() => setQuickRequestProperty(null)}
+          listingId={quickRequestProperty.url || quickRequestProperty.title || `property-${Date.now()}`}
+          listingTitle={quickRequestProperty.title}
+          listingSource={quickRequestProperty.agent?.id ? 'native' : 'scraped'}
+          landlordId={quickRequestProperty.agent?.id}
+          agentEmail={quickRequestProperty.agent?.email}
+          agentName={quickRequestProperty.agent?.name}
+          sourcePlatform={quickRequestProperty.source}
+        />
+      )}
 
       {/* Toast Notification */}
       {showToast && (

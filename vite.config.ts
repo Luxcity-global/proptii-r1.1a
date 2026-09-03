@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
@@ -68,12 +68,15 @@ const envConfigs = {
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode = 'development' }) => {
+  // Load .env, .env.local, .env.[mode] etc. so the proxy can read VITE_SEARCH_BACKEND_URL
+  const envFromFile = loadEnv(mode, process.cwd(), '');
+
   const envConfig = envConfigs[mode as keyof typeof envConfigs] || envConfigs.development;
   const isProduction = mode === 'production';
   const isStaging = mode === 'staging';
 
   // Render dashboard may set SEARCH_BACKEND_URL; Vite only exposes VITE_* to the client.
-  const viteSearchBackendUrl = process.env.VITE_SEARCH_BACKEND_URL?.trim() || '';
+  const viteSearchBackendUrl = (envFromFile.VITE_SEARCH_BACKEND_URL || process.env.VITE_SEARCH_BACKEND_URL || '').trim();
   const aliasSearchBackendUrl = process.env.SEARCH_BACKEND_URL?.trim() || '';
   const define: Record<string, string> = {};
   if (!viteSearchBackendUrl && aliasSearchBackendUrl) {
@@ -114,10 +117,22 @@ export default defineConfig(({ mode = 'development' }) => {
     server: {
       proxy: {
         '/api/search-backend': {
-          target: viteSearchBackendUrl || 'https://proptii-r1-1a-q95f.onrender.com',
+          target: viteSearchBackendUrl || 'http://127.0.0.1:3001',
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api\/search-backend/, ''),
           secure: false,
+          // Disable response buffering so SSE chunks reach the browser immediately.
+          // Without this the proxy holds the full response before forwarding.
+          ws: false,
+          configure: (proxy) => {
+            proxy.on('proxyRes', (proxyRes) => {
+              if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
+                proxyRes.headers['cache-control'] = 'no-cache';
+                proxyRes.headers['x-accel-buffering'] = 'no';
+                proxyRes.headers['connection'] = 'keep-alive';
+              }
+            });
+          },
         }
       },
       watch: {
