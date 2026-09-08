@@ -16,7 +16,8 @@ import {
   useSidebar,
 } from './ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { UserProfile } from '../App';
+import { UserProfile, UserRole } from '../App';
+import LandlordDashboardHeader from './LandlordDashboardHeader';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 import { useIsMobile } from './ui/use-mobile';
 
@@ -40,6 +41,8 @@ interface MainLayoutProps {
   currentScreen: NavigationScreen;
   onNavigate: (screen: NavigationScreen) => void;
   userProfile: UserProfile | null;
+  userRole: UserRole;
+  isAuthenticated: boolean;
   children: React.ReactNode;
 }
 
@@ -173,12 +176,12 @@ function CustomUserProfile({ userProfile }: { userProfile: UserProfile | null })
   if (!userProfile) return null;
 
   return (
-    <div className="border-t border-sidebar-border pt-2 pb-2 pl-4 pr-2">
-      <div className="flex items-center h-8 px-2">
-        <Avatar className="h-4 w-4 flex-shrink-0">
+    <div className={`border-t border-sidebar-border pt-2 pb-2 ${isCollapsed ? 'px-2' : 'pl-4 pr-2'}`}>
+      <div className={`flex items-center ${isCollapsed ? 'justify-center h-10' : 'h-8 px-2'}`}>
+        <Avatar className={`${isCollapsed ? 'h-8 w-8' : 'h-8 w-8'} flex-shrink-0`}>
           {userProfile.logo && <AvatarImage src={userProfile.logo} alt={userProfile.name} />}
           <AvatarFallback>
-            <User className="h-2 w-2" />
+            <User className="h-4 w-4" />
           </AvatarFallback>
         </Avatar>
         {!isCollapsed && (
@@ -206,14 +209,16 @@ function CustomSidebarTrigger({ userProfile }: { userProfile: UserProfile | null
   };
 
   return (
-    <div className="border-t border-sidebar-border pt-2 pb-2 px-4 space-y-2">
+    <div className={`border-t border-sidebar-border pt-2 pb-2 space-y-2 ${isCollapsed ? 'px-2' : 'px-4'}`}>
       {/* Collapse/Expand Trigger */}
       <button
         onClick={toggleSidebar}
-        className="w-full flex items-center justify-center h-8 px-2 rounded-md hover:bg-sidebar-accent transition-colors"
+        className={`w-full flex items-center justify-center rounded-md hover:bg-sidebar-accent transition-colors ${
+          isCollapsed ? 'h-10' : 'h-8 px-2'
+        }`}
       >
         {isCollapsed ? (
-          <ChevronRight className="h-4 w-4" style={{ color: '#374957' }} />
+          <ChevronRight className="h-5 w-5" style={{ color: '#374957' }} />
         ) : (
           <ChevronLeft className="h-4 w-4" style={{ color: '#374957' }} />
         )}
@@ -223,10 +228,10 @@ function CustomSidebarTrigger({ userProfile }: { userProfile: UserProfile | null
       {isCollapsed ? (
         <button
           onClick={handleProptiiHomeClick}
-          className="w-full flex items-center justify-center h-8 px-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors"
+          className="w-full flex items-center justify-center h-10 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors"
           title="Go to Tenant App"
         >
-          <Home className="h-4 w-4" />
+          <Home className="h-5 w-5" />
         </button>
       ) : (
         <button
@@ -442,7 +447,7 @@ function MobileSidebar({
   );
 }
 
-export function MainLayout({ currentScreen, onNavigate, userProfile, children }: MainLayoutProps) {
+export function MainLayout({ currentScreen, onNavigate, userProfile, userRole, isAuthenticated, children }: MainLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
 
@@ -552,6 +557,13 @@ export function MainLayout({ currentScreen, onNavigate, userProfile, children }:
         {/* Main Content */}
         <main className="flex-1" style={{ backgroundColor: '#F7F7F7' }}>
           {isMobile && <div className="h-16" />} {/* Spacer for mobile header */}
+          <div className={`${isMobile ? 'mt-4 px-4' : 'mt-6 px-5 lg:px-6'} w-full max-w-7xl mx-auto`}>
+            <LandlordDashboardHeader
+              userProfile={userProfile}
+              userRole={userRole}
+              isAuthenticated={isAuthenticated}
+            />
+          </div>
           {children}
         </main>
       </div>

@@ -2332,6 +2332,8 @@ export function AppContent() {
             currentScreen={navigationScreen}
             onNavigate={handleNavigation}
             userProfile={userProfile}
+            userRole={userRole}
+            isAuthenticated={isAuthenticated}
           >
             {renderMainAppScreen()}
           </MainLayout>

@@ -106,14 +106,17 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                       <div key={section.id} className="relative group/locked">
                         <button
                           type="button"
-                          onClick={() => navigate('/pricing')}
+                          onClick={() => handleNavClick(section.id, section.path)}
                           title={isCollapsed ? upgradeLabel : undefined}
                           className={`
                             w-full flex items-center h-10 px-3 rounded-md text-sm font-medium
                             opacity-50 cursor-pointer transition-opacity hover:opacity-70
                             ${isCollapsed ? 'justify-center' : 'justify-start'}
                           `}
-                          style={{ color: '#374957' }}
+                          style={{
+                            color: isActive ? '#136C9E' : '#374957',
+                            backgroundColor: isActive ? '#E6F3FF' : 'transparent',
+                          }}
                         >
                           <div className="relative flex-shrink-0">
                             {section.icon?.(false)}
@@ -199,10 +202,10 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           {/* User Profile */}
           {user && (
             <div className="border-t" style={{ borderColor: '#ebebeb' }}>
-              <div className="pt-2 pb-2 pl-4 pr-2">
-                <div className="flex items-center h-8 px-2">
-                  <div className="h-4 w-4 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                    <User className="h-2 w-2" style={{ color: '#374957' }} />
+              <div className={`pt-2 pb-2 ${isCollapsed ? 'px-2' : 'pl-4 pr-2'}`}>
+                <div className={`flex items-center ${isCollapsed ? 'justify-center h-10' : 'h-8 px-2'}`}>
+                  <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                    <User className="h-4 w-4" style={{ color: '#374957' }} />
                   </div>
                   {!isCollapsed && (
                     <div className="ml-2 min-w-0 flex-1">
@@ -221,14 +224,16 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
           {/* Trigger */}
           <div className="border-t" style={{ borderColor: '#ebebeb' }}>
-            <div className="pt-2 pb-2 px-4 space-y-2">
+            <div className={`pt-2 pb-2 space-y-2 ${isCollapsed ? 'px-2' : 'px-4'}`}>
               {/* Collapse/Expand Trigger */}
               <button
                 onClick={onToggleCollapse}
-                className="w-full flex items-center justify-center h-8 px-2 rounded-md hover:bg-gray-100 transition-colors"
+                className={`w-full flex items-center justify-center rounded-md hover:bg-gray-100 transition-colors ${
+                  isCollapsed ? 'h-10' : 'h-8 px-2'
+                }`}
               >
                 {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4" style={{ color: '#374957' }} />
+                  <ChevronRight className="h-5 w-5" style={{ color: '#374957' }} />
                 ) : (
                   <ChevronLeft className="h-4 w-4" style={{ color: '#374957' }} />
                 )}
@@ -238,7 +243,9 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
               {(user?.role === 'landlord' || user?.role === 'agent' || user?.roles?.includes('landlord') || user?.roles?.includes('agent')) && (
                 <button
                   onClick={() => { window.location.href = user?.role === 'agent' ? '/agent' : '/landlord'; }}
-                  className={`w-full flex items-center justify-center h-8 px-2 rounded-full bg-orange-600 text-white hover:bg-orange-700 transition-colors text-xs font-semibold mb-2`}
+                  className={`w-full flex items-center justify-center rounded-full bg-orange-600 text-white hover:bg-orange-700 transition-colors text-xs font-semibold mb-2 ${
+                    isCollapsed ? 'h-10' : 'h-8 px-2'
+                  }`}
                   title="Return to Landlord Portal"
                 >
                   {isCollapsed ? 'L' : 'Return to Landlord'}
@@ -247,10 +254,10 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
               {isCollapsed ? (
                 <button
                   onClick={handleLogoClick}
-                  className="w-full flex items-center justify-center h-8 px-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors"
+                  className="w-full flex items-center justify-center h-10 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors"
                   title="Go to Home"
                 >
-                  <Home className="h-4 w-4" />
+                  <Home className="h-5 w-5" />
                 </button>
               ) : (
                 <button

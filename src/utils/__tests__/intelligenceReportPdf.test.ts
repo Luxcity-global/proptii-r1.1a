@@ -1,35 +1,10 @@
+import { PDFDocument } from 'pdf-lib';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const save = vi.fn();
-const text = vi.fn();
-const splitTextToSize = vi.fn((value: string) => [value]);
-
-vi.mock('jspdf', () => {
-  const jsPDF = vi.fn().mockImplementation(() => ({
-    setFont: vi.fn(),
-    setFontSize: vi.fn(),
-    setTextColor: vi.fn(),
-    setFillColor: vi.fn(),
-    setDrawColor: vi.fn(),
-    setLineWidth: vi.fn(),
-    rect: vi.fn(),
-    roundedRect: vi.fn(),
-    line: vi.fn(),
-    text,
-    splitTextToSize,
-    addPage: vi.fn(),
-    setPage: vi.fn(),
-    getNumberOfPages: () => 1,
-    save,
-    internal: {
-      pageSize: {
-        getWidth: () => 210,
-        getHeight: () => 297,
-      },
-    },
-  }));
-  return { jsPDF, default: jsPDF };
-});
+import {
+  buildIntelligenceReportFields,
+  downloadIntelligenceReportPdf,
+  fillIntelligenceReportPdf,
+} from '../intelligenceReportPdf';
 
 const sampleInput = {
   listingId: 'listing-TB0DF0',
@@ -76,38 +51,90 @@ const sampleInput = {
   },
 };
 
+describe('buildIntelligenceReportFields', () => {
+  it('maps live report data onto the template slots without reading the modal', () => {
+    document.body.innerHTML = '<div id="proptii-report">live report</div>';
+    const fields = buildIntelligenceReportFields(sampleInput);
+
+    expect(fields.street).toBe('Hammerton Street');
+    expect(fields.locality).toContain('Pudsey');
+    expect(fields.postcode).toBe('LS28 7DD');
+    expect(fields.chip).toBe('Renter Report');
+    expect(fields.partARows[0].value).toContain('£895 pcm');
+    expect(fields.watchBody).toContain('conservation area');
+    expect(fields.cards[0].finding).toContain('No significant flood risk');
+    expect(fields.steps[0]).toContain('deposit');
+    expect(fields.verified).toContain('EPC');
+    expect(JSON.stringify(fields)).not.toContain('live report');
+  });
+});
+
+describe('fillIntelligenceReportPdf', () => {
+  it('renders the redesigned multi-page report from live fields', async () => {
+    const pdfBytes = await fillIntelligenceReportPdf(sampleInput);
+    const pdf = await PDFDocument.load(pdfBytes);
+
+    expect(pdf.getPageCount()).toBe(2);
+    expect(new TextDecoder().decode(pdfBytes.slice(0, 5))).toBe('%PDF-');
+    expect(pdfBytes.byteLength).toBeGreaterThan(2_000);
+  });
+});
+
 describe('downloadIntelligenceReportPdf', () => {
   beforeEach(() => {
-    save.mockClear();
-    text.mockClear();
-    splitTextToSize.mockClear();
     document.body.innerHTML = '<div id="proptii-report">live report</div>';
+    vi.restoreAllMocks();
   });
 
-  it('typesets from report data and does not snapshot the live modal', async () => {
-    const { downloadIntelligenceReportPdf } = await import('../intelligenceReportPdf');
+  it('downloads the generated report and does not snapshot the live modal', async () => {
+    const click = vi.fn();
+    const createObjectURL = vi.fn(() => 'blob:report');
+    const revokeObjectURL = vi.fn();
+
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+    const originalCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      if (tag === 'a') {
+        return {
+          href: '',
+          download: '',
+          rel: '',
+          click,
+          remove: vi.fn(),
+        } as unknown as HTMLElement;
+      }
+      return originalCreateElement(tag);
+    });
+    vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
 
     await downloadIntelligenceReportPdf(sampleInput);
 
-    expect(save).toHaveBeenCalledWith(
-      'proptii-intelligence-report-hammerton-street-pudsey-leeds-ls28-7dd.pdf',
-    );
-
-    const written = text.mock.calls.map((args) => String(args[0])).join('\n');
-    expect(written).toContain('Hammerton Street, Pudsey, Leeds, LS28 7DD');
-    expect(written).toContain('WHAT TO WATCH');
-    expect(written).toContain('£895 pcm');
-    expect(written).toContain('Flood Risk');
-    expect(written).toContain('PART A');
-    expect(written).toContain('Recommended Action Steps');
-    expect(written).not.toContain('live report');
+    expect(click).toHaveBeenCalled();
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(document.body.innerHTML).toContain('live report');
   });
 
   it('still exports when the report element is not mounted', async () => {
     document.body.innerHTML = '';
-    const { downloadIntelligenceReportPdf } = await import('../intelligenceReportPdf');
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:report'),
+      revokeObjectURL: vi.fn(),
+    });
+    const originalCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      if (tag === 'a') {
+        return {
+          href: '',
+          download: '',
+          rel: '',
+          click: vi.fn(),
+          remove: vi.fn(),
+        } as unknown as HTMLElement;
+      }
+      return originalCreateElement(tag);
+    });
+    vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
 
     await expect(downloadIntelligenceReportPdf(sampleInput)).resolves.toBeUndefined();
-    expect(save).toHaveBeenCalled();
   });
 });

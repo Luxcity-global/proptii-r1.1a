@@ -71,17 +71,17 @@ const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabChange, counts }) => {
                         style={{
                             display: 'flex', alignItems: 'center', gap: '6px',
                             padding: '10px 4px', background: 'none', border: 'none',
-                            borderBottom: active ? '2px solid #3b82f6' : '2px solid transparent',
+                            borderBottom: active ? '2px solid #136C9E' : '2px solid transparent',
                             marginBottom: '-1px', cursor: 'pointer',
                             fontSize: '0.8125rem', fontWeight: active ? 700 : 500,
-                            color: active ? '#3b82f6' : '#6b7280',
+                            color: active ? '#136C9E' : '#6b7280',
                             transition: 'color 0.15s, border-color 0.15s', whiteSpace: 'nowrap',
                         }}>
                         {label}
                         {count > 0 && (
                             <span style={{
                                 minWidth: '18px', height: '18px', borderRadius: '9px',
-                                background: active ? '#3b82f6' : '#e5e7eb',
+                                background: active ? '#136C9E' : '#e5e7eb',
                                 color: active ? '#ffffff' : '#6b7280',
                                 fontSize: '0.65rem', fontWeight: 700,
                                 display: 'inline-flex', alignItems: 'center',
@@ -109,10 +109,10 @@ const EmptyState: React.FC<{ message: string; sub: string }> = ({ message, sub }
     }}>
         <div style={{
             width: '64px', height: '64px', borderRadius: '50%',
-            background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: '#E6F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
-                stroke="#3b82f6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                stroke="#136C9E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
         </div>
@@ -201,18 +201,18 @@ export const TenantInbox: React.FC = () => {
     return (
         <>
             <style>{`
-                .msg-back-btn-ll:hover { background: #eff6ff !important; color: #2563eb !important; border-color: #bfdbfe !important; }
+                .msg-back-btn-ll:hover { background: #E6F3FF !important; color: #0F5A82 !important; border-color: #80B2FF !important; }
             `}</style>
 
-            <div style={{ minHeight: '100vh', background: '#f9fafb', display: 'flex', flexDirection: 'column' }}>
+            <div className="w-full max-w-7xl mx-auto px-4 md:px-5 lg:px-6 mt-4 md:mt-6 pb-6">
                 <div
                     data-testid="landlord-messages-page"
                     style={{
-                        display: 'flex', flex: 1, margin: '24px',
+                        display: 'flex', flex: 1,
                         borderRadius: '16px', overflow: 'hidden',
                         border: '1px solid #e5e7eb', background: '#ffffff',
                         boxShadow: '0 1px 8px rgba(0,0,0,0.06)',
-                        minHeight: 'calc(100vh - 48px)',
+                        minHeight: 'calc(100vh - 280px)',
                     }}
                 >
                     {/* ── Left sidebar ─────────────────────────────────────── */}
@@ -227,7 +227,7 @@ export const TenantInbox: React.FC = () => {
                         }}>
                             <div style={{
                                 width: '36px', height: '36px', borderRadius: '50%',
-                                background: '#3b82f6', color: '#fff',
+                                background: '#136C9E', color: '#fff',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 fontSize: '0.8125rem', fontWeight: 700, flexShrink: 0,
                             }}>
@@ -287,7 +287,7 @@ export const TenantInbox: React.FC = () => {
                                     }}>
                                         <div style={{
                                             width: '38px', height: '38px', borderRadius: '50%',
-                                            background: '#3b82f6', color: '#fff',
+                                            background: '#136C9E', color: '#fff',
                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                             fontSize: '0.8125rem', fontWeight: 700, flexShrink: 0,
                                         }}>
@@ -307,7 +307,7 @@ export const TenantInbox: React.FC = () => {
                                             <div style={{
                                                 maxWidth: '70%', padding: '10px 14px',
                                                 borderRadius: '16px 16px 4px 16px',
-                                                background: '#3b82f6', color: '#fff', opacity: 0.88,
+                                                background: '#136C9E', color: '#fff', opacity: 0.88,
                                                 display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px',
                                             }}>
                                                 {msg.body ? <p style={{ margin: 0, wordBreak: 'break-word' }}>{msg.body}</p> : null}

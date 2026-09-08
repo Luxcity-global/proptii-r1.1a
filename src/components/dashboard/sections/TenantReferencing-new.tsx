@@ -19,7 +19,8 @@ import {
   Plus,
   ShieldCheck,
   Edit3,
-  ArrowRight
+  ArrowUpRight,
+  Circle
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { firestoreService } from '../../../services/firestoreService';
@@ -98,7 +99,7 @@ interface ReferencingShareItem {
 
 const TenantReferencing: React.FC = () => {
   // ── All hooks must be called unconditionally before any early returns ──────
-  const { plan, status } = useBillingStatus();
+  const { plan, status, loading: billingLoading } = useBillingStatus();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const isMobile = useIsMobile();
   const [formData, setFormData] = useState<FormData | null>(null);
@@ -382,6 +383,17 @@ const TenantReferencing: React.FC = () => {
     }
   };
 
+  if (billingLoading) {
+    return (
+      <div className="flex items-center justify-center h-64 font-sans">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your referencing passport...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!canAccessSection('tenant-referencing', plan, status)) {
     return (
       <PlanUpgradeWall
@@ -538,7 +550,7 @@ const TenantReferencing: React.FC = () => {
       </>
       )}
 
-      {activeTab === 'shared' && (
+      {(activeTab === 'details' || activeTab === 'shared') && (
       <>
       {/* Shared Recipients Manager (Send to Multiple Landlords/Agents) */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
@@ -674,7 +686,8 @@ const TenantReferencing: React.FC = () => {
           {[
             {
               title: "Identity Verification",
-              icon: <User className="w-5 h-5 text-blue-600" />,
+              shortTitle: "Identity",
+              icon: <User className="w-5 h-5" style={{ color: '#374957' }} />,
               progress: "1",
               status: isSectionCompleted(1) ? "Complete" : "Incomplete",
               step: 1,
@@ -688,7 +701,8 @@ const TenantReferencing: React.FC = () => {
             },
             {
               title: "Employment & Income",
-              icon: <Briefcase className="w-5 h-5 text-blue-600" />,
+              shortTitle: "Employment",
+              icon: <Briefcase className="w-5 h-5" style={{ color: '#374957' }} />,
               progress: "2",
               status: isSectionCompleted(2) ? "Complete" : "Incomplete",
               step: 2,
@@ -702,7 +716,8 @@ const TenantReferencing: React.FC = () => {
             },
             {
               title: "Residential History",
-              icon: <Home className="w-5 h-5 text-orange-600" />,
+              shortTitle: "Residential",
+              icon: <Home className="w-5 h-5" style={{ color: '#374957' }} />,
               progress: "3",
               status: isSectionCompleted(3) ? "Complete" : "Incomplete",
               step: 3,
@@ -714,7 +729,8 @@ const TenantReferencing: React.FC = () => {
             },
             {
               title: "Financial & Income Proof",
-              icon: <PoundSterling className="w-5 h-5 text-orange-600" />,
+              shortTitle: "Financial",
+              icon: <PoundSterling className="w-5 h-5" style={{ color: '#374957' }} />,
               progress: "4",
               status: isSectionCompleted(4) ? "Complete" : "Incomplete",
               step: 4,
@@ -725,7 +741,8 @@ const TenantReferencing: React.FC = () => {
             },
             {
               title: "Guarantor Details",
-              icon: <Users className="w-5 h-5 text-amber-600" />,
+              shortTitle: "Guarantor",
+              icon: <Users className="w-5 h-5" style={{ color: '#374957' }} />,
               progress: "5",
               status: isSectionCompleted(5)
                 ? "Complete" 
@@ -747,68 +764,117 @@ const TenantReferencing: React.FC = () => {
                 { name: "Guarantor ID Upload", description: "Guarantor ID document", status: isDocumentUploaded('guarantor', 'identityDocument') ? "complete" : "incomplete" }
               ]
             }
-          ].map((card) => (
+          ].map((card) => {
+            const completedCount = card.items.filter((item) => item.status === 'complete').length;
+            const isComplete = card.status === 'Complete';
+            const asOfDate = new Date().toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+            });
+
+            return (
             <div
               key={card.title}
               onClick={() => openSectionModal(card.step)}
-              className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md hover:border-[#136C9E]/50 transition-all flex flex-col justify-between cursor-pointer group"
+              className="shadow-sm overflow-hidden cursor-pointer group"
+              style={{
+                background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)',
+                border: '1px solid #80B2FF',
+                borderRadius: '20px',
+                fontFamily: 'Archivo, sans-serif',
+                height: isMobile ? 'auto' : '320px',
+                minHeight: isMobile ? '280px' : '320px',
+              }}
             >
-              <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 group-hover:bg-blue-50 transition-colors flex items-center justify-center flex-shrink-0">
-                    {card.icon}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-800 text-base group-hover:text-[#136C9E] transition-colors">{card.title}</h3>
-                    <span className="text-xs text-gray-400">Section {card.progress} of 5</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2.5">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                    card.status === "Complete" 
-                      ? "bg-green-100 text-green-700" 
-                      : card.status === "Invited (Pending)"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-orange-100 text-orange-700"
-                  }`}>
-                    {card.status}
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openSectionModal(card.step);
-                    }}
-                    className="text-xs font-semibold text-[#136C9E] group-hover:text-white px-3 py-1.5 rounded-lg border border-blue-200 group-hover:bg-[#136C9E] group-hover:border-[#136C9E] transition-all flex items-center gap-1 shadow-2xs"
-                  >
-                    <span>{card.status === "Complete" ? (card.step === 5 && ((formData as any)?.guarantor?.verifiedViaLink || (formData as any)?.guarantorInvitation?.status === 'completed') ? "View Verified" : "Edit") : "Fill"}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-5 space-y-3">
-                {card.items.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center space-x-2">
-                      {item.status === 'complete' ? (
-                        <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                      ) : (
-                        <AlertTriangle className="w-4 h-4 text-orange-400 flex-shrink-0" />
-                      )}
-                      <div>
-                        <span className="font-medium text-gray-800">{item.name}</span>
-                        <span className="text-gray-400 ml-1.5 hidden sm:inline">({item.description})</span>
+              <div className={`flex ${isMobile ? 'flex-col' : 'h-full'}`}>
+                <div
+                  className={`${isMobile ? 'p-4 flex-row items-center justify-between' : 'p-6 flex-col items-start min-w-[200px] flex-shrink-0'} flex`}
+                  style={{ background: 'linear-gradient(to bottom, #EEF9FF, #DDE4FF)', color: '#374957' }}
+                >
+                  {isMobile ? (
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                        {card.icon}
                       </div>
+                      <h3 className="text-base font-semibold leading-tight">{card.shortTitle}</h3>
                     </div>
-                    <span className={`font-semibold ${item.status === 'complete' ? 'text-green-600' : 'text-orange-500'}`}>
-                      {item.status === 'complete' ? 'Done' : 'Pending'}
-                    </span>
+                  ) : (
+                    <div className="flex flex-col items-start gap-3">
+                      <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                        {card.icon}
+                      </div>
+                      <h3 className="text-lg font-semibold leading-tight">{card.shortTitle}</h3>
+                    </div>
+                  )}
+                  {!isMobile && <div className="flex-1" />}
+                  <div className={isMobile ? '' : 'mt-auto'}>
+                    <div className="font-bold leading-none mb-1" style={{ fontSize: isMobile ? '24px' : '32px' }}>
+                      {completedCount}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2">
+                      {isComplete ? (
+                        <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                      ) : (
+                        <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
+                      )}
+                      <p className="text-xs opacity-75">As of {asOfDate}</p>
+                    </div>
                   </div>
-                ))}
+                </div>
+
+                <div
+                  className={`flex-1 min-w-0 min-h-0 p-5 bg-white relative z-10 overflow-hidden flex flex-col ${isMobile ? 'rounded-b-[20px]' : ''}`}
+                  style={{
+                    borderRadius: isMobile ? '0 0 20px 20px' : '20px',
+                    boxShadow: isMobile ? 'none' : '-4px 0 24px rgba(70, 95, 194, 0.4)',
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-4 flex-shrink-0">
+                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap ${
+                      isComplete
+                        ? 'bg-green-100 text-green-700'
+                        : card.status === 'Invited (Pending)'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-orange-100 text-orange-700'
+                    }`}>
+                      {card.status}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openSectionModal(card.step);
+                      }}
+                      className="text-xs font-medium text-[#136C9E] hover:underline flex items-center gap-1 whitespace-nowrap flex-shrink-0"
+                    >
+                      Go to Referencing
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="flex-1 min-h-0 overflow-y-auto gcard-fields-scroll pr-1">
+                    {card.items.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className={`flex items-center justify-between gap-3 py-3 text-sm ${
+                          idx > 0 ? 'border-t border-gray-200' : ''
+                        }`}
+                      >
+                        <span className="text-[#374957] truncate">{item.name}</span>
+                        {item.status === 'complete' ? (
+                          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                        ) : (
+                          <Circle className="w-4 h-4 text-orange-400 flex-shrink-0" strokeWidth={2.25} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
       </>

@@ -32,8 +32,6 @@ import {
   Home,
   ChevronLeft,
   ChevronRight,
-  Phone,
-  Mail,
   CheckCircle2,
 } from "lucide-react";
 import { useIsMobile } from "./ui/use-mobile";
@@ -524,179 +522,85 @@ export function Dashboard({
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F7F7F7' }}>
-      {/* Clean Header */}
-      <div className="max-w-7xl mx-auto mt-4 md:mt-8 px-4 md:px-0">
-        <div 
-          className="bg-white shadow-lg rounded-xl px-4 md:px-8 py-4 md:py-6"
-          style={{ fontFamily: 'Archivo, sans-serif' }}
-        >
-          {isMobile ? (
-            // Mobile Header - Streamlined
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium text-base mr-3">
-                    {(userProfile?.name || "").charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <h1 
-                      className="text-lg font-semibold"
-                      style={{ 
-                        color: '#374957',
-                        fontFamily: 'Archivo, sans-serif'
-                      }}
-                    >
-                      Welcome <span style={{ color: '#136C9E' }}>{userProfile?.name || ""}</span>
-                    </h1>
-                    <span className="inline-flex items-center">
-                      <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
-                      <span className="text-xs font-normal text-green-600">Verified</span>
-                    </span>
-                  </div>
-                </div>
-                <Button 
-                  onClick={onAddProperty} 
-                  className="flex items-center space-x-1 px-4 py-2 rounded-lg" 
-                  style={{ 
-                    backgroundColor: '#DC5F12', 
-                    borderColor: '#DC5F12'
-                  }}
-                >
-                  <Plus className="w-4 h-4" strokeWidth={2.5} />
-                  <span className="text-sm">Add</span>
-                </Button>
-              </div>
+      {/* Dashboard actions */}
+      <div className="max-w-7xl mx-auto px-4 md:px-6">
+        {isMobile ? (
+          <div className="flex items-center gap-2 mb-2">
+            <div
+              className="bg-white rounded-lg border border-gray-200 px-4 py-2 cursor-pointer transition-all duration-300 flex items-center justify-center flex-1"
+              onClick={onViewInsights}
+              style={{ boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' }}
+            >
               <div className="flex items-center space-x-2">
-                <div
-                  className="bg-white rounded-lg border border-gray-200 px-4 py-2 cursor-pointer transition-all duration-300 flex items-center justify-center flex-1"
-                  onClick={onViewInsights}
-                  style={{
-                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-                  }}
-                >
-                  <div className="flex items-center space-x-2">
-                    <BarChart3 className="w-4 h-4" style={{ color: '#136C9E' }} />
-                    <span className="text-sm font-medium" style={{ color: '#374957' }}>Portfolio Insights</span>
-                  </div>
-                </div>
+                <BarChart3 className="w-4 h-4" style={{ color: '#136C9E' }} />
+                <span className="text-sm font-medium" style={{ color: '#374957' }}>Portfolio Insights</span>
               </div>
             </div>
-          ) : (
-            // Desktop Header
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Left Column - Welcome Message */}
-            <div className="flex items-center">
-              <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium text-lg mr-3">
-                {(userProfile?.name || "").charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <h1 
-                  className="text-xl font-semibold mb-1"
-                  style={{ 
-                    color: '#374957',
-                    fontFamily: 'Archivo, sans-serif'
-                  }}
+            <Button
+              onClick={onAddProperty}
+              className="flex items-center space-x-1 px-4 py-2 rounded-lg flex-shrink-0"
+              style={{ backgroundColor: '#DC5F12', borderColor: '#DC5F12' }}
+            >
+              <Plus className="w-4 h-4" strokeWidth={2.5} />
+              <span className="text-sm">Add</span>
+            </Button>
+          </div>
+        ) : (
+          <div className="flex justify-end items-center space-x-4 mb-6">
+            <div
+              className="bg-white rounded-2xl border border-gray-200 px-6 py-4 cursor-pointer transition-all duration-300 min-h-[3.5rem] flex items-center justify-center flex-shrink-0"
+              onClick={onViewInsights}
+              style={{ boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 8px 20px rgba(255, 248, 220, 0.6), 0 4px 10px rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.background = 'linear-gradient(135deg, #F3FFDD 0%, #EEFFFF 100%)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.transform = 'translateY(0px)';
+                e.currentTarget.style.background = 'white';
+              }}
+            >
+              <div className="flex items-center space-x-3">
+                <div className="text-left">
+                  <p className="text-sm leading-tight font-medium" style={{ color: '#374957' }}>Portfolio Insights</p>
+                  <p className="text-xs leading-tight" style={{ color: '#717182' }}>AI Powered</p>
+                </div>
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: '#136C9E' }}
                 >
-                  Welcome <span style={{ color: '#136C9E' }}>{userProfile?.name || ""}</span>
-              </h1>
-                <p 
-                  className="text-sm"
-                  style={{ color: '#717182' }}
-                >
-                Here's what's happening with your property portfolio
-              </p>
-                <span className="inline-flex items-center">
-                  <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
-                  <span className="text-sm font-normal text-green-600">Verified</span>
-                </span>
+                  <BarChart3 className="w-4 h-4 text-white" />
+                </div>
               </div>
             </div>
 
-            {/* Middle Column - Contact Info */}
-            <div className="flex flex-col justify-center space-y-2">
-              <div 
-                className="flex items-center space-x-2 px-3 py-2 rounded-lg"
-                style={{ backgroundColor: '#F7F7F7', width: '280px' }}
-              >
-                <Phone className="w-4 h-4 flex-shrink-0" style={{ color: '#374957' }} />
-                <span className="text-sm" style={{ color: '#374957' }}>
-                  {userProfile?.phone || 'Not provided'}
-                </span>
-                </div>
-              
-              <div 
-                className="flex items-center space-x-2 px-3 py-2 rounded-lg"
-                style={{ backgroundColor: '#F7F7F7', width: '280px' }}
-              >
-                <Mail className="w-4 h-4 flex-shrink-0" style={{ color: '#374957' }} />
-                <span className="text-sm" style={{ color: '#374957' }}>
-                  {userProfile?.email || 'Not provided'}
-                </span>
-              </div>
-            </div>
-            
-            {/* Right Column - Portfolio Insights and Add Property Button */}
-            <div className="flex justify-end items-center space-x-4">
-              {/* Portfolio Insights Card */}
-              <div
-                className="bg-white rounded-2xl border border-gray-200 px-6 py-4 cursor-pointer transition-all duration-300 min-h-[3.5rem] flex items-center justify-center flex-shrink-0"
-                  onClick={onViewInsights}
-                style={{
-                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(255, 248, 220, 0.6), 0 4px 10px rgba(0, 0, 0, 0.1)';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #F3FFDD 0%, #EEFFFF 100%)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-                  e.currentTarget.style.transform = 'translateY(0px)';
-                  e.currentTarget.style.background = 'white';
-                }}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="text-left">
-                    <p className="text-sm leading-tight font-medium" style={{ color: '#374957' }}>Portfolio Insights</p>
-                    <p className="text-xs leading-tight" style={{ color: '#717182' }}>AI Powered</p>
-                    </div>
-                  <div 
-                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: '#136C9E' }}
-                  >
-                      <BarChart3 className="w-4 h-4 text-white" />
-                    </div>
-                  </div>
-              </div>
-              
-              {/* Add Property Button */}
-              <Button 
-                onClick={onAddProperty} 
-                className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-lg transition-all duration-300 flex-shrink-0 w-auto" 
-                style={{ 
-                  backgroundColor: '#DC5F12', 
-                  borderColor: '#DC5F12', 
-                  minWidth: '180px',
-                  background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
-                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-                  e.currentTarget.style.transform = 'translateY(0px)';
-                }}
-              >
-                <Plus className="w-4 h-4" strokeWidth={2.5} />
-                <span>Add Property</span>
-              </Button>
-            </div>
+            <Button
+              onClick={onAddProperty}
+              className="flex items-center space-x-0 px-12 py-3 min-h-[3.5rem] rounded-lg transition-all duration-300 flex-shrink-0 w-auto"
+              style={{
+                backgroundColor: '#DC5F12',
+                borderColor: '#DC5F12',
+                minWidth: '180px',
+                background: 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #FF6B1A 0%, #DC5F12 100%)';
+                e.currentTarget.style.boxShadow = '0 10px 25px rgba(220, 95, 18, 0.4), 0 6px 12px rgba(0, 0, 0, 0.15)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #DC5F12 0%, #DC5F12 100%)';
+                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.transform = 'translateY(0px)';
+              }}
+            >
+              <Plus className="w-4 h-4" strokeWidth={2.5} />
+              <span>Add Property</span>
+            </Button>
           </div>
-          )}
-        </div>
+        )}
       </div>
 
       <div className="max-w-7xl mx-auto px-3 py-6">
